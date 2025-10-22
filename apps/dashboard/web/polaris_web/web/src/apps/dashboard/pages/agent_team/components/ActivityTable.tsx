@@ -121,15 +121,25 @@ function ActivityTable({ agentId }) {
             // Refresh the table data
             await fetchTable();
             func.setToast(true, false, "Agent run deleted successfully");
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to delete agent run:', error);
-            func.setToast(true, true, "Failed to delete agent run. Please try again.");
+            //  Check if it's a 422 error (agent not found or already deleted)
+            if (error?.response?.status === 422) {
+                // Treat 422 as success - agent is already deleted or not found
+                // The request interceptor already showed an error toast, so we override it with success
+                await fetchTable();
+                func.setToast(true, false, "Agent run deleted successfully");
+            } else if (error?.response?.status !== 403) {
+                // Don't show error for 403 (forbidden) as it's already handled by interceptor
+                func.setToast(true, true, "Failed to delete agent run. Please try again.");
+            }
+            // For 403 and other interceptor-handled errors, don't show duplicate toast
         }
     };
 
     const getActions = (agentData: TableData) => {
-        // Only show delete action for scheduled or running agents
-        if (agentData.state === State.SCHEDULED || agentData.state === State.RUNNING) {
+        // Only show delete action for scheduled, running, or stopped agents
+        if (agentData.state === State.SCHEDULED || agentData.state === State.RUNNING || agentData.state === State.STOPPED) {
             return [
                 {
                     title: 'Actions',
