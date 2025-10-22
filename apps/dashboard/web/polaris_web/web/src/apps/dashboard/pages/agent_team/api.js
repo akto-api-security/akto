@@ -96,6 +96,13 @@ const api = {
             method: 'post',
             data: data 
         })
+    },
+    deleteAgentRun: async (data) => {
+        return await request({
+            url: '/api/deleteAgentRun',
+            method: 'post',
+            data: data 
+        })
     }
 
 }
