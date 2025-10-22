@@ -82,7 +82,8 @@ public class TestExecutorModifier extends AzureOpenAIPromptHandler {
             .append("- Example: { \"modify_body_param\": {\"key\": \"value1\"} }\n")
             .append("- Example: { \"add_header\": {\"key\": \"value1\"} }\n")
             .append("- Example: { \"add_body_param\": {\"key\": \"value1\"} }\n")
-            .append("- Remember I am sharing the request with you, so if you see the key in the request, then only opt for modify operations, else go for add/insert operations.")
+            .append("- Give preference to the operation given in the prompt, but not strictly as operation can be of modify nature but key would not be there to modify in the api request shared to you, be intelligent about the operations to be performed.\n")
+            .append("- Check the key location for choosing the operation to be performed, if key belongs to headers, then choose the operation from the list of operations given for headers, if key belongs to body, then choose the operation from the list of operations given for body, if key belongs to url, then choose the operation from the list of operations given for url, if key belongs to query params, then choose the operation from the list of operations given for query params.\n")
             .append("- Return ONLY the JSON or " + _NOT_FOUND + " — nothing else.");
         return promptBuilder.toString();
     }
