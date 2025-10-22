@@ -457,8 +457,11 @@ public class ThreatActorService {
   }
 
 
-  private String fetchMetadataString(Document doc){
-    String metadataStr = doc.getString("metadata");
+  private String fetchMetadataString(String metadataStr){
+    if(metadataStr == null || metadataStr.isEmpty()){
+        return "";
+    }
+
     Metadata.Builder metadataBuilder = Metadata.newBuilder();
     try {
       TextFormat.getParser().merge(metadataStr, metadataBuilder);
@@ -479,7 +482,7 @@ public class ThreatActorService {
         maliciousPayloadsResponse.add(
             FetchMaliciousEventsResponse.MaliciousPayloadsResponse.newBuilder().
             setOrig(HttpResponseParams.getSampleStringFromProtoString(event.getLatestApiOrig())).
-            setMetadata(event.getMetadata() != null ? event.getMetadata() : "").
+            setMetadata(fetchMetadataString(event.getMetadata() != null ? event.getMetadata() : "")).
             setTs(event.getDetectedAt()).build());
     }
     return maliciousPayloadsResponse;

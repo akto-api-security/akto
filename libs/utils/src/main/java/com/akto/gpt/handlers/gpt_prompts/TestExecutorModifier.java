@@ -7,7 +7,9 @@ import org.json.JSONObject;
 
 import com.mongodb.BasicDBObject;
 
-public class TestExecutorModifier extends PromptHandler {
+public class TestExecutorModifier extends AzureOpenAIPromptHandler {
+
+    // TODO: use abstract class to decide which prompt handler to use
 
     static final int MAX_QUERY_LENGTH = 100000;
     public static final String _REQUEST = "request";
@@ -78,6 +80,9 @@ public class TestExecutorModifier extends PromptHandler {
             .append("- Example: { \"modify_header\": {\"header1\": \"value1\"} }\n")
             .append("- Example: { \"modify_url\": \"https://example.com/product?id=5 OR 1=1\" }\n")
             .append("- Example: { \"modify_body_param\": {\"key\": \"value1\"} }\n")
+            .append("- Example: { \"add_header\": {\"key\": \"value1\"} }\n")
+            .append("- Example: { \"add_body_param\": {\"key\": \"value1\"} }\n")
+            .append("- Remember I am sharing the request with you, so if you see the key in the request, then only opt for modify operations, else go for add/insert operations.")
             .append("- Return ONLY the JSON or " + _NOT_FOUND + " — nothing else.");
         return promptBuilder.toString();
     }
