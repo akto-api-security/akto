@@ -181,7 +181,7 @@ public class AgentAction extends UserAction {
         }
 
         Bson processIdFilter = Filters.eq(AgentRun.PROCESS_ID, processId);
-        agentRun = AgentRunDao.instance.findOne(processIdFilter);
+        AgentRun agentRun = AgentRunDao.instance.findOne(processIdFilter);
 
         if (agentRun == null) {
             addActionError("No agent run found with the given process ID");
@@ -189,7 +189,7 @@ public class AgentAction extends UserAction {
         }
 
         // Only allow deletion of scheduled or running agents
-        if (!State.SCHEDULED.equals(agentRun.getState()) && !State.RUNNING.equals(agentRun.getState())) {
+        if (!State.SCHEDULED.equals(agentRun.getState()) && !State.RUNNING.equals(agentRun.getState()) && !State.STOPPED.equals(agentRun.getState())) {
             addActionError("Only scheduled or running agent runs can be deleted");
             return Action.ERROR.toUpperCase();
         }
