@@ -20,7 +20,7 @@ public class IngestionAction extends ActionSupport {
     List<IngestDataBatch> batchData;
     private static final LoggerMaker loggerMaker = new LoggerMaker(IngestionAction.class, LoggerMaker.LogDb.DATA_INGESTION);
 
-    private static int MAX_INFO_PRINT = 500000;
+    private static int MAX_INFO_PRINT = 100;
     private boolean success;
 
     private static final int ACCOUNT_ID_TO_ADD_DEFAULT_DATA = getAccountId();
