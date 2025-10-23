@@ -97,6 +97,8 @@ public class TestTemplateUtils {
             TestCategory.MCP_PRIVILEGE_ABUSE,
             TestCategory.MCP_INDIRECT_PROMPT_INJECTION,
             TestCategory.MCP_MALICIOUS_CODE_EXECUTION,
+            TestCategory.MCP_FUNCTION_MANIPULATION,
+            TestCategory.MCP_SECURITY,
         };
 
         TestCategory[] llmCategories = {
