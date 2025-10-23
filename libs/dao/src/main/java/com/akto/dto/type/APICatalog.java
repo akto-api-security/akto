@@ -92,7 +92,8 @@ public class APICatalog {
         return url.contains(SingleTypeInfo.SuperType.STRING.name()) ||
                 url.contains(SingleTypeInfo.SuperType.INTEGER.name()) ||
                 url.contains(SingleTypeInfo.SuperType.FLOAT.name()) ||
-                url.contains(SingleTypeInfo.SuperType.OBJECT_ID.name());
+                url.contains(SingleTypeInfo.SuperType.OBJECT_ID.name()) || 
+                url.contains(SingleTypeInfo.SuperType.LOCALE.name());
     }
 
     @Override
