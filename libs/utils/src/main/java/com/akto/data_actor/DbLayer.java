@@ -1903,6 +1903,19 @@ public class DbLayer {
         }
     }
 
+    public static List<GuardrailPolicies> fetchGuardrailPolicies(Integer updatedAfter) {
+        try {
+            if (updatedAfter != null && updatedAfter > 0) {
+                return GuardrailPoliciesDao.instance.findAll(Filters.gt("updatedTimestamp", updatedAfter));
+            } else {
+                return GuardrailPoliciesDao.instance.findAll();
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchGuardrailPolicies: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
     public static void storeConversationResults(List<AgentConversationResult> conversationResults) {
         AgentConversationResultDao.instance.insertMany(conversationResults);
     }
