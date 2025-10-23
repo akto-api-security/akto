@@ -78,6 +78,9 @@ public class VulnerableTestingRunResultDao extends TestingRunResultDao {
         if(isVulnerable && instance.isStoredInVulnerableCollection(summaryId, true)){
             return instance.fetchLatestTestingRunResultWithCustomAggregations(filters, limit, skip, customSort);
         }else{
+            if (isVulnerable) {
+                filters = Filters.and(filters, Filters.eq(TestingRunResult.VULNERABLE, true));
+            }
             return TestingRunResultDao.instance.fetchLatestTestingRunResultWithCustomAggregations(filters, limit, skip, customSort);
         }
     }
