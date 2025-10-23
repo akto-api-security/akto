@@ -317,22 +317,38 @@ function ApiCollections(props) {
     const userRole = window.USER_ROLE
 
     const navigate = useNavigate();
-    const [data, setData] = useState({'all': [], 'hostname':[], 'groups': [], 'custom': [], 'deactivated': [], 'untracked': []})
-    const [active, setActive] = useState(false);
-    const [loading, setLoading] = useState(false)
-    const [currentNavigationSection, setCurrentNavigationSection] = useState('cloud');
-    const [dashboardCategory, setDashboardCategory] = useState(() => getDashboardCategory());
     
     // Get current navigation section to determine filtering
     const getNavigationSection = () => {
         const leftNavSelected = sessionStorage.getItem('leftNavSelected') || '';
+        
+        // Primary method: Check sessionStorage
         if (leftNavSelected.startsWith('cloud_')) {
             return 'cloud';
         } else if (leftNavSelected.startsWith('endpoint_')) {
             return 'endpoint';
         }
-        return 'cloud'; // default to cloud if no specific section detected
+        
+        // Fallback method: Check URL path
+        const currentPath = window.location.pathname;
+        if (currentPath.includes('endpoint')) {
+            return 'endpoint';
+        }
+        
+        // Final fallback: default to cloud
+        return 'cloud';
     };
+    
+    const [data, setData] = useState({'all': [], 'hostname':[], 'groups': [], 'custom': [], 'deactivated': [], 'untracked': []})
+    const [active, setActive] = useState(false);
+    const [loading, setLoading] = useState(false)
+    const [currentNavigationSection, setCurrentNavigationSection] = useState(() => {
+        const initialSection = getNavigationSection();
+        // Set in PersistStore immediately
+        PersistStore.getState().setNavigationSection(initialSection);
+        return initialSection;
+    });
+    const [dashboardCategory, setDashboardCategory] = useState(() => getDashboardCategory());
 
 
     // Filter collections based on navigation section and source
@@ -435,6 +451,13 @@ function ApiCollections(props) {
     async function fetchData() {
         try {
             setLoading(true)
+            
+            // CRITICAL: Ensure navigation section is properly set before making API calls
+            const currentNavSection = getNavigationSection();
+            PersistStore.getState().setNavigationSection(currentNavSection);
+            if (currentNavSection !== currentNavigationSection) {
+                setCurrentNavigationSection(currentNavSection);
+            }
             
             // Build all API promises to run in parallel
             const shouldCallHeavyApis = (func.timeNow() - lastFetchedInfo.lastRiskScoreInfo) >= (5 * 60)
@@ -774,11 +797,18 @@ function ApiCollections(props) {
             const detectedSection = getNavigationSection();
             if (detectedSection !== currentNavigationSection) {
                 setCurrentNavigationSection(detectedSection);
+                // Update PersistStore so all subsequent API requests include the correct navigation section
+                PersistStore.getState().setNavigationSection(detectedSection);
             }
         };
 
         // Initial check
         updateNavigationSection();
+        
+        // Additional check after a small delay to handle sessionStorage timing issues
+        const timeoutId = setTimeout(() => {
+            updateNavigationSection();
+        }, 100);
 
         // Listen for custom navigationChanged events dispatched from LeftNav
         const handleNavigationChange = (event) => {
@@ -789,12 +819,20 @@ function ApiCollections(props) {
 
         return () => {
             window.removeEventListener('navigationChanged', handleNavigationChange);
+            clearTimeout(timeoutId);
         };
     }, [currentNavigationSection]);
 
     // Re-filter data when navigation section changes
     useEffect(() => {
         if (rawCollectionsData.length > 0) {
+            // Ensure navigation section is set in PersistStore before re-filtering
+            const currentNavSection = getNavigationSection();
+            if (currentNavSection !== currentNavigationSection) {
+                PersistStore.getState().setNavigationSection(currentNavSection);
+                setCurrentNavigationSection(currentNavSection);
+            }
+            
             // Re-apply filtering with the new navigation section
             const filteredArr = filterCollectionsBySection(rawCollectionsData);
             
@@ -1254,12 +1292,16 @@ function ApiCollections(props) {
 
     const handleSelectedTab = (selectedIndex) => {
         setSelected(selectedIndex)
-    }      
+    }
+
+    const filterTreeViewData = (data) => {
+        return data.filter((x) => (!x?.deactivated && x?.type !== "API_GROUP" && x?.urlsCount > 1));
+    }
 
     const tableComponent = (
         centerView === CenterViewType.Tree ?
         <TreeViewTable
-            collectionsArr={normalData.filter((x) => (!x?.deactivated && x?.type !== "API_GROUP"))}
+            collectionsArr={filterTreeViewData(normalData)}
             sortOptions={sortOptions}
             resourceName={resourceName}
             tableHeaders={headers.filter((x) => x.shouldMerge !== undefined)}

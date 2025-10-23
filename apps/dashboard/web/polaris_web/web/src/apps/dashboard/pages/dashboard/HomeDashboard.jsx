@@ -404,6 +404,8 @@ function HomeDashboard() {
     const fetchData = async () => {
         setLoading(true)
         const currentNavigationSection = getNavigationSection();
+        // Update PersistStore with current navigation section
+        PersistStore.getState().setNavigationSection(currentNavigationSection);
         // all apis
         let apiPromises = [
             observeApi.getUserEndpoints(),

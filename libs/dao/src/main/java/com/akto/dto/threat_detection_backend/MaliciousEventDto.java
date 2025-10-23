@@ -1,10 +1,10 @@
-package com.akto.threat.backend.db;
+package com.akto.dto.threat_detection_backend;
 
 import com.akto.dto.type.URLMethods;
 
 import java.util.UUID;
 
-public class MaliciousEventModel {
+public class MaliciousEventDto {
 
   private String id;
   private String filterId;
@@ -25,6 +25,7 @@ public class MaliciousEventModel {
   private String metadata;
   private Boolean successfulExploit;
   private Status status;
+  private Label label;
 
 
   public enum EventType {
@@ -38,9 +39,14 @@ public class MaliciousEventModel {
     IGNORED
   }
 
-  public MaliciousEventModel() {}
+  public enum Label {
+    THREAT,
+    GUARDRAIL
+  }
 
-  private MaliciousEventModel(Builder builder) {
+  public MaliciousEventDto() {}
+
+  private MaliciousEventDto(Builder builder) {
     this.id = UUID.randomUUID().toString();
     this.filterId = builder.filterId;
     this.actor = builder.actor;
@@ -59,6 +65,7 @@ public class MaliciousEventModel {
     this.refId = builder.refId;
     this.status = builder.status != null ? builder.status : Status.ACTIVE;
     this.successfulExploit = builder.successfulExploit;
+    this.label = builder.label;
   }
 
   public static class Builder {
@@ -77,9 +84,10 @@ public class MaliciousEventModel {
     private String refId;
     private String type;
     private String severity;
-    private String metadata; 
+    private String metadata;
     private Status status;
     private Boolean successfulExploit;
+    private Label label;
 
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
@@ -171,8 +179,13 @@ public class MaliciousEventModel {
       return this;
     }
 
-    public MaliciousEventModel build() {
-      return new MaliciousEventModel(this);
+    public Builder setLabel(Label label) {
+      this.label = label;
+      return this;
+    }
+
+    public MaliciousEventDto build() {
+      return new MaliciousEventDto(this);
     }
   }
 
@@ -330,6 +343,14 @@ public class MaliciousEventModel {
 
   public void setStatus(Status status) {
     this.status = status;
+  }
+
+  public Label getLabel() {
+    return label;
+  }
+
+  public void setLabel(Label label) {
+    this.label = label;
   }
 
 }

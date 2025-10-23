@@ -83,6 +83,7 @@ public class UserDetailsFilter implements Filter {
         String accessTokenFromResponse = httpServletResponse.getHeader(AccessTokenAction.ACCESS_TOKEN_HEADER_NAME);
         String accessTokenFromRequest = httpServletRequest.getHeader(AccessTokenAction.ACCESS_TOKEN_HEADER_NAME);
         String contextSourceFromRequest = httpServletRequest.getHeader(AccessTokenAction.CONTEXT_SOURCE_HEADER);
+        String navigationSectionFromRequest = httpServletRequest.getHeader(AccessTokenAction.NAVIGATION_SECTION_HEADER);
 
         String aktoSessionTokenFromRequest = httpServletRequest.getHeader(AccessTokenAction.AKTO_SESSION_TOKEN);
 
@@ -105,6 +106,18 @@ public class UserDetailsFilter implements Filter {
                 Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.valueOf(contextSourceFromRequest.toUpperCase()));
             } catch (Exception e) {
                 Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.API);
+            }
+        }
+        
+        // Set navigation section (cloud or endpoint)
+        if(StringUtils.isEmpty(navigationSectionFromRequest)){
+            Context.navigationSection.set("cloud"); // Default to cloud
+        } else {
+            String navSection = navigationSectionFromRequest.toLowerCase();
+            if("endpoint".equals(navSection) || "cloud".equals(navSection)) {
+                Context.navigationSection.set(navSection);
+            } else {
+                Context.navigationSection.set("cloud"); // Default to cloud for invalid values
             }
         }
 

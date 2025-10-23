@@ -111,6 +111,10 @@ service.interceptors.request.use((config) => {
   }
   config.headers['x-context-source'] = contextSource;
 
+  // Add navigation section header
+  const navigationSection = PersistStore.getState().navigationSection || "cloud";
+  config.headers['x-navigation-section'] = navigationSection;
+
 
   if (window.ACTIVE_ACCOUNT) {
     config.headers['account'] = window.ACTIVE_ACCOUNT

@@ -22,6 +22,7 @@ import { getDashboardCategory, isApiSecurityCategory, mapLabel } from "../../../
 import { useNavigate } from "react-router-dom";
 import LineChart from "../../components/charts/LineChart";
 import P95LatencyGraph from "../../components/charts/P95LatencyGraph";
+import { LABELS } from "./constants";
 
 const convertToGraphData = (severityMap) => {
     let dataArr = []
@@ -434,7 +435,9 @@ function ThreatDetectionPage() {
             endTimestamp,
             [],
             2000,
-            'EVENTS'
+            'EVENTS',
+            null,
+            LABELS.THREAT // Filter for threat protection (not guardrail)
         );
         // Transform to match the mongoDB format
         let jsonData = (res?.maliciousEvents || []).map(ev => ({

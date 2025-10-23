@@ -12,6 +12,7 @@ import { labelMap } from "../../../../main/labelHelperMap";
 import { formatActorId } from "../utils/formatUtils";
 import useTable from "../../../components/tables/TableContext";
 import threatDetectionRequests from "../api";
+import { LABELS } from "../constants";
 
 const resourceName = {
   singular: "sample",
@@ -81,7 +82,7 @@ const sortOptions = [
 
 let filters = [];
 
-function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
+function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABELS.THREAT }) {
   const getTimeEpoch = (key) => {
     return Math.floor(Date.parse(currDateRange.period[key]) / 1000);
   };
@@ -430,7 +431,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
       latestAttack,
       50,
       currentTab.toUpperCase(),
-      successfulBool
+      successfulBool,
+      label // Use the label prop (THREAT or GUARDRAIL)
     );
 
     // Store the total count for filtered results

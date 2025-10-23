@@ -7,6 +7,7 @@ import static com.akto.utils.Utils.deleteApis;
 import static com.akto.utils.billing.OrganizationUtils.syncOrganizationWithAkto;
 import static com.mongodb.client.model.Filters.eq;
 
+import com.akto.action.*;
 import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dto.jobs.JobExecutorType;
 import com.akto.utils.crons.JobsCron;
@@ -54,10 +55,6 @@ import org.bson.types.ObjectId;
 import org.json.JSONObject;
 
 import com.akto.DaoInit;
-import com.akto.action.AdminSettingsAction;
-import com.akto.action.ApiCollectionsAction;
-import com.akto.action.CustomDataTypeAction;
-import com.akto.action.EventMetricsAction;
 import com.akto.action.observe.InventoryAction;
 import com.akto.action.settings.AdvancedTrafficFiltersAction;
 import com.akto.action.testing.StartTestAction;
@@ -2401,8 +2398,8 @@ public class InitializerListener implements ServletContextListener {
             e.printStackTrace();
         }
 
-        boolean runJobFunctions = JobUtils.getRunJobFunctions();
-        boolean runJobFunctionsAnyway = JobUtils.getRunJobFunctionsAnyway();
+        boolean runJobFunctions = true;
+        boolean runJobFunctionsAnyway = true;
 
         executorService.schedule(new Runnable() {
             public void run() {
@@ -2486,7 +2483,6 @@ public class InitializerListener implements ServletContextListener {
                         crons.deleteTestRunsScheduler();
                         setUpUpdateCustomCollections();
                         setUpFillCollectionIdArrayJob();
-                                               
 
                         CleanInventory.cleanInventoryJobRunner();
 
@@ -3510,6 +3506,7 @@ public class InitializerListener implements ServletContextListener {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 byte[] testingTemplates = TestTemplateUtils.getTestingTemplates();
+                logger.info("Fetched testing templates of size: " + (testingTemplates != null ? testingTemplates.length : 0));
                 if(testingTemplates == null){
                     logger.errorAndAddToDb("Error while fetching Test Editor Templates from Github and local", LogDb.DASHBOARD);
                     return;
@@ -3563,7 +3560,7 @@ public class InitializerListener implements ServletContextListener {
                     }
                 }, "update-test-editor-templates-github");
             }
-        }, 0, 4, TimeUnit.HOURS);
+        }, 0, 2, TimeUnit.MINUTES);
     }
 
     public static void processRemedationFilesZip(byte[] zipFile) {
@@ -4274,5 +4271,6 @@ public class InitializerListener implements ServletContextListener {
             }
         }, 0, 4, TimeUnit.HOURS);
     }
+
 }
 

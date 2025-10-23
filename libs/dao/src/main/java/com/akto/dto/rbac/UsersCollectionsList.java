@@ -124,7 +124,7 @@ public class UsersCollectionsList {
     }
 
     public static Set<Integer> getContextCollections(CONTEXT_SOURCE source) {
-        Set<Integer> collectionIds = new HashSet<>();
+        Set<Integer> collectionIds;
         Bson finalFilter = Filters.or(
             Filters.exists(ApiCollection.TAGS_STRING, false),
             Filters.nor(
@@ -132,6 +132,10 @@ public class UsersCollectionsList {
                 Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG))
             )
         );
+        
+        // Get navigation section from context (cloud/endpoint filtering)
+        String navigationSection = com.akto.dao.context.Context.navigationSection.get();
+        
         switch (source) {
             case MCP:
                 finalFilter = Filters.and(
@@ -159,10 +163,42 @@ public class UsersCollectionsList {
             default:
                 break;
         }
-        MongoCursor<ApiCollection> cursor = ApiCollectionsDao.instance.getMCollection().find(finalFilter).projection(Projections.include(Constants.ID)).iterator();
+        // First, get all collections that match the context source filter
+        MongoCursor<ApiCollection> cursor = ApiCollectionsDao.instance.getMCollection().find(finalFilter).iterator();
+        List<ApiCollection> contextCollections = new ArrayList<>();
         while (cursor.hasNext()) {
-            collectionIds.add(cursor.next().getId());
+            contextCollections.add(cursor.next());
         }
+        
+        // Apply navigation section filtering if specified
+        if (navigationSection != null && !navigationSection.isEmpty()) {
+            List<ApiCollection> filteredCollections = contextCollections.stream()
+                .filter(collection -> {
+                    boolean isEndpointCollection = collection.getTagsList() != null && 
+                        collection.getTagsList().stream().anyMatch(tag -> 
+                            CollectionTags.TagSource.ENDPOINT.equals(tag.getSource())
+                        );
+                    
+                    if ("endpoint".equals(navigationSection)) {
+                        return isEndpointCollection;
+                    } else if ("cloud".equals(navigationSection)) {
+                        return !isEndpointCollection;
+                    }
+                    return true; // No filtering if navigationSection is invalid
+                })
+                .collect(Collectors.toList());
+            
+            // Convert to IDs
+            collectionIds = filteredCollections.stream()
+                .map(ApiCollection::getId)
+                .collect(Collectors.toSet());
+        } else {
+            // No navigation filtering, just convert to IDs
+            collectionIds = contextCollections.stream()
+                .map(ApiCollection::getId)
+                .collect(Collectors.toSet());
+        }
+        
         return collectionIds;
     }
 }

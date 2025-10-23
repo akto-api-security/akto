@@ -24,7 +24,7 @@ const threatDetectionRequests = {
         })
     },
 
-    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, latestAttack, limit, statusFilter, successfulExploit) {
+    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, latestAttack, limit, statusFilter, successfulExploit, label) {
         return request({
             url: '/api/fetchSuspectSampleData',
             method: 'post',
@@ -40,7 +40,8 @@ const threatDetectionRequests = {
                 latestAttack: latestAttack || [],
                 limit: limit || 50,
                 statusFilter: statusFilter,
-                ...(typeof successfulExploit === 'boolean' ? { successfulExploit } : {})
+                ...(typeof successfulExploit === 'boolean' ? { successfulExploit } : {}),
+                ...(label ? { label } : {})
             }
         })
     },
@@ -125,11 +126,11 @@ const threatDetectionRequests = {
             data: {startTs, endTs}
         })
     },
-    getDailyThreatActorsCount(startTs, endTs) {
+    getDailyThreatActorsCount(startTs, endTs, latestAttack) {
         return request({
             url: '/api/getDailyThreatActorsCount',
             method: 'post',
-            data: {startTs, endTs}
+            data: {startTs, endTs, latestAttack: latestAttack || []}
         })
     },
     fetchSensitiveParamsForEndpoints (urls) {
@@ -183,6 +184,13 @@ const threatDetectionRequests = {
             url: '/api/deleteMaliciousEvents',
             method: 'post',
             data: data
+        })
+    },
+    fetchThreatTopNData(startTs, endTs, latestAttack, limit = 5) {
+        return request({
+            url: '/api/fetchThreatTopNData',
+            method: 'post',
+            data: {startTs, endTs, latestAttack: latestAttack || [], limit}
         })
     }
 }

@@ -12,11 +12,13 @@ public class Context {
 public static ThreadLocal<Integer> accountId = new ThreadLocal<Integer>();
 public static ThreadLocal<Integer> userId = new ThreadLocal<Integer>();
 public static ThreadLocal<CONTEXT_SOURCE> contextSource = new ThreadLocal<CONTEXT_SOURCE>();
+public static ThreadLocal<String> navigationSection = new ThreadLocal<String>();
 
     public static void resetContextThreadLocals() {
         accountId.remove();
         userId.remove();
         contextSource.remove();
+        navigationSection.remove();
     }
 
     public static int getId() {

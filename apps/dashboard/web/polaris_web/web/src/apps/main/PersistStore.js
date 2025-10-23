@@ -61,6 +61,24 @@ const initialState = {
     sendEventOnLogin: false,
     tableSelectedTab: {},
     dashboardCategory: 'API Security',
+    leftNavCategory: 'cloud',
+    navigationSection: (() => {
+        try {
+            const leftNavSelected = sessionStorage.getItem('leftNavSelected') || '';
+            if (leftNavSelected.startsWith('endpoint_')) {
+                return 'endpoint';
+            } else if (leftNavSelected.startsWith('cloud_')) {
+                return 'cloud';
+            }
+            // Fallback: check URL
+            if (typeof window !== 'undefined' && window.location.pathname.includes('endpoint')) {
+                return 'endpoint';
+            }
+            return 'cloud'; // default
+        } catch (error) {
+            return 'cloud'; // safe fallback
+        }
+    })(), // 'cloud' or 'endpoint'
 };
 
 let persistStore = (set, get) => ({
@@ -221,6 +239,20 @@ let persistStore = (set, get) => ({
             console.error("Error setting dashboardCategory:", error);
         }
     },
+    setNavigationSection: (navigationSection) => {
+        try {
+            set({ navigationSection });
+        } catch (error) {
+            console.error("Error setting navigationSection:", error);
+        }
+    },
+    setLeftNavCategory: (leftNavCategory) => {
+            try {
+                set({ leftNavCategory });
+            } catch (error) {
+                console.error("Error setting leftNavCategory:", error);
+            }
+    },
 });
 
 persistStore = devtools(persistStore);
@@ -241,7 +273,9 @@ persistStore = persist(persistStore, {
         trafficAlerts: state.trafficAlerts,
         sendEventOnLogin: state.sendEventOnLogin,
         tableSelectedTab: state.tableSelectedTab,
-        dashboardCategory: state.dashboardCategory
+        dashboardCategory: state.dashboardCategory,
+        leftNavCategory: state.leftNavCategory,
+        navigationSection: state.navigationSection
     }) 
 });
 
