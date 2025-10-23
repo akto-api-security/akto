@@ -25,6 +25,7 @@ import java.util.regex.Pattern;
 import static com.akto.dto.type.KeyTypes.patternToSubType;
 import static com.akto.runtime.RuntimeUtil.isAlphanumericString;
 import static com.akto.runtime.RuntimeUtil.isValidVersionToken;
+import static com.akto.runtime.RuntimeUtil.isValidLocaleToken;
 
 public class MergingLogic {
 
@@ -234,7 +235,7 @@ public class MergingLogic {
             List<String> templateUrls = new ArrayList<>();
             for(SingleTypeInfo sti: singleTypeInfos) {
                 String key = sti.getMethod() + " " + sti.getUrl();
-                if (key.contains("INTEGER") || key.contains("STRING") || key.contains("UUID") || key.contains("OBJECT_ID") || key.contains("FLOAT") || key.contains("VERSIONED")) {
+                if (key.contains("INTEGER") || key.contains("STRING") || key.contains("UUID") || key.contains("OBJECT_ID") || key.contains("FLOAT") || key.contains("VERSIONED") || key.contains("LOCALE")) {
                     templateUrlSet.add(key);
                     continue;
                 };
@@ -356,7 +357,7 @@ public class MergingLogic {
                 }
 
                 boolean compareKeys = doBodyMatch && RequestTemplate.compareKeys(aTemplate, newTemplate, mergedTemplate);
-                if (areBothMatchingUrls(newStatic,aStatic,mergedTemplate) || areBothUuidUrls(newStatic,aStatic,mergedTemplate) || RequestTemplate.compareKeys(aTemplate, newTemplate, mergedTemplate) || compareKeys || (allowMergingOnVersions && areBothVersionUrls(newStatic, aStatic, mergedTemplate))) {
+                if (areBothMatchingUrls(newStatic,aStatic,mergedTemplate) || areBothUuidUrls(newStatic,aStatic,mergedTemplate) || RequestTemplate.compareKeys(aTemplate, newTemplate, mergedTemplate) || compareKeys || (allowMergingOnVersions && areBothVersionUrls(newStatic, aStatic, mergedTemplate)) || areBothLocaleUrls(newStatic, aStatic, mergedTemplate)) {
                     Map<String, Set<String>> similarTemplates = potentialMerges.get(mergedTemplate);
                     if (similarTemplates == null) {
                         similarTemplates = new HashMap<>();
@@ -364,7 +365,7 @@ public class MergingLogic {
                     }
                     similarTemplates.put(aUrl, aTemplate);
 
-                    if (!RequestTemplate.isMergedOnStr(mergedTemplate) || areBothUuidUrls(newStatic,aStatic,mergedTemplate) || areBothMatchingUrls(newStatic,aStatic,mergedTemplate)) {
+                    if (!RequestTemplate.isMergedOnStr(mergedTemplate) || areBothUuidUrls(newStatic,aStatic,mergedTemplate) || areBothMatchingUrls(newStatic,aStatic,mergedTemplate) || areBothLocaleUrls(newStatic, aStatic, mergedTemplate)) {
                         countSimilarURLs = STRING_MERGING_THRESHOLD;
                     }
 
@@ -420,6 +421,23 @@ public class MergingLogic {
             if (Objects.equals(c, SingleTypeInfo.SuperType.VERSIONED) && o.length > idx) {
                 String val = n[idx];
                 if(!isValidVersionToken(val) || !isValidVersionToken(o[idx])) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private static boolean areBothLocaleUrls(URLStatic newUrl, URLStatic deltaUrl, URLTemplate mergedTemplate) {
+        String[] n = tokenize(newUrl.getUrl());
+        String[] o = tokenize(deltaUrl.getUrl());
+        SingleTypeInfo.SuperType[] b = mergedTemplate.getTypes();
+        for (int idx =0 ; idx < b.length; idx++) {
+            SingleTypeInfo.SuperType c = b[idx];
+            if (Objects.equals(c, SingleTypeInfo.SuperType.LOCALE) && o.length > idx) {
+                String val = n[idx];
+                if(!isValidLocaleToken(val) || !isValidLocaleToken(o[idx])) {
                     return false;
                 }
             }
@@ -496,6 +514,9 @@ public class MergingLogic {
             }else if(allowMergingOnVersions && isValidVersionToken(tempToken) && isValidVersionToken(dbToken)) {
                 newTypes[i] = SingleTypeInfo.SuperType.VERSIONED;
                 newTokens[i] = null;
+            }else if(isValidLocaleToken(tempToken) && isValidLocaleToken(dbToken)) {
+                newTypes[i] = SingleTypeInfo.SuperType.LOCALE;
+                newTokens[i] = null;
             }else {
                 newTypes[i] = SingleTypeInfo.SuperType.STRING;
                 newTokens[i] = null;
@@ -523,6 +544,9 @@ public class MergingLogic {
             } else if (token.equals("INTEGER")) {
                 tokens[i] = null;
                 types[i] = SingleTypeInfo.SuperType.INTEGER;
+            } else if (token.equals("LOCALE")) {
+                tokens[i] = null;
+                types[i] = SingleTypeInfo.SuperType.LOCALE;
             } else {
                 types[i] = null;
             }

@@ -6,9 +6,13 @@ import com.akto.log.LoggerMaker;
 
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 public class RuntimeUtil {
     private static final LoggerMaker loggerMaker = new LoggerMaker(RuntimeUtil.class);
@@ -68,13 +72,41 @@ public class RuntimeUtil {
                 int version = Integer.parseInt(versionString);
                 if (version > 0) {
                     return true;
-                } 
+                }
             } catch (Exception e) {
                 // TODO: handle exception
                 return false;
             }
             return false;
         }
+        return false;
+    }
+
+    private static final Set<String> VALID_LANGUAGE_CODES = new HashSet<>(Arrays.asList(Locale.getISOLanguages()));
+    private static final Set<String> VALID_COUNTRY_CODES = new HashSet<>(Arrays.asList(Locale.getISOCountries()));
+
+    public static boolean isValidLocaleToken(String token){
+        if(token == null || token.isEmpty()) return false;
+
+        // Don't allow trailing or leading dashes
+        if (token.startsWith("-") || token.endsWith("-")) return false;
+
+        // Handle formats like: en, ja, en-US, en-us, ja-JP, pt-BR, pt-br
+        String[] parts = token.split("-");
+
+        // Check language code (2 or 3 letters)
+        if (parts.length == 1) {
+            // Just language code: "en", "ja"
+            return VALID_LANGUAGE_CODES.contains(parts[0].toLowerCase());
+        } else if (parts.length == 2) {
+            // Language + country: "en-US", "ja-JP"
+            String language = parts[0].toLowerCase();
+            String country = parts[1].toUpperCase();
+            // Make sure both parts are non-empty
+            if (language.isEmpty() || country.isEmpty()) return false;
+            return VALID_LANGUAGE_CODES.contains(language) && VALID_COUNTRY_CODES.contains(country);
+        }
+
         return false;
     }
 
