@@ -31,12 +31,28 @@ public class TestingUtilsSingleton {
         return isMcpRequest;
     }
 
-    public String getMcpRequestMethod(ApiInfo.ApiInfoKey apiInfoKey) {
+    public String getMcpRequestMethod(ApiInfo.ApiInfoKey apiInfoKey, RawApi rawApi) {
         if (apiInfoKey == null) return "POST";
         if (instance.mcpRequestMethodMap.containsKey(apiInfoKey)) {
             return instance.mcpRequestMethodMap.get(apiInfoKey);
         }
         // get from AI here and store in the map
-        return "POST";
+        String method =  McpRequestResponseUtils.analyzeMcpRequestMethod(apiInfoKey, rawApi.getRequest().getBody());
+        instance.mcpRequestMethodMap.put(apiInfoKey, method);
+        return method;
     }
+   
+    public static String escapeJsonString(String input) {
+        if (input == null) {
+            return "";
+        }
+        return input.replace("\\", "\\\\")
+                   .replace("\"", "\\\"")
+                   .replace("\b", "\\b")
+                   .replace("\f", "\\f")
+                   .replace("\n", "\\n")
+                   .replace("\r", "\\r")
+                   .replace("\t", "\\t");
+    }
+
 }

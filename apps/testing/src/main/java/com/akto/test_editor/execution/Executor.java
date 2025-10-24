@@ -487,8 +487,8 @@ public class Executor {
         List<BasicDBObject> generatedOperationKeyValuePairs = new ArrayList<>();
         try {
             int accountId = Context.accountId.get();
-            // FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
-            FeatureAccess featureAccess = FeatureAccess.fullAccess;
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
+            // FeatureAccess featureAccess = FeatureAccess.fullAccess;
             if (featureAccess.getIsGranted()) {
 
                 String request = Utils.buildRequestIHttpFormat(rawApi);

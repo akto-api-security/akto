@@ -229,9 +229,9 @@ public final class FilterAction {
         boolean isMcpRequest = McpRequestResponseUtils.isMcpRequest(filterActionRequest.getRawApi());
         if(url.contains("tools") && isMcpRequest) {
             if(url.contains("call")) {
-                method = TestingUtilsSingleton.getInstance().getMcpRequestMethod(filterActionRequest.getApiInfoKey());
+                method = TestingUtilsSingleton.getInstance().getMcpRequestMethod(filterActionRequest.getApiInfoKey(), filterActionRequest.getRawApi());
             }else{
-                method = "GET";
+                method = "POST";
             }
         }
         DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(method, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
@@ -394,7 +394,22 @@ public final class FilterAction {
         }
 
         String reqBody = response.getBody();
-
+        ApiInfo.ApiInfoKey apiInfoKey = filterActionRequest.getApiInfoKey();
+        if(TestingUtilsSingleton.getInstance().isMcpRequest(apiInfoKey, rawApi)) {
+            String contentType = response.getHeaders().get("content-type").get(0);
+            String tempReqBody = McpRequestResponseUtils.parseResponse(contentType, reqBody);
+           
+            if(tempReqBody.contains("error") && filterActionRequest.isValidationContext()) {
+                // check if error comes out in parsing, call to LLM when context is not filter
+                MagicValidateFilter magicValidateFilter = new MagicValidateFilter();
+                DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(reqBody, filterActionRequest.getQuerySet(), "magic_validate");
+                ValidationResult validationResult = magicValidateFilter.isValid(dataOperandFilterRequest);
+                return new DataOperandsFilterResponse(validationResult.getIsValid(), null, null, null, validationResult.getValidationReason());
+            
+            }else{
+                reqBody = tempReqBody;
+            }
+        }
         // Strip BOM before processing for regex filters to avoid false positives with SOAP payloads
         if (filterActionRequest.getOperand() != null &&
             filterActionRequest.getOperand().equals(TestEditorEnums.DataOperands.REGEX.toString())) {
@@ -512,6 +527,11 @@ public final class FilterAction {
             return;
         }
         String payload = rawApi.getResponse().getBody();
+        ApiInfo.ApiInfoKey apiInfoKey = filterActionRequest.getApiInfoKey();
+        if(TestingUtilsSingleton.getInstance().isMcpRequest(apiInfoKey, rawApi)) {
+            String contentType = rawApi.getResponse().getHeaders().get("content-type").get(0);
+            payload = McpRequestResponseUtils.parseResponse(contentType, payload);
+        }
         extractPayload(filterActionRequest, varMap, payload, extractMultiple);
     }
 
@@ -526,6 +546,11 @@ public final class FilterAction {
             reqObj =  BasicDBObject.parse(payload);
         } catch(Exception e) {
             // add log
+        }
+
+        // for mcp requests, remove mcp related params like name, id which is in root level, jsonrpc, etc.
+        if (TestingUtilsSingleton.getInstance().isMcpRequest(filterActionRequest.getApiInfoKey(), filterActionRequest.getRawApi())) {
+            reqObj = McpRequestResponseUtils.removeMcpRelatedParams(reqObj);
         }
 
         if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("key")) {
