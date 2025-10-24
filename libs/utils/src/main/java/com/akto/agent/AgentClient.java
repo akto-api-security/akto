@@ -87,17 +87,13 @@ public class AgentClient {
     
     public List<AgentConversationResult> processConversations(List<String> prompts, String conversationId, String testMode) throws Exception {
         List<AgentConversationResult> results = new ArrayList<>();
-        
+        int index = 0;
+        int totalRequests = prompts.size();
         for (String prompt : prompts) {
+            index++;
             try {
-                AgentConversationResult result = sendChatRequest(prompt, conversationId, testMode);
+                AgentConversationResult result = sendChatRequest(prompt, conversationId, testMode, index == totalRequests);
                 results.add(result);
-                
-                if (!result.isValidation()) {
-                    loggerMaker.infoAndAddToDb("Validation failed for prompt: " + prompt + ", breaking conversation loop");
-                    break;
-                }
-                
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error processing prompt: " + prompt + ", error: " + e.getMessage(), LogDb.TESTING);
                 throw e;
@@ -107,8 +103,8 @@ public class AgentClient {
         return results;
     }
     
-    public AgentConversationResult sendChatRequest(String prompt, String conversationId, String testMode) throws Exception {
-        OriginalHttpRequest request = buildChatRequest(prompt, testMode, conversationId);
+    public AgentConversationResult sendChatRequest(String prompt, String conversationId, String testMode, boolean isLastRequest) throws Exception {
+        OriginalHttpRequest request = buildChatRequest(prompt, conversationId, isLastRequest);
         OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, testingRunConfig, false, new ArrayList<>(), false);
         
         if (response.getStatusCode() != 200) {
@@ -118,7 +114,7 @@ public class AgentClient {
         return parseResponse(response.getBody(), conversationId, prompt);
     }
     
-    private OriginalHttpRequest buildChatRequest(String prompt, String testMode, String conversationId) {
+    private OriginalHttpRequest buildChatRequest(String prompt, String conversationId, boolean isLastRequest) {
         Map<String, List<String>> headers = new HashMap<>();
         headers.put("Content-Type", Arrays.asList("application/json"));
         headers.put("Accept", Arrays.asList("application/json"));
@@ -126,7 +122,7 @@ public class AgentClient {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("prompt", prompt);
         requestBody.put("conversationId", conversationId);
-        requestBody.put("agentType", testMode);
+        requestBody.put("isLastRequest", isLastRequest);
         
         String body;
         try {
