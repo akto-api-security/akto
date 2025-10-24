@@ -16,8 +16,12 @@ public class InitializerListener implements ServletContextListener {
         KafkaUtils kafkaUtils = new KafkaUtils();
         kafkaUtils.initKafkaProducer();
 
-        DataActor dataActor = DataActorFactory.fetchInstance();
-        ModuleInfoWorker.init(ModuleInfo.ModuleType.DATA_INGESTION, dataActor);
+        try {
+            DataActor dataActor = DataActorFactory.fetchInstance();
+            ModuleInfoWorker.init(ModuleInfo.ModuleType.DATA_INGESTION, dataActor);   
+        } catch (Exception e) {
+            // TODO: handle exception
+        }
     }
 
     @Override

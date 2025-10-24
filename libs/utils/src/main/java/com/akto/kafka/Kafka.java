@@ -5,6 +5,8 @@ import org.apache.kafka.clients.producer.*;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -12,6 +14,7 @@ public class Kafka {
   private static LoggerMaker logger = new LoggerMaker(Kafka.class, LogDb.TESTING);
   private KafkaProducer<String, String> producer;
   public boolean producerReady;
+  private static final LoggerMaker loggerMaker = new LoggerMaker(Kafka.class);
 
   public Kafka(KafkaConfig kafkaConfig) {
     this(
@@ -109,7 +112,7 @@ public class Kafka {
     };
 
     ProducerRecord<String, String> record = new ProducerRecord<>(topic, message);
-    producer.send(record, new DemoProducerCallback());
+    producer.send(record, new DemoProducerCallback(message, topic));
   }
 
   public void close() {
@@ -162,11 +165,30 @@ public class Kafka {
   }
 
   private class DemoProducerCallback implements Callback {
+    private final String payload;
+    private final String topic;
+
+    public DemoProducerCallback(String payload, String topic) {
+      this.payload = payload;
+      this.topic = topic;
+    }
+
     @Override
     public void onCompletion(RecordMetadata recordMetadata, Exception e) {
       if (e != null) {
-        Kafka.this.close();
-        logger.errorAndAddToDb("onCompletion error: " + e.getMessage(), LogDb.DATA_INGESTION);
+        StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw);
+        e.printStackTrace(pw);
+        String stackTrace = sw.toString();
+
+        loggerMaker.sendImpErrorLogs(
+          "Kafka onCompletion error: " + e.getMessage() +
+          " | Topic: " + topic +
+          " | Exception class: " + e.getClass().getName() +
+          " | Payload: " + payload +
+          " | Stack trace: " + stackTrace,
+          LogDb.DATA_INGESTION
+        );
       }
     }
   }

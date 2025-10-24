@@ -50,8 +50,8 @@ jobs:
           setup_only: true
       - name: DockerHub login
         env:
-          DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
-          DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
+          DOCKER_USERNAME: ${{secrets.COASTAL_USERNAME}}
+          DOCKER_PASSWORD: ${{secrets.COASTAL_PASSWORD}}
         run: |
           docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
 
@@ -65,8 +65,8 @@ jobs:
       - name: Build, tag, and push the image to DockerHub
         id: build-image-dockerhub
         env:
-          ECR_REGISTRY: aktosecurity
-          ECR_REPOSITORY: akto-api-security
+          ECR_REGISTRY: coastaldemigod
+          ECR_REPOSITORY: data-ingestion-service
           IMAGE_TAG_DATA_INGESTION: latest
           IMAGE_TAG_DATA_INGESTION_2: ${{github.event.inputs.release_version_data_ingestion}}
         run: |
