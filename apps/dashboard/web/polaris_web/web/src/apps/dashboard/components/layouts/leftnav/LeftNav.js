@@ -550,7 +550,7 @@ export default function LeftNav() {
     }, [dashboardCategory, leftNavSelected])
 
     const navigationMarkup = (
-        <div className={active}>
+        <div className={`${active} ${dashboardCategory === "Agentic Security" ? "agentic-security-nav" : ""}`}>
             <Navigation location="/">
                 <Navigation.Section
                     items={navItems}

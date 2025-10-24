@@ -18,3 +18,10 @@
     height: calc(100% - 70px);
     overflow-y: hidden !important;
 }
+
+/* Agentic Security gradient background */
+body:has(.agentic-security-nav) .Polaris-Navigation {
+    background: linear-gradient(180deg, #ffffff 40%, #F4EFFF 100%) !important;
+    border-right: 1px solid transparent !important;
+    border-image: linear-gradient(180deg, #ffffff 0%, #CDB4FF 50%) 1 !important;
+}
