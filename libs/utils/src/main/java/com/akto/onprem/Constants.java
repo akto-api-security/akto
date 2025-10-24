@@ -28,7 +28,7 @@ public class Constants {
 
     public static final String SLACK_ALERT_USAGE_URL = "";
 
-    private static final byte[] privateKey, publicKey;
+    private static byte[] privateKey, publicKey;
 
     static {
         KeyPairGenerator kpg;
@@ -59,6 +59,10 @@ public class Constants {
         return Base64.getDecoder().decode(rsaPrivateKey);
     }
 
+    public static void setPrivateKey(byte[] key) {
+        privateKey = key;
+    }
+
     public static byte[] getPublicKey() {
         if (!DashboardMode.isOnPremDeployment()) {
             return publicKey;
@@ -70,6 +74,10 @@ public class Constants {
         rsaPublicKey = rsaPublicKey.replace("\n","");
 
         return Base64.getDecoder().decode(rsaPublicKey);
+    }
+
+    public static void setPublicKey(byte[] key) {
+        publicKey = key;
     }
 
     private static Config.SendgridConfig sendgridConfig;
