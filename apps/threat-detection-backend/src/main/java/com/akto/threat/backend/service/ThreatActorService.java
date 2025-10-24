@@ -86,6 +86,18 @@ public class ThreatActorService {
         if (rateLimitConfig != null) {
             builder.setRatelimitConfig(rateLimitConfig);
         }
+
+        // Handle archival days
+        Integer archivalDays = null;
+        try {
+            Object val = doc.get("archivalDays");
+            if (val instanceof Number) {
+                archivalDays = ((Number) val).intValue();
+            }
+        } catch (Exception ignore) {}
+        if (archivalDays != null) {
+            builder.setArchivalDays(archivalDays);
+        }
     }
     return builder.build();
 }
@@ -121,6 +133,13 @@ public class ThreatActorService {
             newDoc.append("ratelimitConfig", ratelimitConfigDoc.get("ratelimitConfig"));
         }
     }
+
+    {
+        int val = updatedConfig.getArchivalDays();
+        if (val >= 30 && val <= 90) {
+            newDoc.append("archivalDays", val);
+        }
+    }
     
     Document existingDoc = coll.find().first();
 
@@ -137,6 +156,12 @@ public class ThreatActorService {
     }
     if (updatedConfig.hasRatelimitConfig()) {
         builder.setRatelimitConfig(updatedConfig.getRatelimitConfig());
+    }
+    {
+        int val = updatedConfig.getArchivalDays();
+        if (val >= 30 && val <= 90) {
+            builder.setArchivalDays(val);
+        }
     }
     return builder.build();
 }
