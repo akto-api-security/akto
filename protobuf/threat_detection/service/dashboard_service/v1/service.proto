@@ -30,6 +30,7 @@ message ListMaliciousRequestsResponse {
       string status = 18;
       bool successful_exploit = 19;
       string label = 20;  // Common values: "threat", "guardrail"
+      string host = 21;   // Host header from the request
     }
     repeated MaliciousEvent malicious_events = 1;
     uint64 total = 2;
@@ -384,5 +385,11 @@ message FetchTopNDataResponse {
     string severity = 4;
   }
 
+  message TopHostData {
+    string host = 1;
+    uint32 attacks = 2;
+  }
+
   repeated TopApiData top_apis = 1;
+  repeated TopHostData top_hosts = 2;
 }
