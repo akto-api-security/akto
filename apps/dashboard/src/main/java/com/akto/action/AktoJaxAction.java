@@ -107,7 +107,7 @@ public class AktoJaxAction extends UserAction {
             } else if(testRoleHaxId != null && !testRoleHaxId.isEmpty()) {
                 TestRoles testRole = TestRolesDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(testRoleHaxId)));
                 AuthMechanism authMechanismForRole = testRole.findDefaultAuthMechanism();
-                if (testRole.getAuthWithCondList().get(0).getRecordedLoginFlowInput() != null) {
+                if (testRole != null && !testRole.getAuthWithCondList().isEmpty() && testRole.getAuthWithCondList().get(0).getRecordedLoginFlowInput() != null) {
                     try {
                         RecordedLoginFlowInput recordedLoginFlowInput = authMechanismForRole.getRecordedLoginFlowInput();
                         String payload = recordedLoginFlowInput.getContent().toString();
