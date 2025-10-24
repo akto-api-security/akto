@@ -103,10 +103,10 @@ public class GuardrailPoliciesAction extends UserAction {
             // Only set createdBy and createdTimestamp on insert
             updates.add(Updates.setOnInsert("createdBy", user.getLogin()));
             updates.add(Updates.setOnInsert("createdTimestamp", currentTime));
-            
+            updates.add(Updates.set("updatedTimestamp", currentTime));
+
             // Only set updatedTimestamp and updatedBy on actual updates (when hexId exists)
             if (hexId != null && !hexId.isEmpty()) {
-                updates.add(Updates.set("updatedTimestamp", currentTime));
                 updates.add(Updates.set("updatedBy", user.getLogin()));
             }
 

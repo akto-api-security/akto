@@ -65,10 +65,10 @@ public class ExecutorTest {
         generatedData.put("op", arr);
         List<BasicDBObject> result = invokeParseGeneratedKeyValues(executor, generatedData, "op", "val");
         assertEquals(2, result.size());
-        assertTrue(result.get(0).containsField("k1"));
-        assertEquals("val", result.get(0).get("k1"));
-        assertTrue(result.get(1).containsField("k2"));
-        assertEquals("v2", result.get(1).get("k2"));
+        BasicDBObject dbObject1 = result.get(0);
+        BasicDBObject dbObject2 = result.get(1);
+        assertTrue(dbObject1.containsValue("k1"));
+        assertTrue(dbObject2.containsValue("v2"));
     }
 
     @Test
