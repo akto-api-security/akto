@@ -16,6 +16,9 @@ import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
 import com.akto.threat.backend.tasks.FlushMessagesToDB;
+import com.akto.threat.backend.cron.PercentilesCron;
+import com.akto.util.AccountTask;
+import com.akto.dto.Account;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.ReadPreference;
@@ -24,6 +27,7 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.codecs.pojo.PojoCodecProvider;
+import java.util.function.Consumer;
 
 public class Main {
 
@@ -78,6 +82,25 @@ public class Main {
     ThreatActorService threatActorService = new ThreatActorService(threatProtectionMongo, MaliciousEventDao.instance);
     ThreatApiService threatApiService = new ThreatApiService(MaliciousEventDao.instance);
     ApiDistributionDataService apiDistributionDataService = new ApiDistributionDataService(threatProtectionMongo);
+
+    try {
+      PercentilesCron percentilesCron = new PercentilesCron(threatProtectionMongo);
+      logger.infoAndAddToDb("Starting PercentilesCron for all accounts", com.akto.log.LoggerMaker.LogDb.RUNTIME);
+      AccountTask.instance.executeTask(new Consumer<Account>() {
+        @Override
+        public void accept(Account account) {
+          try {
+            String accountDb = String.valueOf(account.getId());
+            percentilesCron.cron(accountDb);
+            logger.infoAndAddToDb("Scheduled PercentilesCron for account " + accountDb, com.akto.log.LoggerMaker.LogDb.RUNTIME);
+          } catch (Exception e) {
+            logger.errorAndAddToDb("Failed scheduling PercentilesCron for account: " + account.getId() + " due to: " + e.getMessage(), com.akto.log.LoggerMaker.LogDb.RUNTIME);
+          }
+        }
+      }, "percentiles-cron");
+    } catch (Exception e) {
+      logger.errorAndAddToDb("Error starting PercentilesCron: " + e.getMessage(), com.akto.log.LoggerMaker.LogDb.RUNTIME);
+    }
 
     new BackendVerticle(maliciousEventService, threatActorService, threatApiService, apiDistributionDataService).start();
   }
