@@ -45,6 +45,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.RequiredConfigs;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
+import com.akto.test_editor.TestingUtilsSingleton;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.testing.TestExecutor;
 import com.akto.testing.Utils;
@@ -300,6 +301,8 @@ public class SaveTestEditorAction extends UserAction {
             addActionError("sampleDataList is empty");
             return ERROR.toUpperCase();
         }
+
+        TestingUtilsSingleton.init();
 
         Account account = AccountsDao.instance.findOne(Filters.eq(Constants.ID, Context.accountId.get()));
         ApiInfo.ApiInfoKey infoKey = new ApiInfo.ApiInfoKey(apiInfoKey.getInt(ApiInfo.ApiInfoKey.API_COLLECTION_ID),

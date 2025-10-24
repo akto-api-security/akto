@@ -16,6 +16,7 @@ import com.akto.dto.test_editor.ExecutionOrderResp;
 import com.akto.dto.test_editor.ExecutorConfigParserResult;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
+import com.akto.mcp.McpRequestResponseUtils;
 import com.akto.test_editor.Utils;
 
 public class ParseAndExecute {
@@ -79,8 +80,9 @@ public class ParseAndExecute {
             if (valList != null && valList.size() > 0) {
                 val = valList.get(0);
             }
-    
-            ExecutorSingleOperationResp resp = Utils.modifySampleDataUtil(executorNode.getOperationType(), copyRawApi, key, val , varMap, apiInfoKey);
+
+            boolean isMcpRequest = McpRequestResponseUtils.isMcpRequest(copyRawApi);
+            ExecutorSingleOperationResp resp = Utils.modifySampleDataUtil(executorNode.getOperationType(), copyRawApi, key, val , varMap, apiInfoKey, isMcpRequest);
             if(resp.getErrMsg() != null && resp.getErrMsg().length() > 0){
                 break;
             }
