@@ -552,6 +552,31 @@ public class Utils {
         return payload;
     }
 
+    public static ExecutorSingleOperationResp buildNewUrlForMcpRequest(UrlModifierPayload urlModifierPayload, RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey, Object key) {
+        try {
+            // the url in apiInfoKey is the tool name, apply the url modifier payload to the url
+            String originalToolUrl = apiInfoKey.getUrl();
+            if(originalToolUrl.contains("call")){
+                String toolName = originalToolUrl.split("call/")[1];
+                String newToolUrl = key.toString();
+                if(urlModifierPayload != null) {
+                    if (urlModifierPayload.getOperationType().equalsIgnoreCase("regex_replace") && urlModifierPayload.getRegex() != null && !urlModifierPayload.getRegex().equals("")){
+                        newToolUrl = Utils.applyRegexModifier(toolName, urlModifierPayload.getRegex(), urlModifierPayload.getReplaceWith());
+                    }else if(!urlModifierPayload.getOperationType().equalsIgnoreCase("token_replace")){
+                        return new ExecutorSingleOperationResp(false, "can't perform this operation on the url");
+                    }
+                }
+                // since the tool name is the name of the body param, we need to modify the body param
+                return Operations.modifyBodyParam(rawApi, "name", newToolUrl);
+            }else{
+                return new ExecutorSingleOperationResp(false, "The url in apiInfoKey is not a tool url");
+            }
+            
+        } catch (Exception e) {
+            return new ExecutorSingleOperationResp(false, e.getMessage());
+        }
+    }
+
     public static String buildNewUrl(UrlModifierPayload urlModifierPayload, String oldUrl) {
         String url = "";
         if (urlModifierPayload.getOperationType().equalsIgnoreCase("regex_replace") || urlModifierPayload.getOperationType().equalsIgnoreCase("token_replace")) {
@@ -856,7 +881,7 @@ public class Utils {
         return escaped.toString();
     }
 
-    public static ExecutorSingleOperationResp modifySampleDataUtil(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, ApiInfo.ApiInfoKey apiInfoKey){
+    public static ExecutorSingleOperationResp modifySampleDataUtil(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, ApiInfo.ApiInfoKey apiInfoKey, boolean isMcpRequest){
         switch (operationType.toLowerCase()) {
             case "add_body_param":
                 Object epochVal = Utils.getEpochTime(value);
@@ -871,12 +896,24 @@ public class Utils {
                 }
                 return Operations.modifyBodyParam(rawApi, key.toString(), value);
             case "delete_graphql_field":
+                if (isMcpRequest) {
+                    return new ExecutorSingleOperationResp(false, "Delete graphql field is not supported for MCP requests");
+                }
                 return Operations.deleteGraphqlField(rawApi, key == null ? "": key.toString());
             case "add_graphql_field":
+                if (isMcpRequest) {
+                    return new ExecutorSingleOperationResp(false, "Delete graphql field is not supported for MCP requests");
+                }
                 return Operations.addGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
             case "add_unique_graphql_field":
+                if (isMcpRequest) {
+                    return new ExecutorSingleOperationResp(false, "Delete graphql field is not supported for MCP requests");
+                }
                 return Operations.addUniqueGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
             case "modify_graphql_field":
+                if (isMcpRequest) {
+                    return new ExecutorSingleOperationResp(false, "Delete graphql field is not supported for MCP requests");
+                }
                 return Operations.modifyGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
             case "delete_body_param":
                 return Operations.deleteBodyParam(rawApi, key.toString());
@@ -940,8 +977,12 @@ public class Utils {
             case "delete_query_param":
                 return Operations.deleteQueryParam(rawApi, key.toString());
             case "modify_url":
+                
                 String newUrl = null;
                 UrlModifierPayload urlModifierPayload = Utils.fetchUrlModifyPayload(key.toString());
+                if(isMcpRequest) {
+                    return Utils.buildNewUrlForMcpRequest(urlModifierPayload, rawApi, apiInfoKey, key);
+                }
                 if (urlModifierPayload != null) {
                     newUrl = Utils.buildNewUrl(urlModifierPayload, rawApi.getRequest().getUrl());
                 } else {
@@ -949,6 +990,9 @@ public class Utils {
                 }
                 return Operations.modifyUrl(rawApi, newUrl);
             case "modify_method":
+                if(isMcpRequest) {
+                    return Operations.modifyMethod(rawApi, "POST");
+                }
                 return Operations.modifyMethod(rawApi, key.toString());
             default:
                 return new ExecutorSingleOperationResp(false, "invalid operationType");

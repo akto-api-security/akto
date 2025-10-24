@@ -36,6 +36,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLTemplate;
 import com.akto.mcp.McpRequestResponseUtils;
+import com.akto.test_editor.TestingUtilsSingleton;
 import com.akto.test_editor.Utils;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.*;
@@ -193,7 +194,13 @@ public final class FilterAction {
 
     public DataOperandsFilterResponse applyFilterOnUrl(FilterActionRequest filterActionRequest) {
 
+        // handle for mcp requests
         String url = filterActionRequest.getApiInfoKey().getUrl();
+        if(url.contains("tools") && TestingUtilsSingleton.getInstance().isMcpRequest(filterActionRequest.getApiInfoKey(), filterActionRequest.getRawApi())) {
+            if(url.contains("call")) {
+                url = url.split("call/")[1];
+            }
+        }
 
         DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(url, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
         ValidationResult res = invokeFilter(dataOperandFilterRequest);
@@ -202,6 +209,11 @@ public final class FilterAction {
 
     public void extractUrl(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
         String url = filterActionRequest.getRawApi().getRequest().getUrl();
+        if(url.contains("tools") && TestingUtilsSingleton.getInstance().isMcpRequest(filterActionRequest.getApiInfoKey(), filterActionRequest.getRawApi())) {
+            if(url.contains("call")) {
+                url = url.split("call/")[1];
+            }
+        }
         List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
         if (varMap.containsKey(querySet.get(0)) && varMap.get(querySet.get(0)) != null) {
             return;
@@ -212,8 +224,24 @@ public final class FilterAction {
     public DataOperandsFilterResponse applyFilterOnMethod(FilterActionRequest filterActionRequest) {
 
         String method = filterActionRequest.getApiInfoKey().getMethod().toString();
+        // handle of mcp requests
+        String url = filterActionRequest.getApiInfoKey().getUrl();
+        boolean isMcpRequest = McpRequestResponseUtils.isMcpRequest(filterActionRequest.getRawApi());
+        if(url.contains("tools") && isMcpRequest) {
+            if(url.contains("call")) {
+                method = TestingUtilsSingleton.getInstance().getMcpRequestMethod(filterActionRequest.getApiInfoKey());
+            }else{
+                method = "GET";
+            }
+        }
         DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(method, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
         ValidationResult res = invokeFilter(dataOperandFilterRequest);
+        if(!res.getIsValid() && isMcpRequest) {
+            // fallback to POST for all the mcp tests because they have filter of method eq: POST
+            method = "POST";
+            dataOperandFilterRequest = new DataOperandFilterRequest(method, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
+            res = invokeFilter(dataOperandFilterRequest);
+        }
         return new DataOperandsFilterResponse(res.getIsValid(), null, null, null, res.getValidationReason());
     }
 
