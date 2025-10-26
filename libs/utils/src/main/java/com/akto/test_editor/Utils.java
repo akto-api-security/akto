@@ -569,7 +569,7 @@ public class Utils {
                 // since the tool name is the name of the body param, we need to modify the body param
                 return Operations.modifyBodyParam(rawApi, "name", newToolUrl);
             }else{
-                return new ExecutorSingleOperationResp(false, "The url in apiInfoKey is not a tool url");
+                return new ExecutorSingleOperationResp(true, "");
             }
             
         } catch (Exception e) {
