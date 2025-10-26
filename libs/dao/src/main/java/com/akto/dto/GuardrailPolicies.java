@@ -43,6 +43,7 @@ public class GuardrailPolicies {
     
     // Step 4.5: Regex Patterns
     private List<String> regexPatterns;
+    private List<RegexPattern> regexPatternsV2;
     
     // Step 5: Content Filtering
     private Map<String, Object> contentFiltering;
@@ -50,6 +51,9 @@ public class GuardrailPolicies {
     // Step 6: Server and application settings
     private List<String> selectedMcpServers;
     private List<String> selectedAgentServers;
+    private List<SelectedServer> selectedMcpServersV2;
+    private List<SelectedServer> selectedAgentServersV2;
+
     private boolean applyOnResponse;
     private boolean applyOnRequest;
     
@@ -66,7 +70,8 @@ public class GuardrailPolicies {
     public GuardrailPolicies(String name, String description, String blockedMessage, String severity, int createdTimestamp, 
                            int updatedTimestamp, String createdBy, String updatedBy, String selectedCollection, 
                            String selectedModel, List<DeniedTopic> deniedTopics, List<PiiType> piiTypes,
-                           List<String> regexPatterns, Map<String, Object> contentFiltering, List<String> selectedMcpServers,
+                           List<String> regexPatterns,List<RegexPattern> regexPatternsV2, Map<String, Object> contentFiltering, List<String> selectedMcpServers,
+                             List<SelectedServer> selectedMcpServersV2, List<SelectedServer> selectedAgentServersV2,
                            List<String> selectedAgentServers, boolean applyOnResponse, boolean applyOnRequest,
                            boolean active) {
         this.name = name;
@@ -82,9 +87,12 @@ public class GuardrailPolicies {
         this.deniedTopics = deniedTopics;
         this.piiTypes = piiTypes;
         this.regexPatterns = regexPatterns;
+        this.regexPatternsV2 = regexPatternsV2;
         this.contentFiltering = contentFiltering;
         this.selectedMcpServers = selectedMcpServers;
         this.selectedAgentServers = selectedAgentServers;
+        this.selectedMcpServersV2 = selectedMcpServersV2;
+        this.selectedAgentServersV2 = selectedAgentServersV2;
         this.applyOnResponse = applyOnResponse;
         this.applyOnRequest = applyOnRequest;
         this.active = active;
@@ -115,6 +123,32 @@ public class GuardrailPolicies {
         public PiiType(String type, String behavior) {
             this.type = type;
             this.behavior = behavior;
+        }
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class RegexPattern {
+        private String pattern;
+        private String behavior; // "Block" or "Mask"
+
+        public RegexPattern(String pattern, String behavior) {
+            this.pattern = pattern;
+            this.behavior = behavior;
+        }
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class SelectedServer {
+        private String id;
+        private String name;
+
+        public SelectedServer(String id, String name) {
+            this.id = id;
+            this.name = name;
         }
     }
 }
