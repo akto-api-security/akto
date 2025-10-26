@@ -93,9 +93,12 @@ public class GuardrailPoliciesAction extends UserAction {
             updates.add(Updates.set("deniedTopics", policy.getDeniedTopics()));
             updates.add(Updates.set("piiTypes", policy.getPiiTypes()));
             updates.add(Updates.set("regexPatterns", policy.getRegexPatterns()));
+            updates.add(Updates.set("regexPatternsV2", policy.getRegexPatternsV2()));
             updates.add(Updates.set("contentFiltering", policy.getContentFiltering()));
             updates.add(Updates.set("selectedMcpServers", policy.getSelectedMcpServers()));
             updates.add(Updates.set("selectedAgentServers", policy.getSelectedAgentServers()));
+            updates.add(Updates.set("selectedMcpServersV2", policy.getSelectedMcpServersV2()));
+            updates.add(Updates.set("selectedAgentServersV2", policy.getSelectedAgentServersV2()));
             updates.add(Updates.set("applyOnResponse", policy.isApplyOnResponse()));
             updates.add(Updates.set("applyOnRequest", policy.isApplyOnRequest()));
             updates.add(Updates.set("active", policy.isActive()));

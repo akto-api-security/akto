@@ -30,6 +30,7 @@ import {
 } from "@shopify/polaris-icons";
 import AddDeniedTopicModal from "./AddDeniedTopicModal";
 import AddPiiTypeModal from "./AddPiiTypeModal";
+import AddRegexPatternModal from "./AddRegexPatternModal";
 import DropdownSearch from "../../../components/shared/DropdownSearch";
 import api from "../api";
 import PersistStore from '../../../../main/PersistStore';
@@ -69,7 +70,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     // Step 5: Sensitive information filters
     const [piiTypes, setPiiTypes] = useState([]);
     const [regexPatterns, setRegexPatterns] = useState([]);
-    const [newRegexPattern, setNewRegexPattern] = useState("");
 
     // Step 6: Server and application settings
     const [selectedMcpServers, setSelectedMcpServers] = useState([]);
@@ -88,6 +88,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     // Sub-modal states
     const [showAddTopicModal, setShowAddTopicModal] = useState(false);
     const [showAddPiiModal, setShowAddPiiModal] = useState(false);
+    const [showAddRegexModal, setShowAddRegexModal] = useState(false);
     const [editingTopic, setEditingTopic] = useState(null);
 
     const getStepsWithSummary = () => [
@@ -130,7 +131,32 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             title: "Server and application settings", 
             optional: false,
             summary: (selectedMcpServers.length > 0 || selectedAgentServers.length > 0) 
-                ? `${selectedMcpServers.length} MCP, ${selectedAgentServers.length} Agent${(applyOnRequest || applyOnResponse) ? ` - ${applyOnRequest ? 'Req' : ''}${applyOnRequest && applyOnResponse ? '/' : ''}${applyOnResponse ? 'Res' : ''}` : ''}`
+                ? (() => {
+                    const serverSummary = [];
+                    if (selectedMcpServers.length > 0) {
+                        const mcpNames = selectedMcpServers
+                            .map(serverId => {
+                                const server = mcpServers.find(s => s.value === serverId);
+                                return server ? server.label : serverId;
+                            })
+                            .slice(0, 2);
+                        const mcpMore = selectedMcpServers.length > 2 ? ` +${selectedMcpServers.length - 2}` : '';
+                        serverSummary.push(`MCP: ${mcpNames.join(", ")}${mcpMore}`);
+                    }
+                    if (selectedAgentServers.length > 0) {
+                        const agentNames = selectedAgentServers
+                            .map(serverId => {
+                                const server = agentServers.find(s => s.value === serverId);
+                                return server ? server.label : serverId;
+                            })
+                            .slice(0, 2);
+                        const agentMore = selectedAgentServers.length > 2 ? ` +${selectedAgentServers.length - 2}` : '';
+                        serverSummary.push(`Agent: ${agentNames.join(", ")}${agentMore}`);
+                    }
+                    const appSettings = (applyOnRequest || applyOnResponse) ? 
+                        ` - ${applyOnRequest ? 'Req' : ''}${applyOnRequest && applyOnResponse ? '/' : ''}${applyOnResponse ? 'Res' : ''}` : '';
+                    return `${serverSummary.join(", ")}${appSettings}`;
+                })()
                 : null
         }
     ];
@@ -223,7 +249,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setNewWord("");
         setPiiTypes([]);
         setRegexPatterns([]);
-        setNewRegexPattern("");
         setSelectedMcpServers([]);
         setSelectedAgentServers([]);
         setApplyOnResponse(false);
@@ -267,12 +292,34 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         // PII filters
         setPiiTypes(policy.piiTypes || []);
         
-        // Regex patterns
-        setRegexPatterns(policy.regexPatterns || []);
+        // Regex patterns - prefer V2 format with behavior, fallback to old format
+        if (policy.regexPatternsV2 && policy.regexPatternsV2.length > 0) {
+            setRegexPatterns(policy.regexPatternsV2);
+        } else if (policy.regexPatterns && policy.regexPatterns.length > 0) {
+            // Convert old format to new format with default behavior
+            const convertedPatterns = policy.regexPatterns.map(pattern => ({
+                pattern: pattern,
+                behavior: "block" // Default behavior for old data
+            }));
+            setRegexPatterns(convertedPatterns);
+        } else {
+            setRegexPatterns([]);
+        }
         
-        // Server settings
-        setSelectedMcpServers(policy.selectedMcpServers || []);
-        setSelectedAgentServers(policy.selectedAgentServers || []);
+        // Server settings - prefer V2 format with names, fallback to old format
+        if (policy.selectedMcpServersV2 && policy.selectedMcpServersV2.length > 0) {
+            // Extract IDs from V2 format for form population
+            setSelectedMcpServers(policy.selectedMcpServersV2.map(server => server.id));
+        } else {
+            setSelectedMcpServers(policy.selectedMcpServers || []);
+        }
+        
+        if (policy.selectedAgentServersV2 && policy.selectedAgentServersV2.length > 0) {
+            // Extract IDs from V2 format for form population
+            setSelectedAgentServers(policy.selectedAgentServersV2.map(server => server.id));
+        } else {
+            setSelectedAgentServers(policy.selectedAgentServers || []);
+        }
         setApplyOnResponse(policy.applyOnResponse || false);
         setApplyOnRequest(policy.applyOnRequest || false);
     };
@@ -301,6 +348,27 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const handleSave = async () => {
         setLoading(true);
         try {
+            // Transform selectedMcpServers and selectedAgentServers to include both ID and name
+            const transformedMcpServers = selectedMcpServers
+                .filter(serverId => serverId) // Filter out empty values
+                .map(serverId => {
+                    const server = mcpServers.find(s => s.value === serverId || s.value === serverId.toString());
+                    return {
+                        id: serverId.toString(),
+                        name: server ? server.label : serverId.toString()
+                    };
+                });
+
+            const transformedAgentServers = selectedAgentServers
+                .filter(serverId => serverId) // Filter out empty values  
+                .map(serverId => {
+                    const server = agentServers.find(s => s.value === serverId || s.value === serverId.toString());
+                    return {
+                        id: serverId.toString(),
+                        name: server ? server.label : serverId.toString()
+                    };
+                });
+
             const guardrailData = {
                 name,
                 description,
@@ -316,14 +384,36 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                     custom: customWords
                 },
                 piiFilters: piiTypes,
-                regexPatterns: regexPatterns,
-                selectedMcpServers,
-                selectedAgentServers,
+                // Save in both old and new formats for backward compatibility
+                regexPatterns: regexPatterns
+                    .filter(r => r && r.pattern) // Ensure valid regex objects
+                    .map(r => r.pattern), // Old format (just patterns)
+                regexPatternsV2: regexPatterns
+                    .filter(r => r && r.pattern && r.behavior) // Ensure valid regex objects with behavior
+                    .map(r => ({
+                        pattern: r.pattern,
+                        behavior: r.behavior.toLowerCase() // Ensure consistent case
+                    })), // New format (with behavior)
+                selectedMcpServers: selectedMcpServers, // Old format (just IDs)
+                selectedAgentServers: selectedAgentServers, // Old format (just IDs)
+                selectedMcpServersV2: transformedMcpServers, // New format (with names)
+                selectedAgentServersV2: transformedAgentServers, // New format (with names)
                 applyOnResponse,
                 applyOnRequest,
                 // Add edit mode information
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
             };
+
+            // Debug: Log the data being sent
+            console.log("=== FRONTEND DEBUG: Data being sent to backend ===");
+            console.log("Full guardrailData:", JSON.stringify(guardrailData, null, 2));
+            console.log("regexPatterns:", guardrailData.regexPatterns);
+            console.log("regexPatternsV2:", guardrailData.regexPatternsV2);
+            console.log("selectedMcpServers:", guardrailData.selectedMcpServers);
+            console.log("selectedMcpServersV2:", guardrailData.selectedMcpServersV2);
+            console.log("selectedAgentServers:", guardrailData.selectedAgentServers);
+            console.log("selectedAgentServersV2:", guardrailData.selectedAgentServersV2);
+            console.log("=== END FRONTEND DEBUG ===");
             
             await onSave(guardrailData);
             handleClose();
@@ -361,15 +451,12 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setPiiTypes(piiTypes.filter((_, i) => i !== index));
     };
 
-    const addRegexPattern = () => {
-        if (newRegexPattern.trim() && !regexPatterns.includes(newRegexPattern.trim())) {
-            setRegexPatterns([...regexPatterns, newRegexPattern.trim()]);
-            setNewRegexPattern("");
-        }
+    const addRegexPattern = (regexData) => {
+        setRegexPatterns([...regexPatterns, regexData]);
     };
 
-    const removeRegexPattern = (pattern) => {
-        setRegexPatterns(regexPatterns.filter(p => p !== pattern));
+    const removeRegexPattern = (index) => {
+        setRegexPatterns(regexPatterns.filter((_, i) => i !== index));
     };
 
     const handleSaveTopic = (topicData) => {
@@ -389,6 +476,11 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const handleSavePii = (piiData) => {
         setPiiTypes([...piiTypes, piiData]);
         setShowAddPiiModal(false);
+    };
+
+    const handleSaveRegex = (regexData) => {
+        setRegexPatterns([...regexPatterns, regexData]);
+        setShowAddRegexModal(false);
     };
 
     const renderStepIndicator = () => (
@@ -721,41 +813,34 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                     <VerticalStack gap="3">
                         <Text variant="headingMd">Regex patterns</Text>
                         <Text variant="bodyMd" tone="subdued">
-                            Add up to 10 regex patterns to filter custom types of sensitive information for your specific use case. A blocked message will show if user input or model responses match these patterns.
+                            Add up to 10 regex patterns to filter custom types of sensitive information for your specific use case.
                         </Text>
                         
-                        <HorizontalStack gap="2">
-                            <div style={{ flexGrow: 1 }}>
-                                <TextField
-                                    value={newRegexPattern}
-                                    onChange={setNewRegexPattern}
-                                    placeholder="Example - \d{3}-\d{2}-\d{4} (SSN pattern)"
-                                    helpText="Enter a valid regex pattern"
-                                />
-                            </div>
-                            <Button onClick={addRegexPattern} disabled={!newRegexPattern.trim()}>
-                                Add pattern
-                            </Button>
+                        <HorizontalStack align="space-between">
+                            <Text variant="headingMd">Regex patterns ({regexPatterns.length})</Text>
+                            <HorizontalStack gap="2">
+                                <Button onClick={() => setRegexPatterns([])}>Delete all</Button>
+                                <Button primary onClick={() => setShowAddRegexModal(true)}>Add regex pattern</Button>
+                            </HorizontalStack>
                         </HorizontalStack>
 
                         {regexPatterns.length > 0 && (
-                            <Box>
-                                <Text variant="headingMd">View and edit regex patterns ({regexPatterns.length})</Text>
-                                <Box paddingBlockStart="2">
-                                    <VerticalStack gap="2">
-                                        {regexPatterns.map((pattern, index) => (
-                                            <HorizontalStack key={index} align="space-between" blockAlign="center">
-                                                <Text variant="bodyMd" fontWeight="medium">{pattern}</Text>
-                                                <Button
-                                                    icon={DeleteMajor}
-                                                    variant="plain"
-                                                    onClick={() => removeRegexPattern(pattern)}
-                                                />
-                                            </HorizontalStack>
-                                        ))}
-                                    </VerticalStack>
-                                </Box>
-                            </Box>
+                            <div style={{ border: "1px solid #d1d5db", borderRadius: "8px", overflow: "hidden" }}>
+                                <DataTable
+                                    columnContentTypes={['text', 'text', 'text']}
+                                    headings={['Regex Pattern', 'Guardrail behavior', 'Actions']}
+                                    rows={regexPatterns.map((regex, index) => [
+                                        regex.pattern || 'Invalid pattern',
+                                        regex.behavior ? regex.behavior.charAt(0).toUpperCase() + regex.behavior.slice(1) : 'Unknown',
+                                        <Button
+                                            key={index}
+                                            icon={DeleteMajor}
+                                            variant="plain"
+                                            onClick={() => removeRegexPattern(index)}
+                                        />
+                                    ])}
+                                />
+                            </div>
                         )}
                     </VerticalStack>
                 </Box>
@@ -916,6 +1001,12 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 isOpen={showAddPiiModal}
                 onClose={() => setShowAddPiiModal(false)}
                 onSave={handleSavePii}
+            />
+
+            <AddRegexPatternModal
+                isOpen={showAddRegexModal}
+                onClose={() => setShowAddRegexModal(false)}
+                onSave={handleSaveRegex}
             />
         </>
     );
