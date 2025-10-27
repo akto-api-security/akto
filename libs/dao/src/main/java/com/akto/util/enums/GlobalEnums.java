@@ -69,7 +69,9 @@ public class GlobalEnums {
         MCP_AUTH("MCP_AUTH", Severity.HIGH, "MCP - Broken Authentication", "MCP_AUTH"),
         MCP_MALICIOUS_CODE_EXECUTION("MCP_MALICIOUS_CODE_EXECUTION", Severity.HIGH, "MCP - Malicious Code Execution", "MCP_MALICIOUS_CODE_EXECUTION"),
         MCP("MCP", Severity.HIGH, "Model Context Protocol (MCP) Security", "MCP"),
-        MCP_INPUT_VALIDATION("MCP_INPUT_VALIDATION", Severity.HIGH, "MCP - Input Validation", "MCP_INPUT_VALIDATION");
+        MCP_INPUT_VALIDATION("MCP_INPUT_VALIDATION", Severity.HIGH, "MCP - Input Validation", "MCP_INPUT_VALIDATION"),
+        MCP_FUNCTION_MANIPULATION("MCP_FUNCTION_MANIPULATION", Severity.CRITICAL, "Model Context Protocol (MCP) Security - Function Call Manipulation", "MCP_FUNC_MANIP"),
+        MCP_SECURITY("MCP_SECURITY", Severity.HIGH, "Model Context Protocol (MCP) Security", "MCP_SEC");
 
         private final String name;
         private final Severity severity;
