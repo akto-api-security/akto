@@ -8,9 +8,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountResponse;
-import com.akto.threat.backend.constants.MongoDBCollection;
-import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoCollection;
+import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 
@@ -23,11 +21,11 @@ import org.bson.conversions.Bson;
 
 public class ThreatApiService {
 
-  private final MongoClient mongoClient;
+  private final MaliciousEventDao maliciousEventDao;
   private static final LoggerMaker loggerMaker = new LoggerMaker(ThreatApiService.class);
 
-  public ThreatApiService(MongoClient mongoClient) {
-    this.mongoClient = mongoClient;
+  public ThreatApiService(MaliciousEventDao maliciousEventDao) {
+    this.maliciousEventDao = maliciousEventDao;
   }
 
   public ListThreatApiResponse listThreatApis(String accountId, ListThreatApiRequest request) {
@@ -37,10 +35,6 @@ public class ThreatApiService {
     int skip = request.hasSkip() ? request.getSkip() : 0;
     int limit = request.getLimit();
     Map<String, Integer> sort = request.getSortMap();
-    MongoCollection<Document> coll =
-        this.mongoClient
-            .getDatabase(accountId)
-            .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
 
     List<Document> base = new ArrayList<>();
     ListThreatApiRequest.Filter filter = request.getFilter();
@@ -91,7 +85,7 @@ public class ThreatApiService {
     List<Document> countPipeline = new ArrayList<>(base);
     countPipeline.add(new Document("$count", "total"));
 
-    Document result = coll.aggregate(countPipeline).first();
+    Document result = maliciousEventDao.aggregateRaw(accountId, countPipeline).first();
     long total = result != null ? result.getInteger("total", 0) : 0;
 
     List<Document> pipeline = new ArrayList<>(base);
@@ -108,7 +102,7 @@ public class ThreatApiService {
                 .append("actorsCount", sort.getOrDefault("actorsCount", -1))));
 
     List<ListThreatApiResponse.ThreatApi> apis = new ArrayList<>();
-    try (MongoCursor<Document> cursor = coll.aggregate(pipeline).cursor()) {
+    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();
         Document agg = (Document) doc.get("_id");
@@ -139,11 +133,6 @@ public class ThreatApiService {
 
     loggerMaker.info("getSubCategoryWiseCount start ts " + Context.now());
 
-    MongoCollection<Document> coll =
-        this.mongoClient
-            .getDatabase(accountId)
-            .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
-
     List<Document> pipeline = new ArrayList<>();
     Document match = new Document();
 
@@ -171,7 +160,7 @@ public class ThreatApiService {
     List<ThreatCategoryWiseCountResponse.SubCategoryCount> categoryWiseCounts = new ArrayList<>();
 
     // 5. Execute aggregation with controlled batch size
-    try (MongoCursor<Document> cursor = coll.aggregate(pipeline).batchSize(1000).cursor()) {
+    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).batchSize(1000).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();
         Document agg = (Document) doc.get("_id");
@@ -201,11 +190,6 @@ public class ThreatApiService {
 
     loggerMaker.info("getSeverityWiseCount start ts " + Context.now());
 
-    MongoCollection<Document> coll =
-        this.mongoClient
-            .getDatabase(accountId)
-            .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
-
     List<ThreatSeverityWiseCountResponse.SeverityCount> categoryWiseCounts = new ArrayList<>();
 
     String[] severities = { "CRITICAL", "HIGH", "MEDIUM", "LOW" };
@@ -218,7 +202,7 @@ public class ThreatApiService {
           Filters.in("filterId", req.getLatestAttackList())
       );
 
-      long count = coll.countDocuments(filter);
+      long count = maliciousEventDao.countDocuments(accountId, filter);
 
       if (count > 0) {
         categoryWiseCounts.add(

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
     Modal,
     FormLayout,
@@ -30,8 +30,12 @@ import {
 } from "@shopify/polaris-icons";
 import AddDeniedTopicModal from "./AddDeniedTopicModal";
 import AddPiiTypeModal from "./AddPiiTypeModal";
+import AddRegexPatternModal from "./AddRegexPatternModal";
+import DropdownSearch from "../../../components/shared/DropdownSearch";
+import api from "../api";
+import PersistStore from '../../../../main/PersistStore';
 
-const CreateGuardrailModal = ({ isOpen, onClose, onSave }) => {
+const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, isEditMode = false }) => {
     // Step management
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
@@ -65,21 +69,162 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave }) => {
 
     // Step 5: Sensitive information filters
     const [piiTypes, setPiiTypes] = useState([]);
+    const [regexPatterns, setRegexPatterns] = useState([]);
 
+    // Step 6: Server and application settings
+    const [selectedMcpServers, setSelectedMcpServers] = useState([]);
+    const [selectedAgentServers, setSelectedAgentServers] = useState([]);
+    const [applyOnResponse, setApplyOnResponse] = useState(false);
+    const [applyOnRequest, setApplyOnRequest] = useState(false);
+    
+    // Collections data
+    const [mcpServers, setMcpServers] = useState([]);
+    const [agentServers, setAgentServers] = useState([]);
+    const [collectionsLoading, setCollectionsLoading] = useState(false);
+    
+    // Get collections from PersistStore
+    const allCollections = PersistStore(state => state.allCollections);
 
     // Sub-modal states
     const [showAddTopicModal, setShowAddTopicModal] = useState(false);
     const [showAddPiiModal, setShowAddPiiModal] = useState(false);
+    const [showAddRegexModal, setShowAddRegexModal] = useState(false);
     const [editingTopic, setEditingTopic] = useState(null);
 
-    const steps = [
-        { number: 1, title: "Provide guardrail details", optional: false },
-        { number: 2, title: "Configure content filters", optional: true },
-        { number: 3, title: "Add denied topics", optional: true },
-        { number: 4, title: "Add word filters", optional: true },
-        { number: 5, title: "Add sensitive information filters", optional: true },
-        { number: 6, title: "Review and create", optional: false }
+    const getStepsWithSummary = () => [
+        { 
+            number: 1, 
+            title: "Provide guardrail details", 
+            optional: false,
+            summary: name ? `${name}${description ? ` - ${description.substring(0, 30)}${description.length > 30 ? '...' : ''}` : ''}` : null
+        },
+        { 
+            number: 2, 
+            title: "Configure content filters", 
+            optional: true,
+            summary: (enableHarmfulCategories || enablePromptAttacks) 
+                ? `${enableHarmfulCategories ? 'Harmful categories' : ''}${enableHarmfulCategories && enablePromptAttacks ? ', ' : ''}${enablePromptAttacks ? 'Prompt attacks' : ''}`
+                : null
+        },
+        { 
+            number: 3, 
+            title: "Add denied topics", 
+            optional: true,
+            summary: deniedTopics.length > 0 ? `${deniedTopics.length} topic${deniedTopics.length !== 1 ? 's' : ''}` : null
+        },
+        { 
+            number: 4, 
+            title: "Add word filters", 
+            optional: true,
+            summary: (filterProfanity || customWords.length > 0 || regexPatterns.length > 0) 
+                ? `${filterProfanity ? 'Profanity' : ''}${filterProfanity && customWords.length > 0 ? ', ' : ''}${customWords.length > 0 ? `${customWords.length} custom word${customWords.length !== 1 ? 's' : ''}` : ''}${(filterProfanity || customWords.length > 0) && regexPatterns.length > 0 ? ', ' : ''}${regexPatterns.length > 0 ? `${regexPatterns.length} regex pattern${regexPatterns.length !== 1 ? 's' : ''}` : ''}`
+                : null
+        },
+        { 
+            number: 5, 
+            title: "Add sensitive information filters", 
+            optional: true,
+            summary: piiTypes.length > 0 ? `${piiTypes.length} PII type${piiTypes.length !== 1 ? 's' : ''}` : null
+        },
+        { 
+            number: 6, 
+            title: "Server and application settings", 
+            optional: false,
+            summary: (selectedMcpServers.length > 0 || selectedAgentServers.length > 0) 
+                ? (() => {
+                    const serverSummary = [];
+                    if (selectedMcpServers.length > 0) {
+                        const mcpNames = selectedMcpServers
+                            .map(serverId => {
+                                const server = mcpServers.find(s => s.value === serverId);
+                                return server ? server.label : serverId;
+                            })
+                            .slice(0, 2);
+                        const mcpMore = selectedMcpServers.length > 2 ? ` +${selectedMcpServers.length - 2}` : '';
+                        serverSummary.push(`MCP: ${mcpNames.join(", ")}${mcpMore}`);
+                    }
+                    if (selectedAgentServers.length > 0) {
+                        const agentNames = selectedAgentServers
+                            .map(serverId => {
+                                const server = agentServers.find(s => s.value === serverId);
+                                return server ? server.label : serverId;
+                            })
+                            .slice(0, 2);
+                        const agentMore = selectedAgentServers.length > 2 ? ` +${selectedAgentServers.length - 2}` : '';
+                        serverSummary.push(`Agent: ${agentNames.join(", ")}${agentMore}`);
+                    }
+                    const appSettings = (applyOnRequest || applyOnResponse) ? 
+                        ` - ${applyOnRequest ? 'Req' : ''}${applyOnRequest && applyOnResponse ? '/' : ''}${applyOnResponse ? 'Res' : ''}` : '';
+                    return `${serverSummary.join(", ")}${appSettings}`;
+                })()
+                : null
+        }
     ];
+
+    const steps = getStepsWithSummary();
+
+    // Filter collections when modal opens or allCollections changes
+    useEffect(() => {
+        if (isOpen) {
+            if (allCollections && allCollections.length > 0) {
+                filterCollections();
+            } else {
+                // Set empty arrays if no collections available
+                setMcpServers([]);
+                setAgentServers([]);
+                setCollectionsLoading(false);
+            }
+        }
+    }, [isOpen, allCollections]);
+
+    // Populate form when editing
+    useEffect(() => {
+        if (isOpen && isEditMode && editingPolicy) {
+            populateFormForEdit(editingPolicy);
+        } else if (isOpen && !isEditMode) {
+            resetForm();
+        }
+    }, [isOpen, isEditMode, editingPolicy]);
+
+    const filterCollections = () => {
+        setCollectionsLoading(true);
+        try {
+            console.log("allCollections:", allCollections);
+            console.log("Sample collection structure:", allCollections[0]);
+
+            const mcpServerCollections = allCollections.filter(collection => {
+                const hasMcpEnvType = collection.envType && collection.envType.some(envType =>
+                    envType.keyName === 'mcp-server' && envType.value === 'MCP Server'
+                );
+                return hasMcpEnvType;
+            })
+            .sort((a, b) => (b.startTs || 0) - (a.startTs || 0)) // Sort by creation time, latest first
+            .map(collection => ({
+                label: collection.displayName,
+                value: collection.id.toString()
+            }));
+
+
+            const agentServerCollections = allCollections.filter(collection => {
+                const hasGenAiEnvType = collection.envType && collection.envType.some(envType =>
+                    envType.keyName === 'gen-ai' && envType.value === 'Gen AI'
+                );
+                return hasGenAiEnvType;
+            })
+            .sort((a, b) => (b.startTs || 0) - (a.startTs || 0)) // Sort by creation time, latest first
+            .map(collection => ({
+                label: collection.displayName,
+                value: collection.id.toString()
+            }));
+
+            setMcpServers(mcpServerCollections);
+            setAgentServers(agentServerCollections);
+        } catch (error) {
+            console.error("Error filtering collections:", error);
+        } finally {
+            setCollectionsLoading(false);
+        }
+    };
 
     const resetForm = () => {
         setCurrentStep(1);
@@ -103,6 +248,80 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave }) => {
         setCustomWords([]);
         setNewWord("");
         setPiiTypes([]);
+        setRegexPatterns([]);
+        setSelectedMcpServers([]);
+        setSelectedAgentServers([]);
+        setApplyOnResponse(false);
+        setApplyOnRequest(false);
+    };
+
+    const populateFormForEdit = (policy) => {
+        setName(policy.name || "");
+        setDescription(policy.description || "");
+        setBlockedMessage(policy.blockedMessage || "");
+        setApplyToResponses(policy.applyToResponses || false);
+        
+        // Content filters
+        if (policy.contentFiltering) {
+            if (policy.contentFiltering.harmfulCategories) {
+                setEnableHarmfulCategories(true);
+                setHarmfulCategoriesSettings({
+                    hate: policy.contentFiltering.harmfulCategories.hate || "HIGH",
+                    insults: policy.contentFiltering.harmfulCategories.insults || "HIGH",
+                    sexual: policy.contentFiltering.harmfulCategories.sexual || "HIGH",
+                    violence: policy.contentFiltering.harmfulCategories.violence || "HIGH",
+                    misconduct: policy.contentFiltering.harmfulCategories.misconduct || "HIGH",
+                    useForResponses: policy.contentFiltering.harmfulCategories.useForResponses || false
+                });
+            }
+            if (policy.contentFiltering.promptAttacks) {
+                setEnablePromptAttacks(true);
+                setPromptAttackLevel(policy.contentFiltering.promptAttacks.level || "HIGH");
+            }
+        }
+        
+        // Denied topics
+        setDeniedTopics(policy.deniedTopics || []);
+        
+        // Word filters
+        if (policy.wordFilters) {
+            setFilterProfanity(policy.wordFilters.profanity || false);
+            setCustomWords(policy.wordFilters.custom || []);
+        }
+        
+        // PII filters
+        setPiiTypes(policy.piiTypes || []);
+        
+        // Regex patterns - prefer V2 format with behavior, fallback to old format
+        if (policy.regexPatternsV2 && policy.regexPatternsV2.length > 0) {
+            setRegexPatterns(policy.regexPatternsV2);
+        } else if (policy.regexPatterns && policy.regexPatterns.length > 0) {
+            // Convert old format to new format with default behavior
+            const convertedPatterns = policy.regexPatterns.map(pattern => ({
+                pattern: pattern,
+                behavior: "block" // Default behavior for old data
+            }));
+            setRegexPatterns(convertedPatterns);
+        } else {
+            setRegexPatterns([]);
+        }
+        
+        // Server settings - prefer V2 format with names, fallback to old format
+        if (policy.selectedMcpServersV2 && policy.selectedMcpServersV2.length > 0) {
+            // Extract IDs from V2 format for form population
+            setSelectedMcpServers(policy.selectedMcpServersV2.map(server => server.id));
+        } else {
+            setSelectedMcpServers(policy.selectedMcpServers || []);
+        }
+        
+        if (policy.selectedAgentServersV2 && policy.selectedAgentServersV2.length > 0) {
+            // Extract IDs from V2 format for form population
+            setSelectedAgentServers(policy.selectedAgentServersV2.map(server => server.id));
+        } else {
+            setSelectedAgentServers(policy.selectedAgentServers || []);
+        }
+        setApplyOnResponse(policy.applyOnResponse || false);
+        setApplyOnRequest(policy.applyOnRequest || false);
     };
 
     const handleClose = () => {
@@ -122,13 +341,34 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave }) => {
         }
     };
 
-    const handleSkipToReview = () => {
+    const handleSkipToServers = () => {
         setCurrentStep(6);
     };
 
     const handleSave = async () => {
         setLoading(true);
         try {
+            // Transform selectedMcpServers and selectedAgentServers to include both ID and name
+            const transformedMcpServers = selectedMcpServers
+                .filter(serverId => serverId) // Filter out empty values
+                .map(serverId => {
+                    const server = mcpServers.find(s => s.value === serverId || s.value === serverId.toString());
+                    return {
+                        id: serverId.toString(),
+                        name: server ? server.label : serverId.toString()
+                    };
+                });
+
+            const transformedAgentServers = selectedAgentServers
+                .filter(serverId => serverId) // Filter out empty values  
+                .map(serverId => {
+                    const server = agentServers.find(s => s.value === serverId || s.value === serverId.toString());
+                    return {
+                        id: serverId.toString(),
+                        name: server ? server.label : serverId.toString()
+                    };
+                });
+
             const guardrailData = {
                 name,
                 description,
@@ -143,8 +383,37 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave }) => {
                     profanity: filterProfanity,
                     custom: customWords
                 },
-                piiFilters: piiTypes
+                piiFilters: piiTypes,
+                // Save in both old and new formats for backward compatibility
+                regexPatterns: regexPatterns
+                    .filter(r => r && r.pattern) // Ensure valid regex objects
+                    .map(r => r.pattern), // Old format (just patterns)
+                regexPatternsV2: regexPatterns
+                    .filter(r => r && r.pattern && r.behavior) // Ensure valid regex objects with behavior
+                    .map(r => ({
+                        pattern: r.pattern,
+                        behavior: r.behavior.toLowerCase() // Ensure consistent case
+                    })), // New format (with behavior)
+                selectedMcpServers: selectedMcpServers, // Old format (just IDs)
+                selectedAgentServers: selectedAgentServers, // Old format (just IDs)
+                selectedMcpServersV2: transformedMcpServers, // New format (with names)
+                selectedAgentServersV2: transformedAgentServers, // New format (with names)
+                applyOnResponse,
+                applyOnRequest,
+                // Add edit mode information
+                ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
             };
+
+            // Debug: Log the data being sent
+            console.log("=== FRONTEND DEBUG: Data being sent to backend ===");
+            console.log("Full guardrailData:", JSON.stringify(guardrailData, null, 2));
+            console.log("regexPatterns:", guardrailData.regexPatterns);
+            console.log("regexPatternsV2:", guardrailData.regexPatternsV2);
+            console.log("selectedMcpServers:", guardrailData.selectedMcpServers);
+            console.log("selectedMcpServersV2:", guardrailData.selectedMcpServersV2);
+            console.log("selectedAgentServers:", guardrailData.selectedAgentServers);
+            console.log("selectedAgentServersV2:", guardrailData.selectedAgentServersV2);
+            console.log("=== END FRONTEND DEBUG ===");
             
             await onSave(guardrailData);
             handleClose();
@@ -182,6 +451,14 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave }) => {
         setPiiTypes(piiTypes.filter((_, i) => i !== index));
     };
 
+    const addRegexPattern = (regexData) => {
+        setRegexPatterns([...regexPatterns, regexData]);
+    };
+
+    const removeRegexPattern = (index) => {
+        setRegexPatterns(regexPatterns.filter((_, i) => i !== index));
+    };
+
     const handleSaveTopic = (topicData) => {
         if (editingTopic !== null) {
             // Update existing topic
@@ -201,37 +478,51 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave }) => {
         setShowAddPiiModal(false);
     };
 
+    const handleSaveRegex = (regexData) => {
+        setRegexPatterns([...regexPatterns, regexData]);
+        setShowAddRegexModal(false);
+    };
+
     const renderStepIndicator = () => (
         <Box paddingBlockEnd="4">
             <VerticalStack gap="2">
                 {steps.map((step) => (
-                    <HorizontalStack key={step.number} gap="2" blockAlign="center">
-                        <div style={{
-                            width: "24px",
-                            height: "24px",
-                            borderRadius: "50%",
-                            backgroundColor: step.number === currentStep ? "#0070f3" : 
-                                            step.number < currentStep ? "#008060" : "#e1e3e5",
-                            color: step.number <= currentStep ? "white" : "#6d7175",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontSize: "12px",
-                            fontWeight: "bold"
-                        }}>
-                            {step.number < currentStep ? <Icon source={ChecklistMajor} /> : step.number}
-                        </div>
-                        <Text 
-                            variant="bodyMd" 
-                            color={step.number === currentStep ? "critical" : "subdued"}
-                            fontWeight={step.number === currentStep ? "bold" : "regular"}
-                        >
-                            {step.title}
-                        </Text>
-                        {step.optional && (
-                            <Badge size="small" tone="info">optional</Badge>
+                    <VerticalStack key={step.number} gap="1">
+                        <HorizontalStack gap="2" blockAlign="center">
+                            <div style={{
+                                width: "24px",
+                                height: "24px",
+                                borderRadius: "50%",
+                                backgroundColor: step.number === currentStep ? "#0070f3" : 
+                                                step.number < currentStep ? "#008060" : "#e1e3e5",
+                                color: step.number <= currentStep ? "white" : "#6d7175",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: "12px",
+                                fontWeight: "bold"
+                            }}>
+                                {step.number < currentStep ? <Icon source={ChecklistMajor} /> : step.number}
+                            </div>
+                            <Text 
+                                variant="bodyMd" 
+                                color={step.number === currentStep ? "critical" : "subdued"}
+                                fontWeight={step.number === currentStep ? "bold" : "regular"}
+                            >
+                                {step.title}
+                            </Text>
+                            {step.optional && (
+                                <Badge size="small" tone="info">optional</Badge>
+                            )}
+                        </HorizontalStack>
+                        {step.summary && (
+                            <Box paddingInlineStart="6">
+                                <Text variant="bodySm" color="subdued" fontWeight="medium">
+                                    {step.summary}
+                                </Text>
+                            </Box>
                         )}
-                    </HorizontalStack>
+                    </VerticalStack>
                 ))}
             </VerticalStack>
         </Box>
@@ -408,8 +699,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave }) => {
                             columnContentTypes={['text', 'text', 'text']}
                             headings={['Name', 'Definition', 'Sample phrases']}
                             rows={deniedTopics.map(topic => [
-                                topic.name,
-                                topic.definition,
+                                topic.topic,
+                                topic.description,
                                 `${topic.samplePhrases.length} phrase${topic.samplePhrases.length !== 1 ? 's' : ''}`
                             ])}
                         />
@@ -519,36 +810,102 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave }) => {
                 <Button onClick={() => setShowAddPiiModal(true)}>Add new PII</Button>
 
                 <Box paddingBlockStart="4">
-                    <Text variant="headingMd">Regex patterns</Text>
-                    <Text variant="bodyMd" tone="subdued">
-                        Add up to 10 regex patterns to filter custom types of sensitive information for your specific use case. A blocked message will show if user input or model responses match these patterns.
-                    </Text>
+                    <VerticalStack gap="3">
+                        <Text variant="headingMd">Regex patterns</Text>
+                        <Text variant="bodyMd" tone="subdued">
+                            Add up to 10 regex patterns to filter custom types of sensitive information for your specific use case.
+                        </Text>
+                        
+                        <HorizontalStack align="space-between">
+                            <Text variant="headingMd">Regex patterns ({regexPatterns.length})</Text>
+                            <HorizontalStack gap="2">
+                                <Button onClick={() => setRegexPatterns([])}>Delete all</Button>
+                                <Button primary onClick={() => setShowAddRegexModal(true)}>Add regex pattern</Button>
+                            </HorizontalStack>
+                        </HorizontalStack>
+
+                        {regexPatterns.length > 0 && (
+                            <div style={{ border: "1px solid #d1d5db", borderRadius: "8px", overflow: "hidden" }}>
+                                <DataTable
+                                    columnContentTypes={['text', 'text', 'text']}
+                                    headings={['Regex Pattern', 'Guardrail behavior', 'Actions']}
+                                    rows={regexPatterns.map((regex, index) => [
+                                        regex.pattern || 'Invalid pattern',
+                                        regex.behavior ? regex.behavior.charAt(0).toUpperCase() + regex.behavior.slice(1) : 'Unknown',
+                                        <Button
+                                            key={index}
+                                            icon={DeleteMajor}
+                                            variant="plain"
+                                            onClick={() => removeRegexPattern(index)}
+                                        />
+                                    ])}
+                                />
+                            </div>
+                        )}
+                    </VerticalStack>
                 </Box>
             </VerticalStack>
         </LegacyCard>
     );
 
-
     const renderStep6 = () => (
+        <LegacyCard sectioned>
             <VerticalStack gap="4">
-                <Text variant="headingMd">Review and create</Text>
+                <Text variant="headingMd">Server and application settings</Text>
                 <Text variant="bodyMd" tone="subdued">
-                    Review your guardrail configuration and create the guardrail.
+                    Configure which servers the guardrail should be applied to and specify whether it applies to requests, responses, or both.
                 </Text>
-                
-                <div style={{ padding: "16px", border: "1px solid #d1d5db", borderRadius: "8px", backgroundColor: "#FFFFFF" }}>
-                    <VerticalStack gap="3">
-                        <Text variant="headingMd">Guardrail Summary</Text>
-                        <Text variant="bodyMd"><strong>Name:</strong> {name || "Not specified"}</Text>
-                        <Text variant="bodyMd"><strong>Description:</strong> {description || "Not specified"}</Text>
-                        <Text variant="bodyMd"><strong>Content Filters:</strong> {enableHarmfulCategories || enablePromptAttacks ? "Enabled" : "Disabled"}</Text>
-                        <Text variant="bodyMd"><strong>Denied Topics:</strong> {deniedTopics.length} topics</Text>
-                        <Text variant="bodyMd"><strong>Word Filters:</strong> {filterProfanity || customWords.length > 0 ? "Enabled" : "Disabled"}</Text>
-                        <Text variant="bodyMd"><strong>PII Filters:</strong> {piiTypes.length} types</Text>
-                    </VerticalStack>
-                </div>
+
+                <FormLayout>
+                    <DropdownSearch
+                        label="Select MCP Servers"
+                        placeholder="Choose MCP servers where guardrail should be applied"
+                        optionsList={mcpServers}
+                        setSelected={setSelectedMcpServers}
+                        preSelected={selectedMcpServers}
+                        allowMultiple={true}
+                        disabled={collectionsLoading}
+                    />
+
+                    <DropdownSearch
+                        label="Select Agent Servers"
+                        placeholder="Choose agent servers where guardrail should be applied"
+                        optionsList={agentServers}
+                        setSelected={setSelectedAgentServers}
+                        preSelected={selectedAgentServers}
+                        allowMultiple={true}
+                        disabled={collectionsLoading}
+                    />
+
+                    <div style={{ padding: "16px", border: "1px solid #d1d5db", borderRadius: "8px", backgroundColor: "#FFFFFF" }}>
+                        <VerticalStack gap="3">
+                            <Text variant="headingMd">Application Settings</Text>
+                            <Text variant="bodyMd" tone="subdued">
+                                Specify whether the guardrail should be applied to responses and/or requests.
+                            </Text>
+
+                            <VerticalStack gap="2">
+                                <Checkbox
+                                    label="Apply guardrail to responses"
+                                    checked={applyOnResponse}
+                                    onChange={setApplyOnResponse}
+                                    helpText="When enabled, this guardrail will filter and evaluate model responses before they're sent to users."
+                                />
+
+                                <Checkbox
+                                    label="Apply guardrail to requests"
+                                    checked={applyOnRequest}
+                                    onChange={setApplyOnRequest}
+                                    helpText="When enabled, this guardrail will filter and evaluate user inputs before they're processed by the model."
+                                />
+                            </VerticalStack>
+                        </VerticalStack>
+                    </div>
+                </FormLayout>
             </VerticalStack>
+        </LegacyCard>
     );
+
 
     const renderCurrentStep = () => {
         switch (currentStep) {
@@ -574,8 +931,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave }) => {
 
         if (currentStep > 1 && currentStep < 6) {
             actions.push({
-                content: "Skip to Review and create",
-                onAction: handleSkipToReview
+                content: "Skip to Server settings",
+                onAction: handleSkipToServers
             });
         }
 
@@ -585,7 +942,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave }) => {
     const getPrimaryAction = () => {
         if (currentStep === 6) {
             return {
-                content: "Create Guardrail",
+                content: isEditMode ? "Update Guardrail" : "Create Guardrail",
                 onAction: handleSave,
                 loading: loading,
                 disabled: !name.trim() || !blockedMessage.trim()
@@ -605,7 +962,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave }) => {
             <Modal
                 open={isOpen}
                 onClose={handleClose}
-                title={`Create guardrail - Step ${currentStep}`}
+                title={`${isEditMode ? 'Edit' : 'Create'} guardrail - Step ${currentStep}`}
                 primaryAction={getPrimaryAction()}
                 secondaryActions={[
                     {
@@ -644,6 +1001,12 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave }) => {
                 isOpen={showAddPiiModal}
                 onClose={() => setShowAddPiiModal(false)}
                 onSave={handleSavePii}
+            />
+
+            <AddRegexPatternModal
+                isOpen={showAddRegexModal}
+                onClose={() => setShowAddRegexModal(false)}
+                onSave={handleSaveRegex}
             />
         </>
     );

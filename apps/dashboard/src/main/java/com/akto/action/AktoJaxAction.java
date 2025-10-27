@@ -10,12 +10,13 @@ import com.akto.dto.ApiCollection;
 import com.akto.dto.CrawlerRun;
 import com.akto.dto.CrawlerUrl;
 import com.akto.dto.RecordedLoginFlowInput;
-import com.akto.dto.testing.AuthMechanism;
-import com.akto.dto.testing.TestRoles;
+import com.akto.dto.testing.*;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
 import com.akto.util.RecordedLoginFlowUtil;
+import com.akto.util.enums.LoginFlowEnums;
 import com.akto.utils.Utils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.mongodb.BasicDBList;
@@ -50,6 +51,9 @@ public class AktoJaxAction extends UserAction {
     private boolean accepted;
     private int timestamp;
     private String crawlId;
+    private String sourceUrl;
+    private String sourceXpath;
+    private String buttonText;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AktoJaxAction.class, LogDb.DASHBOARD);
 
@@ -103,25 +107,47 @@ public class AktoJaxAction extends UserAction {
             } else if(testRoleHaxId != null && !testRoleHaxId.isEmpty()) {
                 TestRoles testRole = TestRolesDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(testRoleHaxId)));
                 AuthMechanism authMechanismForRole = testRole.findDefaultAuthMechanism();
+                if (testRole != null && !testRole.getAuthWithCondList().isEmpty() && testRole.getAuthWithCondList().get(0).getRecordedLoginFlowInput() != null) {
+                    try {
+                        RecordedLoginFlowInput recordedLoginFlowInput = authMechanismForRole.getRecordedLoginFlowInput();
+                        String payload = recordedLoginFlowInput.getContent().toString();
+                        File tmpOutputFile;
+                        File tmpErrorFile;
+                        tmpOutputFile = File.createTempFile("output", ".json");
+                        tmpErrorFile = File.createTempFile("recordedFlowOutput", ".txt");
+                        RecordedLoginFlowUtil.triggerFlow(recordedLoginFlowInput.getTokenFetchCommand(), payload, tmpOutputFile.getPath(), tmpErrorFile.getPath(), getSUser().getId());
 
-                RecordedLoginFlowInput recordedLoginFlowInput = authMechanismForRole.getRecordedLoginFlowInput();
-                String payload = recordedLoginFlowInput.getContent().toString();
-                File tmpOutputFile;
-                File tmpErrorFile;
-                try {
-                    tmpOutputFile = File.createTempFile("output", ".json");
-                    tmpErrorFile = File.createTempFile("recordedFlowOutput", ".txt");
-                    RecordedLoginFlowUtil.triggerFlow(recordedLoginFlowInput.getTokenFetchCommand(), payload, tmpOutputFile.getPath(), tmpErrorFile.getPath(), getSUser().getId());
-
-                    String token = RecordedLoginFlowUtil.fetchToken(tmpOutputFile.getPath(), tmpErrorFile.getPath());
-                    BasicDBObject parseToken = BasicDBObject.parse(token);
-                    if(parseToken != null) {
-                        loggerMaker.infoAndAddToDb("Got the cookies from test role for crawler");
-                        BasicDBList allCookies = (BasicDBList) parseToken.get("all_cookies");
-                        requestBody.put("cookies", allCookies);
+                        String token = RecordedLoginFlowUtil.fetchToken(tmpOutputFile.getPath(), tmpErrorFile.getPath());
+                        BasicDBObject parseToken = BasicDBObject.parse(token);
+                        if (parseToken != null) {
+                            loggerMaker.infoAndAddToDb("Got the cookies from test role for crawler");
+                            BasicDBList allCookies = (BasicDBList) parseToken.get("all_cookies");
+                            requestBody.put("cookies", allCookies);
+                        }
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("Error while fetching cookies/token from test role using jsonRecording. Error: " + e.getMessage());
+                        return ERROR.toUpperCase();
                     }
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("Error while fetching cookies from test role: " + e.getMessage());
+                } else {
+                    try {
+                        TestExecutor testExecutor = new TestExecutor();
+                        LoginFlowParams loginFlowParams = new LoginFlowParams(getSUser().getId(), true, "x1");
+                        LoginFlowResponse loginFlowResponse = testExecutor.executeLoginFlow(authMechanismForRole, loginFlowParams, testRole.getName());
+
+                        if (!loginFlowResponse.getSuccess()) {
+                            addActionError("Error while fetching accessToken.");
+                            return ERROR.toUpperCase();
+                        }
+
+                        List<AuthParam> authParamsToUse = authMechanismForRole.getAuthParamsFromAuthMechanism();
+                        AuthParam authParam = authParamsToUse.get(0);
+
+                        requestBody.put("cookies", "Bearer " + authParam.getValue());
+                    } catch (Exception ex) {
+                        addActionError(ex.getMessage());
+                        loggerMaker.errorAndAddToDb("Error while fetching cookies/token from test role using loginStepBuilder. Error: " + ex.getMessage());
+                        return ERROR.toUpperCase();
+                    }
                 }
             }
 
@@ -189,7 +215,7 @@ public class AktoJaxAction extends UserAction {
                 return Action.ERROR.toUpperCase();
             }
 
-            CrawlerUrl crawlerUrl = new CrawlerUrl(url, accepted, timestamp, crawlId);
+            CrawlerUrl crawlerUrl = new CrawlerUrl(url, accepted, timestamp, crawlId, sourceUrl, sourceXpath, buttonText);
             CrawlerUrlDao.instance.insertOne(crawlerUrl);
 
             loggerMaker.infoAndAddToDb("Crawler URL saved successfully");
@@ -303,5 +329,29 @@ public class AktoJaxAction extends UserAction {
 
     public void setCrawlId(String crawlId) {
         this.crawlId = crawlId;
+    }
+
+    public String getSourceUrl() {
+        return sourceUrl;
+    }
+
+    public void setSourceUrl(String sourceUrl) {
+        this.sourceUrl = sourceUrl;
+    }
+
+    public String getSourceXpath() {
+        return sourceXpath;
+    }
+
+    public void setSourceXpath(String sourceXpath) {
+        this.sourceXpath = sourceXpath;
+    }
+
+    public String getButtonText() {
+        return buttonText;
+    }
+
+    public void setButtonText(String buttonText) {
+        this.buttonText = buttonText;
     }
 }

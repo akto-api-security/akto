@@ -17,15 +17,30 @@ const headers = [
         filterKey: "url",
         showFilter: true
     },
-    // TODO: implement this
-    // {
-    //     title: "Status",
-    //     text: "Status",
-    //     value: "statusComp",
-    //     textValue: "status",
-    //     filterKey: "status",
-    //     showFilter: true
-    // },
+    {
+        title: "Source URL",
+        text: "Source URL",
+        value: "sourceUrlComp",
+        textValue: "sourceUrl",
+        filterKey: "sourceUrl",
+        showFilter: true
+    },
+    {
+        title: "Button Text",
+        text: "Button Text",
+        value: "buttonTextComp",
+        textValue: "buttonText",
+        filterKey: "buttonText",
+        showFilter: true
+    },
+    {
+        title: "Terminal",
+        text: "Status",
+        value: "statusComp",
+        textValue: "status",
+        filterKey: "status",
+        showFilter: true
+    },
     {
         title: "Discovered At",
         text: "Discovered At",
@@ -34,8 +49,8 @@ const headers = [
 ]
 
 const sortOptions = [
-    { label: 'Discovered At', value: 'timestamp asc', directionLabel: 'Recent first', sortKey: 'timestamp', columnIndex: 2 },
-    { label: 'Discovered At', value: 'timestamp desc', directionLabel: 'Oldest first', sortKey: 'timestamp', columnIndex: 2 }
+    { label: 'Discovered At', value: 'timestamp asc', directionLabel: 'Recent first', sortKey: 'timestamp', columnIndex: 5 },
+    { label: 'Discovered At', value: 'timestamp desc', directionLabel: 'Oldest first', sortKey: 'timestamp', columnIndex: 5 }
 ]
 
 const resourceName = {
@@ -57,7 +72,7 @@ function DastProgressSingle() {
 
             const crawlerUrls = resp || []
             const formattedData = crawlerUrls.map((urlItem, index) => {
-                const status = urlItem.accepted ? "Visited" : "Rejected"
+                const status = urlItem.accepted ? "Non-terminal" : "Terminal"
                 const statusColor = urlItem.accepted ? "success" : "warning"
 
                 return {
@@ -69,6 +84,36 @@ function DastProgressSingle() {
                                 tooltip={urlItem.url}
                                 text={urlItem.url}
                                 textProps={{ fontWeight: 'medium' }}
+                            />
+                        </Box>
+                    ),
+                    sourceUrl: urlItem.sourceUrl || '-',
+                    sourceUrlComp: (
+                        <Box maxWidth="30vw">
+                            <TooltipText
+                                tooltip={urlItem.sourceUrl || 'N/A'}
+                                text={urlItem.sourceUrl || '-'}
+                                textProps={{ fontWeight: 'regular' }}
+                            />
+                        </Box>
+                    ),
+                    sourceXpath: urlItem.sourceXpath || '-',
+                    sourceXpathComp: (
+                        <Box maxWidth="30vw">
+                            <TooltipText
+                                tooltip={urlItem.sourceXpath || 'N/A'}
+                                text={urlItem.sourceXpath || '-'}
+                                textProps={{ fontWeight: 'regular' }}
+                            />
+                        </Box>
+                    ),
+                    buttonText: urlItem.buttonText || '-',
+                    buttonTextComp: (
+                        <Box maxWidth="20vw">
+                            <TooltipText
+                                tooltip={urlItem.buttonText || 'N/A'}
+                                text={urlItem.buttonText || '-'}
+                                textProps={{ fontWeight: 'regular' }}
                             />
                         </Box>
                     ),
@@ -133,16 +178,15 @@ function DastProgressSingle() {
                                         <Text variant="bodyMd" fontWeight="semibold">{crawlDetails.totalUrls}</Text>
                                     </Box>
                                     <Divider orientation="vertical" />
-                                    {/* TODO: implement this later. */}
-                                    {/* <Box>
-                                        <Text variant="bodyMd" color="subdued">Visited Pages</Text>
+                                    <Box>
+                                        <Text variant="bodyMd" color="subdued">Non-terminal Pages</Text>
                                         <Text variant="bodyMd" fontWeight="semibold" color="success">{crawlDetails.acceptedUrls}</Text>
                                     </Box>
                                     <Divider orientation="vertical" />
                                     <Box>
-                                        <Text variant="bodyMd" color="subdued">Rejected Pages</Text>
+                                        <Text variant="bodyMd" color="subdued">Terminal Pages</Text>
                                         <Text variant="bodyMd" fontWeight="semibold" color="warning">{crawlDetails.rejectedUrls}</Text>
-                                    </Box> */}
+                                    </Box>
                                 </HorizontalStack>
                             </VerticalStack>
                         </Card>

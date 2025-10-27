@@ -477,5 +477,6 @@ public class DaoInit {
         SensitiveSampleDataDao.instance.createIndicesIfAbsent();
         McpAuditInfoDao.instance.createIndicesIfAbsent();
         McpReconRequestDao.instance.createIndicesIfAbsent();
+        GuardrailPoliciesDao.instance.createIndicesIfAbsent();
     }
 }
