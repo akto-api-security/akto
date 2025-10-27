@@ -6,7 +6,6 @@ import com.akto.dao.ConfigsDao;
 import com.akto.dto.Config;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.onprem.Constants;
 
 public class RSAKeyPairUtils {
 
@@ -75,50 +74,5 @@ public class RSAKeyPairUtils {
         }
 
         return null;
-    }
-
-    /**
-     * Ensures RSA keys are persisted in the database.
-     * If keys don't exist in DB, this method will fetch current keys from Constants
-     * and save them to the database.
-     * This should be called from InitializerListener after DB connection is established.
-     */
-    public static void initializeKeysFromDb() {
-        logger.info("Initializing RSA keys in db");
-
-        try {
-            Config.RSAKeyPairConfig rsaKeyPairConfig = (Config.RSAKeyPairConfig) ConfigsDao.instance.findOne("_id", Config.ConfigType.RSA_KP.name());
-
-            if (rsaKeyPairConfig == null) {
-                logger.info("RSA keys config not found in db, creating new keys");
-
-                // Get current keys from Constants (which were generated in static block)
-                byte[] privateKeyBytes = Constants.getPrivateKey();
-                byte[] publicKeyBytes = Constants.getPublicKey();
-
-                if (privateKeyBytes != null && publicKeyBytes != null) {
-                    // Convert byte arrays to PEM format
-                    String pemPrivateKey = "-----BEGIN PRIVATE KEY-----\n"
-                        + Base64.getEncoder().encodeToString(privateKeyBytes)
-                        + "\n-----END PRIVATE KEY-----";
-
-                    String pemPublicKey = "-----BEGIN PUBLIC KEY-----\n"
-                        + Base64.getEncoder().encodeToString(publicKeyBytes)
-                        + "\n-----END PUBLIC KEY-----";
-
-                    // Create and insert new config
-                    rsaKeyPairConfig = new Config.RSAKeyPairConfig(pemPrivateKey, pemPublicKey);
-                    ConfigsDao.instance.insertOne(rsaKeyPairConfig);
-
-                    logger.info("Successfully created and saved new RSA keys to db");
-                } else {
-                    logger.error("Cannot save keys to db: keys are null in Constants");
-                }
-            } else {
-                logger.info("RSA keys already exist in db");
-            }
-        } catch (Exception e) {
-            logger.error("Error while initializing RSA keys in db", e);
-        }
     }
 }
