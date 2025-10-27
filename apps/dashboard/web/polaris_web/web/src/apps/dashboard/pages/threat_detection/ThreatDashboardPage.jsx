@@ -160,21 +160,22 @@ function ThreatDashboardPage() {
                 setSeverityDistribution(emptyFormattedSeverity)
             }
 
-            // Row 4: Top Attacked Hosts and APIs
-            // Top Attacked Hosts - Use dummy data
-            const hostsData = dummyData.getTopHostsData()
-            setTopAttackedHosts(hostsData)
-
-            // Top Attacked APIs - Use API
+            // Row 4: Top Attacked Hosts and APIs via common API
             try {
-                const topApisResponse = await api.fetchThreatTopNData(startTimestamp, endTimestamp, [], 5)
-                if (topApisResponse?.topApis && Array.isArray(topApisResponse.topApis)) {
-                    setTopAttackedApis(topApisResponse.topApis)
+                const topResponse = await api.fetchThreatTopNData(startTimestamp, endTimestamp, [], 5)
+                if (topResponse?.topApis && Array.isArray(topResponse.topApis)) {
+                    setTopAttackedApis(topResponse.topApis)
+                } else {
+                    setTopAttackedApis([])
+                }
+                if (topResponse?.topHosts && Array.isArray(topResponse.topHosts)) {
+                    setTopAttackedHosts(topResponse.topHosts)
+                } else {
+                    setTopAttackedHosts([])
                 }
             } catch (err) {
-                //console.error('Error fetching top APIs:', err)
-                // Fall back to empty state
                 setTopAttackedApis([])
+                setTopAttackedHosts([])
             }
 
         } catch (error) {
@@ -354,8 +355,7 @@ function ThreatDashboardPage() {
     const generateHostTableRows = (hosts) => {
         return hosts.map((host) => ([
             <Text variant='bodyMd'>{host.host}</Text>,
-            <Text variant='bodySm' alignment='end'>{host.attacks}</Text>,
-            <Text variant='bodySm' alignment='end'>{host.apis}</Text>
+            <Text variant='bodySm' alignment='end'>{host.attacks}</Text>
         ]))
     }
 
@@ -380,8 +380,8 @@ function ThreatDashboardPage() {
             component={
                 <Box>
                     <DataTable
-                        columnContentTypes={['text', 'numeric', 'numeric']}
-                        headings={['Host', 'Attacks', 'APIs']}
+                        columnContentTypes={['text', 'numeric']}
+                        headings={['Host', 'Attacks']}
                         rows={generateHostTableRows(topAttackedHosts)}
                         hoverable={false}
                         increasedTableDensity
