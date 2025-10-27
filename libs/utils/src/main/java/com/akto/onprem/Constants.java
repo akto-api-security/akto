@@ -1,9 +1,13 @@
 package com.akto.onprem;
 
+import com.akto.DaoInit;
 import com.akto.dao.ConfigsDao;
+import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
 import com.akto.util.DashboardMode;
+import com.akto.utils.RSAKeyPairUtils;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 
 import java.security.KeyPair;
@@ -28,22 +32,53 @@ public class Constants {
 
     public static final String SLACK_ALERT_USAGE_URL = "";
 
-    private static byte[] privateKey, publicKey;
+    private static final byte[] privateKey;
+    private static final byte[] publicKey;
 
     static {
-        KeyPairGenerator kpg;
-        KeyPair kp = null;
-        try {
-            kpg = KeyPairGenerator.getInstance("RSA");
-            kpg.initialize(2048);
-            kp = kpg.generateKeyPair();
+        byte[] tempPrivateKey = null;
+        byte[] tempPublicKey = null;
 
-        } catch (NoSuchAlgorithmException e) {
-            ;
+        // Try to initialize DB connection and fetch keys from database
+        try {
+            // Check if DB client is not already initialized
+            if (MCollection.clients[0] == null) {
+                String mongoURI = System.getenv("AKTO_MONGO_CONN");
+                if (mongoURI != null && !mongoURI.isEmpty()) {
+                    DaoInit.init(new ConnectionString(mongoURI));
+                }
+            }
+
+            // Now try to fetch keys if DB is connected
+            if (MCollection.clients[0] != null && MCollection.checkConnection()) {
+                byte[][] keys = RSAKeyPairUtils.fetchKeysFromDb();
+                if (keys != null && keys.length == 2) {
+                    tempPrivateKey = keys[0];
+                    tempPublicKey = keys[1];
+                }
+            }
+        } catch (Exception e) {
+            // Database not yet initialized or keys not found, will generate new ones
         }
 
-        privateKey = kp == null ? null : kp.getPrivate().getEncoded();
-        publicKey = kp == null ? null : kp.getPublic().getEncoded();
+        // If keys weren't found in database, generate new ones
+        if (tempPrivateKey == null || tempPublicKey == null) {
+            KeyPairGenerator kpg;
+            KeyPair kp = null;
+            try {
+                kpg = KeyPairGenerator.getInstance("RSA");
+                kpg.initialize(2048);
+                kp = kpg.generateKeyPair();
+            } catch (NoSuchAlgorithmException e) {
+                ;
+            }
+
+            tempPrivateKey = kp == null ? null : kp.getPrivate().getEncoded();
+            tempPublicKey = kp == null ? null : kp.getPublic().getEncoded();
+        }
+
+        privateKey = tempPrivateKey;
+        publicKey = tempPublicKey;
     }
 
     public static byte[] getPrivateKey() {
@@ -59,10 +94,6 @@ public class Constants {
         return Base64.getDecoder().decode(rsaPrivateKey);
     }
 
-    public static void setPrivateKey(byte[] key) {
-        privateKey = key;
-    }
-
     public static byte[] getPublicKey() {
         if (!DashboardMode.isOnPremDeployment()) {
             return publicKey;
@@ -74,10 +105,6 @@ public class Constants {
         rsaPublicKey = rsaPublicKey.replace("\n","");
 
         return Base64.getDecoder().decode(rsaPublicKey);
-    }
-
-    public static void setPublicKey(byte[] key) {
-        publicKey = key;
     }
 
     private static Config.SendgridConfig sendgridConfig;

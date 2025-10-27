@@ -2431,12 +2431,6 @@ public class InitializerListener implements ServletContextListener {
                     logger.debugAndAddToDb("Dashboard started at " + Context.now());
                 }
 
-                /*
-                 * Fetch RSA keys from db and set it in Constants
-                 */
-
-                RSAKeyPairUtils.initializeKeysFromDb();
-
                 setDashboardMode();
                 updateGlobalAktoVersion();
 
