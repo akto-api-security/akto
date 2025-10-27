@@ -1518,7 +1518,7 @@ const quickStartFunc = {
             "Manual": manual,
             "Akto SDK": aktoSdk,
             "Virtual Machines": vm,
-            "Source Code": sourceCode
+            "Source Code": sourceCode,
         }
 
         return connectors;
