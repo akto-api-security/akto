@@ -122,19 +122,19 @@ public class UsageMetricCalculator {
     }
 
     public static Set<Integer> getMcpCollections() {
-        return UsersCollectionsList.getContextCollections(CONTEXT_SOURCE.MCP, Context.getLeftNavCategory());
+        return UsersCollectionsList.getContextCollections(CONTEXT_SOURCE.MCP, Context.getSubCategory());
     }
 
     public static Set<Integer> getGenAiCollections() {
-        return UsersCollectionsList.getContextCollections(CONTEXT_SOURCE.GEN_AI, Context.getLeftNavCategory());
+        return UsersCollectionsList.getContextCollections(CONTEXT_SOURCE.GEN_AI, Context.getSubCategory());
     }
 
     public static Set<Integer> getApiCollections() {
-        return UsersCollectionsList.getContextCollections(CONTEXT_SOURCE.API, Context.getLeftNavCategory());
+        return UsersCollectionsList.getContextCollections(CONTEXT_SOURCE.API, null);
     }
 
     public static Set<Integer> getAgenticCollections() {
-        return UsersCollectionsList.getContextCollections(CONTEXT_SOURCE.AGENTIC, Context.getLeftNavCategory());
+        return UsersCollectionsList.getContextCollections(CONTEXT_SOURCE.AGENTIC, Context.getSubCategory());
     }
 
     public static List<String> getInvalidTestErrors() {

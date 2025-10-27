@@ -157,7 +157,7 @@ public class GlobalEnums {
         API, MCP, GEN_AI, AGENTIC
     }
 
-    public enum LEFT_NAVIGATION_SOURCE {
+    public enum SUB_CATEGORY_SOURCE {
         CLOUD_SECURITY, ENDPOINT_SECURITY;
     }
 

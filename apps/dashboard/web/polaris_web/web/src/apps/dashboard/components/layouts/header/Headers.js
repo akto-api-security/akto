@@ -118,6 +118,9 @@ export default function Header() {
     }
 
     const handleDashboardChange = (value) => {
+        // Preserve current subcategory selection
+        const currentSubCategory = PersistStore.getState().subCategory || 'Cloud Security';
+        
         PersistStore.getState().setAllCollections([]);
         PersistStore.getState().setCollectionsMap({});
         PersistStore.getState().setHostNameMap({});
@@ -126,7 +129,15 @@ export default function Header() {
         LocalStore.getState().setCategoryMap({}); 
         LocalStore.getState().setSubCategoryMap({});
         SessionStore.getState().setThreatFiltersMap({});
-        PersistStore.getState().setLeftNavCategory('Cloud Security');
+        
+        // Only set subcategory for dashboard categories that support subcategories
+        if (value === "MCP Security" || value === "Agentic Security") {
+            PersistStore.getState().setSubCategory(currentSubCategory);
+        } else {
+            // For API Security and other categories, reset to default
+            PersistStore.getState().setSubCategory('Cloud Security');
+        }
+        
         setDashboardCategory(value);
         window.location.reload();
         window.location.href("/dashboard/observe/inventory")

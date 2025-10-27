@@ -2,7 +2,9 @@ package com.akto.dao.context;
 
 import com.akto.dao.AccountsDao;
 import com.akto.dto.Account;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.akto.util.enums.GlobalEnums.SUB_CATEGORY_SOURCE;
 
 import java.math.BigDecimal;
 import java.time.*;
@@ -12,13 +14,13 @@ public class Context {
 public static ThreadLocal<Integer> accountId = new ThreadLocal<Integer>();
 public static ThreadLocal<Integer> userId = new ThreadLocal<Integer>();
 public static ThreadLocal<CONTEXT_SOURCE> contextSource = new ThreadLocal<CONTEXT_SOURCE>();
-public static ThreadLocal<String> leftNavCategory = new ThreadLocal<String>();
+public static ThreadLocal<SUB_CATEGORY_SOURCE> subCategory = new ThreadLocal<>();
 
     public static void resetContextThreadLocals() {
         accountId.remove();
         userId.remove();
         contextSource.remove();
-        leftNavCategory.remove();
+        subCategory.remove();
     }
 
     public static int getId() {
@@ -31,9 +33,9 @@ public static ThreadLocal<String> leftNavCategory = new ThreadLocal<String>();
         
     }
 
-    public static String getLeftNavCategory() {
+    public static SUB_CATEGORY_SOURCE getSubCategory() {
         try {
-            return leftNavCategory.get();
+            return subCategory.get();
         } catch (Exception e) {
             return null;
         }

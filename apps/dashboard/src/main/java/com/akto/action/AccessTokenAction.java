@@ -22,7 +22,7 @@ public class AccessTokenAction implements Action, ServletResponseAware, ServletR
     public static final String ACCESS_TOKEN_HEADER_NAME = "access-token";
     public static final String CONTEXT_SOURCE_HEADER = "x-context-source";
     public static final String AKTO_SESSION_TOKEN = "x-akto-session-token";
-    public static final String LEFT_NAV_CATEGORY_HEADER = "x-left-nav-category";
+    public static final String SUB_CATEGORY_HEADER = "x-sub-category";
 
     @Override
     public String execute() {

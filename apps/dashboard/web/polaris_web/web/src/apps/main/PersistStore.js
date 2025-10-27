@@ -61,7 +61,7 @@ const initialState = {
     sendEventOnLogin: false,
     tableSelectedTab: {},
     dashboardCategory: 'API Security',
-    leftNavCategory: 'Cloud Security',
+    subCategory: 'Cloud Security',
 };
 
 let persistStore = (set, get) => ({
@@ -222,11 +222,11 @@ let persistStore = (set, get) => ({
             console.error("Error setting dashboardCategory:", error);
         }
     },
-    setLeftNavCategory: (leftNavCategory) => {
+    setSubCategory: (subCategory) => {
             try {
-                set({ leftNavCategory });
+                set({ subCategory });
             } catch (error) {
-                console.error("Error setting leftNavCategory:", error);
+                console.error("Error setting subCategory:", error);
             }
     },
 
@@ -251,7 +251,7 @@ persistStore = persist(persistStore, {
         sendEventOnLogin: state.sendEventOnLogin,
         tableSelectedTab: state.tableSelectedTab,
         dashboardCategory: state.dashboardCategory,
-        leftNavCategory: state.leftNavCategory
+        subCategory: state.subCategory
     }) 
 });
 

@@ -35,7 +35,7 @@ import ReactFlow, {
   
   } from 'react-flow-renderer';
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
-import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isGenAISecurityCategory, shouldShowLeftNavSwitch, isEndpointSecurityLeftNav, getLeftNavCategory } from "../../../../main/labelHelper";
+import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isGenAISecurityCategory, shouldShowLeftNavSwitch, isEndpointSecurityLeftNav, getSubCategory } from "../../../../main/labelHelper";
 
 const CenterViewType = {
     Table: 0,
@@ -200,26 +200,6 @@ const resourceName = {
     plural: 'collections',
   };
 
-const filterCollectionsByLeftNav = (collectionsArr) => {
-    if (!shouldShowLeftNavSwitch()) {
-        return collectionsArr;
-    }
-
-    const leftNavCategory = getLeftNavCategory();
-
-    return collectionsArr.filter((collection) => {
-        const tagsList = collection?.tagsList || [];
-        const tagsString = JSON.stringify(tagsList);
-
-        if (leftNavCategory === 'Endpoint Security') {
-            // Show collections where tagsList contains source: "Endpoint"
-            return tagsString.includes('"source":"Endpoint"') || tagsString.includes('source') && tagsString.includes('Endpoint');
-        } else {
-            // Cloud Security - show collections where tagsList does NOT contain source: "Endpoint"
-            return !(tagsString.includes('"source":"Endpoint"') || (tagsString.includes('source') && tagsString.includes('Endpoint')));
-        }
-    });
-}
 
 const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, isLoading) => {
 
@@ -229,10 +209,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
         return { prettify: [], normal: [] };
     }
 
-    // Filter collections based on left navigation category
-    const filteredCollections = filterCollectionsByLeftNav(collectionsArr);
-
-    const newData = filteredCollections.map((c) => {
+    const newData = collectionsArr.map((c) => {
         if(c.deactivated){
             c.rowStatus = 'critical'
             c.disableClick = true

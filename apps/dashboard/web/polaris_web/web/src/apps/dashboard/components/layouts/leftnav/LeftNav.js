@@ -22,7 +22,7 @@ import func from "@/util/func";
 import Dropdown from "../Dropdown";
 import SessionStore from "../../../../main/SessionStore";
 import IssuesStore from "../../../pages/issues/issuesStore";
-import { CATEGORY_API_SECURITY, mapLabel, shouldShowLeftNavSwitch, LEFT_NAV_CLOUD_SECURITY, LEFT_NAV_ENDPOINT_SECURITY, getLeftNavCategory } from "../../../../main/labelHelper";
+import { CATEGORY_API_SECURITY, mapLabel, shouldShowLeftNavSwitch, SUB_CATEGORY_CLOUD_SECURITY, SUB_CATEGORY_ENDPOINT_SECURITY, getSubCategory } from "../../../../main/labelHelper";
 
 export default function LeftNav() {
     const navigate = useNavigate();
@@ -39,8 +39,8 @@ export default function LeftNav() {
     const resetStore = LocalStore(state => state.resetStore);
     const resetSession = SessionStore(state => state.resetStore);
     const resetFields = IssuesStore(state => state.resetStore);
-    const leftNavCategory = PersistStore((state) => state.leftNavCategory) || LEFT_NAV_CLOUD_SECURITY;
-    const setLeftNavCategory = PersistStore((state) => state.setLeftNavCategory);
+    const subCategory = PersistStore((state) => state.subCategory) || SUB_CATEGORY_CLOUD_SECURITY;
+    const setSubCategory = PersistStore((state) => state.setSubCategory);
 
     const handleSelect = (selectedId) => {
         setLeftNavSelected(selectedId);
@@ -58,8 +58,8 @@ export default function LeftNav() {
     };
 
 
-   const handleLeftNavCategoryChange = (selected) => {
-           setLeftNavCategory(selected);
+   const handleSubCategoryChange = (selected) => {
+           setSubCategory(selected);
            // Force refresh of current page to reload data with new left nav category
            window.location.reload();
    };
@@ -119,9 +119,9 @@ export default function LeftNav() {
                 onClick: item.onClick ? () => {
                     // Set the left nav category based on section
                     if (prefix === "cloud") {
-                        setLeftNavCategory("Cloud Security");
+                        setSubCategory("Cloud Security");
                     } else if (prefix === "endpoint") {
-                        setLeftNavCategory("Endpoint Security");
+                        setSubCategory("Endpoint Security");
                     }
                     
                     const originalHandler = item.onClick;
@@ -146,9 +146,9 @@ export default function LeftNav() {
                         onClick: subItem.onClick ? () => {
                             // Set the left nav category based on section
                             if (prefix === "cloud") {
-                                setLeftNavCategory("Cloud Security");
+                                setSubCategory("Cloud Security");
                             } else if (prefix === "endpoint") {
-                                setLeftNavCategory("Endpoint Security");
+                                setSubCategory("Endpoint Security");
                             }
                             
                             const originalHandler = subItem.onClick;
@@ -680,7 +680,7 @@ export default function LeftNav() {
         }
 
         return allItems
-    }, [dashboardCategory, leftNavSelected, leftNavCategory])
+    }, [dashboardCategory, leftNavSelected, subCategory])
 
     const navigationMarkup = (
         <div className={active}>

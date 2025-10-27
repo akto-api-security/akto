@@ -83,7 +83,7 @@ public class UserDetailsFilter implements Filter {
         String accessTokenFromResponse = httpServletResponse.getHeader(AccessTokenAction.ACCESS_TOKEN_HEADER_NAME);
         String accessTokenFromRequest = httpServletRequest.getHeader(AccessTokenAction.ACCESS_TOKEN_HEADER_NAME);
         String contextSourceFromRequest = httpServletRequest.getHeader(AccessTokenAction.CONTEXT_SOURCE_HEADER);
-        String leftNavCategoryFromRequest = httpServletRequest.getHeader(AccessTokenAction.LEFT_NAV_CATEGORY_HEADER);
+        String subCategoryFromRequest = httpServletRequest.getHeader(AccessTokenAction.SUB_CATEGORY_HEADER);
 
         String aktoSessionTokenFromRequest = httpServletRequest.getHeader(AccessTokenAction.AKTO_SESSION_TOKEN);
 
@@ -109,8 +109,23 @@ public class UserDetailsFilter implements Filter {
             }
         }
 
-        if(!StringUtils.isEmpty(leftNavCategoryFromRequest)) {
-            Context.leftNavCategory.set(leftNavCategoryFromRequest);
+        if(!StringUtils.isEmpty(subCategoryFromRequest)) {
+            try {
+                // Convert from frontend string format to enum format
+                GlobalEnums.SUB_CATEGORY_SOURCE subCategoryEnum;
+                if ("Cloud Security".equalsIgnoreCase(subCategoryFromRequest)) {
+                    subCategoryEnum = GlobalEnums.SUB_CATEGORY_SOURCE.CLOUD_SECURITY;
+                } else if ("Endpoint Security".equalsIgnoreCase(subCategoryFromRequest)) {
+                    subCategoryEnum = GlobalEnums.SUB_CATEGORY_SOURCE.ENDPOINT_SECURITY;
+                } else {
+                    // Default fallback
+                    subCategoryEnum = GlobalEnums.SUB_CATEGORY_SOURCE.CLOUD_SECURITY;
+                }
+                Context.subCategory.set(subCategoryEnum);
+            } catch (Exception e) {
+                // Fallback to default if conversion fails
+                Context.subCategory.set(GlobalEnums.SUB_CATEGORY_SOURCE.CLOUD_SECURITY);
+            }
         }
 
         if(StringUtils.isNotEmpty(aktoSessionTokenFromRequest) && httpServletRequest.getRequestURI().contains("agent")){

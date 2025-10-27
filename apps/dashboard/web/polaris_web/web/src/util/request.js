@@ -101,7 +101,7 @@ service.interceptors.request.use((config) => {
   config.headers['Content-Type'] = 'application/json'
   config.headers["access-token"] = SessionStore.getState().accessToken
   const currentCategory = PersistStore.getState().dashboardCategory || "API Security";
-  const leftNavCategory = PersistStore.getState().leftNavCategory || "Cloud Security";
+  const subCategory = PersistStore.getState().subCategory || "Cloud Security";
   let contextSource = "API";
   if (currentCategory === "API Security") {
     contextSource = "API";
@@ -111,7 +111,7 @@ service.interceptors.request.use((config) => {
     contextSource = "AGENTIC";
   }
   config.headers['x-context-source'] = contextSource;
-   config.headers['x-left-nav-category'] = leftNavCategory;
+   config.headers['x-sub-category'] = subCategory;
 
 
   if (window.ACTIVE_ACCOUNT) {

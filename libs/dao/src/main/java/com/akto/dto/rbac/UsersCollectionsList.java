@@ -9,6 +9,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.util.Constants;
 import com.akto.util.Pair;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
@@ -27,7 +28,7 @@ import org.slf4j.LoggerFactory;
 
 public class UsersCollectionsList {
     private static final ConcurrentHashMap<Pair<Integer, Integer>, Pair<List<Integer>, Integer>> usersCollectionMap = new ConcurrentHashMap<>();
-    private static final ConcurrentHashMap<Pair<Integer, CONTEXT_SOURCE>, Pair<Set<Integer>, Integer>> contextCollectionsMap = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, Pair<Set<Integer>, Integer>> contextCollectionsMap = new ConcurrentHashMap<>();
     private static final int EXPIRY_TIME = 15 * 60;
     private static final int CONTEXT_EXPIRY_TIME = 120;
 
@@ -82,9 +83,9 @@ public class UsersCollectionsList {
             collectionList = collectionIdEntry.getFirst();
         }
 
-        String leftNavCat = Context.getLeftNavCategory();
+        GlobalEnums.SUB_CATEGORY_SOURCE subCategory = Context.getSubCategory();
         // since this function is used everywhere for the queries, taking context collections into account here
-        Set<Integer> contextCollections = getContextCollectionsForUser(accountId, Context.contextSource.get(), leftNavCat);
+        Set<Integer> contextCollections = getContextCollectionsForUser(accountId, Context.contextSource.get(), subCategory);
         if(collectionList == null) {
             collectionList = contextCollections.stream()
                 .collect(Collectors.toList());
@@ -103,20 +104,25 @@ public class UsersCollectionsList {
         if(contextCollectionsMap.isEmpty()) {
             return;
         }
-        Pair<Integer, CONTEXT_SOURCE> key = new Pair<>(accountId, source);
-        contextCollectionsMap.remove(key);
+        // Remove all cache entries for this accountId and source (regardless of leftNavCategory)
+        final String keyPrefix = accountId + "_" + source + "_";
+        contextCollectionsMap.entrySet().removeIf(entry -> 
+            entry.getKey().startsWith(keyPrefix));
     }
 
-    public static Set<Integer> getContextCollectionsForUser(int accountId, CONTEXT_SOURCE source, String leftNavCategory) {
+    public static Set<Integer> getContextCollectionsForUser(int accountId, CONTEXT_SOURCE source, GlobalEnums.SUB_CATEGORY_SOURCE subCategory) {
         if(source == null) {
             source = CONTEXT_SOURCE.API;
         }
-        Pair<Integer, CONTEXT_SOURCE> key = new Pair<>(accountId, source);
-        Pair<Set<Integer>, Integer> collectionIdEntry = contextCollectionsMap.get(key);
-        Set<Integer> collectionList = new HashSet<>();
+        // Create cache key that includes leftNavCategory to ensure proper filtering
+        String cacheKey = accountId + "_" + source + "_" + (subCategory != null ? subCategory : "null");
+        Pair<Set<Integer>, Integer> collectionIdEntry = contextCollectionsMap.get(cacheKey);
+        Set<Integer> collectionList;
 
         if (collectionIdEntry == null || (Context.now() - collectionIdEntry.getSecond() > CONTEXT_EXPIRY_TIME)) {
-            collectionList = getContextCollections(source, leftNavCategory);
+            collectionList = getContextCollections(source, subCategory);
+            // Cache the result with the new key
+            contextCollectionsMap.put(cacheKey, new Pair<>(collectionList, Context.now()));
         } else {
             collectionList = collectionIdEntry.getFirst();
         }
@@ -124,7 +130,7 @@ public class UsersCollectionsList {
         return collectionList;
     }
 
-    public static Set<Integer> getContextCollections(CONTEXT_SOURCE source, String  leftNavCategory) {
+    public static Set<Integer> getContextCollections(CONTEXT_SOURCE source, GlobalEnums.SUB_CATEGORY_SOURCE subCategory ) {
         Set<Integer> collectionIds = new HashSet<>();
         Bson finalFilter = Filters.or(
             Filters.exists(ApiCollection.TAGS_STRING, false),
@@ -133,6 +139,30 @@ public class UsersCollectionsList {
                 Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG))
             )
         );
+
+        if (subCategory != null) {
+
+            if ((subCategory.equals(GlobalEnums.SUB_CATEGORY_SOURCE.ENDPOINT_SECURITY))) {
+                // For Endpoint Security: filter collections where tags_string has source = "Endpoint"
+                finalFilter = Filters.elemMatch(ApiCollection.TAGS_STRING,
+                        Filters.and(
+                                Filters.eq(CollectionTags.KEY_NAME, CollectionTags.SOURCE),
+                                Filters.eq(CollectionTags.VALUE, CollectionTags.TagSource.ENDPOINT)
+                        )
+                );
+            } else if (subCategory.equals(GlobalEnums.SUB_CATEGORY_SOURCE.CLOUD_SECURITY)) {
+                // For Cloud Security: exclude collections that have source = "ENDPOINT" tag
+                finalFilter = Filters.not(
+                        Filters.elemMatch(ApiCollection.TAGS_STRING,
+                                Filters.and(
+                                        Filters.eq(CollectionTags.KEY_NAME, CollectionTags.SOURCE),
+                                        Filters.eq(CollectionTags.VALUE, CollectionTags.TagSource.ENDPOINT)
+                                )
+                        )
+                );
+            }
+        }
+
         switch (source) {
             case MCP:
                 finalFilter = Filters.and(
@@ -159,34 +189,6 @@ public class UsersCollectionsList {
                 break;
             default:
                 break;
-        }
-
-        if (leftNavCategory != null && !leftNavCategory.isEmpty()) {
-            Bson leftNavFilter = null;
-            if ("Endpoint Security".equalsIgnoreCase(leftNavCategory)) {
-                // For Endpoint Security: filter collections where tags_string has source = "Endpoint"
-                leftNavFilter = Filters.elemMatch(ApiCollection.TAGS_STRING,
-                        Filters.and(
-                                Filters.eq(CollectionTags.KEY_NAME, CollectionTags.SOURCE),
-                                Filters.eq(CollectionTags.VALUE, CollectionTags.TagSource.ENDPOINT)
-                        )
-                );
-            } else if ("Cloud Security".equalsIgnoreCase(leftNavCategory)) {
-                // For Cloud Security: filter collections where tags_string has source != "Endpoint" (or no source tag)
-                leftNavFilter = Filters.or(
-                        Filters.not(Filters.exists(ApiCollection.TAGS_STRING)),
-                        Filters.not(Filters.elemMatch(ApiCollection.TAGS_STRING,
-                                Filters.and(
-                                        Filters.eq(CollectionTags.KEY_NAME, CollectionTags.SOURCE),
-                                        Filters.eq(CollectionTags.VALUE, CollectionTags.TagSource.ENDPOINT)
-                                )
-                        ))
-                );
-            }
-
-            if (leftNavFilter != null) {
-                finalFilter = Filters.and(finalFilter, leftNavFilter);
-            }
         }
 
         MongoCursor<ApiCollection> cursor = ApiCollectionsDao.instance.getMCollection().find(finalFilter).projection(Projections.include(Constants.ID)).iterator();
