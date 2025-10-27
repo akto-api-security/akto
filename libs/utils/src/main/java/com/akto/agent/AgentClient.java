@@ -11,6 +11,7 @@ import okhttp3.*;
 import java.util.concurrent.TimeUnit;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.akto.util.http_util.CoreHTTPClient;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,7 +28,7 @@ public class AgentClient {
     private static final ObjectMapper objectMapper = new ObjectMapper();
     
     // Custom HTTP client with 2-minute timeout for agent requests
-    private static final OkHttpClient agentHttpClient = new OkHttpClient.Builder()
+    private static final OkHttpClient agentHttpClient = CoreHTTPClient.client.newBuilder()
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(120, TimeUnit.SECONDS) // 2 minutes timeout
             .writeTimeout(30, TimeUnit.SECONDS)
