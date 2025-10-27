@@ -71,7 +71,7 @@ import { labelMap } from '../../../../main/labelHelperMap';
   
     const rowMarkup = data.map(
       (
-        {detectedAt, subCategory, url, severity, method},
+        {detectedAt, subCategory, url, severity, method, host},
         index,
       ) => (
         <IndexTable.Row
@@ -94,6 +94,11 @@ import { labelMap } from '../../../../main/labelHelperMap';
             {severity ? (<div key={severity} className={`badge-wrapper-${severity.toUpperCase()}`}>
               <Badge status={func.getHexColorForSeverity(severity)}>{func.toSentenceCase(severity)}</Badge>
             </div>) : "-"}
+          </IndexTable.Cell>
+          <IndexTable.Cell>
+            <Text variant="bodyMd" fontWeight="medium" as="span">
+              {host || "-"}
+            </Text>
           </IndexTable.Cell>
           <IndexTable.Cell>
             <GetPrettifyEndpoint
@@ -140,6 +145,7 @@ import { labelMap } from '../../../../main/labelHelperMap';
                   {title: 'Time'},
                   {title: 'Attack type'},
                   {title: 'Severity'},
+                  {title: 'Host'},
                   {title: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"]},
               ]}
           >

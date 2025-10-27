@@ -183,6 +183,7 @@ public class ThreatActorService {
             .append("latestApiEndpoint", new Document("$first", "$latestApiEndpoint"))
             .append("latestApiMethod", new Document("$first", "$latestApiMethod"))
             .append("latestApiIp", new Document("$first", "$latestApiIp"))
+            .append("latestApiHost", new Document("$first", "$host"))
             .append("country", new Document("$first", "$country"))
             .append("discoveredAt", new Document("$first", "$detectedAt"))
             .append("latestSubCategory", new Document("$first", "$filterId"))
@@ -219,11 +220,12 @@ public class ThreatActorService {
                 while (cursor2.hasNext()) {
                     MaliciousEventDto event = cursor2.next();
                     activityDataList.add(ActivityData.newBuilder()
-                        .setUrl(event.getLatestApiEndpoint())
-                        .setDetectedAt(event.getDetectedAt())
-                        .setSubCategory(event.getFilterId())
-                        .setSeverity(event.getSeverity())
-                        .setMethod(event.getLatestApiMethod().name())
+                        .setUrl(doc2.getString("latestApiEndpoint"))
+                        .setDetectedAt(doc2.getLong("detectedAt"))
+                        .setSubCategory(doc2.getString("filterId"))
+                        .setSeverity(doc2.getString("severity"))
+                        .setMethod(doc2.getString("latestApiMethod"))
+                        .setHost(doc2.getString("host") != null ? doc2.getString("host") : "")
                         .build());
                 }
             }
@@ -233,6 +235,7 @@ public class ThreatActorService {
                 .setLatestApiEndpoint(doc.getString("latestApiEndpoint"))
                 .setLatestApiMethod(doc.getString("latestApiMethod"))
                 .setLatestApiIp(doc.getString("latestApiIp"))
+                .setLatestApiHost(doc.getString("latestApiHost") != null ? doc.getString("latestApiHost") : "")
                 .setDiscoveredAt(doc.getLong("discoveredAt"))
                 .setCountry(doc.getString("country"))
                 .setLatestSubcategory(doc.getString("latestSubCategory"))
