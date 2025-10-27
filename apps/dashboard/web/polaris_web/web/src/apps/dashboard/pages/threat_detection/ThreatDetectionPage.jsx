@@ -496,6 +496,11 @@ function ThreatDetectionPage() {
                                             content: 'Configure Successful Exploits',
                                             onAction: () => navigate('/dashboard/protection/configure-exploits'),
                                             prefix: <Box><Icon source={FileMinor} /></Box>
+                                        },
+                                        {
+                                            content: 'Configure Ignored Events',
+                                            onAction: () => navigate('/dashboard/protection/configure-ignored-events'),
+                                            prefix: <Box><Icon source={FileMinor} /></Box>
                                         }
                                     ]
                                 },
