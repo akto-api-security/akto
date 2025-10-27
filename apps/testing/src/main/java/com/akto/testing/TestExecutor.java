@@ -70,6 +70,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
+import com.akto.test_editor.TestingUtilsSingleton;
 import com.akto.test_editor.execution.Build;
 import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.execution.VariableResolver;
@@ -321,6 +322,7 @@ public class TestExecutor {
         Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();
 
         TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests());
+        TestingUtilsSingleton.init();
 
         Set<Integer> apiCollectionIds = Main.extractApiCollectionIds(apiInfoKeyList);
         AgenticUtils.checkAndInitializeAgent(apiCollectionIds, false, null);

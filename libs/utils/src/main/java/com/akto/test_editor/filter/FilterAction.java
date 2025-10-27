@@ -36,6 +36,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLTemplate;
 import com.akto.mcp.McpRequestResponseUtils;
+import com.akto.test_editor.TestingUtilsSingleton;
 import com.akto.test_editor.Utils;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.*;
@@ -193,7 +194,13 @@ public final class FilterAction {
 
     public DataOperandsFilterResponse applyFilterOnUrl(FilterActionRequest filterActionRequest) {
 
+        // handle for mcp requests
         String url = filterActionRequest.getApiInfoKey().getUrl();
+        if(url.contains("tools") && TestingUtilsSingleton.getInstance().isMcpRequest(filterActionRequest.getApiInfoKey(), filterActionRequest.getRawApi())) {
+            if(url.contains("call")) {
+                url = url.split("call/")[1];
+            }
+        }
 
         DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(url, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
         ValidationResult res = invokeFilter(dataOperandFilterRequest);
@@ -202,6 +209,11 @@ public final class FilterAction {
 
     public void extractUrl(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
         String url = filterActionRequest.getRawApi().getRequest().getUrl();
+        if(url.contains("tools") && TestingUtilsSingleton.getInstance().isMcpRequest(filterActionRequest.getApiInfoKey(), filterActionRequest.getRawApi())) {
+            if(url.contains("call")) {
+                url = url.split("call/")[1];
+            }
+        }
         List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
         if (varMap.containsKey(querySet.get(0)) && varMap.get(querySet.get(0)) != null) {
             return;
@@ -212,8 +224,24 @@ public final class FilterAction {
     public DataOperandsFilterResponse applyFilterOnMethod(FilterActionRequest filterActionRequest) {
 
         String method = filterActionRequest.getApiInfoKey().getMethod().toString();
+        // handle of mcp requests
+        String url = filterActionRequest.getApiInfoKey().getUrl();
+        boolean isMcpRequest = McpRequestResponseUtils.isMcpRequest(filterActionRequest.getRawApi());
+        if(url.contains("tools") && isMcpRequest) {
+            if(url.contains("call")) {
+                method = TestingUtilsSingleton.getInstance().getMcpRequestMethod(filterActionRequest.getApiInfoKey(), filterActionRequest.getRawApi());
+            }else{
+                method = "POST";
+            }
+        }
         DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(method, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
         ValidationResult res = invokeFilter(dataOperandFilterRequest);
+        if(!res.getIsValid() && isMcpRequest) {
+            // fallback to POST for all the mcp tests because they have filter of method eq: POST
+            method = "POST";
+            dataOperandFilterRequest = new DataOperandFilterRequest(method, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
+            res = invokeFilter(dataOperandFilterRequest);
+        }
         return new DataOperandsFilterResponse(res.getIsValid(), null, null, null, res.getValidationReason());
     }
 
@@ -366,7 +394,22 @@ public final class FilterAction {
         }
 
         String reqBody = response.getBody();
-
+        ApiInfo.ApiInfoKey apiInfoKey = filterActionRequest.getApiInfoKey();
+        if(TestingUtilsSingleton.getInstance().isMcpRequest(apiInfoKey, rawApi)) {
+            String contentType = response.getHeaders().get("content-type").get(0);
+            String tempReqBody = McpRequestResponseUtils.parseResponse(contentType, reqBody);
+           
+            if(tempReqBody.contains("error") && filterActionRequest.isValidationContext()) {
+                // check if error comes out in parsing, call to LLM when context is not filter
+                MagicValidateFilter magicValidateFilter = new MagicValidateFilter();
+                DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(reqBody, filterActionRequest.getQuerySet(), "magic_validate");
+                ValidationResult validationResult = magicValidateFilter.isValid(dataOperandFilterRequest);
+                return new DataOperandsFilterResponse(validationResult.getIsValid(), null, null, null, validationResult.getValidationReason());
+            
+            }else{
+                reqBody = tempReqBody;
+            }
+        }
         // Strip BOM before processing for regex filters to avoid false positives with SOAP payloads
         if (filterActionRequest.getOperand() != null &&
             filterActionRequest.getOperand().equals(TestEditorEnums.DataOperands.REGEX.toString())) {
@@ -484,6 +527,11 @@ public final class FilterAction {
             return;
         }
         String payload = rawApi.getResponse().getBody();
+        ApiInfo.ApiInfoKey apiInfoKey = filterActionRequest.getApiInfoKey();
+        if(TestingUtilsSingleton.getInstance().isMcpRequest(apiInfoKey, rawApi)) {
+            String contentType = rawApi.getResponse().getHeaders().get("content-type").get(0);
+            payload = McpRequestResponseUtils.parseResponse(contentType, payload);
+        }
         extractPayload(filterActionRequest, varMap, payload, extractMultiple);
     }
 
@@ -498,6 +546,11 @@ public final class FilterAction {
             reqObj =  BasicDBObject.parse(payload);
         } catch(Exception e) {
             // add log
+        }
+
+        // for mcp requests, remove mcp related params like name, id which is in root level, jsonrpc, etc.
+        if (TestingUtilsSingleton.getInstance().isMcpRequest(filterActionRequest.getApiInfoKey(), filterActionRequest.getRawApi())) {
+            reqObj = McpRequestResponseUtils.removeMcpRelatedParams(reqObj);
         }
 
         if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("key")) {
