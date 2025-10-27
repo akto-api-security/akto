@@ -12,11 +12,13 @@ public class Context {
 public static ThreadLocal<Integer> accountId = new ThreadLocal<Integer>();
 public static ThreadLocal<Integer> userId = new ThreadLocal<Integer>();
 public static ThreadLocal<CONTEXT_SOURCE> contextSource = new ThreadLocal<CONTEXT_SOURCE>();
+public static ThreadLocal<String> leftNavCategory = new ThreadLocal<String>();
 
     public static void resetContextThreadLocals() {
         accountId.remove();
         userId.remove();
         contextSource.remove();
+        leftNavCategory.remove();
     }
 
     public static int getId() {
@@ -27,6 +29,14 @@ public static ThreadLocal<CONTEXT_SOURCE> contextSource = new ThreadLocal<CONTEX
 
     public static void dummy() {
         
+    }
+
+    public static String getLeftNavCategory() {
+        try {
+            return leftNavCategory.get();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public static int today() {

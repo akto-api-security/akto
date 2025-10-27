@@ -126,6 +126,7 @@ export default function Header() {
         LocalStore.getState().setCategoryMap({}); 
         LocalStore.getState().setSubCategoryMap({});
         SessionStore.getState().setThreatFiltersMap({});
+        PersistStore.getState().setLeftNavCategory('Cloud Security');
         setDashboardCategory(value);
         window.location.reload();
         window.location.href("/dashboard/observe/inventory")

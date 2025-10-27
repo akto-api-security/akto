@@ -83,6 +83,7 @@ public class UserDetailsFilter implements Filter {
         String accessTokenFromResponse = httpServletResponse.getHeader(AccessTokenAction.ACCESS_TOKEN_HEADER_NAME);
         String accessTokenFromRequest = httpServletRequest.getHeader(AccessTokenAction.ACCESS_TOKEN_HEADER_NAME);
         String contextSourceFromRequest = httpServletRequest.getHeader(AccessTokenAction.CONTEXT_SOURCE_HEADER);
+        String leftNavCategoryFromRequest = httpServletRequest.getHeader(AccessTokenAction.LEFT_NAV_CATEGORY_HEADER);
 
         String aktoSessionTokenFromRequest = httpServletRequest.getHeader(AccessTokenAction.AKTO_SESSION_TOKEN);
 
@@ -106,6 +107,10 @@ public class UserDetailsFilter implements Filter {
             } catch (Exception e) {
                 Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.API);
             }
+        }
+
+        if(!StringUtils.isEmpty(leftNavCategoryFromRequest)) {
+            Context.leftNavCategory.set(leftNavCategoryFromRequest);
         }
 
         if(StringUtils.isNotEmpty(aktoSessionTokenFromRequest) && httpServletRequest.getRequestURI().contains("agent")){

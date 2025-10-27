@@ -15,6 +15,8 @@ export const CATEGORY_MCP_SECURITY = 'MCP Security';
 export const CATEGORY_GEN_AI = 'Gen AI';
 export const CATEGORY_API_SECURITY = 'API Security';
 export const CATEGORY_AGENTIC_SECURITY = 'Agentic Security';
+export const LEFT_NAV_CLOUD_SECURITY = 'Cloud Security';
+export const LEFT_NAV_ENDPOINT_SECURITY = 'Endpoint Security';
 
 export function getDashboardCategory() {
   try {
@@ -43,4 +45,29 @@ export function isApiSecurityCategory() {
 
 export function isAgenticSecurityCategory() {
   return isCategory(CATEGORY_AGENTIC_SECURITY);
+}
+
+export function getLeftNavCategory() {
+  try {
+    const category = PersistStore.getState().leftNavCategory
+    return category
+  } catch(e){
+    return LEFT_NAV_CLOUD_SECURITY
+  }
+}
+
+export function isLeftNavCategory(category) {
+  return getLeftNavCategory() === category;
+}
+
+export function isCloudSecurityLeftNav() {
+  return isLeftNavCategory(LEFT_NAV_CLOUD_SECURITY);
+}
+
+export function isEndpointSecurityLeftNav() {
+  return isLeftNavCategory(LEFT_NAV_ENDPOINT_SECURITY);
+}
+
+export function shouldShowLeftNavSwitch() {
+  return isMCPSecurityCategory() || isAgenticSecurityCategory();
 }

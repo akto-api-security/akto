@@ -22,7 +22,7 @@ import func from "@/util/func";
 import Dropdown from "../Dropdown";
 import SessionStore from "../../../../main/SessionStore";
 import IssuesStore from "../../../pages/issues/issuesStore";
-import { CATEGORY_API_SECURITY, mapLabel } from "../../../../main/labelHelper";
+import { CATEGORY_API_SECURITY, mapLabel, shouldShowLeftNavSwitch, LEFT_NAV_CLOUD_SECURITY, LEFT_NAV_ENDPOINT_SECURITY, getLeftNavCategory } from "../../../../main/labelHelper";
 
 export default function LeftNav() {
     const navigate = useNavigate();
@@ -39,6 +39,8 @@ export default function LeftNav() {
     const resetStore = LocalStore(state => state.resetStore);
     const resetSession = SessionStore(state => state.resetStore);
     const resetFields = IssuesStore(state => state.resetStore);
+    const leftNavCategory = PersistStore((state) => state.leftNavCategory) || LEFT_NAV_CLOUD_SECURITY;
+    const setLeftNavCategory = PersistStore((state) => state.setLeftNavCategory);
 
     const handleSelect = (selectedId) => {
         setLeftNavSelected(selectedId);
@@ -54,6 +56,13 @@ export default function LeftNav() {
         });
         window.dispatchEvent(navigationChangeEvent);
     };
+
+
+   const handleLeftNavCategoryChange = (selected) => {
+           setLeftNavCategory(selected);
+           // Force refresh of current page to reload data with new left nav category
+           window.location.reload();
+   };
 
     const handleAccountChange = async (selected) => {
         resetAll();
@@ -108,6 +117,13 @@ export default function LeftNav() {
                 // Each section has independent selection state
                 selected: originalSelected !== undefined ? leftNavSelected === newKey : undefined,
                 onClick: item.onClick ? () => {
+                    // Set the left nav category based on section
+                    if (prefix === "cloud") {
+                        setLeftNavCategory("Cloud Security");
+                    } else if (prefix === "endpoint") {
+                        setLeftNavCategory("Endpoint Security");
+                    }
+                    
                     const originalHandler = item.onClick;
                     originalHandler();
                     // Set selection specific to this section
@@ -128,6 +144,13 @@ export default function LeftNav() {
                             leftNavSelected === subNavKey
                             : undefined,
                         onClick: subItem.onClick ? () => {
+                            // Set the left nav category based on section
+                            if (prefix === "cloud") {
+                                setLeftNavCategory("Cloud Security");
+                            } else if (prefix === "endpoint") {
+                                setLeftNavCategory("Endpoint Security");
+                            }
+                            
                             const originalHandler = subItem.onClick;
                             originalHandler();
                             // Extract the base selection pattern and add section prefix
@@ -657,7 +680,7 @@ export default function LeftNav() {
         }
 
         return allItems
-    }, [dashboardCategory, leftNavSelected])
+    }, [dashboardCategory, leftNavSelected, leftNavCategory])
 
     const navigationMarkup = (
         <div className={active}>

@@ -35,8 +35,8 @@ import ReactFlow, {
   
   } from 'react-flow-renderer';
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
-import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isGenAISecurityCategory } from "../../../../main/labelHelper";
-  
+import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isGenAISecurityCategory, shouldShowLeftNavSwitch, isEndpointSecurityLeftNav, getLeftNavCategory } from "../../../../main/labelHelper";
+
 const CenterViewType = {
     Table: 0,
     Tree: 1,
@@ -45,7 +45,7 @@ const CenterViewType = {
 
 
 const headers = [
-    ...((isMCPSecurityCategory() || isAgenticSecurityCategory()) ? [{
+    ...(shouldShowLeftNavSwitch() ? [{
         title: "",
         text: "",
         value: "iconComp",
@@ -200,19 +200,26 @@ const resourceName = {
     plural: 'collections',
   };
 
-// Determine source type for filtering - check the 'source' field in tagsList
-const getCollectionSource = (collection) => {
-    const tagsList = collection?.tagsList || [];
-    
-    // Look for any tag with source === 'ENDPOINT' in tagsList
-    const endpointTag = tagsList.find(tag => tag.source === 'ENDPOINT');
-    
-    if (endpointTag) {
-        return 'Endpoint';
+const filterCollectionsByLeftNav = (collectionsArr) => {
+    if (!shouldShowLeftNavSwitch()) {
+        return collectionsArr;
     }
-    
-    return 'Cloud'; // Default to Cloud source if no tag with source 'ENDPOINT'
-};
+
+    const leftNavCategory = getLeftNavCategory();
+
+    return collectionsArr.filter((collection) => {
+        const tagsList = collection?.tagsList || [];
+        const tagsString = JSON.stringify(tagsList);
+
+        if (leftNavCategory === 'Endpoint Security') {
+            // Show collections where tagsList contains source: "Endpoint"
+            return tagsString.includes('"source":"Endpoint"') || tagsString.includes('source') && tagsString.includes('Endpoint');
+        } else {
+            // Cloud Security - show collections where tagsList does NOT contain source: "Endpoint"
+            return !(tagsString.includes('"source":"Endpoint"') || (tagsString.includes('source') && tagsString.includes('Endpoint')));
+        }
+    });
+}
 
 const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, isLoading) => {
 
@@ -222,7 +229,10 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
         return { prettify: [], normal: [] };
     }
 
-    const newData = collectionsArr.map((c) => {
+    // Filter collections based on left navigation category
+    const filteredCollections = filterCollectionsByLeftNav(collectionsArr);
+
+    const newData = filteredCollections.map((c) => {
         if(c.deactivated){
             c.rowStatus = 'critical'
             c.disableClick = true
@@ -234,17 +244,9 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             nextUrl: "/dashboard/observe/inventory/"+ c.id,
             envTypeOriginal: c?.envType,
             envType: c?.envType?.map(func.formatCollectionType),
-            ...((isMCPSecurityCategory() || isAgenticSecurityCategory()) ? (() => {
-                const collectionSource = getCollectionSource(c);
-                const isMcpCollection = tagsList.includes("mcp-server");
-                
-                if (collectionSource === 'Endpoint') {
-                    return { iconComp: (<Box><img src={LaptopIcon} alt="icon" style={{width: '24px', height: '24px'}} /></Box>) };
-                } else if (isMcpCollection) {
-                    return { iconComp: (<Box><img src={MCPIcon} alt="icon" style={{width: '24px', height: '24px'}} /></Box>) };
-                }
-                return {};
-            })() : {}),
+            ...(shouldShowLeftNavSwitch() ? {
+                iconComp: (<Box><img src={isEndpointSecurityLeftNav() ? LaptopIcon : MCPIcon} alt="icon" style={{width: '24px', height: '24px'}} /></Box>)
+            } : {}),
             ...((isGenAISecurityCategory() || isAgenticSecurityCategory()) && func.isDemoAccount() && tagsList.includes("gen-ai") ? {
                 iconComp: (<Box><Icon source={tagsList.includes("AI Agent") ? AutomationMajor : MagicMajor} color={"base"}/></Box>)
             } : {}),
@@ -274,12 +276,12 @@ const categorizeCollections = (prettifyArray) => {
     const activeCollections = [];
     const deactivatedCollectionsData = [];
     const collectionMap = new Map();
-    
+
     prettifyArray.forEach((c) => {
         // Build environment map
         envTypeObj[c.id] = c.envTypeOriginal;
         collectionMap.set(c.id, c);
-        
+
         // Categorize collections in single pass
         if (!c.deactivated) {
             activeCollections.push(c);
@@ -320,48 +322,10 @@ function ApiCollections(props) {
     const [data, setData] = useState({'all': [], 'hostname':[], 'groups': [], 'custom': [], 'deactivated': [], 'untracked': []})
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
-    const [currentNavigationSection, setCurrentNavigationSection] = useState('cloud');
-    const [dashboardCategory, setDashboardCategory] = useState(() => getDashboardCategory());
-    
-    // Get current navigation section to determine filtering
-    const getNavigationSection = () => {
-        const leftNavSelected = sessionStorage.getItem('leftNavSelected') || '';
-        if (leftNavSelected.startsWith('cloud_')) {
-            return 'cloud';
-        } else if (leftNavSelected.startsWith('endpoint_')) {
-            return 'endpoint';
-        }
-        return 'cloud'; // default to cloud if no specific section detected
-    };
 
-
-    // Filter collections based on navigation section and source
-    const filterCollectionsBySection = (collections) => {
-        // Only apply filtering for MCP Security and Agentic Security
-        const shouldApplyFiltering = dashboardCategory === "MCP Security" || dashboardCategory === "Agentic Security";
-        
-        if (!shouldApplyFiltering) {
-            // For API Security and other categories, return all collections without filtering
-            return collections;
-        }
-        
-        return collections.filter(collection => {
-            const source = getCollectionSource(collection);
-            
-            if (currentNavigationSection === 'endpoint') {
-                // Endpoint Security section: show only collections with source = 'Endpoint'
-                return source === 'Endpoint';
-            } else {
-                // Cloud Security section: show collections with source != 'Endpoint'
-                return source !== 'Endpoint';
-            }
-        });
-    };
-          
     const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0, totalAllowedForTesting: 0})
     const [hasUsageEndpoints, setHasUsageEndpoints] = useState(true)
     const [envTypeMap, setEnvTypeMap] = useState({})
-    const [rawCollectionsData, setRawCollectionsData] = useState([]); // Store unfiltered data
     const [refreshData, setRefreshData] = useState(false)
     const [popover,setPopover] = useState(false)
     const [teamData, setTeamData] = useState([])
@@ -544,14 +508,8 @@ function ApiCollections(props) {
         if(customCollectionDataFilter){ 
             finalArr = finalArr.filter(customCollectionDataFilter)
         }
-        
-        // Store raw collections data for re-filtering when navigation changes
-        setRawCollectionsData(finalArr);
-        
-        // Apply section-based filtering for Cloud Security vs Endpoint Security
-        const filteredFinalArr = filterCollectionsBySection(finalArr);
-            
-        const dataObj = convertToNewData(filteredFinalArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, false);
+
+        const dataObj = convertToNewData(finalArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, false);
         setNormalData(dataObj.normal)
 
         // Ensure dataObj.prettify exists
@@ -562,34 +520,6 @@ function ApiCollections(props) {
 
         const { envTypeObj, collectionMap, activeCollections, categorized } = categorizeCollections(dataObj.prettify);
         let res = categorized;
-
-        // Calculate totalAPIs from filtered collections (context-aware)
-        const totalFilteredAPIs = filteredFinalArr.reduce((total, collection) => {
-            return total + (collection.urlsCount || 0);
-        }, 0);
-        setTotalAPIs(totalFilteredAPIs);
-        
-        // Calculate initial summary with context-filtered data
-        const initialSummary = transform.getSummaryData(dataObj.normal);
-        
-        // Calculate critical endpoints from filtered data
-        const totalCriticalFromFiltered = dataObj.normal.reduce((total, collection) => {
-            const riskScore = riskScoreMap[collection.id] || 0;
-            if (riskScore >= 4) {
-                return total + (collection.urlsCount || 0);
-            }
-            return total;
-        }, 0);
-        
-        // Calculate sensitive endpoints from filtered collections
-        const totalSensitiveFromFiltered = dataObj.normal.reduce((total, collection) => {
-            const sensitiveCount = sensitiveInfoMap[collection.id] ? sensitiveInfoMap[collection.id].length : 0;
-            return total + sensitiveCount;
-        }, 0);
-        
-        initialSummary.totalCriticalEndpoints = totalCriticalFromFiltered;
-        initialSummary.totalSensitiveEndpoints = totalSensitiveFromFiltered;
-        setSummaryData(initialSummary);
 
         // Separate active and deactivated collections
         const deactivatedCollectionsCopy = res.deactivated.map((c)=>{
@@ -640,12 +570,17 @@ function ApiCollections(props) {
         setData(res);
         setEnvTypeMap(envTypeObj);
         setAllCollections(apiCollectionsResp.apiCollections || []);
-        
-        // Fetch sensitive info asynchronously
+
+        // Fetch endpoints count and sensitive info asynchronously
         Promise.all([
+            dashboardApi.fetchEndpointsCount(0, 0),
             shouldCallHeavyApis ? api.getSensitiveInfoForCollections() : Promise.resolve(null)
-        ]).then(([sensitiveResponse]) => {
-            
+        ]).then(([endpointsResponse, sensitiveResponse]) => {
+            // Update endpoints count
+            if (endpointsResponse) {
+                setTotalAPIs(endpointsResponse.newCount);
+            }
+
             // Update sensitive info if available
             if(sensitiveResponse == null || sensitiveResponse === undefined){
                 sensitiveResponse = {
@@ -665,7 +600,7 @@ function ApiCollections(props) {
                 
                 // Re-calculate data with new sensitive info (use same filtered array)
                 const updatedDataObj = convertToNewData(
-                    filteredFinalArr,
+                    finalArr,
                     newSensitiveInfo.sensitiveInfoMap || {},
                     severityInfoMap,
                     coverageMap,
@@ -692,33 +627,11 @@ function ApiCollections(props) {
                     updatedCategorized['untracked'] = untrackedCollections;
                     
                     setData(updatedCategorized);
-                    
-                    // Calculate totalAPIs from filtered collections (context-aware)
-                    const totalFilteredAPIs = filteredFinalArr.reduce((total, collection) => {
-                        return total + (collection.urlsCount || 0);
-                    }, 0);
-                    setTotalAPIs(totalFilteredAPIs);
-                    
-                    // Update summary with context-filtered counts
+
+                    // Update summary with new sensitive endpoints count
                     const updatedSummary = transform.getSummaryData(updatedDataObj.normal);
-                    
-                    // Calculate critical endpoints from filtered data
-                    const totalCriticalFromFiltered = updatedDataObj.normal.reduce((total, collection) => {
-                        const riskScore = riskScoreMap[collection.id] || 0;
-                        if (riskScore >= 4) {
-                            return total + (collection.urlsCount || 0);
-                        }
-                        return total;
-                    }, 0);
-                    
-                    // Calculate sensitive endpoints from filtered collections
-                    const totalSensitiveFromFiltered = updatedDataObj.normal.reduce((total, collection) => {
-                        const sensitiveCount = newSensitiveInfo.sensitiveInfoMap[collection.id] ? newSensitiveInfo.sensitiveInfoMap[collection.id].length : 0;
-                        return total + sensitiveCount;
-                    }, 0);
-                    
-                    updatedSummary.totalCriticalEndpoints = totalCriticalFromFiltered;
-                    updatedSummary.totalSensitiveEndpoints = totalSensitiveFromFiltered;
+                    updatedSummary.totalCriticalEndpoints = riskScoreObj.criticalUrls;
+                    updatedSummary.totalSensitiveEndpoints = newSensitiveInfo.sensitiveUrls;
                     setSummaryData(updatedSummary);
                 }
             }
@@ -759,93 +672,6 @@ function ApiCollections(props) {
         fetchData()
         resetFunc()    
     }, [])
-    
-    // Update dashboard category when it changes
-    useEffect(() => {
-        const currentCategory = getDashboardCategory();
-        if (currentCategory !== dashboardCategory) {
-            setDashboardCategory(currentCategory);
-        }
-    }, [dashboardCategory]);
-    
-    // Check and update navigation section on component mount and listen for navigation changes
-    useEffect(() => {
-        const updateNavigationSection = () => {
-            const detectedSection = getNavigationSection();
-            if (detectedSection !== currentNavigationSection) {
-                setCurrentNavigationSection(detectedSection);
-            }
-        };
-
-        // Initial check
-        updateNavigationSection();
-
-        // Listen for custom navigationChanged events dispatched from LeftNav
-        const handleNavigationChange = (event) => {
-            updateNavigationSection();
-        };
-
-        window.addEventListener('navigationChanged', handleNavigationChange);
-
-        return () => {
-            window.removeEventListener('navigationChanged', handleNavigationChange);
-        };
-    }, [currentNavigationSection]);
-
-    // Re-filter data when navigation section changes
-    useEffect(() => {
-        if (rawCollectionsData.length > 0) {
-            // Re-apply filtering with the new navigation section
-            const filteredArr = filterCollectionsBySection(rawCollectionsData);
-            
-            // Use stored context data for proper re-filtering
-            const lastFetchedSensitiveResp = PersistStore.getState().lastFetchedSensitiveResp;
-            const lastFetchedSeverityResp = PersistStore.getState().lastFetchedSeverityResp;
-            const lastFetchedResp = PersistStore.getState().lastFetchedResp;
-            
-            const sensitiveInfoMap = lastFetchedSensitiveResp?.sensitiveInfoMap || {};
-            const severityInfoMap = lastFetchedSeverityResp || {};
-            const riskScoreMap = lastFetchedResp?.riskScoreMap || {};
-            const coverageMap = PersistStore.getState().coverageMap || {};
-            
-            const dataObj = convertToNewData(filteredArr, sensitiveInfoMap, severityInfoMap, coverageMap, {}, riskScoreMap, false);
-            setNormalData(dataObj.normal);
-            
-            // Calculate context-aware totals
-            const totalFilteredAPIs = filteredArr.reduce((total, collection) => {
-                return total + (collection.urlsCount || 0);
-            }, 0);
-            setTotalAPIs(totalFilteredAPIs);
-            
-            // Update summary with context-filtered counts
-            const contextSummary = transform.getSummaryData(dataObj.normal);
-            
-            // Calculate critical endpoints from filtered data
-            const totalCriticalFromFiltered = dataObj.normal.reduce((total, collection) => {
-                const riskScore = riskScoreMap[collection.id] || 0;
-                if (riskScore >= 4) {
-                    return total + (collection.urlsCount || 0);
-                }
-                return total;
-            }, 0);
-            
-            // Calculate sensitive endpoints from filtered collections
-            const totalSensitiveFromFiltered = dataObj.normal.reduce((total, collection) => {
-                const sensitiveCount = sensitiveInfoMap[collection.id] ? sensitiveInfoMap[collection.id].length : 0;
-                return total + sensitiveCount;
-            }, 0);
-            
-            contextSummary.totalCriticalEndpoints = totalCriticalFromFiltered;
-            contextSummary.totalSensitiveEndpoints = totalSensitiveFromFiltered;
-            setSummaryData(contextSummary);
-            
-            if (dataObj.prettify) {
-                const { envTypeObj, collectionMap, activeCollections, categorized } = categorizeCollections(dataObj.prettify);
-                setData(categorized);
-                setEnvTypeMap(envTypeObj);
-            }
-        }
-    }, [currentNavigationSection]);
     const createCollectionModalActivatorRef = useRef();
     const resetResourcesSelected = () => {
         TableStore.getState().setSelectedItems([])

@@ -82,8 +82,9 @@ public class UsersCollectionsList {
             collectionList = collectionIdEntry.getFirst();
         }
 
+        String leftNavCat = Context.getLeftNavCategory();
         // since this function is used everywhere for the queries, taking context collections into account here
-        Set<Integer> contextCollections = getContextCollectionsForUser(accountId, Context.contextSource.get());
+        Set<Integer> contextCollections = getContextCollectionsForUser(accountId, Context.contextSource.get(), leftNavCat);
         if(collectionList == null) {
             collectionList = contextCollections.stream()
                 .collect(Collectors.toList());
@@ -106,7 +107,7 @@ public class UsersCollectionsList {
         contextCollectionsMap.remove(key);
     }
 
-    public static Set<Integer> getContextCollectionsForUser(int accountId, CONTEXT_SOURCE source) {
+    public static Set<Integer> getContextCollectionsForUser(int accountId, CONTEXT_SOURCE source, String leftNavCategory) {
         if(source == null) {
             source = CONTEXT_SOURCE.API;
         }
@@ -115,7 +116,7 @@ public class UsersCollectionsList {
         Set<Integer> collectionList = new HashSet<>();
 
         if (collectionIdEntry == null || (Context.now() - collectionIdEntry.getSecond() > CONTEXT_EXPIRY_TIME)) {
-            collectionList = getContextCollections(source);
+            collectionList = getContextCollections(source, leftNavCategory);
         } else {
             collectionList = collectionIdEntry.getFirst();
         }
@@ -123,7 +124,7 @@ public class UsersCollectionsList {
         return collectionList;
     }
 
-    public static Set<Integer> getContextCollections(CONTEXT_SOURCE source) {
+    public static Set<Integer> getContextCollections(CONTEXT_SOURCE source, String  leftNavCategory) {
         Set<Integer> collectionIds = new HashSet<>();
         Bson finalFilter = Filters.or(
             Filters.exists(ApiCollection.TAGS_STRING, false),
@@ -159,6 +160,35 @@ public class UsersCollectionsList {
             default:
                 break;
         }
+
+        if (leftNavCategory != null && !leftNavCategory.isEmpty()) {
+            Bson leftNavFilter = null;
+            if ("Endpoint Security".equalsIgnoreCase(leftNavCategory)) {
+                // For Endpoint Security: filter collections where tags_string has source = "Endpoint"
+                leftNavFilter = Filters.elemMatch(ApiCollection.TAGS_STRING,
+                        Filters.and(
+                                Filters.eq(CollectionTags.KEY_NAME, CollectionTags.SOURCE),
+                                Filters.eq(CollectionTags.VALUE, CollectionTags.TagSource.ENDPOINT)
+                        )
+                );
+            } else if ("Cloud Security".equalsIgnoreCase(leftNavCategory)) {
+                // For Cloud Security: filter collections where tags_string has source != "Endpoint" (or no source tag)
+                leftNavFilter = Filters.or(
+                        Filters.not(Filters.exists(ApiCollection.TAGS_STRING)),
+                        Filters.not(Filters.elemMatch(ApiCollection.TAGS_STRING,
+                                Filters.and(
+                                        Filters.eq(CollectionTags.KEY_NAME, CollectionTags.SOURCE),
+                                        Filters.eq(CollectionTags.VALUE, CollectionTags.TagSource.ENDPOINT)
+                                )
+                        ))
+                );
+            }
+
+            if (leftNavFilter != null) {
+                finalFilter = Filters.and(finalFilter, leftNavFilter);
+            }
+        }
+
         MongoCursor<ApiCollection> cursor = ApiCollectionsDao.instance.getMCollection().find(finalFilter).projection(Projections.include(Constants.ID)).iterator();
         while (cursor.hasNext()) {
             collectionIds.add(cursor.next().getId());

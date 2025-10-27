@@ -61,6 +61,7 @@ const initialState = {
     sendEventOnLogin: false,
     tableSelectedTab: {},
     dashboardCategory: 'API Security',
+    leftNavCategory: 'Cloud Security',
 };
 
 let persistStore = (set, get) => ({
@@ -221,6 +222,14 @@ let persistStore = (set, get) => ({
             console.error("Error setting dashboardCategory:", error);
         }
     },
+    setLeftNavCategory: (leftNavCategory) => {
+            try {
+                set({ leftNavCategory });
+            } catch (error) {
+                console.error("Error setting leftNavCategory:", error);
+            }
+    },
+
 });
 
 persistStore = devtools(persistStore);
@@ -241,7 +250,8 @@ persistStore = persist(persistStore, {
         trafficAlerts: state.trafficAlerts,
         sendEventOnLogin: state.sendEventOnLogin,
         tableSelectedTab: state.tableSelectedTab,
-        dashboardCategory: state.dashboardCategory
+        dashboardCategory: state.dashboardCategory,
+        leftNavCategory: state.leftNavCategory
     }) 
 });
 
