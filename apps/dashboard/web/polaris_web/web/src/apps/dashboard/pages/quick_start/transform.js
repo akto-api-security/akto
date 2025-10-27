@@ -859,24 +859,6 @@ const safariExtensionObj = {
     key: "SAFARI_BROWSER_EXTENSION",
 }
 
-const cloudflareWarpObj = {
-    icon: '/public/cloudflare.svg',
-    label: "Cloudflare WARP",
-    text: "Cloudflare WARP setup is recommended, if you use Cloudflare WARP for secure, accelerated device-to-internet connectivity.",
-    docsUrl: 'https://docs.akto.io/traffic-connector',
-    component: <AddOnComponenet/>,
-    key: "CLOUDFLARE_WARP",
-}
-
-const zscalerObj = {
-    icon: '/public/zscaler_logo.svg',
-    label: "Zscaler",
-    text: "Zscaler setup is recommended,if your organization uses Zscaler for secure, zero-trust internet and app access.",
-    docsUrl: 'https://docs.akto.io/traffic-connector',
-    component: <AddOnComponenet/>,
-    key: "ZSCALER",
-}
-
 
 const quick_start_policy_lines= [
     `{`,

@@ -110,21 +110,14 @@ public class UserDetailsFilter implements Filter {
         }
 
         if(!StringUtils.isEmpty(subCategoryFromRequest)) {
-            try {
-                // Convert from frontend string format to enum format
-                GlobalEnums.SUB_CATEGORY_SOURCE subCategoryEnum;
-                if ("Cloud Security".equalsIgnoreCase(subCategoryFromRequest)) {
-                    subCategoryEnum = GlobalEnums.SUB_CATEGORY_SOURCE.CLOUD_SECURITY;
-                } else if ("Endpoint Security".equalsIgnoreCase(subCategoryFromRequest)) {
-                    subCategoryEnum = GlobalEnums.SUB_CATEGORY_SOURCE.ENDPOINT_SECURITY;
-                } else {
-                    // Default fallback
-                    subCategoryEnum = GlobalEnums.SUB_CATEGORY_SOURCE.CLOUD_SECURITY;
+            if(StringUtils.isEmpty(subCategoryFromRequest)){
+                Context.subCategory.set(GlobalEnums.SUB_CATEGORY_SOURCE.DEFAULT);
+            } else {
+                try {
+                    Context.subCategory.set(GlobalEnums.SUB_CATEGORY_SOURCE.valueOf(subCategoryFromRequest.toUpperCase()));
+                } catch (Exception e) {
+                    Context.subCategory.set(GlobalEnums.SUB_CATEGORY_SOURCE.DEFAULT);
                 }
-                Context.subCategory.set(subCategoryEnum);
-            } catch (Exception e) {
-                // Fallback to default if conversion fails
-                Context.subCategory.set(GlobalEnums.SUB_CATEGORY_SOURCE.CLOUD_SECURITY);
             }
         }
 

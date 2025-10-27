@@ -61,7 +61,7 @@ const initialState = {
     sendEventOnLogin: false,
     tableSelectedTab: {},
     dashboardCategory: 'API Security',
-    subCategory: 'Cloud Security',
+    subCategory: 'Default',
 };
 
 let persistStore = (set, get) => ({

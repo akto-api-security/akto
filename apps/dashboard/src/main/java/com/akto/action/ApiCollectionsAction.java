@@ -249,7 +249,7 @@ public class ApiCollectionsAction extends UserAction {
             Integer accountId = Context.accountId.get();
             GlobalEnums.CONTEXT_SOURCE contextSource = Context.contextSource.get();
             if (accountId != null) {
-                UsersCollectionsList.deleteContextCollectionsForUser(accountId, contextSource);
+                UsersCollectionsList.deleteContextCollectionsForUser(accountId, contextSource, Context.subCategory.get());
             }
         } catch (Exception e) {
             // Log the error but don't fail the entire request
@@ -334,7 +334,7 @@ public class ApiCollectionsAction extends UserAction {
 
             UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
             // remove the cache of context collections for account
-            UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
+            UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get(), Context.subCategory.get());
         } catch(Exception e){
         }
 
@@ -403,7 +403,7 @@ public class ApiCollectionsAction extends UserAction {
             UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
 
             // remove the cache of context collections for account
-            UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
+            UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get(), Context.subCategory.get());
         } catch (Exception e) {
         }
 

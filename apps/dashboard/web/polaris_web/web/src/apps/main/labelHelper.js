@@ -60,14 +60,6 @@ export function isSubCategory(category) {
   return getSubCategory() === category;
 }
 
-export function isCloudSecurityLeftNav() {
-  return isLeftNavCategory(SUB_CATEGORY_CLOUD_SECURITY);
-}
-
-export function isEndpointSecurityLeftNav() {
-  return isLeftNavCategory(SUB_CATEGORY_ENDPOINT_SECURITY);
-}
-
 export function shouldShowLeftNavSwitch() {
   return isMCPSecurityCategory() || isAgenticSecurityCategory();
 }

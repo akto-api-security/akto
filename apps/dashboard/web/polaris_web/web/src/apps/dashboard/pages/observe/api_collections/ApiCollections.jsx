@@ -215,6 +215,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             c.disableClick = true
         }
         const tagsList = JSON.stringify(c?.tagsList || "")
+        const currentSubCategory = PersistStore.getState().subCategory
         return{
             ...c,
             icon: CircleTickMajor,
@@ -222,7 +223,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             envTypeOriginal: c?.envType,
             envType: c?.envType?.map(func.formatCollectionType),
             ...(shouldShowLeftNavSwitch() ? {
-                iconComp: (<Box><img src={isEndpointSecurityLeftNav() ? LaptopIcon : MCPIcon} alt="icon" style={{width: '24px', height: '24px'}} /></Box>)
+                iconComp: (<Box><img src={currentSubCategory === "Endpoint Security" ? LaptopIcon : MCPIcon} alt="icon" style={{width: '24px', height: '24px'}} /></Box>)
             } : {}),
             ...((isGenAISecurityCategory() || isAgenticSecurityCategory()) && func.isDemoAccount() && tagsList.includes("gen-ai") ? {
                 iconComp: (<Box><Icon source={tagsList.includes("AI Agent") ? AutomationMajor : MagicMajor} color={"base"}/></Box>)

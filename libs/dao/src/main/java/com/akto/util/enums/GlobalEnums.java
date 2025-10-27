@@ -160,7 +160,7 @@ public class GlobalEnums {
     }
 
     public enum SUB_CATEGORY_SOURCE {
-        CLOUD_SECURITY, ENDPOINT_SECURITY;
+        DEFAULT, CLOUD_SECURITY, ENDPOINT_SECURITY;
     }
 
     /* ********************************************************************** */

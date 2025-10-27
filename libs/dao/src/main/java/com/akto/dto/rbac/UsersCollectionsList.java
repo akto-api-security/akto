@@ -41,6 +41,8 @@ public class UsersCollectionsList {
 
     public static final String RBAC_FEATURE = "RBAC_FEATURE";
 
+    private static final Bson tagFilter = Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.SOURCE, CollectionTags.TagSource.ENDPOINT));
+
     /*
      * Cases:
      * 1. For admin we save the list as null and
@@ -97,25 +99,32 @@ public class UsersCollectionsList {
         return collectionList;
     }
 
-    public static void deleteContextCollectionsForUser(int accountId, CONTEXT_SOURCE source) {
+    public static void deleteContextCollectionsForUser(int accountId, CONTEXT_SOURCE source, GlobalEnums.SUB_CATEGORY_SOURCE subCategory) {
         if(source == null) {
             source = CONTEXT_SOURCE.API;
+        }
+
+        if(subCategory == null) {
+            subCategory = GlobalEnums.SUB_CATEGORY_SOURCE.DEFAULT;
         }
         if(contextCollectionsMap.isEmpty()) {
             return;
         }
         // Remove all cache entries for this accountId and source (regardless of leftNavCategory)
-        final String keyPrefix = accountId + "_" + source + "_";
-        contextCollectionsMap.entrySet().removeIf(entry -> 
-            entry.getKey().startsWith(keyPrefix));
+        String keyPrefix = accountId + "_" + source.name() + "_" + subCategory.name() ;
+        contextCollectionsMap.remove(keyPrefix);
     }
 
     public static Set<Integer> getContextCollectionsForUser(int accountId, CONTEXT_SOURCE source, GlobalEnums.SUB_CATEGORY_SOURCE subCategory) {
         if(source == null) {
             source = CONTEXT_SOURCE.API;
         }
+
+        if(subCategory == null) {
+            subCategory = GlobalEnums.SUB_CATEGORY_SOURCE.DEFAULT;
+        }
         // Create cache key that includes leftNavCategory to ensure proper filtering
-        String cacheKey = accountId + "_" + source + "_" + (subCategory != null ? subCategory : "null");
+        String cacheKey = accountId + "_" + source.name() + "_" + subCategory.name() ;
         Pair<Set<Integer>, Integer> collectionIdEntry = contextCollectionsMap.get(cacheKey);
         Set<Integer> collectionList;
 
@@ -140,25 +149,13 @@ public class UsersCollectionsList {
             )
         );
 
-        if (subCategory != null) {
-
+        Bson subCategoryFilter = Filters.empty();
+        if (!subCategory.equals(GlobalEnums.SUB_CATEGORY_SOURCE.DEFAULT)){
             if ((subCategory.equals(GlobalEnums.SUB_CATEGORY_SOURCE.ENDPOINT_SECURITY))) {
-                // For Endpoint Security: filter collections where tags_string has source = "Endpoint"
-                finalFilter = Filters.elemMatch(ApiCollection.TAGS_STRING,
-                        Filters.and(
-                                Filters.eq(CollectionTags.KEY_NAME, CollectionTags.SOURCE),
-                                Filters.eq(CollectionTags.VALUE, CollectionTags.TagSource.ENDPOINT)
-                        )
-                );
+                subCategoryFilter = tagFilter;
             } else if (subCategory.equals(GlobalEnums.SUB_CATEGORY_SOURCE.CLOUD_SECURITY)) {
-                // For Cloud Security: exclude collections that have source = "ENDPOINT" tag
-                finalFilter = Filters.not(
-                        Filters.elemMatch(ApiCollection.TAGS_STRING,
-                                Filters.and(
-                                        Filters.eq(CollectionTags.KEY_NAME, CollectionTags.SOURCE),
-                                        Filters.eq(CollectionTags.VALUE, CollectionTags.TagSource.ENDPOINT)
-                                )
-                        )
+                subCategoryFilter = Filters.not(
+                        tagFilter
                 );
             }
         }
@@ -167,7 +164,8 @@ public class UsersCollectionsList {
             case MCP:
                 finalFilter = Filters.and(
                     Filters.exists(ApiCollection.TAGS_STRING),
-                    Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG))
+                    Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
+                    subCategoryFilter
                 );
                 break;
             case GEN_AI:
@@ -183,7 +181,8 @@ public class UsersCollectionsList {
                     Filters.exists(ApiCollection.TAGS_STRING),
                     Filters.or(
                         Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
-                        Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG))
+                        Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG)),
+                        subCategoryFilter
                     )
                 );
                 break;

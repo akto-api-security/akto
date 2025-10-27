@@ -101,7 +101,7 @@ service.interceptors.request.use((config) => {
   config.headers['Content-Type'] = 'application/json'
   config.headers["access-token"] = SessionStore.getState().accessToken
   const currentCategory = PersistStore.getState().dashboardCategory || "API Security";
-  const subCategory = PersistStore.getState().subCategory || "Cloud Security";
+  let subCategory = PersistStore.getState().subCategory || "Default";
   let contextSource = "API";
   if (currentCategory === "API Security") {
     contextSource = "API";
@@ -110,8 +110,15 @@ service.interceptors.request.use((config) => {
   } else if (currentCategory === "Agentic Security") {
     contextSource = "AGENTIC";
   }
+
+  if(subCategory === "Cloud Security"){
+    subCategory = "CLOUD_SECURITY";
+  } else if(subCategory === "Endpoint Security"){
+    subCategory = "ENDPOINT_SECURITY";
+  }
+
   config.headers['x-context-source'] = contextSource;
-   config.headers['x-sub-category'] = subCategory;
+  config.headers['x-sub-category'] = subCategory;
 
 
   if (window.ACTIVE_ACCOUNT) {
