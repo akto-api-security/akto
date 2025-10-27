@@ -3,7 +3,6 @@ import Highcharts from "highcharts";
 import HighchartsSankey from "highcharts/modules/sankey";
 import { useEffect, useRef, useState } from "react";
 import func from "../../../../util/func";
-import SpinnerCentered from "../progress/SpinnerCentered";
 
 // Initialize Sankey module
 if (typeof Highcharts === 'object') {
@@ -124,7 +123,7 @@ function SankeyChart(props) {
       highcharts={Highcharts}
       options={chartOptions}
       ref={chartComponentRef}
-    /> : <SpinnerCentered/>
+    /> : <></>
   );
 }
 

@@ -31,6 +31,11 @@ const headers = [
     title: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"],
   },
   {
+    text: "Host",
+    value: "host",
+    title: "Host",
+  },
+  {
     text: "Threat Actor",
     value: "actorComp",
     title: "Actor",
@@ -445,6 +450,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         ...x,
         id: x.id,
         actorComp: formatActorId(x.actor),
+        host: x.host || "-",
         endpointComp: (
           <GetPrettifyEndpoint 
             maxWidth="300px" 
