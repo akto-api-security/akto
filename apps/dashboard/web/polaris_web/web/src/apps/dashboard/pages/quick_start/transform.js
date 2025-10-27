@@ -815,6 +815,23 @@ const azurefuncObj = {
     key: "Azure Functions",
 }
 
+const cloudflareWarpObj = {
+    icon: '/public/cloudflare.svg',
+    label: "Cloudflare WARP",
+    text: "Cloudflare WARP setup is recommended, if you use Cloudflare WARP for secure, accelerated device-to-internet connectivity.",
+    docsUrl: 'https://docs.akto.io/traffic-connector',
+    component: <AddOnComponenet/>,
+    key: "CLOUDFLARE_WARP",
+}
+
+const zscalerObj = {
+    icon: '/public/zscaler_logo.svg',
+    label: "Zscaler",
+    text: "Zscaler setup is recommended,if your organization uses Zscaler for secure, zero-trust internet and app access.",
+    docsUrl: 'https://docs.akto.io/traffic-connector',
+    component: <AddOnComponenet/>,
+    key: "ZSCALER",
+}
 const chromeExtensionObj = {
     icon: '/public/chrome.svg',
     label: "Chrome Extension",
@@ -1474,9 +1491,9 @@ const quickStartFunc = {
         ];
 
         // Secure Web Networks
-       const secureWebNetworks = [
-             cloudflareWarpObj, zscalerObj
-       ];
+        const secureWebNetworks = [
+            cloudflareWarpObj, zscalerObj
+        ];
 
         const browserExtensions = [
             chromeExtensionObj, firefoxExtensionObj, safariExtensionObj
@@ -1495,6 +1512,7 @@ const quickStartFunc = {
             connectors["AI Agent Security"] = aiAgentConnectors
             connectors["AI Model Security"] = aiScanConnectors
             connectors["Browser Extension"] = browserExtensions
+            connectors["Secure Web Networks"] = secureWebNetworks
 
         }
 

@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
 import InfoCard from "../../dashboard/new_components/InfoCard";
-import { Spinner } from "@shopify/polaris";
 import SankeyChart from "../../../components/charts/SankeyChart";
 import api from "../api";
 
 function ThreatSankeyChart({ startTimestamp, endTimestamp }) {
-  const [loading, setLoading] = useState(true);
   const [chartData, setChartData] = useState([]);
 
   const formatCategoryName = (category) => {
@@ -22,7 +20,6 @@ function ThreatSankeyChart({ startTimestamp, endTimestamp }) {
   useEffect(() => {
     let mounted = true;
     const fetchData = async () => {
-      setLoading(true);
       try {
         const res = await api.fetchThreatCategoryCount(startTimestamp, endTimestamp);
 
@@ -63,27 +60,12 @@ function ThreatSankeyChart({ startTimestamp, endTimestamp }) {
       } catch (error) {
         if (mounted) setChartData([]);
       } finally {
-        if (mounted) setLoading(false);
       }
     };
 
     fetchData();
     return () => { mounted = false; };
   }, [startTimestamp, endTimestamp]);
-
-  if (loading) {
-    return (
-      <InfoCard
-        title="Threat Categories"
-        titleToolTip="Flow visualization of threat categories and attack types"
-        component={
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
-            <Spinner size="large" />
-          </div>
-        }
-      />
-    );
-  }
 
   return (
     <InfoCard
