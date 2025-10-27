@@ -181,9 +181,9 @@ public class UsersCollectionsList {
                     Filters.exists(ApiCollection.TAGS_STRING),
                     Filters.or(
                         Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
-                        Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG)),
-                        subCategoryFilter
-                    )
+                        Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG))
+                    ),
+                    subCategoryFilter
                 );
                 break;
             default:

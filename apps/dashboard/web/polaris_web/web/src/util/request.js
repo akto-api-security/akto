@@ -101,14 +101,17 @@ service.interceptors.request.use((config) => {
   config.headers['Content-Type'] = 'application/json'
   config.headers["access-token"] = SessionStore.getState().accessToken
   const currentCategory = PersistStore.getState().dashboardCategory || "API Security";
-  let subCategory = PersistStore.getState().subCategory || "Default";
+  let subCategory = PersistStore.getState().subCategory;
   let contextSource = "API";
   if (currentCategory === "API Security") {
     contextSource = "API";
+    subCategory = subCategory || "Default";
   } else if (currentCategory === "MCP Security") {
     contextSource = "MCP";
+    subCategory = subCategory || "Cloud Security";
   } else if (currentCategory === "Agentic Security") {
     contextSource = "AGENTIC";
+    subCategory = subCategory || "Cloud Security";
   }
 
   if(subCategory === "Cloud Security"){

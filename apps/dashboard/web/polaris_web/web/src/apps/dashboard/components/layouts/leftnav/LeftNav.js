@@ -39,7 +39,14 @@ export default function LeftNav() {
     const resetStore = LocalStore(state => state.resetStore);
     const resetSession = SessionStore(state => state.resetStore);
     const resetFields = IssuesStore(state => state.resetStore);
-    const subCategory = PersistStore((state) => state.subCategory) || SUB_CATEGORY_CLOUD_SECURITY;
+    const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
+    const getDefaultSubCategory = () => {
+        if (dashboardCategory === "MCP Security" || dashboardCategory === "Agentic Security") {
+            return SUB_CATEGORY_CLOUD_SECURITY;
+        }
+        return "Default";
+    };
+    const subCategory = PersistStore((state) => state.subCategory) || getDefaultSubCategory();
     const setSubCategory = PersistStore((state) => state.setSubCategory);
 
     const handleSelect = (selectedId) => {
@@ -103,7 +110,6 @@ export default function LeftNav() {
         })
     }
 
-    const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
 
     // Helper function to duplicate navigation items with different prefix and independent selection
     const duplicateNavItems = (items, prefix, startKey = 100) => {
@@ -120,8 +126,12 @@ export default function LeftNav() {
                     // Set the left nav category based on section
                     if (prefix === "cloud") {
                         setSubCategory("Cloud Security");
+                        // Clear collections cache to trigger refresh
+                        PersistStore.getState().setAllCollections([]);
                     } else if (prefix === "endpoint") {
                         setSubCategory("Endpoint Security");
+                        // Clear collections cache to trigger refresh
+                        PersistStore.getState().setAllCollections([]);
                     }
                     
                     const originalHandler = item.onClick;
@@ -147,8 +157,12 @@ export default function LeftNav() {
                             // Set the left nav category based on section
                             if (prefix === "cloud") {
                                 setSubCategory("Cloud Security");
+                                // Clear collections cache to trigger refresh
+                                PersistStore.getState().setAllCollections([]);
                             } else if (prefix === "endpoint") {
                                 setSubCategory("Endpoint Security");
+                                // Clear collections cache to trigger refresh
+                                PersistStore.getState().setAllCollections([]);
                             }
                             
                             const originalHandler = subItem.onClick;

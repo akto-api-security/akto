@@ -130,12 +130,17 @@ export default function Header() {
         LocalStore.getState().setSubCategoryMap({});
         SessionStore.getState().setThreatFiltersMap({});
         
-        // Only set subcategory for dashboard categories that support subcategories
+        // Set appropriate default subcategory for each dashboard category
         if (value === "MCP Security" || value === "Agentic Security") {
-            PersistStore.getState().setSubCategory(currentSubCategory);
+            // For MCP/Agentic Security, use Cloud Security as default on first load
+            const defaultSubCategory = currentSubCategory === 'Default' ? 'Cloud Security' : currentSubCategory;
+            PersistStore.getState().setSubCategory(defaultSubCategory);
+        } else if (value === "API Security") {
+            // For API Security, use Default subcategory (no filtering)
+            PersistStore.getState().setSubCategory('Default');
         } else {
-            // For API Security and other categories, reset to default
-            PersistStore.getState().setSubCategory('Cloud Security');
+            // For other categories, use Default subcategory
+            PersistStore.getState().setSubCategory('Default');
         }
         
         setDashboardCategory(value);

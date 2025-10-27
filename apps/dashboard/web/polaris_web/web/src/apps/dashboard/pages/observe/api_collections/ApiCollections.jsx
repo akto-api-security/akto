@@ -349,6 +349,7 @@ function ApiCollections(props) {
     }
 
     const allCollections = PersistStore(state => state.allCollections)
+    const subCategory = PersistStore(state => state.subCategory)
     // const allCollections = dummyData.allCollections;
     const setAllCollections = PersistStore(state => state.setAllCollections)
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
@@ -649,7 +650,7 @@ function ApiCollections(props) {
     useEffect(() => {
         fetchData()
         resetFunc()    
-    }, [])
+    }, [subCategory])
     const createCollectionModalActivatorRef = useRef();
     const resetResourcesSelected = () => {
         TableStore.getState().setSelectedItems([])
