@@ -220,12 +220,12 @@ public class ThreatActorService {
                 while (cursor2.hasNext()) {
                     MaliciousEventDto event = cursor2.next();
                     activityDataList.add(ActivityData.newBuilder()
-                        .setUrl(doc2.getString("latestApiEndpoint"))
-                        .setDetectedAt(doc2.getLong("detectedAt"))
-                        .setSubCategory(doc2.getString("filterId"))
-                        .setSeverity(doc2.getString("severity"))
-                        .setMethod(doc2.getString("latestApiMethod"))
-                        .setHost(doc2.getString("host") != null ? doc2.getString("host") : "")
+                        .setUrl(event.getLatestApiEndpoint())
+                        .setDetectedAt(event.getDetectedAt())
+                        .setSubCategory(event.getFilterId())
+                        .setSeverity(event.getSeverity())
+                        .setMethod(event.getLatestApiMethod().name())
+                        .setHost(event.getHost() != null ? event.getHost() : "")
                         .build());
                 }
             }
