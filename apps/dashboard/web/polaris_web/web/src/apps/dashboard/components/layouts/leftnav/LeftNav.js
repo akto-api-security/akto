@@ -16,7 +16,7 @@ import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
 import Store from "../../../store";
 import api from "../../../../signup/api";
-import { useMemo, useState} from "react";
+import { useMemo, useState, useEffect} from "react";
 import func from "@/util/func";
 import Dropdown from "../Dropdown";
 import SessionStore from "../../../../main/SessionStore";
@@ -42,14 +42,27 @@ export default function LeftNav() {
     const subcategory = PersistStore((state) => state.subCategory);
     const setSubCategory = PersistStore((state) => state.setSubCategory);
 
+    // Set initial selection based on current path and subcategory
+    useEffect(() => {
+        const pathString = func.transformString(location.pathname);
+        const subCategoryIndex = subcategory === "Endpoint Security" ? "1" : "0";
+        const keyWithIndex = pathString + subCategoryIndex;
+        
+        // Only update if the current selection doesn't match
+        if (leftNavSelected !== keyWithIndex && leftNavSelected !== pathString) {
+            setLeftNavSelected(keyWithIndex);
+        }
+    }, [subcategory, location.pathname]);
 
-    const handleClick = (key, path, activeState, subcategory = "Default") => {
-        const finalKey = subcategory === "Endpoint Security" ? key + "_1" : key + "_0";
+    const handleClick = (key, path, activeState, subcategoryValue = "Default") => {
+        const finalKey = subcategoryValue === "Endpoint Security" ? key + "_1" : key + "_0";
         setLeftNavSelected(finalKey);
         navigate(path);
         setActive(activeState);
-        if (subcategory) {
-            setSubCategory(subcategory);
+        if (subcategoryValue && subcategoryValue !== subcategory) {
+            setSubCategory(subcategoryValue);
+            // Clear collections cache to trigger refresh when subcategory changes
+            PersistStore.getState().setAllCollections([]);
         }
     }
 
@@ -72,11 +85,13 @@ export default function LeftNav() {
 
     const getMainNavItems = (subCategoryValue) => {
         const subCategoryIndex = subCategoryValue === "Endpoint Security" ? "1" : "0";
+        const isCurrentSubCategory = subcategory === subCategoryValue;
+        
         let reportsSubNavigationItems = [
             {
                 label: "Issues",
                 onClick: () => handleClick("dashboard_reports_issues", "/dashboard/reports/issues", "active", subCategoryValue),
-                selected: leftNavSelected === "dashboard_reports_issues",
+                selected: isCurrentSubCategory && (leftNavSelected === "dashboard_reports_issues" + subCategoryIndex || leftNavSelected === "dashboard_reports_issues"),
             }
         ]
     
@@ -84,7 +99,7 @@ export default function LeftNav() {
             reportsSubNavigationItems.push({
                 label: "Compliance",
                 onClick: () => handleClick("dashboard_reports_compliance", "/dashboard/reports/compliance", "active", subCategoryValue),
-                selected: leftNavSelected === "dashboard_reports_compliance",
+                selected: isCurrentSubCategory && (leftNavSelected === "dashboard_reports_compliance" + subCategoryIndex || leftNavSelected === "dashboard_reports_compliance"),
             })
         }
         return [
@@ -92,14 +107,14 @@ export default function LeftNav() {
                 label: "Quick Start",
                 icon: AppsFilledMajor,
                 onClick: () => handleClick("dashboard_quick_start", "/dashboard/quick-start", "normal", subCategoryValue),
-                selected: leftNavSelected === "dashboard_quick_start" + subCategoryIndex,
+                selected: isCurrentSubCategory && (leftNavSelected === "dashboard_quick_start" + subCategoryIndex || leftNavSelected === "dashboard_quick_start"),
                 key: "quick_start",
             },
             {
                 label: mapLabel("API Security Posture", dashboardCategory),
                 icon: ReportFilledMinor,
                 onClick: () => handleClick("dashboard_home", "/dashboard/home", "normal", subCategoryValue),
-                selected: leftNavSelected === "dashboard_home" + subCategoryIndex,
+                selected: isCurrentSubCategory && (leftNavSelected === "dashboard_home" + subCategoryIndex || leftNavSelected === "dashboard_home"),
                 key: "2",
             },
             {
@@ -121,22 +136,22 @@ export default function LeftNav() {
                 ),
                 icon: InventoryFilledMajor,
                 onClick: () => handleClick("dashboard_observe_inventory", "/dashboard/observe/inventory", "normal", subCategoryValue),
-                selected: leftNavSelected.includes(subCategoryIndex) && leftNavSelected.includes("_observe"),
+                selected: isCurrentSubCategory && leftNavSelected.includes("_observe"),
                 subNavigationItems: [
                     {
                         label: "Collections",
                         onClick: () => handleClick("dashboard_observe_inventory", "/dashboard/observe/inventory", "active", subCategoryValue),
-                        selected: leftNavSelected === "dashboard_observe_inventory" + subCategoryIndex,
+                        selected: isCurrentSubCategory && (leftNavSelected === "dashboard_observe_inventory" + subCategoryIndex || leftNavSelected === "dashboard_observe_inventory"),
                     },
                     {
                         label: "Recent Changes",
                         onClick: () => handleClick("dashboard_observe_changes", "/dashboard/observe/changes", "active", subCategoryValue),
-                        selected: leftNavSelected === "dashboard_observe_changes" + subCategoryIndex,
+                        selected: isCurrentSubCategory && (leftNavSelected === "dashboard_observe_changes" + subCategoryIndex || leftNavSelected === "dashboard_observe_changes"),
                     },
                     {
                         label: "Sensitive Data",
                         onClick: () => handleClick("dashboard_observe_sensitive", "/dashboard/observe/sensitive", "active", subCategoryValue),
-                        selected: leftNavSelected === "dashboard_observe_sensitive" + subCategoryIndex,
+                        selected: isCurrentSubCategory && (leftNavSelected === "dashboard_observe_sensitive" + subCategoryIndex || leftNavSelected === "dashboard_observe_sensitive"),
                     },
                     ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AKTO_DAST?.isGranted && dashboardCategory === CATEGORY_API_SECURITY ? [{
                         label: "DAST scans",
