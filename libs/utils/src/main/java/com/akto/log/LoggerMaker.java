@@ -169,6 +169,7 @@ public class LoggerMaker  {
         return err;
     }
 
+    @Deprecated
     public void errorAndAddToDb(String err, LogDb db) {
         try {
             err = basicError(err, db);

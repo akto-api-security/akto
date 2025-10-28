@@ -205,7 +205,7 @@ public class Executor {
                 TestResult res = null;
                 if (AgentClient.isRawApiValidForAgenticTest(testReq)) {
                     // execute agentic test here
-                    res = agentClient.executeAgenticTest(testReq);
+                    res = agentClient.executeAgenticTest(testReq, apiInfoKey.getApiCollectionId());
                 }else{
                     String url = testReq.getRequest().getUrl();
                     if (url.contains("sampl-aktol-1exannwybqov-67928726")) {

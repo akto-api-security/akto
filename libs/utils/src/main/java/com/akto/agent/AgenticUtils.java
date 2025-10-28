@@ -5,7 +5,9 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.testing.TestRolesDao;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.AuthMechanism;
@@ -33,11 +35,13 @@ public class AgenticUtils {
     }
 
     // TODO: run test with role for test editor.
-    public static void checkAndInitializeAgent(String conversationId, RawApi rawApi) {
+    public static void checkAndInitializeAgent(String conversationId, RawApi rawApi, int apiCollectionId) {
         if (agentClient.performHealthCheck()) {
-            // TODO: move away from role check, 
-            // will break for mcp & agentic together.
-            if (rawApi != null && getMcpAuthPairs() == null) {
+
+            ApiCollection apiCollection = ApiCollectionsDao.instance.getMetaForId(apiCollectionId);
+            boolean isMcpCollection = apiCollection.isMcpCollection();
+
+            if (rawApi != null && !isMcpCollection) {
                 OriginalHttpRequest request = rawApi.getRequest();
                 String url = request.getFullUrlWithParams();
                 String requestBody = request.getBody();
