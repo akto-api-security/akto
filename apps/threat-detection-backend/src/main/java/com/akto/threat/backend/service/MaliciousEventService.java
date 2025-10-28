@@ -119,18 +119,7 @@ public class MaliciousEventService {
     // Convert string label to model enum
     MaliciousEventDto.Label label = convertStringLabelToModelLabel(evt.getLabel());
 
-    // Get status directly from the status field, default to ACTIVE if not set
-    String statusString = evt.getStatus();
-    MaliciousEventDto.Status status;
-    if (statusString == null || statusString.isEmpty()) {
-        status = MaliciousEventDto.Status.ACTIVE;
-    } else if (statusString.equalsIgnoreCase(ThreatDetectionConstants.IGNORED)) {
-        status = MaliciousEventDto.Status.IGNORED;
-    } else if (statusString.equalsIgnoreCase(ThreatDetectionConstants.UNDER_REVIEW)) {
-        status = MaliciousEventDto.Status.UNDER_REVIEW;
-    } else {
-        status = MaliciousEventDto.Status.ACTIVE;
-    }
+    String status = (evt.getStatus() != null && !evt.getStatus().isEmpty()) ? evt.getStatus() : ThreatDetectionConstants.ACTIVE;
 
     MaliciousEventDto maliciousEventModel =
         MaliciousEventDto.newBuilder()
@@ -151,7 +140,7 @@ public class MaliciousEventService {
             .setType(evt.getType())
             .setMetadata(evt.getMetadata().toString())
             .setSuccessfulExploit(evt.getSuccessfulExploit())
-            .setStatus(status)
+            .setStatus(MaliciousEventDto.Status.valueOf(status.toUpperCase()))
             .setLabel(label)
             .build();
 
