@@ -147,7 +147,7 @@ public class Main {
         }
         int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
 
-        DictionaryFilter.readDictionaryBinary();
+        //DictionaryFilter.readDictionaryBinary();
 
         if (topicName == null) topicName = "akto.api.logs";
 
