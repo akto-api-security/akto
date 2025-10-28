@@ -52,12 +52,22 @@ public class AgentClient {
         String testMode = getTestModeFromRole();
         
         try {
+            /*
+             * the rawApi already has been modified by the testRole, 
+             * and should have the updated auth request headers
+             */
+            AgenticUtils.checkAndInitializeAgent(conversationId, rawApi);
+        } catch(Exception e){
+        }
+
+        try {
             List<AgentConversationResult> conversationResults = processConversations(promptsList, conversationId, testMode);
             
             boolean isVulnerable = conversationResults.get(conversationResults.size() - 1).isValidation();
             List<String> errors = new ArrayList<>();
             
             TestResult testResult = new TestResult();
+            // TODO: Fill in message field
             testResult.setMessage(null);
             testResult.setConversationId(conversationId);
             testResult.setResultTypeAgentic(true);
@@ -197,7 +207,28 @@ public class AgentClient {
     }
     public void initializeAgent(String sseUrl, String authorizationToken) {
         try {
-            Request initRequest = buildOkHttpInitializeRequest(sseUrl, authorizationToken);
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("sseUrl", sseUrl);
+            requestBody.put("authorization", authorizationToken);
+            Request initRequest = buildOkHttpInitializeRequest(requestBody);
+            try (Response response = agentHttpClient.newCall(initRequest).execute()) {
+                if (!response.isSuccessful()) {
+                    loggerMaker.errorAndAddToDb("Agent initialization failed with status: " + response.code(), LogDb.TESTING);
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Agent initialization failed with exception: " + e.getMessage(), LogDb.TESTING);
+        }
+    }
+
+    public void initializeAgent(String sessionUrl, String requestHeaders, String apiRequestBody, String conversationId) {
+        try {
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("sessionUrl", sessionUrl);
+            requestBody.put("requestHeaders", requestHeaders);
+            requestBody.put("requestBody", apiRequestBody);
+            requestBody.put("conversationId", conversationId);
+            Request initRequest = buildOkHttpInitializeRequest(requestBody);
             try (Response response = agentHttpClient.newCall(initRequest).execute()) {
                 if (!response.isSuccessful()) {
                     loggerMaker.errorAndAddToDb("Agent initialization failed with status: " + response.code(), LogDb.TESTING);
@@ -216,18 +247,15 @@ public class AgentClient {
                 .build();
     }
     
-    
-    private Request buildOkHttpInitializeRequest(String sseUrl, String authorizationToken) {
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("sseUrl", sseUrl);
-        requestBody.put("authorization", authorizationToken);
-        
-        String body;
+    private Request buildOkHttpInitializeRequest(Map<String, Object> requestBody) {
+
+        String body = "";
         try {
             body = objectMapper.writeValueAsString(requestBody);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error serializing initialize request body: " + e.getMessage(), LogDb.TESTING);
-            body = "{\"sseUrl\":\"" + sseUrl.replace("\"", "\\\"") + "\"}";
+            // TODO: Fix at sse URL.
+            // body = "{\"sseUrl\":\"" + sseUrl.replace("\"", "\\\"") + "\"}";
         }
         
         RequestBody requestBodyObj = RequestBody.create(body, MediaType.parse("application/json"));

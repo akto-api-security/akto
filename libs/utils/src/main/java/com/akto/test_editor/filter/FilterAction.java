@@ -351,6 +351,10 @@ public final class FilterAction {
         if (rawApi == null || rawApi.getRequest() == null) {
             return new DataOperandsFilterResponse(false, null, null, null);
         }
+        if(true){
+            return new DataOperandsFilterResponse(true, null, null, null);
+        }
+        // TODO: add check for agents as well.
         boolean isMcpRequest = McpRequestResponseUtils.isMcpRequest(rawApi);
         if (isMcpRequest) {
             return new DataOperandsFilterResponse(true, null, null, null);

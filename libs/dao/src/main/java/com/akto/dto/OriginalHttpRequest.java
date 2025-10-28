@@ -8,7 +8,6 @@ import com.alibaba.fastjson2.JSONObject;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 
-import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.Setter;
 import okhttp3.HttpUrl;
@@ -16,7 +15,6 @@ import okhttp3.Headers;
 
 import java.net.URI;
 import java.util.*;
-import org.apache.commons.lang3.StringUtils;
 
 public class OriginalHttpRequest {
 
@@ -361,6 +359,33 @@ public class OriginalHttpRequest {
 
     public Map<String, List<String>> getHeaders() {
         return headers;
+    }
+
+    public String fetchHeadersJsonString() {
+        Map<String, List<String>> headersMap = this.getHeaders();
+        List<String> forbiddenHeaders = Arrays.asList("content-length", "accept-encoding");
+        if (headersMap == null)
+            headersMap = new HashMap<>();
+        // TODO: uncomment before prod release.
+        // headersMap.put(Constants.AKTO_IGNORE_FLAG, Collections.singletonList("0"));
+        Map<String, String> filteredHeaders = new HashMap<>();
+        for (String headerName : headersMap.keySet()) {
+            if (forbiddenHeaders.contains(headerName))
+                continue;
+            if (headerName.contains(" "))
+                continue;
+            List<String> headerValueList = headersMap.get(headerName);
+            if (headerValueList == null || headerValueList.isEmpty())
+                continue;
+            for (String headerValue : headerValueList) {
+                if (headerValue == null)
+                    continue;
+                filteredHeaders.put(headerName, headerValue);
+                break;
+            }
+        }
+
+        return gson.toJson(filteredHeaders);
     }
 
     public void setHeaders(Map<String, List<String>> headers) {

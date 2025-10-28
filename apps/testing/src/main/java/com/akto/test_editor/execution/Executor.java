@@ -609,6 +609,8 @@ public class Executor {
         return removed;
     }
 
+    // Add support to also update the URL ID 
+    // use case for an ai agent.
     public synchronized static ExecutorSingleOperationResp modifyAuthTokenInRawApi(TestRoles testRole, RawApi rawApi) {
         AuthMechanism authMechanismForRole = testRole.findMatchingAuthMechanism(rawApi);
 
