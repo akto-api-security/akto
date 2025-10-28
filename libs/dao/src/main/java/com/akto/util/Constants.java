@@ -28,8 +28,9 @@ public class Constants {
     public static final String P90_CACHE_KEY = "p90";
     public static final String MAX_REQUESTS_CACHE_KEY= "max_requests";
 
-    // Threat module, successful exploit category
+    // Threat module constants
     public static final String THREAT_PROTECTION_SUCCESSFUL_EXPLOIT_CATEGORY = "SuccessfulExploit";
+    public static final String THREAT_PROTECTION_IGNORED_EVENTS_CATEGORY = "IgnoredEvent";
 
     public static final String AWS_ACCOUNT_ID = "AWS_ACCOUNT_ID";
 

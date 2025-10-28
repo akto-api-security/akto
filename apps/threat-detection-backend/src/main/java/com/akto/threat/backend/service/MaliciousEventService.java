@@ -19,7 +19,7 @@ import com.akto.threat.backend.constants.KafkaTopic;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.utils.KafkaUtils;
 import com.akto.threat.backend.utils.ThreatUtils;
-import com.akto.threat.backend.constants.StatusConstants;
+import com.akto.util.ThreatDetectionConstants;
 import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
 
@@ -314,7 +314,7 @@ public class MaliciousEventService {
                 .setRefId(evt.getRefId())
                 .setEventTypeVal(evt.getEventType().toString())
                 .setMetadata(metadata)
-                .setStatus(evt.getStatus() != null ? evt.getStatus().toString() : StatusConstants.ACTIVE)
+                .setStatus(evt.getStatus() != null ? evt.getStatus().toString() : ThreatDetectionConstants.ACTIVE)
                 .setSuccessfulExploit(evt.getSuccessfulExploit() != null ? evt.getSuccessfulExploit() : false)
                 .setLabel(convertModelLabelToString(evt.getLabel()))
                 .build());
@@ -412,17 +412,17 @@ public class MaliciousEventService {
       return;
     }
 
-    if (StatusConstants.UNDER_REVIEW.equals(statusFilter)) {
-      query.append("status", StatusConstants.UNDER_REVIEW);
-    } else if (StatusConstants.IGNORED.equals(statusFilter)) {
-      query.append("status", StatusConstants.IGNORED);
-    } else if (StatusConstants.ACTIVE.equals(statusFilter) || StatusConstants.EVENTS_FILTER.equals(statusFilter)) {
+    if (ThreatDetectionConstants.UNDER_REVIEW.equals(statusFilter)) {
+      query.append("status", ThreatDetectionConstants.UNDER_REVIEW);
+    } else if (ThreatDetectionConstants.IGNORED.equals(statusFilter)) {
+      query.append("status", ThreatDetectionConstants.IGNORED);
+    } else if (ThreatDetectionConstants.ACTIVE.equals(statusFilter) || ThreatDetectionConstants.EVENTS_FILTER.equals(statusFilter)) {
       // For Events tab: show null, empty, or ACTIVE status
       List<Document> orConditions = Arrays.asList(
         new Document("status", new Document("$exists", false)),
         new Document("status", null),
         new Document("status", ""),
-        new Document("status", StatusConstants.ACTIVE)
+        new Document("status", ThreatDetectionConstants.ACTIVE)
       );
       query.append("$or", orConditions);
     }

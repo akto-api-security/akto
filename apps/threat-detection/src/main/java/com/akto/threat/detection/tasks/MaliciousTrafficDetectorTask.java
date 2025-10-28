@@ -104,6 +104,7 @@ public class MaliciousTrafficDetectorTask implements Task {
   private boolean apiDistributionEnabled;
   private ApiCountCacheLayer apiCacheCountLayer;
   private static List<FilterConfig> successfulExploitFilters = new ArrayList<>();
+  private static List<FilterConfig> ignoredEventFilters = new ArrayList<>();
   private final AtomicInteger applyFilterLogCount = new AtomicInteger(0);
   private static final int MAX_APPLY_FILTER_LOGS = 1000;
 
@@ -217,15 +218,22 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     // Extract successful exploit filters
     successfulExploitFilters.clear();
+    // Extract ignored event filters
+    ignoredEventFilters.clear();
 
     Iterator<Map.Entry<String, FilterConfig>> iterator = apiFilters.entrySet().iterator();
     while (iterator.hasNext()) {
         Map.Entry<String, FilterConfig> entry = iterator.next();
         FilterConfig filter = entry.getValue();
-        if (filter.getInfo() != null && filter.getInfo().getCategory() != null &&
-            Constants.THREAT_PROTECTION_SUCCESSFUL_EXPLOIT_CATEGORY.equalsIgnoreCase(filter.getInfo().getCategory().getName())) {
-            successfulExploitFilters.add(filter);
-            iterator.remove();
+        if (filter.getInfo() != null && filter.getInfo().getCategory() != null) {
+            String categoryName = filter.getInfo().getCategory().getName();
+            if (Constants.THREAT_PROTECTION_SUCCESSFUL_EXPLOIT_CATEGORY.equalsIgnoreCase(categoryName)) {
+                successfulExploitFilters.add(filter);
+                iterator.remove();
+            } else if (Constants.THREAT_PROTECTION_IGNORED_EVENTS_CATEGORY.equalsIgnoreCase(categoryName)) {
+                ignoredEventFilters.add(filter);
+                iterator.remove();
+            }
         }
     }
     return apiFilters;
@@ -299,6 +307,12 @@ public class MaliciousTrafficDetectorTask implements Task {
     boolean successfulExploit = false; 
     if (!successfulExploitFilters.isEmpty()) {
       successfulExploit = threatDetector.isSuccessfulExploit(successfulExploitFilters, rawApi, apiInfoKey);
+    }
+
+    // Check IgnoredEvents category filters
+    boolean isIgnoredEvent = false;
+    if (!ignoredEventFilters.isEmpty()) {
+      isIgnoredEvent = threatDetector.isIgnoredEvent(ignoredEventFilters, rawApi, apiInfoKey);
     }
 
     if (apiDistributionEnabled) {
