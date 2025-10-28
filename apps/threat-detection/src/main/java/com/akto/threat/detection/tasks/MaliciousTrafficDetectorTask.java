@@ -308,7 +308,6 @@ public class MaliciousTrafficDetectorTask implements Task {
     if (!successfulExploitFilters.isEmpty()) {
       successfulExploit = threatDetector.isSuccessfulExploit(successfulExploitFilters, rawApi, apiInfoKey);
     }
-
     // Check IgnoredEvents category filters
     boolean isIgnoredEvent = false;
     if (!ignoredEventFilters.isEmpty()) {
@@ -336,7 +335,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
         // Send event to BE.
         SampleMaliciousRequest maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam,
-            ipApiRateLimitFilter, metadata, errors, successfulExploit);
+            ipApiRateLimitFilter, metadata, errors, successfulExploit, isIgnoredEvent);
         generateAndPushMaliciousEventRequest(ipApiRateLimitFilter, actor, responseParam, maliciousReq,
             EventType.EVENT_TYPE_AGGREGATED);
 
@@ -403,7 +402,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
         SampleMaliciousRequest maliciousReq = null;
         if (!isAggFilter || !apiFilter.getInfo().getSubCategory().equalsIgnoreCase("API_LEVEL_RATE_LIMITING")) {
-          maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors, successfulExploit);
+          maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors, successfulExploit, isIgnoredEvent);
         }
 
         if (!isAggFilter) {
@@ -421,7 +420,7 @@ public class MaliciousTrafficDetectorTask implements Task {
               }
               shouldNotify = this.apiCountWindowBasedThresholdNotifier.calcApiCount(apiHitCountKey, responseParam.getTime(), rule);
               if (shouldNotify) {
-                maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors, successfulExploit);
+                maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors, successfulExploit, isIgnoredEvent);
               }
           } else {
               shouldNotify = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule);
@@ -466,6 +465,7 @@ public class MaliciousTrafficDetectorTask implements Task {
             .setMetadata(maliciousReq.getMetadata())
             .setType("Rule-Based")
             .setSuccessfulExploit(maliciousReq.getSuccessfulExploit())
+            .setIgnoredEvent(maliciousReq.getIgnoredEvent())
             .build();
     MaliciousEventKafkaEnvelope envelope =
         MaliciousEventKafkaEnvelope.newBuilder()

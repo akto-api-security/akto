@@ -119,6 +119,11 @@ public class MaliciousEventService {
     // Convert string label to model enum
     MaliciousEventDto.Label label = convertStringLabelToModelLabel(evt.getLabel());
 
+    // Determine status based on ignoredEvent flag
+    MaliciousEventDto.Status status = evt.getIgnoredEvent() 
+        ? MaliciousEventDto.Status.IGNORED 
+        : MaliciousEventDto.Status.ACTIVE;
+
     MaliciousEventDto maliciousEventModel =
         MaliciousEventDto.newBuilder()
             .setDetectedAt(evt.getDetectedAt())
@@ -138,6 +143,7 @@ public class MaliciousEventService {
             .setType(evt.getType())
             .setMetadata(evt.getMetadata().toString())
             .setSuccessfulExploit(evt.getSuccessfulExploit())
+            .setStatus(status)
             .setLabel(label)
             .build();
 
