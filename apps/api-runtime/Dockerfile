@@ -1,9 +1,10 @@
-FROM openjdk
+FROM openjdk:17-jdk-slim
 WORKDIR /app
 
-RUN apk update && \
-    apk upgrade && \
-    rm -rf /var/cache/apk/*
+# Update system packages
+RUN apt-get update \
+ && apt-get upgrade -y \
+ && rm -rf /var/lib/apt/lists/*
 
 COPY ./target/api-runtime-1.0-SNAPSHOT-jar-with-dependencies.jar /app/api-runtime-1.0-SNAPSHOT-jar-with-dependencies.jar
 
