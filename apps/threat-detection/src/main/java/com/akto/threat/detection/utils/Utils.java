@@ -46,6 +46,9 @@ public class Utils {
             metadataBuilder.addAllSchemaErrors(errors);
         }
         
+        // Determine status based on ignoredEvent flag
+        String status = ignoredEvent ? com.akto.util.ThreatDetectionConstants.IGNORED : com.akto.util.ThreatDetectionConstants.ACTIVE;
+        
         SampleMaliciousRequest.Builder maliciousReqBuilder = SampleMaliciousRequest.newBuilder()
             .setUrl(responseParam.getRequestParams().getURL())
             .setMethod(responseParam.getRequestParams().getMethod())
@@ -55,7 +58,7 @@ public class Utils {
             .setTimestamp(responseParam.getTime())
             .setFilterId(apiFilter.getId())
             .setSuccessfulExploit(successfulExploit)
-            .setIgnoredEvent(ignoredEvent);
+            .setIgnoredEvent(status);
 
         metadataBuilder.setCountryCode(metadata.getCountryCode());
         maliciousReqBuilder.setMetadata(metadataBuilder.build());

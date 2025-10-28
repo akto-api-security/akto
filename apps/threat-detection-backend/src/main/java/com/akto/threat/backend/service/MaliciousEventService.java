@@ -119,10 +119,18 @@ public class MaliciousEventService {
     // Convert string label to model enum
     MaliciousEventDto.Label label = convertStringLabelToModelLabel(evt.getLabel());
 
-    // Determine status based on ignoredEvent flag
-    MaliciousEventDto.Status status = evt.getIgnoredEvent() 
-        ? MaliciousEventDto.Status.IGNORED 
-        : MaliciousEventDto.Status.ACTIVE;
+    // Get status directly from the ignoredEvent field, default to ACTIVE if not set
+    String statusString = evt.getIgnoredEvent();
+    MaliciousEventDto.Status status;
+    if (statusString == null || statusString.isEmpty()) {
+        status = MaliciousEventDto.Status.ACTIVE;
+    } else if (statusString.equalsIgnoreCase(ThreatDetectionConstants.IGNORED)) {
+        status = MaliciousEventDto.Status.IGNORED;
+    } else if (statusString.equalsIgnoreCase(ThreatDetectionConstants.UNDER_REVIEW)) {
+        status = MaliciousEventDto.Status.UNDER_REVIEW;
+    } else {
+        status = MaliciousEventDto.Status.ACTIVE;
+    }
 
     MaliciousEventDto maliciousEventModel =
         MaliciousEventDto.newBuilder()

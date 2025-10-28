@@ -27,7 +27,7 @@ message SampleMaliciousRequest {
   string filter_id = 7;
   Metadata metadata = 8; 
   bool successful_exploit = 9;
-  bool ignored_event = 10;
+  string ignored_event = 10; 
 }
 
 message SampleRequestKafkaEnvelope {
