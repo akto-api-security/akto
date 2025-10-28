@@ -2,6 +2,8 @@ package com.akto.merging;
 
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
+import com.akto.dao.filter.MergedUrlsDao;
+import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.log.LoggerMaker;
 import com.akto.dao.SampleDataDao;
@@ -33,7 +35,37 @@ public class MergingLogic {
     private static final String AKTO_MCP_SERVER_TAG = "mcp-server";
     private static final LoggerMaker loggerMaker = new LoggerMaker(MergingLogic.class);
 
+    private static Set<MergedUrls> mergedUrls = new HashSet<>();
+
+    private static void loadMergedUrls() {
+        try {
+            mergedUrls = MergedUrlsDao.instance.getMergedUrls();
+            loggerMaker.infoAndAddToDb("Loaded " + mergedUrls.size() + " demerged URLs", LogDb.DB_ABS);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error loading merged URLs: " + e.getMessage(), LogDb.DB_ABS);
+            mergedUrls = new HashSet<>();
+        }
+    }
+
+    private static boolean isDemergedUrl(URLTemplate urlTemplate, int apiCollectionId) {
+        try {
+            for (MergedUrls mergedUrl : mergedUrls) {
+                if (mergedUrl.getApiCollectionId() == apiCollectionId &&
+                    mergedUrl.getUrl().equals(urlTemplate.getTemplateString()) &&
+                    mergedUrl.getMethod().equals(urlTemplate.getMethod().name())) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error checking demerged URL: " + e.getMessage(), LogDb.DB_ABS);
+        }
+        return false;
+    }
+
     public static void mergeUrlsAndSave(int apiCollectionId, boolean mergeUrlsBasic, boolean allowMergingOnVersions) {
+        // Load demerged URLs to prevent re-merging them
+        loadMergedUrls();
+
         ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, mergeUrlsBasic, allowMergingOnVersions);
 
         String deletedStaticUrlsString = "";
@@ -286,7 +318,7 @@ public class MergingLogic {
 
 
             for(int size: sizeToUrlToSti.keySet()) {
-                ApiMergerResult result = tryMergingWithKnownStrictURLs(sizeToUrlToSti.get(size), !mergeUrlsBasic, allowMergingOnVersions);
+                ApiMergerResult result = tryMergingWithKnownStrictURLs(sizeToUrlToSti.get(size), !mergeUrlsBasic, allowMergingOnVersions, apiCollectionId);
                 finalResult.templateToStaticURLs.putAll(result.templateToStaticURLs);
             }
 
@@ -317,7 +349,7 @@ public class MergingLogic {
         return sizeToURL;
     }
 
-    private static ApiMergerResult tryMergingWithKnownStrictURLs(Map<String, Set<String>> pendingRequests, boolean doBodyMatch, boolean allowMergingOnVersions) {
+    private static ApiMergerResult tryMergingWithKnownStrictURLs(Map<String, Set<String>> pendingRequests, boolean doBodyMatch, boolean allowMergingOnVersions, int apiCollectionId) {
         Map<URLTemplate, Set<String>> templateToStaticURLs = new HashMap<>();
 
         Iterator<Map.Entry<String, Set<String>>> iterator = pendingRequests.entrySet().iterator();
@@ -375,6 +407,14 @@ public class MergingLogic {
 
             if (countSimilarURLs >= STRING_MERGING_THRESHOLD) {
                 URLTemplate mergedTemplate = potentialMerges.keySet().iterator().next();
+
+                // Skip merging if this URL was previously demerged
+                if (isDemergedUrl(mergedTemplate, apiCollectionId)) {
+                    loggerMaker.infoAndAddToDb("Skipping merge for demerged URL: " + mergedTemplate.getTemplateString() +
+                        " " + mergedTemplate.getMethod() + " in collection " + apiCollectionId, LogDb.DB_ABS);
+                    continue;
+                }
+
                 Set<String> matchedStaticURLs = templateToStaticURLs.get(mergedTemplate);
 
                 if (matchedStaticURLs == null) {
