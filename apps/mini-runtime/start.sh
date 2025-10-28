@@ -64,8 +64,6 @@ monitor_memory() {
 
         MEM_USAGE_PERCENT=$((MEM_USAGE_BYTES * 100 / MEM_LIMIT_BYTES))
 
-        echo "Current memory usage: ${MEM_USAGE_PERCENT}%" | tee -a "$LOG_FILE"
-
         if (( MEM_USAGE_PERCENT >= MEMORY_RESTART_THRESHOLD )); then
             echo "Memory usage exceeded ${MEMORY_RESTART_THRESHOLD}%. Restarting application..." | tee -a "$LOG_FILE"
             kill -9 "$JAVA_PID" 2>/dev/null
