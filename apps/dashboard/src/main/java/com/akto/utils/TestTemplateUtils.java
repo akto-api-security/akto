@@ -97,6 +97,8 @@ public class TestTemplateUtils {
             TestCategory.MCP_PRIVILEGE_ABUSE,
             TestCategory.MCP_INDIRECT_PROMPT_INJECTION,
             TestCategory.MCP_MALICIOUS_CODE_EXECUTION,
+            TestCategory.MCP_FUNCTION_MANIPULATION,
+            TestCategory.MCP_SECURITY,
         };
 
         TestCategory[] llmCategories = {
@@ -115,17 +117,15 @@ public class TestTemplateUtils {
 
         switch (contextSource) {
             case MCP:
-                return mcpCategories;
+                return Arrays.stream(allCategories)
+                .filter(category ->  !Arrays.asList(llmCategories).contains(category))
+                .toArray(TestCategory[]::new);
 
             case GEN_AI:
                 return llmCategories;
             
             case AGENTIC:
-                // Combine both MCP and GEN_AI categories for agentic context
-                TestCategory[] agenticCategories = new TestCategory[mcpCategories.length + llmCategories.length];
-                System.arraycopy(mcpCategories, 0, agenticCategories, 0, mcpCategories.length);
-                System.arraycopy(llmCategories, 0, agenticCategories, mcpCategories.length, llmCategories.length);
-                return agenticCategories;
+                return allCategories;
             
             default:
                 return Arrays.stream(allCategories)

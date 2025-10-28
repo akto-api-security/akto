@@ -54,6 +54,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   @Getter int totalUnderReviewStatus;
 
   @Getter List<TopApiData> topApis;
+  @Getter List<TopHostData> topHosts;
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -314,7 +315,8 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
                             URLMethods.Method.fromString(smr.getMethod()),
                             smr.getActorsCount(),
                             smr.getRequestsCount(),
-                            smr.getDiscoveredAt()))
+                            smr.getDiscoveredAt(),
+                            smr.getHost()))
                     .collect(Collectors.toList());
 
                 this.total = m.getTotal();
@@ -362,6 +364,11 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
                             smr.getAttacks(),
                             smr.getSeverity()))
                     .collect(Collectors.toList());
+                this.topHosts = m.getTopHostsList().stream()
+                    .map(smr -> new TopHostData(
+                        smr.getHost(),
+                        smr.getAttacks()
+                    )).collect(Collectors.toList());
               });
     } catch (Exception e) {
       e.printStackTrace();

@@ -14,6 +14,7 @@ public class DashboardThreatActor {
   private String country;
   private String latestAttack;
   private List<ActivityData> activity;
+  private String latestApiHost;
 
   public DashboardThreatActor(
       String id,
@@ -23,7 +24,8 @@ public class DashboardThreatActor {
       long discoveredAt,
       String country,
       String latestAttack,
-      List<ActivityData> activity) {
+      List<ActivityData> activity,
+      String latestApiHost) {
 
     this.id = id;
     this.latestApiEndpoint = latestApiEndpoint;
@@ -33,6 +35,7 @@ public class DashboardThreatActor {
     this.country = country;
     this.latestAttack = latestAttack;
     this.activity = activity;
+    this.latestApiHost = latestApiHost;
   }
 
   public String getId() {
@@ -99,4 +102,11 @@ public class DashboardThreatActor {
     this.latestAttack = latestAttack;
   }
 
+  public String getLatestApiHost() {
+    return latestApiHost;
+  }
+
+  public void setLatestApiHost(String latestApiHost) {
+    this.latestApiHost = latestApiHost;
+  }
 }

@@ -9604,7 +9604,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS" type="json">
-                <param name="includeProperties">^topApis.*</param>
+                <param name="includeProperties">^(topApis|topHosts).*</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -10327,6 +10327,33 @@
                  <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
+
+        <action name="api/deleteAgentRun" class="com.akto.action.agents.AgentAction" method="deleteAgentRun">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">AI_AGENTS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">Delete an agent run</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json"></result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/getAllAgentRuns" class="com.akto.action.agents.AgentAction" method="getAllAgentRuns">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -11575,6 +11602,28 @@
             </result>
             <result name="SUCCESS" type="json">
                 <param name="root">allowedFeaturesForRBAC</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchMcpToolsApiCalls" class="com.akto.action.ApiCollectionsAction" method="fetchMcpToolsApiCalls">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json">
+                <param name="root">response</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>

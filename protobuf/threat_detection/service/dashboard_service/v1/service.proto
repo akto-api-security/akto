@@ -30,6 +30,7 @@ message ListMaliciousRequestsResponse {
       string status = 18;
       bool successful_exploit = 19;
       string label = 20;  // Common values: "threat", "guardrail"
+      string host = 21;   // Host header from the request
     }
     repeated MaliciousEvent malicious_events = 1;
     uint64 total = 2;
@@ -93,6 +94,7 @@ message ListThreatActorResponse {
     uint64 detected_at = 3;
     string severity = 4;
     string method = 5;
+    string host = 6;
   }
   message ThreatActor {
     string id = 1;
@@ -103,6 +105,7 @@ message ListThreatActorResponse {
     string country = 6;
     repeated ActivityData activity_data = 7;
     string latest_subcategory = 8;
+    string latest_api_host = 9;
   }
   repeated ThreatActor actors = 1;
   uint64 total = 2;
@@ -145,6 +148,7 @@ message ListThreatApiResponse {
     uint64 discovered_at = 3;
     uint32 actors_count = 4;
     uint32 requests_count = 5;
+    string host = 6;
   }
 
   repeated ThreatApi apis = 1;
@@ -384,5 +388,11 @@ message FetchTopNDataResponse {
     string severity = 4;
   }
 
+  message TopHostData {
+    string host = 1;
+    uint32 attacks = 2;
+  }
+
   repeated TopApiData top_apis = 1;
+  repeated TopHostData top_hosts = 2;
 }

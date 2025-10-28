@@ -2,6 +2,7 @@ import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
 import { Box, Button, Popover, Modal, Tooltip, ActionList, VerticalStack, HorizontalStack, Tag, Text } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
+import ApiGroups from "../../../components/shared/ApiGroups";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import { useEffect, useState, useRef } from "react";
 import api from "../api";
@@ -75,7 +76,7 @@ function ApiDetails(props) {
     const [isEditingDescription, setIsEditingDescription] = useState(false)
     const [editableDescription, setEditableDescription] = useState(description)
     const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
-    const [apiCallStats, setApiCallStats] = useState([]); 
+    const [apiCallStats, setApiCallStats] = useState([]);
     const [apiCallDistribution, setApiCallDistribution] = useState([]);
     const endTs = func.timeNow();
     const [startTime, setStartTime] = useState(endTs - statsOptions[6].value)
@@ -679,19 +680,24 @@ function ApiDetails(props) {
     newData['description'] = (isEditingDescription?<InlineEditableText textValue={editableDescription} setTextValue={setEditableDescription} handleSaveClick={handleSaveDescription} setIsEditing={setIsEditingDescription}  placeholder={"Add a brief description"} maxLength={64}/> : description )
 
     const headingComp = (
-        <HorizontalStack align="space-between" wrap={false} key="heading">
-            <VerticalStack>
-                <HorizontalStack gap={"2"} wrap={false} >
-                    <GithubCell
-                        width="32vw"
-                        data={newData}
-                        headers={headers}
-                        getStatus={statusFunc}
+        <VerticalStack gap="4" key="heading">
+            <HorizontalStack align="space-between" wrap={false}>
+                <VerticalStack gap="3">
+                    <HorizontalStack gap={"2"} wrap={false} >
+                        <GithubCell
+                            width="32vw"
+                            data={newData}
+                            headers={headers}
+                            getStatus={statusFunc}
+                        />
+                    </HorizontalStack>
+                    <ApiGroups
+                        collectionIds={apiDetail?.collectionIds}
+                        onGroupClick={() => setShowDetails(false)}
                     />
-                </HorizontalStack>
-            </VerticalStack>
-            <VerticalStack gap="3" align="space-between">
-                <HorizontalStack gap={"1"} wrap={false} >
+                </VerticalStack>
+                <VerticalStack gap="3" align="space-between">
+                    <HorizontalStack gap={"1"} wrap={false} >
                     <RunTest
                         apiCollectionId={apiDetail["apiCollectionId"]}
                         endpoints={[apiDetail]}
@@ -732,7 +738,8 @@ function ApiDetails(props) {
                     </VerticalStack>
                 }
             </VerticalStack>
-        </HorizontalStack>
+            </HorizontalStack>
+        </VerticalStack>
     )
 
     const components = [

@@ -1,8 +1,6 @@
 package com.akto.threat.backend.service;
 
-import com.akto.dao.MCollection;
 import com.akto.dto.HttpResponseParams;
-import com.akto.dto.billing.Organization;
 import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.log.LoggerMaker;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
@@ -26,6 +24,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Li
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataResponse;
 import com.akto.ProtoMessageUtils;
 import com.akto.threat.backend.constants.MongoDBCollection;
+import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.db.ActorInfoModel;
 import com.akto.threat.backend.dto.RateLimitConfigDTO;
 import com.akto.util.ThreatDetectionConstants;
@@ -49,10 +48,12 @@ import org.bson.conversions.Bson;
 public class ThreatActorService {
 
   private final MongoClient mongoClient;
+  private final MaliciousEventDao maliciousEventDao;
   private static final LoggerMaker loggerMaker = new LoggerMaker(ThreatActorService.class, LoggerMaker.LogDb.THREAT_DETECTION);
 
-  public ThreatActorService(MongoClient mongoClient) {
+  public ThreatActorService(MongoClient mongoClient, MaliciousEventDao maliciousEventDao) {
     this.mongoClient = mongoClient;
+    this.maliciousEventDao = maliciousEventDao;
   }
 
   public ThreatConfiguration fetchThreatConfiguration(String accountId) {
@@ -143,12 +144,8 @@ public class ThreatActorService {
 
     public void deleteAllMaliciousEvents(String accountId) {
         loggerMaker.infoAndAddToDb("Deleting all malicious events for accountId: " + accountId);
-        MongoCollection<Document> coll = this.mongoClient
-                .getDatabase(accountId)
-                .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
-
-        coll.drop();
-        ThreatUtils.createIndexIfAbsent(accountId, mongoClient);
+        maliciousEventDao.getCollection(accountId).drop();
+        ThreatUtils.createIndexIfAbsent(accountId, maliciousEventDao);
         loggerMaker.infoAndAddToDb("Deleted all malicious events for accountId: " + accountId);
     }
 
@@ -157,10 +154,6 @@ public class ThreatActorService {
         int skip = request.hasSkip() ? request.getSkip() : 0;
         int limit = request.getLimit();
         Map<String, Integer> sort = request.getSortMap();
-
-        MongoCollection<Document> coll = this.mongoClient
-            .getDatabase(accountId)
-            .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
 
         ListThreatActorsRequest.Filter filter = request.getFilter();
         Document match = new Document();
@@ -191,6 +184,7 @@ public class ThreatActorService {
             .append("latestApiEndpoint", new Document("$first", "$latestApiEndpoint"))
             .append("latestApiMethod", new Document("$first", "$latestApiMethod"))
             .append("latestApiIp", new Document("$first", "$latestApiIp"))
+            .append("latestApiHost", new Document("$first", "$host"))
             .append("country", new Document("$first", "$country"))
             .append("discoveredAt", new Document("$first", "$detectedAt"))
             .append("latestSubCategory", new Document("$first", "$filterId"))
@@ -208,7 +202,7 @@ public class ThreatActorService {
             .append("count", Arrays.asList(new Document("$count", "total")))
         ));
 
-        Document result = coll.aggregate(pipeline).first();
+        Document result = maliciousEventDao.aggregateRaw(accountId, pipeline).first();
         List<Document> paginated = result.getList("paginated", Document.class, Collections.emptyList());
         List<Document> countList = result.getList("count", Document.class, Collections.emptyList());
         long total = countList.isEmpty() ? 0 : countList.get(0).getInteger("total");
@@ -219,18 +213,20 @@ public class ThreatActorService {
             String actorId = doc.getString("_id");
             List<ActivityData> activityDataList = new ArrayList<>();
 
-            try (MongoCursor<Document> cursor2 = coll.find(Filters.eq("actor", actorId))
+            try (MongoCursor<MaliciousEventDto> cursor2 = maliciousEventDao.getCollection(accountId)
+                    .find(Filters.eq("actor", actorId))
                     .sort(Sorts.descending("detectedAt"))
                     .limit(40)
                     .cursor()) {
                 while (cursor2.hasNext()) {
-                    Document doc2 = cursor2.next();
+                    MaliciousEventDto event = cursor2.next();
                     activityDataList.add(ActivityData.newBuilder()
-                        .setUrl(doc2.getString("latestApiEndpoint"))
-                        .setDetectedAt(doc2.getLong("detectedAt"))
-                        .setSubCategory(doc2.getString("filterId"))
-                        .setSeverity(doc2.getString("severity"))
-                        .setMethod(doc2.getString("latestApiMethod"))
+                        .setUrl(event.getLatestApiEndpoint())
+                        .setDetectedAt(event.getDetectedAt())
+                        .setSubCategory(event.getFilterId())
+                        .setSeverity(event.getSeverity())
+                        .setMethod(event.getLatestApiMethod().name())
+                        .setHost(event.getHost() != null ? event.getHost() : "")
                         .build());
                 }
             }
@@ -240,6 +236,7 @@ public class ThreatActorService {
                 .setLatestApiEndpoint(doc.getString("latestApiEndpoint"))
                 .setLatestApiMethod(doc.getString("latestApiMethod"))
                 .setLatestApiIp(doc.getString("latestApiIp"))
+                .setLatestApiHost(doc.getString("latestApiHost") != null ? doc.getString("latestApiHost") : "")
                 .setDiscoveredAt(doc.getLong("discoveredAt"))
                 .setCountry(doc.getString("country"))
                 .setLatestSubcategory(doc.getString("latestSubCategory"))
@@ -257,10 +254,6 @@ public class ThreatActorService {
     }
 
     List<DailyActorsCountResponse.ActorsCount> actors = new ArrayList<>();
-    MongoCollection<Document> coll = this.mongoClient
-        .getDatabase(accountId)
-        .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
-
         List<Document> pipeline = new ArrayList<>();
 
 
@@ -319,8 +312,8 @@ public class ThreatActorService {
                                 new Document("$eq", Arrays.asList("$severity", "HIGH")),
                                 1,
                                 0))))));
-    
-        try (MongoCursor<Document> cursor = coll.aggregate(pipeline).cursor()) {
+
+        try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {
             while (cursor.hasNext()) {
                 Document doc = cursor.next();
                 // Convert dayStart from Date (ms) back to seconds
@@ -338,12 +331,12 @@ public class ThreatActorService {
             }
         }
 
-        // Calculate summary counts using direct MongoDB queries
+        // Calculate summary counts using MaliciousEventDao
         // Total analysed - count all documents matching the filter
-        long totalAnalysed = coll.countDocuments(matchConditions);
+        long totalAnalysed = maliciousEventDao.getCollection(accountId).countDocuments(matchConditions);
 
         // Total attacks - count documents with successfulExploit = true
-        long totalAttacks = coll.countDocuments(new Document(matchConditions).append("successfulExploit", true));
+        long totalAttacks = maliciousEventDao.getCollection(accountId).countDocuments(new Document(matchConditions).append("successfulExploit", true));
 
         int criticalActorsCount = 0;
         for (DailyActorsCountResponse.ActorsCount ac : actors) {
@@ -360,7 +353,7 @@ public class ThreatActorService {
         int totalActive = 0;
         int totalIgnored = 0;
         int totalUnderReview = 0;
-        try (MongoCursor<Document> cursor = coll.aggregate(statusPipeline).cursor()) {
+        try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, statusPipeline).cursor()) {
             while (cursor.hasNext()) {
                 Document d = cursor.next();
                 String status = d.getString("_id");
@@ -397,9 +390,6 @@ public class ThreatActorService {
         // if (startTs < endTs - sevenDaysInSeconds) {
         //     startTs = endTs - sevenDaysInSeconds;
         // }
-        MongoCollection<Document> coll = this.mongoClient
-            .getDatabase(accountId)
-            .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
 
       Document match = new Document();
 
@@ -431,7 +421,7 @@ public class ThreatActorService {
                 new Document("$push", new Document("subCategory", "$_id.subCategory").append("count", "$count"))))
         );
 
-        try (MongoCursor<Document> cursor = coll.aggregate(pipeline).cursor()) {
+        try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {
             while (cursor.hasNext()) {
                 Document doc = cursor.next();
                 System.out.print(doc);
@@ -471,8 +461,11 @@ public class ThreatActorService {
   }
 
 
-  private String fetchMetadataString(Document doc){
-    String metadataStr = doc.getString("metadata");
+  private String fetchMetadataString(String metadataStr){
+    if(metadataStr == null || metadataStr.isEmpty()){
+        return "";
+    }
+
     Metadata.Builder metadataBuilder = Metadata.newBuilder();
     try {
       TextFormat.getParser().merge(metadataStr, metadataBuilder);
@@ -484,17 +477,17 @@ public class ThreatActorService {
     return metadataStr;
   }
 
-  private List<FetchMaliciousEventsResponse.MaliciousPayloadsResponse> fetchMaliciousPayloadsResponse(FindIterable<Document> respList){
+  private List<FetchMaliciousEventsResponse.MaliciousPayloadsResponse> fetchMaliciousPayloadsResponse(FindIterable<MaliciousEventDto> respList){
     if (respList == null) {
       return Collections.emptyList();
     }
     List<FetchMaliciousEventsResponse.MaliciousPayloadsResponse> maliciousPayloadsResponse = new ArrayList<>();
-    for (Document doc: respList) {
+    for (MaliciousEventDto event: respList) {
         maliciousPayloadsResponse.add(
             FetchMaliciousEventsResponse.MaliciousPayloadsResponse.newBuilder().
-            setOrig(HttpResponseParams.getSampleStringFromProtoString(doc.getString("latestApiOrig"))).
-            setMetadata(fetchMetadataString(doc)).
-            setTs(doc.getLong("detectedAt")).build());
+            setOrig(HttpResponseParams.getSampleStringFromProtoString(event.getLatestApiOrig())).
+            setMetadata(fetchMetadataString(event.getMetadata() != null ? event.getMetadata() : "")).
+            setTs(event.getDetectedAt()).build());
     }
     return maliciousPayloadsResponse;
   } 
@@ -504,9 +497,8 @@ public class ThreatActorService {
 
     List<FetchMaliciousEventsResponse.MaliciousPayloadsResponse> maliciousPayloadsResponse = new ArrayList<>();
     String refId = request.getRefId();
-    MongoCollection<Document> coll = this.mongoClient.getDatabase(accountId).getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
     Bson filters = Filters.eq("refId", refId);
-    FindIterable<Document> respList;
+    FindIterable<MaliciousEventDto> respList;
 
     if (request.getEventType().equalsIgnoreCase(MaliciousEventDto.EventType.AGGREGATED.name())) {
         Bson matchConditions = Filters.and(
@@ -517,12 +509,12 @@ public class ThreatActorService {
             matchConditions,
             filters
         );
-        respList = (FindIterable<Document>) coll.find(matchConditions).sort(Sorts.descending("detectedAt")).limit(10);
+        respList = maliciousEventDao.getCollection(accountId).find(matchConditions).sort(Sorts.descending("detectedAt")).limit(10);
         maliciousPayloadsResponse.addAll(this.fetchMaliciousPayloadsResponse(respList));
         // TODO: Handle case where aggregate was satisfied only once.
     } else {
-        respList = (FindIterable<Document>) coll.find(filters);
-        maliciousPayloadsResponse = this.fetchMaliciousPayloadsResponse(respList); 
+        respList = maliciousEventDao.getCollection(accountId).find(filters);
+        maliciousPayloadsResponse = this.fetchMaliciousPayloadsResponse(respList);
 
     }
     return FetchMaliciousEventsResponse.newBuilder().addAllMaliciousPayloadsResponse(maliciousPayloadsResponse).build();
@@ -534,11 +526,6 @@ public class ThreatActorService {
       if(request.getLatestAttackList() == null || request.getLatestAttackList().isEmpty()) {
           return ThreatActorByCountryResponse.newBuilder().build();
       }
-
-    MongoCollection<Document> coll =
-        this.mongoClient
-            .getDatabase(accountId)
-            .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
 
     List<Document> pipeline = new ArrayList<>();
 
@@ -572,7 +559,7 @@ public class ThreatActorService {
 
     List<ThreatActorByCountryResponse.CountryCount> actorsByCountryCount = new ArrayList<>();
 
-    try (MongoCursor<Document> cursor = coll.aggregate(pipeline).batchSize(1000).cursor()) {
+    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).batchSize(1000).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();
         actorsByCountryCount.add(
@@ -655,26 +642,24 @@ public class ThreatActorService {
   public FetchTopNDataResponse fetchTopNData(
       String accountId, long startTs, long endTs, List<String> latestAttackList, int limit) {
 
-    MongoCollection<Document> coll = this.mongoClient
-        .getDatabase(accountId)
-        .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
-
     List<Document> pipeline = new ArrayList<>();
 
-    // Match stage
-    Document match = new Document();
-    if (latestAttackList != null && !latestAttackList.isEmpty()) {
-      match.append("filterId", new Document("$in", latestAttackList));
-    }
-    if (startTs > 0 || endTs > 0) {
-      Document tsRange = new Document();
-      if (startTs > 0) tsRange.append("$gte", startTs);
-      if (endTs > 0) tsRange.append("$lte", endTs);
-      match.append("detectedAt", tsRange);
-    }
-    if (!match.isEmpty()) {
-      pipeline.add(new Document("$match", match));
-    }
+        // Match stage (only apply time range filter; ignore latestAttackList)
+        Document match = new Document();
+        
+        if (latestAttackList != null && !latestAttackList.isEmpty()) {
+            match.append("filterId", new Document("$in", latestAttackList));
+        }
+
+        if (startTs > 0 || endTs > 0) {
+            Document tsRange = new Document();
+            if (startTs > 0) tsRange.append("$gte", startTs);
+            if (endTs > 0) tsRange.append("$lte", endTs);
+            match.append("detectedAt", tsRange);
+        }
+        if (!match.isEmpty()) {
+            pipeline.add(new Document("$match", match));
+        }
 
     // Group by endpoint and method, count attacks, get max severity
     pipeline.add(new Document("$group",
@@ -708,11 +693,11 @@ public class ThreatActorService {
     pipeline.add(new Document("$sort", new Document("attacks", -1)));
 
     // Limit results
-    pipeline.add(new Document("$limit", limit > 0 ? limit : 10));
+    pipeline.add(new Document("$limit", limit > 0 ? limit : 5));
 
     List<FetchTopNDataResponse.TopApiData> topApis = new ArrayList<>();
 
-    try (MongoCursor<Document> cursor = coll.aggregate(pipeline).cursor()) {
+    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();
         topApis.add(
@@ -725,8 +710,41 @@ public class ThreatActorService {
       }
     }
 
+    // Build pipeline for top hosts based on 'host' field
+    List<Document> hostPipeline = new ArrayList<>();
+    if (!match.isEmpty()) {
+      hostPipeline.add(new Document("$match", match));
+    }
+    // Only consider documents where host exists and is not empty
+    hostPipeline.add(new Document("$match", new Document("host", new Document("$ne", null))));
+    hostPipeline.add(new Document("$match", new Document("host", new Document("$ne", ""))));
+
+    hostPipeline.add(new Document("$group",
+        new Document("_id", "$host")
+            .append("attacks", new Document("$sum", 1))));
+
+    hostPipeline.add(new Document("$project",
+        new Document("host", "$_id")
+            .append("attacks", 1)));
+
+    hostPipeline.add(new Document("$sort", new Document("attacks", -1)));
+    hostPipeline.add(new Document("$limit", limit > 0 ? limit : 5));
+
+    List<FetchTopNDataResponse.TopHostData> topHosts = new ArrayList<>();
+    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, hostPipeline).cursor()) {
+      while (cursor.hasNext()) {
+        Document doc = cursor.next();
+        topHosts.add(
+            FetchTopNDataResponse.TopHostData.newBuilder()
+                .setHost(doc.getString("host"))
+                .setAttacks(doc.getInteger("attacks", 0))
+                .build());
+      }
+    }
+
     return FetchTopNDataResponse.newBuilder()
         .addAllTopApis(topApis)
+        .addAllTopHosts(topHosts)
         .build();
   }
 }
