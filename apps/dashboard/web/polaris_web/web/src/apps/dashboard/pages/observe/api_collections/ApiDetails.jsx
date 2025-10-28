@@ -1,6 +1,7 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Box, Button, Popover, Modal, Tooltip, ActionList, VerticalStack, HorizontalStack, Tag, Text } from "@shopify/polaris"
+import { Box, Button, Popover, Modal, Tooltip, ActionList, VerticalStack, HorizontalStack, Tag, Text, Link } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
+import {useNavigate} from "react-router-dom";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import { useEffect, useState, useRef } from "react";
@@ -60,6 +61,9 @@ function ApiDetails(props) {
 
     const localCategoryMap = LocalStore.getState().categoryMap
     const localSubCategoryMap = LocalStore.getState().subCategoryMap
+    const apiCollectionMap = PersistStore(state => state.collectionsMap)
+    const allCollections = PersistStore(state => state.allCollections)
+    const navigate = useNavigate()
 
     const [sampleData, setSampleData] = useState([])
     const [paramList, setParamList] = useState([])
@@ -75,7 +79,7 @@ function ApiDetails(props) {
     const [isEditingDescription, setIsEditingDescription] = useState(false)
     const [editableDescription, setEditableDescription] = useState(description)
     const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
-    const [apiCallStats, setApiCallStats] = useState([]); 
+    const [apiCallStats, setApiCallStats] = useState([]);
     const [apiCallDistribution, setApiCallDistribution] = useState([]);
     const endTs = func.timeNow();
     const [startTime, setStartTime] = useState(endTs - statsOptions[6].value)
@@ -678,20 +682,82 @@ function ApiDetails(props) {
 
     newData['description'] = (isEditingDescription?<InlineEditableText textValue={editableDescription} setTextValue={setEditableDescription} handleSaveClick={handleSaveDescription} setIsEditing={setIsEditingDescription}  placeholder={"Add a brief description"} maxLength={64}/> : description )
 
+    /**
+     * Get API groups that this API belongs to
+     * Handles both string names and numeric IDs from collectionIds
+     * @returns {Array<{id: string|number, name: string}>} Array of API group objects
+     */
+    const apiGroups = (() => {
+        // Only process if dialog is shown and apiDetail has data
+        if (!showDetails || !apiDetail || Object.keys(apiDetail).length === 0) {
+            return [];
+        }
+
+        if (!apiDetail.collectionIds || apiDetail.collectionIds.length === 0) {
+            return [];
+        }
+
+        // Check if collectionIds contains strings (names) or numbers (IDs)
+        const firstItem = apiDetail.collectionIds[0];
+
+        if (typeof firstItem === 'string') {
+            // collectionIds contains names directly
+            return apiDetail.collectionIds.map((name) => ({
+                id: name,
+                name: name
+            }));
+        } else {
+            // collectionIds contains IDs, map to names
+            return apiDetail.collectionIds
+                .filter(id => apiCollectionMap[id])
+                .map(id => ({
+                    id: id,
+                    name: apiCollectionMap[id]
+                }));
+        }
+    })();
+
+    /**
+     * Handle API group tag click - navigate to the group's collection page
+     * @param {string} groupName - Name of the API group
+     */
+    const handleGroupClick = (groupName) => {
+        const collection = allCollections.find(c => c.displayName === groupName || c.name === groupName);
+        if (collection) {
+            setShowDetails(false);
+            navigate(`/dashboard/observe/inventory/${collection.id}`);
+        }
+    };
+
     const headingComp = (
-        <HorizontalStack align="space-between" wrap={false} key="heading">
-            <VerticalStack>
-                <HorizontalStack gap={"2"} wrap={false} >
-                    <GithubCell
-                        width="32vw"
-                        data={newData}
-                        headers={headers}
-                        getStatus={statusFunc}
-                    />
-                </HorizontalStack>
-            </VerticalStack>
-            <VerticalStack gap="3" align="space-between">
-                <HorizontalStack gap={"1"} wrap={false} >
+        <VerticalStack gap="4" key="heading">
+            <HorizontalStack align="space-between" wrap={false}>
+                <VerticalStack gap="3">
+                    <HorizontalStack gap={"2"} wrap={false} >
+                        <GithubCell
+                            width="32vw"
+                            data={newData}
+                            headers={headers}
+                            getStatus={statusFunc}
+                        />
+                    </HorizontalStack>
+                    {apiGroups.length > 0 && (
+                        <HorizontalStack gap="2" wrap={true} align="start">
+                            <Text variant="bodyMd" color="subdued">API Groups:</Text>
+                            {apiGroups.map((group) => (
+                                <Link
+                                    key={group.id}
+                                    removeUnderline
+                                    onClick={() => handleGroupClick(group.name)}
+                                >
+                                    <Tag>{group.name}</Tag>
+                                </Link>
+                            ))}
+                        </HorizontalStack>
+                    )}
+                </VerticalStack>
+                <VerticalStack gap="3" align="space-between">
+                    <HorizontalStack gap={"1"} wrap={false} >
                     <RunTest
                         apiCollectionId={apiDetail["apiCollectionId"]}
                         endpoints={[apiDetail]}
@@ -732,7 +798,8 @@ function ApiDetails(props) {
                     </VerticalStack>
                 }
             </VerticalStack>
-        </HorizontalStack>
+            </HorizontalStack>
+        </VerticalStack>
     )
 
     const components = [
