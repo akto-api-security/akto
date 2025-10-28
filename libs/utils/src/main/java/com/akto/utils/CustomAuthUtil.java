@@ -97,8 +97,8 @@ public class CustomAuthUtil {
             boolean sampleProcessed = false;
             ApiInfo.ApiInfoKey id = apiInfo.getId();
             if (sampleData != null && sampleData.getSamples() != null && !sampleData.getSamples().isEmpty()) {
-                if (printLogs && (id.getApiCollectionId() == 1991121043 || id.getApiCollectionId() == -1134993740)) {
-                    loggerMaker.infoAndAddToDb("Found sample data for " + sampleData.getId().toString() ,LogDb.DASHBOARD);
+                if (printLogs || (id.getApiCollectionId() == 1991121043 || id.getApiCollectionId() == -1134993740)) {
+                    loggerMaker.infoAndAddToDb("Found sample data for " + sampleData.getId().toString());
                 }
                 for (String sample : sampleData.getSamples()) {
                     try {
