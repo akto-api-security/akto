@@ -318,4 +318,149 @@ public class AuthPolicyTest {
         s.add(ApiInfo.AuthType.JWT);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
     }
+
+    // SESSION_TOKEN tests
+    @Test
+    public void testSessionId() {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("cookie", Collections.singletonList("sessionid=abc123xyz"));
+        HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
+        ApiInfo apiInfo = new ApiInfo(httpResponseParams);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
+        Assertions.assertFalse(result);
+        Set<ApiInfo.AuthType> s = new HashSet<>();
+        s.add(ApiInfo.AuthType.SESSION_TOKEN);
+        Assertions.assertEquals(1, apiInfo.getAllAuthTypesFound().size());
+        Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
+    }
+
+    @Test
+    public void testSessionKey() {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("cookie", Collections.singletonList("sessionkey=def456uvw"));
+        HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
+        ApiInfo apiInfo = new ApiInfo(httpResponseParams);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
+        Assertions.assertFalse(result);
+        Set<ApiInfo.AuthType> s = new HashSet<>();
+        s.add(ApiInfo.AuthType.SESSION_TOKEN);
+        Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
+    }
+
+    @Test
+    public void testSessionToken() {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("cookie", Collections.singletonList("sessiontoken=ghi789rst"));
+        HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
+        ApiInfo apiInfo = new ApiInfo(httpResponseParams);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
+        Assertions.assertFalse(result);
+        Set<ApiInfo.AuthType> s = new HashSet<>();
+        s.add(ApiInfo.AuthType.SESSION_TOKEN);
+        Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
+    }
+
+    @Test
+    public void testSessionIdWithUnderscore() {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("cookie", Collections.singletonList("session_id=abc123xyz"));
+        HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
+        ApiInfo apiInfo = new ApiInfo(httpResponseParams);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
+        Assertions.assertFalse(result);
+        Set<ApiInfo.AuthType> s = new HashSet<>();
+        s.add(ApiInfo.AuthType.SESSION_TOKEN);
+        Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
+    }
+
+    @Test
+    public void testSessionIdWithHyphen() {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("cookie", Collections.singletonList("session-id=abc123xyz"));
+        HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
+        ApiInfo apiInfo = new ApiInfo(httpResponseParams);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
+        Assertions.assertFalse(result);
+        Set<ApiInfo.AuthType> s = new HashSet<>();
+        s.add(ApiInfo.AuthType.SESSION_TOKEN);
+        Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
+    }
+
+    @Test
+    public void testSessionIdWithDot() {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("cookie", Collections.singletonList("session.id=abc123xyz"));
+        HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
+        ApiInfo apiInfo = new ApiInfo(httpResponseParams);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
+        Assertions.assertFalse(result);
+        Set<ApiInfo.AuthType> s = new HashSet<>();
+        s.add(ApiInfo.AuthType.SESSION_TOKEN);
+        Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
+    }
+
+    @Test
+    public void testSessionIdWithPrefix() {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("cookie", Collections.singletonList("user_sessionid=abc123xyz"));
+        HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
+        ApiInfo apiInfo = new ApiInfo(httpResponseParams);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
+        Assertions.assertFalse(result);
+        Set<ApiInfo.AuthType> s = new HashSet<>();
+        s.add(ApiInfo.AuthType.SESSION_TOKEN);
+        Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
+    }
+
+    @Test
+    public void testSessionTokenWithPrefixAndSeparator() {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("cookie", Collections.singletonList("my-session-token=abc123xyz"));
+        HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
+        ApiInfo apiInfo = new ApiInfo(httpResponseParams);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
+        Assertions.assertFalse(result);
+        Set<ApiInfo.AuthType> s = new HashSet<>();
+        s.add(ApiInfo.AuthType.SESSION_TOKEN);
+        Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
+    }
+
+    @Test
+    public void testSessionIdUpperCase() {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("cookie", Collections.singletonList("SESSIONID=abc123xyz"));
+        HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
+        ApiInfo apiInfo = new ApiInfo(httpResponseParams);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
+        Assertions.assertFalse(result);
+        Set<ApiInfo.AuthType> s = new HashSet<>();
+        s.add(ApiInfo.AuthType.SESSION_TOKEN);
+        Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
+    }
+
+    @Test
+    public void testNonSessionCookie() {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("cookie", Collections.singletonList("user_id=12345"));
+        HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
+        ApiInfo apiInfo = new ApiInfo(httpResponseParams);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
+        Assertions.assertTrue(result);
+        Set<ApiInfo.AuthType> s = new HashSet<>();
+        s.add(ApiInfo.AuthType.UNAUTHENTICATED);
+        Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
+    }
+
+    @Test
+    public void testMultipleCookiesWithSession() {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("cookie", Collections.singletonList("user_id=12345; session_id=abc123; lang=en"));
+        HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
+        ApiInfo apiInfo = new ApiInfo(httpResponseParams);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
+        Assertions.assertFalse(result);
+        Set<ApiInfo.AuthType> s = new HashSet<>();
+        s.add(ApiInfo.AuthType.SESSION_TOKEN);
+        Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
+    }
 }
