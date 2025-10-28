@@ -37,6 +37,11 @@ const headers = [
     value: "latestIp",
   },
   {
+    text: "Latest Host",
+    title: "Latest Host",
+    value: "latestHost",
+  },
+  {
     text: "Latest " + labelMap[PersistStore.getState().dashboardCategory]["API"],
     title: "Latest " + labelMap[PersistStore.getState().dashboardCategory]["API"],
     value: "latestApi",
@@ -166,12 +171,12 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
           ...x,
           actor: formatActorId(x.id),
           latestIp: formatActorId(x.latestApiIp),
+          latestHost: x.latestApiHost || "-",
           discoveredAt: x.discoveredAt ? dayjs(x.discoveredAt*1000).format('YYYY-MM-DD, HH:mm:ss A') : "-",
           sensitiveData: sensitiveData && sensitiveData.length > 0 ? observeFunc.prettifySubtypes(sensitiveData, false) : "-",
           latestAttack: x.latestAttack || "-",
           accessType: accessTypes.length > 0 ? getAccessType(accessTypes) : "-",
           status: "Active",
-          latestAttack: x.latestAttack || "-",
           country: (
             <Tooltip
               content={x.country || "Unknown"}

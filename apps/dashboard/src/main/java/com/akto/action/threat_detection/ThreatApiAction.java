@@ -315,7 +315,8 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
                             URLMethods.Method.fromString(smr.getMethod()),
                             smr.getActorsCount(),
                             smr.getRequestsCount(),
-                            smr.getDiscoveredAt()))
+                            smr.getDiscoveredAt(),
+                            smr.getHost()))
                     .collect(Collectors.toList());
 
                 this.total = m.getTotal();

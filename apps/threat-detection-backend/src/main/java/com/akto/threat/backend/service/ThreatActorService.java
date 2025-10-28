@@ -183,6 +183,7 @@ public class ThreatActorService {
             .append("latestApiEndpoint", new Document("$first", "$latestApiEndpoint"))
             .append("latestApiMethod", new Document("$first", "$latestApiMethod"))
             .append("latestApiIp", new Document("$first", "$latestApiIp"))
+            .append("latestApiHost", new Document("$first", "$host"))
             .append("country", new Document("$first", "$country"))
             .append("discoveredAt", new Document("$first", "$detectedAt"))
             .append("latestSubCategory", new Document("$first", "$filterId"))
@@ -224,6 +225,7 @@ public class ThreatActorService {
                         .setSubCategory(event.getFilterId())
                         .setSeverity(event.getSeverity())
                         .setMethod(event.getLatestApiMethod().name())
+                        .setHost(event.getHost() != null ? event.getHost() : "")
                         .build());
                 }
             }
@@ -233,6 +235,7 @@ public class ThreatActorService {
                 .setLatestApiEndpoint(doc.getString("latestApiEndpoint"))
                 .setLatestApiMethod(doc.getString("latestApiMethod"))
                 .setLatestApiIp(doc.getString("latestApiIp"))
+                .setLatestApiHost(doc.getString("latestApiHost") != null ? doc.getString("latestApiHost") : "")
                 .setDiscoveredAt(doc.getLong("discoveredAt"))
                 .setCountry(doc.getString("country"))
                 .setLatestSubcategory(doc.getString("latestSubCategory"))
