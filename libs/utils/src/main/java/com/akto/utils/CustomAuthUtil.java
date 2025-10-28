@@ -32,7 +32,7 @@ import static com.akto.dto.ApiInfo.ALL_AUTH_TYPES_FOUND;
 
 public class CustomAuthUtil {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(CustomAuthUtil.class, LogDb.CYBORG);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(CustomAuthUtil.class, LogDb.DASHBOARD);
 
     public static Bson getFilters(ApiInfo apiInfo) {
         return Filters.and(
@@ -80,11 +80,11 @@ public class CustomAuthUtil {
         if (customAuthTypes == null) {
             customAuthTypes = new ArrayList<>();
         }
-        loggerMaker.infoAndAddToDb("Read " + apiInfos.size() + " api infos for custom auth types " + customAuthTypes.size());
+        loggerMaker.infoAndAddToDb("Read " + apiInfos.size() + " api infos for custom auth types " + customAuthTypes.size(), LogDb.DASHBOARD);
         for (ApiInfo apiInfo : apiInfos) {
 
-            if (printLogs || apiInfo.getId().getApiCollectionId() == -86954493) {
-                loggerMaker.infoAndAddToDb("initial auth types " + apiInfo.getId().getUrl() + " authtypes: " + apiInfo.getAllAuthTypesFound());
+            if (apiInfo.getId().getApiCollectionId() == -86954493) {
+                loggerMaker.infoAndAddToDb("initial auth types " + apiInfo.getId().getUrl() + " authtypes: " + apiInfo.getAllAuthTypesFound(), LogDb.DASHBOARD);
             }
 
             Set<Set<ApiInfo.AuthType>> authTypes = apiInfo.getAllAuthTypesFound();
@@ -97,15 +97,15 @@ public class CustomAuthUtil {
             boolean sampleProcessed = false;
             ApiInfo.ApiInfoKey id = apiInfo.getId();
             if (sampleData != null && sampleData.getSamples() != null && !sampleData.getSamples().isEmpty()) {
-                if (printLogs || (id.getApiCollectionId() == 1991121043 || id.getApiCollectionId() == -1134993740)) {
-                    loggerMaker.infoAndAddToDb("Found sample data for " + sampleData.getId().toString());
+                if (printLogs && (id.getApiCollectionId() == 1991121043 || id.getApiCollectionId() == -1134993740)) {
+                    loggerMaker.infoAndAddToDb("Found sample data for " + sampleData.getId().toString() ,LogDb.DASHBOARD);
                 }
                 for (String sample : sampleData.getSamples()) {
                     try {
                         HttpResponseParams httpResponseParams = SampleParser.parseSampleMessage(sample);
                         AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
-                        if (printLogs || id.getApiCollectionId() == -86954493) {
-                            loggerMaker.infoAndAddToDb("auth types sample data processed: url " + id.getUrl() + " authtypes: " + apiInfo.getAllAuthTypesFound());
+                        if (id.getApiCollectionId() == -86954493) {
+                            loggerMaker.infoAndAddToDb("auth types sample data processed: url " + id.getUrl() + " authtypes: " + apiInfo.getAllAuthTypesFound(), LogDb.DASHBOARD);
                         }
                         sampleProcessed = true;
                     } catch (Exception e) {
@@ -133,7 +133,7 @@ public class CustomAuthUtil {
                 // }
             }
 
-            if (printLogs || (id.getApiCollectionId() == 1991121043 || id.getApiCollectionId() == -1134993740)) {
+            if (printLogs && (id.getApiCollectionId() == 1991121043 || id.getApiCollectionId() == -1134993740)) {
                 loggerMaker.infoAndAddToDb("auth types for endpoint post processing " + apiInfo.getId().getUrl() + " " + apiInfo.getId().getMethod() + " : " + apiInfo.getAllAuthTypesFound());
             }
 
@@ -144,7 +144,7 @@ public class CustomAuthUtil {
             apiInfosUpdates.add(update);
 
         }
-        loggerMaker.infoAndAddToDb("Finished processing " + apiInfos.size() + " api infos for custom auth type");
+        loggerMaker.infoAndAddToDb("Finished processing " + apiInfos.size() + " api infos for custom auth type", LogDb.DASHBOARD);
         return apiInfosUpdates;
 
     }
