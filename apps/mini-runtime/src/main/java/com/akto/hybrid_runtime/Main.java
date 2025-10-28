@@ -60,6 +60,7 @@ public class Main {
     public static final boolean isKafkaAuthenticationEnabled = System.getenv("KAFKA_AUTH_ENABLED") != null && System.getenv("KAFKA_AUTH_ENABLED").equalsIgnoreCase("true");
     public static final String kafkaUsername = System.getenv("KAFKA_USERNAME");
     public static final String kafkaPassword = System.getenv("KAFKA_PASSWORD");
+    public static final boolean isSendToThreatEnabled = System.getenv("SEND_TO_THREAT_ENABLED") != null && System.getenv("SEND_TO_THREAT_ENABLED").equalsIgnoreCase("true");
 
     private static int debugPrintCounter = 500;
     private static void printL(Object o) {
@@ -142,7 +143,7 @@ public class Main {
     }
     
     private static boolean isProtoKafkaEnabled() {
-        if (DataActor.actualAccountId == 1752208054 || DataActor.actualAccountId == 1753806619 || DataActor.actualAccountId == 1757403870 || DataActor.actualAccountId == 1759692400) {
+        if (DataActor.actualAccountId == 1752208054 || DataActor.actualAccountId == 1753806619 || DataActor.actualAccountId == 1757403870 || DataActor.actualAccountId == 1759692400 || isSendToThreatEnabled) {
             return true;
         }
         return false;
