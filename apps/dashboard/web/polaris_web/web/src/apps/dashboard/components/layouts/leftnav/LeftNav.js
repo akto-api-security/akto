@@ -273,7 +273,7 @@ export default function LeftNav() {
                 subNavigationItems: reportsSubNavigationItems,
                 key: "6",
             },
-            ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted  ? [{
+            ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted && dashboardCategory === "API Security" ? [{
                     label: (
                         <Text variant="bodyMd" fontWeight="medium">
                             {mapLabel("Threat Detection", dashboardCategory)}
@@ -339,7 +339,7 @@ export default function LeftNav() {
                 ),
                 icon: LockMajor,
                 onClick: () => handleClick("dashboard_mcp_guardrails", "/dashboard/guardrails/activity", "normal", subCategoryValue),
-                selected: leftNavSelected.includes(subCategoryIndex) && leftNavSelected.includes("_guardrails"),
+                selected: leftNavSelected.includes(subCategoryIndex) && (leftNavSelected.includes("_guardrails") || leftNavSelected.includes("_threat")),
                 url: "#",
                 key: "9",
                 subNavigationItems: [
@@ -352,7 +352,17 @@ export default function LeftNav() {
                         label: "Guardrails Policies",
                         onClick: () => handleClick("dashboard_guardrails_policies", "/dashboard/guardrails/policies", "active", subCategoryValue),
                         selected:
-                            leftNavSelected === "dashboard_guardrails_policies",
+                            leftNavSelected === "dashboard_guardrails_policies" + subCategoryIndex,
+                    },
+                    {
+                        label: "Guardrail Actors",
+                        onClick: () => handleClick("dashboard_threat_actor", "/dashboard/protection/threat-actor", "active", subCategoryValue),
+                        selected: leftNavSelected === "dashboard_threat_actor" + subCategoryIndex,
+                    },
+                    {
+                        label: `${mapLabel("APIs", dashboardCategory)} Under Guardrail`,
+                        onClick: () => handleClick("dashboard_threat_api", "/dashboard/protection/threat-api", "active", subCategoryValue),
+                        selected: leftNavSelected === "dashboard_threat_api" + subCategoryIndex,
                     }
                 ]
 
@@ -390,7 +400,7 @@ export default function LeftNav() {
                 ),
                 icon: LockMajor,
                 onClick: () => handleClick("dashboard_agentic_guardrails", "/dashboard/guardrails/activity", "normal", subCategoryValue),
-                selected: leftNavSelected.includes(subCategoryIndex) && leftNavSelected.includes("_guardrails"),
+                selected: leftNavSelected.includes(subCategoryIndex) && (leftNavSelected.includes("_guardrails") || leftNavSelected.includes("_threat")),
                 url: "#",
                 key: "11",
                 subNavigationItems: [
@@ -404,7 +414,18 @@ export default function LeftNav() {
                         onClick: () => handleClick("dashboard_guardrails_policies", "/dashboard/guardrails/policies", "active", subCategoryValue),
                         selected:
                             leftNavSelected === "dashboard_guardrails_policies" + subCategoryIndex,
+                    },
+                    {
+                        label: "Guardrail Actors",
+                        onClick: () => handleClick("dashboard_threat_actor", "/dashboard/protection/threat-actor", "active", subCategoryValue),
+                        selected: leftNavSelected === "dashboard_threat_actor" + subCategoryIndex,
+                    },
+                    {
+                        label: `${mapLabel("APIs", dashboardCategory)} Under Guardrail`,
+                        onClick: () => handleClick("dashboard_threat_api", "/dashboard/protection/threat-api", "active", subCategoryValue),
+                        selected: leftNavSelected === "dashboard_threat_api" + subCategoryIndex,
                     }
+
                 ]
             }] : [])
         ];

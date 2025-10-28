@@ -137,7 +137,8 @@ export const labelMap = {
     "tests selected": "probes selected",
     "testing": "scanning",
     "Test library":"Probe library",
-    "Endpoint Shield": "MCP Endpoint Shield"
+    "Endpoint Shield": "MCP Endpoint Shield",
+    "Threat": "Guardrail"
   },
   "Gen AI": {
     "API Security Posture": "AI Agent Security Posture",
@@ -276,6 +277,7 @@ export const labelMap = {
     "tests selected": "probes selected",
     "testing": "scanning",
     "Test library":"Probe library",
-    "Endpoint Shield": "Agentic Endpoint Shield"
+    "Endpoint Shield": "Agentic Endpoint Shield",
+    "Threat": "Guardrail"
   },
 }
