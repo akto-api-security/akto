@@ -87,7 +87,7 @@ public class AgentClient {
         }
     }
     
-    public List<AgentConversationResult> processConversations(List<String> prompts, String conversationId, String testMode) throws Exception {
+    private List<AgentConversationResult> processConversations(List<String> prompts, String conversationId, String testMode) throws Exception {
         List<AgentConversationResult> results = new ArrayList<>();
         int index = 0;
         int totalRequests = prompts.size();
@@ -105,7 +105,7 @@ public class AgentClient {
         return results;
     }
     
-    public AgentConversationResult sendChatRequest(String prompt, String conversationId, String testMode, boolean isLastRequest) throws Exception {
+    private AgentConversationResult sendChatRequest(String prompt, String conversationId, String testMode, boolean isLastRequest) throws Exception {
         Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest);
         
         try (Response response = agentHttpClient.newCall(request).execute()) {

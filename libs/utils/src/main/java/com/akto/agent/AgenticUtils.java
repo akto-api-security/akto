@@ -36,6 +36,9 @@ public class AgenticUtils {
         return authPairs;
     }
 
+    // TODO: add role as a parameter
+    // TODO: run test with role for test editor. [ later ]
+    // TODO: move this call from test executer to executeAgenticTest.
     public static void checkAndInitializeAgent(Set<Integer> apiCollectionIds, boolean isTestEditor, FilterNode filterNode) {
         if(apiCollectionIds.isEmpty()){
             return;
@@ -62,6 +65,8 @@ public class AgenticUtils {
                 if(StringUtils.isEmpty(sseUrl) || StringUtils.isEmpty(authorization)){
                     return;
                 }
+    // TODO: initialize with session URL and sample request body.
+    // todo: add conversation id with initialization.
                 agentClient.initializeAgent(sseUrl, authorization);
             }
         }
