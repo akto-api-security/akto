@@ -5,7 +5,7 @@ import transform from '../transform'
 import SampleDataList from '../../../components/shared/SampleDataList'
 import SampleData from '../../../components/shared/SampleData'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
-import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link, Modal, InlineCode, Tag } from '@shopify/polaris'
+import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link, Modal, InlineCode } from '@shopify/polaris'
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
 import testingApi from "../api"
@@ -21,14 +21,12 @@ import MarkdownViewer from '../../../components/shared/MarkdownViewer.jsx'
 import InlineEditableText from '../../../components/shared/InlineEditableText.jsx'
 import ChatInterface from '../../../components/shared/ChatInterface.jsx'
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper.js'
-import PersistStore from '../../../../main/PersistStore'
+import ApiGroups from '../../../components/shared/ApiGroups'
 
 function TestRunResultFlyout(props) {
 
 
     const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, conversations} = props
-    const apiCollectionMap = PersistStore(state => state.collectionsMap)
-    const allCollections = PersistStore(state => state.allCollections)
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
@@ -298,34 +296,7 @@ function TestRunResultFlyout(props) {
                         <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
                         <Text color="subdued" variant="bodySm">{selectedTestRunResult?.testCategory}</Text>
                     </HorizontalStack>
-                    {apiInfo?.collectionIds && apiInfo.collectionIds.length > 0 && (
-                        <HorizontalStack gap="2" wrap={true} align="start">
-                            <Text variant="bodyMd" color="subdued">API Groups:</Text>
-                            {apiInfo.collectionIds.map((collectionId) => {
-                                const collectionName = typeof collectionId === 'string'
-                                    ? collectionId
-                                    : apiCollectionMap[collectionId] || collectionId;
-                                return (
-                                    <Link
-                                        key={collectionId}
-                                        removeUnderline
-                                        onClick={() => {
-                                            const collection = allCollections.find(c =>
-                                                c.id === collectionId ||
-                                                c.displayName === collectionName ||
-                                                c.name === collectionName
-                                            );
-                                            if (collection) {
-                                                navigate(`/dashboard/observe/inventory/${collection.id}`);
-                                            }
-                                        }}
-                                    >
-                                        <Tag>{collectionName}</Tag>
-                                    </Link>
-                                );
-                            })}
-                        </HorizontalStack>
-                    )}
+                    <ApiGroups collectionIds={apiInfo?.collectionIds} />
                 </VerticalStack>
                 <HorizontalStack gap={2} wrap={false}>
                     <ActionsComp />
