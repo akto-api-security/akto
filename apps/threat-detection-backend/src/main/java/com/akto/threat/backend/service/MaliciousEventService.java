@@ -119,8 +119,8 @@ public class MaliciousEventService {
     // Convert string label to model enum
     MaliciousEventDto.Label label = convertStringLabelToModelLabel(evt.getLabel());
 
-    // Get status directly from the ignoredEvent field, default to ACTIVE if not set
-    String statusString = evt.getIgnoredEvent();
+    // Get status directly from the status field, default to ACTIVE if not set
+    String statusString = evt.getStatus();
     MaliciousEventDto.Status status;
     if (statusString == null || statusString.isEmpty()) {
         status = MaliciousEventDto.Status.ACTIVE;

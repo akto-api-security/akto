@@ -58,7 +58,7 @@ public class Utils {
             .setTimestamp(responseParam.getTime())
             .setFilterId(apiFilter.getId())
             .setSuccessfulExploit(successfulExploit)
-            .setIgnoredEvent(status);
+            .setStatus(status);
 
         metadataBuilder.setCountryCode(metadata.getCountryCode());
         maliciousReqBuilder.setMetadata(metadataBuilder.build());

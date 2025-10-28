@@ -465,7 +465,7 @@ public class MaliciousTrafficDetectorTask implements Task {
             .setMetadata(maliciousReq.getMetadata())
             .setType("Rule-Based")
             .setSuccessfulExploit(maliciousReq.getSuccessfulExploit())
-            .setIgnoredEvent(maliciousReq.getIgnoredEvent())
+            .setStatus(maliciousReq.getStatus())
             .build();
     MaliciousEventKafkaEnvelope envelope =
         MaliciousEventKafkaEnvelope.newBuilder()
