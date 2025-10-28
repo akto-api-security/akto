@@ -509,8 +509,6 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    private List<Integer> authTypesLogAccountIds = Arrays.asList(1721887185, 1662680463, 1736798101);
-    private List<Integer> authTypesLogApiCollectionIds = Arrays.asList(1991121043, -1134993740, 1736798101);
     public String bulkWriteApiInfo() {
         int accountId = Context.accountId.get();
         try {
@@ -530,8 +528,8 @@ public class DbAction extends ActionSupport {
                 if (URLMethods.Method.OPTIONS.equals(id.getMethod()) || URLMethods.Method.OTHER.equals(id.getMethod())) {
                     continue;
                 }
-                if (authTypesLogAccountIds.contains(accountId))  {
-                    loggerMaker.infoAndAddToDb("auth types for endpoint from runtime " + id.getUrl() + " " + id.getMethod() + " : " + apiInfo.getAllAuthTypesFound(), LogDb.CYBORG);
+                if (accountId == 1721887185 && (id.getApiCollectionId() == 1991121043 || id.getApiCollectionId() == -1134993740)  && !id.getMethod().equals(Method.OPTIONS))  {
+                    loggerMaker.infoAndAddToDb("auth types for endpoint from runtime " + id.getUrl() + " " + id.getMethod() + " : " + apiInfo.getAllAuthTypesFound());
                 }
                 apiInfos.add(apiInfo);
             }
@@ -541,7 +539,7 @@ public class DbAction extends ActionSupport {
                     public void run() {
                         Context.accountId.set(accountId);
                         List<CustomAuthType> customAuthTypes = SingleTypeInfo.getCustomAuthType(accountId);
-                        CustomAuthUtil.calcAuth(apiInfos, customAuthTypes, authTypesLogAccountIds.contains(accountId));
+                        CustomAuthUtil.calcAuth(apiInfos, customAuthTypes, accountId == 1721887185);
                         DbLayer.bulkWriteApiInfo(apiInfos);
                     }
                 }, 0, TimeUnit.SECONDS);
