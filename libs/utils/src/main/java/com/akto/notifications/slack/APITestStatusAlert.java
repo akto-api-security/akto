@@ -65,7 +65,8 @@ public class APITestStatusAlert extends SlackAlerts {
         this.title = "✅ Test run on " + title;
 
         Map<String, Integer> horizontalField = new HashMap<>();
-        horizontalField.put("High", critical + high);
+        horizontalField.put("Critical", critical);
+        horizontalField.put("High", high);
         horizontalField.put("Medium", medium);
         horizontalField.put("Low", low);
         horizontalFieldModel = new HorizontalFieldModel(horizontalField);
