@@ -21,6 +21,7 @@ import MarkdownViewer from '../../../components/shared/MarkdownViewer.jsx'
 import InlineEditableText from '../../../components/shared/InlineEditableText.jsx'
 import ChatInterface from '../../../components/shared/ChatInterface.jsx'
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper.js'
+import ApiGroups from '../../../components/shared/ApiGroups'
 
 function TestRunResultFlyout(props) {
 
@@ -29,6 +30,7 @@ function TestRunResultFlyout(props) {
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
+    const [apiInfo, setApiInfo] = useState({})
     const [popoverActive, setPopoverActive] = useState(false)
     const [modalActive, setModalActive] = useState(false)
     const [jiraProjectMaps,setJiraProjectMap] = useState({})
@@ -58,10 +60,11 @@ function TestRunResultFlyout(props) {
     })
 
     const fetchApiInfo = useCallback( async(apiInfoKey) => {
-        let apiInfo = {}
+        let apiInfoData = {}
         if(apiInfoKey !== null){
             await api.fetchEndpoint(apiInfoKey).then((res) => {
-                apiInfo = JSON.parse(JSON.stringify(res))
+                apiInfoData = JSON.parse(JSON.stringify(res))
+                setApiInfo(apiInfoData)
             })
             let sensitiveParam = ""
             const sensitiveParamsSet = new Set();
@@ -79,7 +82,7 @@ function TestRunResultFlyout(props) {
                     index++
                 })
             })
-            setRowItems(transform.getRowInfo(issueDetails.severity,apiInfo,issueDetails.jiraIssueUrl,sensitiveParam,issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl))
+            setRowItems(transform.getRowInfo(issueDetails.severity,apiInfoData,issueDetails.jiraIssueUrl,sensitiveParam,issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl))
         }
     },[issueDetails])
 
@@ -293,6 +296,7 @@ function TestRunResultFlyout(props) {
                         <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
                         <Text color="subdued" variant="bodySm">{selectedTestRunResult?.testCategory}</Text>
                     </HorizontalStack>
+                    <ApiGroups collectionIds={apiInfo?.collectionIds} />
                 </VerticalStack>
                 <HorizontalStack gap={2} wrap={false}>
                     <ActionsComp />
