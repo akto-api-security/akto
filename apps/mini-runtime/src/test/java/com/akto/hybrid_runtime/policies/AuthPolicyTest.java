@@ -8,7 +8,9 @@ import com.akto.dto.HttpResponseParams;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
 import java.util.*;
+import java.util.regex.Pattern;
 
 public class AuthPolicyTest {
 
@@ -462,5 +464,63 @@ public class AuthPolicyTest {
         Set<ApiInfo.AuthType> s = new HashSet<>();
         s.add(ApiInfo.AuthType.SESSION_TOKEN);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
+    }
+
+    // Direct SESSION_TOKEN_PATTERN regex tests
+    private Pattern getSessionTokenPattern() throws Exception {
+        Field field = AuthPolicy.class.getDeclaredField("SESSION_TOKEN_PATTERN");
+        field.setAccessible(true);
+        return (Pattern) field.get(null);
+    }
+
+    @Test
+    public void testSessionTokenPatternPositiveCases() throws Exception {
+        Pattern pattern = getSessionTokenPattern();
+
+        // Positive cases - should match
+        Assertions.assertTrue(pattern.matcher("sessionid").find(), "Should match: sessionid");
+        Assertions.assertTrue(pattern.matcher("sessionkey").find(), "Should match: sessionkey");
+        Assertions.assertTrue(pattern.matcher("sessiontoken").find(), "Should match: sessiontoken");
+        Assertions.assertTrue(pattern.matcher("session_id").find(), "Should match: session_id");
+        Assertions.assertTrue(pattern.matcher("session-id").find(), "Should match: session-id");
+        Assertions.assertTrue(pattern.matcher("session.id").find(), "Should match: session.id");
+        Assertions.assertTrue(pattern.matcher("usersessionid").find(), "Should match: usersessionid");
+        Assertions.assertTrue(pattern.matcher("my_session_key").find(), "Should match: my_session_key");
+        Assertions.assertTrue(pattern.matcher("app-session-token").find(), "Should match: app-session-token");
+        Assertions.assertTrue(pattern.matcher("SESSIONID").find(), "Should match: SESSIONID (case insensitive)");
+        Assertions.assertTrue(pattern.matcher("SessionKey").find(), "Should match: SessionKey (case insensitive)");
+        Assertions.assertTrue(pattern.matcher("api_sessiontoken").find(), "Should match: api_sessiontoken");
+        Assertions.assertTrue(pattern.matcher("session").find(), "Should match: session (optional suffix)");
+    }
+
+    @Test
+    public void testSessionTokenPatternNegativeCases() throws Exception {
+        Pattern pattern = getSessionTokenPattern();
+
+        // Negative cases - should NOT match
+        Assertions.assertFalse(pattern.matcher("userid").find(), "Should NOT match: userid");
+        Assertions.assertFalse(pattern.matcher("test-id").find(), "Should NOT match: userid");
+        Assertions.assertFalse(pattern.matcher("token").find(), "Should NOT match: userid");
+        Assertions.assertFalse(pattern.matcher("token").find(), "Should NOT match: userid");
+        Assertions.assertFalse(pattern.matcher("authtoken").find(), "Should NOT match: authtoken");
+        Assertions.assertFalse(pattern.matcher("access_key").find(), "Should NOT match: access_key");
+        Assertions.assertFalse(pattern.matcher("csrf_token").find(), "Should NOT match: csrf_token");
+        Assertions.assertFalse(pattern.matcher("remember_me").find(), "Should NOT match: remember_me");
+        Assertions.assertFalse(pattern.matcher("language").find(), "Should NOT match: language");
+        Assertions.assertFalse(pattern.matcher("user_id").find(), "Should NOT match: user_id");
+        Assertions.assertFalse(pattern.matcher("api_key").find(), "Should NOT match: api_key");
+        Assertions.assertFalse(pattern.matcher("").find(), "Should NOT match: empty string");
+    }
+
+    @Test
+    public void testSessionTokenPatternEdgeCases() throws Exception {
+        Pattern pattern = getSessionTokenPattern();
+
+        // Edge cases
+        Assertions.assertTrue(pattern.matcher("sessionsessionid").find(), "Should match: sessionsessionid");
+        Assertions.assertTrue(pattern.matcher("session___id").find(), "Should match: session___id (multiple separators)");
+        Assertions.assertTrue(pattern.matcher("xsessionidx").find(), "Should match: xsessionidx (prefix and suffix)");
+        Assertions.assertFalse(pattern.matcher("sesion_id").find(), "Should NOT match: sesion_id (typo)");
+        Assertions.assertFalse(pattern.matcher("sesson").find(), "Should NOT match: sesson (typo)");
     }
 }
