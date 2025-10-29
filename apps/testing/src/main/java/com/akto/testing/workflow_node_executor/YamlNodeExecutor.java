@@ -162,7 +162,7 @@ public class YamlNodeExecutor extends NodeExecutor {
                 TestResult res = null;
                 if (AgentClient.isRawApiValidForAgenticTest(testReq)) {
                     // execute agentic test here
-                    res = agentClient.executeAgenticTest(testReq);
+                    res = agentClient.executeAgenticTest(testReq, yamlNodeDetails.getApiCollectionId());
                 }else{
                     tsBeforeReq = Context.nowInMillis();
                     String url = testReq.getRequest().getUrl();

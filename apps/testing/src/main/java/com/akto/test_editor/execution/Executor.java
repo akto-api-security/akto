@@ -205,7 +205,7 @@ public class Executor {
                 TestResult res = null;
                 if (AgentClient.isRawApiValidForAgenticTest(testReq)) {
                     // execute agentic test here
-                    res = agentClient.executeAgenticTest(testReq);
+                    res = agentClient.executeAgenticTest(testReq, apiInfoKey.getApiCollectionId());
                 }else{
                     String url = testReq.getRequest().getUrl();
                     if (url.contains("sampl-aktol-1exannwybqov-67928726")) {
@@ -609,6 +609,8 @@ public class Executor {
         return removed;
     }
 
+    // Add support to also update the URL ID 
+    // use case for an ai agent.
     public synchronized static ExecutorSingleOperationResp modifyAuthTokenInRawApi(TestRoles testRole, RawApi rawApi) {
         AuthMechanism authMechanismForRole = testRole.findMatchingAuthMechanism(rawApi);
 
