@@ -41,6 +41,7 @@ import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.AccessMatrixTaskInfo;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
+import com.akto.dto.testing.AgentConversationResult;
 import com.akto.dto.testing.EndpointLogicalGroup;
 import com.akto.dto.testing.LoginFlowStepsData;
 import com.akto.dto.testing.OtpTestData;
@@ -3218,6 +3219,7 @@ public class ClientActor extends DataActor {
             try {
                 payloadObj =  BasicDBObject.parse(responsePayload);
                 BasicDBObject dataControlSettings = (BasicDBObject) payloadObj.get("dataControlSettings");
+                if (dataControlSettings == null) return null;
                 return objectMapper.readValue(dataControlSettings.toJson(), DataControlSettings.class);
             } catch(Exception e) {
                 loggerMaker.errorAndAddToDb("error extracting response in fetchDataControlSettings" + e, LoggerMaker.LogDb.RUNTIME);
@@ -4154,5 +4156,38 @@ public class ClientActor extends DataActor {
         }
     }
 
+    @Override
+    public void storeConversationResults(List<AgentConversationResult> conversationResults) {
+        Map<String, List<String>> headers = buildHeaders();
+        
+        List<Document> docs = new ArrayList<>();
+        for (AgentConversationResult r : conversationResults) {
+            Document d = new Document()
+                    .append("conversationId", r.getConversationId())
+                    .append("prompt", r.getPrompt())
+                    .append("response", r.getResponse())
+                    .append("conversation", r.getConversation())
+                    .append("timestamp", r.getTimestamp())
+                    .append("validation", r.isValidation());
+
+            docs.add(d);
+        }
+
+        Document wrapper = new Document("conversationResults", docs);
+        String jsonBody = wrapper.toJson();
+        
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeConversationResults", "", "POST", jsonBody, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in storeConversationResults", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        }
+        catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in storeConversationResults" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
 
 }

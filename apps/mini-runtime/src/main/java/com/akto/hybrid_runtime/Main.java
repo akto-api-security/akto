@@ -116,6 +116,7 @@ public class Main {
     public static final boolean isKafkaAuthenticationEnabled = System.getenv("KAFKA_AUTH_ENABLED") != null && System.getenv("KAFKA_AUTH_ENABLED").equalsIgnoreCase("true");
     public static final String kafkaUsername = System.getenv("KAFKA_USERNAME");
     public static final String kafkaPassword = System.getenv("KAFKA_PASSWORD");
+    public static final boolean isSendToThreatEnabled = System.getenv("SEND_TO_THREAT_ENABLED") != null && System.getenv("SEND_TO_THREAT_ENABLED").equalsIgnoreCase("true");
 
     private static int debugPrintCounter = 500;
     private static void printL(Object o) {
@@ -248,7 +249,7 @@ public class Main {
     }
     
     private static boolean isProtoKafkaEnabled() {
-        if (DataActor.actualAccountId == 1752208054 || DataActor.actualAccountId == 1753806619) {
+        if (DataActor.actualAccountId == 1752208054 || DataActor.actualAccountId == 1753806619 || DataActor.actualAccountId == 1757403870 || DataActor.actualAccountId == 1759692400 || isSendToThreatEnabled) {
             return true;
         }
         return false;
@@ -368,6 +369,21 @@ public class Main {
             kafkaBrokerUrl = "127.0.0.1:29092";
         }
         final String brokerUrlFinal = kafkaBrokerUrl;
+        String groupIdConfig =  System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG") != null
+                ? System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG")
+                : "asdf";
+        boolean syncImmediately = false;
+        boolean fetchAllSTI = true;
+        Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
+
+        boolean isDashboardInstance = false;
+        if (isDashboardInstance) {
+            syncImmediately = true;
+            fetchAllSTI = false;
+        }
+        int maxPollRecordsConfigTemp = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG") != null
+                ? System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG")
+                : "100");
 
         AccountSettings aSettings = dataActor.fetchAccountSettings();
         if (aSettings == null) {
@@ -376,6 +392,12 @@ public class Main {
         }
         DataActor.actualAccountId = aSettings.getId();
         loggerMaker.infoAndAddToDb("Fetched account settings for account ");
+
+        if (DataActor.actualAccountId == 1759692400) {
+            maxPollRecordsConfigTemp = 5000;
+        }
+
+        int maxPollRecordsConfig = maxPollRecordsConfigTemp;
 
         DataControlFetcher.init(dataActor);
 
@@ -483,8 +505,119 @@ public class Main {
         return System.getenv().getOrDefault("DB_MERGING_MODE", "false").equalsIgnoreCase("true");
     }
 
+    /**
+     * Main method of mini runtime where traffic kafka topic consumer does processing.
+     */
+    private static void kafkaSubscribeAndProcess(String topicName, boolean syncImmediately, boolean fetchAllSTI,
+            Map<Integer, AccountInfo> accountInfoMap, boolean isDashboardInstance, String centralKafkaTopicName,
+            APIConfig apiConfig, final Main main, final AtomicBoolean exceptionOnCommitSync,
+            Map<String, HttpCallParser> httpCallParserMap, long lastSyncOffset) {
+        try {
+            main.consumer.subscribe(Arrays.asList(topicName));
+            loggerMaker.infoAndAddToDb("Consumer subscribed to topic: " + topicName);
+            while (true) {
+                ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
+                try {
+                    main.consumer.commitSync();
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error while committing offset: " + e.getMessage());
+                    throw e;
+                }
+                long start = System.currentTimeMillis();
+                // TODO: what happens if exception
+                Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
+                bulkParseTrafficToResponseParams(lastSyncOffset, records, responseParamsToAccountMap);
+
+                handleResponseParams(responseParamsToAccountMap,
+                    accountInfoMap,
+                    isDashboardInstance,
+                    httpCallParserMap,
+                    apiConfig,
+                    fetchAllSTI,
+                    syncImmediately,
+                    centralKafkaTopicName);
+                AllMetrics.instance.setRuntimeProcessLatency(System.currentTimeMillis()-start);
+                loggerMaker.infoAndAddToDb("Processed " + responseParamsToAccountMap.size() + " total records " + records.count() + " accounts in " + (System.currentTimeMillis()-start) + " ms");
+            }
+
+        } catch (WakeupException ignored) {
+          // nothing to catch. This exception is called from the shutdown hook.
+          loggerMaker.error("Kafka consumer closed due to wakeup exception");
+        } catch (Exception e) {
+            exceptionOnCommitSync.set(true);
+            printL(e);
+            loggerMaker.errorAndAddToDb(e, "Error in main runtime: " + e.getMessage());
+            e.printStackTrace();
+            System.exit(0);
+        } finally {
+            loggerMaker.warn("Closing kafka consumer for topic: " + topicName);
+            main.consumer.close();
+        }
+    }
+
+    private static int LOG_DEBUG_RECORDS = 100;
+    private static void bulkParseTrafficToResponseParams(long lastSyncOffset, ConsumerRecords<String, String> records,
+            Map<String, List<HttpResponseParams>> responseParamsToAccountMap) {
+        for (ConsumerRecord<String,String> r: records) {
+            HttpResponseParams httpResponseParams;
+            try {
+
+                printL(r.value());
+                if(LOG_DEBUG_RECORDS > 0){
+                    LOG_DEBUG_RECORDS--;
+                    loggerMaker.infoAndAddToDb("Kafka record recieved" + r.value());
+                }
+                AllMetrics.instance.setRuntimeKafkaRecordCount(1);
+                AllMetrics.instance.setRuntimeKafkaRecordSize(r.value().length());
 
 
+                if (DataActor.actualAccountId != 1759692400 && lastSyncOffset % 100 == 0) {
+                    loggerMaker.infoAndAddToDb("Committing offset at position: " + lastSyncOffset);
+                }
+
+                if (DataActor.actualAccountId == 1759692400 && lastSyncOffset % 1000 == 0) {
+                    loggerMaker.infoAndAddToDb("Committing offset at position: " + lastSyncOffset);
+                }
+
+                if (DataActor.actualAccountId != 1759692400 && tryForCollectionName(r.value())) {
+                    continue;
+                }
+
+                httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
+                if (httpResponseParams == null) {
+                    loggerMaker.error("httpresponse params was skipped due to invalid json requestBody");
+                    continue;
+                }
+
+                if (httpResponseParams.getRequestParams().getURL().contains("api/ingestData")) {
+                    continue;
+                }
+
+                // if (DataActor.actualAccountId == 1759692400) {
+                //     String host = HttpCallParser.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "host");
+                //     loggerMaker.infoAndAddToDb("HttpResponseparam received with url: "
+                //             + httpResponseParams.getRequestParams().getURL() + " host: " + (host != null ? host : "null"));
+                // }
+
+                HttpRequestParams requestParams = httpResponseParams.getRequestParams();
+                String debugHost = Utils.printDebugHostLog(httpResponseParams);
+                // if (debugHost != null) {
+                //     loggerMaker.infoAndAddToDb("Found debug host: " + debugHost + " in url: " + requestParams.getMethod() + " " + requestParams.getURL());
+                // }
+                // if (Utils.printDebugUrlLog(requestParams.getURL())) {
+                //     loggerMaker.infoAndAddToDb("Found debug url: " + requestParams.getURL());
+                // }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message: " + r.value() + e);
+                continue;
+            }
+            String accountId = httpResponseParams.getAccountId();
+            if (!responseParamsToAccountMap.containsKey(accountId)) {
+                responseParamsToAccountMap.put(accountId, new ArrayList<>());
+            }
+            responseParamsToAccountMap.get(accountId).add(httpResponseParams);
+        }
+    }
 
     /**
      * This method is used to run the postgres db sample data merging job.
@@ -557,7 +690,7 @@ public class Main {
                 List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
 
                 // send to protobuf kafka topic (separate from central kafka)
-                loggerMaker.infoAndAddToDb("Sending " + accWiseResponse.size() +" records to protobuf kafka topic");
+                //loggerMaker.infoAndAddToDb("Sending " + accWiseResponse.size() +" records to protobuf kafka topic");
                 for (HttpResponseParams httpResponseParams: accWiseResponse) {
                     try {
                         sendToProtobufKafka(httpResponseParams);
@@ -569,7 +702,7 @@ public class Main {
                 accWiseResponse = filterBasedOnHeaders(accWiseResponse, accountInfo.accountSettings);
                 loggerMaker.infoAndAddToDb("Initiating sync function for account: " + accountId);
                 parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI, accountInfo.accountSettings);
-                loggerMaker.debugInfoAddToDb("Sync function completed for account: " + accountId);
+                loggerMaker.infoAndAddToDb("Sync function completed for account: " + accountId);
 
                 sendToCentralKafka(centralKafkaTopicName, accWiseResponse);
             } catch (Exception e) {
@@ -816,11 +949,11 @@ public class Main {
                 if (exception != null) {
                     loggerMaker.errorAndAddToDb(exception, "Error sending protobuf message to kafka: " + exception.getMessage());
                 } else {
-                    loggerMaker.errorAndAddToDb("Successfully sent protobuf message to akto.api.logs2 topic with offset: " + metadata.offset());
+                    //loggerMaker.errorAndAddToDb("Successfully sent protobuf message to akto.api.logs2 topic with offset: " + metadata.offset());
                 }
             });
 
-            loggerMaker.errorAndAddToDb("Finished sending data ");       
+            //loggerMaker.errorAndAddToDb("Finished sending data ");
             
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error converting HttpResponseParams to protobuf: " + e.getMessage());
@@ -843,7 +976,12 @@ public class Main {
         properties.put(ConsumerConfig.GROUP_ID_CONFIG, groupIdConfig);
         properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
-        
+
+        if(DataActor.actualAccountId == 1759692400){
+            properties.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, 50 * 1024 * 1024); // 50MB per partition
+            properties.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, 100 * 1024 * 1024); // 100MB total
+        }
+
         if (isKafkaAuthenticationEnabled) {
             if(StringUtils.isEmpty(kafkaPassword) || StringUtils.isEmpty(kafkaUsername)){
                 loggerMaker.errorAndAddToDb("Kafka authentication credentials not provided");
@@ -894,7 +1032,10 @@ public class Main {
                    loggerMaker.infoAndAddToDb("Found debug url: " + requestParams.getURL());
                }
            } catch (Exception e) {
-               loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message " + e);
+               String payloadStr = payload != null ? payload.toString() : "null";
+               String payloadSnippet = payloadStr.substring(0, Math.min(50000, payloadStr.length()));
+               loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message | Payload length: " + payloadStr.length() +
+                   " | First 50000 chars: " + payloadSnippet);
                continue;
            }
 

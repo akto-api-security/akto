@@ -113,10 +113,16 @@ public class SampleParser {
 
         // JSON string of K8 POD tags
         String tags = (String) json.getOrDefault("tag", "");
+        List<String> parentMcpToolNames;
+        try {
+            parentMcpToolNames = (List<String>) json.get("parentMcpToolNames");
+        } catch (Exception e) {
+            parentMcpToolNames = new ArrayList<>();
+        }
         HttpResponseParams httpResponseParams = new HttpResponseParams(
-                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP, destIP, direction, tags
+                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP, destIP, direction, tags, parentMcpToolNames
         );
-        if(!tags.isEmpty()){
+        if(tags != null && !tags.isEmpty()){
             String tagLog = "K8 Pod Tags: " + tags + " Host: " + requestHeaders.getOrDefault("host", new ArrayList<>()) + " Url: " + url;
             printL(tagLog);
             if ((Utils.printDebugHostLog(httpResponseParams) != null) || Utils.printDebugUrlLog(url)) {

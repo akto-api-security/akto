@@ -77,7 +77,7 @@ public class HttpCallParser {
     private static final String trafficMetricsUrl = "https://logs.akto.io/traffic-metrics";
     private static final String NON_HOSTNAME_KEY = "null" + " "; // used for collections created without hostnames
 
-    private static final List<Integer> INPROCESS_ADVANCED_FILTERS_ACCOUNTS = Arrays.asList(1736798101, 1718042191);
+    private static final List<Integer> INPROCESS_ADVANCED_FILTERS_ACCOUNTS = Arrays.asList(1736798101, 1718042191, 1759692400);
 
     // Using default timeouts [10 seconds], as this is a slow API.
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
@@ -392,7 +392,7 @@ public class HttpCallParser {
         if (syncImmediately || this.sync_count >= syncThresh || (Context.now() - this.last_synced) > this.sync_threshold_time || isHarOrPcap) {
             long startTime = System.currentTimeMillis();
             numberOfSyncs++;
-            loggerMaker.debug("Starting Syncing API catalog..." + numberOfSyncs);
+            loggerMaker.infoAndAddToDb("Starting Syncing API catalog..." + numberOfSyncs);
             List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta();
             for (ApiCollection apiCollection: apiCollections) {
                 apiCollectionsMap.put(apiCollection.getId(), apiCollection);
@@ -408,7 +408,7 @@ public class HttpCallParser {
             this.sync_count = 0;
 
             long endTime = System.currentTimeMillis();
-            loggerMaker.debug("Completed Syncing API catalog..." + numberOfSyncs + " " + (endTime - startTime) + " ms");
+            loggerMaker.infoAndAddToDb("Completed Syncing API catalog..." + numberOfSyncs + " " + (endTime - startTime) + " ms");
         }
     }
 
