@@ -152,7 +152,7 @@ public class GlobalEnums {
     }
 
     public enum TicketSource {
-        JIRA, AZURE_BOARDS
+        JIRA, AZURE_BOARDS, SERVICENOW
     }
 
     public enum CONTEXT_SOURCE {

@@ -96,6 +96,7 @@ import F5Waf from "../dashboard/pages/settings/integrations/F5Waf";
 import AWSWaf from "../dashboard/pages/settings/integrations/AWSWaf";
 import AgentConfig from "../dashboard/pages/settings/integrations/AgentConfig";
 import AzureBoards from "../dashboard/pages/settings/integrations/AzureBoards";
+import ServiceNow from "../dashboard/pages/settings/integrations/ServiceNow";
 import CloudflareWaf from "../dashboard/pages/settings/integrations/CloudflareWaf";
 import UndoDemergedApis from "../dashboard/pages/settings/undo_demerged_apis/UndoDemergedApis";
 import GmailWebhookCore from "../dashboard/pages/settings/integrations/gmailWebhooks/GmailWebhookCore";
@@ -382,6 +383,10 @@ const router = createBrowserRouter([
                     {
                         path: "integrations/azure_boards",
                         element: <AzureBoards/>,
+                    },
+                    {
+                        path: "integrations/servicenow",
+                        element: <ServiceNow/>,
                     },
                     {
                         path: "integrations/akto_apis",

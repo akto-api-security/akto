@@ -606,6 +606,38 @@ const settingRequests = {
             data: {}
         })
     },
+
+    fetchServiceNowIntegration() {
+        return request({
+            url: '/api/fetchServiceNowIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchServiceNowTables(instanceUrl, clientId, clientSecret) {
+        return request({
+            url: '/api/fetchServiceNowTables',
+            method: 'post',
+            data: {instanceUrl, clientId, clientSecret}
+        })
+    },
+
+    addServiceNowIntegration(instanceUrl, clientId, clientSecret, tableNames) {
+        return request({
+            url: '/api/addServiceNowIntegration',
+            method: 'post',
+            data: {instanceUrl, clientId, clientSecret, tableNames}
+        })
+    },
+
+    removeServiceNowIntegration() {
+        return request({
+            url: '/api/removeServiceNowIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
     removeInvitation(email) {
         return request({
             url: '/api/removeInvitation',

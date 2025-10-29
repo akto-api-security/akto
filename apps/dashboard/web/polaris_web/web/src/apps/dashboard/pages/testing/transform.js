@@ -1018,7 +1018,7 @@ getTestingRunResultUrl(testingResult){
   return finalMethod + " " + truncatedUrl
   
 },
-getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoardsWorkItemUrl){
+getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoardsWorkItemUrl, serviceNowTicketUrl, servicenowTicketId){
   if(apiInfo == null || apiInfo === undefined){
     apiInfo = {
       allAuthTypesFound: [],
@@ -1054,7 +1054,7 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoards
       <Tag>
           <HorizontalStack gap={1}>
             <Avatar size="extraSmall" shape='round' source="/public/logo_jira.svg" />
-            <Link url={jiraIssueUrl}>
+            <Link target="_blank" url={jiraIssueUrl}>
               <Text>
                 {key}
               </Text>
@@ -1070,9 +1070,24 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoards
       <Tag>
         <HorizontalStack gap={1}>
           <Avatar size="extraSmall" shape='round' source="/public/azure-boards.svg" />
-          <Link url={azureBoardsWorkItemUrl}>
+          <Link target="_blank" url={azureBoardsWorkItemUrl}>
             <Text>
               {azureBoardsWorkItemUrl?.split("/")?.[azureBoardsWorkItemUrl?.split("/")?.length - 1]}
+            </Text>
+          </Link>
+        </HorizontalStack>
+      </Tag>
+    </Box>
+  ) : null
+
+  const serviceNowComp = serviceNowTicketUrl?.length > 0 ? (
+    <Box>
+      <Tag>
+        <HorizontalStack gap={1}>
+          <Avatar size="extraSmall" shape='round' source="/public/servicenow.svg" />
+          <Link target="_blank" url={serviceNowTicketUrl}>
+            <Text>
+              {servicenowTicketId || "View Ticket"}
             </Text>
           </Link>
         </HorizontalStack>
@@ -1117,18 +1132,33 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoards
       title: "Detected",
       value: <TextComp value={func.prettifyEpoch(apiInfo.lastSeen)} />,
       tooltipContent: "Discovered time of the API"
-    },
-    {
+    }
+  ]
+
+  if(jiraComponent != null) {
+    rowItems.push({
       title: "Jira ticket",
       value: jiraComponent,
       tooltipContent:"Jira ticket number attached to the testing run issue"
-    },
-    {
+    })
+  }
+
+  if(azureBoardsComp != null) {
+    rowItems.push({
       title: "Azure work item",
       value: azureBoardsComp,
       tooltipContent: "Azure boards work item number attached to the testing run issue"
-    }
-  ]
+    })
+  }
+
+  if(serviceNowComp != null) {
+    rowItems.push({
+      title: "ServiceNow ticket",
+      value: serviceNowComp,
+      tooltipContent: "ServiceNow ticket attached to the testing run issue"
+    })
+  }
+
   return rowItems
 },
 

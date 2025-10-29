@@ -65,6 +65,7 @@ function TestRunResultPage(props) {
   const [issueDetails, setIssueDetails] = useState({});
   const [jiraIssueUrl, setJiraIssueUrl] = useState({});
   const [azureBoardsWorkItemUrl, setAzureBoardsWorkItemUrl] = useState({});
+  const [serviceNowTicketUrl, setServiceNowTicketUrl] = useState({});
   const subCategoryMap = LocalStore(state => state.subCategoryMap);
   const params = useParams();
   const hexId = params.hexId;
@@ -233,9 +234,11 @@ function TestRunResultPage(props) {
       })
       let jiraIssueCopy = runIssues.jiraIssueUrl || "";
       let azureBoardsWorkItemUrlCopy = runIssues.azureBoardsWorkItemUrl || "";
+      let serviceNowTicketUrlCopy = runIssues.servicenowIssueUrl || "";
       const moreInfoSections = transform.getInfoSectionsHeaders()
       setJiraIssueUrl(jiraIssueCopy)
       setAzureBoardsWorkItemUrl(azureBoardsWorkItemUrlCopy)
+      setServiceNowTicketUrl(serviceNowTicketUrlCopy)
       setInfoState(transform.fillMoreInformation(subCategoryMap[runIssues?.id?.testSubCategory],moreInfoSections, runIssuesArr, jiraIssueCopy, onClickButton))
       setRemediation(subCategoryMap[runIssues?.id?.testSubCategory]?.remediation)
       // setJiraIssueUrl(jiraIssueUrl)
@@ -255,19 +258,20 @@ function TestRunResultPage(props) {
     <TestRunResultFlyout
       selectedTestRunResult={selectedTestRunResult}
       remediationSrc={remediation}
-      testingRunResult={testingRunResult} 
-      loading={loading} 
-      issueDetails={issueDetails} 
-      getDescriptionText={getDescriptionText} 
-      infoState={infoState} 
-      createJiraTicket={createJiraTicket} 
-      jiraIssueUrl={jiraIssueUrl} 
-      hexId={hexId} 
+      testingRunResult={testingRunResult}
+      loading={loading}
+      issueDetails={issueDetails}
+      getDescriptionText={getDescriptionText}
+      infoState={infoState}
+      createJiraTicket={createJiraTicket}
+      jiraIssueUrl={jiraIssueUrl}
+      hexId={hexId}
       source={props?.source}
       setShowDetails={setShowDetails}
       showDetails={showDetails}
       isIssuePage={location.pathname.includes("issues")}
       azureBoardsWorkItemUrl={azureBoardsWorkItemUrl}
+      serviceNowTicketUrl={serviceNowTicketUrl}
       conversations={conversations}
     />
     </>
