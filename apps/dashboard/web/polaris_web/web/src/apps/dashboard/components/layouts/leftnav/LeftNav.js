@@ -400,7 +400,7 @@ export default function LeftNav() {
                     </Text>
                 ),
                 icon: LockMajor,
-                onClick: () => handleClick("dashboard_agentic_guardrails", "/dashboard/guardrails/activity", "normal", subCategoryValue),
+                onClick: () => handleClick("dashboard_threat_activity", "/dashboard/protection/threat-activity", "normal", subCategoryValue),
                 selected: leftNavSelected.includes(subCategoryIndex) && (leftNavSelected.includes("_guardrails") || leftNavSelected.includes("_threat")),
                 url: "#",
                 key: "11",
