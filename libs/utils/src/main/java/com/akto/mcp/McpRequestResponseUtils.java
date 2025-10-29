@@ -160,7 +160,7 @@ public final class McpRequestResponseUtils {
             BasicDBObject findQuery = new BasicDBObject();
             findQuery.put("type", auditInfo.getType());
             findQuery.put("resourceName", auditInfo.getResourceName());
-            findQuery.put("hostCollectionId", auditInfo.getHostCollectionId());
+           // findQuery.put("hostCollectionId", auditInfo.getHostCollectionId());  //removing this check for now to avoid auditing same mcp servers from different hosts
 
             McpAuditInfo existingRecord = McpAuditInfoDao.instance.findOne(findQuery);
 
