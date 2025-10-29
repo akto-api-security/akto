@@ -108,6 +108,10 @@ public class MaliciousTrafficDetectorTask implements Task {
   private final AtomicInteger applyFilterLogCount = new AtomicInteger(0);
   private static final int MAX_APPLY_FILTER_LOGS = 1000;
 
+  // Kafka records per minute tracking
+  private int recordsReadCount = 0;
+  private long lastRecordCountLogTime = System.currentTimeMillis();
+
   public MaliciousTrafficDetectorTask(
       KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient, DistributionCalculator distributionCalculator, boolean apiDistributionEnabled) throws Exception {
     this.kafkaConfig = trafficConfig;
@@ -165,6 +169,19 @@ public class MaliciousTrafficDetectorTask implements Task {
                     Duration.ofMillis(kafkaConfig.getConsumerConfig().getPollDurationMilli()));
 
             try {
+              int recordCount = records.count();
+              recordsReadCount += recordCount;
+
+              // Log records per minute
+              long currentTime = System.currentTimeMillis();
+              long timeDiff = currentTime - lastRecordCountLogTime;
+              if (timeDiff >= 60000) { // 60 seconds = 1 minute
+                logger.warnAndAddToDb("Kafka records read in last minute: " + recordsReadCount +
+                                      " (avg " + String.format("%.2f", recordsReadCount / (timeDiff / 1000.0)) + " records/sec)");
+                recordsReadCount = 0;
+                lastRecordCountLogTime = currentTime;
+              }
+
               for (ConsumerRecord<String, byte[]> record : records) {
                 HttpResponseParam httpResponseParam = HttpResponseParam.parseFrom(record.value());
                 if(MAX_KAFKA_DEBUG_MSGS > 0){
