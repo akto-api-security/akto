@@ -1791,7 +1791,7 @@ public class DbLayer {
             BasicDBObject findQuery = new BasicDBObject();
             findQuery.put("type", auditInfo.getType());
             findQuery.put("resourceName", auditInfo.getResourceName());
-            findQuery.put("hostCollectionId", auditInfo.getHostCollectionId());
+            //findQuery.put("hostCollectionId", auditInfo.getHostCollectionId());
 
             McpAuditInfo existingRecord = McpAuditInfoDao.instance.findOne(findQuery);
 
