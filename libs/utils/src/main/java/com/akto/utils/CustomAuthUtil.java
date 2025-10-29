@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 
 import com.mongodb.BasicDBObject;
@@ -139,7 +140,7 @@ public class CustomAuthUtil {
 
             UpdateOneModel<ApiInfo> update = new UpdateOneModel<>(
                     ApiInfoDao.getFilter(apiInfo.getId()),
-                    Updates.addToSet(ALL_AUTH_TYPES_FOUND, apiInfo.getAllAuthTypesFound()),
+                    Updates.addEachToSet(ALL_AUTH_TYPES_FOUND, Arrays.asList(apiInfo.getAllAuthTypesFound())),
                     new UpdateOptions().upsert(false));
             apiInfosUpdates.add(update);
 
