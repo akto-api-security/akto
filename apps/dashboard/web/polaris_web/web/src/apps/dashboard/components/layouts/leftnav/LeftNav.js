@@ -344,9 +344,10 @@ export default function LeftNav() {
                 key: "9",
                 subNavigationItems: [
                     {
-                        label: "Guardrails Activity",
-                        onClick: () => handleClick("dashboard_guardrails_activity", "/dashboard/guardrails/activity", "active", subCategoryValue),
-                        selected: leftNavSelected === "dashboard_guardrails_activity" + subCategoryIndex,
+                        label: "Guardrail Activity",
+                        onClick: () => handleClick("dashboard_threat_activity", "/dashboard/protection/threat-activity", "active", subCategoryValue),
+                        selected:
+                            leftNavSelected === "dashboard_threat_activity" + subCategoryIndex,
                     },
                     {
                         label: "Guardrails Policies",
@@ -405,9 +406,10 @@ export default function LeftNav() {
                 key: "11",
                 subNavigationItems: [
                     {
-                        label: "Guardrails Activity",
-                        onClick: () => handleClick("dashboard_guardrails_activity", "/dashboard/guardrails/activity", "active", subCategoryValue),
-                        selected: leftNavSelected === "dashboard_guardrails_activity" + subCategoryIndex,
+                        label: "Guardrail Activity",
+                        onClick: () => handleClick("dashboard_threat_activity", "/dashboard/protection/threat-activity", "active", subCategoryValue),
+                        selected:
+                            leftNavSelected === "dashboard_threat_activity" + subCategoryIndex,
                     },
                     {
                         label: "Guardrails Policies",

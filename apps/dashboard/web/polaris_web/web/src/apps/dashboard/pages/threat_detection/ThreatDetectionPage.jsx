@@ -140,7 +140,7 @@ const ChartComponent = ({ subCategoryCount, severityCountMap }) => {
             data={subCategoryCount}
           />
           <InfoCard
-                title={"Threats by severity"}
+                title={`${mapLabel("Threat", getDashboardCategory())} by severity`}
                 titleToolTip={`Number of ${mapLabel("APIs", getDashboardCategory())} per each category`}
                 component={
                     <BarGraph
@@ -162,10 +162,10 @@ const ChartComponent = ({ subCategoryCount, severityCountMap }) => {
             />
         </HorizontalGrid>
         {
-            func.isDemoAccount() && !isApiSecurityCategory() ? <HorizontalGrid gap={4} columns={2}>
+            !isApiSecurityCategory() ? <HorizontalGrid gap={4} columns={2}>
                 <InfoCard
-                    title={`Threat Messages by Direction (Request/Response)`}
-                    titleToolTip="Number of threat messages found in requests vs responses over time"
+                    title={`${mapLabel("Threat", getDashboardCategory())} Messages by Direction (Request/Response)`}
+                    titleToolTip={`Number of ${mapLabel("Threat", getDashboardCategory())} messages found in requests vs responses over time`}
                     component={
                         <LineChart
                             data={directionData}
@@ -180,7 +180,7 @@ const ChartComponent = ({ subCategoryCount, severityCountMap }) => {
                 />
                 <InfoCard
                     title={`Flagged/Safe messages`}
-                    titleToolTip="Number of messages flagged as threats vs those marked safe over time"
+                    titleToolTip={`Number of messages flagged as ${mapLabel("Threat", getDashboardCategory())} vs those marked safe over time`}
                     component={
                         <LineChart
                             data={flaggedData}
@@ -369,7 +369,7 @@ function ThreatDetectionPage() {
         fetchCountBySeverity();
         
         // Generate latency data for demo mode
-        if (isDemoMode) {
+        if (!isApiSecurityCategory()) {
             try {
                 const latency = generateLatencyData();
                 setLatencyData(latency);
@@ -378,16 +378,16 @@ function ThreatDetectionPage() {
                 setLatencyData([]);
             }
         }
-      }, [startTimestamp, endTimestamp, isDemoMode]);
+      }, [startTimestamp, endTimestamp]);
 
     const components = [
         <ChartComponent subCategoryCount={subCategoryCount} severityCountMap={severityCountMap} />,
         // Add P95 latency graphs for MCP and AI Agent security in demo mode
-        ...(isDemoMode && !isApiSecurityCategory() ? [
+        ...(!isApiSecurityCategory() ? [
             <P95LatencyGraph
                 key="threat-detection-latency"
-                title="Threat Detection Latency"
-                subtitle="95th percentile latency metrics for threat-detection"
+                title={`${mapLabel("Threat", getDashboardCategory())} Detection Latency`}
+                subtitle={`95th percentile latency metrics for ${mapLabel("Threat", getDashboardCategory())}-detection`}
                 dataType="threat-security"
                 startTimestamp={startTimestamp}
                 endTimestamp={endTimestamp}
@@ -510,7 +510,7 @@ function ThreatDetectionPage() {
         title={
             <TitleWithInfo
                 titleText={mapLabel("API Threat Activity", getDashboardCategory())}
-                tooltipContent={"Identify malicious requests with Akto's powerful threat detection capabilities"}
+                tooltipContent={`Identify malicious requests with Akto's powerful ${mapLabel("Threat", getDashboardCategory())} detection capabilities`}
             />
         }
         isFirstPage={true}

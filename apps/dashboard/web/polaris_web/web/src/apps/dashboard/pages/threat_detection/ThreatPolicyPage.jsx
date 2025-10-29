@@ -24,8 +24,8 @@ function ThreatPolicyPage() {
     return <PageWithMultipleCards
         title={
             <TitleWithInfo
-                titleText={"Threat Policy"}
-                tooltipContent={"Identify malicious requests with Akto's powerful threat detection capabilities"}
+                titleText={`${mapLabel("Threat", getDashboardCategory())} Policy`}
+                tooltipContent={`Identify malicious requests with Akto's powerful ${mapLabel("Threat", getDashboardCategory())} detection capabilities`}
             />
         }
         isFirstPage={true}
