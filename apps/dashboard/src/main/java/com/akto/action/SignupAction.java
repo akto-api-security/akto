@@ -581,6 +581,22 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             String email = userInfo.get("email").toString();
             String username = userInfo.get("preferred_username").toString();
 
+            if (oktaConfig.getOrganizationDomain() != null && !oktaConfig.getOrganizationDomain().isEmpty()) {
+                String userDomain = null;
+                if (email != null && email.contains("@")) {
+                    userDomain = email.substring(email.indexOf('@') + 1);
+                }
+
+                if (userDomain == null || !oktaConfig.getOrganizationDomain().equalsIgnoreCase(userDomain)) {
+                    logger.errorAndAddToDb("Domain mismatch: user " + email + " with domain " + userDomain +
+                                         " attempted to access account " + accountId +
+                                         " with required domain " + oktaConfig.getOrganizationDomain(), LogDb.DASHBOARD);
+                    servletResponse.sendRedirect("/login?error=unauthorized");
+                    return ERROR.toUpperCase();
+                }
+                logger.infoAndAddToDb("Domain validation passed for user " + email + " accessing account " + accountId);
+            }
+
             // check for accepted invite code here, if exist, add user to that account, else sending to it's own account post login.
             if(!StringUtils.isEmpty(signupInvitationCode) && !StringUtils.isEmpty(signupEmailId)) {
                 Bson filter = Filters.eq(PendingInviteCode.INVITE_CODE, signupInvitationCode);
@@ -731,10 +747,13 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         }
 
         if(oktaConfig == null) {
-            logger.error("No Okta configuration found, redirecting to SSO login page");
+            logger.error("No Okta configuration found for accountId: " + accountId + ", redirecting to SSO login page");
             servletResponse.sendRedirect(SSO_URL);
             return ERROR.toUpperCase();
         }
+
+        logger.infoAndAddToDb("Okta SSO login initiated for accountId: " + accountId +
+                             " with organizationDomain: " + oktaConfig.getOrganizationDomain());
 
         logger.debug("Okta config found - ClientId: " + oktaConfig.getClientId() +
                     ", Domain: " + oktaConfig.getOktaDomainUrl() +
