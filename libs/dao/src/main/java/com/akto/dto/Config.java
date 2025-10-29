@@ -945,9 +945,11 @@ public abstract class Config {
 
         public static final String PRIVATE_KEY = "privateKey";
         public static final String PUBLIC_KEY = "publicKey";
+        public static final String CREATED_AT = "createdAt";
 
         private String privateKey;
         private String publicKey;
+        private int createdAt;
 
         public RSAKeyPairConfig() {
             this.configType = ConfigType.RSA_KP;
@@ -959,6 +961,14 @@ public abstract class Config {
             this.id = ConfigType.RSA_KP.name();
             this.privateKey = privateKey;
             this.publicKey = publicKey;
+        }
+
+        public RSAKeyPairConfig(String privateKey, String publicKey, int createdAt) {
+            this.configType = ConfigType.RSA_KP;
+            this.id = ConfigType.RSA_KP.name();
+            this.privateKey = privateKey;
+            this.publicKey = publicKey;
+            this.createdAt = createdAt;
         }
     }
 

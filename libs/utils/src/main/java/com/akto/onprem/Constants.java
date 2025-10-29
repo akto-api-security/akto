@@ -61,7 +61,7 @@ public class Constants {
             e.printStackTrace();
         }
 
-        // If keys weren't found in database, generate new ones
+        // If keys weren't found in database, generate new ones and save them
         if (tempPrivateKey == null || tempPublicKey == null) {
             KeyPairGenerator kpg;
             KeyPair kp = null;
@@ -75,6 +75,25 @@ public class Constants {
 
             tempPrivateKey = kp == null ? null : kp.getPrivate().getEncoded();
             tempPublicKey = kp == null ? null : kp.getPublic().getEncoded();
+
+            // Save generated keys to database
+            if (tempPrivateKey != null && tempPublicKey != null && MCollection.checkConnection()) {
+                try {
+                    String pemPrivateKey = "-----BEGIN PRIVATE KEY-----\n" +
+                            Base64.getEncoder().encodeToString(tempPrivateKey) + "\n" +
+                            "-----END PRIVATE KEY-----";
+
+                    String pemPublicKey = "-----BEGIN PUBLIC KEY-----\n" +
+                            Base64.getEncoder().encodeToString(tempPublicKey) + "\n" +
+                            "-----END PUBLIC KEY-----";
+
+                    int now = Context.now();
+                    Config.RSAKeyPairConfig newConfig = new Config.RSAKeyPairConfig(pemPrivateKey, pemPublicKey, now);
+                    ConfigsDao.instance.insertOne(newConfig);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
         }
 
         privateKey = tempPrivateKey;
