@@ -139,7 +139,7 @@ public class CustomAuthUtil {
 
             UpdateOneModel<ApiInfo> update = new UpdateOneModel<>(
                     ApiInfoDao.getFilter(apiInfo.getId()),
-                    Updates.set(ALL_AUTH_TYPES_FOUND, apiInfo.getAllAuthTypesFound()),
+                    Updates.addToSet(ALL_AUTH_TYPES_FOUND, apiInfo.getAllAuthTypesFound()),
                     new UpdateOptions().upsert(false));
             apiInfosUpdates.add(update);
 
