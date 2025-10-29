@@ -26,6 +26,7 @@ message MaliciousEventMessage {
   bool successful_exploit = 15;
   string label = 16;  // Common values: "threat", "guardrail"
   string host = 17;   // Host header from the request
+  string status = 18;
 }
 
 message MaliciousEventKafkaEnvelope {

@@ -91,6 +91,19 @@ public class ThreatDetector {
         return false;
     }
 
+    public boolean isIgnoredEvent(List<FilterConfig> ignoredEventFilters,
+            RawApi rawApi, ApiInfoKey apiInfoKey) {
+        for (FilterConfig filter : ignoredEventFilters) {
+            if (validateFilterForRequest(filter, rawApi, apiInfoKey)) {
+                logger.debug("Event should be ignored for ApiInfo {}, filterId {}", apiInfoKey.toString(), filter.getId());
+                return true;
+            }
+        }
+        return false;
+    }
+
+    
+
     private boolean validateFilterForRequest(
             FilterConfig apiFilter, RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey) {
         try {

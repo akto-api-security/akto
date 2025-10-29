@@ -89,6 +89,7 @@ import ThreatApiPage from "../dashboard/pages/threat_detection/ThreatApiPage";
 import ThreatActorPage from "../dashboard/pages/threat_detection/ThreatActorPage";
 import ThreatPolicyPage from "../dashboard/pages/threat_detection/ThreatPolicyPage";
 import ConfigureExploitsPage from "../dashboard/pages/threat_detection/ConfigureExploitsPage";
+import ConfigureIgnoredEventsPage from "../dashboard/pages/threat_detection/ConfigureIgnoredEventsPage";
 import TestSuite from "../dashboard/pages/testing/testSuite/TestSuite";
 import TestsTablePage from "../dashboard/pages/test_editor/tests_table/TestsTablePage";
 import Splunk from "../dashboard/pages/settings/integrations/Splunk";
@@ -277,6 +278,11 @@ const router = createBrowserRouter([
                             {
                                 path: "configure-exploits",
                                 element: <ConfigureExploitsPage/>
+                            }
+                            ,
+                            {
+                                path: "configure-ignored-events",
+                                element: <ConfigureIgnoredEventsPage/>
                             }
                         ]
                     },
