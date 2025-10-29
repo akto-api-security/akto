@@ -6,6 +6,9 @@ import com.akto.dao.ConfigsDao;
 import com.akto.dto.Config;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.Constants;
+
+import static com.akto.dto.Config.CONFIG_SALT;
 
 public class RSAKeyPairUtils {
 
@@ -48,7 +51,7 @@ public class RSAKeyPairUtils {
         logger.info("Fetching RSA keys from db");
 
         try {
-            Config.RSAKeyPairConfig rsaKeyPairConfig = (Config.RSAKeyPairConfig) ConfigsDao.instance.findOne("_id", Config.ConfigType.RSA_KP.name());
+            Config.RSAKeyPairConfig rsaKeyPairConfig = (Config.RSAKeyPairConfig) ConfigsDao.instance.findOne(Constants.ID, Config.ConfigType.RSA_KP.name() + CONFIG_SALT);
 
             if (rsaKeyPairConfig != null) {
                 logger.info("Found RSA keys config in db");
