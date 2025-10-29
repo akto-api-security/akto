@@ -378,7 +378,8 @@ public class MaliciousTrafficDetectorTask implements Task {
         if (applyFilterLogCount.get() < MAX_APPLY_FILTER_LOGS) {
           logger.warnAndAddToDb("applyFilter - apiInfoKey: " + apiInfoKey.toString() +
                                 ", filterId: " + apiFilter.getId() +
-                                ", result: " + hasPassedFilter);
+                                ", result: " + hasPassedFilter + 
+                                ", statusCode " + responseParam.getStatusCode());
           applyFilterLogCount.incrementAndGet();
         }
       }
