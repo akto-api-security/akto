@@ -1329,12 +1329,12 @@ public class DbAction extends ActionSupport {
     public String fetchEstimatedDocCount() {
         try {
             count = DbLayer.fetchEstimatedDocCount();
-            if (HIGHER_STI_LIMIT_ACCOUNT_IDS.contains(Context.accountId.get())) {
-                // Mini runtime skips traffic processing for more than 20M STIs, 
-                // This will help allowing 20M more STIs to be processed.
-                loggerMaker.infoAndAddToDb("HIGH STI customer fetchEstimatedDocCount:" + count + "subtractedCountSent: " + (count - higherStiLimit));
-                count = count >= STI_LIMIT ? count - higherStiLimit: count;
-            }
+            // if (HIGHER_STI_LIMIT_ACCOUNT_IDS.contains(Context.accountId.get())) {
+            //     // Mini runtime skips traffic processing for more than 20M STIs, 
+            //     // This will help allowing 20M more STIs to be processed.
+            //     loggerMaker.infoAndAddToDb("HIGH STI customer fetchEstimatedDocCount:" + count + "subtractedCountSent: " + (count - higherStiLimit));
+            //     count = count >= STI_LIMIT ? count - higherStiLimit: count;
+            // }
         } catch (Exception e){
             loggerMaker.errorAndAddToDb(e, "Error in fetchEstimatedDocCount " + e.toString());
         }
