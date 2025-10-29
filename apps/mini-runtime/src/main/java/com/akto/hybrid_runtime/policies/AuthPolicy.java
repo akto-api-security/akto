@@ -23,6 +23,7 @@ public class AuthPolicy {
     // Pre-compiled regex patterns for performance
     private static final Pattern API_KEY_PATTERN = Pattern.compile(".*(apikey|passkey).*");
     private static final Pattern MTLS_PATTERN = Pattern.compile(".*(clientcert|sslcert|clientdn|sslclientsdn|sslclientverify|forwardedclientcert).*");
+    private static final Pattern SESSION_TOKEN_PATTERN = Pattern.compile("(?i)(session[_\\-.]?(id|key|token)?)");
 
     private static boolean isApiKeyHeader(String headerName) {
         // Matches variations: x-api-key, x_api_key, api_key, api-key, apiKey, x-pass-key
@@ -37,6 +38,11 @@ public class AuthPolicy {
         String normalized = headerName.toLowerCase().replaceAll("[_-]", "");
         // Check for common mTLS/client certificate headers
         return MTLS_PATTERN.matcher(normalized).matches();
+    }
+
+    private static boolean isSessionToken(String cookieName) {
+        // Check for session token
+        return SESSION_TOKEN_PATTERN.matcher(cookieName).find();
     }
 
     private static List<ApiInfo.AuthType> findBearerBasicAuth(String header, String value){
@@ -128,6 +134,10 @@ public class AuthPolicy {
                 if (isMtlsHeader(header, value)) {
                     authTypes.add(ApiInfo.AuthType.MTLS);
                 }
+
+                if(isSessionToken(header)){
+                    authTypes.add(ApiInfo.AuthType.SESSION_TOKEN);
+                }
             }
         }
 
@@ -139,6 +149,10 @@ public class AuthPolicy {
             if (KeyTypes.isJWT(cookieMap.get(cookieKey))) {
                 authTypes.add(ApiInfo.AuthType.JWT);
                 flag = true;
+            }
+
+            if(isSessionToken(cookieKey)){
+                authTypes.add(ApiInfo.AuthType.SESSION_TOKEN);
             }
         }
 
