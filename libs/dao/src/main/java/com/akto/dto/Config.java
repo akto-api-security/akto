@@ -37,7 +37,7 @@ public abstract class Config {
     public String id;
 
     public enum ConfigType {
-        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, GOOGLE_SAML, AWS_WAF, SPLUNK_SIEM, AKTO_DASHBOARD_HOST_URL, CLOUDFLARE_WAF;
+        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, GOOGLE_SAML, AWS_WAF, SPLUNK_SIEM, AKTO_DASHBOARD_HOST_URL, CLOUDFLARE_WAF, RSA_KP;
     }
 
     public ConfigType configType;
@@ -935,6 +935,40 @@ public abstract class Config {
         public AktoHostUrlConfig() {
             this.configType = ConfigType.AKTO_DASHBOARD_HOST_URL;
             this.id = ConfigType.AKTO_DASHBOARD_HOST_URL.name();
+        }
+    }
+
+    @Getter
+    @Setter
+    @BsonDiscriminator
+    public static class RSAKeyPairConfig extends Config {
+
+        public static final String PRIVATE_KEY = "privateKey";
+        public static final String PUBLIC_KEY = "publicKey";
+        public static final String CREATED_AT = "createdAt";
+
+        private String privateKey;
+        private String publicKey;
+        private int createdAt;
+
+        public RSAKeyPairConfig() {
+            this.configType = ConfigType.RSA_KP;
+            this.id = ConfigType.RSA_KP.name() + CONFIG_SALT;
+        }
+
+        public RSAKeyPairConfig(String privateKey, String publicKey) {
+            this.configType = ConfigType.RSA_KP;
+            this.id = ConfigType.RSA_KP.name() + CONFIG_SALT;
+            this.privateKey = privateKey;
+            this.publicKey = publicKey;
+        }
+
+        public RSAKeyPairConfig(String privateKey, String publicKey, int createdAt) {
+            this.configType = ConfigType.RSA_KP;
+            this.id = ConfigType.RSA_KP.name() + CONFIG_SALT;
+            this.privateKey = privateKey;
+            this.publicKey = publicKey;
+            this.createdAt = createdAt;
         }
     }
 
