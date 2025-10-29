@@ -21,7 +21,7 @@ const DisplayJiraCreateIssueFields = ({ displayJiraIssueFieldMetadata }) => {
     )
 }
 
-const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handleSaveAction, jiraProjectMaps, setProjId, setIssueType, projId, issueType, issueId, isAzureModal }) => {
+const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handleSaveAction, jiraProjectMaps, setProjId, setIssueType, projId, issueType, issueId, isAzureModal, isServiceNowModal }) => {
     const [isCreatingTicket, setIsCreatingTicket] = useState(false)
     const [displayJiraIssueFieldMetadata, setDisplayJiraIssueFieldMetadata] = useState([])
 
@@ -39,7 +39,7 @@ const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handl
     }
 
     useEffect(() => {
-        if (!isAzureModal && projId && issueType) {
+        if (!isAzureModal && !isServiceNowModal && projId && issueType) {
             const initialFieldMetaData = createJiraIssueFieldMetaData?.[projId]?.[issueType] || [];
 
             const filteredFieldMetaData = initialFieldMetaData.filter(field => {
@@ -56,7 +56,7 @@ const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handl
             }, {});
             setDisplayJiraIssueFieldValues(initialValues);
         }
-    }, [isAzureModal, projId, issueType, createJiraIssueFieldMetaData])
+    }, [isAzureModal, isServiceNowModal, projId, issueType, createJiraIssueFieldMetaData])
 
     return (
         <Modal
@@ -64,7 +64,7 @@ const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handl
             open={modalActive}
             onClose={() => setModalActive(false)}
             size="small"
-            title={<Text variant="headingMd">{isAzureModal ? "Configure Azure Boards Work Item" : "Configure jira ticket details"}</Text>}
+            title={<Text variant="headingMd">{isServiceNowModal ? "Configure ServiceNow ticket details" : isAzureModal ? "Configure Azure Boards Work Item" : "Configure jira ticket details"}</Text>}
             primaryAction={{
                 content: (isAzureModal ? 'Create work item' : 'Create ticket'),
                 onAction: () => {
@@ -73,41 +73,54 @@ const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handl
                     setIsCreatingTicket(false)
                     setModalActive(false)
                 },
-                disabled: (!projId || !issueType || isCreatingTicket)
+                disabled: (isServiceNowModal ? (!projId || isCreatingTicket) : (!projId || !issueType || isCreatingTicket))
             }}
         >
             <Modal.Section>
                 <VerticalStack gap={"3"}>
-                    <DropdownSearch
-                        disabled={jiraProjectMaps === undefined || Object.keys(jiraProjectMaps).length === 0}
-                        placeholder={isAzureModal ? "Select Azure Boards project" : "Select JIRA project"}
-                        optionsList={jiraProjectMaps ? Object.keys(jiraProjectMaps).map((x) => {return{label: x, value: x}}): []}
-                        setSelected={setProjId}
-                        preSelected={projId}
-                        value={projId}
-                    />
-
-                    <DropdownSearch
-                        disabled={jiraProjectMaps == undefined || Object.keys(jiraProjectMaps).length === 0}
-                        placeholder={isAzureModal ? "Select work item type" : "Select JIRA issue type"}
-                        optionsList={jiraProjectMaps[projId] && jiraProjectMaps[projId].length > 0 ? jiraProjectMaps[projId].map(
-                            (x) => {
-                                if(isAzureModal){
-                                    return {label: x, value: x}
-                                } else {
-                                    return {label: x.issueType, value: x.issueId}
-                                }
-                            }
-                        ) : []}
-                        setSelected={setIssueType}
-                        preSelected={issueType}
-                        value={isAzureModal ? issueType : getValueFromIssueType(projId, issueType)}
-                    />  
-
-                    {!isAzureModal && projId && issueType && displayJiraIssueFieldMetadata.length > 0 && (
-                        <DisplayJiraCreateIssueFields 
-                            displayJiraIssueFieldMetadata={displayJiraIssueFieldMetadata} 
+                    {isServiceNowModal ? (
+                        <DropdownSearch
+                            disabled={!jiraProjectMaps || jiraProjectMaps.length === 0}
+                            placeholder="Select ServiceNow table"
+                            optionsList={jiraProjectMaps ? jiraProjectMaps.map((x) => {return{label: x, value: x}}): []}
+                            setSelected={setProjId}
+                            preSelected={projId}
+                            value={projId}
                         />
+                    ) : (
+                        <>
+                            <DropdownSearch
+                                disabled={jiraProjectMaps === undefined || Object.keys(jiraProjectMaps).length === 0}
+                                placeholder={isAzureModal ? "Select Azure Boards project" : "Select JIRA project"}
+                                optionsList={jiraProjectMaps ? Object.keys(jiraProjectMaps).map((x) => {return{label: x, value: x}}): []}
+                                setSelected={setProjId}
+                                preSelected={projId}
+                                value={projId}
+                            />
+
+                            <DropdownSearch
+                                disabled={jiraProjectMaps == undefined || Object.keys(jiraProjectMaps).length === 0}
+                                placeholder={isAzureModal ? "Select work item type" : "Select JIRA issue type"}
+                                optionsList={jiraProjectMaps[projId] && jiraProjectMaps[projId].length > 0 ? jiraProjectMaps[projId].map(
+                                    (x) => {
+                                        if(isAzureModal){
+                                            return {label: x, value: x}
+                                        } else {
+                                            return {label: x.issueType, value: x.issueId}
+                                        }
+                                    }
+                                ) : []}
+                                setSelected={setIssueType}
+                                preSelected={issueType}
+                                value={isAzureModal ? issueType : getValueFromIssueType(projId, issueType)}
+                            />
+
+                            {!isAzureModal && projId && issueType && displayJiraIssueFieldMetadata.length > 0 && (
+                                <DisplayJiraCreateIssueFields
+                                    displayJiraIssueFieldMetadata={displayJiraIssueFieldMetadata}
+                                />
+                            )}
+                        </>
                     )}
                 </VerticalStack>
             </Modal.Section>

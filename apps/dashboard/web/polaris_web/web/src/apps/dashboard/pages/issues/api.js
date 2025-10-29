@@ -92,5 +92,19 @@ export default {
             method: 'post',
             data: {}
         })
+    },
+    createServiceNowTicket(testingIssuesId, tableName) {
+        return request({
+            url: 'api/createServiceNowTicket',
+            method: 'post',
+            data: {testingIssuesId, tableName}
+        })
+    },
+    bulkCreateServiceNowTickets(testingIssuesIdList, tableName) {
+        return request({
+            url: 'api/bulkCreateServiceNowTickets',
+            method: 'post',
+            data: {testingIssuesIdList, tableName}
+        })
     }
 }

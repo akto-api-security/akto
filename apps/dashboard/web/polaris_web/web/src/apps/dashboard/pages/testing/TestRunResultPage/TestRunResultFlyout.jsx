@@ -26,7 +26,7 @@ import ApiGroups from '../../../components/shared/ApiGroups'
 function TestRunResultFlyout(props) {
 
 
-    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, conversations} = props
+    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, conversations} = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
@@ -41,6 +41,10 @@ function TestRunResultFlyout(props) {
     const [projectToWorkItemsMap, setProjectToWorkItemsMap] = useState({})
     const [projectId, setProjectId] = useState('')
     const [workItemType, setWorkItemType] = useState('')
+
+    const [serviceNowModalActive, setServiceNowModalActive] = useState(false)
+    const [serviceNowTables, setServiceNowTables] = useState([])
+    const [serviceNowTable, setServiceNowTable] = useState('')
 
     const [description, setDescription] = useState("")
     const [editDescription, setEditDescription] = useState("")
@@ -82,7 +86,8 @@ function TestRunResultFlyout(props) {
                     index++
                 })
             })
-            setRowItems(transform.getRowInfo(issueDetails.severity,apiInfoData,issueDetails.jiraIssueUrl,sensitiveParam,issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl))
+
+            setRowItems(transform.getRowInfo(issueDetails.severity,apiInfoData,issueDetails.jiraIssueUrl,sensitiveParam,issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl, issueDetails.servicenowIssueUrl, issueDetails.ticketId))
         }
     },[issueDetails])
 
@@ -197,6 +202,35 @@ function TestRunResultFlyout(props) {
         }
         setBoardsModalActive(false)
     }
+
+    const handleServiceNowClick = async() => {
+        if(!serviceNowModalActive){
+            const serviceNowIntegration = await settingFunctions.fetchServiceNowIntegration()
+            if(serviceNowIntegration.tableNames && serviceNowIntegration.tableNames.length > 0){
+                setServiceNowTables(serviceNowIntegration.tableNames)
+                setServiceNowTable(serviceNowIntegration.tableNames[0])
+            }
+        }
+        setServiceNowModalActive(!serviceNowModalActive)
+    }
+
+    const handleServiceNowTicketCreation = async(id) => {
+        if(serviceNowTable && serviceNowTable.length > 0){
+            func.setToast(true, false, "Please wait while we create your ServiceNow ticket.")
+            await issuesApi.createServiceNowTicket(issueDetails.id, serviceNowTable).then((res) => {
+                if(res?.errorMessage) {
+                    func.setToast(true, false, res?.errorMessage)
+                } else {
+                    func.setToast(true, false, "ServiceNow ticket created successfully")
+                }
+            }).catch((err) => {
+                func.setToast(true, true, err?.response?.data?.errorMessage || "Error creating ServiceNow ticket")
+            })
+        }else{
+            func.setToast(true, true, "Invalid ServiceNow table")
+        }
+        setServiceNowModalActive(false)
+    }
     
     const issues = [{
         content: 'False positive',
@@ -301,10 +335,10 @@ function TestRunResultFlyout(props) {
                 <HorizontalStack gap={2} wrap={false}>
                     <ActionsComp />
 
-                    {selectedTestRunResult && selectedTestRunResult.vulnerable && 
+                    {selectedTestRunResult && selectedTestRunResult.vulnerable &&
                         <HorizontalStack gap={2} wrap={false}>
                             <JiraTicketCreationModal
-                                activator={<Button id={"create-jira-ticket-button"} primary onClick={handleJiraClick} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>Create Jira Ticket</Button>}
+                                activator={window.JIRA_INTEGRATED === 'true' ? <Button id={"create-jira-ticket-button"} primary onClick={handleJiraClick} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>Create Jira Ticket</Button> : <></>}
                                 modalActive={modalActive}
                                 setModalActive={setModalActive}
                                 handleSaveAction={handleSaveAction}
@@ -327,6 +361,19 @@ function TestRunResultFlyout(props) {
                                 setIssueType={setWorkItemType}
                                 issueId={issueDetails.id}
                                 isAzureModal={true}
+                            />
+                            <JiraTicketCreationModal
+                                activator={window.SERVICENOW_INTEGRATED === 'true' ? <Button id={"create-servicenow-ticket-button"} primary onClick={handleServiceNowClick} disabled={serviceNowTicketUrl !== "" || window.SERVICENOW_INTEGRATED !== "true"}>Create ServiceNow Ticket</Button> : <></>}
+                                modalActive={serviceNowModalActive}
+                                setModalActive={setServiceNowModalActive}
+                                handleSaveAction={handleServiceNowTicketCreation}
+                                jiraProjectMaps={serviceNowTables}
+                                setProjId={setServiceNowTable}
+                                setIssueType={() => {}}
+                                projId={serviceNowTable}
+                                issueType=""
+                                issueId={issueDetails.id}
+                                isServiceNowModal={true}
                             />
                         </HorizontalStack>
                     }

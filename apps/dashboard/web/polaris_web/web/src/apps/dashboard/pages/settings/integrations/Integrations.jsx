@@ -80,6 +80,11 @@ function Integrations() {
       name:'Azure Boards',
       source: '/public/azure-boards.svg'
     }
+    let serviceNowObj={
+      id: 'servicenow',
+      name:'ServiceNow',
+      source: '/public/servicenow.svg'
+    }
     let jenkinsObj={
       id: `jenkins`,
       name: "Jenkins",
@@ -219,7 +224,7 @@ function Integrations() {
     const cicdItems = [jenkinsObj, azuredevopsObj, gitlabObj, githubactionsObj, ciCdObj];
     const aiItems = [aktoGptObj, agentConfigObj];
     const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj, gmailWebhooksObj];
-    const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj];
+    const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj, serviceNowObj];
     const wafItems = [awsWafObj, f5WafObj, cloudflareWafObj];
     const siemItems = [splunkObj];
     switch (tabId) {
