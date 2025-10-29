@@ -42,7 +42,7 @@ public class Constants {
         // Try to initialize DB connection and fetch keys from database
         try {
             // Check if DB client is not already initialized
-            if (MCollection.clients[0] == null) {
+            if (!MCollection.checkConnection()) {
                 String mongoURI = System.getenv("AKTO_MONGO_CONN");
                 if (mongoURI != null && !mongoURI.isEmpty()) {
                     DaoInit.init(new ConnectionString(mongoURI));
@@ -50,7 +50,7 @@ public class Constants {
             }
 
             // Now try to fetch keys if DB is connected
-            if (MCollection.clients[0] != null && MCollection.checkConnection()) {
+            if (MCollection.checkConnection()) {
                 byte[][] keys = RSAKeyPairUtils.fetchKeysFromDb();
                 if (keys != null && keys.length == 2) {
                     tempPrivateKey = keys[0];
@@ -58,7 +58,7 @@ public class Constants {
                 }
             }
         } catch (Exception e) {
-            // Database not yet initialized or keys not found, will generate new ones
+            e.printStackTrace();
         }
 
         // If keys weren't found in database, generate new ones
