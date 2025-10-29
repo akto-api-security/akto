@@ -2,6 +2,7 @@ package com.akto.dto;
 
 import com.akto.dto.testing.TLSAuthParam;
 import com.akto.dto.type.RequestTemplate;
+import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
@@ -366,14 +367,14 @@ public class OriginalHttpRequest {
         List<String> forbiddenHeaders = Arrays.asList("content-length", "accept-encoding");
         if (headersMap == null)
             headersMap = new HashMap<>();
-        // TODO: uncomment before prod release.
-        // headersMap.put(Constants.AKTO_IGNORE_FLAG, Collections.singletonList("0"));
+        headersMap.put(Constants.AKTO_IGNORE_FLAG, Collections.singletonList("0"));
         Map<String, String> filteredHeaders = new HashMap<>();
         for (String headerName : headersMap.keySet()) {
             if (forbiddenHeaders.contains(headerName))
                 continue;
             if (headerName.contains(" "))
                 continue;
+            if(headerName.startsWith(":")) continue;
             List<String> headerValueList = headersMap.get(headerName);
             if (headerValueList == null || headerValueList.isEmpty())
                 continue;
@@ -384,7 +385,6 @@ public class OriginalHttpRequest {
                 break;
             }
         }
-
         return gson.toJson(filteredHeaders);
     }
 

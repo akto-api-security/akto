@@ -15,12 +15,14 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import org.bson.conversions.Bson;
 
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.BodyOperator;
 import com.akto.dao.test_editor.TestEditorEnums.CollectionOperands;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
@@ -345,24 +347,23 @@ public final class FilterAction {
         return new DataOperandsFilterResponse(res.getIsValid(), null, null, null, res.getValidationReason());
     }
 
-    // apply filter on test types
     public DataOperandsFilterResponse applyFilterOnTestType(FilterActionRequest filterActionRequest) {
         RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
         if (rawApi == null || rawApi.getRequest() == null) {
             return new DataOperandsFilterResponse(false, null, null, null);
         }
-        if(true){
+        int apiCollectionId = filterActionRequest.getApiInfoKey().getApiCollectionId();
+        ApiCollection apiCollection = ApiCollectionsDao.instance.getMetaForId(apiCollectionId);
+        if (apiCollection == null) {
+            return new DataOperandsFilterResponse(false, null, null, null, "API collection not found");
+        }
+        if (apiCollection.isGenAICollection() ||
+                apiCollection.isMcpCollection() ||
+                apiCollection.isGuardRailCollection()) {
             return new DataOperandsFilterResponse(true, null, null, null);
         }
-        // TODO: add check for agents as well.
-        boolean isMcpRequest = McpRequestResponseUtils.isMcpRequest(rawApi);
-        if (isMcpRequest) {
-            return new DataOperandsFilterResponse(true, null, null, null);
-        } else {
-            return new DataOperandsFilterResponse(false, null, null, null, "The request is not an MCP request");
-        }
+        return new DataOperandsFilterResponse(false, null, null, null, "The request is not an Agentic request");
     }
-
 
     public DataOperandsFilterResponse applyFilterOnRequestPayload(FilterActionRequest filterActionRequest) {
 
