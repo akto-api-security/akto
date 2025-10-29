@@ -953,12 +953,12 @@ public abstract class Config {
 
         public RSAKeyPairConfig() {
             this.configType = ConfigType.RSA_KP;
-            this.id = ConfigType.RSA_KP.name();
+            this.id = ConfigType.RSA_KP.name() + CONFIG_SALT;
         }
 
         public RSAKeyPairConfig(String privateKey, String publicKey) {
             this.configType = ConfigType.RSA_KP;
-            this.id = ConfigType.RSA_KP.name();
+            this.id = ConfigType.RSA_KP.name() + CONFIG_SALT;
             this.privateKey = privateKey;
             this.publicKey = publicKey;
         }
