@@ -27,6 +27,7 @@ import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.db.ActorInfoModel;
 import com.akto.threat.backend.dto.RateLimitConfigDTO;
+import com.akto.util.ThreatDetectionConstants;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
 import com.akto.threat.backend.utils.ThreatUtils;
 import com.google.protobuf.TextFormat;
@@ -359,7 +360,7 @@ public class ThreatActorService {
                 int c = d.getInteger("count", 0);
                 if ("ACTIVE".equalsIgnoreCase(status)) {
                     totalActive = c;
-                } else if ("IGNORED".equalsIgnoreCase(status)) {
+                } else if (ThreatDetectionConstants.IGNORED.equalsIgnoreCase(status)) {
                     totalIgnored = c;
                 } else if ("UNDER_REVIEW".equalsIgnoreCase(status)) {
                     totalUnderReview = c;
