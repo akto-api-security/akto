@@ -608,12 +608,16 @@ public class Main {
                     continue;
                 }
 
-                // if (DataActor.actualAccountId == 1759692400) {
-                //     String host = HttpCallParser.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "host");
-                //     loggerMaker.infoAndAddToDb("HttpResponseparam received with url: "
-                //             + httpResponseParams.getRequestParams().getURL() + " host: " + (host != null ? host : "null"));
-                // }
-
+                if (DataActor.actualAccountId == 1759692400) {
+                    String debugHeader = HttpCallParser.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "x-debug-trace");
+                    if (debugHeader != null && !debugHeader.isEmpty()) {
+                        String host = HttpCallParser.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "host");
+                        loggerMaker.infoAndAddToDb("HttpResponseparam received with url: "
+                                + httpResponseParams.getRequestParams().getURL() + " host: " + (host != null ? host : "null")
+                                + " statusCode: " + httpResponseParams.getStatusCode());
+                    }
+                }
+                
                 HttpRequestParams requestParams = httpResponseParams.getRequestParams();
                 String debugHost = Utils.printDebugHostLog(httpResponseParams);
                 // if (debugHost != null) {
