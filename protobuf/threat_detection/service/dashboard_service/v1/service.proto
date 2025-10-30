@@ -53,6 +53,7 @@ message ListMaliciousRequestsRequest {
       optional string status_filter = 8;
       optional bool successful_exploit = 9;
       optional string label = 10;  // Common values: "threat", "guardrail"
+      repeated string hosts = 11;  // Host header values for filtering
     }
 
     // The number of alerts to return
@@ -68,6 +69,7 @@ message FetchAlertFiltersResponse {
   repeated string actors = 1;
   repeated string urls = 2;
   repeated string sub_category = 3;
+  repeated string hosts = 4;
 }
 
 message ListThreatActorsRequest {
@@ -77,6 +79,7 @@ message ListThreatActorsRequest {
     optional TimeRangeFilter detected_at_time_range = 3;
     repeated string latest_attack = 4;
     repeated string country = 5;
+    repeated string hosts = 6;  // Host header values for filtering
   }
 
   optional uint32 skip = 1;
@@ -183,6 +186,7 @@ message ThreatActorFilterResponse {
   repeated string sub_categories = 1;
   repeated string countries = 2;
   repeated string actor_id = 3;
+  repeated string host = 4;
 }
 
 message ThreatCategoryWiseCountResponse {

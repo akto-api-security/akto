@@ -92,10 +92,9 @@ const sortOptions = [
   },
 ];
 
-let filters = [];
-
 function ThreatActorTable({ data, currDateRange, handleRowClick }) {
   const [loading, setLoading] = useState(false);
+  const [filters, setFilters] = useState([]);
 
   const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
@@ -126,7 +125,7 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
     let total = 0;
     let ret = [];
     try {
-      const res = await api.fetchThreatActors(skip, sort, filters.latestAttack || [], filters.country || [], startTimestamp, endTimestamp, filters.actorId || []);
+      const res = await api.fetchThreatActors(skip, sort, filters.latestAttack || [], filters.country || [], startTimestamp, endTimestamp, filters.actorId || [], filters.host || []);
       total = res.total;
       if (res?.actors?.length === 0) {
         return { value: [], total: 0 };
@@ -246,7 +245,17 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
       label: x,
       value: x
     }));
-    filters = [
+    
+    // Extract unique hosts from the fetched data
+    let hostChoices = [];
+    if (res?.host && Array.isArray(res.host) && res.host.length > 0) {
+      hostChoices = res.host
+        .filter(host => host && host.trim() !== '' && host !== '-')
+        .map(x => ({ label: x, value: x }));
+        console.log({hostChoices});
+    }
+    
+    setFilters([
       {
         key: 'actorId',
         label: 'Actor Id',
@@ -267,8 +276,16 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
         type: 'select',
         choices: countryChoices,
         multiple: true
+      },
+      {
+        key: 'host',
+        label: 'Host',
+        title: 'Host',
+        choices: hostChoices,
+        multiple: true,
+        type: 'select',
       }
-    ]
+    ]);
   }
 
   useEffect(() => {

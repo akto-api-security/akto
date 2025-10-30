@@ -25,6 +25,7 @@ import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.DistinctIterable;
 import com.mongodb.client.MongoCursor;
+import org.bson.conversions.Bson;
 
 import java.util.*;
 
@@ -178,7 +179,10 @@ public class MaliciousEventService {
     Set<String> actorIds =
         this.findDistinctFields(accountId, "actor", String.class, Filters.empty());
 
-    return ThreatActorFilterResponse.newBuilder().addAllSubCategories(latestAttack).addAllCountries(countries).addAllActorId(actorIds).build();
+    Set<String> hosts =
+        this.findDistinctFields(accountId, "host", String.class, Filters.empty());
+
+    return ThreatActorFilterResponse.newBuilder().addAllSubCategories(latestAttack).addAllCountries(countries).addAllActorId(actorIds).addAllHost(hosts).build();
   }
 
   public FetchAlertFiltersResponse fetchAlertFilters(
@@ -190,8 +194,10 @@ public class MaliciousEventService {
         this.findDistinctFields(accountId, "latestApiEndpoint", String.class, Filters.empty());
     Set<String> subCategories =
         this.findDistinctFields(accountId, "filterId", String.class, Filters.empty());
+    Set<String> hosts =
+        this.findDistinctFields(accountId, "host", String.class, Filters.empty());
 
-    return FetchAlertFiltersResponse.newBuilder().addAllActors(actors).addAllUrls(urls).addAllSubCategory(subCategories).build();
+    return FetchAlertFiltersResponse.newBuilder().addAllActors(actors).addAllUrls(urls).addAllSubCategory(subCategories).addAllHosts(hosts).build();
   }
 
   public ListMaliciousRequestsResponse listMaliciousRequests(
@@ -229,6 +235,10 @@ public class MaliciousEventService {
 
     if (!filter.getSubCategoryList().isEmpty()) {
       query.append("subCategory", new Document("$in", filter.getSubCategoryList()));
+    }
+
+    if (!filter.getHostsList().isEmpty()) {
+      query.append("host", new Document("$in", filter.getHostsList()));
     }
 
 

@@ -24,7 +24,7 @@ const threatDetectionRequests = {
         })
     },
 
-    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, latestAttack, limit, statusFilter, successfulExploit, label) {
+    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, latestAttack, limit, statusFilter, successfulExploit, label, hosts) {
         return request({
             url: '/api/fetchSuspectSampleData',
             method: 'post',
@@ -41,7 +41,8 @@ const threatDetectionRequests = {
                 limit: limit || 50,
                 statusFilter: statusFilter,
                 ...(typeof successfulExploit === 'boolean' ? { successfulExploit } : {}),
-                ...(label ? { label } : {})
+                ...(label ? { label } : {}),
+                ...(hosts && hosts.length > 0 ? { hosts } : {})
             }
         })
     },
@@ -52,7 +53,7 @@ const threatDetectionRequests = {
             data: {}
         })
     },
-    fetchThreatActors(skip, sort, latestAttack, country, startTs, endTs, actorId) {
+    fetchThreatActors(skip, sort, latestAttack, country, startTs, endTs, actorId, host) {
         return request({
             url: '/api/fetchThreatActors',
             method: 'post',
@@ -63,7 +64,8 @@ const threatDetectionRequests = {
                 country: country,
                 startTs: startTs,
                 endTs: endTs,
-                actorId: actorId
+                actorId: actorId,
+                host: host
             }
         })
     },
