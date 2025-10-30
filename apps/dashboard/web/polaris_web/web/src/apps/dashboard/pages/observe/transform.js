@@ -550,7 +550,7 @@ const transform = {
 
     getTruncatedUrl(url){
         const category = getDashboardCategory();
-        if(category.includes("MCP")){
+        if(category.includes("MCP") || category.includes("Agentic")){
             try {
                 const s = String(url);
                 const [path, tail = ""] = s.split(/(?=[?#])/); // keep ? or # in tail
