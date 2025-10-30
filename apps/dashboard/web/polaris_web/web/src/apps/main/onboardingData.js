@@ -718,6 +718,14 @@ const learnMoreObject = {
                 value: "https://docs.akto.io/api-protection/concepts/successful-exploits"
             }
         ]
+    },
+    dashboard_protection_configure_ignored_events: {
+        docsLink: [
+            {
+                content: "How to configure Ignored Events",
+                value: "https://docs.akto.io/api-protection/concepts/threat-ignored-events"
+            }
+        ]
     }
 }
 
