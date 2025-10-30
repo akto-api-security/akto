@@ -9,8 +9,8 @@ import com.akto.kafka.Serializer;
 import com.akto.kafka.KafkaProtoProducer;
 import com.akto.kafka.KafkaProducerConfig;
 import com.mongodb.BasicDBObject;
-import com.akto.proto.http_response_param.v1.HttpResponseParam;
-import com.akto.proto.http_response_param.v1.StringList;
+import com.akto.proto.generated.threat_detection.message.http_response_param.v1.HttpResponseParam;
+import com.akto.proto.generated.threat_detection.message.http_response_param.v1.StringList;
 import java.util.HashMap;
 import java.util.Map;
 
