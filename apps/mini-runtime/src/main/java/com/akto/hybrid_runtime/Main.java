@@ -613,10 +613,11 @@ public class Main {
                     if (debugHeader != null && !debugHeader.isEmpty()) {
                         String host = HttpCallParser.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "host");
                         loggerMaker.infoAndAddToDb("HttpResponseparam received with url: "
-                                + httpResponseParams.getRequestParams().getURL() + " host: " + (host != null ? host : "null"));
+                                + httpResponseParams.getRequestParams().getURL() + " host: " + (host != null ? host : "null")
+                                + " statusCode: " + httpResponseParams.getStatusCode());
                     }
                 }
-
+                
                 HttpRequestParams requestParams = httpResponseParams.getRequestParams();
                 String debugHost = Utils.printDebugHostLog(httpResponseParams);
                 // if (debugHost != null) {
