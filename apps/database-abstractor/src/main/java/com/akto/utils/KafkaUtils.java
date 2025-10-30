@@ -299,7 +299,8 @@ public class KafkaUtils {
      * and add a separate consumer for the topic.
      */
     public void insertDataTraffic(List<BulkUpdates> writes, String triggerMethod, int accountId) {
-        insertDataCore(writes, triggerMethod, accountId, "AKTO_KAFKA_TOPIC_NAME_TRAFFIC", "akto.trafficdata", "kafka insertDataTraffic");
+        return;
+        // insertDataCore(writes, triggerMethod, accountId, "AKTO_KAFKA_TOPIC_NAME_TRAFFIC", "akto.trafficdata", "kafka insertDataTraffic");
     }
 
     public void insertDataCore(Object writes, String triggerMethod, int accountId, String topicEnvVar, String defaultTopic, String errorContext) {
