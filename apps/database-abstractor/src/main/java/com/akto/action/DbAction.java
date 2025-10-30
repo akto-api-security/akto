@@ -2251,10 +2251,6 @@ public class DbAction extends ActionSupport {
 
     public String ingestMetricsData() {
         try {
-            int accId = Context.accountId.get();
-            if (accId == 1736798101) {
-                return Action.SUCCESS.toUpperCase();
-            }
             // Then ingest the new metrics
             DbLayer.ingestMetricsData(metricData);
         } catch (Exception e) {
