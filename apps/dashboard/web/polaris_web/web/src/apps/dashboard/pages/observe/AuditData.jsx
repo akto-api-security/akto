@@ -159,7 +159,7 @@ const convertDataIntoTableFormat = (auditRecord, collectionName) => {
                                     { condition: temp?.expiresAtComp, label: 'Expires At', value: temp.expiresAtComp },
                                     { condition: temp?.approvalConditions?.allowedIps, label: 'Allowed IPs', value: temp.approvalConditions.allowedIps?.join(', ') },
                                     { condition: temp?.approvalConditions?.allowedIpRange, label: 'Allowed IP Ranges', value: temp.approvalConditions.allowedIpRange },
-                                    { condition: temp?.approvalConditions?.allowedEndpoint, label: 'Allowed Endpoint', value: temp.approvalConditions.allowedEndpoint?.name }
+                                    { condition: temp?.approvalConditions?.allowedEndpoints, label: 'Allowed Endpoints', value: temp.approvalConditions.allowedEndpoints?.map(ep => ep.name).join(', ') }
                                 ];
                                 
                                 const elements = [];

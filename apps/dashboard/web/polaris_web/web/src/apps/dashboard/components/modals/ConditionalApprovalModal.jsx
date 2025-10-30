@@ -38,7 +38,7 @@ const ConditionalApprovalModal = ({
 
     // Endpoint restriction state
     const [endpointRestricted, setEndpointRestricted] = useState(false);
-    const [selectedEndpoint, setSelectedEndpoint] = useState('');
+    const [selectedEndpoints, setSelectedEndpoints] = useState([]);
     const [availableEndpoints, setAvailableEndpoints] = useState([]);
 
     // Justification
@@ -111,7 +111,7 @@ const ConditionalApprovalModal = ({
         setSpecificIpsList([]);
         setIpRangeList([]);
         setEndpointRestricted(false);
-        setSelectedEndpoint('');
+        setSelectedEndpoints([]);
         setJustification("");
     };
 
@@ -171,19 +171,20 @@ const ConditionalApprovalModal = ({
 
         // Endpoint conditions
         if (endpointRestricted) {
-            if (!selectedEndpoint) {
-                alert("Please select an endpoint");
+            if (!selectedEndpoints || selectedEndpoints.length === 0) {
+                alert("Please select at least one endpoint");
                 setLoading(false);
                 return;
             }
             // Find the selected endpoint details
-            const endpointDetails = availableEndpoints.find(ep => ep.value === selectedEndpoint);
-            if (endpointDetails) {
-                conditions.allowedEndpoint = {
+            const endpointDetailsList = selectedEndpoints.map(endpointId => {
+                const endpointDetails = availableEndpoints.find(ep => ep.value === endpointId);
+                return {
                     id: endpointDetails.value,
                     name: endpointDetails.label
                 };
-            }
+            });
+            conditions.allowedEndpoints = endpointDetailsList;
         }
 
         try {
@@ -337,11 +338,14 @@ const ConditionalApprovalModal = ({
                                     <LegacyCard sectioned>
                                         <LegacyStack vertical spacing="tight">
                                             <DropdownSearch
-                                                label="Select endpoint"
-                                                placeholder="Select an endpoint"
+                                                label="Select endpoints"
+                                                placeholder="Select endpoints"
                                                 optionsList={availableEndpoints}
-                                                setSelected={setSelectedEndpoint}
-                                                value={availableEndpoints.find(ep => ep.value === selectedEndpoint)?.label || 'Select an endpoint'}
+                                                setSelected={setSelectedEndpoints}
+                                                preSelected={selectedEndpoints}
+                                                allowMultiple={true}
+                                                itemName="endpoint"
+                                                value={`${selectedEndpoints.length} endpoint${selectedEndpoints.length !== 1 ? 's' : ''} selected`}
                                                 searchDisable={false}
                                             />
                                         </LegacyStack>
