@@ -221,6 +221,11 @@ public class MaliciousTrafficDetectorTask implements Task {
     return hosts.contains(Constants.AKTO_THREAT_PROTECTION_BACKEND_HOST);
   }
 
+  private boolean isDebugRequest(HttpResponseParams responseParam) {
+    Map<String, List<String>> headers = responseParam.getRequestParams().getHeaders();
+    return headers != null && headers.get("x-debug-trace") != null;
+  }
+
   private Map<String, FilterConfig> getFilters() {
     int now = (int) (System.currentTimeMillis() / 1000);
     if (now - filterLastUpdatedAt < filterUpdateIntervalSec) {
@@ -364,7 +369,9 @@ public class MaliciousTrafficDetectorTask implements Task {
     for (FilterConfig apiFilter : apiFilters.values()) {
       boolean hasPassedFilter = false;
 
-      logger.debug("Evaluating filter condition for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
+      if(isDebugRequest(responseParam)){
+        logger.debugAndAddToDb("Evaluating filter condition for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
+      }
 
       // Skip this filter, as it's handled by apiDistributionenabled
       if(apiFilter.getId().equals(ipApiRateLimitFilter.getId())){
@@ -388,7 +395,7 @@ public class MaliciousTrafficDetectorTask implements Task {
       }else {
         hasPassedFilter = threatDetector.applyFilter(apiFilter, responseParam, rawApi, apiInfoKey);
 
-        if (applyFilterLogCount.get() < MAX_APPLY_FILTER_LOGS) {
+        if (applyFilterLogCount.get() < MAX_APPLY_FILTER_LOGS || isDebugRequest(responseParam)) {
           logger.warnAndAddToDb("applyFilter - apiInfoKey: " + apiInfoKey.toString() +
                                 ", filterId: " + apiFilter.getId() +
                                 ", result: " + hasPassedFilter + 
@@ -458,6 +465,8 @@ public class MaliciousTrafficDetectorTask implements Task {
     } 
 
   }
+
+  
 
   private void generateAndPushMaliciousEventRequest(
       FilterConfig apiFilter,
