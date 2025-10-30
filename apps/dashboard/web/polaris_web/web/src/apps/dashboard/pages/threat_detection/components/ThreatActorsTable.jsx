@@ -252,7 +252,6 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
       hostChoices = res.host
         .filter(host => host && host.trim() !== '' && host !== '-')
         .map(x => ({ label: x, value: x }));
-        console.log({hostChoices});
     }
     
     setFilters([
