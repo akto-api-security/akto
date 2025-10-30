@@ -159,7 +159,7 @@ const convertDataIntoTableFormat = (auditRecord, collectionName) => {
                                     { condition: temp?.expiresAtComp, label: 'Expires At', value: temp.expiresAtComp },
                                     { condition: temp?.approvalConditions?.allowedIps, label: 'Allowed IPs', value: temp.approvalConditions.allowedIps?.join(', ') },
                                     { condition: temp?.approvalConditions?.allowedIpRange, label: 'Allowed IP Ranges', value: temp.approvalConditions.allowedIpRange },
-                                    { condition: temp?.approvalConditions?.allowedUsers, label: 'Allowed Users', value: temp.approvalConditions.allowedUsers?.join(', ') }
+                                    { condition: temp?.approvalConditions?.allowedEndpoint, label: 'Allowed Endpoint', value: temp.approvalConditions.allowedEndpoint?.name }
                                 ];
                                 
                                 const elements = [];
@@ -188,7 +188,6 @@ function AuditData() {
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedAuditItem, setSelectedAuditItem] = useState(null);
-    const [teamData, setTeamData] = useState([]);
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5]);
     const getTimeEpoch = (key) => {
@@ -282,7 +281,6 @@ function AuditData() {
         const usersResponse = await settingRequests.getTeamData()
         if (usersResponse) {
             filters[1].choices = usersResponse.map((user) => ({label: user.login, value: user.login}))
-            setTeamData(usersResponse); // Store team data for modal
         }
         filters[3].choices = Object.entries(collectionsMap).map(([id, name]) => ({ label: name, value: id }));
     }
@@ -346,7 +344,6 @@ function AuditData() {
                 }}
                 onApprove={updateAuditDataWithConditions}
                 auditItem={selectedAuditItem}
-                teamData={teamData}
             />
         </>
     )
