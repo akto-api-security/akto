@@ -1324,17 +1324,17 @@ public class DbAction extends ActionSupport {
 
     private static final List<Integer> HIGHER_STI_LIMIT_ACCOUNT_IDS = Arrays.asList(1736798101, 1718042191);
     private static final int STI_LIMIT = 20_000_000;
-    private static final int higherStiLimit = Integer.parseInt(System.getenv().getOrDefault("HIGHER_STI_LIMIT", String.valueOf(STI_LIMIT)));
+    private static final int higherStiLimit = Integer.parseInt(System.getenv().getOrDefault("HIGHER_STI_LIMIT", String.valueOf(5_000_000)));
 
     public String fetchEstimatedDocCount() {
         try {
             count = DbLayer.fetchEstimatedDocCount();
-            // if (HIGHER_STI_LIMIT_ACCOUNT_IDS.contains(Context.accountId.get())) {
-            //     // Mini runtime skips traffic processing for more than 20M STIs, 
-            //     // This will help allowing 20M more STIs to be processed.
-            //     loggerMaker.infoAndAddToDb("HIGH STI customer fetchEstimatedDocCount:" + count + "subtractedCountSent: " + (count - higherStiLimit));
-            //     count = count >= STI_LIMIT ? count - higherStiLimit: count;
-            // }
+            if (HIGHER_STI_LIMIT_ACCOUNT_IDS.contains(Context.accountId.get())) {
+                // Mini runtime skips traffic processing for more than 20M STIs, 
+                // This will help allowing 20M more STIs to be processed.
+                loggerMaker.infoAndAddToDb("HIGH STI customer fetchEstimatedDocCount:" + count + "subtractedCountSent: " + (count - higherStiLimit));
+                count = count >= STI_LIMIT ? count - higherStiLimit: count;
+            }
         } catch (Exception e){
             loggerMaker.errorAndAddToDb(e, "Error in fetchEstimatedDocCount " + e.toString());
         }
