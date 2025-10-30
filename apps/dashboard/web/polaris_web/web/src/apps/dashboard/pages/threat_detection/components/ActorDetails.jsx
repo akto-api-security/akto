@@ -73,7 +73,7 @@ export const ActorDetails = ({ actorDetails, setShowActorDetails }) => {
     ]
     return (
         <FlyLayout
-            title="Threat actor details"
+            title={`${mapLabel("Threat", getDashboardCategory())} actor details`}
             show={true}
             setShow={setShowActorDetails}
             components={components}

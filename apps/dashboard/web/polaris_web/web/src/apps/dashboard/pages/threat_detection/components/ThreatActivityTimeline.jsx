@@ -91,8 +91,8 @@ const ThreatActivityTimeline = ({ startTimestamp, endTimestamp, onSubCategoryCli
 
     return (
         <InfoCard
-            title={"Threat Activity Timeline"}
-            titleToolTip={"Threat activity by sub-category over time. Maximum of one week is displayed."}
+            title={`${mapLabel("Threat", getDashboardCategory())} Activity Timeline`}
+            titleToolTip={`${mapLabel("Threat", getDashboardCategory())} activity by sub-category over time. Maximum of one week is displayed.`}
             component={<HighchartsReact highcharts={Highcharts} options={chartOptions} />}
         />
     )

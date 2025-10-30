@@ -35,8 +35,8 @@ import ReactFlow, {
   
   } from 'react-flow-renderer';
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
-import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isGenAISecurityCategory } from "../../../../main/labelHelper";
-  
+import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isGenAISecurityCategory, shouldShowLeftNavSwitch, isEndpointSecurityLeftNav, getSubCategory } from "../../../../main/labelHelper";
+
 const CenterViewType = {
     Table: 0,
     Tree: 1,
@@ -45,7 +45,7 @@ const CenterViewType = {
 
 
 const headers = [
-    ...((isMCPSecurityCategory() || isAgenticSecurityCategory()) && func.isDemoAccount() ? [{
+    ...(shouldShowLeftNavSwitch() ? [{
         title: "",
         text: "",
         value: "iconComp",
@@ -200,6 +200,7 @@ const resourceName = {
     plural: 'collections',
   };
 
+
 const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, isLoading) => {
 
     // Ensure collectionsArr is an array
@@ -214,14 +215,15 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             c.disableClick = true
         }
         const tagsList = JSON.stringify(c?.tagsList || "")
+        const currentSubCategory = PersistStore.getState().subCategory
         return{
             ...c,
             icon: CircleTickMajor,
             nextUrl: "/dashboard/observe/inventory/"+ c.id,
             envTypeOriginal: c?.envType,
             envType: c?.envType?.map(func.formatCollectionType),
-            ...((isMCPSecurityCategory() || isAgenticSecurityCategory()) && func.isDemoAccount() && tagsList.includes("mcp-server") ? {
-                iconComp: (<Box><img src={c.displayName?.toLowerCase().startsWith('mcp') ? MCPIcon : LaptopIcon} alt="icon" style={{width: '24px', height: '24px'}} /></Box>)
+            ...(shouldShowLeftNavSwitch() ? {
+                iconComp: (<Box><img src={currentSubCategory === "Endpoint Security" ? LaptopIcon : MCPIcon} alt="icon" style={{width: '24px', height: '24px'}} /></Box>)
             } : {}),
             ...((isGenAISecurityCategory() || isAgenticSecurityCategory()) && func.isDemoAccount() && tagsList.includes("gen-ai") ? {
                 iconComp: (<Box><Icon source={tagsList.includes("AI Agent") ? AutomationMajor : MagicMajor} color={"base"}/></Box>)
@@ -252,12 +254,12 @@ const categorizeCollections = (prettifyArray) => {
     const activeCollections = [];
     const deactivatedCollectionsData = [];
     const collectionMap = new Map();
-    
+
     prettifyArray.forEach((c) => {
         // Build environment map
         envTypeObj[c.id] = c.envTypeOriginal;
         collectionMap.set(c.id, c);
-        
+
         // Categorize collections in single pass
         if (!c.deactivated) {
             activeCollections.push(c);
@@ -298,7 +300,7 @@ function ApiCollections(props) {
     const [data, setData] = useState({'all': [], 'hostname':[], 'groups': [], 'custom': [], 'deactivated': [], 'untracked': []})
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
-          
+
     const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0, totalAllowedForTesting: 0})
     const [hasUsageEndpoints, setHasUsageEndpoints] = useState(true)
     const [envTypeMap, setEnvTypeMap] = useState({})
@@ -347,6 +349,7 @@ function ApiCollections(props) {
     }
 
     const allCollections = PersistStore(state => state.allCollections)
+    const subCategory = PersistStore(state => state.subCategory)
     // const allCollections = dummyData.allCollections;
     const setAllCollections = PersistStore(state => state.setAllCollections)
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
@@ -484,7 +487,7 @@ function ApiCollections(props) {
         if(customCollectionDataFilter){ 
             finalArr = finalArr.filter(customCollectionDataFilter)
         }
-            
+
         const dataObj = convertToNewData(finalArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, false);
         setNormalData(dataObj.normal)
 
@@ -546,7 +549,7 @@ function ApiCollections(props) {
         setData(res);
         setEnvTypeMap(envTypeObj);
         setAllCollections(apiCollectionsResp.apiCollections || []);
-        
+
         // Fetch endpoints count and sensitive info asynchronously
         Promise.all([
             dashboardApi.fetchEndpointsCount(0, 0),
@@ -556,7 +559,7 @@ function ApiCollections(props) {
             if (endpointsResponse) {
                 setTotalAPIs(endpointsResponse.newCount);
             }
-            
+
             // Update sensitive info if available
             if(sensitiveResponse == null || sensitiveResponse === undefined){
                 sensitiveResponse = {
@@ -574,7 +577,7 @@ function ApiCollections(props) {
                 // Update the store with new sensitive info
                 setLastFetchedSensitiveResp(newSensitiveInfo);
                 
-                // Re-calculate data with new sensitive info
+                // Re-calculate data with new sensitive info (use same filtered array)
                 const updatedDataObj = convertToNewData(
                     finalArr,
                     newSensitiveInfo.sensitiveInfoMap || {},
@@ -603,7 +606,7 @@ function ApiCollections(props) {
                     updatedCategorized['untracked'] = untrackedCollections;
                     
                     setData(updatedCategorized);
-                    
+
                     // Update summary with new sensitive endpoints count
                     const updatedSummary = transform.getSummaryData(updatedDataObj.normal);
                     updatedSummary.totalCriticalEndpoints = riskScoreObj.criticalUrls;
@@ -647,7 +650,7 @@ function ApiCollections(props) {
     useEffect(() => {
         fetchData()
         resetFunc()    
-    }, [])
+    }, [subCategory])
     const createCollectionModalActivatorRef = useRef();
     const resetResourcesSelected = () => {
         TableStore.getState().setSelectedItems([])

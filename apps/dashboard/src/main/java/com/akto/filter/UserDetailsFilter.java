@@ -83,6 +83,7 @@ public class UserDetailsFilter implements Filter {
         String accessTokenFromResponse = httpServletResponse.getHeader(AccessTokenAction.ACCESS_TOKEN_HEADER_NAME);
         String accessTokenFromRequest = httpServletRequest.getHeader(AccessTokenAction.ACCESS_TOKEN_HEADER_NAME);
         String contextSourceFromRequest = httpServletRequest.getHeader(AccessTokenAction.CONTEXT_SOURCE_HEADER);
+        String subCategoryFromRequest = httpServletRequest.getHeader(AccessTokenAction.SUB_CATEGORY_HEADER);
 
         String aktoSessionTokenFromRequest = httpServletRequest.getHeader(AccessTokenAction.AKTO_SESSION_TOKEN);
 
@@ -105,6 +106,18 @@ public class UserDetailsFilter implements Filter {
                 Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.valueOf(contextSourceFromRequest.toUpperCase()));
             } catch (Exception e) {
                 Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.API);
+            }
+        }
+
+        if(!StringUtils.isEmpty(subCategoryFromRequest)) {
+            if(StringUtils.isEmpty(subCategoryFromRequest)){
+                Context.subCategory.set(GlobalEnums.SUB_CATEGORY_SOURCE.DEFAULT);
+            } else {
+                try {
+                    Context.subCategory.set(GlobalEnums.SUB_CATEGORY_SOURCE.valueOf(subCategoryFromRequest.toUpperCase()));
+                } catch (Exception e) {
+                    Context.subCategory.set(GlobalEnums.SUB_CATEGORY_SOURCE.DEFAULT);
+                }
             }
         }
 

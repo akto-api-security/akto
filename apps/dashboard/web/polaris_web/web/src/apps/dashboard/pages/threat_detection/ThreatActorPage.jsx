@@ -14,6 +14,7 @@ import { HorizontalGrid, VerticalStack } from "@shopify/polaris";
 import { ThreatSummary } from "./components/ThreatSummary";
 import ThreatActivityTimeline from "./components/ThreatActivityTimeline";
 import React from "react";
+import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
 
 const ChartComponent = ({ onSubCategoryClick, currDateRange }) => {
     return (
@@ -79,7 +80,7 @@ function ThreatActorPage() {
 
   return (
     <PageWithMultipleCards
-      title={<TitleWithInfo titleText={"Threat Actor"} />}
+      title={<TitleWithInfo titleText={`${mapLabel("Threat", getDashboardCategory())} Actor`} />}
       isFirstPage={true}
       primaryAction={
         <DateRangeFilter

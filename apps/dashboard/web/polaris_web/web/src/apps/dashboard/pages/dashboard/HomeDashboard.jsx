@@ -71,6 +71,7 @@ function HomeDashboard() {
     const allCollections = PersistStore(state => state.allCollections)
     const hostNameMap = PersistStore(state => state.hostNameMap)
     const coverageMap = PersistStore(state => state.coverageMap)
+    const subCategory = PersistStore(state => state.subCategory)
     const [authMap, setAuthMap] = useState({})
     const [apiTypesData, setApiTypesData] = useState([{ "data": [], "color": "#D6BBFB" }])
     const [riskScoreData, setRiskScoreData] = useState([])
@@ -448,21 +449,21 @@ function HomeDashboard() {
 
     useEffect(() => {
         fetchData()
-    }, [startTimestamp, endTimestamp])
+    }, [startTimestamp, endTimestamp, subCategory])
     
     // Fetch MCP API call stats when time range changes
     useEffect(() => {
         if (allCollections && allCollections.length > 0) {
             fetchMcpApiCallStats(mcpStatsTimeRange, func.timeNow());
         }
-    }, [mcpStatsTimeRange, allCollections])
+    }, [mcpStatsTimeRange, allCollections, subCategory])
 
     // Fetch Policy Guardrail stats when time range changes
     useEffect(() => {
         if (allCollections && allCollections.length > 0) {
             fetchPolicyGuardrailStats(policyGuardrailStatsTimeRange, func.timeNow());
         }
-    }, [policyGuardrailStatsTimeRange, allCollections])
+    }, [policyGuardrailStatsTimeRange, allCollections, subCategory])
 
     async function getActionItemsDataAndCount() {
         const data = await fetchActionItemsData();
