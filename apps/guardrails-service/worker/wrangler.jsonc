@@ -1,0 +1,38 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "akto-guardrails-service",
+	"account_id": "53a10bdb35f546522193c9670ad3e7e5",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-06-23",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"observability": {
+		"enabled": true
+	},
+	"containers": [
+		{
+			"name": "akto-guardrails-service-container",
+			"class_name": "Backend",
+			"image": "./../container/Dockerfile",
+			"instance_type": "standard-1",
+			"max_instances": 2
+		}
+	],
+	"durable_objects": {
+		"bindings": [
+			{
+				"class_name": "Backend",
+				"name": "BACKEND"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"new_sqlite_classes": [
+				"Backend"
+			],
+			"tag": "v1"
+		}
+	]
+}
