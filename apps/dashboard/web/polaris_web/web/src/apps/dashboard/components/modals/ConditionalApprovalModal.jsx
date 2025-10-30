@@ -70,9 +70,12 @@ const ConditionalApprovalModal = ({
                     response.moduleInfos.forEach(module => {
                         if (!seenNames.has(module.name)) {
                             seenNames.add(module.name);
+                            const username = module.additionalData?.username;
+                            const displayLabel = username ? `${module.name} - (${username})` : module.name;
                             uniqueEndpoints.push({
                                 value: module.id,
-                                label: module.name
+                                label: displayLabel,
+                                name: module.name  // Store original name for API calls
                             });
                         }
                     });
@@ -181,7 +184,7 @@ const ConditionalApprovalModal = ({
                 const endpointDetails = availableEndpoints.find(ep => ep.value === endpointId);
                 return {
                     id: endpointDetails.value,
-                    name: endpointDetails.label
+                    name: endpointDetails.name  // Use original name, not the display label
                 };
             });
             conditions.allowedEndpoints = endpointDetailsList;
