@@ -7,6 +7,7 @@ import values from "@/util/values";
 import {produce} from "immer"
 import func from "@/util/func";
 import {HorizontalGrid} from "@shopify/polaris";
+import { mapLabel, getDashboardCategory } from '../../../main/labelHelper';
 
 function ThreatPolicyPage() {
 

@@ -18,6 +18,7 @@ import ThreatSankeyChart from './components/ThreatSankeyChart';
 import ThreatCategoryStackedChart from './components/ThreatCategoryStackedChart';
 import GetPrettifyEndpoint from '../observe/GetPrettifyEndpoint';
 import api from './api';
+import { mapLabel, getDashboardCategory } from '../../../main/labelHelper';
 
 
 function ThreatDashboardPage() {
