@@ -10,7 +10,7 @@ import { ActorDetails } from "./components/ActorDetails";
 import ThreatWorldMap from "./components/ThreatWorldMap";
 // import ThreatApiSubcategoryCount from "./components/ThreatApiSubcategoryCount";
 
-import { HorizontalGrid, VerticalStack } from "@shopify/polaris";
+import { HorizontalGrid, VerticalStack, HorizontalStack, Checkbox, Select } from "@shopify/polaris";
 import { ThreatSummary } from "./components/ThreatSummary";
 import ThreatActivityTimeline from "./components/ThreatActivityTimeline";
 import React from "react";
@@ -43,6 +43,8 @@ const MemoizedChartComponent = React.memo(ChartComponent);
 function ThreatActorPage() {
   const [actorDetails, setActorDetails] = useState(null);
   const [showActorDetails, setShowActorDetails] = useState(false);
+  const [status, setStatus] = useState('ACTIVE'); // Default: show only active events
+  const [onlySuccessfulExploits, setOnlySuccessfulExploits] = useState(false); // Default: show all
 
   const initialVal = values.ranges[2];
   const [currDateRange, dispatchCurrDateRange] = useReducer(
@@ -82,17 +84,35 @@ function ThreatActorPage() {
       title={<TitleWithInfo titleText={"Threat Actor"} />}
       isFirstPage={true}
       primaryAction={
-        <DateRangeFilter
-          initialDispatch={currDateRange}
-          dispatch={(dateObj) =>
-            dispatchCurrDateRange({
-              type: "update",
-              period: dateObj.period,
-              title: dateObj.title,
-              alias: dateObj.alias,
-            })
-          }
-        />
+        <HorizontalStack gap="4" align="end">
+          <Select
+            label="Status filter"
+            options={[
+              {label: 'All Statuses', value: ''},
+              {label: 'Active', value: 'ACTIVE'},
+              {label: 'Under Review', value: 'UNDER_REVIEW'},
+              {label: 'Ignored', value: 'IGNORED'},
+            ]}
+            value={status}
+            onChange={(value) => setStatus(value)}
+          />
+          <Checkbox
+            label="Only successful exploits"
+            checked={onlySuccessfulExploits}
+            onChange={(newValue) => setOnlySuccessfulExploits(newValue)}
+          />
+          <DateRangeFilter
+            initialDispatch={currDateRange}
+            dispatch={(dateObj) =>
+              dispatchCurrDateRange({
+                type: "update",
+                period: dateObj.period,
+                title: dateObj.title,
+                alias: dateObj.alias,
+              })
+            }
+          />
+        </HorizontalStack>
       }
       components={components}
     />

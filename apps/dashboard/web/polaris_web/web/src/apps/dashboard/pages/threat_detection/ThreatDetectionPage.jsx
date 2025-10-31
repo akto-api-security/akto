@@ -10,7 +10,7 @@ import SampleDetails from "./components/SampleDetails";
 import threatDetectionRequests from "./api";
 import tempFunc from "./dummyData";
 import NormalSampleDetails from "./components/NormalSampleDetails";
-import { HorizontalGrid, VerticalStack, HorizontalStack, Popover, Button, ActionList, Box, Icon, Badge, Text} from "@shopify/polaris";
+import { HorizontalGrid, VerticalStack, HorizontalStack, Popover, Button, ActionList, Box, Icon, Badge, Text, Checkbox, Select} from "@shopify/polaris";
 import { FileMinor } from '@shopify/polaris-icons';
 import TopThreatTypeChart from "./components/TopThreatTypeChart";
 import api from "./api";
@@ -202,6 +202,8 @@ const ChartComponent = ({ subCategoryCount, severityCountMap }) => {
 function ThreatDetectionPage() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
+    const [status, setStatus] = useState('ACTIVE'); // Default: show only active events
+    const [onlySuccessfulExploits, setOnlySuccessfulExploits] = useState(false); // Default: show all
     const [currentRefId, setCurrentRefId] = useState('')
     const [rowDataList, setRowDataList] = useState([])
     const [moreInfoData, setMoreInfoData] = useState({})
@@ -519,7 +521,30 @@ function ThreatDetectionPage() {
             />
         }
         isFirstPage={true}
-        primaryAction={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
+        primaryAction={
+            <HorizontalStack gap="4" align="end">
+                <Select
+                    label="Status filter"
+                    options={[
+                        {label: 'All Statuses', value: ''},
+                        {label: 'Active', value: 'ACTIVE'},
+                        {label: 'Under Review', value: 'UNDER_REVIEW'},
+                        {label: 'Ignored', value: 'IGNORED'},
+                    ]}
+                    value={status}
+                    onChange={(value) => setStatus(value)}
+                />
+                <Checkbox
+                    label="Only successful exploits"
+                    checked={onlySuccessfulExploits}
+                    onChange={(newValue) => setOnlySuccessfulExploits(newValue)}
+                />
+                <DateRangeFilter 
+                    initialDispatch={currDateRange} 
+                    dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} 
+                />
+            </HorizontalStack>
+        }
         components={components}
         secondaryActions={secondaryActionsComp}
     />

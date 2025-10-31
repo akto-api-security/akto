@@ -170,17 +170,19 @@ public class MaliciousEventService {
   public  ThreatActorFilterResponse fetchThreatActorFilters(
       String accountId, ThreatActorFilterRequest request) {
 
+    Bson statusFilter = Filters.ne("status", "IGNORED");
+
     Set<String> latestAttack =
-        this.findDistinctFields(accountId, "filterId", String.class, Filters.empty());
+        this.findDistinctFields(accountId, "filterId", String.class, statusFilter);
 
     Set<String> countries =
-        this.findDistinctFields(accountId, "country", String.class, Filters.empty());
+        this.findDistinctFields(accountId, "country", String.class, statusFilter);
 
     Set<String> actorIds =
-        this.findDistinctFields(accountId, "actor", String.class, Filters.empty());
+        this.findDistinctFields(accountId, "actor", String.class, statusFilter);
 
     Set<String> hosts =
-        this.findDistinctFields(accountId, "host", String.class, Filters.empty());
+        this.findDistinctFields(accountId, "host", String.class, statusFilter);
 
     return ThreatActorFilterResponse.newBuilder().addAllSubCategories(latestAttack).addAllCountries(countries).addAllActorId(actorIds).addAllHost(hosts).build();
   }
@@ -188,14 +190,16 @@ public class MaliciousEventService {
   public FetchAlertFiltersResponse fetchAlertFilters(
       String accountId, FetchAlertFiltersRequest request) {
 
+    Bson statusFilter = Filters.ne("status", "IGNORED");
+
     Set<String> actors =
-        this.findDistinctFields(accountId, "actor", String.class, Filters.empty());
+        this.findDistinctFields(accountId, "actor", String.class, statusFilter);
     Set<String> urls =
-        this.findDistinctFields(accountId, "latestApiEndpoint", String.class, Filters.empty());
+        this.findDistinctFields(accountId, "latestApiEndpoint", String.class, statusFilter);
     Set<String> subCategories =
-        this.findDistinctFields(accountId, "filterId", String.class, Filters.empty());
+        this.findDistinctFields(accountId, "filterId", String.class, statusFilter);
     Set<String> hosts =
-        this.findDistinctFields(accountId, "host", String.class, Filters.empty());
+        this.findDistinctFields(accountId, "host", String.class, statusFilter);
 
     return FetchAlertFiltersResponse.newBuilder().addAllActors(actors).addAllUrls(urls).addAllSubCategory(subCategories).addAllHosts(hosts).build();
   }
