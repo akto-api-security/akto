@@ -220,7 +220,7 @@ function ThreatDashboardPage() {
 
     const summaryCards = [
         {
-            title: 'Total Analysed',
+            title: 'Total Attacks',
             data: observeFunc.formatNumberWithCommas(summaryMetrics.currentPeriod.totalAnalysed),
             variant: 'heading2xl',
             byLineComponent: generateChangeIndicator(
@@ -230,7 +230,7 @@ function ThreatDashboardPage() {
             smoothChartComponent: (<SmoothAreaChart tickPositions={[summaryMetrics.previousPeriod.totalAnalysed, summaryMetrics.currentPeriod.totalAnalysed]} />),
         },
         {
-            title: 'Total Attacks',
+            title: 'Successful Attacks',
             data: observeFunc.formatNumberWithCommas(summaryMetrics.currentPeriod.totalAttacks),
             variant: 'heading2xl',
             color: 'critical',
