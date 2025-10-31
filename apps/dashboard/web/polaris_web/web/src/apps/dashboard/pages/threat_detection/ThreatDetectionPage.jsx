@@ -10,7 +10,7 @@ import SampleDetails from "./components/SampleDetails";
 import threatDetectionRequests from "./api";
 import tempFunc from "./dummyData";
 import NormalSampleDetails from "./components/NormalSampleDetails";
-import { HorizontalGrid, VerticalStack, HorizontalStack, Popover, Button, ActionList, Box, Icon, Badge, Text} from "@shopify/polaris";
+import { HorizontalGrid, VerticalStack, HorizontalStack, Popover, Button, ActionList, Box, Icon, Badge, Text, Checkbox, Select} from "@shopify/polaris";
 import { FileMinor } from '@shopify/polaris-icons';
 import TopThreatTypeChart from "./components/TopThreatTypeChart";
 import api from "./api";
@@ -519,7 +519,14 @@ function ThreatDetectionPage() {
             />
         }
         isFirstPage={true}
-        primaryAction={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
+        primaryAction={
+            <HorizontalStack gap="4" align="end">
+                <DateRangeFilter 
+                    initialDispatch={currDateRange} 
+                    dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} 
+                />
+            </HorizontalStack>
+        }
         components={components}
         secondaryActions={secondaryActionsComp}
     />

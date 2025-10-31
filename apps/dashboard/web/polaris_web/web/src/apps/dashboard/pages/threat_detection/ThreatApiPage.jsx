@@ -10,7 +10,7 @@ import TopThreatTypeChart from "./components/TopThreatTypeChart";
 import ThreatApiSubcategoryCount from "./components/ThreatApiSubcategoryCount";
 
 import api from "./api";
-import { HorizontalGrid } from "@shopify/polaris";
+import { HorizontalGrid, HorizontalStack, Checkbox, Select } from "@shopify/polaris";
 import threatDetectionFunc from "./transform";
 import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
 function ThreatApiPage() {
@@ -60,17 +60,19 @@ function ThreatApiPage() {
       title={<TitleWithInfo titleText={`${mapLabel("APIs", getDashboardCategory())} under Threat`} />}
       isFirstPage={true}
       primaryAction={
-        <DateRangeFilter
-          initialDispatch={currDateRange}
-          dispatch={(dateObj) =>
-            dispatchCurrDateRange({
-              type: "update",
-              period: dateObj.period,
-              title: dateObj.title,
-              alias: dateObj.alias,
-            })
-          }
-        />
+        <HorizontalStack gap="4" align="end">
+          <DateRangeFilter
+            initialDispatch={currDateRange}
+            dispatch={(dateObj) =>
+              dispatchCurrDateRange({
+                type: "update",
+                period: dateObj.period,
+                title: dateObj.title,
+                alias: dateObj.alias,
+              })
+            }
+          />
+        </HorizontalStack>
       }
       components={components}
     />

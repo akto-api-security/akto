@@ -277,7 +277,7 @@ const ChartLegend = ({ items, onToggle }) => {
 /**
  * Stacked Percent Area Chart for threat categories over time.
  */
-function ThreatCategoryStackedChart({ startTimestamp, endTimestamp }) {
+function ThreatCategoryStackedChart({ startTimestamp, endTimestamp, successfulExploit, status }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [chartData, setChartData] = useState([]);
@@ -296,7 +296,10 @@ function ThreatCategoryStackedChart({ startTimestamp, endTimestamp }) {
         // Fetch time-series threat activity for given range
         const resp = await api.getThreatActivityTimeline(
           startTimestamp,
-          endTimestamp
+          endTimestamp,
+          [],
+          successfulExploit,
+          status
         );
 
         if (!mounted) return;
@@ -361,7 +364,7 @@ function ThreatCategoryStackedChart({ startTimestamp, endTimestamp }) {
     return () => {
       mounted = false;
     };
-  }, [startTimestamp, endTimestamp]);
+  }, [startTimestamp, endTimestamp, successfulExploit, status]);
 
   // When visibleSeries changes, update chart series visibility but keep percentages constant
   useEffect(() => {

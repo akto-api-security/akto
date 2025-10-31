@@ -45,6 +45,8 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   List<String> latestAttack;
   int startTs;
   int endTs;
+  Boolean successfulExploit;
+  String status;  // Can be "ACTIVE", "UNDER_REVIEW", or "IGNORED"
 
   @Getter int totalAnalysed;
   @Getter int totalAttacks;
@@ -109,6 +111,12 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
         put("start_ts", startTs);
         put("end_ts", endTs);
         put("latestAttack", getTemplates(latestAttack));
+        if (successfulExploit != null) {
+          put("successful_exploit", successfulExploit);
+        }
+        if (status != null && !status.isEmpty()) {
+          put("status", status);
+        }
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -153,6 +161,12 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
         put("start_ts", startTs);
         put("end_ts", endTs);
         put("latestAttack", getTemplates(latestAttack));
+        if (successfulExploit != null) {
+          put("successful_exploit", successfulExploit);
+        }
+        if (status != null && !status.isEmpty()) {
+          put("status", status);
+        }
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -193,6 +207,12 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
         put("start_ts", startTs);
         put("end_ts", endTs);
         put("latestAttack", templatesContext);
+        if (successfulExploit != null) {
+          put("successful_exploit", successfulExploit);
+        }
+        if (status != null && !status.isEmpty()) {
+          put("status", status);
+        }
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -242,6 +262,12 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
         put("start_ts", startTs);
         put("end_ts", endTs);
         put("latestAttack", templatesContext);
+        if (successfulExploit != null) {
+          put("successful_exploit", successfulExploit);
+        }
+        if (status != null && !status.isEmpty()) {
+          put("status", status);
+        }
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -342,6 +368,12 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
         put("end_ts", endTs);
         put("latestAttack", templatesContext);
         put("limit", 5);
+        if (successfulExploit != null) {
+          put("successful_exploit", successfulExploit);
+        }
+        if (status != null && !status.isEmpty()) {
+          put("status", status);
+        }
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -446,6 +478,21 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   public void setLatestAttack(List<String> latestAttack) {
     this.latestAttack = latestAttack;
   }
+
+  public Boolean getSuccessfulExploit() {
+    return successfulExploit;
+  }
+
+  public void setSuccessfulExploit(Boolean successfulExploit) {
+    this.successfulExploit = successfulExploit;
+  }
+
+  public String getStatus() {
+    return status;
+  }
+
+  public void setStatus(String status) {
+    this.status = status;
+  }
   
 }
-
