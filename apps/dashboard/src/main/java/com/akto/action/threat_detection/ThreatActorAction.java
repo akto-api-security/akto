@@ -60,6 +60,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   List<String> latestAttack;
   List<String> country;
   List<String> actorId;
+  List<String> host;
   int startTs;
   int endTs;
   String splunkUrl;
@@ -150,6 +151,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
                         .filter(allowedTemplates::contains)
                         .collect(Collectors.toList());
                 this.actorId = msg.getActorIdList();
+                this.host = msg.getHostList();
               });
     } catch (Exception e) {
       e.printStackTrace();
@@ -173,6 +175,9 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     }
     if(this.actorId != null && !this.actorId.isEmpty()){
       filter.put("actors", this.actorId);
+    }
+    if(this.host != null && !this.host.isEmpty()){
+      filter.put("hosts", this.host);
     }
     Map<String, Object> body =
         new HashMap<String, Object>() {
@@ -723,6 +728,14 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
 
   public void setActorId(List<String> actorId) {
     this.actorId = actorId;
+  }
+
+  public List<String> getHost() {
+    return host;
+  }
+
+  public void setHost(List<String> host) {
+    this.host = host;
   }
 
   public String getEventType() {

@@ -62,6 +62,9 @@ public class DashboardRouter implements ARouter {
         if (!protoFilter.getLatestAttackList().isEmpty()) {
             filterMap.put("latestAttack", new ArrayList<>(protoFilter.getLatestAttackList()));
         }
+        if (!protoFilter.getHostsList().isEmpty()) {
+            filterMap.put("hosts", new ArrayList<>(protoFilter.getHostsList()));
+        }
         if (protoFilter.hasStatusFilter()) {
             filterMap.put("statusFilter", protoFilter.getStatusFilter());
         }

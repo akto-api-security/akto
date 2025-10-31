@@ -229,7 +229,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         currentFilters.latestAttack || [],
         startTimestamp,
         endTimestamp,
-        currentTab.toUpperCase()
+        currentTab.toUpperCase(),
+        currentFilters.host || []
       ];
 
       if (operation === 'delete') {
@@ -240,7 +241,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           latestAttack: filterParams[3],
           startTimestamp: filterParams[4],
           endTimestamp: filterParams[5],
-          statusFilter: filterParams[6]
+          statusFilter: filterParams[6],
+          hosts: filterParams[7]
         });
       } else {
         response = await threatDetectionRequests.updateMaliciousEventStatus({
@@ -251,7 +253,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           startTimestamp: filterParams[4],
           endTimestamp: filterParams[5],
           statusFilter: filterParams[6],
-          status: newState
+          status: newState,
+          hosts: filterParams[7]
         });
       }
 
@@ -391,7 +394,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       apiCollectionIdsFilter = [],
       matchingUrlFilter = [],
       typeFilter = [],
-      latestAttack = [];
+      latestAttack = [],
+      hostFilter = [];
     if (filters?.actor) {
       sourceIpsFilter = filters?.actor;
     }
@@ -407,6 +411,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     if(filters?.latestAttack){
       latestAttack = filters?.latestAttack
     }
+    if(filters?.host){
+      hostFilter = filters?.host
+    }
     
     // Store current filters for bulk operations
     setCurrentFilters({
@@ -415,6 +422,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       url: matchingUrlFilter,
       type: typeFilter,
       latestAttack: latestAttack,
+      host: hostFilter,
       sortKey: sortKey,
       sortOrder: sortOrder
     });
@@ -437,7 +445,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       50,
       currentTab.toUpperCase(),
       successfulBool,
-      label // Use the label prop (THREAT or GUARDRAIL)
+      label, // Use the label prop (THREAT or GUARDRAIL)
+      hostFilter
     );
 
     // Store the total count for filtered results
@@ -486,6 +495,14 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     let ipChoices = res?.ips.map((x) => {
       return { label: x, value: x };
     });
+    
+    // Extract unique hosts from the fetched data
+    let hostChoices = [];
+    if (res?.hosts && Array.isArray(res.hosts) && res.hosts.length > 0) {
+      hostChoices = res.hosts
+        .filter(host => host && host.trim() !== '' && host !== '-')
+        .map(x => ({ label: x, value: x }));
+    }
 
     const attackTypeChoices = Object.keys(threatFiltersMap).length === 0 ? [] : Object.entries(threatFiltersMap).map(([key, value]) => {
       return {
@@ -506,6 +523,12 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         label: "URL",
         title: "URL",
         choices: urlChoices,
+      },
+      {
+        key: 'host',
+        label: "Host",
+        title: "Host",
+        choices: hostChoices,
       },
       {
         key: 'type',

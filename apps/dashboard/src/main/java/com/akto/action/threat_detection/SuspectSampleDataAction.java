@@ -65,6 +65,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   @Getter @Setter boolean deleteSuccess;
   @Getter @Setter String deleteMessage;
   @Getter @Setter int deletedCount;
+  @Getter @Setter List<String> hosts;
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -109,6 +110,10 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
     if (this.label != null && !this.label.isEmpty()) {
       filter.put("label", this.label);
+    }
+
+    if (this.hosts != null && !this.hosts.isEmpty()) {
+      filter.put("hosts", this.hosts);
     }
 
     List<String> templates = getTemplates(latestAttack);
@@ -200,6 +205,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
               msg -> {
                 this.ips = msg.getActorsList();
                 this.urls = msg.getUrlsList();
+                this.hosts = msg.getHostsList();
                 Set<String> allowedTemplates = FilterYamlTemplateDao.getContextTemplatesForAccount(accountId, source);
                 this.subCategory =
                     msg.getSubCategoryList().stream()
