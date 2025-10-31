@@ -163,7 +163,7 @@ message ThreatActorByCountryRequest {
   uint32 end_ts = 2;
   repeated string latest_attack = 3;
   optional bool successful_exploit = 4;
-  optional bool exclude_ignored = 5;
+  optional string status = 5;  // Filter by status: "ACTIVE", "UNDER_REVIEW", or "IGNORED"
 }
 
 message ThreatActorByCountryResponse {
@@ -180,7 +180,7 @@ message ThreatCategoryWiseCountRequest {
   uint32 end_ts = 2;
   repeated string latest_attack = 3;
   optional bool successful_exploit = 4;
-  optional bool exclude_ignored = 5;
+  optional string status = 5;  // Filter by status: "ACTIVE", "UNDER_REVIEW", or "IGNORED"
 }
 
 message ThreatActorFilterRequest {
@@ -208,7 +208,7 @@ message ThreatSeverityWiseCountRequest {
   uint32 end_ts = 2;
   repeated string latest_attack = 3;
   optional bool successful_exploit = 4;
-  optional bool exclude_ignored = 5;
+  optional string status = 5;  // Filter by status: "ACTIVE", "UNDER_REVIEW", or "IGNORED"
 }
 
 message ThreatSeverityWiseCountResponse {
@@ -225,7 +225,7 @@ message DailyActorsCountRequest {
   uint32 end_ts = 2;
   repeated string latest_attack = 3;
   optional bool successful_exploit = 4;
-  optional bool exclude_ignored = 5;
+  optional string status = 5;  // Filter by status: "ACTIVE", "UNDER_REVIEW", or "IGNORED"
 }
 
 message DailyActorsCountResponse {
@@ -249,7 +249,7 @@ message ThreatActivityTimelineRequest {
   uint32 end_ts = 2;
   repeated string latest_attack = 3;
   optional bool successful_exploit = 4;
-  optional bool exclude_ignored = 5;
+  optional string status = 5;  // Filter by status: "ACTIVE", "UNDER_REVIEW", or "IGNORED"
 }
 
 message ThreatActivityTimelineResponse {
@@ -393,7 +393,7 @@ message FetchTopNDataRequest {
   repeated string latest_attack = 3;
   uint32 limit = 4;
   optional bool successful_exploit = 5;
-  optional bool exclude_ignored = 6;
+  optional string status = 6;  // Filter by status: "ACTIVE", "UNDER_REVIEW", or "IGNORED"
 }
 
 message FetchTopNDataResponse {

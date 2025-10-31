@@ -64,7 +64,6 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   int startTs;
   int endTs;
   Boolean successfulExploit;
-  Boolean excludeIgnored;
   String splunkUrl;
   String splunkToken;
   String actorIp;
@@ -108,8 +107,8 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         if (successfulExploit != null) {
           put("successful_exploit", successfulExploit);
         }
-        if (excludeIgnored != null) {
-          put("exclude_ignored", excludeIgnored);
+        if (status != null && !status.isEmpty()) {
+          put("status", status);
         }
       }
     };
@@ -784,13 +783,5 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
 
   public void setSuccessfulExploit(Boolean successfulExploit) {
     this.successfulExploit = successfulExploit;
-  }
-
-  public Boolean getExcludeIgnored() {
-    return excludeIgnored;
-  }
-
-  public void setExcludeIgnored(Boolean excludeIgnored) {
-    this.excludeIgnored = excludeIgnored;
   }
 }

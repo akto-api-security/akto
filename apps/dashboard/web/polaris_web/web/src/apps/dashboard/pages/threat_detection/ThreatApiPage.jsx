@@ -10,12 +10,12 @@ import TopThreatTypeChart from "./components/TopThreatTypeChart";
 import ThreatApiSubcategoryCount from "./components/ThreatApiSubcategoryCount";
 
 import api from "./api";
-import { HorizontalGrid, HorizontalStack, Checkbox } from "@shopify/polaris";
+import { HorizontalGrid, HorizontalStack, Checkbox, Select } from "@shopify/polaris";
 import threatDetectionFunc from "./transform";
 import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
 function ThreatApiPage() {
   const [loading, setLoading] = useState(false);
-  const [excludeIgnored, setExcludeIgnored] = useState(true); // Default: exclude ignored events
+  const [status, setStatus] = useState('ACTIVE'); // Default: show only active events
   const [onlySuccessfulExploits, setOnlySuccessfulExploits] = useState(false); // Default: show all
   const [categoryCount, setCategoryCount] = useState([]);
   const [subCategoryCount, setSubCategoryCount] = useState([]);
@@ -63,10 +63,16 @@ function ThreatApiPage() {
       isFirstPage={true}
       primaryAction={
         <HorizontalStack gap="4" align="end">
-          <Checkbox
-            label="Exclude ignored events"
-            checked={excludeIgnored}
-            onChange={(newValue) => setExcludeIgnored(newValue)}
+          <Select
+            label="Status filter"
+            options={[
+              {label: 'All Statuses', value: ''},
+              {label: 'Active', value: 'ACTIVE'},
+              {label: 'Under Review', value: 'UNDER_REVIEW'},
+              {label: 'Ignored', value: 'IGNORED'},
+            ]}
+            value={status}
+            onChange={(value) => setStatus(value)}
           />
           <Checkbox
             label="Only successful exploits"

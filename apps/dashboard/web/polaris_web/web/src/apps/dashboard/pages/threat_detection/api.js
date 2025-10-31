@@ -80,7 +80,7 @@ const threatDetectionRequests = {
             }
         })
     },
-    getActorsCountPerCounty(startTs, endTs, latestAttack, successfulExploit, excludeIgnored) {
+    getActorsCountPerCounty(startTs, endTs, latestAttack, successfulExploit, status) {
         const data = {startTs, endTs}
         if (latestAttack && latestAttack.length > 0) {
             data.latestAttack = latestAttack
@@ -88,8 +88,8 @@ const threatDetectionRequests = {
         if (typeof successfulExploit === 'boolean') {
             data.successfulExploit = successfulExploit
         }
-        if (typeof excludeIgnored === 'boolean') {
-            data.excludeIgnored = excludeIgnored
+        if (typeof status === 'string' && status.trim() !== '') {
+            data.status = status
         }
         return request({
             url: '/api/getActorsCountPerCounty',
@@ -110,7 +110,7 @@ const threatDetectionRequests = {
             data: { threatConfiguration: data}
         })
     },
-    fetchThreatCategoryCount(startTs, endTs, latestAttack, successfulExploit, excludeIgnored) {
+    fetchThreatCategoryCount(startTs, endTs, latestAttack, successfulExploit, status) {
         const data = {startTs, endTs}
         if (latestAttack && latestAttack.length > 0) {
             data.latestAttack = latestAttack
@@ -118,8 +118,8 @@ const threatDetectionRequests = {
         if (typeof successfulExploit === 'boolean') {
             data.successfulExploit = successfulExploit
         }
-        if (typeof excludeIgnored === 'boolean') {
-            data.excludeIgnored = excludeIgnored
+        if (typeof status === 'string' && status.trim() !== '') {
+            data.status = status
         }
         return request({
             url: '/api/fetchThreatCategoryCount',
@@ -134,7 +134,7 @@ const threatDetectionRequests = {
             data: {refId, eventType, actor, filterId}
         })
     },
-    fetchCountBySeverity(startTs, endTs, latestAttack, successfulExploit, excludeIgnored) {
+    fetchCountBySeverity(startTs, endTs, latestAttack, successfulExploit, status) {
         const data = {startTs, endTs}
         if (latestAttack && latestAttack.length > 0) {
             data.latestAttack = latestAttack
@@ -142,8 +142,8 @@ const threatDetectionRequests = {
         if (typeof successfulExploit === 'boolean') {
             data.successfulExploit = successfulExploit
         }
-        if (typeof excludeIgnored === 'boolean') {
-            data.excludeIgnored = excludeIgnored
+        if (typeof status === 'string' && status.trim() !== '') {
+            data.status = status
         }
         return request({
             url: '/api/fetchCountBySeverity',
@@ -151,7 +151,7 @@ const threatDetectionRequests = {
             data
         })
     },
-    getThreatActivityTimeline(startTs, endTs, latestAttack, successfulExploit, excludeIgnored) {
+    getThreatActivityTimeline(startTs, endTs, latestAttack, successfulExploit, status) {
         const data = {startTs, endTs}
         if (latestAttack && latestAttack.length > 0) {
             data.latestAttack = latestAttack
@@ -159,8 +159,8 @@ const threatDetectionRequests = {
         if (typeof successfulExploit === 'boolean') {
             data.successfulExploit = successfulExploit
         }
-        if (typeof excludeIgnored === 'boolean') {
-            data.excludeIgnored = excludeIgnored
+        if (typeof status === 'string' && status.trim() !== '') {
+            data.status = status
         }
         return request({
             url: '/api/getThreatActivityTimeline',
@@ -168,13 +168,13 @@ const threatDetectionRequests = {
             data
         })
     },
-    getDailyThreatActorsCount(startTs, endTs, latestAttack, successfulExploit, excludeIgnored) {
+    getDailyThreatActorsCount(startTs, endTs, latestAttack, successfulExploit, status) {
         const data = {startTs, endTs, latestAttack: latestAttack || []}
         if (typeof successfulExploit === 'boolean') {
             data.successfulExploit = successfulExploit
         }
-        if (typeof excludeIgnored === 'boolean') {
-            data.excludeIgnored = excludeIgnored
+        if (typeof status === 'string' && status.trim() !== '') {
+            data.status = status
         }
         return request({
             url: '/api/getDailyThreatActorsCount',
@@ -235,13 +235,13 @@ const threatDetectionRequests = {
             data: data
         })
     },
-    fetchThreatTopNData(startTs, endTs, latestAttack, limit = 5, successfulExploit, excludeIgnored) {
+    fetchThreatTopNData(startTs, endTs, latestAttack, limit = 5, successfulExploit, status) {
         const data = {startTs, endTs, latestAttack: latestAttack || [], limit}
         if (typeof successfulExploit === 'boolean') {
             data.successfulExploit = successfulExploit
         }
-        if (typeof excludeIgnored === 'boolean') {
-            data.excludeIgnored = excludeIgnored
+        if (typeof status === 'string' && status.trim() !== '') {
+            data.status = status
         }
         return request({
             url: '/api/fetchThreatTopNData',

@@ -148,9 +148,9 @@ public class ThreatApiService {
       match.append("detectedAt", new Document("$gte", req.getStartTs()).append("$lte", req.getEndTs()));
     }
 
-    // Exclude IGNORED status events if requested
-    if (req.hasExcludeIgnored() && req.getExcludeIgnored()) {
-      match.append("status", new Document("$ne", "IGNORED"));
+    // Filter by status if specified
+    if (req.hasStatus() && !req.getStatus().isEmpty()) {
+      match.append("status", req.getStatus());
     }
 
     // Filter by successfulExploit if specified
@@ -214,9 +214,9 @@ public class ThreatApiService {
       filters.add(Filters.lte("detectedAt", req.getEndTs()));
       filters.add(Filters.in("filterId", req.getLatestAttackList()));
       
-      // Exclude IGNORED status events if requested
-      if (req.hasExcludeIgnored() && req.getExcludeIgnored()) {
-        filters.add(Filters.ne("status", "IGNORED"));
+      // Filter by status if specified
+      if (req.hasStatus() && !req.getStatus().isEmpty()) {
+        filters.add(Filters.eq("status", req.getStatus()));
       }
       
       // Filter by successfulExploit if specified

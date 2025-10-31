@@ -3,7 +3,7 @@ import InfoCard from "../../dashboard/new_components/InfoCard";
 import SankeyChart from "../../../components/charts/SankeyChart";
 import api from "../api";
 
-function ThreatSankeyChart({ startTimestamp, endTimestamp, successfulExploit, excludeIgnored }) {
+function ThreatSankeyChart({ startTimestamp, endTimestamp, successfulExploit, status }) {
   const [chartData, setChartData] = useState([]);
 
   const formatCategoryName = (category) => {
@@ -21,7 +21,7 @@ function ThreatSankeyChart({ startTimestamp, endTimestamp, successfulExploit, ex
     let mounted = true;
     const fetchData = async () => {
       try {
-        const res = await api.fetchThreatCategoryCount(startTimestamp, endTimestamp, [], successfulExploit, excludeIgnored);
+        const res = await api.fetchThreatCategoryCount(startTimestamp, endTimestamp, [], successfulExploit, status);
 
         if (!mounted) return;
 
@@ -65,7 +65,7 @@ function ThreatSankeyChart({ startTimestamp, endTimestamp, successfulExploit, ex
 
     fetchData();
     return () => { mounted = false; };
-  }, [startTimestamp, endTimestamp, successfulExploit, excludeIgnored]);
+  }, [startTimestamp, endTimestamp, successfulExploit, status]);
 
   return (
     <InfoCard

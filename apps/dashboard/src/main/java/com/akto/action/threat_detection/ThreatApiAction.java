@@ -46,7 +46,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   int startTs;
   int endTs;
   Boolean successfulExploit;
-  Boolean excludeIgnored;
+  String status;  // Can be "ACTIVE", "UNDER_REVIEW", or "IGNORED"
 
   @Getter int totalAnalysed;
   @Getter int totalAttacks;
@@ -114,8 +114,8 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
         if (successfulExploit != null) {
           put("successful_exploit", successfulExploit);
         }
-        if (excludeIgnored != null) {
-          put("exclude_ignored", excludeIgnored);
+        if (status != null && !status.isEmpty()) {
+          put("status", status);
         }
       }
     };
@@ -164,8 +164,8 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
         if (successfulExploit != null) {
           put("successful_exploit", successfulExploit);
         }
-        if (excludeIgnored != null) {
-          put("exclude_ignored", excludeIgnored);
+        if (status != null && !status.isEmpty()) {
+          put("status", status);
         }
       }
     };
@@ -210,8 +210,8 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
         if (successfulExploit != null) {
           put("successful_exploit", successfulExploit);
         }
-        if (excludeIgnored != null) {
-          put("exclude_ignored", excludeIgnored);
+        if (status != null && !status.isEmpty()) {
+          put("status", status);
         }
       }
     };
@@ -265,8 +265,8 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
         if (successfulExploit != null) {
           put("successful_exploit", successfulExploit);
         }
-        if (excludeIgnored != null) {
-          put("exclude_ignored", excludeIgnored);
+        if (status != null && !status.isEmpty()) {
+          put("status", status);
         }
       }
     };
@@ -371,8 +371,8 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
         if (successfulExploit != null) {
           put("successful_exploit", successfulExploit);
         }
-        if (excludeIgnored != null) {
-          put("exclude_ignored", excludeIgnored);
+        if (status != null && !status.isEmpty()) {
+          put("status", status);
         }
       }
     };
@@ -487,12 +487,12 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     this.successfulExploit = successfulExploit;
   }
 
-  public Boolean getExcludeIgnored() {
-    return excludeIgnored;
+  public String getStatus() {
+    return status;
   }
 
-  public void setExcludeIgnored(Boolean excludeIgnored) {
-    this.excludeIgnored = excludeIgnored;
+  public void setStatus(String status) {
+    this.status = status;
   }
   
 }

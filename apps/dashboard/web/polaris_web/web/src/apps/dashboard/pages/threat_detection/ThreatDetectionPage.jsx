@@ -10,7 +10,7 @@ import SampleDetails from "./components/SampleDetails";
 import threatDetectionRequests from "./api";
 import tempFunc from "./dummyData";
 import NormalSampleDetails from "./components/NormalSampleDetails";
-import { HorizontalGrid, VerticalStack, HorizontalStack, Popover, Button, ActionList, Box, Icon, Badge, Text, Checkbox} from "@shopify/polaris";
+import { HorizontalGrid, VerticalStack, HorizontalStack, Popover, Button, ActionList, Box, Icon, Badge, Text, Checkbox, Select} from "@shopify/polaris";
 import { FileMinor } from '@shopify/polaris-icons';
 import TopThreatTypeChart from "./components/TopThreatTypeChart";
 import api from "./api";
@@ -202,7 +202,7 @@ const ChartComponent = ({ subCategoryCount, severityCountMap }) => {
 function ThreatDetectionPage() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
-    const [excludeIgnored, setExcludeIgnored] = useState(true); // Default: exclude ignored events
+    const [status, setStatus] = useState('ACTIVE'); // Default: show only active events
     const [onlySuccessfulExploits, setOnlySuccessfulExploits] = useState(false); // Default: show all
     const [currentRefId, setCurrentRefId] = useState('')
     const [rowDataList, setRowDataList] = useState([])
@@ -523,10 +523,16 @@ function ThreatDetectionPage() {
         isFirstPage={true}
         primaryAction={
             <HorizontalStack gap="4" align="end">
-                <Checkbox
-                    label="Exclude ignored events"
-                    checked={excludeIgnored}
-                    onChange={(newValue) => setExcludeIgnored(newValue)}
+                <Select
+                    label="Status filter"
+                    options={[
+                        {label: 'All Statuses', value: ''},
+                        {label: 'Active', value: 'ACTIVE'},
+                        {label: 'Under Review', value: 'UNDER_REVIEW'},
+                        {label: 'Ignored', value: 'IGNORED'},
+                    ]}
+                    value={status}
+                    onChange={(value) => setStatus(value)}
                 />
                 <Checkbox
                     label="Only successful exploits"
