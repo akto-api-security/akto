@@ -3,10 +3,13 @@ package com.akto.dto;
 import com.akto.dto.testing.TLSAuthParam;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.util.HttpRequestResponseUtils;
-import com.alibaba.fastjson2.JSON;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 
+import java.io.IOException;
 import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.Setter;
@@ -19,6 +22,7 @@ import org.apache.commons.lang3.StringUtils;
 public class OriginalHttpRequest {
 
     private static final Gson gson = new Gson();
+    private static final JsonFactory JSON_FACTORY = new JsonFactory();
     private String url;
     private String type;
     private String queryParams;
@@ -242,15 +246,58 @@ public class OriginalHttpRequest {
     }
 
     public static Map<String,List<String>> buildHeadersMap(String headersString) {
-        Map headersFromRequest = JSON.parseObject(headersString);
         Map<String,List<String>> headers = new HashMap<>();
-        if (headersFromRequest == null) return headers;
-        for (Object k: headersFromRequest.keySet()) {
-            List<String> values = headers.getOrDefault(k,new ArrayList<>());
-            values.add(headersFromRequest.get(k).toString());
-            headers.put(k.toString().toLowerCase(),values);
+        if (headersString == null || headersString.isEmpty()) return headers;
+
+        try (JsonParser p = JSON_FACTORY.createParser(headersString)) {
+            // Expect a single JSON object
+            if (p.nextToken() != JsonToken.START_OBJECT) return headers;
+
+            String currentKey = null;
+            while (p.nextToken() != JsonToken.END_OBJECT) {
+                JsonToken t = p.currentToken();
+
+                if (t == JsonToken.FIELD_NAME) {
+                    currentKey = p.getCurrentName();
+                } else if (currentKey != null) {
+                    // Capture any JSON value as a String
+                    String value = tokenToString(p, t);
+                    String keyLower = currentKey.toLowerCase();
+                    List<String> values = headers.get(keyLower);
+                    if (values == null) {
+                        values = new ArrayList<>(1);
+                        headers.put(keyLower, values);
+                    }
+                    values.add(value);
+                    currentKey = null;
+                }
+            }
+        } catch (IOException e) {
+            // Return empty map on parse failure
+            return new HashMap<>();
         }
+
         return headers;
+    }
+
+    private static String tokenToString(JsonParser p, JsonToken t) throws IOException {
+        switch (t) {
+            case VALUE_STRING:
+                return p.getValueAsString();              // already unescaped
+            case VALUE_NUMBER_INT:
+            case VALUE_NUMBER_FLOAT:
+            case VALUE_TRUE:
+            case VALUE_FALSE:
+                return p.getText();                       // numeric or boolean literal text
+            case VALUE_NULL:
+                return "null";
+            case START_ARRAY:
+            case START_OBJECT:
+                // If nested occurs by mistake, read it as compact JSON text
+                return p.readValueAsTree().toString();
+            default:
+                return p.getText();                       // fallback
+        }
     }
 
     public void addHeaderFromLine(String line) {

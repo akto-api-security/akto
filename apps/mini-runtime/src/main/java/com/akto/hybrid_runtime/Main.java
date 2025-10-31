@@ -78,38 +78,6 @@ public class Main {
 
     static boolean isDashboardInstance = false;
 
-    public static boolean tryForCollectionName(String message) {
-        boolean ret = false;
-        try {
-            Gson gson = new Gson();
-
-            Map<String, Object> json = gson.fromJson(message, Map.class);
-
-            // loggerMaker.info("Json size: " + json.size());
-            boolean withoutCidrCond = json.containsKey(GROUP_NAME) && json.containsKey(VXLAN_ID);
-            boolean withCidrCond = json.containsKey(GROUP_NAME) && json.containsKey(VXLAN_ID) && json.containsKey(VPC_CIDR);
-            if (withCidrCond || withoutCidrCond) {
-                ret = true;
-                String groupName = (String) (json.get(GROUP_NAME));
-                String vxlanIdStr = ((Double) json.get(VXLAN_ID)).intValue() + "";
-                int vxlanId = Integer.parseInt(vxlanIdStr);
-                dataActor.updateApiCollectionNameForVxlan(vxlanId, groupName);
-
-                if (json.containsKey(VPC_CIDR)) {
-                    List<String> cidrList = (List<String>) json.get(VPC_CIDR);
-                    loggerMaker.info("cidrList: " + cidrList);
-                    dataActor.updateCidrList(cidrList);
-                }
-            }
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "error in try collection" + e);
-        }
-
-        return ret;
-    }
-
-
-
     public static void insertRuntimeFilters() {
         RuntimeFilterDao.instance.initialiseFilters();
     }
@@ -592,10 +560,6 @@ public class Main {
 
                 if (DataActor.actualAccountId == 1759692400 && lastSyncOffset % 1000 == 0) {
                     loggerMaker.infoAndAddToDb("Committing offset at position: " + lastSyncOffset);
-                }
-
-                if (DataActor.actualAccountId != 1759692400 && tryForCollectionName(r.value())) {
-                    continue;
                 }
                 
                 httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
