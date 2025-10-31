@@ -1,15 +1,29 @@
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "../../components/shared/TitleWithInfo";
 import FilterComponent from "./components/FilterComponent";
-import {HorizontalGrid} from "@shopify/polaris";
+import {HorizontalGrid, Button, Modal, Text} from "@shopify/polaris";
 import jsYaml from 'js-yaml';
+import { useState } from 'react';
+import trafficFiltersRequest from '../settings/traffic-conditions/api';
 
-function ConfigureEventsPage({ 
-    categoryName, 
-    pageTitle, 
-    pageTooltip, 
-    componentTitle 
+function ConfigureEventsPage({
+    categoryName,
+    pageTitle,
+    pageTooltip,
+    componentTitle
 }) {
+    const [topLevelActive, setTopLevelActive] = useState(false);
+
+    const handleRetrospectiveApply = async() => {
+        if(window.USER_NAME.includes("akto")) {
+            if(topLevelActive) {
+                await trafficFiltersRequest.cleanUpInventory(shouldDelete).then((res) => {
+                    console.log("Apply policy response", res)
+                })
+            }
+        }
+    }
+
     const validateCategory = (data) => {
         try {
             // Parse the YAML content
@@ -56,16 +70,32 @@ function ConfigureEventsPage({
         horizontalComponent,
     ]
 
-    return <PageWithMultipleCards
-        title={
-            <TitleWithInfo
-                titleText={pageTitle}
-                tooltipContent={pageTooltip}
-            />
-        }
-        isFirstPage={true}
-        components={components}
-    />
+    return <>
+        <PageWithMultipleCards
+            title={
+                <TitleWithInfo
+                    titleText={pageTitle}
+                    tooltipContent={pageTooltip}
+                />
+            }
+            isFirstPage={true}
+            components={components}
+            primaryAction={window.USER_NAME && window.USER_NAME.endsWith("@akto.io") ? <Button onClick={() => setTopLevelActive(true)}>Apply Policy</Button> : null}
+        />
+        <Modal
+            open={topLevelActive}
+            onClose={() => setTopLevelActive(false)}
+            secondaryActions={[{content: 'Apply', onAction: () => handleRetrospectiveApply(true)}]}
+            title={"Apply Policy on existing"}
+        >
+            <Modal.Section>
+                <Text variant="bodyMd" color="subdued">
+                    This will apply the policy to the existing malicious events.
+                    Are you sure you want to proceed?
+                </Text>
+            </Modal.Section>
+        </Modal>
+    </>
 }
 
 export default ConfigureEventsPage;
