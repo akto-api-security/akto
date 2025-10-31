@@ -25,7 +25,6 @@
 .azure/
 .bash_
 .bashrc
-.boto
 .cache/notify-osd.log
 .config/
 .cshrc
