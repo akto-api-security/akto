@@ -10,11 +10,13 @@ import TopThreatTypeChart from "./components/TopThreatTypeChart";
 import ThreatApiSubcategoryCount from "./components/ThreatApiSubcategoryCount";
 
 import api from "./api";
-import { HorizontalGrid } from "@shopify/polaris";
+import { HorizontalGrid, HorizontalStack, Checkbox } from "@shopify/polaris";
 import threatDetectionFunc from "./transform";
 import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
 function ThreatApiPage() {
   const [loading, setLoading] = useState(false);
+  const [excludeIgnored, setExcludeIgnored] = useState(true); // Default: exclude ignored events
+  const [onlySuccessfulExploits, setOnlySuccessfulExploits] = useState(false); // Default: show all
   const [categoryCount, setCategoryCount] = useState([]);
   const [subCategoryCount, setSubCategoryCount] = useState([]);
   const initialVal = values.ranges[3];
@@ -60,17 +62,29 @@ function ThreatApiPage() {
       title={<TitleWithInfo titleText={`${mapLabel("APIs", getDashboardCategory())} under Threat`} />}
       isFirstPage={true}
       primaryAction={
-        <DateRangeFilter
-          initialDispatch={currDateRange}
-          dispatch={(dateObj) =>
-            dispatchCurrDateRange({
-              type: "update",
-              period: dateObj.period,
-              title: dateObj.title,
-              alias: dateObj.alias,
-            })
-          }
-        />
+        <HorizontalStack gap="4" align="end">
+          <Checkbox
+            label="Exclude ignored events"
+            checked={excludeIgnored}
+            onChange={(newValue) => setExcludeIgnored(newValue)}
+          />
+          <Checkbox
+            label="Only successful exploits"
+            checked={onlySuccessfulExploits}
+            onChange={(newValue) => setOnlySuccessfulExploits(newValue)}
+          />
+          <DateRangeFilter
+            initialDispatch={currDateRange}
+            dispatch={(dateObj) =>
+              dispatchCurrDateRange({
+                type: "update",
+                period: dateObj.period,
+                title: dateObj.title,
+                alias: dateObj.alias,
+              })
+            }
+          />
+        </HorizontalStack>
       }
       components={components}
     />

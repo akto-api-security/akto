@@ -63,6 +63,8 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   List<String> host;
   int startTs;
   int endTs;
+  Boolean successfulExploit;
+  Boolean excludeIgnored;
   String splunkUrl;
   String splunkToken;
   String actorIp;
@@ -103,6 +105,12 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         put("start_ts", startTs);
         put("end_ts", endTs);
         put("latestAttack", templatesContext);
+        if (successfulExploit != null) {
+          put("successful_exploit", successfulExploit);
+        }
+        if (excludeIgnored != null) {
+          put("exclude_ignored", excludeIgnored);
+        }
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -768,5 +776,21 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
 
   public void setSort(Map<String, Integer> sort) {
     this.sort = sort;
+  }
+
+  public Boolean getSuccessfulExploit() {
+    return successfulExploit;
+  }
+
+  public void setSuccessfulExploit(Boolean successfulExploit) {
+    this.successfulExploit = successfulExploit;
+  }
+
+  public Boolean getExcludeIgnored() {
+    return excludeIgnored;
+  }
+
+  public void setExcludeIgnored(Boolean excludeIgnored) {
+    this.excludeIgnored = excludeIgnored;
   }
 }

@@ -62,6 +62,9 @@ public class ThreatApiService {
       match.append("detectedAt", new Document("$gte", start).append("$lte", end));
     }
 
+    // Exclude IGNORED status events
+    match.append("status", new Document("$ne", "IGNORED"));
+
     if (!match.isEmpty()) {
       base.add(new Document("$match", match));
     }
@@ -145,6 +148,16 @@ public class ThreatApiService {
       match.append("detectedAt", new Document("$gte", req.getStartTs()).append("$lte", req.getEndTs()));
     }
 
+    // Exclude IGNORED status events if requested
+    if (req.hasExcludeIgnored() && req.getExcludeIgnored()) {
+      match.append("status", new Document("$ne", "IGNORED"));
+    }
+
+    // Filter by successfulExploit if specified
+    if (req.hasSuccessfulExploit()) {
+      match.append("successfulExploit", req.getSuccessfulExploit());
+    }
+
     pipeline.add(new Document("$match", match));
 
     // 3. Group by category and subCategory
@@ -195,12 +208,23 @@ public class ThreatApiService {
     String[] severities = { "CRITICAL", "HIGH", "MEDIUM", "LOW" };
 
     for (String severity : severities) {
-      Bson filter = Filters.and(
-          Filters.eq("severity", severity),
-          Filters.gte("detectedAt", req.getStartTs()),
-          Filters.lte("detectedAt", req.getEndTs()),
-          Filters.in("filterId", req.getLatestAttackList())
-      );
+      List<Bson> filters = new ArrayList<>();
+      filters.add(Filters.eq("severity", severity));
+      filters.add(Filters.gte("detectedAt", req.getStartTs()));
+      filters.add(Filters.lte("detectedAt", req.getEndTs()));
+      filters.add(Filters.in("filterId", req.getLatestAttackList()));
+      
+      // Exclude IGNORED status events if requested
+      if (req.hasExcludeIgnored() && req.getExcludeIgnored()) {
+        filters.add(Filters.ne("status", "IGNORED"));
+      }
+      
+      // Filter by successfulExploit if specified
+      if (req.hasSuccessfulExploit()) {
+        filters.add(Filters.eq("successfulExploit", req.getSuccessfulExploit()));
+      }
+
+      Bson filter = Filters.and(filters);
 
       long count = maliciousEventDao.countDocuments(accountId, filter);
 

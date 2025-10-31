@@ -174,6 +174,9 @@ public class ThreatActorService {
             match.append("detectedAt", new Document("$gte", request.getStartTs()).append("$lte", request.getEndTs()));
         }
 
+        // Exclude IGNORED status events
+        match.append("status", new Document("$ne", "IGNORED"));
+
         List<Document> pipeline = new ArrayList<>();
         if (!match.isEmpty()) pipeline.add(new Document("$match", match));
 
@@ -251,7 +254,7 @@ public class ThreatActorService {
         return ListThreatActorResponse.newBuilder().addAllActors(actors).setTotal(total).build();
     }
 
-  public DailyActorsCountResponse getDailyActorCounts(String accountId, long startTs, long endTs, List<String> latestAttackList) {
+  public DailyActorsCountResponse getDailyActorCounts(String accountId, long startTs, long endTs, List<String> latestAttackList, Boolean successfulExploit, Boolean excludeIgnored) {
 
     if(latestAttackList == null || latestAttackList.isEmpty()) {
         return DailyActorsCountResponse.newBuilder().build();
@@ -271,6 +274,17 @@ public class ThreatActorService {
         if (startTs > 0) {
             matchConditions.get("detectedAt", Document.class).append("$gte", startTs);
         }
+        
+        // Exclude IGNORED status events if requested
+        if (excludeIgnored != null && excludeIgnored) {
+            matchConditions.append("status", new Document("$ne", "IGNORED"));
+        }
+        
+        // Filter by successfulExploit if specified
+        if (successfulExploit != null) {
+            matchConditions.append("successfulExploit", successfulExploit);
+        }
+        
         pipeline.add(new Document("$match", matchConditions));
     
         pipeline.add(new Document("$project", 
@@ -383,7 +397,7 @@ public class ThreatActorService {
             .build();
   }
 
-  public ThreatActivityTimelineResponse getThreatActivityTimeline(String accountId, long startTs, long endTs, List<String> latestAttackList) {
+  public ThreatActivityTimelineResponse getThreatActivityTimeline(String accountId, long startTs, long endTs, List<String> latestAttackList, Boolean successfulExploit, Boolean excludeIgnored) {
 
     if(latestAttackList == null || latestAttackList.isEmpty()) {
         return ThreatActivityTimelineResponse.newBuilder().build();
@@ -403,6 +417,16 @@ public class ThreatActorService {
 
       // Stage 1: Match documents within the startTs and endTs range
       match.append("detectedAt", new Document("$gte", startTs).append("$lte", endTs));
+      
+      // Exclude IGNORED status events if requested
+      if (excludeIgnored != null && excludeIgnored) {
+          match.append("status", new Document("$ne", "IGNORED"));
+      }
+      
+      // Filter by successfulExploit if specified
+      if (successfulExploit != null) {
+          match.append("successfulExploit", successfulExploit);
+      }
 
       List<Document> pipeline = Arrays.asList(
         new Document("$match", match),
@@ -547,6 +571,16 @@ public class ThreatActorService {
                   .append("$lte", request.getEndTs()));
     }
 
+    // Exclude IGNORED status events if requested
+    if (request.hasExcludeIgnored() && request.getExcludeIgnored()) {
+        match.append("status", new Document("$ne", "IGNORED"));
+    }
+    
+    // Filter by successfulExploit if specified
+    if (request.hasSuccessfulExploit()) {
+        match.append("successfulExploit", request.getSuccessfulExploit());
+    }
+
   pipeline.add(new Document("$match", match));
 
     // 2. Project only necessary fields
@@ -644,7 +678,7 @@ public class ThreatActorService {
       }
 
   public FetchTopNDataResponse fetchTopNData(
-      String accountId, long startTs, long endTs, List<String> latestAttackList, int limit) {
+      String accountId, long startTs, long endTs, List<String> latestAttackList, int limit, Boolean successfulExploit, Boolean excludeIgnored) {
 
     List<Document> pipeline = new ArrayList<>();
 
@@ -661,6 +695,17 @@ public class ThreatActorService {
             if (endTs > 0) tsRange.append("$lte", endTs);
             match.append("detectedAt", tsRange);
         }
+        
+        // Exclude IGNORED status events if requested
+        if (excludeIgnored != null && excludeIgnored) {
+            match.append("status", new Document("$ne", "IGNORED"));
+        }
+        
+        // Filter by successfulExploit if specified
+        if (successfulExploit != null) {
+            match.append("successfulExploit", successfulExploit);
+        }
+        
         if (!match.isEmpty()) {
             pipeline.add(new Document("$match", match));
         }

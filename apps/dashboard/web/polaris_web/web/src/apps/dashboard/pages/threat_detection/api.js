@@ -80,11 +80,21 @@ const threatDetectionRequests = {
             }
         })
     },
-    getActorsCountPerCounty(startTs, endTs) {
+    getActorsCountPerCounty(startTs, endTs, latestAttack, successfulExploit, excludeIgnored) {
+        const data = {startTs, endTs}
+        if (latestAttack && latestAttack.length > 0) {
+            data.latestAttack = latestAttack
+        }
+        if (typeof successfulExploit === 'boolean') {
+            data.successfulExploit = successfulExploit
+        }
+        if (typeof excludeIgnored === 'boolean') {
+            data.excludeIgnored = excludeIgnored
+        }
         return request({
             url: '/api/getActorsCountPerCounty',
             method: 'post',
-            data: {startTs, endTs}
+            data
         })
     },
     fetchThreatConfiguration() {
@@ -100,11 +110,21 @@ const threatDetectionRequests = {
             data: { threatConfiguration: data}
         })
     },
-    fetchThreatCategoryCount(startTs, endTs) {
+    fetchThreatCategoryCount(startTs, endTs, latestAttack, successfulExploit, excludeIgnored) {
+        const data = {startTs, endTs}
+        if (latestAttack && latestAttack.length > 0) {
+            data.latestAttack = latestAttack
+        }
+        if (typeof successfulExploit === 'boolean') {
+            data.successfulExploit = successfulExploit
+        }
+        if (typeof excludeIgnored === 'boolean') {
+            data.excludeIgnored = excludeIgnored
+        }
         return request({
             url: '/api/fetchThreatCategoryCount',
             method: 'post',
-            data: {startTs, endTs}
+            data
         })
     },
     fetchMaliciousRequest(refId, eventType, actor, filterId) {
@@ -114,25 +134,52 @@ const threatDetectionRequests = {
             data: {refId, eventType, actor, filterId}
         })
     },
-    fetchCountBySeverity(startTs, endTs) {
+    fetchCountBySeverity(startTs, endTs, latestAttack, successfulExploit, excludeIgnored) {
+        const data = {startTs, endTs}
+        if (latestAttack && latestAttack.length > 0) {
+            data.latestAttack = latestAttack
+        }
+        if (typeof successfulExploit === 'boolean') {
+            data.successfulExploit = successfulExploit
+        }
+        if (typeof excludeIgnored === 'boolean') {
+            data.excludeIgnored = excludeIgnored
+        }
         return request({
             url: '/api/fetchCountBySeverity',
             method: 'post',
-            data: {startTs, endTs}
+            data
         })
     },
-    getThreatActivityTimeline(startTs, endTs) {
+    getThreatActivityTimeline(startTs, endTs, latestAttack, successfulExploit, excludeIgnored) {
+        const data = {startTs, endTs}
+        if (latestAttack && latestAttack.length > 0) {
+            data.latestAttack = latestAttack
+        }
+        if (typeof successfulExploit === 'boolean') {
+            data.successfulExploit = successfulExploit
+        }
+        if (typeof excludeIgnored === 'boolean') {
+            data.excludeIgnored = excludeIgnored
+        }
         return request({
             url: '/api/getThreatActivityTimeline',
             method: 'post',
-            data: {startTs, endTs}
+            data
         })
     },
-    getDailyThreatActorsCount(startTs, endTs, latestAttack) {
+    getDailyThreatActorsCount(startTs, endTs, latestAttack, successfulExploit, excludeIgnored) {
+        const data = {startTs, endTs, latestAttack: latestAttack || []}
+        if (typeof successfulExploit === 'boolean') {
+            data.successfulExploit = successfulExploit
+        }
+        if (typeof excludeIgnored === 'boolean') {
+            data.excludeIgnored = excludeIgnored
+        }
         return request({
             url: '/api/getDailyThreatActorsCount',
             method: 'post',
-            data: {startTs, endTs, latestAttack: latestAttack || []}
+            data
         })
     },
     fetchSensitiveParamsForEndpoints (urls) {
@@ -188,11 +235,18 @@ const threatDetectionRequests = {
             data: data
         })
     },
-    fetchThreatTopNData(startTs, endTs, latestAttack, limit = 5) {
+    fetchThreatTopNData(startTs, endTs, latestAttack, limit = 5, successfulExploit, excludeIgnored) {
+        const data = {startTs, endTs, latestAttack: latestAttack || [], limit}
+        if (typeof successfulExploit === 'boolean') {
+            data.successfulExploit = successfulExploit
+        }
+        if (typeof excludeIgnored === 'boolean') {
+            data.excludeIgnored = excludeIgnored
+        }
         return request({
             url: '/api/fetchThreatTopNData',
             method: 'post',
-            data: {startTs, endTs, latestAttack: latestAttack || [], limit}
+            data
         })
     }
 }

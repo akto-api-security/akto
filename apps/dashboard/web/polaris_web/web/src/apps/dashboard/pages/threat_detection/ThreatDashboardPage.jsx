@@ -1,6 +1,6 @@
 import React, { useEffect, useReducer, useState, useCallback } from 'react'
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
-import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Text, VerticalStack, Badge } from '@shopify/polaris';
+import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Text, VerticalStack, Badge, Checkbox } from '@shopify/polaris';
 import SummaryCard from '../dashboard/new_components/SummaryCard';
 import { ArrowUpMinor, ArrowDownMinor } from '@shopify/polaris-icons';
 import InfoCard from '../dashboard/new_components/InfoCard';
@@ -22,6 +22,8 @@ import api from './api';
 
 function ThreatDashboardPage() {
     const [loading, setLoading] = useState(true);
+    const [excludeIgnored, setExcludeIgnored] = useState(true); // Default: exclude ignored events
+    const [onlySuccessfulExploits, setOnlySuccessfulExploits] = useState(false); // Default: show all
     
     // Summary metrics state
     const [summaryMetrics, setSummaryMetrics] = useState({
@@ -65,7 +67,7 @@ function ThreatDashboardPage() {
             // Row 1: Summary metrics - Use getDailyThreatActorsCount API
             let summaryResponse = null
             try {
-                summaryResponse = await api.getDailyThreatActorsCount(startTimestamp, endTimestamp, [])
+                summaryResponse = await api.getDailyThreatActorsCount(startTimestamp, endTimestamp, [], onlySuccessfulExploits, excludeIgnored)
                 if (summaryResponse) {
                     // Use actorsCounts latest entry for active actors similar to ThreatSummary.jsx
                     let activeActorsValue = summaryResponse.totalActive || 0
@@ -110,7 +112,7 @@ function ThreatDashboardPage() {
 
             // Severity Distribution - Use API
             try {
-                const severityResponse = await api.fetchCountBySeverity(startTimestamp, endTimestamp)
+                const severityResponse = await api.fetchCountBySeverity(startTimestamp, endTimestamp, [], onlySuccessfulExploits, excludeIgnored)
                 
                 if (severityResponse?.categoryCounts && Array.isArray(severityResponse.categoryCounts)) {
                     const categoryCounts = severityResponse.categoryCounts
@@ -162,7 +164,7 @@ function ThreatDashboardPage() {
 
             // Row 4: Top Attacked Hosts and APIs via common API
             try {
-                const topResponse = await api.fetchThreatTopNData(startTimestamp, endTimestamp, [], 5)
+                const topResponse = await api.fetchThreatTopNData(startTimestamp, endTimestamp, [], 5, onlySuccessfulExploits, excludeIgnored)
                 if (topResponse?.topApis && Array.isArray(topResponse.topApis)) {
                     setTopAttackedApis(topResponse.topApis)
                 } else {
@@ -193,7 +195,7 @@ function ThreatDashboardPage() {
         } finally {
             setLoading(false)
         }
-    }, [startTimestamp, endTimestamp])
+    }, [startTimestamp, endTimestamp, onlySuccessfulExploits, excludeIgnored])
 
 
     useEffect(() => {
@@ -275,6 +277,8 @@ function ThreatDashboardPage() {
         <ThreatSankeyChart
             startTimestamp={startTimestamp}
             endTimestamp={endTimestamp}
+            successfulExploit={onlySuccessfulExploits}
+            excludeIgnored={excludeIgnored}
         />
     )
 
@@ -283,6 +287,8 @@ function ThreatDashboardPage() {
         <ThreatWorldMap
             startTimestamp={startTimestamp}
             endTimestamp={endTimestamp}
+            successfulExploit={onlySuccessfulExploits}
+            excludeIgnored={excludeIgnored}
             style={{
                 width: "100%",
                 marginRight: "auto",
@@ -422,7 +428,12 @@ function ThreatDashboardPage() {
 
     // Row 3: Stacked category breakdown (uses same API as Sankey)
     const row3Cards = (
-        <ThreatCategoryStackedChart startTimestamp={startTimestamp} endTimestamp={endTimestamp} />
+        <ThreatCategoryStackedChart 
+            startTimestamp={startTimestamp} 
+            endTimestamp={endTimestamp} 
+            successfulExploit={onlySuccessfulExploits}
+            excludeIgnored={excludeIgnored}
+        />
     )
 
     const dashboardRows = [
@@ -457,7 +468,24 @@ function ThreatDashboardPage() {
                     }
                     isFirstPage={true}
                     components={pageContent}
-                    primaryAction={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
+                    primaryAction={
+                        <HorizontalStack gap="4" align="end">
+                            <Checkbox
+                                label="Exclude ignored events"
+                                checked={excludeIgnored}
+                                onChange={(newValue) => setExcludeIgnored(newValue)}
+                            />
+                            <Checkbox
+                                label="Only successful exploits"
+                                checked={onlySuccessfulExploits}
+                                onChange={(newValue) => setOnlySuccessfulExploits(newValue)}
+                            />
+                            <DateRangeFilter 
+                                initialDispatch={currDateRange} 
+                                dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} 
+                            />
+                        </HorizontalStack>
+                    }
                 />
             }
         </Box>

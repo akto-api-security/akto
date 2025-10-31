@@ -12,14 +12,14 @@ Exporting(Highcharts);
 ExportData(Highcharts);
 FullScreen(Highcharts);
 
-function ThreatWorldMap({ startTimestamp, endTimestamp,  style}) {
+function ThreatWorldMap({ startTimestamp, endTimestamp, successfulExploit, excludeIgnored, style}) {
 
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(false);
 
     const fetchActorsPerCountry = async () => {
       // setLoading(true);
-      const res = await api.getActorsCountPerCounty(startTimestamp, endTimestamp);
+      const res = await api.getActorsCountPerCounty(startTimestamp, endTimestamp, [], successfulExploit, excludeIgnored);
       if (res?.actorsCountPerCountry) {
         setData(
           res.actorsCountPerCountry.map((x) => {
@@ -136,7 +136,7 @@ function ThreatWorldMap({ startTimestamp, endTimestamp,  style}) {
   useEffect(() => {
     fetchActorsPerCountry();
     fetchMapData();
-  }, [startTimestamp, endTimestamp]);
+  }, [startTimestamp, endTimestamp, successfulExploit, excludeIgnored]);
 
   if (loading) {
     return <Spinner />;
