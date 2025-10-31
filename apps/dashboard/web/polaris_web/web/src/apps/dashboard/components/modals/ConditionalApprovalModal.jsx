@@ -23,8 +23,7 @@ const ConditionalApprovalModal = ({
     isOpen, 
     onClose, 
     onApprove, 
-    auditItem,
-    teamData = []
+    auditItem
 }) => {
     // Time restriction state
     const [timeRestricted, setTimeRestricted] = useState(false);
@@ -37,11 +36,10 @@ const ConditionalApprovalModal = ({
     const [specificIpsList, setSpecificIpsList] = useState([]);
     const [ipRangeList, setIpRangeList] = useState([]);
 
-    // User restriction state
-    const [userRestricted, setUserRestricted] = useState(false);
-    const [userOption, setUserOption] = useState("all_users");
-    const [selectedUsers, setSelectedUsers] = useState([]);
-    const [availableUsers, setAvailableUsers] = useState([]);
+    // Endpoint restriction state
+    const [endpointRestricted, setEndpointRestricted] = useState(false);
+    const [selectedEndpoints, setSelectedEndpoints] = useState([]);
+    const [availableEndpoints, setAvailableEndpoints] = useState([]);
 
     // Justification
     const [justification, setJustification] = useState("");
@@ -59,15 +57,37 @@ const ConditionalApprovalModal = ({
         { label: "Custom", value: "custom" }
     ];
 
-    // Set available users from passed team data
+    // Fetch available endpoints
     useEffect(() => {
-        if (teamData && teamData.length > 0) {
-            setAvailableUsers(teamData.map(user => ({
-                value: user.login,
-                label: user.login
-            })));
-        }
-    }, [teamData]);
+        const fetchEndpoints = async () => {
+            try {
+                const response = await settingRequests.fetchModuleInfo({ moduleType: 'MCP_ENDPOINT_SHIELD' });
+                if (response?.moduleInfos) {
+                    // Filter out duplicates based on name
+                    const uniqueEndpoints = [];
+                    const seenNames = new Set();
+                    
+                    response.moduleInfos.forEach(module => {
+                        if (!seenNames.has(module.name)) {
+                            seenNames.add(module.name);
+                            const username = module.additionalData?.username;
+                            const displayLabel = username ? `${module.name} - (${username})` : module.name;
+                            uniqueEndpoints.push({
+                                value: module.id,
+                                label: displayLabel,
+                                name: module.name  // Store original name for API calls
+                            });
+                        }
+                    });
+                    
+                    setAvailableEndpoints(uniqueEndpoints);
+                }
+            } catch (error) {
+                console.error("Error fetching endpoints:", error);
+            }
+        };
+        fetchEndpoints();
+    }, []);
 
     // Reset form when modal opens/closes
     useEffect(() => {
@@ -93,9 +113,8 @@ const ConditionalApprovalModal = ({
         setIpOption("all_ips");
         setSpecificIpsList([]);
         setIpRangeList([]);
-        setUserRestricted(false);
-        setUserOption("all_users");
-        setSelectedUsers([]);
+        setEndpointRestricted(false);
+        setSelectedEndpoints([]);
         setJustification("");
     };
 
@@ -153,14 +172,22 @@ const ConditionalApprovalModal = ({
             }
         }
 
-        // User conditions
-        if (userRestricted && userOption === "specific_users") {
-            if (selectedUsers.length === 0) {
-                alert("Please select at least one user");
+        // Endpoint conditions
+        if (endpointRestricted) {
+            if (!selectedEndpoints || selectedEndpoints.length === 0) {
+                alert("Please select at least one endpoint");
                 setLoading(false);
                 return;
             }
-            conditions.allowedUsers = selectedUsers;
+            // Find the selected endpoint details
+            const endpointDetailsList = selectedEndpoints.map(endpointId => {
+                const endpointDetails = availableEndpoints.find(ep => ep.value === endpointId);
+                return {
+                    id: endpointDetails.value,
+                    name: endpointDetails.name  // Use original name, not the display label
+                };
+            });
+            conditions.allowedEndpoints = endpointDetailsList;
         }
 
         try {
@@ -304,43 +331,26 @@ const ConditionalApprovalModal = ({
                                     </LegacyCard>
                                 )}
 
-                                {/* User Restriction */}
+                                {/* Endpoint Restriction */}
                                 <Checkbox
-                                    label="Users Allowed"
-                                    checked={userRestricted}
-                                    onChange={setUserRestricted}
+                                    label="Endpoint Allowed"
+                                    checked={endpointRestricted}
+                                    onChange={setEndpointRestricted}
                                 />
-                                {userRestricted && (
+                                {endpointRestricted && (
                                     <LegacyCard sectioned>
                                         <LegacyStack vertical spacing="tight">
-                                            <RadioButton
-                                                label="All users"
-                                                checked={userOption === "all_users"}
-                                                id="all_users"
-                                                name="userOption"
-                                                onChange={() => setUserOption("all_users")}
+                                            <DropdownSearch
+                                                label="Select endpoints"
+                                                placeholder="Select endpoints"
+                                                optionsList={availableEndpoints}
+                                                setSelected={setSelectedEndpoints}
+                                                preSelected={selectedEndpoints}
+                                                allowMultiple={true}
+                                                itemName="endpoint"
+                                                value={`${selectedEndpoints.length} endpoint${selectedEndpoints.length !== 1 ? 's' : ''} selected`}
+                                                searchDisable={false}
                                             />
-                                            <RadioButton
-                                                label="Specific users"
-                                                checked={userOption === "specific_users"}
-                                                id="specific_users"
-                                                name="userOption"
-                                                onChange={() => setUserOption("specific_users")}
-                                            />
-                                            {userOption === "specific_users" && (
-                                                <LegacyStack vertical spacing="tight">
-                                                    <DropdownSearch
-                                                        label="Select users"
-                                                        placeholder="Select users"
-                                                        optionsList={availableUsers}
-                                                        setSelected={setSelectedUsers}
-                                                        preSelected={selectedUsers}
-                                                        allowMultiple={true}
-                                                        itemName="user"
-                                                        value={`${selectedUsers.length} user${selectedUsers.length !== 1 ? 's' : ''} selected`}
-                                                    />
-                                                </LegacyStack>
-                                            )}
                                         </LegacyStack>
                                     </LegacyCard>
                                 )}

@@ -2246,6 +2246,33 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       default:
         return 'new';
     }
+  },
+  // Category priority helpers: mcp > agentic > llm > others
+  getCategoryPriority(name){
+    const lower = (name || '').toLowerCase();
+    if (lower.includes('mcp')) return 0;
+    if (lower.includes('agentic')) return 1;
+    if (lower.includes('llm')) return 2;
+    return 3;
+  },
+  // Generic sorter: accepts array of strings or objects. If objects, pass a key string or a getter fn.
+  sortByCategoryPriority(items, keyOrGetter){
+    if(!Array.isArray(items)) return items;
+    const getName = typeof keyOrGetter === 'function'
+      ? keyOrGetter
+      : (item) => {
+          if (typeof item === 'string') return item;
+          const key = keyOrGetter || 'name';
+          return item?.[key];
+        };
+    return [...items].sort((a,b)=>{
+      const nameA = getName(a);
+      const nameB = getName(b);
+      const pA = this.getCategoryPriority(nameA);
+      const pB = this.getCategoryPriority(nameB);
+      if(pA !== pB) return pA - pB;
+      return (nameA || '').localeCompare(nameB || '');
+    })
   }
 }
 

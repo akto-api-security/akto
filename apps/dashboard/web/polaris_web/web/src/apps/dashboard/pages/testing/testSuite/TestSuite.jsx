@@ -13,11 +13,6 @@ import { CellType } from "../../../components/tables/rows/GithubRow"
 import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper"
 
 
-const sortOptions = [
-    { label: 'Template Name', value: 'template asc', directionLabel: 'A-Z', sortKey: 'testSuiteName', columnIndex: 1 },
-    { label: 'Template Name', value: 'template desc', directionLabel: 'Z-A', sortKey: 'testSuiteName', columnIndex: 1 },
-];
-
 function TestSuite() {
     const [show, setShow] = useState(false)
     const [data, setData] = useState({ 'all': [], 'by_akto': [], 'custom': [] })
@@ -80,7 +75,7 @@ function TestSuite() {
 
     const fetchData = async () => {
         const subCategoryMap = await transform.getSubCategoryMap(LocalStore);
-        const all = [], by_akto = [], custom = [];
+        let all = [], by_akto = [], custom = [];
 
         // Get dashboard category using the existing helper function
         const dashboardCategory = getDashboardCategory();
@@ -131,11 +126,16 @@ function TestSuite() {
             all.push(customTestSuite);
             custom.push(customTestSuite);
         });
-        
+
+        // sort here by category priority
+        all = func.sortByCategoryPriority(all, 'testSuiteName');
+        by_akto = func.sortByCategoryPriority(by_akto, 'testSuiteName');
+        custom = func.sortByCategoryPriority(custom, 'testSuiteName');
+
         setData({
-            all: [...all],
-            by_akto: [...by_akto],
-            custom: [...custom],
+            all,
+            by_akto,
+            custom,
         });
 
     };
@@ -185,7 +185,6 @@ function TestSuite() {
     const components = [
         <GithubSimpleTable
             key={"test-suite-table"}
-            sortOptions={sortOptions}
             tableTabs={tableTabs}
             loading={tableLoading}
             selected={selected}
