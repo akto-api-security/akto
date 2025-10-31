@@ -1,6 +1,6 @@
 import React, { useEffect, useReducer, useState, useCallback } from 'react'
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
-import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Text, VerticalStack, Badge, Checkbox, Select } from '@shopify/polaris';
+import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Text, VerticalStack, Badge, Checkbox, Button, Popover, ActionList } from '@shopify/polaris';
 import SummaryCard from '../dashboard/new_components/SummaryCard';
 import { ArrowUpMinor, ArrowDownMinor } from '@shopify/polaris-icons';
 import InfoCard from '../dashboard/new_components/InfoCard';
@@ -22,8 +22,9 @@ import api from './api';
 
 function ThreatDashboardPage() {
     const [loading, setLoading] = useState(true);
-    const [status, setStatus] = useState('ACTIVE'); // Default: show only active events
+    const [status, setStatus] = useState(''); // Default: show all
     const [onlySuccessfulExploits, setOnlySuccessfulExploits] = useState(false); // Default: show all
+    const [statusPopoverActive, setStatusPopoverActive] = useState(false);
     
     // Summary metrics state
     const [summaryMetrics, setSummaryMetrics] = useState({
@@ -470,25 +471,59 @@ function ThreatDashboardPage() {
                     components={pageContent}
                     primaryAction={
                         <HorizontalStack gap="4" align="end">
-                            <Select
-                                label="Status filter"
-                                options={[
-                                    {label: 'All Statuses', value: ''},
-                                    {label: 'Active', value: 'ACTIVE'},
-                                    {label: 'Under Review', value: 'UNDER_REVIEW'},
-                                    {label: 'Ignored', value: 'IGNORED'},
-                                ]}
-                                value={status}
-                                onChange={(value) => setStatus(value)}
-                            />
-                            <Checkbox
-                                label="Only successful exploits"
-                                checked={onlySuccessfulExploits}
-                                onChange={(newValue) => setOnlySuccessfulExploits(newValue)}
-                            />
-                            <DateRangeFilter 
-                                initialDispatch={currDateRange} 
-                                dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} 
+                            <Button
+                                pressed={onlySuccessfulExploits}
+                                onClick={() => setOnlySuccessfulExploits(!onlySuccessfulExploits)}
+                            >
+                                Only successful Attacks
+                            </Button>
+                            <Popover
+                                active={statusPopoverActive}
+                                activator={
+                                    <Button onClick={() => setStatusPopoverActive(!statusPopoverActive)} disclosure>
+                                        {status === '' ? 'All Statuses' : status === 'ACTIVE' ? 'Active' : status === 'UNDER_REVIEW' ? 'Under Review' : 'Ignored'}
+                                    </Button>
+                                }
+                                onClose={() => setStatusPopoverActive(false)}
+                            >
+                                <Popover.Pane>
+                                    <ActionList
+                                        items={[
+                                            {
+                                                content: 'All Statuses',
+                                                onAction: () => {
+                                                    setStatus('');
+                                                    setStatusPopoverActive(false);
+                                                }
+                                            },
+                                            {
+                                                content: 'Active',
+                                                onAction: () => {
+                                                    setStatus('ACTIVE');
+                                                    setStatusPopoverActive(false);
+                                                }
+                                            },
+                                            {
+                                                content: 'Under Review',
+                                                onAction: () => {
+                                                    setStatus('UNDER_REVIEW');
+                                                    setStatusPopoverActive(false);
+                                                }
+                                            },
+                                            {
+                                                content: 'Ignored',
+                                                onAction: () => {
+                                                    setStatus('IGNORED');
+                                                    setStatusPopoverActive(false);
+                                                }
+                                            }
+                                        ]}
+                                    />
+                                </Popover.Pane>
+                            </Popover>
+                            <DateRangeFilter
+                                initialDispatch={currDateRange}
+                                dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })}
                             />
                         </HorizontalStack>
                     }

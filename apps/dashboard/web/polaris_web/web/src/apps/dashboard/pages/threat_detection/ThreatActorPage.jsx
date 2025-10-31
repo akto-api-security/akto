@@ -43,8 +43,6 @@ const MemoizedChartComponent = React.memo(ChartComponent);
 function ThreatActorPage() {
   const [actorDetails, setActorDetails] = useState(null);
   const [showActorDetails, setShowActorDetails] = useState(false);
-  const [status, setStatus] = useState('ACTIVE'); // Default: show only active events
-  const [onlySuccessfulExploits, setOnlySuccessfulExploits] = useState(false); // Default: show all
 
   const initialVal = values.ranges[2];
   const [currDateRange, dispatchCurrDateRange] = useReducer(
@@ -85,22 +83,6 @@ function ThreatActorPage() {
       isFirstPage={true}
       primaryAction={
         <HorizontalStack gap="4" align="end">
-          <Select
-            label="Status filter"
-            options={[
-              {label: 'All Statuses', value: ''},
-              {label: 'Active', value: 'ACTIVE'},
-              {label: 'Under Review', value: 'UNDER_REVIEW'},
-              {label: 'Ignored', value: 'IGNORED'},
-            ]}
-            value={status}
-            onChange={(value) => setStatus(value)}
-          />
-          <Checkbox
-            label="Only successful exploits"
-            checked={onlySuccessfulExploits}
-            onChange={(newValue) => setOnlySuccessfulExploits(newValue)}
-          />
           <DateRangeFilter
             initialDispatch={currDateRange}
             dispatch={(dateObj) =>
