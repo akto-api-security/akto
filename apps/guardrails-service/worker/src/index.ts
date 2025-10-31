@@ -4,19 +4,33 @@ export class Backend extends Container {
   defaultPort = 8080; // pass requests to port 8080 in the container
   sleepAfter = "2h"; // only sleep a container if it hasn't gotten requests in 2 hours
   maxStartupTime = "60s"; // allow more time for container startup
-  
+
   constructor(state: DurableObjectState, env: Env) {
     super(state, env);
+
+    // Validate required environment variables
+    const requiredVars = [
+      'DATABASE_ABSTRACTOR_SERVICE_URL',
+      'DATABASE_ABSTRACTOR_SERVICE_TOKEN',
+      'THREAT_BACKEND_URL',
+      'THREAT_BACKEND_TOKEN'
+    ];
+
+    const missing = requiredVars.filter(v => !env[v as keyof Env]);
+    if (missing.length > 0) {
+      throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+    }
+
     // Pass environment variables to the container
     this.envVars = {
-      SERVER_PORT: "8080",
-      DATABASE_ABSTRACTOR_SERVICE_URL: "https://cyborg.akto.io",
-      DATABASE_ABSTRACTOR_SERVICE_TOKEN: "eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoiaW52aXRlX3VzZXIiLCJhY2NvdW50SWQiOjE3MjY2MTU0NzAsImlhdCI6MTc1MDM0NDU5MSwiZXhwIjoxNzY2MTU1NzkxfQ.gV7r0q5q7DhRuerRS9XwbrnITtxfxHqnY-9MIVfji67JWwbjdWUF5igFU5DQDNdDsmLFCNyixBW21Mf99tVEZPSlxcHZfPDKH-Epa3TLy_0Z3Ale82_kowkOH1-WFo9-2CZJ59vs1sue7HoflXxbiag4Yx8nKnjD92tcJq-YVByezV8MTSTKYzojyxlykNzO-6OLDdbU9DqofkGuD8ct6x47erawsvpzcLmyR0UttTNVETLE-ULwkVS0YipKVisckrRjy-BqY_dVBXSnA_Yo9_fUBKi__tdNGcNvgTf3d40ISwq58kcjujAq4VNRJeP6nyNtHQa5oFmo2SCOI1pIdA",
-      AGENT_GUARD_ENGINE_URL: "https://akto-agent-guard-engine.billing-53a.workers.dev",
-      THREAT_BACKEND_URL: "https://tbs.akto.io",
-      THREAT_BACKEND_TOKEN: "eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoiaW52aXRlX3VzZXIiLCJhY2NvdW50SWQiOjE3MjY2MTU0NzAsImlhdCI6MTc1MDM0NDU5MSwiZXhwIjoxNzY2MTU1NzkxfQ.gV7r0q5q7DhRuerRS9XwbrnITtxfxHqnY-9MIVfji67JWwbjdWUF5igFU5DQDNdDsmLFCNyixBW21Mf99tVEZPSlxcHZfPDKH-Epa3TLy_0Z3Ale82_kowkOH1-WFo9-2CZJ59vs1sue7HoflXxbiag4Yx8nKnjD92tcJq-YVByezV8MTSTKYzojyxlykNzO-6OLDdbU9DqofkGuD8ct6x47erawsvpzcLmyR0UttTNVETLE-ULwkVS0YipKVisckrRjy-BqY_dVBXSnA_Yo9_fUBKi__tdNGcNvgTf3d40ISwq58kcjujAq4VNRJeP6nyNtHQa5oFmo2SCOI1pIdA",
-      LOG_LEVEL: "info",
-      GIN_MODE: "release",
+      SERVER_PORT: env.SERVER_PORT || "8080",
+      DATABASE_ABSTRACTOR_SERVICE_URL: env.DATABASE_ABSTRACTOR_SERVICE_URL!,
+      DATABASE_ABSTRACTOR_SERVICE_TOKEN: env.DATABASE_ABSTRACTOR_SERVICE_TOKEN!,
+      AGENT_GUARD_ENGINE_URL: env.AGENT_GUARD_ENGINE_URL || "",
+      THREAT_BACKEND_URL: env.THREAT_BACKEND_URL!,
+      THREAT_BACKEND_TOKEN: env.THREAT_BACKEND_TOKEN!,
+      LOG_LEVEL: env.LOG_LEVEL || "info",
+      GIN_MODE: env.GIN_MODE || "release",
     };
   }
 }
@@ -35,15 +49,32 @@ export interface Env {
 }
 
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const url = new URL(request.url);
-    if (url.pathname === "/health") {
-      return new Response("OK", { status: 200 });
+  async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
+    try {
+      const url = new URL(request.url);
+
+      // Health check endpoint
+      if (url.pathname === "/health") {
+        return new Response("OK", { status: 200 });
+      }
+
+      // Get container instance and forward request
+      const stub = getContainer(env.BACKEND, "main");
+      await stub.startAndWaitForPorts();
+      const response = await stub.fetch(request);
+      return response;
+    } catch (error) {
+      console.error("Error handling request:", error);
+      return new Response(
+        JSON.stringify({
+          error: "Internal Server Error",
+          message: error instanceof Error ? error.message : "Unknown error"
+        }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        }
+      );
     }
-    
-    const stub = getContainer(env.BACKEND, "main");
-    await stub.startAndWaitForPorts();
-    const response = await stub.fetch(request);
-    return response;
   },
 };
