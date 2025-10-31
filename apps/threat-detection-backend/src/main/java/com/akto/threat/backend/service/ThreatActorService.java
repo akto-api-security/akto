@@ -190,6 +190,10 @@ public class ThreatActorService {
             .append("latestSubCategory", new Document("$first", "$filterId"))
         ));
 
+        if (!filter.getHostsList().isEmpty()) {
+            pipeline.add(new Document("$match", new Document("latestApiHost", new Document("$in", filter.getHostsList()))));
+        }
+
         // Facet: count and paginated result
         List<Document> facetStages = Arrays.asList(
             new Document("$sort", new Document("discoveredAt", sort.getOrDefault("discoveredAt", -1))),
