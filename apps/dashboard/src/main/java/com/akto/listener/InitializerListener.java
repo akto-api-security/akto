@@ -428,6 +428,7 @@ public class InitializerListener implements ServletContextListener {
                             return;
                         }
                         createFirstUnauthenticatedApiGroup();
+                        backFillStatusCodeType();
                     }
                 }, "update-api-groups");
             }
@@ -3039,6 +3040,10 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private static void backFillStatusCodeType() {
+        int accountId = Context.accountId.get();
+        if(accountId == 1718042191 || accountId == 1736798101){
+            return;
+        }
         long count = ApiInfoDao.instance.count(Filters.exists(ApiInfo.API_TYPE, false));
         if (count == 0) {
             logger.warnAndAddToDb("No need to run backFillStatusCodeType");
