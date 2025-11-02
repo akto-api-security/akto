@@ -1,12 +1,87 @@
 import { Box } from '@shopify/polaris'
 import ReactMarkdown from 'react-markdown'
 import { useState, useEffect } from 'react'
+import EventStreamComponent from './EventStreamComponent'
+
+// Function to separate event stream content from regular content
+const separateContent = (msg) => {
+    if (!msg || typeof msg !== 'string') return { hasEventStream: false, eventStream: '', regular: msg }
+    
+    const lines = msg.split('\n')
+    let eventStreamLines = []
+    let regularLines = []
+    let inEventStream = false
+    let eventStreamStartIndex = -1
+    
+    // Find where event stream starts
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim()
+        console.log(line)
+        if (line.startsWith('event:') || line.startsWith('data:')) {
+            if (!inEventStream) {
+                inEventStream = true
+                eventStreamStartIndex = i
+            }
+            eventStreamLines.push(lines[i])
+        } else if (inEventStream) {
+            if (line === '') {
+                // Empty line might be part of event stream
+                eventStreamLines.push(lines[i])
+            } else if (line.startsWith('event:') || line.startsWith('data:')) {
+                // Continue event stream
+                eventStreamLines.push(lines[i])
+            } else {
+                inEventStream = false;
+            }
+        } else {
+            // Regular content before event stream
+            regularLines.push(lines[i])
+        }
+    }
+    
+    // If we found event stream content, check if it's valid
+    if (eventStreamLines.length > 0) {
+        const eventStreamText = eventStreamLines.join('\n')
+        const hasValidEventStream = eventStreamText.includes('event:') && eventStreamText.includes('data:')
+        
+        if (hasValidEventStream) {
+            return {
+                hasEventStream: true,
+                eventStream: eventStreamText,
+                regular: regularLines.join('\n').trim()
+            }
+        }
+    }
+    
+    // Check if entire message is event stream
+    const hasEventLines = lines.some(line => line.trim().startsWith('event:'))
+    const hasDataLines = lines.some(line => line.trim().startsWith('data:'))
+    
+    if (hasEventLines && hasDataLines) {
+        return {
+            hasEventStream: true,
+            eventStream: msg,
+            regular: ''
+        }
+    }
+    
+    return { hasEventStream: false, eventStream: '', regular: msg }
+}
 
 function AIMessage({ message, isStreaming = false }) {
     const [displayedMessage, setDisplayedMessage] = useState('')
     const [showTypingIndicator, setShowTypingIndicator] = useState(false)
+    const [isEventStream, setIsEventStream] = useState(false)
+    const [eventStreamContent, setEventStreamContent] = useState('')
+    const [regularContent, setRegularContent] = useState('')
 
     useEffect(() => {
+        // Separate event stream content from regular content
+        const { hasEventStream, eventStream, regular } = separateContent(message)
+        setIsEventStream(hasEventStream)
+        setEventStreamContent(eventStream)
+        setRegularContent(regular)
+
         if (isStreaming) {
             setShowTypingIndicator(true)
             // Simulate streaming effect by gradually revealing the message
@@ -51,45 +126,54 @@ function AIMessage({ message, isStreaming = false }) {
                         </span>
                     </Box>
                     <Box style={{ flex: 1, paddingTop: '2px', minWidth: 0, width: '100%' }}>
-                        <div className="markdown-content">
-                            <ReactMarkdown
-                                components={{
-                                    h1: ({ children }) => <h1 className="markdown-h1">{children}</h1>,
-                                    h2: ({ children }) => <h2 className="markdown-h2">{children}</h2>,
-                                    h3: ({ children }) => <h3 className="markdown-h3">{children}</h3>,
-                                    h4: ({ children }) => <h4 className="markdown-h4">{children}</h4>,
-                                    p: ({ children }) => <p className="markdown-p">{children}</p>,
-                                    ul: ({ children }) => <ul className="markdown-ul">{children}</ul>,
-                                    ol: ({ children }) => <ol className="markdown-ol">{children}</ol>,
-                                    li: ({ children }) => <li className="markdown-li">{children}</li>,
-                                    code: ({ children, className }) => {
-                                        const isInline = !className;
-                                        return isInline ? (
-                                            <code className="markdown-inline-code">{children}</code>
-                                        ) : (
-                                            <code className="markdown-code-block">{children}</code>
-                                        );
-                                    },
-                                    pre: ({ children }) => <pre className="markdown-pre">{children}</pre>,
-                                    blockquote: ({ children }) => <blockquote className="markdown-blockquote">{children}</blockquote>,
-                                    strong: ({ children }) => <strong className="markdown-strong">{children}</strong>,
-                                    em: ({ children }) => <em className="markdown-em">{children}</em>,
-                                    a: ({ children, href }) => <a href={href} className="markdown-link" target="_blank" rel="noopener noreferrer">{children}</a>
-                                }}
-                            >
-                                {displayedMessage}
-                            </ReactMarkdown>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            {regularContent && (
+                                <div className="markdown-content">
+                                    <ReactMarkdown
+                                        components={{
+                                            h1: ({ children }) => <h1 className="markdown-h1">{children}</h1>,
+                                            h2: ({ children }) => <h2 className="markdown-h2">{children}</h2>,
+                                            h3: ({ children }) => <h3 className="markdown-h3">{children}</h3>,
+                                            h4: ({ children }) => <h4 className="markdown-h4">{children}</h4>,
+                                            p: ({ children }) => <p className="markdown-p">{children}</p>,
+                                            ul: ({ children }) => <ul className="markdown-ul">{children}</ul>,
+                                            ol: ({ children }) => <ol className="markdown-ol">{children}</ol>,
+                                            li: ({ children }) => <li className="markdown-li">{children}</li>,
+                                            code: ({ children, className }) => {
+                                                const isInline = !className;
+                                                return isInline ? (
+                                                    <code className="markdown-inline-code">{children}</code>
+                                                ) : (
+                                                    <code className="markdown-code-block">{children}</code>
+                                                );
+                                            },
+                                            pre: ({ children }) => <pre className="markdown-pre">{children}</pre>,
+                                            blockquote: ({ children }) => <blockquote className="markdown-blockquote">{children}</blockquote>,
+                                            strong: ({ children }) => <strong className="markdown-strong">{children}</strong>,
+                                            em: ({ children }) => <em className="markdown-em">{children}</em>,
+                                            a: ({ children, href }) => <a href={href} className="markdown-link" target="_blank" rel="noopener noreferrer">{children}</a>
+                                        }}
+                                    >
+                                        {isStreaming ? displayedMessage : regularContent}
+                                    </ReactMarkdown>
+                                </div>
+                            )}
+                            
+                            {isEventStream && eventStreamContent && (
+                                <EventStreamComponent eventStream={eventStreamContent} />
+                            )}
+
+                            {showTypingIndicator && !isEventStream && (
+                                <span style={{
+                                    display: 'inline-block',
+                                    width: '8px',
+                                    height: '16px',
+                                    backgroundColor: '#10a37f',
+                                    marginLeft: '4px',
+                                    animation: 'blink 1s infinite'
+                                }} />
+                            )}
                         </div>
-                        {showTypingIndicator && (
-                            <span style={{
-                                display: 'inline-block',
-                                width: '8px',
-                                height: '16px',
-                                backgroundColor: '#10a37f',
-                                marginLeft: '4px',
-                                animation: 'blink 1s infinite'
-                            }} />
-                        )}
                     </Box>
                 </div>
             </div>
