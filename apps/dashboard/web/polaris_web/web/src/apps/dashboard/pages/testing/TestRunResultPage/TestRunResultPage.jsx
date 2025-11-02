@@ -117,10 +117,10 @@ function TestRunResultPage(props) {
     
   }
 
-  async function createJiraTicketApiCall(hostStr, endPointStr, issueUrl, issueDescription, issueTitle, testingIssueId,projId, issueType, additionalIssueFields) {
+  async function createJiraTicketApiCall(hostStr, endPointStr, issueUrl, issueDescription, issueTitle, testingIssueId,projId, issueType, additionalIssueFields, labels) {
     
     const jiraMetaData = {
-      issueTitle,hostStr,endPointStr,issueUrl,issueDescription,testingIssueId, additionalIssueFields
+      issueTitle,hostStr,endPointStr,issueUrl,issueDescription,testingIssueId, additionalIssueFields, labels
     }
     let jiraInteg = await api.createJiraTicket(jiraMetaData, projId, issueType);
     return jiraInteg.jiraTicketKey
@@ -157,7 +157,7 @@ function TestRunResultPage(props) {
     setLoading(false);
   }, 500)
 }
-  async function createJiraTicket(issueId, projId, issueType){
+  async function createJiraTicket(issueId, projId, issueType, labels){
 
     if (Object.keys(issueId).length === 0) {
       return
@@ -195,7 +195,7 @@ function TestRunResultPage(props) {
       return;
     }
 
-    await createJiraTicketApiCall("Host - "+hostName, pathname, window.location.href, description, issueTitle, issueId, projId, issueType, additionalIssueFields).then(async(res)=> {
+    await createJiraTicketApiCall("Host - "+hostName, pathname, window.location.href, description, issueTitle, issueId, projId, issueType, additionalIssueFields, labels).then(async(res)=> {
       if(res?.errorMessage) {
         setToast(true, true, res?.errorMessage)
       }

@@ -190,6 +190,7 @@ function IssuesPage() {
     const [serviceNowModalActive, setServiceNowModalActive] = useState(false)
     const [serviceNowTables, setServiceNowTables] = useState([])
     const [serviceNowTable, setServiceNowTable] = useState('')
+    const [labelsText, setLabelsText] = useState('')
 
     // Compulsory description modal states
     const [compulsoryDescriptionModal, setCompulsoryDescriptionModal] = useState(false)
@@ -323,10 +324,15 @@ function IssuesPage() {
             });
         }
 
-    const handleSaveJiraAction = () => {
+    const handleSaveJiraAction = (issueId, labels) => {
         let jiraMetaData;
         try {
             jiraMetaData = issuesFunctions.prepareAdditionalIssueFieldsJiraMetaData(projId, issueType);
+            // Use labels parameter if provided, otherwise fall back to state
+            const labelsToUse = labels !== undefined ? labels : labelsText;
+            if (labelsToUse && labelsToUse.trim()) {
+                jiraMetaData.labels = labelsToUse.trim();
+            }
         } catch (error) {
             setToast(true, true, "Please fill all required fields before creating a Jira ticket.");
             resetResourcesSelected()
@@ -938,6 +944,8 @@ function IssuesPage() {
                 setIssueType={setIssueType}
                 projId={projId}
                 issueType={issueType}
+                labelsText={labelsText}
+                setLabelsText={setLabelsText}
             />
 
             <JiraTicketCreationModal

@@ -282,10 +282,14 @@ function CompliancePage() {
 
     filtersOptions = func.getCollectionFilters(filtersOptions)
 
-    const handleSaveJiraAction = () => {
+    const handleSaveJiraAction = (issueId, labels) => {
         let jiraMetaData;
         try {
             jiraMetaData = issuesFunctions.prepareAdditionalIssueFieldsJiraMetaData(projId, issueType);
+            // Use labels parameter if provided
+            if (labels !== undefined && labels && labels.trim()) {
+                jiraMetaData.labels = labels.trim();
+            }
         } catch (error) {
             setToast(true, true, "Please fill all required fields before creating a Jira ticket.");
             resetResourcesSelected()
