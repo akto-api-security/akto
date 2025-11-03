@@ -249,7 +249,7 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
         }
     }, [actionItemsData, jiraTicketUrlMap, onCountChange]);
 
-    const handleSaveJiraAction = () => {
+    const handleSaveJiraAction = (issueId, labels) => {
         if (!selectedActionItem) {
             navigate(JIRA_INTEGRATION_URL);
             return;
@@ -257,13 +257,16 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
 
         setModalActive(false);
         const { title, displayName, description, actionItemType } = selectedActionItem;
+        // Use labels parameter if provided, otherwise fall back to state
+        const labelsToUse = labels !== undefined ? labels : labelsText;
 
         issuesApi.createGeneralJiraTicket({
             title: title || displayName || 'Action Item',
             description: description || '',
             projId,
             issueType,
-            actionItemType: actionItemType || ''
+            actionItemType: actionItemType || '',
+            labels: labelsToUse || ''
         }).then((res) => {
             if (res?.errorMessage) {
                 navigate(JIRA_INTEGRATION_URL);

@@ -1,5 +1,5 @@
-import { FormLayout, Modal, Text, VerticalStack } from '@shopify/polaris'
-import React, { useEffect, useState } from 'react'
+import { FormLayout, Modal, Text, TextField, VerticalStack } from '@shopify/polaris'
+import React, { useEffect, useState, useCallback } from 'react'
 import DropdownSearch from './DropdownSearch'
 import IssuesStore from '@/apps/dashboard/pages/issues/issuesStore';
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
@@ -21,9 +21,10 @@ const DisplayJiraCreateIssueFields = ({ displayJiraIssueFieldMetadata }) => {
     )
 }
 
-const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handleSaveAction, jiraProjectMaps, setProjId, setIssueType, projId, issueType, issueId, isAzureModal, isServiceNowModal }) => {
+const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handleSaveAction, jiraProjectMaps, setProjId, setIssueType, projId, issueType, issueId, isAzureModal, isServiceNowModal, labelsText, setLabelsText }) => {
     const [isCreatingTicket, setIsCreatingTicket] = useState(false)
     const [displayJiraIssueFieldMetadata, setDisplayJiraIssueFieldMetadata] = useState([])
+    const [localLabelsText, setLocalLabelsText] = useState(labelsText || "")
 
     const createJiraIssueFieldMetaData = IssuesStore((state) => state.createJiraIssueFieldMetaData)
     const setDisplayJiraIssueFieldValues = IssuesStore((state) => state.setDisplayJiraIssueFieldValues)
@@ -58,6 +59,17 @@ const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handl
         }
     }, [isAzureModal, isServiceNowModal, projId, issueType, createJiraIssueFieldMetaData])
 
+    // Reset local state when modal opens
+    useEffect(() => {
+        if (modalActive) {
+            setLocalLabelsText(labelsText || "");
+        }
+    }, [modalActive, labelsText])
+
+    const handleLabelsChange = useCallback((val) => {
+        setLocalLabelsText(val);
+    }, [])
+
     return (
         <Modal
             activator={activator}
@@ -68,8 +80,13 @@ const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handl
             primaryAction={{
                 content: (isAzureModal ? 'Create work item' : 'Create ticket'),
                 onAction: () => {
+                    // Sync local labels to parent before saving
+                    if (setLabelsText) {
+                        setLabelsText(localLabelsText);
+                    }
                     setIsCreatingTicket(true)
-                    handleSaveAction(issueId)
+                    // Pass labels directly to handleSaveAction to avoid async state issues
+                    handleSaveAction(issueId, localLabelsText)
                     setIsCreatingTicket(false)
                     setModalActive(false)
                 },
@@ -120,6 +137,14 @@ const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handl
                                     displayJiraIssueFieldMetadata={displayJiraIssueFieldMetadata}
                                 />
                             )}
+                            {!isAzureModal && setLabelsText &&
+                                <TextField 
+                                    onChange={handleLabelsChange} 
+                                    value={localLabelsText} 
+                                    placeholder={"Labels (comma separated)"}
+                                    autoComplete="off"
+                                />
+                            }
                         </>
                     )}
                 </VerticalStack>

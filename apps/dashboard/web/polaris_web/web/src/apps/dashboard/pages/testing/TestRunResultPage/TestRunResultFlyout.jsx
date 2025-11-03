@@ -52,6 +52,7 @@ function TestRunResultFlyout(props) {
 
     const [vulnerabilityAnalysisError, setVulnerabilityAnalysisError] = useState(null)
     const [refreshFlag, setRefreshFlag] = useState(Date.now().toString())
+    const [labelsText, setLabelsText] = useState("")
     
     const fetchRemediationInfo = useCallback (async (testId) => {
         if (testId && testId.length > 0) {
@@ -164,9 +165,11 @@ function TestRunResultFlyout(props) {
         setModalActive(!modalActive)
     }
 
-    const handleSaveAction = (id) => {
+    const handleSaveAction = (id, labels) => {
         if(projId.length > 0 && issueType.length > 0){
-            createJiraTicket(id, projId, issueType)
+            // Use labels parameter if provided, otherwise fall back to state
+            const labelsToUse = labels !== undefined ? labels : labelsText;
+            createJiraTicket(id, projId, issueType, labelsToUse)
             setModalActive(false)
         }else{
             func.setToast(true, true, "Invalid project id or issue type")
@@ -348,6 +351,8 @@ function TestRunResultFlyout(props) {
                                 projId={projId}
                                 issueType={issueType}
                                 issueId={issueDetails.id}
+                                labelsText={labelsText}
+                                setLabelsText={setLabelsText}
                             />
                             <JiraTicketCreationModal
                                 activator={window.AZURE_BOARDS_INTEGRATED === 'true' ? <Button id={"create-azure-boards-ticket-button"} primary onClick={handleAzureBoardClick} disabled={azureBoardsWorkItemUrl !== "" || window.AZURE_BOARDS_INTEGRATED !== "true"}>Create Work Item</Button> : <></>}
