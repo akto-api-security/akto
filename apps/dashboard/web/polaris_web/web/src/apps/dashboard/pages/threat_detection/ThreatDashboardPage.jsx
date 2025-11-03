@@ -1,7 +1,8 @@
 import React, { useEffect, useReducer, useState, useCallback } from 'react'
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
-import { Box, DataTable, HorizontalGrid, Text, VerticalStack, Badge } from '@shopify/polaris';
+import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Text, VerticalStack, Badge } from '@shopify/polaris';
 import SummaryCard from '../dashboard/new_components/SummaryCard';
+import { ArrowUpMinor, ArrowDownMinor } from '@shopify/polaris-icons';
 import InfoCard from '../dashboard/new_components/InfoCard';
 import SpinnerCentered from '../../components/progress/SpinnerCentered';
 import SmoothAreaChart from '../dashboard/new_components/SmoothChart'
@@ -228,22 +229,18 @@ function ThreatDashboardPage() {
     
 
     function generateChangeIndicator(currentValue, previousValue) {
-        // Skip comparison for "all time" filter
-        if (currDateRange.alias === 'allTime') {
-            return null
-        }
-        
-        // Check for null/undefined, but allow 0 as a valid value
-        if (currentValue == null || previousValue == null) return null
+        if (!currentValue || !previousValue) return null
         const delta = currentValue - previousValue
         if (delta === 0) return null
         
-        const color = "critical"
+        const icon = delta > 0 ? ArrowUpMinor : ArrowDownMinor
+        const color = delta > 0 ? "success" : "critical"
         
         return (
-            <Text color={color}>
-                {delta > 0 ? '+' : '-'}{observeFunc.formatNumberWithCommas(Math.abs(delta))}
-            </Text>
+            <HorizontalStack wrap={false}>
+                <Icon source={icon} color={color} />
+                <Text color={color}>{Math.abs(delta)}</Text>
+            </HorizontalStack>
         )
     }
 
