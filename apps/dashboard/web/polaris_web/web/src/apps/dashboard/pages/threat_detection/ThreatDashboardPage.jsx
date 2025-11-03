@@ -421,7 +421,7 @@ function ThreatDashboardPage() {
 
     const row5Cards = (
         <HorizontalGrid gap={5} columns={2}>
-            {/* {threatStatusCard} */}
+            {threatStatusCard}
             {severityDistributionCard}
         </HorizontalGrid>
     )
