@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
@@ -7,17 +8,19 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
-import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import lombok.Getter;
 import lombok.Setter;
+import okhttp3.Headers;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
+import org.apache.commons.collections.MapUtils;
 import org.json.JSONObject;
 
 @Getter
@@ -61,80 +64,63 @@ public class LLMAction extends ActionSupport {
     Map<String, Object> llmResponsePayload;
 
     public String getLLMResponse() {
-
-        MediaType mediaType = MediaType.parse("application/json");
-
-        if (llmPayload == null || llmPayload.isEmpty()) {
-            logger.error("LLM payload is empty or null");
-            return Action.ERROR.toUpperCase();
-        }
-
-        JSONObject payload = new JSONObject(llmPayload);
-
-        RequestBody body = RequestBody.create(payload.toString(), mediaType);
-        Request request = new Request.Builder()
-            .url(OLLAMA_SERVER_ENDPOINT)
-            .method("POST", body)
-            .addHeader("Content-Type", "application/json")
-            .build();
-
-        try (Response response = client.newCall(request).execute()) {
-            logger.debug("llmPayload: {}",  gson.toJson(llmPayload));
-            if (!response.isSuccessful() || response.body() == null) {
-                logger.error("Request failed with status code: {} and response: {}",
-                    response.code(), response.body() != null ? response.body().string() : "null");
-                return Action.ERROR.toUpperCase();
-            }
-            llmResponsePayload = new Gson().fromJson(response.body().string(),
-                new TypeToken<Map<String, Object>>() {
-                }.getType());
-            logger.debug("LLM Response: {}", llmResponsePayload);
-            return Action.SUCCESS.toUpperCase();
-        } catch (Exception e) {
-            logger.error("Error while executing request: " + e.getMessage());
-            return Action.ERROR.toUpperCase();
-        }
+        return executeLLMRequest(OLLAMA_SERVER_ENDPOINT, null);
     }
 
     public String getLLMResponseV2() {
+        Map<String, String> headers = new HashMap<>();
+        headers.put("api-key", AZURE_OPENAI_API_KEY);
+        return executeLLMRequest(AZURE_OPENAI_ENDPOINT, headers);
+    }
+
+    private String executeLLMRequest(String endpoint, Map<String, String> additionalHeaders) {
         MediaType mediaType = MediaType.parse("application/json");
-        
+
         if (llmPayload == null || llmPayload.isEmpty()) {
             logger.error("LLM payload is empty or null");
             return Action.ERROR.toUpperCase();
         }
 
         JSONObject payload = new JSONObject(llmPayload);
-
-
         RequestBody body = RequestBody.create(payload.toString(), mediaType);
-        Request request = new Request.Builder()
-            .url(AZURE_OPENAI_ENDPOINT)
-            .method("POST", body)
-            .addHeader("Content-Type", "application/json")
-            .addHeader("api-key", AZURE_OPENAI_API_KEY)
-            .build();
+
+        Request.Builder requestBuilder = new Request.Builder()
+            .url(endpoint)
+            .method(Method.POST.name(), body)
+            .addHeader("Content-Type", "application/json");
+
+        // Add any additional headers
+        if (MapUtils.isNotEmpty(additionalHeaders)) {
+            for (Map.Entry<String, String> entry : additionalHeaders.entrySet()) {
+                requestBuilder.addHeader(entry.getKey(), entry.getValue());
+            }
+        }
+
+        Request request = requestBuilder.build();
 
         try (Response response = client.newCall(request).execute()) {
+            logger.debug("llmPayload: {}", gson.toJson(llmPayload));
             if (!response.isSuccessful()) {
                 logger.error("LLM Request failed with status code: {} and response: {}",
                     response.code(), response.body() != null ? response.body().string() : "null");
                 return Action.ERROR.toUpperCase();
             }
+
             ResponseBody responseBody = response.body();
             String rawResponse = responseBody != null ? responseBody.string() : null;
 
             if (rawResponse == null) {
-                return null;
+                logger.error("Response body is null");
+                return Action.ERROR.toUpperCase();
             }
 
-            llmResponsePayload = new Gson().fromJson(rawResponse, new TypeToken<Map<String, Object>>() {
-            }.getType());
+            llmResponsePayload = gson.fromJson(rawResponse,
+                new TypeToken<Map<String, Object>>() {}.getType());
             logger.debug("LLM Response: {}", llmResponsePayload);
             return Action.SUCCESS.toUpperCase();
-        } catch (IOException e) {
+        } catch (Exception e) {
             logger.error("Error while executing request: " + e.getMessage());
-            return null;
+            return Action.ERROR.toUpperCase();
         }
     }
 
