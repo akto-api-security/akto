@@ -62,31 +62,8 @@ function ThreatDashboardPage() {
         try {
             // Row 1: Summary metrics - Use getDailyThreatActorsCount API
             let summaryResponse = null
-            let previousPeriodResponse = null
-            
-            // Skip previous period for "all time" filter
-            const isAllTime = currDateRange.alias === 'allTime'
-            
             try {
-                if (isAllTime) {
-                    // For "all time", only fetch current period
-                    summaryResponse = await api.getDailyThreatActorsCount(startTimestamp, endTimestamp, [])
-                } else {
-                    // Always compare to 7 days before the selected filter period
-                    // For example: if "Last 2 months" (60 days) selected, compare current 60 days to the 7 days before that period
-                    const sevenDaysInSeconds = 7 * 24 * 60 * 60
-                    const previousPeriodEndTimestamp = startTimestamp - 1
-                    const previousPeriodStartTimestamp = previousPeriodEndTimestamp - sevenDaysInSeconds
-                    
-                    // Fetch both current period and 7 days before period in parallel
-                    const results = await Promise.all([
-                        api.getDailyThreatActorsCount(startTimestamp, endTimestamp, []),
-                        api.getDailyThreatActorsCount(previousPeriodStartTimestamp, previousPeriodEndTimestamp, [])
-                    ])
-                    summaryResponse = results[0]
-                    previousPeriodResponse = results[1]
-                }
-                
+                summaryResponse = await api.getDailyThreatActorsCount(startTimestamp, endTimestamp, [])
                 if (summaryResponse) {
                     // Use actorsCounts latest entry for active actors similar to ThreatSummary.jsx
                     let activeActorsValue = summaryResponse.totalActive || 0
@@ -94,15 +71,6 @@ function ThreatDashboardPage() {
                         const last = summaryResponse.actorsCounts[summaryResponse.actorsCounts.length - 1]
                         if (last && typeof last.totalActors !== 'undefined') {
                             activeActorsValue = last.totalActors
-                        }
-                    }
-
-                    // Calculate previous period active actors
-                    let previousActiveActorsValue = previousPeriodResponse?.totalActive || 0
-                    if (previousPeriodResponse?.actorsCounts && Array.isArray(previousPeriodResponse.actorsCounts) && previousPeriodResponse.actorsCounts.length > 0) {
-                        const last = previousPeriodResponse.actorsCounts[previousPeriodResponse.actorsCounts.length - 1]
-                        if (last && typeof last.totalActors !== 'undefined') {
-                            previousActiveActorsValue = last.totalActors
                         }
                     }
 
@@ -114,10 +82,10 @@ function ThreatDashboardPage() {
                             activeThreats: activeActorsValue,
                         },
                         previousPeriod: {
-                            totalAnalysed: previousPeriodResponse?.totalAnalysed || 0,
-                            totalAttacks: previousPeriodResponse?.totalAttacks || 0,
-                            totalCriticalActors: previousPeriodResponse?.totalCriticalActors || 0,
-                            activeThreats: previousActiveActorsValue,
+                            totalAnalysed: 0,
+                            totalAttacks: 0,
+                            totalCriticalActors: 0,
+                            activeThreats: 0,
                         }
                     })
                 }
