@@ -38,6 +38,7 @@ public class LLMAction extends ActionSupport {
     private static final String OLLAMA_SERVER_ENDPOINT = buildLlmServerUrl();
 
     // Azure Open AI urls
+    private static final String AZURE_API_ENDPOINT = "%s/openai/deployments/%s/chat/completions?api-version=%s";
     private static final String AZURE_OPENAI_HOST = System.getenv("AZURE_OPENAI_HOST");
     private static final String AZURE_OPENAI_DEPLOYMENT = System.getenv("AZURE_OPENAI_DEPLOYMENT");
     private static final String AZURE_OPENAI_API_KEY = System.getenv("AZURE_OPENAI_API_KEY");
@@ -139,11 +140,9 @@ public class LLMAction extends ActionSupport {
             ? AZURE_OPENAI_API_VERSION
             : "2024-04-01-preview";
 
-        String endpoint = String.format("%s/openai/deployments/%s/chat/completions?api-version=%s",
-            AZURE_OPENAI_HOST, AZURE_OPENAI_DEPLOYMENT, apiVersion);
+        String endpoint = String.format(AZURE_API_ENDPOINT, AZURE_OPENAI_HOST, AZURE_OPENAI_DEPLOYMENT, apiVersion);
 
         logger.debug("Azure OpenAI endpoint: " + endpoint);
         return endpoint;
     }
-
 }
