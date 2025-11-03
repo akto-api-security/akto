@@ -23,10 +23,18 @@ function ThreatDashboardPage() {
     
     // Summary metrics state
     const [summaryMetrics, setSummaryMetrics] = useState({
-        totalAnalysed: 0,
-        totalAttacks: 0,
-        totalCriticalActors: 0,
-        activeThreats: 0,
+        currentPeriod: {
+            totalAnalysed: 0,
+            totalAttacks: 0,
+            totalCriticalActors: 0,
+            activeThreats: 0,
+        },
+        previousPeriod: {
+            totalAnalysed: 0,
+            totalAttacks: 0,
+            totalCriticalActors: 0,
+            activeThreats: 0,
+        }
     })
 
 
@@ -54,8 +62,31 @@ function ThreatDashboardPage() {
         try {
             // Row 1: Summary metrics - Use getDailyThreatActorsCount API
             let summaryResponse = null
+            let previousPeriodResponse = null
+            
+            // Skip previous period for "all time" filter
+            const isAllTime = currDateRange.alias === 'allTime'
+            
             try {
-                summaryResponse = await api.getDailyThreatActorsCount(startTimestamp, endTimestamp, [])
+                if (isAllTime) {
+                    // For "all time", only fetch current period
+                    summaryResponse = await api.getDailyThreatActorsCount(startTimestamp, endTimestamp, [])
+                } else {
+                    // Always compare to 7 days before the selected filter period
+                    // For example: if "Last 2 months" (60 days) selected, compare current 60 days to the 7 days before that period
+                    const sevenDaysInSeconds = 7 * 24 * 60 * 60
+                    const previousPeriodEndTimestamp = startTimestamp - 1
+                    const previousPeriodStartTimestamp = previousPeriodEndTimestamp - sevenDaysInSeconds
+                    
+                    // Fetch both current period and 7 days before period in parallel
+                    const results = await Promise.all([
+                        api.getDailyThreatActorsCount(startTimestamp, endTimestamp, []),
+                        api.getDailyThreatActorsCount(previousPeriodStartTimestamp, previousPeriodEndTimestamp, [])
+                    ])
+                    summaryResponse = results[0]
+                    previousPeriodResponse = results[1]
+                }
+                
                 if (summaryResponse) {
                     // Use actorsCounts latest entry for active actors similar to ThreatSummary.jsx
                     let activeActorsValue = summaryResponse.totalActive || 0
@@ -66,21 +97,36 @@ function ThreatDashboardPage() {
                         }
                     }
 
+                    // Calculate previous period active actors
+                    let previousActiveActorsValue = previousPeriodResponse?.totalActive || 0
+                    if (previousPeriodResponse?.actorsCounts && Array.isArray(previousPeriodResponse.actorsCounts) && previousPeriodResponse.actorsCounts.length > 0) {
+                        const last = previousPeriodResponse.actorsCounts[previousPeriodResponse.actorsCounts.length - 1]
+                        if (last && typeof last.totalActors !== 'undefined') {
+                            previousActiveActorsValue = last.totalActors
+                        }
+                    }
+
                     setSummaryMetrics({
-                        totalAnalysed: summaryResponse.totalAnalysed || 0,
-                        totalAttacks: summaryResponse.totalAttacks || 0,
-                        totalCriticalActors: summaryResponse.totalCriticalActors || 0,
-                        activeThreats: activeActorsValue,
+                        currentPeriod: {
+                            totalAnalysed: summaryResponse.totalAnalysed || 0,
+                            totalAttacks: summaryResponse.totalAttacks || 0,
+                            totalCriticalActors: summaryResponse.totalCriticalActors || 0,
+                            activeThreats: activeActorsValue,
+                        },
+                        previousPeriod: {
+                            totalAnalysed: previousPeriodResponse?.totalAnalysed || 0,
+                            totalAttacks: previousPeriodResponse?.totalAttacks || 0,
+                            totalCriticalActors: previousPeriodResponse?.totalCriticalActors || 0,
+                            activeThreats: previousActiveActorsValue,
+                        }
                     })
                 }
             } catch (err) {
                 //console.error('Error fetching summary counts:', err)
                 // Fall back to empty state
                 setSummaryMetrics({
-                    totalAnalysed: 0,
-                    totalAttacks: 0,
-                    totalCriticalActors: 0,
-                    activeThreats: 0
+                    currentPeriod: { totalAnalysed: 0, totalAttacks: 0, totalCriticalActors: 0, activeThreats: 0 },
+                    previousPeriod: { totalAnalysed: 0, totalAttacks: 0, totalCriticalActors: 0, activeThreats: 0 }
                 })
             }
 
@@ -194,10 +240,8 @@ function ThreatDashboardPage() {
             // Set empty states on error
             setSeverityDistribution({})
             setSummaryMetrics({
-                totalAnalysed: 0,
-                totalAttacks: 0,
-                totalCriticalActors: 0,
-                activeThreats: 0
+                currentPeriod: { totalAnalysed: 0, totalAttacks: 0, totalCriticalActors: 0, activeThreats: 0 },
+                previousPeriod: { totalAnalysed: 0, totalAttacks: 0, totalCriticalActors: 0, activeThreats: 0 }
             })
             setThreatStatusBreakdown({})
             setTopAttackedHosts([])
@@ -205,7 +249,7 @@ function ThreatDashboardPage() {
         } finally {
             setLoading(false)
         }
-    }, [startTimestamp, endTimestamp])
+    }, [startTimestamp, endTimestamp, currDateRange.alias])
 
 
     useEffect(() => {
@@ -213,35 +257,86 @@ function ThreatDashboardPage() {
     }, [fetchData])
 
 
+    function getComparisonTooltip() {
+        // Skip comparison for "all time" filter
+        if (currDateRange.alias === 'allTime') {
+            return null
+        }
+        
+        // Always compare to 7 days before the selected filter period
+        return 'Shows comparison from 7 days before the selected filter period'
+    }
 
+    function generateChangeIndicator(currentValue, previousValue) {
+        // Skip comparison for "all time" filter
+        if (currDateRange.alias === 'allTime') {
+            return null
+        }
+        
+        // Check for null/undefined, but allow 0 as a valid value
+        if (currentValue == null || previousValue == null) return null
+        const delta = currentValue - previousValue
+        if (delta === 0) return null
+        
+        const color = "critical"
+        
+        return (
+            <Text color={color}>
+                {delta > 0 ? '+' : '-'}{observeFunc.formatNumberWithCommas(Math.abs(delta))}
+            </Text>
+        )
+    }
+
+
+    const comparisonTooltip = getComparisonTooltip()
 
     const summaryCards = [
         {
-            title: 'Total Analysed',
-            data: observeFunc.formatNumberWithCommas(summaryMetrics.totalAnalysed),
+            title: 'Total Attacks',
+            data: observeFunc.formatNumberWithCommas(summaryMetrics.currentPeriod.totalAnalysed),
             variant: 'heading2xl',
-            smoothChartComponent: (<SmoothAreaChart tickPositions={[summaryMetrics.totalAnalysed]} />),
+            tooltipContent: comparisonTooltip,
+            byLineComponent: generateChangeIndicator(
+                summaryMetrics.currentPeriod.totalAnalysed, 
+                summaryMetrics.previousPeriod.totalAnalysed
+            ),
+            smoothChartComponent: (<SmoothAreaChart tickPositions={[summaryMetrics.previousPeriod.totalAnalysed, summaryMetrics.currentPeriod.totalAnalysed]} />),
         },
         {
-            title: 'Total Attacks',
-            data: observeFunc.formatNumberWithCommas(summaryMetrics.totalAttacks),
+            title: 'Successful Attacks',
+            data: observeFunc.formatNumberWithCommas(summaryMetrics.currentPeriod.totalAttacks),
             variant: 'heading2xl',
             color: 'critical',
-            smoothChartComponent: (<SmoothAreaChart tickPositions={[summaryMetrics.totalAttacks]} />),
+            tooltipContent: comparisonTooltip,
+            byLineComponent: generateChangeIndicator(
+                summaryMetrics.currentPeriod.totalAttacks, 
+                summaryMetrics.previousPeriod.totalAttacks
+            ),
+            smoothChartComponent: (<SmoothAreaChart tickPositions={[summaryMetrics.previousPeriod.totalAttacks, summaryMetrics.currentPeriod.totalAttacks]} />),
         },
         {
             title: 'Critical Actors',
-            data: observeFunc.formatNumberWithCommas(summaryMetrics.totalCriticalActors),
+            data: observeFunc.formatNumberWithCommas(summaryMetrics.currentPeriod.totalCriticalActors),
             variant: 'heading2xl',
             color: 'critical',
-            smoothChartComponent: (<SmoothAreaChart tickPositions={[summaryMetrics.totalCriticalActors]} />),
+            tooltipContent: comparisonTooltip,
+            byLineComponent: generateChangeIndicator(
+                summaryMetrics.currentPeriod.totalCriticalActors, 
+                summaryMetrics.previousPeriod.totalCriticalActors
+            ),
+            smoothChartComponent: (<SmoothAreaChart tickPositions={[summaryMetrics.previousPeriod.totalCriticalActors, summaryMetrics.currentPeriod.totalCriticalActors]} />),
         },
-        {
+        {   
             title: 'Active Actors',
-            data: observeFunc.formatNumberWithCommas(summaryMetrics.activeThreats),
+            data: observeFunc.formatNumberWithCommas(summaryMetrics.currentPeriod.activeThreats),
             variant: 'heading2xl',
             color: 'warning',
-            smoothChartComponent: (<SmoothAreaChart tickPositions={[summaryMetrics.activeThreats]} />),
+            tooltipContent: comparisonTooltip,
+            byLineComponent: generateChangeIndicator(
+                summaryMetrics.currentPeriod.activeThreats, 
+                summaryMetrics.previousPeriod.activeThreats
+            ),
+            smoothChartComponent: (<SmoothAreaChart tickPositions={[summaryMetrics.previousPeriod.activeThreats, summaryMetrics.currentPeriod.activeThreats]} />),
         }
     ]
 
