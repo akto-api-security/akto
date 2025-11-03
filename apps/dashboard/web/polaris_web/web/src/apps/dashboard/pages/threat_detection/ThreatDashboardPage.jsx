@@ -1,8 +1,7 @@
 import React, { useEffect, useReducer, useState, useCallback } from 'react'
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
-import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Text, VerticalStack, Badge } from '@shopify/polaris';
+import { Box, DataTable, HorizontalGrid, Text, VerticalStack, Badge } from '@shopify/polaris';
 import SummaryCard from '../dashboard/new_components/SummaryCard';
-import { ArrowUpMinor, ArrowDownMinor } from '@shopify/polaris-icons';
 import InfoCard from '../dashboard/new_components/InfoCard';
 import SpinnerCentered from '../../components/progress/SpinnerCentered';
 import SmoothAreaChart from '../dashboard/new_components/SmoothChart'
@@ -24,18 +23,10 @@ function ThreatDashboardPage() {
     
     // Summary metrics state
     const [summaryMetrics, setSummaryMetrics] = useState({
-        currentPeriod: {
-            totalAnalysed: 0,
-            totalAttacks: 0,
-            totalCriticalActors: 0,
-            activeThreats: 0,
-        },
-        previousPeriod: {
-            totalAnalysed: 0,
-            totalAttacks: 0,
-            totalCriticalActors: 0,
-            activeThreats: 0,
-        }
+        totalAnalysed: 0,
+        totalAttacks: 0,
+        totalCriticalActors: 0,
+        activeThreats: 0,
     })
 
 
@@ -76,27 +67,20 @@ function ThreatDashboardPage() {
                     }
 
                     setSummaryMetrics({
-                        currentPeriod: {
-                            totalAnalysed: summaryResponse.totalAnalysed || 0,
-                            totalAttacks: summaryResponse.totalAttacks || 0,
-                            totalCriticalActors: summaryResponse.totalCriticalActors || 0,
-                            activeThreats: activeActorsValue,
-                        },
-                        previousPeriod: {
-                            // These would need to come from a separate API call with previous period timestamps
-                            totalAnalysed: 0,
-                            totalAttacks: 0,
-                            totalCriticalActors: 0,
-                            activeThreats: 0,
-                        }
+                        totalAnalysed: summaryResponse.totalAnalysed || 0,
+                        totalAttacks: summaryResponse.totalAttacks || 0,
+                        totalCriticalActors: summaryResponse.totalCriticalActors || 0,
+                        activeThreats: activeActorsValue,
                     })
                 }
             } catch (err) {
                 //console.error('Error fetching summary counts:', err)
                 // Fall back to empty state
                 setSummaryMetrics({
-                    currentPeriod: { totalAnalysed: 0, totalAttacks: 0, totalCriticalActors: 0, activeThreats: 0 },
-                    previousPeriod: { totalAnalysed: 0, totalAttacks: 0, totalCriticalActors: 0, activeThreats: 0 }
+                    totalAnalysed: 0,
+                    totalAttacks: 0,
+                    totalCriticalActors: 0,
+                    activeThreats: 0
                 })
             }
 
@@ -210,8 +194,10 @@ function ThreatDashboardPage() {
             // Set empty states on error
             setSeverityDistribution({})
             setSummaryMetrics({
-                currentPeriod: { totalAnalysed: 0, totalAttacks: 0, totalCriticalActors: 0, activeThreats: 0 },
-                previousPeriod: { totalAnalysed: 0, totalAttacks: 0, totalCriticalActors: 0, activeThreats: 0 }
+                totalAnalysed: 0,
+                totalAttacks: 0,
+                totalCriticalActors: 0,
+                activeThreats: 0
             })
             setThreatStatusBreakdown({})
             setTopAttackedHosts([])
@@ -227,66 +213,35 @@ function ThreatDashboardPage() {
     }, [fetchData])
 
 
-    function generateChangeIndicator(currentValue, previousValue) {
-        if (!currentValue || !previousValue) return null
-        const delta = currentValue - previousValue
-        if (delta === 0) return null
-        
-        const icon = delta > 0 ? ArrowUpMinor : ArrowDownMinor
-        const color = delta > 0 ? "success" : "critical"
-        
-        return (
-            <HorizontalStack wrap={false}>
-                <Icon source={icon} color={color} />
-                <Text color={color}>{Math.abs(delta)}</Text>
-            </HorizontalStack>
-        )
-    }
 
 
     const summaryCards = [
         {
             title: 'Total Analysed',
-            data: observeFunc.formatNumberWithCommas(summaryMetrics.currentPeriod.totalAnalysed),
+            data: observeFunc.formatNumberWithCommas(summaryMetrics.totalAnalysed),
             variant: 'heading2xl',
-            byLineComponent: generateChangeIndicator(
-                summaryMetrics.currentPeriod.totalAnalysed, 
-                summaryMetrics.previousPeriod.totalAnalysed
-            ),
-            smoothChartComponent: (<SmoothAreaChart tickPositions={[summaryMetrics.previousPeriod.totalAnalysed, summaryMetrics.currentPeriod.totalAnalysed]} />),
+            smoothChartComponent: (<SmoothAreaChart tickPositions={[summaryMetrics.totalAnalysed]} />),
         },
         {
             title: 'Total Attacks',
-            data: observeFunc.formatNumberWithCommas(summaryMetrics.currentPeriod.totalAttacks),
+            data: observeFunc.formatNumberWithCommas(summaryMetrics.totalAttacks),
             variant: 'heading2xl',
             color: 'critical',
-            byLineComponent: generateChangeIndicator(
-                summaryMetrics.currentPeriod.totalAttacks, 
-                summaryMetrics.previousPeriod.totalAttacks
-            ),
-            smoothChartComponent: (<SmoothAreaChart tickPositions={[summaryMetrics.previousPeriod.totalAttacks, summaryMetrics.currentPeriod.totalAttacks]} />),
+            smoothChartComponent: (<SmoothAreaChart tickPositions={[summaryMetrics.totalAttacks]} />),
         },
         {
             title: 'Critical Actors',
-            data: observeFunc.formatNumberWithCommas(summaryMetrics.currentPeriod.totalCriticalActors),
+            data: observeFunc.formatNumberWithCommas(summaryMetrics.totalCriticalActors),
             variant: 'heading2xl',
             color: 'critical',
-            byLineComponent: generateChangeIndicator(
-                summaryMetrics.currentPeriod.totalCriticalActors, 
-                summaryMetrics.previousPeriod.totalCriticalActors
-            ),
-            smoothChartComponent: (<SmoothAreaChart tickPositions={[summaryMetrics.previousPeriod.totalCriticalActors, summaryMetrics.currentPeriod.totalCriticalActors]} />),
+            smoothChartComponent: (<SmoothAreaChart tickPositions={[summaryMetrics.totalCriticalActors]} />),
         },
         {
             title: 'Active Actors',
-            data: observeFunc.formatNumberWithCommas(summaryMetrics.currentPeriod.activeThreats),
+            data: observeFunc.formatNumberWithCommas(summaryMetrics.activeThreats),
             variant: 'heading2xl',
             color: 'warning',
-            byLineComponent: generateChangeIndicator(
-                summaryMetrics.currentPeriod.activeThreats, 
-                summaryMetrics.previousPeriod.activeThreats
-            ),
-            smoothChartComponent: (<SmoothAreaChart tickPositions={[summaryMetrics.previousPeriod.activeThreats, summaryMetrics.currentPeriod.activeThreats]} />),
+            smoothChartComponent: (<SmoothAreaChart tickPositions={[summaryMetrics.activeThreats]} />),
         }
     ]
 
