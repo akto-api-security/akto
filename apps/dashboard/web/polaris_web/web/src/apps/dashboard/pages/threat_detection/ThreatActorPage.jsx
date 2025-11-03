@@ -10,7 +10,7 @@ import { ActorDetails } from "./components/ActorDetails";
 import ThreatWorldMap from "./components/ThreatWorldMap";
 // import ThreatApiSubcategoryCount from "./components/ThreatApiSubcategoryCount";
 
-import { HorizontalGrid, VerticalStack, HorizontalStack, Checkbox, Select } from "@shopify/polaris";
+import { HorizontalGrid, VerticalStack} from "@shopify/polaris";
 import { ThreatSummary } from "./components/ThreatSummary";
 import ThreatActivityTimeline from "./components/ThreatActivityTimeline";
 import React from "react";
@@ -82,7 +82,6 @@ function ThreatActorPage() {
       title={<TitleWithInfo titleText={"Threat Actor"} />}
       isFirstPage={true}
       primaryAction={
-        <HorizontalStack gap="4" align="end">
           <DateRangeFilter
             initialDispatch={currDateRange}
             dispatch={(dateObj) =>
@@ -94,7 +93,6 @@ function ThreatActorPage() {
               })
             }
           />
-        </HorizontalStack>
       }
       components={components}
     />
