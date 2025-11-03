@@ -78,6 +78,7 @@ function TestRunResultPage(props) {
   const hostNameMap = PersistStore(state => state.hostNameMap)
 
   const [conversations, setConversations] = useState([])
+  const [showForbidden, setShowForbidden] = useState(false)
 
   const useFlyout = location.pathname.includes("test-editor") ? false : true
 
@@ -132,13 +133,31 @@ function TestRunResultPage(props) {
 
   async function fetchData() {
     if (hexId2 !== undefined) {
-      if (testingRunResult === undefined) {
-        let res = await api.fetchTestRunResultDetails(hexId2)
-        testingRunResult = res.testingRunResult;
+      try {
+        if (testingRunResult === undefined) {
+          let res = await api.fetchTestRunResultDetails(hexId2)
+          testingRunResult = res.testingRunResult;
+        }
+      } catch (error) {
+        if (error?.response?.status === 403 || error?.status === 403) {
+          setShowForbidden(true);
+          setLoading(false);
+          return;
+        }
+        throw error;
       }
-      if (runIssues === undefined) {
-        let res = await api.fetchIssueFromTestRunResultDetails(hexId2)
-        runIssues = res.runIssues;
+      try {
+        if (runIssues === undefined) {
+          let res = await api.fetchIssueFromTestRunResultDetails(hexId2)
+          runIssues = res.runIssues;
+        }
+      } catch (error) {
+        if (error?.response?.status === 403 || error?.status === 403) {
+          setShowForbidden(true);
+          setLoading(false);
+          return;
+        }
+        throw error;
       }
       if(testingRunResult?.testResults?.length > 0){
         let conversationId = testingRunResult.testResults[0].conversationId;
@@ -273,6 +292,7 @@ function TestRunResultPage(props) {
       azureBoardsWorkItemUrl={azureBoardsWorkItemUrl}
       serviceNowTicketUrl={serviceNowTicketUrl}
       conversations={conversations}
+      showForbidden={showForbidden}
     />
     </>
     :

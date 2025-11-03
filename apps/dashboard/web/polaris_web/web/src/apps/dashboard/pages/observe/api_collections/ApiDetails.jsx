@@ -22,6 +22,7 @@ import InlineEditableText from "../../../components/shared/InlineEditableText";
 import GridRows from "../../../components/shared/GridRows";
 import Dropdown from "../../../components/layouts/Dropdown";
 import ApiIssuesTab from "./ApiIssuesTab";
+import ForbiddenRole from "../../../components/shared/ForbiddenRole";
 
 import Highcharts from 'highcharts';
 import HighchartsMore from 'highcharts/highcharts-more';
@@ -85,6 +86,7 @@ function ApiDetails(props) {
     const apiStatsAvailableRef = useRef(false);
     const apiDistributionAvailableRef = useRef(false);
     const [selectedTabId, setSelectedTabId] = useState('values');
+    const [showForbidden, setShowForbidden] = useState(false);
 
     const statusFunc = getStatus ? getStatus : (x) => {
         try {
@@ -247,13 +249,22 @@ function ApiDetails(props) {
             setLoading(true)
             const { apiCollectionId, endpoint, method, description } = apiDetail
             setSelectedUrl({ url: endpoint, method: method })
-            api.checkIfDependencyGraphAvailable(apiCollectionId, endpoint, method).then((resp) => {
-                if (!resp.dependencyGraphExists) {
-                    setDisabledTabs(["dependency"])
-                } else {
-                    setDisabledTabs([])
+            
+            try {
+                await api.checkIfDependencyGraphAvailable(apiCollectionId, endpoint, method).then((resp) => {
+                    if (!resp.dependencyGraphExists) {
+                        setDisabledTabs(["dependency"])
+                    } else {
+                        setDisabledTabs([])
+                    }
+                })
+            } catch (error) {
+                if (error?.response?.status === 403 || error?.status === 403) {
+                    setShowForbidden(true);
+                    setLoading(false);
+                    return;
                 }
-            })
+            }
 
             setTimeout(() => {
                 setDescription(description == null ? "" : description)
@@ -266,8 +277,10 @@ function ApiDetails(props) {
             })
 
             let commonMessages = []
-            await api.fetchSampleData(endpoint, apiCollectionId, method).then((res) => {
-                api.fetchSensitiveSampleData(endpoint, apiCollectionId, method).then(async (resp) => {
+            try {
+                const res = await api.fetchSampleData(endpoint, apiCollectionId, method)
+                try {
+                    const resp = await api.fetchSensitiveSampleData(endpoint, apiCollectionId, method)
                     if (resp.sensitiveSampleData && Object.keys(resp.sensitiveSampleData).length > 0) {
                         if (res.sampleDataList.length > 0) {
                             commonMessages = transform.getCommonSamples(res.sampleDataList[0].samples, resp)
@@ -276,9 +289,16 @@ function ApiDetails(props) {
                         }
                     } else {
                         let sensitiveData = []
-                        await api.loadSensitiveParameters(apiCollectionId, endpoint, method).then((res3) => {
+                        try {
+                            const res3 = await api.loadSensitiveParameters(apiCollectionId, endpoint, method)
                             sensitiveData = res3.data.endpoints;
-                        })
+                        } catch (error) {
+                            if (error?.response?.status === 403 || error?.status === 403) {
+                                setShowForbidden(true);
+                                setLoading(false);
+                                return;
+                            }
+                        }
                         let samples = res.sampleDataList.map(x => x.samples)
                         samples = samples.reverse();
                         samples = samples.flat()
@@ -286,8 +306,21 @@ function ApiDetails(props) {
                         commonMessages = transform.prepareSampleData(newResp, '')
                     }
                     setSampleData(commonMessages)
-                })
-            })
+                } catch (error) {
+                    if (error?.response?.status === 403 || error?.status === 403) {
+                        setShowForbidden(true);
+                        setLoading(false);
+                        return;
+                    }
+                }
+            } catch (error) {
+                if (error?.response?.status === 403 || error?.status === 403) {
+                    setShowForbidden(true);
+                    setLoading(false);
+                    return;
+                }
+            }
+            
             setTimeout(() => {
                 setLoading(false)
             }, 100)
@@ -742,21 +775,23 @@ function ApiDetails(props) {
         </VerticalStack>
     )
 
-    const components = [
-        headingComp,
-        <LayoutWithTabs
-            key="tabs"
-            tabs={[
-                ValuesTab,
-                SchemaTab,
-                ...(hasIssues ? [IssuesTab] : []),
-                ApiCallStatsTab,
-                DependencyTab
-            ]}
-            currTab={(tab) => setSelectedTabId(tab.id)}
-            disabledTabs={disabledTabs}
-        />
-    ]
+    const components = showForbidden
+        ? [<Box padding="4" key="forbidden"><ForbiddenRole /></Box>]
+        : [
+            headingComp,
+            <LayoutWithTabs
+                key="tabs"
+                tabs={[
+                    ValuesTab,
+                    SchemaTab,
+                    ...(hasIssues ? [IssuesTab] : []),
+                    ApiCallStatsTab,
+                    DependencyTab
+                ]}
+                currTab={(tab) => setSelectedTabId(tab.id)}
+                disabledTabs={disabledTabs}
+            />
+        ]
 
     return (
         <div>
