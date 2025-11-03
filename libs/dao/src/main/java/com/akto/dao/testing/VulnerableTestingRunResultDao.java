@@ -89,9 +89,9 @@ public class VulnerableTestingRunResultDao extends TestingRunResultDao {
     }
 
     public TestingRunResult findOneWithComparison(Bson q, Bson projection) {
-        TestingRunResult tr = super.findOne(q, projection);
+        TestingRunResult tr = super.findOneNoRbacFilter(q, projection);
         if(tr == null){
-            return TestingRunResultDao.instance.findOne(q, projection);
+            return TestingRunResultDao.instance.findOneNoRbacFilter(q, projection);
         }
         return tr;
     }
