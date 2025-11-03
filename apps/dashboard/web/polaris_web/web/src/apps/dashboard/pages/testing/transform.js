@@ -438,9 +438,9 @@ const transform = {
     return details.replace(/{{percentageMatch}}/g, func.prettifyShort(percentageMatch))
   },
 
-  fillMoreInformation(category, moreInfoSections, affectedEndpoints, jiraIssueUrl, createJiraTicket) {
+  getJiraComponent(jiraIssueUrl) {
     var key = /[^/]*$/.exec(jiraIssueUrl)[0];
-    const jiraComponent = jiraIssueUrl?.length > 0 ? (
+    return jiraIssueUrl?.length > 0 ? (
       <Box>
               <Tag>
                   <HorizontalStack gap={1}>
@@ -454,6 +454,10 @@ const transform = {
                 </Tag>
           </Box>
     ) : <Text> No Jira ticket created. Click on the top right button to create a new ticket.</Text>
+  },
+
+  fillMoreInformation(category, moreInfoSections, affectedEndpoints, jiraIssueUrl, createJiraTicket) {
+    const jiraComponent = this.getJiraComponent(jiraIssueUrl)
     
     //<Box width="300px"><Button onClick={createJiraTicket} plain disabled={window.JIRA_INTEGRATED != "true"}>Click here to create a new ticket</Button></Box>
     let filledSection = []

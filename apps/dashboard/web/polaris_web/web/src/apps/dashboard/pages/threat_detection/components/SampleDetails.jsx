@@ -12,6 +12,7 @@ import TooltipText from "../../../components/shared/TooltipText";
 import ActivityTracker from "../../dashboard/components/ActivityTracker";
 import settingFunctions from "../../settings/module";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal";
+import transform from "../../testing/transform";
 
 function SampleDetails(props) {
     const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate } = props
@@ -25,14 +26,11 @@ function SampleDetails(props) {
     const [actionPopoverActive, setActionPopoverActive] = useState(false);
 
     // Jira ticket states
-    const [jiraIssueUrl, setJiraIssueUrl] = useState(props.jiraIssueUrl || "");
+    const [jiraTicketUrl, setJiraTicketUrl] = useState(props.jiraTicketUrl || "");
     const [modalActive, setModalActive] = useState(false);
     const [jiraProjectMaps, setJiraProjectMaps] = useState({});
     const [projId, setProjId] = useState("");
     const [issueType, setIssueType] = useState("");
-    const [toastActive, setToastActive] = useState(false);
-    const [toastMessage, setToastMessage] = useState("");
-    const [toastError, setToastError] = useState(false);
 
     const fetchRemediationInfo = async() => {
         if(moreInfoData?.templateId !== undefined){
@@ -64,17 +62,7 @@ function SampleDetails(props) {
                 <Divider />
                 <VerticalStack gap={"2"}>
                     <Text variant="headingMd">Jira</Text>
-                    {jiraIssueUrl ? (
-                        <Tag>
-                            <HorizontalStack gap={1}>
-                                <a href={jiraIssueUrl} target="_blank" rel="noopener noreferrer">
-                                    <Text>{jiraIssueUrl.split('/').pop()}</Text>
-                                </a>
-                            </HorizontalStack>
-                        </Tag>
-                    ) : (
-                        <Text variant="bodyMd" color="subdued">No Jira ticket created</Text>
-                    )}
+                    {transform.getJiraComponent(jiraTicketUrl)}
                 </VerticalStack>
             </VerticalStack>
         </Box>
@@ -138,6 +126,10 @@ function SampleDetails(props) {
        fetchRemediationInfo()
        aggregateActivity()
     },[moreInfoData?.templateId, data])
+
+    useEffect(() => {
+        setJiraTicketUrl(props.jiraTicketUrl || "")
+    }, [props.jiraTicketUrl])
 
     const openTest = (id) => {
         const navigateUrl = window.location.origin + "/dashboard/protection/threat-policy?policy=" + id
@@ -255,7 +247,7 @@ Reference URL: ${window.location.href}`.trim();
 
             // Update local state with the Jira ticket URL
             if (response?.jiraTicketUrl) {
-                setJiraIssueUrl(response.jiraTicketUrl);
+                setJiraTicketUrl(response.jiraTicketUrl);
                 func.setToast(true, false, "Jira Ticket Created Successfully");
             }
 
@@ -359,7 +351,7 @@ Reference URL: ${window.location.href}`.trim();
                                 <Button
                                     size="slim"
                                     onClick={handleJiraClick}
-                                    disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}
+                                    disabled={jiraTicketUrl !== "" || window.JIRA_INTEGRATED !== "true"}
                                 >
                                     Create Jira Ticket
                                 </Button>
