@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Divider, HorizontalStack, Modal, Text, Tooltip, VerticalStack, Popover, ActionList } from "@shopify/polaris";
+import { Badge, Box, Button, Divider, HorizontalStack, Modal, Text, Tooltip, VerticalStack, Popover, ActionList, Tag } from "@shopify/polaris";
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
@@ -6,9 +6,13 @@ import func from "@/util/func";
 import { useEffect, useState } from "react";
 import testingApi from "../../testing/api"
 import threatDetectionApi from "../api"
+import issuesApi from "../../issues/api"
 import MarkdownViewer from "../../../components/shared/MarkdownViewer";
 import TooltipText from "../../../components/shared/TooltipText";
 import ActivityTracker from "../../dashboard/components/ActivityTracker";
+import issuesFunctions from "../../issues/module";
+import settingFunctions from "../../settings/module";
+import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal";
 
 function SampleDetails(props) {
     const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate } = props
@@ -20,6 +24,16 @@ function SampleDetails(props) {
     const [showModal, setShowModal] = useState(false);
     const [triageLoading, setTriageLoading] = useState(false);
     const [actionPopoverActive, setActionPopoverActive] = useState(false);
+
+    // Jira ticket states
+    const [jiraIssueUrl, setJiraIssueUrl] = useState(props.jiraIssueUrl || "");
+    const [modalActive, setModalActive] = useState(false);
+    const [jiraProjectMaps, setJiraProjectMaps] = useState({});
+    const [projId, setProjId] = useState("");
+    const [issueType, setIssueType] = useState("");
+    const [toastActive, setToastActive] = useState(false);
+    const [toastMessage, setToastMessage] = useState("");
+    const [toastError, setToastError] = useState(false);
 
     const fetchRemediationInfo = async() => {
         if(moreInfoData?.templateId !== undefined){
@@ -47,6 +61,21 @@ function SampleDetails(props) {
                 <VerticalStack gap={"2"}>
                     <Text variant="headingMd">Impact</Text>
                     <Text variant="bodyMd">{currentTemplateObj?.impact || "-"}</Text>
+                </VerticalStack>
+                <Divider />
+                <VerticalStack gap={"2"}>
+                    <Text variant="headingMd">Jira</Text>
+                    {jiraIssueUrl ? (
+                        <Tag>
+                            <HorizontalStack gap={1}>
+                                <a href={jiraIssueUrl} target="_blank" rel="noopener noreferrer">
+                                    <Text>{jiraIssueUrl.split('/').pop()}</Text>
+                                </a>
+                            </HorizontalStack>
+                        </Tag>
+                    ) : (
+                        <Text variant="bodyMd" color="subdued">No Jira ticket created</Text>
+                    )}
                 </VerticalStack>
             </VerticalStack>
         </Box>
@@ -141,6 +170,111 @@ function SampleDetails(props) {
         }
     }
 
+    const handleJiraClick = async () => {
+        if (!modalActive) {
+            try {
+                const jiraIntegration = await settingFunctions.fetchJiraIntegration();
+                if (jiraIntegration.projectIdsMap !== null && Object.keys(jiraIntegration.projectIdsMap).length > 0) {
+                    setJiraProjectMaps(jiraIntegration.projectIdsMap);
+                    if (Object.keys(jiraIntegration.projectIdsMap).length > 0) {
+                        setProjId(Object.keys(jiraIntegration.projectIdsMap)[0]);
+                    }
+                } else {
+                    setProjId(jiraIntegration.projId || '');
+                    setIssueType(jiraIntegration.issueType || '');
+                }
+            } catch (error) {
+                func.setToast(true, true, "Failed to fetch Jira integration settings");
+            }
+        }
+        setModalActive(!modalActive);
+    }
+
+    const createJiraTicket = async (threatEventId, projId, issueType) => {
+        if (!threatEventId || !projId || !issueType) {
+            func.setToast(true, true, "Missing required parameters");
+            return;
+        }
+
+        try {
+            // Extract host and endpoint from URL
+            const url = moreInfoData?.url || "";
+            let hostStr = "";
+            let endPointStr = "";
+
+            try {
+                if (url.startsWith("http")) {
+                    const urlObj = new URL(url);
+                    hostStr = urlObj.host;
+                    endPointStr = urlObj.pathname;
+                } else {
+                    hostStr = url;
+                    endPointStr = url;
+                }
+            } catch (err) {
+                hostStr = url;
+                endPointStr = url;
+            }
+
+            // Build issue title and description (Jira-compatible formatting)
+            const issueTitle = currentTemplateObj?.testName || currentTemplateObj?.name || moreInfoData?.templateId;
+            const attackCount = data?.length || 0;
+            const issueDescription = `Threat Detection Alert
+
+Template ID: ${moreInfoData?.templateId}
+Severity: ${severity}
+Attack Count: ${attackCount}
+Host: ${hostStr}
+Endpoint: ${endPointStr}
+
+Description:
+${currentTemplateObj?.description || "No description available"}
+
+Details:
+${currentTemplateObj?.details || "N/A"}
+
+Impact:
+${currentTemplateObj?.impact || "N/A"}
+
+Reference URL: ${window.location.href}`.trim();
+
+            func.setToast(true, false, "Creating Jira Ticket");
+
+            // Call createGeneralJiraTicket API (similar to ActionItemsContent)
+            const response = await issuesApi.createGeneralJiraTicket({
+                title: issueTitle,
+                description: issueDescription,
+                projId,
+                issueType,
+                threatEventId: threatEventId
+            });
+
+            if (response?.errorMessage) {
+                func.setToast(true, true, response?.errorMessage);
+                return;
+            }
+
+            // Update local state with the Jira ticket URL
+            if (response?.jiraTicketUrl) {
+                setJiraIssueUrl(response.jiraTicketUrl);
+                func.setToast(true, false, "Jira Ticket Created Successfully");
+            }
+
+        } catch (error) {
+            func.setToast(true, true, "Failed to create Jira ticket");
+        }
+    }
+
+    const handleSaveAction = async () => {
+        if (!projId || !issueType) {
+            func.setToast(true, true, "Please select a project and issue type");
+            return;
+        }
+
+        await createJiraTicket(eventId, projId, issueType);
+        setModalActive(false);
+    }
+
     function TitleComponent () {
         return(
             <Box padding={"4"} paddingBlockStart={"0"} maxWidth="100%">
@@ -221,7 +355,26 @@ function SampleDetails(props) {
                                 </Text>
                             </Modal.Section>
                         </Modal>
-                        <Button size="slim" disabled>Create Jira Ticket</Button>
+                        <JiraTicketCreationModal
+                            activator={
+                                <Button
+                                    size="slim"
+                                    onClick={handleJiraClick}
+                                    disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}
+                                >
+                                    Create Jira Ticket
+                                </Button>
+                            }
+                            modalActive={modalActive}
+                            setModalActive={setModalActive}
+                            handleSaveAction={handleSaveAction}
+                            jiraProjectMaps={jiraProjectMaps}
+                            projId={projId}
+                            setProjId={setProjId}
+                            issueType={issueType}
+                            setIssueType={setIssueType}
+                            issueId={eventId}
+                        />
                     </HorizontalStack>
                 </HorizontalStack>
             </Box>

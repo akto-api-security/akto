@@ -31,6 +31,7 @@ message ListMaliciousRequestsResponse {
       bool successful_exploit = 19;
       string label = 20;  // Common values: "threat", "guardrail"
       string host = 21;   // Host header from the request
+      string jira_ticket_url = 22;  // URL of associated Jira ticket
     }
     repeated MaliciousEvent malicious_events = 1;
     uint64 total = 2;
@@ -280,7 +281,8 @@ message UpdateMaliciousEventStatusRequest {
   repeated string event_ids = 2;  // For bulk update by IDs
   optional ListMaliciousRequestsRequest.Filter filter = 3;  // For filtered update
 
-  string status = 4;  // The new status to set
+  optional string status = 4;  // The new status to set
+  optional string jira_ticket_url = 5;  // Jira ticket URL to associate with the event(s)
 }
 
 message UpdateMaliciousEventStatusResponse {

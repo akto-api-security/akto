@@ -430,7 +430,7 @@ public class DashboardRouter implements ARouter {
                 // Determine which type of update to perform
                 List<String> eventIds = null;
                 Map<String, Object> filterMap = null;
-
+                String jiraTicketUrl = null;
                 if (req.hasEventId()) {
                     // Single event update
                     eventIds = java.util.Arrays.asList(req.getEventId());
@@ -440,7 +440,11 @@ public class DashboardRouter implements ARouter {
                 } else if (req.hasFilter()) {
                     // Filtered update - convert proto filter to Map
                     filterMap = convertProtoFilterToMap(req.getFilter());
-                } else {
+                } else if (req.hasJiraTicketUrl()) {
+                    // Jira ticket URL update
+                    jiraTicketUrl = req.getJiraTicketUrl();
+                }
+                else {
                     ctx.response().setStatusCode(400).end("Must provide event_id, event_ids, or filter");
                     return;
                 }
@@ -449,7 +453,8 @@ public class DashboardRouter implements ARouter {
                     ctx.get("accountId"),
                     eventIds,
                     filterMap,
-                    req.getStatus()
+                    req.getStatus(),
+                    jiraTicketUrl
                 );
 
                 UpdateMaliciousEventStatusResponse resp = UpdateMaliciousEventStatusResponse.newBuilder()
