@@ -60,17 +60,17 @@ function ThreatApiPage() {
       title={<TitleWithInfo titleText={`${mapLabel("APIs", getDashboardCategory())} under Threat`} />}
       isFirstPage={true}
       primaryAction={
-          <DateRangeFilter
-            initialDispatch={currDateRange}
-            dispatch={(dateObj) =>
-              dispatchCurrDateRange({
-                type: "update",
-                period: dateObj.period,
-                title: dateObj.title,
-                alias: dateObj.alias,
-              })
-            }
-          />
+        <DateRangeFilter
+          initialDispatch={currDateRange}
+          dispatch={(dateObj) =>
+            dispatchCurrDateRange({
+              type: "update",
+              period: dateObj.period,
+              title: dateObj.title,
+              alias: dateObj.alias,
+            })
+          }
+        />
       }
       components={components}
     />
