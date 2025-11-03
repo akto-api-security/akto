@@ -218,15 +218,13 @@ function ThreatDashboardPage() {
         } finally {
             setLoading(false)
         }
-    }, [startTimestamp, endTimestamp, currDateRange.alias])
+    }, [startTimestamp, endTimestamp])
 
 
     useEffect(() => {
         fetchData()
     }, [fetchData])
 
-
-    
 
     function generateChangeIndicator(currentValue, previousValue) {
         if (!currentValue || !previousValue) return null
@@ -278,7 +276,7 @@ function ThreatDashboardPage() {
             ),
             smoothChartComponent: (<SmoothAreaChart tickPositions={[summaryMetrics.previousPeriod.totalCriticalActors, summaryMetrics.currentPeriod.totalCriticalActors]} />),
         },
-        {   
+        { 
             title: 'Active Actors',
             data: observeFunc.formatNumberWithCommas(summaryMetrics.currentPeriod.activeThreats),
             variant: 'heading2xl',
