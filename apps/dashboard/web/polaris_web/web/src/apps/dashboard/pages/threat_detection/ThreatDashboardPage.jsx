@@ -276,7 +276,7 @@ function ThreatDashboardPage() {
             ),
             smoothChartComponent: (<SmoothAreaChart tickPositions={[summaryMetrics.previousPeriod.totalCriticalActors, summaryMetrics.currentPeriod.totalCriticalActors]} />),
         },
-        { 
+        {
             title: 'Active Actors',
             data: observeFunc.formatNumberWithCommas(summaryMetrics.currentPeriod.activeThreats),
             variant: 'heading2xl',
