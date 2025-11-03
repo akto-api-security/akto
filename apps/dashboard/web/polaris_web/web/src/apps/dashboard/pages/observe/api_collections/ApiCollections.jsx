@@ -3,6 +3,7 @@ import { Text, Button, IndexFiltersMode, Box, Popover, ActionList, ResourceItem,
 import MCPIcon from "@/assets/MCP_Icon.svg"
 import LaptopIcon from "@/assets/Laptop.svg"
 import { HideMinor, ViewMinor,FileMinor, AutomationMajor, MagicMajor } from '@shopify/polaris-icons';
+import RegistryBadge from "../../../components/shared/RegistryBadge";
 import api from "../api"
 import dashboardApi from "../../dashboard/api"
 import settingRequests from "../../settings/api"
@@ -226,7 +227,12 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             ...((isGenAISecurityCategory() || isAgenticSecurityCategory()) && func.isDemoAccount() && tagsList.includes("gen-ai") ? {
                 iconComp: (<Box><Icon source={tagsList.includes("AI Agent") ? AutomationMajor : MagicMajor} color={"base"}/></Box>)
             } : {}),
-            displayNameComp: (<Box maxWidth="30vw"><Text truncate fontWeight="medium">{c.displayName}</Text></Box>),
+            displayNameComp: (
+                <HorizontalStack gap="2" align="center">
+                    <Box maxWidth="30vw"><Text truncate fontWeight="medium">{c.displayName}</Text></Box>
+                    {c.registryStatus === "available" && <RegistryBadge />}
+                </HorizontalStack>
+            ),
             testedEndpoints: c.urlsCount === 0 ? 0 : (coverageMap[c.id] ? coverageMap[c.id] : 0),
             sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id] : [],
             severityInfo: severityInfoMap[c.id] ? severityInfoMap[c.id] : {},

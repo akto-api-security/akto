@@ -15,6 +15,7 @@ import { Icon } from "@shopify/polaris";
 import settingRequests from "../settings/api";
 import PersistStore from "../../../main/PersistStore";
 import ConditionalApprovalModal from "../../components/modals/ConditionalApprovalModal";
+import RegistryBadge from "../../components/shared/RegistryBadge";
 
 const headings = [
     {
@@ -122,7 +123,7 @@ const resourceName = {
     plural: 'audit records',
 };
 
-const convertDataIntoTableFormat = (auditRecord, collectionName) => {
+const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegistry) => {
     let temp = {...auditRecord}
     temp['typeComp'] = (
         <MethodBox method={""} url={auditRecord?.type.toLowerCase() || "TOOL"}/>
@@ -180,7 +181,12 @@ const convertDataIntoTableFormat = (auditRecord, collectionName) => {
                 )}
             </VerticalStack>
     )
-    temp['collectionName'] = collectionName;
+    temp['collectionName'] = (
+        <HorizontalStack gap="2" align="center">
+            <Text>{collectionName}</Text>
+            {collectionRegistry === "available" && <RegistryBadge />}
+        </HorizontalStack>
+    );
     return temp;
 }
 
@@ -197,6 +203,7 @@ function AuditData() {
     const startTimestamp = getTimeEpoch("since")
     const endTimestamp = getTimeEpoch("until")
     const collectionsMap = PersistStore(state => state.collectionsMap)
+    const collectionsRegistryStatusMap = PersistStore(state => state.collectionsRegistryStatusMap)
 
     function disambiguateLabel(key, value) {
         switch (key) {
@@ -263,8 +270,14 @@ function AuditData() {
             const res = await api.fetchAuditData(sortKey, sortOrder, skip, limit, finalFilters, filterOperators)
             if (res && res.auditData) {
                 res.auditData.forEach((auditRecord) => {
+                    // Get collection name and registry status from separate maps
                     const collectionName = collectionsMap[auditRecord?.hostCollectionId] || "Unknown Collection";
-                    const dataObj = convertDataIntoTableFormat(auditRecord, collectionName)
+                    const collectionRegistryStatus = collectionsRegistryStatusMap[auditRecord?.hostCollectionId];
+                    const dataObj = convertDataIntoTableFormat(
+                        auditRecord, 
+                        collectionName, 
+                        collectionRegistryStatus
+                    )
                     ret.push(dataObj);
                 })
                 total = res.total || 0;
