@@ -60,10 +60,6 @@ function SampleDetails(props) {
                     <Text variant="bodyMd">{currentTemplateObj?.impact || "-"}</Text>
                 </VerticalStack>
                 <Divider />
-                <VerticalStack gap={"2"}>
-                    <Text variant="headingMd">Jira</Text>
-                    {transform.getJiraComponent(jiraTicketUrl)}
-                </VerticalStack>
             </VerticalStack>
         </Box>
     )
@@ -346,26 +342,30 @@ Reference URL: ${window.location.href}`.trim();
                                 </Text>
                             </Modal.Section>
                         </Modal>
-                        <JiraTicketCreationModal
-                            activator={
-                                <Button
-                                    size="slim"
-                                    onClick={handleJiraClick}
-                                    disabled={jiraTicketUrl !== "" || window.JIRA_INTEGRATED !== "true"}
-                                >
-                                    Create Jira Ticket
-                                </Button>
-                            }
-                            modalActive={modalActive}
-                            setModalActive={setModalActive}
-                            handleSaveAction={handleSaveAction}
-                            jiraProjectMaps={jiraProjectMaps}
-                            projId={projId}
-                            setProjId={setProjId}
-                            issueType={issueType}
-                            setIssueType={setIssueType}
-                            issueId={eventId}
-                        />
+                        {jiraTicketUrl ? (
+                            transform.getJiraComponent(jiraTicketUrl)
+                        ) : (
+                            <JiraTicketCreationModal
+                                activator={
+                                    <Button
+                                        size="slim"
+                                        onClick={handleJiraClick}
+                                        disabled={window.JIRA_INTEGRATED !== "true"}
+                                    >
+                                        Create Jira Ticket
+                                    </Button>
+                                }
+                                modalActive={modalActive}
+                                setModalActive={setModalActive}
+                                handleSaveAction={handleSaveAction}
+                                jiraProjectMaps={jiraProjectMaps}
+                                projId={projId}
+                                setProjId={setProjId}
+                                issueType={issueType}
+                                setIssueType={setIssueType}
+                                issueId={eventId}
+                            />
+                        )}
                     </HorizontalStack>
                 </HorizontalStack>
             </Box>
