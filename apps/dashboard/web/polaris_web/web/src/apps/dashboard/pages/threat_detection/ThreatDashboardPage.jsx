@@ -225,15 +225,7 @@ function ThreatDashboardPage() {
     }, [fetchData])
 
 
-    function getComparisonTooltip() {
-        // Skip comparison for "all time" filter
-        if (currDateRange.alias === 'allTime') {
-            return null
-        }
-        
-        // Always compare to 7 days before the selected filter period
-        return 'Shows comparison from 7 days before the selected filter period'
-    }
+    
 
     function generateChangeIndicator(currentValue, previousValue) {
         // Skip comparison for "all time" filter
@@ -256,14 +248,11 @@ function ThreatDashboardPage() {
     }
 
 
-    const comparisonTooltip = getComparisonTooltip()
-
     const summaryCards = [
         {
             title: 'Total Attacks',
             data: observeFunc.formatNumberWithCommas(summaryMetrics.currentPeriod.totalAnalysed),
             variant: 'heading2xl',
-            tooltipContent: comparisonTooltip,
             byLineComponent: generateChangeIndicator(
                 summaryMetrics.currentPeriod.totalAnalysed, 
                 summaryMetrics.previousPeriod.totalAnalysed
@@ -275,7 +264,6 @@ function ThreatDashboardPage() {
             data: observeFunc.formatNumberWithCommas(summaryMetrics.currentPeriod.totalAttacks),
             variant: 'heading2xl',
             color: 'critical',
-            tooltipContent: comparisonTooltip,
             byLineComponent: generateChangeIndicator(
                 summaryMetrics.currentPeriod.totalAttacks, 
                 summaryMetrics.previousPeriod.totalAttacks
@@ -287,7 +275,6 @@ function ThreatDashboardPage() {
             data: observeFunc.formatNumberWithCommas(summaryMetrics.currentPeriod.totalCriticalActors),
             variant: 'heading2xl',
             color: 'critical',
-            tooltipContent: comparisonTooltip,
             byLineComponent: generateChangeIndicator(
                 summaryMetrics.currentPeriod.totalCriticalActors, 
                 summaryMetrics.previousPeriod.totalCriticalActors
@@ -299,7 +286,6 @@ function ThreatDashboardPage() {
             data: observeFunc.formatNumberWithCommas(summaryMetrics.currentPeriod.activeThreats),
             variant: 'heading2xl',
             color: 'warning',
-            tooltipContent: comparisonTooltip,
             byLineComponent: generateChangeIndicator(
                 summaryMetrics.currentPeriod.activeThreats, 
                 summaryMetrics.previousPeriod.activeThreats
