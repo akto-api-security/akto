@@ -1,8 +1,7 @@
 import React, { useEffect, useReducer, useState, useCallback } from 'react'
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
-import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Text, VerticalStack, Badge } from '@shopify/polaris';
+import { Box, DataTable, HorizontalGrid, Text, VerticalStack, Badge } from '@shopify/polaris';
 import SummaryCard from '../dashboard/new_components/SummaryCard';
-import { ArrowUpMinor, ArrowDownMinor } from '@shopify/polaris-icons';
 import InfoCard from '../dashboard/new_components/InfoCard';
 import SpinnerCentered from '../../components/progress/SpinnerCentered';
 import SmoothAreaChart from '../dashboard/new_components/SmoothChart'
@@ -11,7 +10,6 @@ import { produce } from 'immer';
 import func from '@/util/func';
 import values from "@/util/values";
 import ChartypeComponent from '../testing/TestRunsPage/ChartypeComponent';
-import dummyData from './dummyData';
 import observeFunc from '../observe/transform';
 import ThreatWorldMap from './components/ThreatWorldMap';
 import ThreatSankeyChart from './components/ThreatSankeyChart';
@@ -64,8 +62,31 @@ function ThreatDashboardPage() {
         try {
             // Row 1: Summary metrics - Use getDailyThreatActorsCount API
             let summaryResponse = null
+            let previousPeriodResponse = null
+            
+            // Skip previous period for "all time" filter
+            const isAllTime = currDateRange.alias === 'allTime'
+            
             try {
-                summaryResponse = await api.getDailyThreatActorsCount(startTimestamp, endTimestamp, [])
+                if (isAllTime) {
+                    // For "all time", only fetch current period
+                    summaryResponse = await api.getDailyThreatActorsCount(startTimestamp, endTimestamp, [])
+                } else {
+                    // Always compare to 7 days before the selected filter period
+                    // For example: if "Last 2 months" (60 days) selected, compare current 60 days to the 7 days before that period
+                    const sevenDaysInSeconds = 7 * 24 * 60 * 60
+                    const previousPeriodEndTimestamp = startTimestamp - 1
+                    const previousPeriodStartTimestamp = previousPeriodEndTimestamp - sevenDaysInSeconds
+                    
+                    // Fetch both current period and 7 days before period in parallel
+                    const results = await Promise.all([
+                        api.getDailyThreatActorsCount(startTimestamp, endTimestamp, []),
+                        api.getDailyThreatActorsCount(previousPeriodStartTimestamp, previousPeriodEndTimestamp, [])
+                    ])
+                    summaryResponse = results[0]
+                    previousPeriodResponse = results[1]
+                }
+                
                 if (summaryResponse) {
                     // Use actorsCounts latest entry for active actors similar to ThreatSummary.jsx
                     let activeActorsValue = summaryResponse.totalActive || 0
@@ -73,6 +94,15 @@ function ThreatDashboardPage() {
                         const last = summaryResponse.actorsCounts[summaryResponse.actorsCounts.length - 1]
                         if (last && typeof last.totalActors !== 'undefined') {
                             activeActorsValue = last.totalActors
+                        }
+                    }
+
+                    // Calculate previous period active actors
+                    let previousActiveActorsValue = previousPeriodResponse?.totalActive || 0
+                    if (previousPeriodResponse?.actorsCounts && Array.isArray(previousPeriodResponse.actorsCounts) && previousPeriodResponse.actorsCounts.length > 0) {
+                        const last = previousPeriodResponse.actorsCounts[previousPeriodResponse.actorsCounts.length - 1]
+                        if (last && typeof last.totalActors !== 'undefined') {
+                            previousActiveActorsValue = last.totalActors
                         }
                     }
 
@@ -84,12 +114,10 @@ function ThreatDashboardPage() {
                             activeThreats: activeActorsValue,
                         },
                         previousPeriod: {
-                            // These would need to come from a separate API call with previous period timestamps
-                            // For now, using dummy data or setting to 0
-                            totalAnalysed: 0,
-                            totalAttacks: 0,
-                            totalCriticalActors: 0,
-                            activeThreats: 0,
+                            totalAnalysed: previousPeriodResponse?.totalAnalysed || 0,
+                            totalAttacks: previousPeriodResponse?.totalAttacks || 0,
+                            totalCriticalActors: previousPeriodResponse?.totalCriticalActors || 0,
+                            activeThreats: previousActiveActorsValue,
                         }
                     })
                 }
@@ -104,9 +132,37 @@ function ThreatDashboardPage() {
 
             // Row 2: Sankey Chart and Map use APIs (handled in their components)
             
-            // Row 3: Threat Status - use dummy data for now
-            const statusData = dummyData.getThreatStatusData()
-            setThreatStatusBreakdown(statusData)
+            // Row 3: Threat Status - Use actual data from backend
+            if (summaryResponse) {
+                const totalActive = summaryResponse.totalActiveStatus || 0
+                const totalIgnored = summaryResponse.totalIgnoredStatus || 0
+                const totalUnderReview = summaryResponse.totalUnderReviewStatus || 0
+                const total = totalActive + totalIgnored + totalUnderReview
+
+                const statusData = {
+                    "Active": {
+                        "text": totalActive,
+                        "color": observeFunc.getColorForStatus("Active"),
+                        "filterKey": "Active"
+                    },
+                    "Under Review": {
+                        "text": totalUnderReview,
+                        "color": observeFunc.getColorForStatus("UNDER_REVIEW"),
+                        "filterKey": "Under Review"
+                    },
+                    "Ignored": {
+                        "text": totalIgnored,
+                        "color": observeFunc.getColorForStatus("Ignored"),
+                        "filterKey": "Ignored"
+                    },
+                    "Total": {
+                        "text": total,
+                        "color": observeFunc.getColorForStatus("Total"),
+                        "filterKey": "Total"
+                    }
+                }
+                setThreatStatusBreakdown(statusData)
+            }
 
             // Severity Distribution - Use API
             try {
@@ -193,7 +249,7 @@ function ThreatDashboardPage() {
         } finally {
             setLoading(false)
         }
-    }, [startTimestamp, endTimestamp])
+    }, [startTimestamp, endTimestamp, currDateRange.alias])
 
 
     useEffect(() => {
@@ -201,28 +257,45 @@ function ThreatDashboardPage() {
     }, [fetchData])
 
 
+    function getComparisonTooltip() {
+        // Skip comparison for "all time" filter
+        if (currDateRange.alias === 'allTime') {
+            return null
+        }
+        
+        // Always compare to 7 days before the selected filter period
+        return 'Shows comparison from 7 days before the selected filter period'
+    }
+
     function generateChangeIndicator(currentValue, previousValue) {
-        if (!currentValue || !previousValue) return null
+        // Skip comparison for "all time" filter
+        if (currDateRange.alias === 'allTime') {
+            return null
+        }
+        
+        // Check for null/undefined, but allow 0 as a valid value
+        if (currentValue == null || previousValue == null) return null
         const delta = currentValue - previousValue
         if (delta === 0) return null
         
-        const icon = delta > 0 ? ArrowUpMinor : ArrowDownMinor
-        const color = delta > 0 ? "success" : "critical"
+        const color = "critical"
         
         return (
-            <HorizontalStack wrap={false}>
-                <Icon source={icon} color={color} />
-                <Text color={color}>{Math.abs(delta)}</Text>
-            </HorizontalStack>
+            <Text color={color}>
+                {delta > 0 ? '+' : '-'}{observeFunc.formatNumberWithCommas(Math.abs(delta))}
+            </Text>
         )
     }
 
+
+    const comparisonTooltip = getComparisonTooltip()
 
     const summaryCards = [
         {
             title: 'Total Attacks',
             data: observeFunc.formatNumberWithCommas(summaryMetrics.currentPeriod.totalAnalysed),
             variant: 'heading2xl',
+            tooltipContent: comparisonTooltip,
             byLineComponent: generateChangeIndicator(
                 summaryMetrics.currentPeriod.totalAnalysed, 
                 summaryMetrics.previousPeriod.totalAnalysed
@@ -234,6 +307,7 @@ function ThreatDashboardPage() {
             data: observeFunc.formatNumberWithCommas(summaryMetrics.currentPeriod.totalAttacks),
             variant: 'heading2xl',
             color: 'critical',
+            tooltipContent: comparisonTooltip,
             byLineComponent: generateChangeIndicator(
                 summaryMetrics.currentPeriod.totalAttacks, 
                 summaryMetrics.previousPeriod.totalAttacks
@@ -245,17 +319,19 @@ function ThreatDashboardPage() {
             data: observeFunc.formatNumberWithCommas(summaryMetrics.currentPeriod.totalCriticalActors),
             variant: 'heading2xl',
             color: 'critical',
+            tooltipContent: comparisonTooltip,
             byLineComponent: generateChangeIndicator(
                 summaryMetrics.currentPeriod.totalCriticalActors, 
                 summaryMetrics.previousPeriod.totalCriticalActors
             ),
             smoothChartComponent: (<SmoothAreaChart tickPositions={[summaryMetrics.previousPeriod.totalCriticalActors, summaryMetrics.currentPeriod.totalCriticalActors]} />),
         },
-        {
+        {   
             title: 'Active Actors',
             data: observeFunc.formatNumberWithCommas(summaryMetrics.currentPeriod.activeThreats),
             variant: 'heading2xl',
             color: 'warning',
+            tooltipContent: comparisonTooltip,
             byLineComponent: generateChangeIndicator(
                 summaryMetrics.currentPeriod.activeThreats, 
                 summaryMetrics.previousPeriod.activeThreats
