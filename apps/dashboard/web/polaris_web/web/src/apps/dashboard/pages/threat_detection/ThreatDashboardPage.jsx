@@ -11,7 +11,6 @@ import { produce } from 'immer';
 import func from '@/util/func';
 import values from "@/util/values";
 import ChartypeComponent from '../testing/TestRunsPage/ChartypeComponent';
-import dummyData from './dummyData';
 import observeFunc from '../observe/transform';
 import ThreatWorldMap from './components/ThreatWorldMap';
 import ThreatSankeyChart from './components/ThreatSankeyChart';
@@ -85,7 +84,6 @@ function ThreatDashboardPage() {
                         },
                         previousPeriod: {
                             // These would need to come from a separate API call with previous period timestamps
-                            // For now, using dummy data or setting to 0
                             totalAnalysed: 0,
                             totalAttacks: 0,
                             totalCriticalActors: 0,
@@ -104,9 +102,37 @@ function ThreatDashboardPage() {
 
             // Row 2: Sankey Chart and Map use APIs (handled in their components)
             
-            // Row 3: Threat Status - use dummy data for now
-            const statusData = dummyData.getThreatStatusData()
-            setThreatStatusBreakdown(statusData)
+            // Row 3: Threat Status - Use actual data from backend
+            if (summaryResponse) {
+                const totalActive = summaryResponse.totalActiveStatus || 0
+                const totalIgnored = summaryResponse.totalIgnoredStatus || 0
+                const totalUnderReview = summaryResponse.totalUnderReviewStatus || 0
+                const total = totalActive + totalIgnored + totalUnderReview
+
+                const statusData = {
+                    "Active": {
+                        "text": totalActive,
+                        "color": observeFunc.getColorForStatus("Active"),
+                        "filterKey": "Active"
+                    },
+                    "Under Review": {
+                        "text": totalUnderReview,
+                        "color": observeFunc.getColorForStatus("UNDER_REVIEW"),
+                        "filterKey": "Under Review"
+                    },
+                    "Ignored": {
+                        "text": totalIgnored,
+                        "color": observeFunc.getColorForStatus("Ignored"),
+                        "filterKey": "Ignored"
+                    },
+                    "Total": {
+                        "text": total,
+                        "color": observeFunc.getColorForStatus("Total"),
+                        "filterKey": "Total"
+                    }
+                }
+                setThreatStatusBreakdown(statusData)
+            }
 
             // Severity Distribution - Use API
             try {
