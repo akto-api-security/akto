@@ -94,6 +94,8 @@ import com.akto.dao.SetupDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.SuspectSampleDataDao;
 import com.akto.dao.UsersDao;
+import com.akto.dao.MaliciousEventDao;
+import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.loaders.LoadersDao;
@@ -1096,18 +1098,21 @@ public class InitializerListener implements ServletContextListener {
         ChangesInfo ci = getChangesInfo(now - webhook.getLastSentTimestamp(), now - webhook.getLastSentTimestamp(), webhook.getNewEndpointCollections(), webhook.getNewSensitiveEndpointCollections(), true);
 
         boolean sendApiThreats = false;
-        List<SuspectSampleData> suspectSampleData = new ArrayList<>();
+        List<MaliciousEventDto> maliciousEvents = new ArrayList<>();
         if (webhook.getSelectedWebhookOptions() != null) {
             for (WebhookOptions option : webhook.getSelectedWebhookOptions()) {
                 if (WebhookOptions.API_THREAT_PAYLOADS.equals(option)) {
                     // Fetch one record to see if data exists
-                    suspectSampleData = SuspectSampleDataDao.instance.findAll(
-                            Filters.and(
-                                    Filters.gte(SuspectSampleData._DISCOVERED, webhook.getLastSentTimestamp()),
-                                    Filters.lt(SuspectSampleData._DISCOVERED, now)),
-                            0, 1, Sorts.descending(SuspectSampleData._DISCOVERED, Constants.ID),
-                            Projections.exclude(SuspectSampleData._SAMPLE));
-                    if (suspectSampleData != null && !suspectSampleData.isEmpty()) {
+                    String accountId = String.valueOf(Context.accountId.get());
+                    maliciousEvents = MaliciousEventDao.instance.getCollection(accountId)
+                            .find(Filters.and(
+                                    Filters.gte("detectedAt", webhook.getLastSentTimestamp()),
+                                    Filters.lt("detectedAt", now),
+                                    Filters.eq("successfulExploit", true)))
+                            .sort(Sorts.descending("detectedAt", Constants.ID))
+                            .limit(1)
+                            .into(new ArrayList<>());
+                    if (maliciousEvents != null && !maliciousEvents.isEmpty()) {
                         sendApiThreats = true;
                     }
                     break;
@@ -1116,13 +1121,16 @@ public class InitializerListener implements ServletContextListener {
         } 
 
         if (webhook.getBody() != null && !sendApiThreats) {
-            suspectSampleData = SuspectSampleDataDao.instance.findAll(
-                    Filters.and(
-                            Filters.gte(SuspectSampleData._DISCOVERED, webhook.getLastSentTimestamp()),
-                            Filters.lt(SuspectSampleData._DISCOVERED, now)),
-                    0, 1, Sorts.descending(SuspectSampleData._DISCOVERED, Constants.ID),
-                    Projections.exclude(SuspectSampleData._SAMPLE));
-            if (suspectSampleData != null && !suspectSampleData.isEmpty()) {
+            String accountId = String.valueOf(Context.accountId.get());
+            maliciousEvents = MaliciousEventDao.instance.getCollection(accountId)
+                    .find(Filters.and(
+                            Filters.gte("detectedAt", webhook.getLastSentTimestamp()),
+                            Filters.lt("detectedAt", now),
+                            Filters.eq("successfulExploit", true)))
+                    .sort(Sorts.descending("detectedAt", Constants.ID))
+                    .limit(1)
+                    .into(new ArrayList<>());
+            if (maliciousEvents != null && !maliciousEvents.isEmpty()) {
                 sendApiThreats = webhook.getBody().contains("AKTO.changes_info.apiThreatPayloads");
             }
         }
@@ -1130,7 +1138,7 @@ public class InitializerListener implements ServletContextListener {
         if ((ci == null ||
                 (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() +
                         ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0)
-                && (suspectSampleData == null || suspectSampleData.isEmpty())) {
+                && (maliciousEvents == null || maliciousEvents.isEmpty())) {
             return;
         }
 
@@ -1151,26 +1159,32 @@ public class InitializerListener implements ServletContextListener {
 
         if(sendApiThreats){
 
-            final int DATA_LIMIT = webhook.getBatchSize() > 0 ? webhook.getBatchSize() : 50;
+            final int DATA_LIMIT = webhook.getBatchSize() > 0 ? Math.min(webhook.getBatchSize(), 20) : 20;
             int skip = 0;
             final int lastSentTimestamp = webhook.getLastSentTimestamp();
+            String accountId = String.valueOf(Context.accountId.get());
 
             do {
                 try {
-                    suspectSampleData = SuspectSampleDataDao.instance.findAll(
-                            Filters.and(
-                                    Filters.gte(SuspectSampleData._DISCOVERED, lastSentTimestamp),
-                                    Filters.lt(SuspectSampleData._DISCOVERED, now)),
-                            skip, DATA_LIMIT, Sorts.descending(SuspectSampleData._DISCOVERED, Constants.ID));
+                    maliciousEvents = MaliciousEventDao.instance.getCollection(accountId)
+                            .find(Filters.and(
+                                    Filters.gte("detectedAt", lastSentTimestamp),
+                                    Filters.lt("detectedAt", now),
+                                    Filters.eq("successfulExploit", true)))
+                            .sort(Sorts.descending("detectedAt", Constants.ID))
+                            .projection(Projections.exclude("latestApiOrig"))
+                            .skip(skip)
+                            .limit(DATA_LIMIT)
+                            .into(new ArrayList<>());
 
-                    if (suspectSampleData != null && !suspectSampleData.isEmpty()) {
-                        valueMap.put("AKTO.changes_info.apiThreatPayloads", suspectSampleData);
+                    if (maliciousEvents != null && !maliciousEvents.isEmpty()) {
+                        valueMap.put("AKTO.changes_info.apiThreatPayloads", maliciousEvents);
                         actuallySendWebhook(webhook, valueMap, now);
                     }
                     skip += DATA_LIMIT;
                     valueMap.clear();
 
-                    if ((suspectSampleData != null && suspectSampleData.size() < DATA_LIMIT) ||
+                    if ((maliciousEvents != null && maliciousEvents.size() < DATA_LIMIT) ||
                     // In case of a dry run / run once, we only want to send data once.
                             webhook.getFrequencyInSeconds() == 0) {
                         break;
@@ -1180,7 +1194,7 @@ public class InitializerListener implements ServletContextListener {
                             LogDb.DASHBOARD);
                 }
 
-            } while(suspectSampleData != null && !suspectSampleData.isEmpty());
+            } while(maliciousEvents != null && !maliciousEvents.isEmpty());
 
         } else {
             actuallySendWebhook(webhook, valueMap, now);
@@ -1189,9 +1203,21 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private static final ObjectMapper mapper = new ObjectMapper();
-    private static String createMicrosoftTeamsWorkflowWebhookPayload(CustomWebhook webhook, Map<String, Object> valueMap){
-        StringBuilder body = new StringBuilder();
-        body.append("{\n" +
+    
+    private static String escapeJsonString(String str) {
+        if (str == null) {
+            return "";
+        }
+        return str.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\b", "\\b")
+                .replace("\f", "\\f")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
+    }
+
+    private static String TEAMS_WEBHOOK_OPENING_BODY = "{\n" +
                 "    \"type\": \"message\",\n" +
                 "    \"attachments\": [\n" +
                 "        {\n" +
@@ -1201,7 +1227,18 @@ public class InitializerListener implements ServletContextListener {
                 "                \"$schema\": \"http://adaptivecards.io/schemas/adaptive-card.json\",\n" +
                 "                \"version\": \"1.5\",\n" +
                 "\"msteams\": { \"width\": \"full\" }," +
-                "                \"body\": [");
+                "                \"body\": [";
+    
+    private static String TEAMS_WEBHOOK_CLOSING_BODY = "]\n" +
+                "            }\n" +
+                "        }\n" +
+                "    ]\n" +
+                "}\n" +
+                "";
+
+    private static String createMicrosoftTeamsWorkflowWebhookPayload(CustomWebhook webhook, Map<String, Object> valueMap){
+        StringBuilder body = new StringBuilder();
+        body.append(TEAMS_WEBHOOK_OPENING_BODY);
         
         if (webhook.getSelectedWebhookOptions() != null) {
             for (WebhookOptions webhookOption : webhook.getSelectedWebhookOptions()) {
@@ -1210,109 +1247,170 @@ public class InitializerListener implements ServletContextListener {
                 String name = webhookOption.getOptionName();
     
                 Object value = valueMap.get(replaceString);
-                if (value instanceof List) {
-                    body.append("        {\n" +
-                            "            \"type\": \"TextBlock\",\n" +
-                            "            \"text\": \"" + name + "\",\n" +
-                            "            \"wrap\": true\n" +
-                            "        },");
-                    
-                    List<Object> list = (List<Object>) value;
-                    boolean headerAdded = false;
-    
-                    for (Object obj : list) {
-                        Map<String, Object> data = mapper.convertValue(obj, HashMap.class);
-                        
-                        if (!headerAdded) {
-                            // Add the table headers (first row)
-                            body.append("        {\n" +
-                                    "            \"type\": \"Table\",\n" +
-                                    "            \"columns\": [\n");
-    
-                            for (String key : data.keySet()) {
-                                if(key=="id" || key=="sample"){
-                                    continue;
-                                }
-
-                                body.append("                {\"width\": 1},\n");
-                            }
-    
-                            body.append("            ],\n" +
-                                    "            \"rows\": [\n" +
-                                    "                {\n" +
-                                    "                    \"type\": \"TableRow\",\n" +
-                                    "                    \"cells\": [\n");
-    
-                            // Add header row (keys)
-                            for (String key : data.keySet()) {
-                                if(key=="id" || key=="sample"){
-                                    continue;
-                                }
-                                body.append("                        {\n" +
-                                        "                            \"type\": \"TableCell\",\n" +
-                                        "                            \"items\": [\n" +
-                                        "                                {\n" +
-                                        "                                    \"type\": \"TextBlock\",\n" +
-                                        "                                    \"text\": \"" + key + "\",\n" +
-                                        "                                    \"wrap\": true\n" +
-                                        "                                }\n" +
-                                        "                            ]\n" +
-                                        "                        },\n");
-                            }
-    
-                            body.append("                    ]\n" +
-                                    "                },\n");
-    
-                            headerAdded = true;
-                        }
-    
-                        // Add each data row (values)
-                        body.append("                {\n" +
-                                "                    \"type\": \"TableRow\",\n" +
-                                "                    \"cells\": [\n");
-    
-                        for (Entry<String,Object> entry : data.entrySet()) {
-                            if(entry.getKey()=="id" || entry.getKey()=="sample"){
-                                continue;
-                            }
-                            body.append("                        {\n" +
-                                    "                            \"type\": \"TableCell\",\n" +
-                                    "                            \"items\": [\n" +
-                                    "                                {\n" +
-                                    "                                    \"type\": \"TextBlock\",\n" +
-                                    "                                    \"text\": \"" + entry.getValue() + "\",\n" +
-                                    "                                    \"wrap\": true\n" +
-                                    "                                }\n" +
-                                    "                            ]\n" +
-                                    "                        },\n");
-                        }
-    
-                        body.append("                    ]\n" +
-                                "                },\n");
-                    }
-    
-                    // Close the table structure
-                    body.append("            ]\n" +
-                            "        },\n");
-                    
-                } else {
-                    body.append("        {\n" +
-                            "            \"type\": \"TextBlock\",\n" +
-                            "            \"text\": \"" + name + "\",\n" +
-                            "            \"wrap\": true\n" +
-                            "        },");
+                if(replaceString.equals("AKTO.changes_info.apiThreatPayloads")){
+                    buildApiThreatsTeamsWebhookBody(body, name, value);
+                } else{
+                    buildNormalTeamsWebhookBody(body, name, value);
                 }
             }
         }
     
-        body.append("]\n" +
-                "            }\n" +
-                "        }\n" +
-                "    ]\n" +
-                "}\n" +
-                "");
+        body.append(TEAMS_WEBHOOK_CLOSING_BODY);
     
         return body.toString();
+    }
+
+    private static void buildNormalTeamsWebhookBody(StringBuilder body, String name, Object value) {
+        if (value instanceof List) {
+            body.append("        {\n" +
+                    "            \"type\": \"TextBlock\",\n" +
+                    "            \"text\": \"" + name + "\",\n" +
+                    "            \"wrap\": true\n" +
+                    "        },");
+            
+            List<Object> list = (List<Object>) value;
+            boolean headerAdded = false;
+   
+            for (Object obj : list) {
+                Map<String, Object> data = mapper.convertValue(obj, HashMap.class);
+                
+                if (!headerAdded) {
+                    // Add the table headers (first row)
+                    body.append("        {\n" +
+                            "            \"type\": \"Table\",\n" +
+                            "            \"columns\": [\n");
+   
+                    for (String key : data.keySet()) {
+                        if(key=="id" || key=="sample"){
+                            continue;
+                        }
+
+                        body.append("                {\"width\": 1},\n");
+                    }
+   
+                    body.append("            ],\n" +
+                            "            \"rows\": [\n" +
+                            "                {\n" +
+                            "                    \"type\": \"TableRow\",\n" +
+                            "                    \"cells\": [\n");
+   
+                    // Add header row (keys)
+                    for (String key : data.keySet()) {
+                        if(key=="id" || key=="sample"){
+                            continue;
+                        }
+                        body.append("                        {\n" +
+                                "                            \"type\": \"TableCell\",\n" +
+                                "                            \"items\": [\n" +
+                                "                                {\n" +
+                                "                                    \"type\": \"TextBlock\",\n" +
+                                "                                    \"text\": \"" + key + "\",\n" +
+                                "                                    \"wrap\": true\n" +
+                                "                                }\n" +
+                                "                            ]\n" +
+                                "                        },\n");
+                    }
+   
+                    body.append("                    ]\n" +
+                            "                },\n");
+   
+                    headerAdded = true;
+                }
+   
+                // Add each data row (values)
+                body.append("                {\n" +
+                        "                    \"type\": \"TableRow\",\n" +
+                        "                    \"cells\": [\n");
+   
+                for (Entry<String,Object> entry : data.entrySet()) {
+                    if(entry.getKey()=="id" || entry.getKey()=="sample"){
+                        continue;
+                    }
+                    body.append("                        {\n" +
+                            "                            \"type\": \"TableCell\",\n" +
+                            "                            \"items\": [\n" +
+                            "                                {\n" +
+                            "                                    \"type\": \"TextBlock\",\n" +
+                            "                                    \"text\": \"" + entry.getValue() + "\",\n" +
+                            "                                    \"wrap\": true\n" +
+                            "                                }\n" +
+                            "                            ]\n" +
+                            "                        },\n");
+                }
+   
+                body.append("                    ]\n" +
+                        "                },\n");
+            }
+   
+            // Close the table structure
+            body.append("            ]\n" +
+                    "        },\n");
+            
+        } else {
+            body.append("        {\n" +
+                    "            \"type\": \"TextBlock\",\n" +
+                    "            \"text\": \"" + name + "\",\n" +
+                    "            \"wrap\": true\n" +
+                    "        },");
+        }
+    }
+    
+
+    private static void buildApiThreatsTeamsWebhookBody(StringBuilder body, String name, Object value) {
+        if (value instanceof List) {
+            body.append("        {\n" +
+                    "            \"type\": \"TextBlock\",\n" +
+                    "            \"text\": \"" + escapeJsonString(name) + "\",\n" +
+                    "            \"weight\": \"bolder\",\n" +
+                    "            \"wrap\": true\n" +
+                    "        },");
+            
+            List<Object> list = (List<Object>) value;
+            boolean isFirstItem = true;
+
+            for (Object obj : list) {
+                Map<String, Object> data = mapper.convertValue(obj, HashMap.class);
+                
+                // Create a FactSet for each object (better for key-value pairs)
+                body.append("        {\n" +
+                        "            \"type\": \"FactSet\",\n" +
+                        (isFirstItem ? "" : "            \"separator\": true,\n            \"spacing\": \"extraLarge\",\n") +
+                        "            \"facts\": [\n");
+                
+                boolean firstFact = true;
+                for (Entry<String, Object> entry : data.entrySet()) {
+                    String key = entry.getKey();
+                    if ("id".equals(key) || "sample".equals(key) || "metadata".equals(key)) {
+                        continue;
+                    }
+                    
+                    if (!firstFact) {
+                        body.append(",\n");
+                    }
+                    
+                    Object val = entry.getValue();
+                    String valueStr = val == null ? "" : val.toString();
+                    
+                    body.append("                {\n" +
+                            "                    \"title\": \"" + escapeJsonString(key) + ":\",\n" +
+                            "                    \"value\": \"" + escapeJsonString(valueStr) + "\"\n" +
+                            "                }");
+                    firstFact = false;
+                }
+                
+                body.append("\n            ]\n" +
+                        "        },\n");
+                isFirstItem = false;
+            }
+            
+        } else {
+            String valueStr = value == null ? "" : value.toString();
+            body.append("        {\n" +
+                    "            \"type\": \"TextBlock\",\n" +
+                    "            \"text\": \"" + escapeJsonString(name) + ": " + escapeJsonString(valueStr) + "\",\n" +
+                    "            \"wrap\": true\n" +
+                    "        },");
+        }
     }
         
     private static void actuallySendWebhook(CustomWebhook webhook, Map<String, Object> valueMap, int now){
@@ -1389,7 +1487,7 @@ public class InitializerListener implements ServletContextListener {
                     }
                 }, "webhook-sender");
             }
-        }, 0, 1, TimeUnit.HOURS);
+        }, 0, 1, TimeUnit.MINUTES);
     }
 
     static class ChangesInfo {
@@ -2446,52 +2544,52 @@ public class InitializerListener implements ServletContextListener {
                 SingleTypeInfo.init();
 
                 int now = Context.now();
-                if (runJobFunctions || runJobFunctionsAnyway) {
+                if (true || runJobFunctionsAnyway) {
 
                     logger.debug("Starting init functions and scheduling jobs at " + now);
 
                     AccountTask.instance.executeTask(new Consumer<Account>() {
                         @Override
                         public void accept(Account account) {
-                            runInitializerFunctions();
+                            // runInitializerFunctions();
                         }
                     }, "context-initializer-secondary");
                     logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
                     setUpWebhookScheduler();
                     logger.warn("Started traffic alert schedulers", LogDb.DASHBOARD);
-                    setUpTrafficAlertScheduler();
+                    // setUpTrafficAlertScheduler();
                     logger.warn("Started daily schedulers", LogDb.DASHBOARD);
-                    setUpDailyScheduler();
+                    // setUpDailyScheduler();
                     if (DashboardMode.isMetered()) {
-                        setupUsageScheduler();
+                        // setupUsageScheduler();
                     }
-                    updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
-                    syncCronInfo.setUpUpdateCronScheduler();
-                    setUpTestEditorTemplatesScheduler();
-                    JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
-                    updateApiGroupsForAccounts(); 
-                    setupAutomatedApiGroupsScheduler();
+                    // updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
+                    // syncCronInfo.setUpUpdateCronScheduler();
+                    // setUpTestEditorTemplatesScheduler();
+                    // JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
+                    // updateApiGroupsForAccounts(); 
+                    // setupAutomatedApiGroupsScheduler();
                     if(runJobFunctionsAnyway) {
-                        crons.trafficAlertsScheduler();
+                        // crons.trafficAlertsScheduler();
                         // crons.insertHistoricalDataJob();
                         // if(DashboardMode.isOnPremDeployment()){
                         //     crons.insertHistoricalDataJobForOnPrem();
                         // }
 
                         // trimCappedCollectionsJob();
-                        setUpPiiAndTestSourcesScheduler();
-                        cleanInventoryJobRunner();
-                        setUpDefaultPayloadRemover();
-                        setUpDependencyFlowScheduler();
-                        tokenGeneratorCron.tokenGeneratorScheduler();
-                        crons.deleteTestRunsScheduler();
-                        setUpUpdateCustomCollections();
-                        setUpFillCollectionIdArrayJob();
+                        // setUpPiiAndTestSourcesScheduler();
+                        // cleanInventoryJobRunner();
+                        // setUpDefaultPayloadRemover();
+                        // setUpDependencyFlowScheduler();
+                        // tokenGeneratorCron.tokenGeneratorScheduler();
+                        // crons.deleteTestRunsScheduler();
+                        // setUpUpdateCustomCollections();
+                        // setUpFillCollectionIdArrayJob();
                                                
 
-                        CleanInventory.cleanInventoryJobRunner();
+                        // CleanInventory.cleanInventoryJobRunner();
 
-                        MatchingJob.MatchingJobRunner();
+                        // MatchingJob.MatchingJobRunner();
                     }
 
                     int now2 = Context.now();
