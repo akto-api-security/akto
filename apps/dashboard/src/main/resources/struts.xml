@@ -5668,7 +5668,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">TEST_RESULTS</param>
+                <param name="featureLabel">TEST_RUN_RESULTS</param>
                 <param name="accessType">READ</param>
             </interceptor-ref>
 
@@ -6444,7 +6444,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">TEST_RESULTS</param>
+                <param name="featureLabel">TEST_RUN_RESULTS</param>
                 <param name="accessType">READ</param>
             </interceptor-ref>
 

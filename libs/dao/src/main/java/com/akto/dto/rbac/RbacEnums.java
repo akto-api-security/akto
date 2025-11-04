@@ -16,7 +16,8 @@ public class RbacEnums {
         DEBUG_INFO,
         USER,
         AI,
-        THREAT_PROTECTION;
+        THREAT_PROTECTION,
+        PII_DATA;
     
         public static AccessGroups[] getAccessGroups() {
             return values();
@@ -25,14 +26,15 @@ public class RbacEnums {
 
     public enum Feature {
         API_COLLECTIONS(AccessGroups.INVENTORY),
-        SENSITIVE_DATA(AccessGroups.INVENTORY),
+        SENSITIVE_DATA(AccessGroups.PII_DATA),
         TRAFFIC_FILTERS(AccessGroups.INVENTORY),
         DEFAULT_PAYLOADS(AccessGroups.INVENTORY),
-        SAMPLE_DATA(AccessGroups.INVENTORY),
+        SAMPLE_DATA(AccessGroups.PII_DATA),
         TAGS(AccessGroups.INVENTORY),
         ASK_GPT(AccessGroups.INVENTORY),
         START_TEST_RUN(AccessGroups.TESTING),
         TEST_RESULTS(AccessGroups.TESTING),
+        TEST_RUN_RESULTS(AccessGroups.PII_DATA),
         TEST_ROLES(AccessGroups.TESTING),
         USER_CONFIG(AccessGroups.TESTING),
         AUTH_TYPE(AccessGroups.TESTING),
@@ -69,7 +71,8 @@ public class RbacEnums {
 
     public enum ReadWriteAccess {
         READ,
-        READ_WRITE
+        READ_WRITE,
+        NO_ACCESS
     }
 
     public static void mergeUserFeaturesAccess (Map<Feature, ReadWriteAccess> accessMap){

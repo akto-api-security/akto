@@ -22,11 +22,12 @@ import InlineEditableText from '../../../components/shared/InlineEditableText.js
 import ChatInterface from '../../../components/shared/ChatInterface.jsx'
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper.js'
 import ApiGroups from '../../../components/shared/ApiGroups'
+import ForbiddenRole from '../../../components/shared/ForbiddenRole'
 
 function TestRunResultFlyout(props) {
 
 
-    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, conversations} = props
+    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, conversations, showForbidden} = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
@@ -720,9 +721,9 @@ function TestRunResultFlyout(props) {
         />
     )
 
-    const currentComponents = [
-        <TitleComponent/>, tabsComponent
-    ]
+    const currentComponents = showForbidden 
+        ? [<Box padding="4"><ForbiddenRole /></Box>]
+        : [<TitleComponent/>, tabsComponent]
 
     const title = isIssuePage ? "Issue details" : mapLabel('Test result', getDashboardCategory())
 
