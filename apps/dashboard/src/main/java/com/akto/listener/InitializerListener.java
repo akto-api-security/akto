@@ -1197,6 +1197,20 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private static final ObjectMapper mapper = new ObjectMapper();
+    
+    private static String escapeJsonString(String str) {
+        if (str == null) {
+            return "";
+        }
+        return str.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\b", "\\b")
+                .replace("\f", "\\f")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
+    }
+    
     private static String createMicrosoftTeamsWorkflowWebhookPayload(CustomWebhook webhook, Map<String, Object> valueMap){
         StringBuilder body = new StringBuilder();
         body.append("{\n" +
@@ -1221,92 +1235,51 @@ public class InitializerListener implements ServletContextListener {
                 if (value instanceof List) {
                     body.append("        {\n" +
                             "            \"type\": \"TextBlock\",\n" +
-                            "            \"text\": \"" + name + "\",\n" +
+                            "            \"text\": \"" + escapeJsonString(name) + "\",\n" +
+                            "            \"weight\": \"bolder\",\n" +
                             "            \"wrap\": true\n" +
                             "        },");
                     
                     List<Object> list = (List<Object>) value;
-                    boolean headerAdded = false;
     
                     for (Object obj : list) {
                         Map<String, Object> data = mapper.convertValue(obj, HashMap.class);
                         
-                        if (!headerAdded) {
-                            // Add the table headers (first row)
-                            body.append("        {\n" +
-                                    "            \"type\": \"Table\",\n" +
-                                    "            \"columns\": [\n");
-    
-                            for (String key : data.keySet()) {
-                                if(key=="id" || key=="sample"){
-                                    continue;
-                                }
-
-                                body.append("                {\"width\": 1},\n");
-                            }
-    
-                            body.append("            ],\n" +
-                                    "            \"rows\": [\n" +
-                                    "                {\n" +
-                                    "                    \"type\": \"TableRow\",\n" +
-                                    "                    \"cells\": [\n");
-    
-                            // Add header row (keys)
-                            for (String key : data.keySet()) {
-                                if(key=="id" || key=="sample"){
-                                    continue;
-                                }
-                                body.append("                        {\n" +
-                                        "                            \"type\": \"TableCell\",\n" +
-                                        "                            \"items\": [\n" +
-                                        "                                {\n" +
-                                        "                                    \"type\": \"TextBlock\",\n" +
-                                        "                                    \"text\": \"" + key + "\",\n" +
-                                        "                                    \"wrap\": true\n" +
-                                        "                                }\n" +
-                                        "                            ]\n" +
-                                        "                        },\n");
-                            }
-    
-                            body.append("                    ]\n" +
-                                    "                },\n");
-    
-                            headerAdded = true;
-                        }
-    
-                        // Add each data row (values)
-                        body.append("                {\n" +
-                                "                    \"type\": \"TableRow\",\n" +
-                                "                    \"cells\": [\n");
-    
-                        for (Entry<String,Object> entry : data.entrySet()) {
-                            if(entry.getKey()=="id" || entry.getKey()=="sample"){
+                        // Create a FactSet for each object (better for key-value pairs)
+                        body.append("        {\n" +
+                                "            \"type\": \"FactSet\",\n" +
+                                "            \"facts\": [\n");
+                        
+                        boolean firstFact = true;
+                        for (Entry<String, Object> entry : data.entrySet()) {
+                            String key = entry.getKey();
+                            if ("id".equals(key) || "sample".equals(key)) {
                                 continue;
                             }
-                            body.append("                        {\n" +
-                                    "                            \"type\": \"TableCell\",\n" +
-                                    "                            \"items\": [\n" +
-                                    "                                {\n" +
-                                    "                                    \"type\": \"TextBlock\",\n" +
-                                    "                                    \"text\": \"" + entry.getValue() + "\",\n" +
-                                    "                                    \"wrap\": true\n" +
-                                    "                                }\n" +
-                                    "                            ]\n" +
-                                    "                        },\n");
+                            
+                            if (!firstFact) {
+                                body.append(",\n");
+                            }
+                            
+                            Object val = entry.getValue();
+                            String valueStr = val == null ? "" : val.toString();
+                            
+                            body.append("                {\n" +
+                                    "                    \"title\": \"" + escapeJsonString(key) + ":\",\n" +
+                                    "                    \"value\": \"" + escapeJsonString(valueStr) + "\"\n" +
+                                    "                }");
+                            firstFact = false;
                         }
-    
-                        body.append("                    ]\n" +
-                                "                },\n");
+                        
+                        body.append("\n            ]\n" +
+                                "        },\n");
                     }
-    
-                    // Close the table structure
-                    body.append("            ]\n" +
-                            "        },\n");
                     
                 } else {
+                    String valueStr = value == null ? "" : value.toString();
                     body.append("        {\n" +
                             "            \"type\": \"TextBlock\",\n" +
-                            "            \"text\": \"" + name + "\",\n" +
+                            "            \"text\": \"" + escapeJsonString(name) + ": " + escapeJsonString(valueStr) + "\",\n" +
                             "            \"wrap\": true\n" +
                             "        },");
                 }
