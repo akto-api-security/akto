@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
@@ -7,15 +8,19 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import lombok.Getter;
 import lombok.Setter;
+import okhttp3.Headers;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
+import okhttp3.ResponseBody;
+import org.apache.commons.collections.MapUtils;
 import org.json.JSONObject;
 
 @Getter
@@ -31,6 +36,15 @@ public class LLMAction extends ActionSupport {
         .writeTimeout(60, TimeUnit.SECONDS)
         .build();
     private static final String OLLAMA_SERVER_ENDPOINT = buildLlmServerUrl();
+
+    // Azure Open AI urls
+    private static final String AZURE_API_ENDPOINT = "%s/openai/deployments/%s/chat/completions?api-version=%s";
+    private static final String AZURE_OPENAI_HOST = System.getenv("AZURE_OPENAI_HOST");
+    private static final String AZURE_OPENAI_DEPLOYMENT = System.getenv("AZURE_OPENAI_DEPLOYMENT");
+    private static final String AZURE_OPENAI_API_KEY = System.getenv("AZURE_OPENAI_API_KEY");
+    private static final String AZURE_OPENAI_API_VERSION = System.getenv("AZURE_OPENAI_API_VERSION");
+    private static final String AZURE_OPENAI_ENDPOINT = buildAzureOpenAIUrl();
+
 
     private static String buildLlmServerUrl() {
         String serverEndpoint = JARVIS_ENDPOINT;
@@ -51,7 +65,16 @@ public class LLMAction extends ActionSupport {
     Map<String, Object> llmResponsePayload;
 
     public String getLLMResponse() {
+        return executeLLMRequest(OLLAMA_SERVER_ENDPOINT, null);
+    }
 
+    public String getLLMResponseV2() {
+        Map<String, String> headers = new HashMap<>();
+        headers.put("api-key", AZURE_OPENAI_API_KEY);
+        return executeLLMRequest(AZURE_OPENAI_ENDPOINT, headers);
+    }
+
+    private String executeLLMRequest(String endpoint, Map<String, String> additionalHeaders) {
         MediaType mediaType = MediaType.parse("application/json");
 
         if (llmPayload == null || llmPayload.isEmpty()) {
@@ -60,29 +83,66 @@ public class LLMAction extends ActionSupport {
         }
 
         JSONObject payload = new JSONObject(llmPayload);
-
         RequestBody body = RequestBody.create(payload.toString(), mediaType);
-        Request request = new Request.Builder()
-            .url(OLLAMA_SERVER_ENDPOINT)
-            .method("POST", body)
-            .addHeader("Content-Type", "application/json")
-            .build();
+
+        Request.Builder requestBuilder = new Request.Builder()
+            .url(endpoint)
+            .method(Method.POST.name(), body)
+            .addHeader("Content-Type", "application/json");
+
+        // Add any additional headers
+        if (MapUtils.isNotEmpty(additionalHeaders)) {
+            for (Map.Entry<String, String> entry : additionalHeaders.entrySet()) {
+                requestBuilder.addHeader(entry.getKey(), entry.getValue());
+            }
+        }
+
+        Request request = requestBuilder.build();
 
         try (Response response = client.newCall(request).execute()) {
-            logger.debug("llmPayload: {}",  gson.toJson(llmPayload));
-            if (!response.isSuccessful() || response.body() == null) {
-                logger.error("Request failed with status code: {} and response: {}", 
+            logger.debug("llmPayload: {}", gson.toJson(llmPayload));
+            if (!response.isSuccessful()) {
+                logger.error("LLM Request failed with status code: {} and response: {}",
                     response.code(), response.body() != null ? response.body().string() : "null");
                 return Action.ERROR.toUpperCase();
             }
-            llmResponsePayload = new Gson().fromJson(response.body().string(),
-                new TypeToken<Map<String, Object>>() {
-                }.getType());
+
+            ResponseBody responseBody = response.body();
+            String rawResponse = responseBody != null ? responseBody.string() : null;
+
+            if (rawResponse == null) {
+                logger.error("Response body is null");
+                return Action.ERROR.toUpperCase();
+            }
+
+            llmResponsePayload = gson.fromJson(rawResponse,
+                new TypeToken<Map<String, Object>>() {}.getType());
             logger.debug("LLM Response: {}", llmResponsePayload);
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             logger.error("Error while executing request: " + e.getMessage());
             return Action.ERROR.toUpperCase();
         }
+    }
+
+    private static String buildAzureOpenAIUrl() {
+        if (AZURE_OPENAI_HOST == null || AZURE_OPENAI_HOST.isEmpty()) {
+            throw new RuntimeException("AZURE_OPENAI_HOST environment variable is not set");
+        }
+        if (AZURE_OPENAI_DEPLOYMENT == null || AZURE_OPENAI_DEPLOYMENT.isEmpty()) {
+            throw new RuntimeException("AZURE_OPENAI_DEPLOYMENT environment variable is not set");
+        }
+        if (AZURE_OPENAI_API_KEY == null || AZURE_OPENAI_API_KEY.isEmpty()) {
+            throw new RuntimeException("AZURE_OPENAI_API_KEY environment variable is not set");
+        }
+
+        String apiVersion = AZURE_OPENAI_API_VERSION != null && !AZURE_OPENAI_API_VERSION.isEmpty()
+            ? AZURE_OPENAI_API_VERSION
+            : "2024-04-01-preview";
+
+        String endpoint = String.format(AZURE_API_ENDPOINT, AZURE_OPENAI_HOST, AZURE_OPENAI_DEPLOYMENT, apiVersion);
+
+        logger.debug("Azure OpenAI endpoint: " + endpoint);
+        return endpoint;
     }
 }
