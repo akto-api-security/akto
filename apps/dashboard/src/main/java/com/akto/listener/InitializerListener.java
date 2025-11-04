@@ -1157,7 +1157,7 @@ public class InitializerListener implements ServletContextListener {
 
         if(sendApiThreats){
 
-            final int DATA_LIMIT = webhook.getBatchSize() > 0 ? webhook.getBatchSize() : 50;
+            final int DATA_LIMIT = webhook.getBatchSize() > 0 ? Math.min(webhook.getBatchSize(), 20) : 20;
             int skip = 0;
             final int lastSentTimestamp = webhook.getLastSentTimestamp();
             String accountId = String.valueOf(Context.accountId.get());
