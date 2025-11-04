@@ -1,34 +1,37 @@
-import { Icon, Tooltip } from "@shopify/polaris"
+import { Box, Icon, Link, Text, Tooltip, VerticalStack } from "@shopify/polaris"
 import { CircleTickMajor } from "@shopify/polaris-icons"
 
 const RegistryBadge = () => {
     const tooltipContent = (
-        <div style={{ maxWidth: '280px' }}>
-            <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Listed on the MCP Registry</div>
-            <div style={{ marginBottom: '4px', fontSize: '13px', color: '#6d7175' }}>
-                This MCP server appears in the official Model Context Protocol Registry.
-            </div>
-            <div style={{ marginBottom: '8px', fontSize: '13px', color: '#6d7175' }}>
-                The registry is a community-maintained directory for MCP-compatible servers.
-            </div>
-            <a 
-                href="https://registry.modelcontextprotocol.io/docs#/operations/list-servers-v0.1" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                style={{ color: '#005bd3', textDecoration: 'none', fontSize: '13px' }}
-                onMouseOver={(e) => e.target.style.textDecoration = 'underline'}
-                onMouseOut={(e) => e.target.style.textDecoration = 'none'}
-            >
-                View on MCP Registry →
-            </a>
-        </div>
+        <Box maxWidth="280px">
+            <VerticalStack gap="2">
+                <Text as="span" fontWeight="bold">
+                    Listed on the MCP Registry
+                </Text>
+                <Text as="span" variant="bodySm" tone="subdued">
+                    This MCP server appears in the official Model Context Protocol Registry.
+                </Text>
+                <Text as="span" variant="bodySm" tone="subdued">
+                    The registry is a community-maintained directory for MCP-compatible servers.
+                </Text>
+                <Box as="span">
+                    <Link 
+                        url="https://registry.modelcontextprotocol.io/docs#/operations/list-servers-v0.1"
+                        target="_blank"
+                        onClick={(e) => { e.stopPropagation(); }}
+                    >
+                        View on MCP Registry →
+                    </Link>
+                </Box>
+            </VerticalStack>
+        </Box>
     );
     
     return (
         <Tooltip content={tooltipContent} preferredPosition="above" width="wide">
-            <span style={{ display: 'inline-flex' }}>
+            <Box as="span" display="inlineFlex">
                 <Icon source={CircleTickMajor} tone="success" />
-            </span>
+            </Box>
         </Tooltip>
     );
 };
