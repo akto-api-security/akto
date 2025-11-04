@@ -25,7 +25,7 @@ function OktaIntegration() {
     const [nextButtonActive,setNextButtonActive] = useState(true)
 
     const redirectUri = hostname + "/authorization-code/callback"
-    const initiateLoginUri = hostname + "/okta-initiate-login"
+    const initiateLoginUri = hostname + "/okta-initiate-login?accountId=" + window.ACTIVE_ACCOUNT
 
     const integrationSteps = [
         {
