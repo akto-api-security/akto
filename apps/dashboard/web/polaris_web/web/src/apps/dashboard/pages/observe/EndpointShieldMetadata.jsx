@@ -12,7 +12,7 @@ import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCard
 import GithubServerTable from "../../components/tables/GithubServerTable";
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
 import { CellType } from "../../components/tables/rows/GithubRow";
-import { getMcpServersByAgent, getAgentLogs } from "./dummyData";
+import { getAgentLogs } from "./dummyData";
 import EndpointShieldMetadataDemo from "./EndpointShieldMetadataDemo";
 import settingRequests from "../settings/api";
 import PersistStore from "../../../main/PersistStore";
@@ -247,17 +247,46 @@ function EndpointShieldMetadata() {
     }, [editableDescription]);
 
     // Handle agent row click to open flyout with details
-    const handleRowClick = useCallback((agent) => {
+    const handleRowClick = useCallback(async (agent) => {
         setSelectedAgent(agent);
 
-        // Get MCP servers and logs from dummy data
-        const serversData = getMcpServersByAgent(agent.agentId, agent.deviceId);
-        const logsData = getAgentLogs(agent.agentId);
+        try {
+            // Get MCP servers from API
+            const serversResponse = await settingRequests.getMcpServersByAgent(agent.agentId, agent.deviceId);
+            const servers = serversResponse.mcpServers || [];
+            setMcpServers(servers);
+            
+            if (servers.length === 0) {
+                console.log("No MCP servers found for agent:", agent.agentId);
+            }
+        } catch (error) {
+            console.error("Error fetching MCP servers:", error);
+            setMcpServers([]);
+        }
 
-        setMcpServers(serversData);
-        // Reverse logs array so oldest appears first in the UI
-        const reversedLogs = [...logsData].reverse();
-        setAgentLogs(reversedLogs);
+        try {
+            // Get logs from API
+            const logsResponse = await settingRequests.getAgentLogs(agent.agentId);
+            // Transform API response to match expected format
+            const transformedLogs = (logsResponse.agentLogs || []).map(log => ({
+                timestamp: log.timestamp,
+                level: log.level || 'INFO',
+                message: log.log || log.message
+            }));
+            // Reverse logs array so oldest appears first in the UI
+            const reversedLogs = [...transformedLogs].reverse();
+            setAgentLogs(reversedLogs);
+            
+            if (transformedLogs.length === 0) {
+                console.log("No logs found for agent:", agent.agentId);
+            }
+        } catch (error) {
+            console.error("Error fetching agent logs:", error);
+            // Fallback to dummy data if API fails
+            const logsData = getAgentLogs(agent.agentId);
+            const reversedLogs = [...logsData].reverse();
+            setAgentLogs(reversedLogs);
+        }
         setDisplayedLogs([]);
         setDescription("");
         setEditableDescription("");
@@ -285,6 +314,16 @@ function EndpointShieldMetadata() {
     }, [agentLogs, showFlyout]);
 
     const renderLogs = () => {
+        // If no logs were fetched at all, show "No logs found"
+        if (!agentLogs || agentLogs.length === 0) {
+            return (
+                <Box padding="4" background="bg-surface">
+                    <Text variant="bodyMd" color="subdued" alignment="center">No logs found</Text>
+                </Box>
+            );
+        }
+        
+        // If logs exist but none are displayed yet (still streaming), show loading
         if (!displayedLogs || displayedLogs.length === 0) {
             return (
                 <Box padding="4" background="bg-surface">
@@ -409,21 +448,27 @@ function EndpointShieldMetadata() {
         content: 'MCP Servers',
         component: (
             <Box paddingBlockStart={"4"}>
-                <GithubSimpleTable
-                    key="mcp-servers-table"
-                    data={mcpServersTableData}
-                    resourceName={{ singular: "server", plural: "servers" }}
-                    headers={mcpServersHeaders}
-                    headings={mcpServersHeaders}
-                    useNewRow={true}
-                    condensedHeight={true}
-                    hideQueryField={true}
-                    loading={false}
-                    pageLimit={10}
-                    showFooter={false}
-                    onRowClick={handleServerClick}
-                    rowClickable={true}
-                />
+                {mcpServersTableData.length === 0 ? (
+                    <Box padding="4" background="bg-surface">
+                        <Text variant="bodyMd" color="subdued" alignment="center">No servers found</Text>
+                    </Box>
+                ) : (
+                    <GithubSimpleTable
+                        key="mcp-servers-table"
+                        data={mcpServersTableData}
+                        resourceName={{ singular: "server", plural: "servers" }}
+                        headers={mcpServersHeaders}
+                        headings={mcpServersHeaders}
+                        useNewRow={true}
+                        condensedHeight={true}
+                        hideQueryField={true}
+                        loading={false}
+                        pageLimit={10}
+                        showFooter={false}
+                        onRowClick={handleServerClick}
+                        rowClickable={true}
+                    />
+                )}
             </Box>
         ),
         panelID: 'mcp-servers-panel',
