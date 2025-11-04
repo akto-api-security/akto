@@ -94,6 +94,8 @@ import com.akto.dao.SetupDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.SuspectSampleDataDao;
 import com.akto.dao.UsersDao;
+import com.akto.dao.MaliciousEventDao;
+import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.loaders.LoadersDao;
@@ -1378,7 +1380,7 @@ public class InitializerListener implements ServletContextListener {
                 boolean firstFact = true;
                 for (Entry<String, Object> entry : data.entrySet()) {
                     String key = entry.getKey();
-                    if ("id".equals(key) || "sample".equals(key)) {
+                    if ("id".equals(key) || "sample".equals(key) || "metadata".equals(key)) {
                         continue;
                     }
                     
@@ -1485,7 +1487,7 @@ public class InitializerListener implements ServletContextListener {
                     }
                 }, "webhook-sender");
             }
-        }, 0, 1, TimeUnit.HOURS);
+        }, 0, 1, TimeUnit.MINUTES);
     }
 
     static class ChangesInfo {
@@ -2542,52 +2544,52 @@ public class InitializerListener implements ServletContextListener {
                 SingleTypeInfo.init();
 
                 int now = Context.now();
-                if (runJobFunctions || runJobFunctionsAnyway) {
+                if (true || runJobFunctionsAnyway) {
 
                     logger.debug("Starting init functions and scheduling jobs at " + now);
 
                     AccountTask.instance.executeTask(new Consumer<Account>() {
                         @Override
                         public void accept(Account account) {
-                            runInitializerFunctions();
+                            // runInitializerFunctions();
                         }
                     }, "context-initializer-secondary");
                     logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
                     setUpWebhookScheduler();
                     logger.warn("Started traffic alert schedulers", LogDb.DASHBOARD);
-                    setUpTrafficAlertScheduler();
+                    // setUpTrafficAlertScheduler();
                     logger.warn("Started daily schedulers", LogDb.DASHBOARD);
-                    setUpDailyScheduler();
+                    // setUpDailyScheduler();
                     if (DashboardMode.isMetered()) {
-                        setupUsageScheduler();
+                        // setupUsageScheduler();
                     }
-                    updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
-                    syncCronInfo.setUpUpdateCronScheduler();
-                    setUpTestEditorTemplatesScheduler();
-                    JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
-                    updateApiGroupsForAccounts(); 
-                    setupAutomatedApiGroupsScheduler();
+                    // updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
+                    // syncCronInfo.setUpUpdateCronScheduler();
+                    // setUpTestEditorTemplatesScheduler();
+                    // JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
+                    // updateApiGroupsForAccounts(); 
+                    // setupAutomatedApiGroupsScheduler();
                     if(runJobFunctionsAnyway) {
-                        crons.trafficAlertsScheduler();
+                        // crons.trafficAlertsScheduler();
                         // crons.insertHistoricalDataJob();
                         // if(DashboardMode.isOnPremDeployment()){
                         //     crons.insertHistoricalDataJobForOnPrem();
                         // }
 
                         // trimCappedCollectionsJob();
-                        setUpPiiAndTestSourcesScheduler();
-                        cleanInventoryJobRunner();
-                        setUpDefaultPayloadRemover();
-                        setUpDependencyFlowScheduler();
-                        tokenGeneratorCron.tokenGeneratorScheduler();
-                        crons.deleteTestRunsScheduler();
-                        setUpUpdateCustomCollections();
-                        setUpFillCollectionIdArrayJob();
+                        // setUpPiiAndTestSourcesScheduler();
+                        // cleanInventoryJobRunner();
+                        // setUpDefaultPayloadRemover();
+                        // setUpDependencyFlowScheduler();
+                        // tokenGeneratorCron.tokenGeneratorScheduler();
+                        // crons.deleteTestRunsScheduler();
+                        // setUpUpdateCustomCollections();
+                        // setUpFillCollectionIdArrayJob();
                                                
 
-                        CleanInventory.cleanInventoryJobRunner();
+                        // CleanInventory.cleanInventoryJobRunner();
 
-                        MatchingJob.MatchingJobRunner();
+                        // MatchingJob.MatchingJobRunner();
                     }
 
                     int now2 = Context.now();
