@@ -1105,7 +1105,8 @@ public class InitializerListener implements ServletContextListener {
                     maliciousEvents = MaliciousEventDao.instance.getCollection(accountId)
                             .find(Filters.and(
                                     Filters.gte("detectedAt", webhook.getLastSentTimestamp()),
-                                    Filters.lt("detectedAt", now)))
+                                    Filters.lt("detectedAt", now),
+                                    Filters.eq("successfulExploit", true)))
                             .sort(Sorts.descending("detectedAt", Constants.ID))
                             .limit(1)
                             .into(new ArrayList<>());
@@ -1122,7 +1123,8 @@ public class InitializerListener implements ServletContextListener {
             maliciousEvents = MaliciousEventDao.instance.getCollection(accountId)
                     .find(Filters.and(
                             Filters.gte("detectedAt", webhook.getLastSentTimestamp()),
-                            Filters.lt("detectedAt", now)))
+                            Filters.lt("detectedAt", now),
+                            Filters.eq("successfulExploit", true)))
                     .sort(Sorts.descending("detectedAt", Constants.ID))
                     .limit(1)
                     .into(new ArrayList<>());
@@ -1165,8 +1167,10 @@ public class InitializerListener implements ServletContextListener {
                     maliciousEvents = MaliciousEventDao.instance.getCollection(accountId)
                             .find(Filters.and(
                                     Filters.gte("detectedAt", lastSentTimestamp),
-                                    Filters.lt("detectedAt", now)))
+                                    Filters.lt("detectedAt", now),
+                                    Filters.eq("successfulExploit", true)))
                             .sort(Sorts.descending("detectedAt", Constants.ID))
+                            .projection(Projections.exclude("latestApiOrig"))
                             .skip(skip)
                             .limit(DATA_LIMIT)
                             .into(new ArrayList<>());
@@ -1210,10 +1214,8 @@ public class InitializerListener implements ServletContextListener {
                 .replace("\r", "\\r")
                 .replace("\t", "\\t");
     }
-    
-    private static String createMicrosoftTeamsWorkflowWebhookPayload(CustomWebhook webhook, Map<String, Object> valueMap){
-        StringBuilder body = new StringBuilder();
-        body.append("{\n" +
+
+    private static String TEAMS_WEBHOOK_OPENING_BODY = "{\n" +
                 "    \"type\": \"message\",\n" +
                 "    \"attachments\": [\n" +
                 "        {\n" +
@@ -1223,7 +1225,18 @@ public class InitializerListener implements ServletContextListener {
                 "                \"$schema\": \"http://adaptivecards.io/schemas/adaptive-card.json\",\n" +
                 "                \"version\": \"1.5\",\n" +
                 "\"msteams\": { \"width\": \"full\" }," +
-                "                \"body\": [");
+                "                \"body\": [";
+    
+    private static String TEAMS_WEBHOOK_CLOSING_BODY = "]\n" +
+                "            }\n" +
+                "        }\n" +
+                "    ]\n" +
+                "}\n" +
+                "";
+
+    private static String createMicrosoftTeamsWorkflowWebhookPayload(CustomWebhook webhook, Map<String, Object> valueMap){
+        StringBuilder body = new StringBuilder();
+        body.append(TEAMS_WEBHOOK_OPENING_BODY);
         
         if (webhook.getSelectedWebhookOptions() != null) {
             for (WebhookOptions webhookOption : webhook.getSelectedWebhookOptions()) {
@@ -1232,68 +1245,170 @@ public class InitializerListener implements ServletContextListener {
                 String name = webhookOption.getOptionName();
     
                 Object value = valueMap.get(replaceString);
-                if (value instanceof List) {
-                    body.append("        {\n" +
-                            "            \"type\": \"TextBlock\",\n" +
-                            "            \"text\": \"" + escapeJsonString(name) + "\",\n" +
-                            "            \"weight\": \"bolder\",\n" +
-                            "            \"wrap\": true\n" +
-                            "        },");
-                    
-                    List<Object> list = (List<Object>) value;
-    
-                    for (Object obj : list) {
-                        Map<String, Object> data = mapper.convertValue(obj, HashMap.class);
-                        
-                        // Create a FactSet for each object (better for key-value pairs)
-                        body.append("        {\n" +
-                                "            \"type\": \"FactSet\",\n" +
-                                "            \"facts\": [\n");
-                        
-                        boolean firstFact = true;
-                        for (Entry<String, Object> entry : data.entrySet()) {
-                            String key = entry.getKey();
-                            if ("id".equals(key) || "sample".equals(key)) {
-                                continue;
-                            }
-                            
-                            if (!firstFact) {
-                                body.append(",\n");
-                            }
-                            
-                            Object val = entry.getValue();
-                            String valueStr = val == null ? "" : val.toString();
-                            
-                            body.append("                {\n" +
-                                    "                    \"title\": \"" + escapeJsonString(key) + ":\",\n" +
-                                    "                    \"value\": \"" + escapeJsonString(valueStr) + "\"\n" +
-                                    "                }");
-                            firstFact = false;
-                        }
-                        
-                        body.append("\n            ]\n" +
-                                "        },\n");
-                    }
-                    
-                } else {
-                    String valueStr = value == null ? "" : value.toString();
-                    body.append("        {\n" +
-                            "            \"type\": \"TextBlock\",\n" +
-                            "            \"text\": \"" + escapeJsonString(name) + ": " + escapeJsonString(valueStr) + "\",\n" +
-                            "            \"wrap\": true\n" +
-                            "        },");
+                if(replaceString.equals("AKTO.changes_info.apiThreatPayloads")){
+                    buildApiThreatsTeamsWebhookBody(body, name, value);
+                } else{
+                    buildNormalTeamsWebhookBody(body, name, value);
                 }
             }
         }
     
-        body.append("]\n" +
-                "            }\n" +
-                "        }\n" +
-                "    ]\n" +
-                "}\n" +
-                "");
+        body.append(TEAMS_WEBHOOK_CLOSING_BODY);
     
         return body.toString();
+    }
+
+    private static void buildNormalTeamsWebhookBody(StringBuilder body, String name, Object value) {
+        if (value instanceof List) {
+            body.append("        {\n" +
+                    "            \"type\": \"TextBlock\",\n" +
+                    "            \"text\": \"" + name + "\",\n" +
+                    "            \"wrap\": true\n" +
+                    "        },");
+            
+            List<Object> list = (List<Object>) value;
+            boolean headerAdded = false;
+   
+            for (Object obj : list) {
+                Map<String, Object> data = mapper.convertValue(obj, HashMap.class);
+                
+                if (!headerAdded) {
+                    // Add the table headers (first row)
+                    body.append("        {\n" +
+                            "            \"type\": \"Table\",\n" +
+                            "            \"columns\": [\n");
+   
+                    for (String key : data.keySet()) {
+                        if(key=="id" || key=="sample"){
+                            continue;
+                        }
+
+                        body.append("                {\"width\": 1},\n");
+                    }
+   
+                    body.append("            ],\n" +
+                            "            \"rows\": [\n" +
+                            "                {\n" +
+                            "                    \"type\": \"TableRow\",\n" +
+                            "                    \"cells\": [\n");
+   
+                    // Add header row (keys)
+                    for (String key : data.keySet()) {
+                        if(key=="id" || key=="sample"){
+                            continue;
+                        }
+                        body.append("                        {\n" +
+                                "                            \"type\": \"TableCell\",\n" +
+                                "                            \"items\": [\n" +
+                                "                                {\n" +
+                                "                                    \"type\": \"TextBlock\",\n" +
+                                "                                    \"text\": \"" + key + "\",\n" +
+                                "                                    \"wrap\": true\n" +
+                                "                                }\n" +
+                                "                            ]\n" +
+                                "                        },\n");
+                    }
+   
+                    body.append("                    ]\n" +
+                            "                },\n");
+   
+                    headerAdded = true;
+                }
+   
+                // Add each data row (values)
+                body.append("                {\n" +
+                        "                    \"type\": \"TableRow\",\n" +
+                        "                    \"cells\": [\n");
+   
+                for (Entry<String,Object> entry : data.entrySet()) {
+                    if(entry.getKey()=="id" || entry.getKey()=="sample"){
+                        continue;
+                    }
+                    body.append("                        {\n" +
+                            "                            \"type\": \"TableCell\",\n" +
+                            "                            \"items\": [\n" +
+                            "                                {\n" +
+                            "                                    \"type\": \"TextBlock\",\n" +
+                            "                                    \"text\": \"" + entry.getValue() + "\",\n" +
+                            "                                    \"wrap\": true\n" +
+                            "                                }\n" +
+                            "                            ]\n" +
+                            "                        },\n");
+                }
+   
+                body.append("                    ]\n" +
+                        "                },\n");
+            }
+   
+            // Close the table structure
+            body.append("            ]\n" +
+                    "        },\n");
+            
+        } else {
+            body.append("        {\n" +
+                    "            \"type\": \"TextBlock\",\n" +
+                    "            \"text\": \"" + name + "\",\n" +
+                    "            \"wrap\": true\n" +
+                    "        },");
+        }
+    }
+    
+
+    private static void buildApiThreatsTeamsWebhookBody(StringBuilder body, String name, Object value) {
+        if (value instanceof List) {
+            body.append("        {\n" +
+                    "            \"type\": \"TextBlock\",\n" +
+                    "            \"text\": \"" + escapeJsonString(name) + "\",\n" +
+                    "            \"weight\": \"bolder\",\n" +
+                    "            \"wrap\": true\n" +
+                    "        },");
+            
+            List<Object> list = (List<Object>) value;
+            boolean isFirstItem = true;
+
+            for (Object obj : list) {
+                Map<String, Object> data = mapper.convertValue(obj, HashMap.class);
+                
+                // Create a FactSet for each object (better for key-value pairs)
+                body.append("        {\n" +
+                        "            \"type\": \"FactSet\",\n" +
+                        (isFirstItem ? "" : "            \"separator\": true,\n            \"spacing\": \"extraLarge\",\n") +
+                        "            \"facts\": [\n");
+                
+                boolean firstFact = true;
+                for (Entry<String, Object> entry : data.entrySet()) {
+                    String key = entry.getKey();
+                    if ("id".equals(key) || "sample".equals(key)) {
+                        continue;
+                    }
+                    
+                    if (!firstFact) {
+                        body.append(",\n");
+                    }
+                    
+                    Object val = entry.getValue();
+                    String valueStr = val == null ? "" : val.toString();
+                    
+                    body.append("                {\n" +
+                            "                    \"title\": \"" + escapeJsonString(key) + ":\",\n" +
+                            "                    \"value\": \"" + escapeJsonString(valueStr) + "\"\n" +
+                            "                }");
+                    firstFact = false;
+                }
+                
+                body.append("\n            ]\n" +
+                        "        },\n");
+                isFirstItem = false;
+            }
+            
+        } else {
+            String valueStr = value == null ? "" : value.toString();
+            body.append("        {\n" +
+                    "            \"type\": \"TextBlock\",\n" +
+                    "            \"text\": \"" + escapeJsonString(name) + ": " + escapeJsonString(valueStr) + "\",\n" +
+                    "            \"wrap\": true\n" +
+                    "        },");
+        }
     }
         
     private static void actuallySendWebhook(CustomWebhook webhook, Map<String, Object> valueMap, int now){
