@@ -1096,18 +1096,20 @@ public class InitializerListener implements ServletContextListener {
         ChangesInfo ci = getChangesInfo(now - webhook.getLastSentTimestamp(), now - webhook.getLastSentTimestamp(), webhook.getNewEndpointCollections(), webhook.getNewSensitiveEndpointCollections(), true);
 
         boolean sendApiThreats = false;
-        List<SuspectSampleData> suspectSampleData = new ArrayList<>();
+        List<MaliciousEventDto> maliciousEvents = new ArrayList<>();
         if (webhook.getSelectedWebhookOptions() != null) {
             for (WebhookOptions option : webhook.getSelectedWebhookOptions()) {
                 if (WebhookOptions.API_THREAT_PAYLOADS.equals(option)) {
                     // Fetch one record to see if data exists
-                    suspectSampleData = SuspectSampleDataDao.instance.findAll(
-                            Filters.and(
-                                    Filters.gte(SuspectSampleData._DISCOVERED, webhook.getLastSentTimestamp()),
-                                    Filters.lt(SuspectSampleData._DISCOVERED, now)),
-                            0, 1, Sorts.descending(SuspectSampleData._DISCOVERED, Constants.ID),
-                            Projections.exclude(SuspectSampleData._SAMPLE));
-                    if (suspectSampleData != null && !suspectSampleData.isEmpty()) {
+                    String accountId = String.valueOf(Context.accountId.get());
+                    maliciousEvents = MaliciousEventDao.instance.getCollection(accountId)
+                            .find(Filters.and(
+                                    Filters.gte("detectedAt", webhook.getLastSentTimestamp()),
+                                    Filters.lt("detectedAt", now)))
+                            .sort(Sorts.descending("detectedAt", Constants.ID))
+                            .limit(1)
+                            .into(new ArrayList<>());
+                    if (maliciousEvents != null && !maliciousEvents.isEmpty()) {
                         sendApiThreats = true;
                     }
                     break;
@@ -1116,13 +1118,15 @@ public class InitializerListener implements ServletContextListener {
         } 
 
         if (webhook.getBody() != null && !sendApiThreats) {
-            suspectSampleData = SuspectSampleDataDao.instance.findAll(
-                    Filters.and(
-                            Filters.gte(SuspectSampleData._DISCOVERED, webhook.getLastSentTimestamp()),
-                            Filters.lt(SuspectSampleData._DISCOVERED, now)),
-                    0, 1, Sorts.descending(SuspectSampleData._DISCOVERED, Constants.ID),
-                    Projections.exclude(SuspectSampleData._SAMPLE));
-            if (suspectSampleData != null && !suspectSampleData.isEmpty()) {
+            String accountId = String.valueOf(Context.accountId.get());
+            maliciousEvents = MaliciousEventDao.instance.getCollection(accountId)
+                    .find(Filters.and(
+                            Filters.gte("detectedAt", webhook.getLastSentTimestamp()),
+                            Filters.lt("detectedAt", now)))
+                    .sort(Sorts.descending("detectedAt", Constants.ID))
+                    .limit(1)
+                    .into(new ArrayList<>());
+            if (maliciousEvents != null && !maliciousEvents.isEmpty()) {
                 sendApiThreats = webhook.getBody().contains("AKTO.changes_info.apiThreatPayloads");
             }
         }
@@ -1130,7 +1134,7 @@ public class InitializerListener implements ServletContextListener {
         if ((ci == null ||
                 (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() +
                         ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0)
-                && (suspectSampleData == null || suspectSampleData.isEmpty())) {
+                && (maliciousEvents == null || maliciousEvents.isEmpty())) {
             return;
         }
 
@@ -1154,23 +1158,27 @@ public class InitializerListener implements ServletContextListener {
             final int DATA_LIMIT = webhook.getBatchSize() > 0 ? webhook.getBatchSize() : 50;
             int skip = 0;
             final int lastSentTimestamp = webhook.getLastSentTimestamp();
+            String accountId = String.valueOf(Context.accountId.get());
 
             do {
                 try {
-                    suspectSampleData = SuspectSampleDataDao.instance.findAll(
-                            Filters.and(
-                                    Filters.gte(SuspectSampleData._DISCOVERED, lastSentTimestamp),
-                                    Filters.lt(SuspectSampleData._DISCOVERED, now)),
-                            skip, DATA_LIMIT, Sorts.descending(SuspectSampleData._DISCOVERED, Constants.ID));
+                    maliciousEvents = MaliciousEventDao.instance.getCollection(accountId)
+                            .find(Filters.and(
+                                    Filters.gte("detectedAt", lastSentTimestamp),
+                                    Filters.lt("detectedAt", now)))
+                            .sort(Sorts.descending("detectedAt", Constants.ID))
+                            .skip(skip)
+                            .limit(DATA_LIMIT)
+                            .into(new ArrayList<>());
 
-                    if (suspectSampleData != null && !suspectSampleData.isEmpty()) {
-                        valueMap.put("AKTO.changes_info.apiThreatPayloads", suspectSampleData);
+                    if (maliciousEvents != null && !maliciousEvents.isEmpty()) {
+                        valueMap.put("AKTO.changes_info.apiThreatPayloads", maliciousEvents);
                         actuallySendWebhook(webhook, valueMap, now);
                     }
                     skip += DATA_LIMIT;
                     valueMap.clear();
 
-                    if ((suspectSampleData != null && suspectSampleData.size() < DATA_LIMIT) ||
+                    if ((maliciousEvents != null && maliciousEvents.size() < DATA_LIMIT) ||
                     // In case of a dry run / run once, we only want to send data once.
                             webhook.getFrequencyInSeconds() == 0) {
                         break;
@@ -1180,7 +1188,7 @@ public class InitializerListener implements ServletContextListener {
                             LogDb.DASHBOARD);
                 }
 
-            } while(suspectSampleData != null && !suspectSampleData.isEmpty());
+            } while(maliciousEvents != null && !maliciousEvents.isEmpty());
 
         } else {
             actuallySendWebhook(webhook, valueMap, now);
