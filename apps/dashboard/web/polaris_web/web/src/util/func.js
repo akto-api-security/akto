@@ -960,6 +960,16 @@ toMethodUrlString({method,url, shouldParse =false}){
   }
   return method + " " + url;
 },
+
+toMethodUrlApiCollectionIdString({ method, url, apiCollectionId, shouldParse = false }) {
+  if (shouldParse) {
+    const finalMethod = getMethod(url, method);
+    const finalUrl = observeFunc.getTruncatedUrl(url);
+    return finalMethod + " " + finalUrl + " " + apiCollectionId;
+  }
+  return method + " " + url + " " + apiCollectionId;
+},
+
 toMethodUrlObject(str){
 
   if(!str){
@@ -967,6 +977,14 @@ toMethodUrlObject(str){
   }
 
   return {method:str.split(" ")[0], url:str.split(" ")[1]}
+},
+
+toMethodUrlApiCollectionIdObject(str){
+  if(!str){
+    return {method:"", url:"", apiCollectionId:0}  
+  }
+
+  return {method:str.split(" ")[0], url:str.split(" ")[1], apiCollectionId:str.split(" ")[2]}
 },
 validateMethod(methodName) {
   let m = methodName.toUpperCase()
