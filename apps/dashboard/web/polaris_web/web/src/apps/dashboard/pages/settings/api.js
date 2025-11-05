@@ -723,6 +723,13 @@ const settingRequests = {
                 compulsoryDescription
             }
         })
+    },
+    addMcpRegistryIntegration(registries) {
+        return request({
+            url: '/api/addMcpRegistryIntegration',
+            method: 'post',
+            data: {registries}
+        })
     }
 }
 

@@ -36,6 +36,7 @@ import com.akto.util.McpSseEndpointHelper;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
+import com.akto.mcp.McpRegistryUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.mongodb.BasicDBObject;
@@ -120,7 +121,14 @@ public class McpToolsSyncJobExecutor {
 
         logger.info("Starting MCP sync for apiCollectionId: {} and hostname: {}", apiCollection.getId(),
         apiCollection.getHostName());
+        
         List<HttpResponseParams> initResponseList = initializeMcpServerCapabilities(apiCollection, authHeader);
+        
+        // Check registry status AFTER confirming MCP server capabilities
+        if (!initResponseList.isEmpty()) {
+            updateRegistryStatusAfterMcpConfirmation(apiCollection);
+        }
+        
         List<HttpResponseParams> toolsResponseList = handleMcpToolsDiscovery(apiCollection, authHeader);
         List<HttpResponseParams> resourcesResponseList = handleMcpResourceDiscovery(apiCollection, authHeader);
         List<HttpResponseParams> promptsResponseList = handleMcpPromptsDiscovery(apiCollection, authHeader);
@@ -130,6 +138,25 @@ public class McpToolsSyncJobExecutor {
             addAll(resourcesResponseList);
             addAll(promptsResponseList);
         }});
+    }
+
+    private void updateRegistryStatusAfterMcpConfirmation(ApiCollection apiCollection) {
+        try {
+            String hostName = apiCollection.getHostName();
+            String registryStatus = McpRegistryUtils.checkRegistryAvailability(hostName);
+            
+            logger.info("Registry status for MCP server {} (after capability confirmation): {}", 
+                hostName, registryStatus);
+            
+            if (registryStatus != null) {
+                // Update the collection with registry status
+                Bson filter = Filters.eq(ApiCollection.ID, apiCollection.getId());
+                Bson update = Updates.set(ApiCollection.REGISTRY_STATUS, registryStatus);
+                ApiCollectionsDao.instance.updateOne(filter, update);
+            }
+        } catch (Exception e) {
+            logger.error("Error updating registry status for collection: " + apiCollection.getId(), e);
+        }
     }
 
 

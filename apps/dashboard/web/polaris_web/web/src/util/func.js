@@ -708,6 +708,17 @@ prettifyEpoch(epoch) {
     return collectionsObj
   },
 
+  mapCollectionIdToRegistryStatus(collections) {
+    let registryStatusObj = {}
+    collections.forEach((collection)=>{
+      if(!registryStatusObj[collection.id] && collection.registryStatus){
+        registryStatusObj[collection.id] = collection.registryStatus
+      }
+    })
+
+    return registryStatusObj
+  },
+
   mapCollectionIdsToTagName(collections) {
         const allTagCollectionsMap = {};
               collections
@@ -1786,9 +1797,11 @@ joinWordsWithUnderscores(input) {
   async refreshApiCollections() {
     let apiCollections = await homeFunctions.getAllCollections()
     const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
+    const collectionsRegistryStatusMap = func.mapCollectionIdToRegistryStatus(apiCollections)
 
     PersistStore.getState().setAllCollections(apiCollections);
     PersistStore.getState().setCollectionsMap(allCollectionsMap);
+    PersistStore.getState().setCollectionsRegistryStatusMap(collectionsRegistryStatusMap);
   },
 
   convertParamToDotNotation(str) {
@@ -1829,9 +1842,11 @@ joinWordsWithUnderscores(input) {
   async refreshApiCollections() {
     let apiCollections = await homeFunctions.getAllCollections()
     const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
+    const collectionsRegistryStatusMap = func.mapCollectionIdToRegistryStatus(apiCollections)
 
     PersistStore.getState().setAllCollections(apiCollections);
     PersistStore.getState().setCollectionsMap(allCollectionsMap);
+    PersistStore.getState().setCollectionsRegistryStatusMap(collectionsRegistryStatusMap);
   },
   transformString(inputString) {
     let transformedString = inputString.replace(/^\//, '').replace(/\/$/, '').replace(/#$/, '');
