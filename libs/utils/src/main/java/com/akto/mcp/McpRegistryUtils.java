@@ -302,30 +302,10 @@ public final class McpRegistryUtils {
                 for (JsonNode remote : remotesNode) {
                     if (remote == null) continue;
                     
-                    JsonNode urlNode = remote.get(JSON_FIELD_URL);
-                    if (urlNode != null && !urlNode.isNull()) {
-                        String remoteUrl = urlNode.asText();
-                        if (remoteUrl != null && !remoteUrl.isEmpty()) {
-                            if (urlMatchesDomain(remoteUrl, hostname)) {
-                                logger.debug("Domain match found in remotes: {} matches {}", remoteUrl, hostname);
-                                return true;
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Also check repository URL as fallback
-            JsonNode repositoryNode = server.get(JSON_FIELD_REPOSITORY);
-            if (repositoryNode != null && !repositoryNode.isNull()) {
-                JsonNode repoUrlNode = repositoryNode.get(JSON_FIELD_URL);
-                if (repoUrlNode != null && !repoUrlNode.isNull()) {
-                    String repoUrl = repoUrlNode.asText();
-                    if (repoUrl != null && !repoUrl.isEmpty()) {
-                        if (urlMatchesDomain(repoUrl, hostname)) {
-                            logger.debug("Domain match found in repository: {} matches {}", repoUrl, hostname);
-                            return true;
-                        }
+                    String remoteUrl = remote.path(JSON_FIELD_URL).asText();
+                    if (!remoteUrl.isEmpty() && urlMatchesDomain(remoteUrl, hostname)) {
+                        logger.debug("Domain match found in remotes: {} matches {}", remoteUrl, hostname);
+                        return true;
                     }
                 }
             }
@@ -340,16 +320,8 @@ public final class McpRegistryUtils {
     /**
      * Extract domain from URL and check if it matches the given hostname.
      * 
-     * <p>This method:</p>
-     * <ul>
-     *   <li>Removes protocol (http://, https://)</li>
-     *   <li>Extracts the domain part before first slash</li>
-     *   <li>Removes port if present</li>
-     *   <li>Performs case-insensitive exact match</li>
-     * </ul>
-     * 
      * @param url The URL to check (e.g., "https://mcp.notion.com/mcp")
-     * @param hostname The hostname to match (e.g., "mcp.notion.com")
+     * @param hostname The hostname to match (e.g., "mcp.notion.com", without protocol)
      * @return true if the domain extracted from URL matches the hostname exactly
      */
     private static boolean urlMatchesDomain(String url, String hostname) {
@@ -358,33 +330,23 @@ public final class McpRegistryUtils {
         }
         
         try {
-            // Normalize inputs
-            url = url.trim();
-            hostname = hostname.trim();
+            // Remove protocol from URL (e.g., "https://mcp.notion.com/path" -> "mcp.notion.com/path")
+            String domain = url.trim().replaceFirst("^[a-zA-Z][a-zA-Z0-9+.-]*://", "");
             
-            // Remove protocol (http://, https://, etc.)
-            String urlWithoutProtocol = url.replaceFirst("^[a-zA-Z][a-zA-Z0-9+.-]*://", "");
-            
-            if (urlWithoutProtocol.isEmpty()) {
-                return false;
+            // Extract domain part before first slash
+            int slashIndex = domain.indexOf('/');
+            if (slashIndex > 0) {
+                domain = domain.substring(0, slashIndex);
             }
-            
-            // Extract domain (part before first /)
-            int slashIndex = urlWithoutProtocol.indexOf('/');
-            String urlDomain = slashIndex > 0 ? urlWithoutProtocol.substring(0, slashIndex) : urlWithoutProtocol;
             
             // Remove port if present (e.g., "localhost:3000" -> "localhost")
-            int colonIndex = urlDomain.lastIndexOf(':');
-            if (colonIndex > 0) {
-                // Check if what follows is a port number
-                String potentialPort = urlDomain.substring(colonIndex + 1);
-                if (potentialPort.matches("\\d+")) {
-                    urlDomain = urlDomain.substring(0, colonIndex);
-                }
+            int colonIndex = domain.lastIndexOf(':');
+            if (colonIndex > 0 && domain.substring(colonIndex + 1).matches("\\d+")) {
+                domain = domain.substring(0, colonIndex);
             }
             
-            // Perform case-insensitive exact match
-            return urlDomain.equalsIgnoreCase(hostname);
+            // Compare with hostname (case-insensitive)
+            return domain.equalsIgnoreCase(hostname.trim());
             
         } catch (Exception e) {
             logger.error("Error while parsing URL '{}' for domain match with hostname '{}': {}", 
