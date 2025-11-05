@@ -608,7 +608,7 @@ const transform = {
           if (collectionMap[collectionId]) {
             let apiKeyInfoList = []
             collectionMap[collectionId].forEach(apiKeyInfo => {
-              apiKeyInfoList.push({ 'url': apiKeyInfo['url'], 'method': apiKeyInfo['method'], 'apiCollectionId': Number(collectionId) })
+              apiKeyInfoList.push({ 'url': apiKeyInfo['url'], 'method': apiKeyInfo['method'], 'apiCollectionId': Number(apiKeyInfo['apiCollectionId']) })
               found = true
             })
             if (apiKeyInfoList.length > 0) {
@@ -633,12 +633,10 @@ const transform = {
         for (var index = 0; index < valueFromPredicate.length; index++) {
           let apiEndpoint = {
             method: valueFromPredicate[index]['method'],
-            url: valueFromPredicate[index]['url']
+            url: valueFromPredicate[index]['url'],
+            apiCollectionId: valueFromPredicate[index]['apiCollectionId']
           }
-          apiInfoKeyList.push({
-            method: apiEndpoint.method,
-            url: apiEndpoint.url
-          })
+          apiInfoKeyList.push(apiEndpoint)
         }
         valueForCondition[collectionId] = apiInfoKeyList
         conditions.push({ operator: operator, type: e.type, value: valueForCondition })
