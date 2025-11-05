@@ -527,73 +527,73 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     }
 
     public String registerViaOkta() throws IOException{
-        logger.debugAndAddToDb("registerViaOkta called with code: " + (this.code != null ? this.code.substring(0, Math.min(10, this.code.length())) + "..." : "null") + ", state: " + (this.state != null ? "present" : "null"));
+        logger.infoAndAddToDb("registerViaOkta called with code: " + (this.code != null ? this.code.substring(0, Math.min(10, this.code.length())) + "..." : "null") + ", state: " + (this.state != null ? "present" : "null"));
         try {
             Config.OktaConfig oktaConfig = null;
-            logger.debug("Checking deployment mode");
+            logger.info("Checking deployment mode");
             if(DashboardMode.isOnPremDeployment()) {
-                logger.debug("On-prem deployment detected");
+                logger.info("On-prem deployment detected");
                 OktaLogin oktaLoginInstance = OktaLogin.getInstance();
-                logger.debug("OktaLogin instance: " + (oktaLoginInstance != null ? "found" : "null"));
+                logger.info("OktaLogin instance: " + (oktaLoginInstance != null ? "found" : "null"));
                 if(oktaLoginInstance == null){
-                    logger.debugAndAddToDb("OktaLogin instance is null, redirecting to /login");
+                    logger.infoAndAddToDb("OktaLogin instance is null, redirecting to /login");
                     servletResponse.sendRedirect("/login");
                     return ERROR.toUpperCase();
                 }
                 try {
-                    logger.debug("Parsing state as accountId for on-prem");
+                    logger.info("Parsing state as accountId for on-prem");
                     setAccountId(Integer.parseInt(state));
-                    logger.debugAndAddToDb("Parsed accountId from state: " + this.accountId);
+                    logger.infoAndAddToDb("Parsed accountId from state: " + this.accountId);
                 } catch (NumberFormatException e) {
-                    logger.debugAndAddToDb("Failed to parse state as accountId: " + e.getMessage());
+                    logger.infoAndAddToDb("Failed to parse state as accountId: " + e.getMessage());
                     servletResponse.sendRedirect("/login");
                     return ERROR.toUpperCase();
                 }
-                logger.debug("Getting OktaConfig from OktaLogin instance");
+                logger.info("Getting OktaConfig from OktaLogin instance");
                 oktaConfig = OktaLogin.getInstance().getOktaConfig();
-                logger.debug("OktaConfig retrieved: " + (oktaConfig != null ? "found" : "null"));
+                logger.info("OktaConfig retrieved: " + (oktaConfig != null ? "found" : "null"));
             } else {
-                logger.debug("SaaS deployment detected");
-                logger.debug("Decoding state from Base64");
+                logger.info("SaaS deployment detected");
+                logger.info("Decoding state from Base64");
                 String decodedState = new String(java.util.Base64.getDecoder().decode(state));
-                logger.debug("Decoded state: " + decodedState);
+                logger.info("Decoded state: " + decodedState);
                 BasicDBObject parsedState = BasicDBObject.parse(decodedState);
                 String accountId = parsedState.getString("accountId");
-                logger.debug("Extracted accountId from parsed state: " + accountId);
+                logger.info("Extracted accountId from parsed state: " + accountId);
                 setAccountId(Integer.parseInt(accountId));
-                logger.debugAndAddToDb("Set accountId: " + this.accountId);
+                logger.infoAndAddToDb("Set accountId: " + this.accountId);
 
                 if(parsedState.containsKey("signupInvitationCode") && parsedState.containsKey("signupEmailId")) {
-                    logger.debug("State contains signupInvitationCode and signupEmailId");
+                    logger.info("State contains signupInvitationCode and signupEmailId");
                     setSignupInvitationCode(parsedState.getString("signupInvitationCode"));
                     setSignupEmailId(parsedState.getString("signupEmailId"));
-                    logger.debugAndAddToDb("Set signupInvitationCode: " + (this.signupInvitationCode != null ? "present" : "null") + ", signupEmailId: " + this.signupEmailId);
+                    logger.infoAndAddToDb("Set signupInvitationCode: " + (this.signupInvitationCode != null ? "present" : "null") + ", signupEmailId: " + this.signupEmailId);
                 } else {
-                    logger.debug("State does not contain signupInvitationCode or signupEmailId");
+                    logger.info("State does not contain signupInvitationCode or signupEmailId");
                 }
-                logger.debug("Getting OktaConfig for accountId: " + this.accountId);
+                logger.info("Getting OktaConfig for accountId: " + this.accountId);
                 oktaConfig = Config.getOktaConfig(this.accountId);
-                logger.debug("OktaConfig retrieved: " + (oktaConfig != null ? "found" : "null"));
+                logger.info("OktaConfig retrieved: " + (oktaConfig != null ? "found" : "null"));
             }
             if(oktaConfig == null) {
-                logger.debugAndAddToDb("OktaConfig is null, redirecting to /login");
+                logger.infoAndAddToDb("OktaConfig is null, redirecting to /login");
                 servletResponse.sendRedirect("/login");
                 return ERROR.toUpperCase();
             }
-            logger.debug("Building domain URL from OktaDomainUrl: " + oktaConfig.getOktaDomainUrl());
+            logger.info("Building domain URL from OktaDomainUrl: " + oktaConfig.getOktaDomainUrl());
             String domainUrl = "https://" + oktaConfig.getOktaDomainUrl() + "/oauth2/";
             if(oktaConfig.getAuthorisationServerId() == null || oktaConfig.getAuthorisationServerId().isEmpty()){
-                logger.debug("No authorisation server ID found, using default /v1");
+                logger.info("No authorisation server ID found, using default /v1");
                 domainUrl += "/v1";
             }else{
-                logger.debug("Using authorisation server ID: " + oktaConfig.getAuthorisationServerId());
+                logger.info("Using authorisation server ID: " + oktaConfig.getAuthorisationServerId());
                 domainUrl += oktaConfig.getAuthorisationServerId() + "/v1";
             }
             logger.infoAndAddToDb("Trying to login with okta sso for account id: " + accountId + " domain url: " + domainUrl);
             String clientId = oktaConfig.getClientId();
             String clientSecret = oktaConfig.getClientSecret();
             String redirectUri = oktaConfig.getRedirectUri();
-            logger.debug("OktaConfig - ClientId: " + (clientId != null ? "present" : "null") + ", ClientSecret: " + (clientSecret != null ? "present" : "null") + ", RedirectUri: " + redirectUri);
+            logger.info("OktaConfig - ClientId: " + (clientId != null ? "present" : "null") + ", ClientSecret: " + (clientSecret != null ? "present" : "null") + ", RedirectUri: " + redirectUri);
 
             BasicDBObject params = new BasicDBObject();
             params.put("grant_type", "authorization_code");
@@ -601,78 +601,80 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             params.put("client_id", clientId);
             params.put("client_secret", clientSecret);
             params.put("redirect_uri", redirectUri);
-            logger.debug("Built token request params with grant_type: authorization_code");
-            logger.debugAndAddToDb("Making POST request to: " + domainUrl + "/token");
+            logger.info("Built token request params with grant_type: authorization_code");
+            logger.infoAndAddToDb("========== [registerViaOkta] API CALL 1: TOKEN ENDPOINT ==========");
+            logger.infoAndAddToDb("Making POST request to: " + domainUrl + "/token");
             Map<String,Object> tokenData = CustomHttpRequest.postRequestEncodedType(domainUrl +"/token",params);
-            logger.debugAndAddToDb("Token response received, checking for access_token");
+            logger.infoAndAddToDb("Token response received, checking for access_token");
             String accessToken = tokenData.get("access_token").toString();
-            logger.debug("Access token retrieved: " + (accessToken != null && !accessToken.isEmpty() ? "present (length: " + accessToken.length() + ")" : "null/empty"));
-            logger.debugAndAddToDb("Making GET request to: " + domainUrl + "/userinfo");
+            logger.info("Access token retrieved: " + (accessToken != null && !accessToken.isEmpty() ? "present (length: " + accessToken.length() + ")" : "null/empty"));
+            logger.infoAndAddToDb("========== [registerViaOkta] API CALL 2: USERINFO ENDPOINT ==========");
+            logger.infoAndAddToDb("Making GET request to: " + domainUrl + "/userinfo");
             Map<String,Object> userInfo = CustomHttpRequest.getRequest( domainUrl + "/userinfo","Bearer " + accessToken);
-            logger.debugAndAddToDb("UserInfo response received");
+            logger.infoAndAddToDb("UserInfo response received");
             String email = userInfo.get("email").toString();
             String username = userInfo.get("preferred_username").toString();
-            logger.debugAndAddToDb("Extracted user info - email: " + email + ", preferred_username: " + username);
+            logger.infoAndAddToDb("Extracted user info - email: " + email + ", preferred_username: " + username);
 
             if (oktaConfig.getOrganizationDomain() != null && !oktaConfig.getOrganizationDomain().isEmpty()) {
-                logger.debug("Organization domain validation required: " + oktaConfig.getOrganizationDomain());
+                logger.info("Organization domain validation required: " + oktaConfig.getOrganizationDomain());
                 String userDomain = null;
                 if (email != null && email.contains("@")) {
                     userDomain = email.substring(email.indexOf('@') + 1);
-                    logger.debug("Extracted user domain from email: " + userDomain);
+                    logger.info("Extracted user domain from email: " + userDomain);
                 } else {
-                    logger.debug("Email does not contain '@' or is null");
+                    logger.info("Email does not contain '@' or is null");
                 }
 
                 if (userDomain == null || !oktaConfig.getOrganizationDomain().equalsIgnoreCase(userDomain)) {
                     logger.errorAndAddToDb("Domain mismatch: user " + email + " with domain " + userDomain +
                                          " attempted to access account " + accountId +
                                          " with required domain " + oktaConfig.getOrganizationDomain(), LogDb.DASHBOARD);
-                    logger.debug("Redirecting to /login?error=unauthorized due to domain mismatch");
+                    logger.info("Redirecting to /login?error=unauthorized due to domain mismatch");
                     servletResponse.sendRedirect("/login?error=unauthorized");
                     return ERROR.toUpperCase();
                 }
                 logger.infoAndAddToDb("Domain validation passed for user " + email + " accessing account " + accountId);
             } else {
-                logger.debug("No organization domain configured, skipping domain validation");
+                logger.info("No organization domain configured, skipping domain validation");
             }
 
-            logger.debug("Checking for pending invite code");
+            logger.info("Checking for pending invite code");
             if(!StringUtils.isEmpty(signupInvitationCode) && !StringUtils.isEmpty(signupEmailId)) {
-                logger.debug("Processing invite code: " + signupInvitationCode + " for email: " + signupEmailId);
+                logger.info("Processing invite code: " + signupInvitationCode + " for email: " + signupEmailId);
                 Bson filter = Filters.eq(PendingInviteCode.INVITE_CODE, signupInvitationCode);
-                logger.debug("Querying PendingInviteCodesDao for invite code");
+                logger.info("Querying PendingInviteCodesDao for invite code");
                 PendingInviteCode pendingInviteCode = PendingInviteCodesDao.instance.findOne(filter);
-                logger.debug("PendingInviteCode found: " + (pendingInviteCode != null ? "yes" : "no"));
+                logger.info("PendingInviteCode found: " + (pendingInviteCode != null ? "yes" : "no"));
                 if (pendingInviteCode != null && pendingInviteCode.getInviteeEmailId().equals(email)) {
-                    logger.debug("Invite code matches, deleting invite code and updating accountId to: " + pendingInviteCode.getAccountId());
+                    logger.info("Invite code matches, deleting invite code and updating accountId to: " + pendingInviteCode.getAccountId());
                     PendingInviteCodesDao.instance.getMCollection().deleteOne(filter);
                     accountId = pendingInviteCode.getAccountId();
-                    logger.debug("Updated accountId from invite: " + accountId);
+                    logger.info("Updated accountId from invite: " + accountId);
                 } else {
-                    logger.debug("Invite code does not match or invitee email mismatch");
+                    logger.info("Invite code does not match or invitee email mismatch");
                 }
             } else {
-                logger.debug("No signupInvitationCode or signupEmailId present");
+                logger.info("No signupInvitationCode or signupEmailId present");
             }
 
-            logger.debug("Creating OktaSignupInfo for user: " + username);
+            logger.info("Creating OktaSignupInfo for user: " + username);
             SignupInfo.OktaSignupInfo oktaSignupInfo= new SignupInfo.OktaSignupInfo(accessToken, username);
             shouldLogin = "true";
-            logger.debug("Setting shouldLogin to true");
-            logger.debug("Calling createUserAndRedirectWithDefaultRole for email: " + email + ", accountId: " + accountId);
+            logger.info("Setting shouldLogin to true");
+            logger.info("Calling createUserAndRedirectWithDefaultRole for email: " + email + ", accountId: " + accountId);
             createUserAndRedirectWithDefaultRole(email, username, oktaSignupInfo, accountId, Config.ConfigType.OKTA.toString());
             code = "";
-            logger.debug("registerViaOkta completed successfully");
+            logger.info("registerViaOkta completed successfully");
         } catch (Exception e) {
             logger.errorAndAddToDb("Error while signing in via okta sso \n" + e.getMessage(), LogDb.DASHBOARD);
-            logger.debug("Exception in registerViaOkta: " + e.getClass().getName() + " - " + e.getMessage());
+            logger.info("Exception in registerViaOkta: " + e.getClass().getName() + " - " + e.getMessage());
             e.printStackTrace();
-            logger.debug("Redirecting to /login due to exception");
+            logger.info("Redirecting to /login due to exception");
             servletResponse.sendRedirect("/login");
             return ERROR.toUpperCase();
         }
-        logger.debug("Returning SUCCESS from registerViaOkta");
+        logger.info("Returning SUCCESS from registerViaOkta");
         return SUCCESS.toUpperCase();
     }
 
@@ -709,7 +711,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             servletResponse.sendRedirect("/login");
             return ERROR.toUpperCase();
         }
-        logger.debug("Trying to sign in for: " + emailId);
+        logger.info("Trying to sign in for: " + emailId);
         setUserEmail(emailId);
 
         SAMLConfig samlConfig = null;
@@ -724,7 +726,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             return oktaAuthUrlCreator(emailId);
         }
         int tempAccountId = Integer.parseInt(samlConfig.getId());
-        logger.debug("Account id: " + tempAccountId + " found for " + emailId);
+        logger.info("Account id: " + tempAccountId + " found for " + emailId);
         setAccountId(tempAccountId);
 
         Saml2Settings settings = null;
@@ -744,7 +746,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             }
             String relayState = java.util.Base64.getEncoder().encodeToString(relayStateObj.toJson().getBytes());
             auth.login(relayState);
-            logger.debug("Initiated login from saml of " + userEmail);
+            logger.info("Initiated login from saml of " + userEmail);
         } catch (Exception e) {
             servletResponse.sendRedirect("/login");
             return ERROR.toUpperCase();
@@ -771,61 +773,61 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     }
 
     public String oktaInitiateLogin() throws IOException {
-        logger.debug("Okta-initiated login flow started");
+        logger.info("Okta-initiated login flow started");
 
         Config.OktaConfig oktaConfig = null;
         int accountId = -1;
 
-        logger.debug("Getting query string from servlet request");
+        logger.info("Getting query string from servlet request");
         String queryString = servletRequest.getQueryString();
-        logger.debug("Query string: " + (queryString != null ? queryString : "null"));
+        logger.info("Query string: " + (queryString != null ? queryString : "null"));
         String accountIdParam = null;
         if(queryString != null && !queryString.isEmpty()) {
-            logger.debug("Extracting accountId parameter from query string");
+            logger.info("Extracting accountId parameter from query string");
             accountIdParam = Util.getValueFromQueryString(queryString, "accountId");
-            logger.debug("Extracted accountId parameter: " + (accountIdParam != null ? accountIdParam : "null"));
+            logger.info("Extracted accountId parameter: " + (accountIdParam != null ? accountIdParam : "null"));
         } else {
-            logger.debug("Query string is null or empty");
+            logger.info("Query string is null or empty");
         }
 
         if(accountIdParam != null && !accountIdParam.isEmpty()) {
             try {
-                logger.debug("Parsing accountId from query parameter");
+                logger.info("Parsing accountId from query parameter");
                 accountId = Integer.parseInt(accountIdParam);
-                logger.debug("Using accountId from query parameter: " + accountId);
+                logger.info("Using accountId from query parameter: " + accountId);
             } catch (NumberFormatException e) {
                 logger.error("Invalid accountId in query parameter: " + accountIdParam);
-                logger.debug("NumberFormatException: " + e.getMessage());
+                logger.info("NumberFormatException: " + e.getMessage());
             }
         } else {
-            logger.debug("No accountId parameter in query string or it is empty");
+            logger.info("No accountId parameter in query string or it is empty");
         }
 
-        logger.debug("Getting OktaConfig for accountId: " + accountId);
+        logger.info("Getting OktaConfig for accountId: " + accountId);
         oktaConfig = Config.getOktaConfig(accountId);
-        logger.debug("OktaConfig from Config.getOktaConfig: " + (oktaConfig != null ? "found" : "null"));
+        logger.info("OktaConfig from Config.getOktaConfig: " + (oktaConfig != null ? "found" : "null"));
 
         if(oktaConfig == null && DashboardMode.isOnPremDeployment()) {
-            logger.debug("Trying OktaLogin.getInstance() for on-prem deployment");
-            logger.debug("Setting Context.accountId to 1000000");
+            logger.info("Trying OktaLogin.getInstance() for on-prem deployment");
+            logger.info("Setting Context.accountId to 1000000");
             Context.accountId.set(1_000_000);
-            logger.debug("Getting OktaLogin instance");
+            logger.info("Getting OktaLogin instance");
             OktaLogin oktaLoginInstance = OktaLogin.getInstance();
-            logger.debug("OktaLogin instance: " + (oktaLoginInstance != null ? "found" : "null"));
+            logger.info("OktaLogin instance: " + (oktaLoginInstance != null ? "found" : "null"));
             if(oktaLoginInstance != null) {
-                logger.debug("Getting OktaConfig from OktaLogin instance");
+                logger.info("Getting OktaConfig from OktaLogin instance");
                 oktaConfig = oktaLoginInstance.getOktaConfig();
-                logger.debug("OktaConfig from OktaLogin instance: " + (oktaConfig != null ? "found" : "null"));
+                logger.info("OktaConfig from OktaLogin instance: " + (oktaConfig != null ? "found" : "null"));
             } else {
-                logger.debug("OktaLogin instance is null");
+                logger.info("OktaLogin instance is null");
             }
         } else {
-            logger.debug("Skipping OktaLogin.getInstance() - oktaConfig: " + (oktaConfig != null ? "found" : "null") + ", isOnPremDeployment: " + DashboardMode.isOnPremDeployment());
+            logger.info("Skipping OktaLogin.getInstance() - oktaConfig: " + (oktaConfig != null ? "found" : "null") + ", isOnPremDeployment: " + DashboardMode.isOnPremDeployment());
         }
 
         if(oktaConfig == null) {
             logger.error("No Okta configuration found for accountId: " + accountId + ", redirecting to SSO login page");
-            logger.debug("Redirecting to: " + SSO_URL);
+            logger.info("Redirecting to: " + SSO_URL);
             servletResponse.sendRedirect(SSO_URL);
             return ERROR.toUpperCase();
         }
@@ -833,59 +835,59 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         logger.infoAndAddToDb("Okta SSO login initiated for accountId: " + accountId +
                              " with organizationDomain: " + oktaConfig.getOrganizationDomain());
 
-        logger.debug("Okta config found - ClientId: " + oktaConfig.getClientId() +
+        logger.info("Okta config found - ClientId: " + oktaConfig.getClientId() +
                     ", Domain: " + oktaConfig.getOktaDomainUrl() +
                     ", RedirectUri: " + oktaConfig.getRedirectUri() +
                     ", AuthServerId: " + oktaConfig.getAuthorisationServerId());
 
-        logger.debug("Building OAuth parameter map");
+        logger.info("Building OAuth parameter map");
         Map<String, String> paramMap = new HashMap<>();
         paramMap.put("client_id", oktaConfig.getClientId());
         paramMap.put("redirect_uri", oktaConfig.getRedirectUri());
         paramMap.put("response_type", "code");
         paramMap.put("scope", "openid%20email%20profile");
-        logger.debug("OAuth parameters set - client_id, redirect_uri, response_type: code, scope: openid%20email%20profile");
+        logger.info("OAuth parameters set - client_id, redirect_uri, response_type: code, scope: openid%20email%20profile");
 
-        logger.debug("Building state parameter");
+        logger.info("Building state parameter");
         String stateParam;
         if(DashboardMode.isOnPremDeployment()) {
-            logger.debug("On-prem deployment: using plain accountId as state");
+            logger.info("On-prem deployment: using plain accountId as state");
             stateParam = String.valueOf(accountId);
-            logger.debug("Using plain state for on-prem: " + stateParam);
+            logger.info("Using plain state for on-prem: " + stateParam);
         } else {
-            logger.debug("SaaS deployment: building Base64-encoded JSON state");
+            logger.info("SaaS deployment: building Base64-encoded JSON state");
             BasicDBObject stateObj = new BasicDBObject("accountId", String.valueOf(accountId));
             String stateJson = stateObj.toJson();
-            logger.debug("State JSON before encoding: " + stateJson);
+            logger.info("State JSON before encoding: " + stateJson);
             stateParam = java.util.Base64.getEncoder().encodeToString(stateJson.getBytes());
-            logger.debug("Using Base64-encoded JSON state for SaaS: " + stateJson);
+            logger.info("Using Base64-encoded JSON state for SaaS: " + stateJson);
         }
         paramMap.put("state", stateParam);
-        logger.debug("State parameter added to paramMap");
+        logger.info("State parameter added to paramMap");
         String nonce = UUID.randomUUID().toString();
-        logger.debug("Generated nonce: " + nonce);
+        logger.info("Generated nonce: " + nonce);
         paramMap.put("nonce", nonce);
-        logger.debug("Nonce added to paramMap");
+        logger.info("Nonce added to paramMap");
 
-        logger.debug("Converting paramMap to query string");
+        logger.info("Converting paramMap to query string");
         String queryStringParams = SsoUtils.getQueryString(paramMap);
-        logger.debug("Query string params: " + queryStringParams);
+        logger.info("Query string params: " + queryStringParams);
 
-        logger.debug("Building authorization URL");
+        logger.info("Building authorization URL");
         String authUrl = "https://" + oktaConfig.getOktaDomainUrl() + "/oauth2/";
-        logger.debug("Base auth URL: " + authUrl);
+        logger.info("Base auth URL: " + authUrl);
         if(oktaConfig.getAuthorisationServerId() != null && !oktaConfig.getAuthorisationServerId().isEmpty()) {
-            logger.debug("Adding authorisation server ID: " + oktaConfig.getAuthorisationServerId());
+            logger.info("Adding authorisation server ID: " + oktaConfig.getAuthorisationServerId());
             authUrl += oktaConfig.getAuthorisationServerId() + "/";
         } else {
-            logger.debug("No authorisation server ID, using default");
+            logger.info("No authorisation server ID, using default");
         }
         authUrl += "v1/authorize?" + queryStringParams;
 
-        logger.debug("Final authorization URL: " + authUrl);
-        logger.debug("Redirecting to Okta authorization URL for accountId: " + accountId);
+        logger.info("Final authorization URL: " + authUrl);
+        logger.info("Redirecting to Okta authorization URL for accountId: " + accountId);
         servletResponse.sendRedirect(authUrl);
-        logger.debug("Redirect issued successfully");
+        logger.info("Redirect issued successfully");
         return SUCCESS.toUpperCase();
     }
 
@@ -894,7 +896,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         try {
             SAMLConfig samlConfig = null;
             String relayState = servletRequest.getParameter("RelayState");
-            logger.debug("RelayState received in registerViaAzure: " + relayState);
+            logger.info("RelayState received in registerViaAzure: " + relayState);
             if (relayState == null || relayState.isEmpty()) {
                 logger.errorAndAddToDb("RelayState not found");
                 return ERROR.toUpperCase();
