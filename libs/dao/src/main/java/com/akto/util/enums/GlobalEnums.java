@@ -71,7 +71,11 @@ public class GlobalEnums {
         MCP("MCP", Severity.HIGH, "Model Context Protocol (MCP) Security", "MCP"),
         MCP_INPUT_VALIDATION("MCP_INPUT_VALIDATION", Severity.HIGH, "MCP - Input Validation", "MCP_INPUT_VALIDATION"),
         MCP_FUNCTION_MANIPULATION("MCP_FUNCTION_MANIPULATION", Severity.CRITICAL, "Model Context Protocol (MCP) Security - Function Call Manipulation", "MCP_FUNC_MANIP"),
-        MCP_SECURITY("MCP_SECURITY", Severity.HIGH, "Model Context Protocol (MCP) Security", "MCP_SEC");
+        MCP_SECURITY("MCP_SECURITY", Severity.HIGH, "Model Context Protocol (MCP) Security", "MCP_SEC"),
+        AGENTIC_BUSINESS_ALIGNMENT("AGENTIC_BUSINESS_ALIGNMENT", Severity.HIGH, "Business Alignment", "AGENTIC_BUSINESS_ALIGNMENT"),
+        AGENTIC_HALLUCINATION_AND_TRUSTWORTHINESS("AGENTIC_HALLUCINATION_AND_TRUSTWORTHINESS", Severity.HIGH, "Hallucination and Trustworthiness", "AGENTIC_HALLUCINATION_AND_TRUSTWORTHINESS"),
+        AGENTIC_SAFETY("AGENTIC_SAFETY", Severity.HIGH, "Safety", "AGENTIC_SAFETY"),
+        AGENTIC_SECURITY("AGENTIC_SECURITY", Severity.HIGH, "Security", "AGENTIC_SECURITY");
 
         private final String name;
         private final Severity severity;
