@@ -14,6 +14,7 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.mcp.McpRegistryUtils;
 import com.akto.mcp.McpSchema;
 import com.akto.mcp.McpSchema.CallToolRequest;
 import com.akto.mcp.McpSchema.ClientCapabilities;
@@ -64,6 +65,13 @@ public class McpToolsSyncJobExecutor {
     public static final String LOCAL_IP = "127.0.0.1";
     private ServerCapabilities mcpServerCapabilities = null;
 
+    // Configuration for MCP Registry integration
+    private static final String ENV_ENABLE_REGISTRY_CHECK = "ENABLE_MCP_REGISTRY_CHECK";
+    private static final boolean ENABLE_REGISTRY_CHECK_DEFAULT = true;
+    private static final boolean enableRegistryCheck = Boolean.parseBoolean(
+        System.getenv().getOrDefault(ENV_ENABLE_REGISTRY_CHECK, String.valueOf(ENABLE_REGISTRY_CHECK_DEFAULT))
+    );
+
     public static final McpToolsSyncJobExecutor INSTANCE = new McpToolsSyncJobExecutor();
 
     public McpToolsSyncJobExecutor() {
@@ -98,9 +106,20 @@ public class McpToolsSyncJobExecutor {
             logger.info("Starting MCP sync for apiCollectionId: {} and hostname: {}", apiCollection.getId(),
                 apiCollection.getHostName());
             try {
+                // Check if server is listed in official MCP Registry (if enabled)
+
+                
                 Set<String> normalizedSampleDataSet = getNormalizedSampleData(apiCollection.getId());
                 List<HttpResponseParams> initResponseList = initializeMcpServerCapabilities(apiCollection,
                     normalizedSampleDataSet);
+
+                if (!initResponseList.isEmpty()) {
+                    String registryStatus = McpRegistryUtils.checkAndLogRegistryStatus(apiCollection.getHostName(), 
+                        apiCollection.getDisplayName());
+                    // Update the API collection with registry status using DataActor (cyborg)
+                    DataActorFactory.fetchInstance().updateApiCollectionRegistryStatus(
+                        apiCollection.getId(), registryStatus);
+                }
                 List<HttpResponseParams> toolsResponseList = handleMcpToolsDiscovery(apiCollection,
                     normalizedSampleDataSet);
                 List<HttpResponseParams> resourcesResponseList = handleMcpResourceDiscovery(apiCollection,
@@ -413,5 +432,6 @@ public class McpToolsSyncJobExecutor {
             });
         return result;
     }
+    
 }
 

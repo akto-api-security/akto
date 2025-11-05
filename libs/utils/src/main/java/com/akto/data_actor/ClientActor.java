@@ -218,6 +218,24 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public void updateApiCollectionRegistryStatus(int apiCollectionId, String registryStatus) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("apiCollectionId", apiCollectionId);
+        obj.put("registryStatus", registryStatus);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateApiCollectionRegistryStatus", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateApiCollectionRegistryStatus", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error updating api collection registry status" + e + " apiCollectionId " + apiCollectionId
+                    + " registryStatus " + registryStatus, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
     @Override
     public void updateModuleInfo(ModuleInfo moduleInfo) {
         Map<String, List<String>> headers = buildHeaders();

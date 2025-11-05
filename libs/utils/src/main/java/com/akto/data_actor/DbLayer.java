@@ -136,6 +136,13 @@ public class DbLayer {
         );
     }
 
+    public static void updateApiCollectionRegistryStatus(int apiCollectionId, String registryStatus) {
+        ApiCollectionsDao.instance.getMCollection().updateOne(
+                Filters.eq(ApiCollection.ID, apiCollectionId),
+                Updates.set(ApiCollection.REGISTRY_STATUS, registryStatus)
+        );
+    }
+
     public static void updateCidrList(List<String> cidrList) {
         AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(), Updates.addEachToSet("privateCidrList", cidrList),

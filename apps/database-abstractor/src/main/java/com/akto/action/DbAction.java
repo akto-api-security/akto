@@ -68,6 +68,7 @@ public class DbAction extends ActionSupport {
     Account account;
     int vxlanId;
     String name;
+    String registryStatus;
     List<String> cidrList;
     List<BasicDBObject> apiInfoList;
     List<BulkUpdates> writesForFilterSampleData;
@@ -299,6 +300,15 @@ public class DbAction extends ActionSupport {
     public String updateApiCollectionNameForVxlan() {
         try {
             DbLayer.updateApiCollectionName(vxlanId, name);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateApiCollectionRegistryStatus() {
+        try {
+            DbLayer.updateApiCollectionRegistryStatus(apiCollectionId, registryStatus);
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }

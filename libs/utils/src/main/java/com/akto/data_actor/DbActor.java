@@ -71,6 +71,10 @@ public class DbActor extends DataActor {
         DbLayer.updateApiCollectionName(vxlanId, name);
     }
 
+    public void updateApiCollectionRegistryStatus(int apiCollectionId, String registryStatus) {
+        DbLayer.updateApiCollectionRegistryStatus(apiCollectionId, registryStatus);
+    }
+
     public APIConfig fetchApiConfig(String configName) {
         return DbLayer.fetchApiconfig(configName);
     }

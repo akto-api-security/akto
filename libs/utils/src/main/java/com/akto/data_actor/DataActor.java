@@ -58,6 +58,8 @@ public abstract class DataActor {
 
     public abstract void updateApiCollectionNameForVxlan(int vxlanId, String name);
 
+    public abstract void updateApiCollectionRegistryStatus(int apiCollectionId, String registryStatus);
+
     public abstract APIConfig fetchApiConfig(String configName);
 
     public abstract void bulkWriteSingleTypeInfo(List<Object> writesForApiInfo);
