@@ -11051,6 +11051,25 @@
             </result>
         </action>
 
+        <action name="api/addMcpRegistryIntegration"
+            class="com.akto.action.McpRegistryAction" method="addMcpRegistryIntegration">
+            <interceptor-ref name="json" />
+            <interceptor-ref name="defaultStack" />
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param
+                    name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json"> </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param
+                    name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/saveAgentModel" class="com.akto.action.agents.ModelAction" method="saveAgentModel">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
