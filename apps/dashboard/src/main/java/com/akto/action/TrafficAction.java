@@ -36,7 +36,7 @@ import com.opensymphony.xwork2.Action;
 import lombok.Getter;
 import lombok.Setter;
 
-public class TrafficAction {
+public class TrafficAction extends UserAction {
     
     private static final LoggerMaker loggerMaker = new LoggerMaker(TrafficAction.class);
     // TODO: remove this, use API Executor.

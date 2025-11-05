@@ -59,7 +59,14 @@ public class RBAC {
         }
 
         public ReadWriteAccess getReadWriteAccessForFeature(Feature feature) {
-            return roleStrategy.getFeatureAccessMap().getOrDefault(feature, ReadWriteAccess.READ);
+            // change default for dev and and feature label to NO_ACCESS
+            ReadWriteAccess defaultAccess = ReadWriteAccess.READ;
+            if(this.name.equals(Role.DEVELOPER.name()) || this.name.equals(Role.GUEST.name())){
+                if(feature.getAccessGroup().equals(RbacEnums.AccessGroups.PII_DATA)){
+                    defaultAccess = ReadWriteAccess.NO_ACCESS;
+                }
+            }
+            return roleStrategy.getFeatureAccessMap().getOrDefault(feature, defaultAccess);
         }
 
         public String getName() {
