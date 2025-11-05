@@ -16,11 +16,10 @@ import (
 
 // Service handles payload validation using akto-gateway library
 type Service struct {
-	config         *config.Config
-	dbClient       *dbabstractor.Client
-	processor      mcp.RequestProcessor
-	threatReporter *mcp.ThreatReporter
-	logger         *zap.Logger
+	config    *config.Config
+	dbClient  *dbabstractor.Client
+	processor mcp.RequestProcessor
+	logger    *zap.Logger
 }
 
 // NewService creates a new validator service
@@ -28,39 +27,30 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 	// Create database abstractor client
 	dbClient := dbabstractor.NewClient(logger)
 
-	// Create threat reporter for publishing results to dashboard
-	threatReporter := mcp.NewThreatReporter(cfg.ThreatBackendToken)
-
 	// Create validator
-	validator, err := mcp.NewPolicyValidator()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create policy validator: %w", err)
-	}
+	validator := mcp.NewPolicyValidator()
 
 	// Create ingestor (can be nil if not using ingestion)
-	// We'll handle ingestion separately through threat reporter
 	var ingestor mcp.DataIngestor = nil
 
 	// Create session manager (can be nil if not using sessions)
 	var sessionMgr mcp.SessionManagerInterface = nil
 
-	// Create processor with validator, ingestor, sessionManager, and threatReporter
+	// Create processor with validator, ingestor, and sessionManager
 	processor := mcp.NewCommonMCPProcessor(
 		validator,
 		ingestor,
 		sessionMgr,
-		threatReporter,
 		"", // sessionID - empty for our use case
 		"", // projectName - empty for our use case
 		false, // skipThreat - false to enable threat reporting
 	)
 
 	return &Service{
-		config:         cfg,
-		dbClient:       dbClient,
-		processor:      processor,
-		threatReporter: threatReporter,
-		logger:         logger,
+		config:    cfg,
+		dbClient:  dbClient,
+		processor: processor,
+		logger:    logger,
 	}, nil
 }
 
@@ -195,7 +185,7 @@ func (s *Service) ValidateRequest(ctx context.Context, payload string) (*mcp.Val
 		zap.String("payload", payload))
 
 	// Use processor's ProcessRequest method with external policies
-	processResult, err := s.processor.ProcessRequest(ctx, payload, valCtx, policies, auditPolicies, compiledRules, hasAuditRules)
+	processResult, err := s.processor.ProcessRequest(ctx, payload, valCtx, policies, auditPolicies, hasAuditRules)
 	if err != nil {
 		s.logger.Error("ProcessRequest failed", zap.Error(err))
 		return nil, fmt.Errorf("failed to process request: %w", err)
@@ -230,7 +220,7 @@ func (s *Service) ValidateResponse(ctx context.Context, payload string) (*mcp.Va
 	s.logger.Info("Validating response payload")
 
 	// Fetch and parse policies from database abstractor
-	policies, _, compiledRules, _, err := s.fetchAndParsePolicies()
+	policies, _, _, _, err := s.fetchAndParsePolicies()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
@@ -241,7 +231,7 @@ func (s *Service) ValidateResponse(ctx context.Context, payload string) (*mcp.Va
 	}
 
 	// Use processor's ProcessResponse method with external policies
-	processResult, err := s.processor.ProcessResponse(ctx, payload, valCtx, policies, compiledRules)
+	processResult, err := s.processor.ProcessResponse(ctx, payload, valCtx, policies)
 	if err != nil {
 		return nil, fmt.Errorf("failed to process response: %w", err)
 	}
@@ -268,7 +258,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 	s.logger.Info("Validating batch data", zap.Int("count", len(batchData)))
 
 	// Fetch policies once for the entire batch to improve performance
-	policies, auditPolicies, compiledRules, hasAuditRules, err := s.fetchAndParsePolicies()
+	policies, auditPolicies, _, hasAuditRules, err := s.fetchAndParsePolicies()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
@@ -320,7 +310,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 				zap.String("path", data.Path),
 				zap.String("payload", data.RequestPayload))
 
-			processResult, err := s.processor.ProcessRequest(ctx, data.RequestPayload, valCtx, policies, auditPolicies, compiledRules, hasAuditRules)
+			processResult, err := s.processor.ProcessRequest(ctx, data.RequestPayload, valCtx, policies, auditPolicies, hasAuditRules)
 			if err != nil {
 				s.logger.Error("Failed to validate request",
 					zap.Int("index", i),
@@ -348,7 +338,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 
 		// Validate response payload if present
 		if data.ResponsePayload != "" {
-			processResult, err := s.processor.ProcessResponse(ctx, data.ResponsePayload, valCtx, policies, compiledRules)
+			processResult, err := s.processor.ProcessResponse(ctx, data.ResponsePayload, valCtx, policies)
 			if err != nil {
 				s.logger.Error("Failed to validate response", zap.Error(err))
 				result.ResponseError = err.Error()
@@ -394,15 +384,21 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 		}
 
 		// Report to threat backend if threat detected
-		if shouldReport && s.threatReporter != nil {
-			s.reportThreat(ctx, &data, reqResult, respResult)
+		// TODO: Implement threat reporting using new API
+		if shouldReport {
+			// s.reportThreat(ctx, &data, reqResult, respResult)
+			s.logger.Info("Threat detected but reporting not yet implemented",
+				zap.String("method", data.Method),
+				zap.String("path", data.Path))
 		}
 	}
 
 	return results, nil
 }
 
-// reportThreat reports a detected threat to the dashboard using ThreatReporter
+// reportThreat reports a detected threat to the dashboard
+// TODO: Reimplement using new API when threat reporting is available
+/*
 func (s *Service) reportThreat(ctx context.Context, data *models.IngestDataBatch, reqResult, respResult *mcp.ValidationResult) {
 	// Prepare headers
 	reqHeaders := make(map[string]string)
@@ -423,31 +419,12 @@ func (s *Service) reportThreat(ctx context.Context, data *models.IngestDataBatch
 		metadata = respResult.Metadata
 	}
 
-	// Report the threat
-	err := s.threatReporter.ReportThreat(
-		ctx,
-		data.RequestPayload,
-		data.ResponsePayload,
-		metadata,
-		data.IP,           // actor/source IP
-		data.Path,         // endpoint
-		data.Method,       // HTTP method
-		reqHeaders,        // request headers
-		respHeaders,       // response headers
-		statusCode,        // status code
-	)
-
-	if err != nil {
-		s.logger.Error("Failed to report threat to dashboard",
-			zap.Error(err),
-			zap.String("method", data.Method),
-			zap.String("path", data.Path))
-	} else {
-		s.logger.Info("Successfully reported threat to dashboard",
-			zap.String("method", data.Method),
-			zap.String("path", data.Path))
-	}
+	// TODO: Implement threat reporting with new API
+	s.logger.Info("Threat reporting not yet implemented",
+		zap.String("method", data.Method),
+		zap.String("path", data.Path))
 }
+*/
 
 // FetchPolicies fetches guardrail policies from database-abstractor
 func (s *Service) FetchPolicies() error {

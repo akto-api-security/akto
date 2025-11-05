@@ -22,7 +22,7 @@
 		{
 			"name": "akto-guardrails-service-container",
 			"class_name": "Backend",
-			"image": "./../container/Dockerfile",
+			"image": "registry.cloudflare.com/53a10bdb35f546522193c9670ad3e7e5/guardrails-service:1.0.0_local",
 			"instance_type": "standard-1",
 			"max_instances": 2
 		}

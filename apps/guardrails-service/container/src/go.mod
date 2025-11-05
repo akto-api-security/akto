@@ -49,5 +49,5 @@ require (
 	modernc.org/sqlite v1.39.0 // indirect
 )
 
-// Replace directive to point to the actual location in akto-gateway repository (pass_policies_externally branch)
-replace github.com/akto-api-security/mcp-endpoint-shield => github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20251024110204-dc3bd07750e4
+// Replace directive to point to the actual location in akto-gateway repository (stdio-header-fix branch)
+replace github.com/akto-api-security/mcp-endpoint-shield => github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20251104150935-84df8d2eb79f

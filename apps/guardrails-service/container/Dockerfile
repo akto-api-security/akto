@@ -7,11 +7,22 @@ RUN apk add --no-cache git make
 # Set working directory
 WORKDIR /app
 
+# Set GOPRIVATE to skip checksum verification for private repos
+ENV GOPRIVATE=github.com/akto-api-security/*
+ENV GONOSUMDB=github.com/akto-api-security/*
+
+# Copy .netrc for GitHub authentication (create one with your token first)
+# Run: echo -e "machine github.com\nlogin x-access-token\npassword YOUR_TOKEN" > .netrc
+COPY --chmod=600 .netrc /root/.netrc
+
 # Copy go mod files from src directory
 COPY src/go.mod src/go.sum ./
 
 # Download dependencies
 RUN go mod download
+
+# Clean up credentials after download
+RUN rm -f /root/.netrc
 
 # Copy source code from src directory
 COPY src/ .
