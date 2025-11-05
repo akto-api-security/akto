@@ -86,6 +86,9 @@ public class ApiCollection {
     List<CollectionTags> tagsList;
     public static final String TAGS_STRING = "tagsList";
 
+    private String registryStatus;  // "available" if listed in MCP Registry, null otherwise
+    public static final String REGISTRY_STATUS = "registryStatus";
+
     private static final List<String> ENV_KEYWORDS_WITH_DOT = Arrays.asList(
             "staging", "preprod", "qa", "demo", "dev", "test", "svc",
             "localhost", "local", "intranet", "lan", "example", "invalid",
@@ -387,6 +390,14 @@ public class ApiCollection {
             return this.getTagsList().stream().anyMatch(t -> Constants.AKTO_GEN_AI_TAG.equals(t.getKeyName()));
         }
         return false;
+    }
+
+    public String getRegistryStatus() {
+        return registryStatus;
+    }
+
+    public void setRegistryStatus(String registryStatus) {
+        this.registryStatus = registryStatus;
     }
 
 }
