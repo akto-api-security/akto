@@ -69,6 +69,17 @@ const PromptResponse = () => {
         const yamlContent = currentContent;
         
         if (yamlContent && yamlContent.includes('attack_pattern:')) {
+            // Reject potentially dangerous YAML tags that can trigger arbitrary code/object constructors
+            if (yamlContent && /!!(?:js|python|python\/object|<[^>]+>|!<|!ruby\/object)/i.test(yamlContent)) {
+                setToastConfig({
+                    isActive: true,
+                    isError: true,
+                    message: 'Unsupported or unsafe YAML tags detected in input'
+                });
+                setIsLoading(false);
+                return;
+            }
+            
             try {
                 // Use JSON_SCHEMA to prevent arbitrary JS object construction (security fix)
                 const parsedYaml = jsYaml.load(yamlContent, { schema: jsYaml.JSON_SCHEMA });
@@ -142,6 +153,17 @@ const PromptResponse = () => {
         
         // Check if we have YAML template with attack patterns
         if (yamlContent && yamlContent.includes('attack_pattern:')) {
+            // Reject potentially dangerous YAML tags that can trigger arbitrary code/object constructors
+            if (yamlContent && /!!(?:js|python|python\/object|<[^>]+>|!<|!ruby\/object)/i.test(yamlContent)) {
+                setToastConfig({
+                    isActive: true,
+                    isError: true,
+                    message: 'Unsupported or unsafe YAML tags detected in input'
+                });
+                setIsLoading(false);
+                return;
+            }
+            
             try {
                 // Use JSON_SCHEMA to prevent arbitrary JS object construction (security fix)
                 const parsedYaml = jsYaml.load(yamlContent, { schema: jsYaml.JSON_SCHEMA })
