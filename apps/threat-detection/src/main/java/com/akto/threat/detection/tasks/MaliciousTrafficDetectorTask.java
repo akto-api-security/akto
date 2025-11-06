@@ -378,7 +378,7 @@ public class MaliciousTrafficDetectorTask implements Task {
         continue;
       }
 
-
+      // Evaluate filter first (ignore and filter are independent conditions)
       if(apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
         logger.debug("SchemaConform filter found for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
         String apiSchema = getApiSchema(apiCollectionId);
@@ -404,7 +404,18 @@ public class MaliciousTrafficDetectorTask implements Task {
         }
       }
 
-      // If a request passes any of the filter, then it's a malicious request,
+      // If filter matches, check ignore condition
+      // If both filter AND ignore match, don't treat it as a threat (ignore wins)
+      if (hasPassedFilter) {
+        boolean shouldIgnore = threatDetector.shouldIgnoreApi(apiFilter, rawApi, apiInfoKey);
+        if (shouldIgnore) {
+          logger.debugAndAddToDb("Filter matched but ignore condition also matched for url " + apiInfoKey.getUrl() + 
+              " filterId " + apiFilter.getId() + " - skipping threat detection");
+          continue; // Don't send as threat if ignore matches
+        }
+      }
+
+      // If a request passes the filter and ignore doesn't match, then it's a malicious request,
       // and so we push it to kafka
       if (hasPassedFilter) {
         logger.debugAndAddToDb("filter condition satisfied for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
