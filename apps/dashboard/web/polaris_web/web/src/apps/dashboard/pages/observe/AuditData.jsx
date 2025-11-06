@@ -123,36 +123,54 @@ const resourceName = {
     plural: 'audit records',
 };
 
-const stripDeviceIdFromName = (name, dashboardCategory) => {
-    if (dashboardCategory !== 'Agentic Security' || !name) {
+const stripDeviceIdFromName = (name, allCollections, collectionId) => {
+    if (!name || !allCollections || !collectionId) {
         return name;
     }
     
-// Safely verify a 32-char lowercase hex device id followed by a dot without running a regex against unbounded input
-if (name.length >= 33 && name.charAt(32) === '.') {
-    const prefix = name.slice(0, 32);
-    let isHex = true;
-    for (let i = 0; i < 32; i++) {
-        const code = prefix.charCodeAt(i); if (!((code >= 48 && code <= 57) || (code >= 97 && code <= 102))) { isHex = false; break; }
+    // Find the collection by ID
+    const collection = allCollections.find(col => col.id === collectionId);
+    if (!collection || !collection.envType || !Array.isArray(collection.envType)) {
+        return name;
     }
-    if (isHex) { return name.substring(33); }
-}
-    if (deviceIdPattern.test(name)) {
-        return name.substring(33);
+    
+    // Check if any envType has source "ENDPOINT" (case insensitive)
+    const hasEndpointSource = collection.envType.some(env => 
+        env.source && env.source.toLowerCase() === 'endpoint'
+    );
+    
+    if (!hasEndpointSource) {
+        return name;
+    }
+    
+    // Safely verify a 32-char lowercase hex device id followed by a dot
+    if (name.length >= 33 && name.charAt(32) === '.') {
+        const prefix = name.slice(0, 32);
+        let isHex = true;
+        for (let i = 0; i < 32; i++) {
+            const code = prefix.charCodeAt(i); 
+            if (!((code >= 48 && code <= 57) || (code >= 97 && code <= 102))) { 
+                isHex = false; 
+                break; 
+            }
+        }
+        if (isHex) { 
+            return name.substring(33); 
+        }
     }
     
     return name;
 };
 
 const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegistry) => {
-    const dashboardCategory = PersistStore.getState().dashboardCategory;
+    const allCollections = PersistStore.getState().allCollections;
     let temp = {...auditRecord}
     temp['typeComp'] = (
         <MethodBox method={""} url={auditRecord?.type.toLowerCase() || "TOOL"}/>
     )
     
     temp['apiAccessTypesComp'] = temp?.apiAccessTypes && temp?.apiAccessTypes.length > 0 && temp?.apiAccessTypes.join(', ') ;
-    temp['resourceName'] = stripDeviceIdFromName(temp?.resourceName, dashboardCategory);
+    temp['resourceName'] = stripDeviceIdFromName(temp?.resourceName, allCollections, temp?.hostCollectionId);
     temp['lastDetectedComp'] = func.prettifyEpoch(temp?.lastDetected)
     temp['updatedTimestampComp'] = func.prettifyEpoch(temp?.updatedTimestamp)
     temp['approvedAtComp'] = func.prettifyEpoch(temp?.approvedAt)
@@ -206,7 +224,7 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
     )
     temp['collectionName'] = (
         <HorizontalStack gap="2" align="center">
-            <Text>{stripDeviceIdFromName(collectionName, dashboardCategory)}</Text>
+            <Text>{stripDeviceIdFromName(collectionName, allCollections, temp?.hostCollectionId)}</Text>
             {collectionRegistry === "available" && <RegistryBadge />}
         </HorizontalStack>
     );
