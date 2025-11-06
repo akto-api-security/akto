@@ -493,6 +493,20 @@
             </result>
         </action>
 
+
+        <action name="api/insertEndpointShieldLog" class="com.akto.action.DbAction" method="insertEndpointShieldLog">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/insertAnalyserLog" class="com.akto.action.DbAction" method="insertAnalyserLog">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

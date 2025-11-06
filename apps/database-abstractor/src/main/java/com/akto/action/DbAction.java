@@ -1501,6 +1501,24 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String insertEndpointShieldLog() {
+        try {
+            LogsEndpointShield dbLog = new LogsEndpointShield(
+                log.getString("agentId"),
+                log.getString("deviceId"),
+                log.getString("key"),
+                log.getString("level"),
+                log.getString("log"),
+                log.getInt("timestamp")
+            );
+            DbLayer.insertEndpointShieldLog(dbLog);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertEndpointShieldLog " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     private static boolean shouldPersistRuntimeLog(Log log) {
         try {
             String regex = System.getenv("PERSIST_RUNTIME_LOG_REGEX");

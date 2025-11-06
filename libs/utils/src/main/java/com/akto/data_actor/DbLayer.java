@@ -687,6 +687,10 @@ public class DbLayer {
         CyborgLogsDao.instance.insertOne(log);
     }
 
+    public static void insertEndpointShieldLog(LogsEndpointShield log) {
+        LogsEndpointShieldDao.instance.insertOne(log);
+    }
+
     public static void modifyHybridSaasSetting(boolean isHybridSaas) {
         Integer accountId = Context.accountId.get();
         AccountsDao.instance.updateOne(Filters.eq("_id", accountId), Updates.set(Account.HYBRID_SAAS_ACCOUNT, isHybridSaas));
