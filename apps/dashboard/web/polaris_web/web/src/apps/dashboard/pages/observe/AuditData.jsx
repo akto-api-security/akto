@@ -123,13 +123,28 @@ const resourceName = {
     plural: 'audit records',
 };
 
+const stripDeviceIdFromName = (name, dashboardCategory) => {
+    if (dashboardCategory !== 'Agentic Security' || !name) {
+        return name;
+    }
+    
+    const deviceIdPattern = /^[a-f0-9]{32}\./;
+    if (deviceIdPattern.test(name)) {
+        return name.substring(33);
+    }
+    
+    return name;
+};
+
 const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegistry) => {
+    const dashboardCategory = PersistStore.getState().dashboardCategory;
     let temp = {...auditRecord}
     temp['typeComp'] = (
         <MethodBox method={""} url={auditRecord?.type.toLowerCase() || "TOOL"}/>
     )
     
     temp['apiAccessTypesComp'] = temp?.apiAccessTypes && temp?.apiAccessTypes.length > 0 && temp?.apiAccessTypes.join(', ') ;
+    temp['resourceName'] = stripDeviceIdFromName(temp?.resourceName, dashboardCategory);
     temp['lastDetectedComp'] = func.prettifyEpoch(temp?.lastDetected)
     temp['updatedTimestampComp'] = func.prettifyEpoch(temp?.updatedTimestamp)
     temp['approvedAtComp'] = func.prettifyEpoch(temp?.approvedAt)
@@ -183,7 +198,7 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
     )
     temp['collectionName'] = (
         <HorizontalStack gap="2" align="center">
-            <Text>{collectionName}</Text>
+            <Text>{stripDeviceIdFromName(collectionName, dashboardCategory)}</Text>
             {collectionRegistry === "available" && <RegistryBadge />}
         </HorizontalStack>
     );
