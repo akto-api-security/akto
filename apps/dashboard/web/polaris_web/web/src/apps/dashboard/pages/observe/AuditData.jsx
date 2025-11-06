@@ -128,7 +128,15 @@ const stripDeviceIdFromName = (name, dashboardCategory) => {
         return name;
     }
     
-    const deviceIdPattern = /^[a-f0-9]{32}\./;
+// Safely verify a 32-char lowercase hex device id followed by a dot without running a regex against unbounded input
+if (name.length >= 33 && name.charAt(32) === '.') {
+    const prefix = name.slice(0, 32);
+    let isHex = true;
+    for (let i = 0; i < 32; i++) {
+        const code = prefix.charCodeAt(i); if (!((code >= 48 && code <= 57) || (code >= 97 && code <= 102))) { isHex = false; break; }
+    }
+    if (isHex) { return name.substring(33); }
+}
     if (deviceIdPattern.test(name)) {
         return name.substring(33);
     }
