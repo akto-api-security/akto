@@ -31,6 +31,49 @@ const promptHardeningApi = {
             method: 'post',
             data: { templateId }
         })
+    },
+
+    testSystemPrompt: async (systemPrompt, userInput, attackPatterns = null, detectionRules = null) => {
+        // Build request data, only including non-null optional fields
+        const data = { 
+            systemPrompt, 
+            userInput
+        }
+        
+        // Only include attackPatterns if it's not null and has items
+        if (attackPatterns && attackPatterns.length > 0) {
+            data.attackPatterns = attackPatterns
+        }
+        
+        // Only include detectionRules if it's not null
+        // Frontend parses YAML using js-yaml and sends structured data
+        if (detectionRules) {
+            data.detectionRules = detectionRules
+        }
+        
+        console.log('API sending data:', data)
+        
+        return await request({
+            url: '/api/testSystemPrompt',
+            method: 'post',
+            data
+        })
+    },
+
+    hardenSystemPrompt: async (systemPrompt, vulnerabilityContext = null) => {
+        const data = { systemPrompt }
+        
+        if (vulnerabilityContext) {
+            data.vulnerabilityContext = vulnerabilityContext
+        }
+        
+        console.log('API hardening prompt with data:', data)
+        
+        return await request({
+            url: '/api/hardenSystemPrompt',
+            method: 'post',
+            data
+        })
     }
 }
 

@@ -12,8 +12,10 @@ import com.akto.dao.context.Context;
 import com.akto.dao.prompt_hardening.PromptHardeningYamlTemplateDao;
 import com.akto.dto.test_editor.Category;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.gpt.handlers.gpt_prompts.PromptHardeningTestHandler;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
@@ -24,6 +26,17 @@ public class PromptHardeningAction extends UserAction {
     private String templateId;
     private String category;
     private boolean inactive;
+    
+    // Fields for testSystemPrompt endpoint
+    private String systemPrompt;
+    private String userInput;
+    private List<String> attackPatterns;
+    private Map<String, Object> detectionRules;  // Parsed by frontend using js-yaml
+    private Map<String, Object> testResult;
+    
+    // Fields for hardenSystemPrompt endpoint
+    private String vulnerabilityContext;
+    private String hardenedPrompt;
 
     /**
      * Fetches all prompt hardening templates and organizes them by category
@@ -190,6 +203,51 @@ public class PromptHardeningAction extends UserAction {
     }
 
     /**
+     * Helper method to convert nested Map structures to BasicDBObject
+     * This is needed because JSON deserialization creates HashMap objects,
+     * but we need BasicDBObject for MongoDB operations
+     * Frontend parses YAML using js-yaml and sends structured JSON
+     */
+    private BasicDBObject convertToBasicDBObject(Map<String, Object> map) {
+        if (map == null) {
+            return null;
+        }
+        
+        BasicDBObject result = new BasicDBObject();
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            Object value = entry.getValue();
+            
+            // Recursively convert nested maps
+            if (value instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> nestedMap = (Map<String, Object>) value;
+                result.put(entry.getKey(), convertToBasicDBObject(nestedMap));
+            }
+            // Convert lists of maps
+            else if (value instanceof List) {
+                List<?> list = (List<?>) value;
+                List<Object> convertedList = new ArrayList<>();
+                for (Object item : list) {
+                    if (item instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> itemMap = (Map<String, Object>) item;
+                        convertedList.add(convertToBasicDBObject(itemMap));
+                    } else {
+                        convertedList.add(item);
+                    }
+                }
+                result.put(entry.getKey(), convertedList);
+            }
+            // Keep primitive values as-is
+            else {
+                result.put(entry.getKey(), value);
+            }
+        }
+        
+        return result;
+    }
+
+    /**
      * Toggles the inactive status of a prompt template
      */
     public String togglePromptStatus() {
@@ -210,6 +268,73 @@ public class PromptHardeningAction extends UserAction {
                 Filters.eq(Constants.ID, templateId),
                 Updates.set(YamlTemplate.INACTIVE, !template.isInactive())
             );
+            
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            e.printStackTrace();
+            addActionError(e.getMessage());
+            return ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Tests a system prompt against attack patterns using Azure OpenAI
+     * This endpoint simulates an AI agent with the given system prompt and evaluates
+     * whether it's vulnerable to the provided attack patterns
+     */
+    public String testSystemPrompt() {
+        try {
+            // Validate inputs
+            if (systemPrompt == null || systemPrompt.trim().isEmpty()) {
+                throw new Exception("System prompt is required");
+            }
+            
+            if (userInput == null || userInput.trim().isEmpty()) {
+                throw new Exception("User input is required");
+            }
+            
+            // If attackPatterns is null or empty, use userInput as the attack
+            if (attackPatterns == null || attackPatterns.isEmpty()) {
+                attackPatterns = new ArrayList<>();
+                attackPatterns.add(userInput);
+            }
+            
+            // Create query data for the handler
+            BasicDBObject queryData = new BasicDBObject();
+            queryData.put("systemPrompt", systemPrompt);
+            queryData.put("userInput", userInput);
+            queryData.put("attackPatterns", attackPatterns);
+            
+            // Call the LLM handler
+            PromptHardeningTestHandler handler = new PromptHardeningTestHandler();
+            BasicDBObject response = handler.handle(queryData);
+            
+            // Check for errors
+            if (response.containsKey("error")) {
+                throw new Exception(response.getString("error"));
+            }
+            
+            // Get the agent response
+            String agentResponse = response.getString("agentResponse");
+            
+            // Convert detection rules if provided (frontend parses YAML using js-yaml)
+            BasicDBObject detectionRulesObj = null;
+            if (detectionRules != null) {
+                detectionRulesObj = convertToBasicDBObject(detectionRules);
+            }
+            
+            // Analyze vulnerability
+            BasicDBObject analysis = PromptHardeningTestHandler.analyzeVulnerability(
+                agentResponse, 
+                detectionRulesObj
+            );
+            
+            // Build result
+            testResult = new HashMap<>();
+            testResult.put("text", agentResponse);
+            testResult.put("isSafe", analysis.getBoolean("isSafe"));
+            testResult.put("safetyMessage", analysis.getString("safetyMessage"));
+            testResult.put("analysisDetail", analysis.getString("analysisDetail"));
             
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
@@ -258,6 +383,87 @@ public class PromptHardeningAction extends UserAction {
 
     public void setInactive(boolean inactive) {
         this.inactive = inactive;
+    }
+
+    public String getSystemPrompt() {
+        return systemPrompt;
+    }
+
+    public void setSystemPrompt(String systemPrompt) {
+        this.systemPrompt = systemPrompt;
+    }
+
+    public String getUserInput() {
+        return userInput;
+    }
+
+    public void setUserInput(String userInput) {
+        this.userInput = userInput;
+    }
+
+    public List<String> getAttackPatterns() {
+        return attackPatterns;
+    }
+
+    public void setAttackPatterns(List<String> attackPatterns) {
+        this.attackPatterns = attackPatterns;
+    }
+
+    public Map<String, Object> getDetectionRules() {
+        return detectionRules;
+    }
+
+    public void setDetectionRules(Map<String, Object> detectionRules) {
+        this.detectionRules = detectionRules;
+    }
+
+    public Map<String, Object> getTestResult() {
+        return testResult;
+    }
+
+    public void setTestResult(Map<String, Object> testResult) {
+        this.testResult = testResult;
+    }
+
+    public String getVulnerabilityContext() {
+        return vulnerabilityContext;
+    }
+
+    public void setVulnerabilityContext(String vulnerabilityContext) {
+        this.vulnerabilityContext = vulnerabilityContext;
+    }
+
+    public String getHardenedPrompt() {
+        return hardenedPrompt;
+    }
+
+    public void setHardenedPrompt(String hardenedPrompt) {
+        this.hardenedPrompt = hardenedPrompt;
+    }
+
+    /**
+     * Hardens a system prompt by adding security measures using LLM
+     * Takes a vulnerable prompt and returns a hardened version
+     */
+    public String hardenSystemPrompt() {
+        try {
+            // Validate inputs
+            if (systemPrompt == null || systemPrompt.trim().isEmpty()) {
+                throw new Exception("System prompt is required");
+            }
+            
+            // Call the handler to harden the prompt
+            hardenedPrompt = PromptHardeningTestHandler.hardenSystemPrompt(
+                systemPrompt,
+                vulnerabilityContext  // Can be null
+            );
+            
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            e.printStackTrace();
+            addActionError(e.getMessage());
+            return ERROR.toUpperCase();
+        }
     }
 }
 
