@@ -13,7 +13,6 @@ import GithubServerTable from "../../components/tables/GithubServerTable";
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
 import { CellType } from "../../components/tables/rows/GithubRow";
 import { getAgentLogs } from "./dummyData";
-import EndpointShieldMetadataDemo from "./EndpointShieldMetadataDemo";
 import settingRequests from "../settings/api";
 import PersistStore from "../../../main/PersistStore";
 import { mapLabel } from "../../../main/labelHelper";
@@ -130,13 +129,6 @@ const getMetadataFields = (agent) => [
 ];
 
 function EndpointShieldMetadata() {
-    const isDemoAccount = func.isDemoAccount();
-
-    // Show demo version for demo accounts
-    if (isDemoAccount) {
-        return <EndpointShieldMetadataDemo />;
-    }
-
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5]);
@@ -418,7 +410,7 @@ function EndpointShieldMetadata() {
     const mcpServersHeaders = [
         createSimpleHeader("Server Name", "serverName"),
         createSimpleHeader("Server URL", "serverUrl"),
-        createSimpleHeader("Last Seen", "lastSeenFormatted")
+        createSimpleHeader("Last Updated", "lastSeenFormatted")
     ];
 
     // Memoize table data transformation to avoid recalculation on every render
