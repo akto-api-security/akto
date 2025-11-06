@@ -9050,7 +9050,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
@@ -9071,7 +9071,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User saved a prompt hardening template</param>
             </interceptor-ref>
@@ -9093,7 +9093,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User deleted a prompt hardening template</param>
             </interceptor-ref>
@@ -9115,7 +9115,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User toggled prompt template status</param>
             </interceptor-ref>
@@ -9137,7 +9137,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ</param>
                 <param name="actionDescription">User tested a system prompt for vulnerabilities</param>
             </interceptor-ref>
@@ -9159,7 +9159,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ</param>
                 <param name="actionDescription">User hardened a system prompt</param>
             </interceptor-ref>
