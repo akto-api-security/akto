@@ -70,7 +70,8 @@ const PromptResponse = () => {
         
         if (yamlContent && yamlContent.includes('attack_pattern:')) {
             try {
-                const parsedYaml = jsYaml.load(yamlContent);
+                // Use JSON_SCHEMA to prevent arbitrary JS object construction (security fix)
+                const parsedYaml = jsYaml.load(yamlContent, { schema: jsYaml.JSON_SCHEMA });
                 
                 if (parsedYaml.attack_pattern && Array.isArray(parsedYaml.attack_pattern)) {
                     attackPatterns = parsedYaml.attack_pattern;
@@ -142,8 +143,8 @@ const PromptResponse = () => {
         // Check if we have YAML template with attack patterns
         if (yamlContent && yamlContent.includes('attack_pattern:')) {
             try {
-                // Parse YAML using js-yaml library (proper parsing)
-                const parsedYaml = jsYaml.load(yamlContent)
+                // Use JSON_SCHEMA to prevent arbitrary JS object construction (security fix)
+                const parsedYaml = jsYaml.load(yamlContent, { schema: jsYaml.JSON_SCHEMA })
                 
                 // Extract attack patterns
                 if (parsedYaml.attack_pattern && Array.isArray(parsedYaml.attack_pattern)) {
