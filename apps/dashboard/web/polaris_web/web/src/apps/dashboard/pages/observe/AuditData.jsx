@@ -142,21 +142,11 @@ const stripDeviceIdFromName = (name, allCollections, collectionId) => {
     if (!hasEndpointSource) {
         return name;
     }
-    
-    // Safely verify a 32-char lowercase hex device id followed by a dot
-    if (name.length >= 33 && name.charAt(32) === '.') {
-        const prefix = name.slice(0, 32);
-        let isHex = true;
-        for (let i = 0; i < 32; i++) {
-            const code = prefix.charCodeAt(i); 
-            if (!((code >= 48 && code <= 57) || (code >= 97 && code <= 102))) { 
-                isHex = false; 
-                break; 
-            }
-        }
-        if (isHex) { 
-            return name.substring(33); 
-        }
+
+    const dotIndex = name.indexOf('.');
+    if (dotIndex > 0 && dotIndex < name.length - 1) {
+        // Return everything after the first dot
+        return name.substring(dotIndex + 1);
     }
     
     return name;
