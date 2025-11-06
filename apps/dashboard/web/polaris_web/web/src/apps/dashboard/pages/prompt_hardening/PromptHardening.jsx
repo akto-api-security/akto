@@ -13,6 +13,7 @@ import PromptHardeningStore from "./promptHardeningStore"
 import PersistStore from "../../../main/PersistStore"
 
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
+import api from "./api"
 
 import "./PromptHardening.css"
 
@@ -31,7 +32,28 @@ const PromptHardening = () => {
     }
 
     const fetchAllPrompts = async () => {
-        // Initialize with sample prompts data structured like test editor
+        try {
+            // Fetch prompts from backend API using the standard request pattern
+            const data = await api.fetchAllPrompts()
+            
+            // If backend returns data, use it; otherwise fall back to sample data
+            if (data && data.promptsObj) {
+                setPromptsObj(data.promptsObj)
+                
+                // Set default selected prompt if available
+                const firstCategory = Object.keys(data.promptsObj.customPrompts || {})[0]
+                if (firstCategory && data.promptsObj.customPrompts[firstCategory].length > 0) {
+                    setSelectedPrompt(data.promptsObj.customPrompts[firstCategory][0])
+                }
+                
+                setLoading(false)
+                return
+            }
+        } catch (error) {
+            console.error('Error fetching prompts from backend, using sample data:', error)
+        }
+
+        // Fallback to sample prompts data if backend call fails
         const samplePrompts = {
             customPrompts: {
                 "Prompt Injection": [
