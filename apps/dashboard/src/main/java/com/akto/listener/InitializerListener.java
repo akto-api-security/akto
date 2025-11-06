@@ -4077,6 +4077,41 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    /**
+     * 
+     * @param newContent The new template content from GitHub
+     * @param existingContent The existing template content in the database
+     * @return The merged content with ignore section preserved
+     */
+    private static String mergeIgnoreSectionFromExisting(String newContent, String existingContent) {
+        if (existingContent == null || existingContent.isEmpty()) {
+            return newContent;
+        }
+        
+        try {
+            // Parse both YAML contents
+            com.fasterxml.jackson.databind.ObjectMapper yamlMapper = 
+                new com.fasterxml.jackson.databind.ObjectMapper(new com.fasterxml.jackson.dataformat.yaml.YAMLFactory());
+            
+            Map<String, Object> existingMap = yamlMapper.readValue(existingContent, 
+                new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+            Map<String, Object> newMap = yamlMapper.readValue(newContent, 
+                new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+            
+            // If existing template has an ignore section, preserve it
+            if (existingMap.containsKey("ignore")) {
+                newMap.put("ignore", existingMap.get("ignore"));
+                logger.infoAndAddToDb("Preserving ignore section for template during sync");
+            }
+            
+            // Convert back to YAML string
+            return yamlMapper.writeValueAsString(newMap);
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error merging ignore section, using new content as-is: " + e.getMessage());
+            return newContent;
+        }
+    }
+
     public static void processThreatFilterTemplateFilesZip(byte[] zipFile, String author, String source, String repositoryUrl) {
         if (zipFile != null) {
             try (ByteArrayInputStream inputStream = new ByteArrayInputStream(zipFile);
@@ -4125,27 +4160,38 @@ public class InitializerListener implements ServletContextListener {
                             int createdAt = Context.now();
                             int updatedAt = Context.now();
                             int newHashCode = templateContent.hashCode();
-                            List<Bson> updates = new ArrayList<>(
-                                    Arrays.asList(
-                                            Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
-                                            Updates.setOnInsert(YamlTemplate.AUTHOR, author),
-                                            Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
-                                            Updates.set(YamlTemplate.CONTENT, templateContent),
-                                            Updates.set(YamlTemplate.SOURCE, source)
-                                    ));
                             try {
-                                YamlTemplate threatPolicy = FilterYamlTemplateDao.instance.findOne(Filters.eq(Constants.ID, id), Projections.include(YamlTemplate.HASH));
+                                YamlTemplate threatPolicy = FilterYamlTemplateDao.instance.findOne(
+                                    Filters.eq(Constants.ID, id), 
+                                    Projections.include(YamlTemplate.HASH, YamlTemplate.CONTENT)
+                                );
 
+                                String finalContent = templateContent;
+                                int finalHashCode = newHashCode;
+                                
                                 if (threatPolicy == null) {
+                                    // New template - use content as-is
                                     logger.infoAndAddToDb("Adding new threat template=" + id +" for account " + Context.accountId, LogDb.DASHBOARD);
-                                    YamlTemplate insertNew = new YamlTemplate(id, createdAt, author, updatedAt, templateContent, null, null);
+                                    YamlTemplate insertNew = new YamlTemplate(id, createdAt, author, updatedAt, finalContent, null, null);
                                     insertNew.setSource(YamlTemplateSource.AKTO_TEMPLATES);
                                     FilterYamlTemplateDao.instance.insertOne(insertNew);
                                 } else if (threatPolicy.getHash() != newHashCode) {
+                                    // Template exists and has changed - merge ignore section from existing
                                     logger.infoAndAddToDb("Modifying threat template=" + id +" for account " + Context.accountId, LogDb.DASHBOARD);
-                                    updates.add(
-                                        Updates.set(YamlTemplate.HASH, newHashCode)
-                                    );
+                                    
+                                    // Merge: take new fields from repo, preserve ignore from existing
+                                    finalContent = mergeIgnoreSectionFromExisting(templateContent, threatPolicy.getContent());
+                                    finalHashCode = finalContent.hashCode();
+                                    
+                                    // Update all fields with merged content (new fields + preserved ignore)
+                                    List<Bson> updates = new ArrayList<>(
+                                        Arrays.asList(
+                                                Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
+                                                Updates.set(YamlTemplate.CONTENT, finalContent),
+                                                Updates.set(YamlTemplate.SOURCE, source),
+                                                Updates.set(YamlTemplate.HASH, finalHashCode)
+                                        ));
+                                    
                                     FilterYamlTemplateDao.instance.getMCollection().findOneAndUpdate(
                                         Filters.eq(Constants.ID, id),
                                         Updates.combine(updates),
