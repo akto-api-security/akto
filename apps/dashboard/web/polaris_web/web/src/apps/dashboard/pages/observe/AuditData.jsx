@@ -136,7 +136,7 @@ const stripDeviceIdFromName = (name, allCollections, collectionId) => {
     
     // Check if any envType has source "ENDPOINT" (case insensitive)
     const hasEndpointSource = collection.envType.some(env => 
-        env.source && env.source.toLowerCase() === 'endpoint'
+        env.value && env.value.toLowerCase() === 'endpoint'
     );
     
     if (!hasEndpointSource) {
