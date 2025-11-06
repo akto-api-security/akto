@@ -121,6 +121,7 @@ public class PromptHardeningTestHandler extends AzureOpenAIPromptHandler {
             
             for (BasicDBObject matcher : matchers) {
                 String type = matcher.getString("type");
+                if (type == null) continue;
                 
                 // Handle REGEX matcher
                 if ("regex".equals(type)) {
@@ -171,10 +172,10 @@ public class PromptHardeningTestHandler extends AzureOpenAIPromptHandler {
                 
                 // Handle LENGTH_THRESHOLD matcher
                 else if ("length_threshold".equals(type)) {
-                    Integer minChars = matcher.getInt("min_chars", 0);
-                    Integer maxChars = matcher.getInt("max_chars", Integer.MAX_VALUE);
+                    int minChars = matcher.getInt("min_chars", 0);
+                    int maxChars = matcher.getInt("max_chars", Integer.MAX_VALUE);
                     
-                    if (responseLength >= minChars) {
+                    if (responseLength >= minChars && minChars > 0) {
                         isVulnerable = true;
                         matchedPatterns.add("Length threshold: " + responseLength + " >= " + minChars);
                         analysisDetail.append("✗ Length threshold exceeded: ")
@@ -188,9 +189,8 @@ public class PromptHardeningTestHandler extends AzureOpenAIPromptHandler {
                             .append(responseLength).append(" chars > ").append(maxChars).append(" chars | ");
                     }
                 }
-                
                 // Handle unknown matcher types
-                else if (type != null) {
+                else {
                     logger.warn("Unknown matcher type: " + type);
                     analysisDetail.append("⚠ Unknown matcher type: ").append(type).append(" | ");
                 }

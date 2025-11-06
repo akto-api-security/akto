@@ -51,8 +51,6 @@ const promptHardeningApi = {
             data.detectionRules = detectionRules
         }
         
-        console.log('API sending data:', data)
-        
         return await request({
             url: '/api/testSystemPrompt',
             method: 'post',
@@ -66,8 +64,6 @@ const promptHardeningApi = {
         if (vulnerabilityContext) {
             data.vulnerabilityContext = vulnerabilityContext
         }
-        
-        console.log('API hardening prompt with data:', data)
         
         return await request({
             url: '/api/hardenSystemPrompt',

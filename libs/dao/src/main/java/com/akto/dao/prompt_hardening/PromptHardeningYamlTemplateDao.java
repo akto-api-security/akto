@@ -30,12 +30,8 @@ public class PromptHardeningYamlTemplateDao extends AccountsContextDao<YamlTempl
     private static Map<String, YamlTemplate> convertToMap(List<YamlTemplate> yamlTemplates) {
         Map<String, YamlTemplate> templateMap = new HashMap<>();
         for (YamlTemplate yamlTemplate : yamlTemplates) {
-            try {
-                if (yamlTemplate != null && yamlTemplate.getId() != null) {
-                    templateMap.put(yamlTemplate.getId(), yamlTemplate);
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
+            if (yamlTemplate != null && yamlTemplate.getId() != null) {
+                templateMap.put(yamlTemplate.getId(), yamlTemplate);
             }
         }
         return templateMap;
@@ -50,22 +46,20 @@ public class PromptHardeningYamlTemplateDao extends AccountsContextDao<YamlTempl
         Map<String, List<YamlTemplate>> categoryMap = new HashMap<>();
         
         for (YamlTemplate template : yamlTemplates) {
-            try {
-                if (template != null && template.getInfo() != null && 
-                    template.getInfo().getCategory() != null && 
-                    template.getInfo().getCategory().getName() != null) {
-                    
-                    String categoryName = template.getInfo().getCategory().getName();
-                    List<YamlTemplate> templates = categoryMap.getOrDefault(categoryName, new ArrayList<>());
-                    templates.add(template);
-                    categoryMap.put(categoryName, templates);
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
+            if (isValidTemplate(template)) {
+                String categoryName = template.getInfo().getCategory().getName();
+                categoryMap.computeIfAbsent(categoryName, k -> new ArrayList<>()).add(template);
             }
         }
         
         return categoryMap;
+    }
+    
+    private boolean isValidTemplate(YamlTemplate template) {
+        return template != null && 
+               template.getInfo() != null && 
+               template.getInfo().getCategory() != null && 
+               template.getInfo().getCategory().getName() != null;
     }
 
     @Override

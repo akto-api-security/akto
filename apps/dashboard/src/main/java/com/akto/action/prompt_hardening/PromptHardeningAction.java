@@ -124,11 +124,11 @@ public class PromptHardeningAction extends UserAction {
      */
     public String savePrompt() {
         try {
-            if (content == null || content.isEmpty()) {
+            if (content == null || content.trim().isEmpty()) {
                 throw new Exception("Content cannot be empty");
             }
             
-            if (templateId == null || templateId.isEmpty()) {
+            if (templateId == null || templateId.trim().isEmpty()) {
                 throw new Exception("Template ID cannot be empty");
             }
 
@@ -186,7 +186,7 @@ public class PromptHardeningAction extends UserAction {
      */
     public String deletePrompt() {
         try {
-            if (templateId == null || templateId.isEmpty()) {
+            if (templateId == null || templateId.trim().isEmpty()) {
                 throw new Exception("Template ID cannot be empty");
             }
 
@@ -203,10 +203,8 @@ public class PromptHardeningAction extends UserAction {
     }
 
     /**
-     * Helper method to convert nested Map structures to BasicDBObject
-     * This is needed because JSON deserialization creates HashMap objects,
-     * but we need BasicDBObject for MongoDB operations
-     * Frontend parses YAML using js-yaml and sends structured JSON
+     * Converts nested Map structures to BasicDBObject recursively
+     * This is needed because JSON deserialization creates HashMap objects
      */
     private BasicDBObject convertToBasicDBObject(Map<String, Object> map) {
         if (map == null) {
@@ -215,36 +213,24 @@ public class PromptHardeningAction extends UserAction {
         
         BasicDBObject result = new BasicDBObject();
         for (Map.Entry<String, Object> entry : map.entrySet()) {
-            Object value = entry.getValue();
-            
-            // Recursively convert nested maps
-            if (value instanceof Map) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> nestedMap = (Map<String, Object>) value;
-                result.put(entry.getKey(), convertToBasicDBObject(nestedMap));
-            }
-            // Convert lists of maps
-            else if (value instanceof List) {
-                List<?> list = (List<?>) value;
-                List<Object> convertedList = new ArrayList<>();
-                for (Object item : list) {
-                    if (item instanceof Map) {
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> itemMap = (Map<String, Object>) item;
-                        convertedList.add(convertToBasicDBObject(itemMap));
-                    } else {
-                        convertedList.add(item);
-                    }
-                }
-                result.put(entry.getKey(), convertedList);
-            }
-            // Keep primitive values as-is
-            else {
-                result.put(entry.getKey(), value);
-            }
+            result.put(entry.getKey(), convertValue(entry.getValue()));
         }
-        
         return result;
+    }
+    
+    @SuppressWarnings("unchecked")
+    private Object convertValue(Object value) {
+        if (value instanceof Map) {
+            return convertToBasicDBObject((Map<String, Object>) value);
+        } else if (value instanceof List) {
+            List<?> list = (List<?>) value;
+            List<Object> convertedList = new ArrayList<>();
+            for (Object item : list) {
+                convertedList.add(convertValue(item));
+            }
+            return convertedList;
+        }
+        return value;
     }
 
     /**
@@ -252,7 +238,7 @@ public class PromptHardeningAction extends UserAction {
      */
     public String togglePromptStatus() {
         try {
-            if (templateId == null || templateId.isEmpty()) {
+            if (templateId == null || templateId.trim().isEmpty()) {
                 throw new Exception("Template ID cannot be empty");
             }
 

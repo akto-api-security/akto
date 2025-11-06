@@ -26,15 +26,11 @@ const PromptResponse = () => {
                 `${agentResponse.safetyMessage}\n${agentResponse.analysisDetail}` : 
                 "Vulnerability detected in system prompt";
             
-            console.log('🔒 Calling hardenSystemPrompt API...');
-            
             // Call LLM to generate hardened prompt
             const response = await api.hardenSystemPrompt(systemPrompt, vulnerabilityContext);
             
             if (response && response.hardenedPrompt) {
                 const hardenedPrompt = response.hardenedPrompt;
-                
-                console.log('✅ Received hardened prompt:', hardenedPrompt.substring(0, 100) + '...');
                 
                 // Update the UI with hardened prompt
                 setSystemPrompt(hardenedPrompt);
@@ -54,7 +50,6 @@ const PromptResponse = () => {
                 throw new Error("Failed to receive hardened prompt from server");
             }
         } catch (error) {
-            console.error('Error hardening prompt:', error);
             setToastConfig({
                 isActive: true,
                 isError: true,
@@ -85,7 +80,7 @@ const PromptResponse = () => {
                     detectionRules = parsedYaml.detection;
                 }
             } catch (e) {
-                console.error('Error parsing YAML:', e);
+                // Silently handle YAML parsing errors
             }
         }
         
@@ -94,8 +89,6 @@ const PromptResponse = () => {
         }
         
         try {
-            console.log('🚀 Testing with hardened prompt...');
-            
             // Call API with the NEW hardened prompt
             const response = await api.testSystemPrompt(
                 hardenedPrompt,  // Use the NEW hardened prompt
@@ -124,7 +117,6 @@ const PromptResponse = () => {
                 throw new Error("Invalid response from server");
             }
         } catch (error) {
-            console.error('Error testing hardened prompt:', error);
             setToastConfig({
                 isActive: true,
                 isError: true,
@@ -147,13 +139,6 @@ const PromptResponse = () => {
         // Priority: 1) testPrompt parameter (from editor trigger), 2) currentContent (from store)
         const yamlContent = testPrompt || currentContent
         
-        console.log('Testing with:', {
-            hasTestPrompt: !!testPrompt,
-            hasCurrentContent: !!currentContent,
-            usingYaml: !!yamlContent,
-            hasAttackPatterns: yamlContent?.includes('attack_pattern:')
-        })
-        
         // Check if we have YAML template with attack patterns
         if (yamlContent && yamlContent.includes('attack_pattern:')) {
             try {
@@ -169,18 +154,9 @@ const PromptResponse = () => {
                 if (parsedYaml.detection) {
                     detectionRules = parsedYaml.detection
                 }
-                
-                console.log('✅ Parsed YAML with js-yaml:', { 
-                    attackPatterns, 
-                    detectionRules,
-                    promptText,
-                    totalPatterns: attackPatterns?.length || 0
-                })
             } catch (e) {
-                console.error('❌ Error parsing YAML:', e)
+                // Silently handle YAML parsing errors
             }
-        } else {
-            console.log('ℹ️ No YAML template with attack patterns found, using manual input')
         }
 
         // Validate that we have something to test
@@ -198,18 +174,9 @@ const PromptResponse = () => {
         // This ensures attackPatterns is always sent to the backend
         if (!attackPatterns || attackPatterns.length === 0) {
             attackPatterns = [promptText]
-            console.log('📝 No YAML patterns found, using user input as attack pattern:', attackPatterns)
         }
         
         try {
-            console.log('🚀 Calling API with:', { 
-                systemPrompt: systemPrompt.substring(0, 50) + '...', 
-                promptText, 
-                attackPatterns, 
-                attackPatternsCount: attackPatterns?.length || 0,
-                detectionRules
-            })
-            
             // Call the real API
             const response = await api.testSystemPrompt(
                 systemPrompt,
@@ -236,7 +203,6 @@ const PromptResponse = () => {
                 throw new Error("Invalid response from server")
             }
         } catch (error) {
-            console.error('Error testing prompt:', error)
             setToastConfig({
                 isActive: true,
                 isError: true,

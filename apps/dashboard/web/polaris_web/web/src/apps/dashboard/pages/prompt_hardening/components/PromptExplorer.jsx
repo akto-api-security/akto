@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
-import { Badge, Box, Button, HorizontalStack, Icon, Navigation, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris"
-import {ChevronDownMinor, ChevronRightMinor, SearchMinor, CirclePlusMinor} from "@shopify/polaris-icons"
+import { Box, Button, HorizontalStack, Icon, Navigation, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris"
+import {ChevronDownMinor, ChevronRightMinor, SearchMinor} from "@shopify/polaris-icons"
 
 import PromptHardeningStore from "../promptHardeningStore"
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
