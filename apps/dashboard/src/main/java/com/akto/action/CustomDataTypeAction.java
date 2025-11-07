@@ -44,6 +44,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static com.akto.dto.type.SingleTypeInfo.fetchCustomDataTypes;
+import static com.akto.dto.type.SingleTypeInfo.getCustomDataTypeMap;
 import static com.akto.dto.type.SingleTypeInfo.subTypeMap;
 import static com.akto.utils.Utils.extractJsonResponse;
 
@@ -224,7 +225,7 @@ public class CustomDataTypeAction extends UserAction{
         }
 
         SingleTypeInfo.fetchCustomDataTypes(Context.accountId.get());
-        SingleTypeInfo.SubType currentSubType = subTypeMap.get(customDataType.getName());
+        SingleTypeInfo.SubType currentSubType = getCustomDataTypeMap(Context.accountId.get()).get(aktoDataType.getName()).toSubType();
 
         if(redacted){
             int accountId = Context.accountId.get();
@@ -320,12 +321,13 @@ public class CustomDataTypeAction extends UserAction{
         }
 
         SingleTypeInfo.fetchCustomDataTypes(Context.accountId.get());
+        SingleTypeInfo.SubType currentSubType = subTypeMap.get(aktoDataType.getName());
         if(redacted){
             int accountId = Context.accountId.get();
             service.submit(() ->{
                 Context.accountId.set(accountId);
                 loggerMaker.debugAndAddToDb("Triggered a job to fix existing akto data types", LogDb.DASHBOARD);
-                handleDataTypeRedaction();
+                handleRedactionForSubType(currentSubType, true);
             });
         }
 
@@ -500,7 +502,7 @@ public class CustomDataTypeAction extends UserAction{
             for(ApiInfo.ApiInfoKey key : apiInfoKeys){
                 Bson basicFilter = ApiInfoDao.getFilter(key);
                 query.add(basicFilter);
-                querySensitive.add(Filters.and(basicFilter, Filters.eq(SingleTypeInfo.SUB_TYPE, subType.getName())));
+                querySensitive.add(Filters.and(basicFilter, Filters.eq("_id." + SingleTypeInfo.SUB_TYPE, subType.getName())));
             }
             if(!modifySampleData){
                 UpdateResult updateResult = SampleDataDao.instance.updateManyNoUpsert(Filters.or(query), Updates.set("samples", Collections.emptyList()));
