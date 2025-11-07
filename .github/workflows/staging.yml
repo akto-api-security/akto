@@ -85,7 +85,6 @@ jobs:
           IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
           IMAGE_TAG_DASHBOARD: ${{ github.event.inputs.Deploy == 'true' && '-t aktosecurity/akto-api-security-dashboard:flash' || '' }}
           IMAGE_TAG_TESTING: ${{ github.event.inputs.Deploy == 'true' && '-t aktosecurity/akto-api-testing:flash' || '' }}
-          IMAGE_TAG_TESTING_CLI: ${{ github.event.inputs.Deploy == 'true' && '-t aktosecurity/akto-api-testing-cli:flash' || '' }}
         run: |
           echo $IMAGE_TAG >> $GITHUB_STEP_SUMMARY
           docker buildx create --use
@@ -94,14 +93,10 @@ jobs:
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG $IMAGE_TAG_DASHBOARD . --push
           cd ../testing
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG $IMAGE_TAG_TESTING . --push
-          cd ../testing-cli
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG $IMAGE_TAG_TESTING_CLI . --push
           cd ../billing
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-billing:$IMAGE_TAG . --push
           cd ../internal
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG . --push
-          cd ../source-code-analyser
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/source-code-analyser:$IMAGE_TAG . --push
           cd ../threat-detection
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG . --push
           cd ../threat-detection-backend

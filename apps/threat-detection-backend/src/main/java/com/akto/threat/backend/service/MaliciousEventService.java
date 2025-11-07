@@ -317,6 +317,7 @@ public class MaliciousEventService {
                 .setSuccessfulExploit(evt.getSuccessfulExploit() != null ? evt.getSuccessfulExploit() : false)
                 .setLabel(convertModelLabelToString(evt.getLabel()))
                 .setHost(evt.getHost() != null ? evt.getHost() : "")
+                .setJiraTicketUrl(evt.getJiraTicketUrl() != null ? evt.getJiraTicketUrl() : "")
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()
@@ -331,18 +332,25 @@ public class MaliciousEventService {
     shouldNotCreateIndexes.put(accountId, true);
   }
 
-  public int updateMaliciousEventStatus(String accountId, List<String> eventIds, Map<String, Object> filterMap, String status) {
+  public int updateMaliciousEventStatus(String accountId, List<String> eventIds, Map<String, Object> filterMap, String status, String jiraTicketUrl) {
     try {
-      MaliciousEventDto.Status eventStatus = MaliciousEventDto.Status.valueOf(status.toUpperCase());
-      Bson update = Updates.set("status", eventStatus.toString());
+      Bson update = null;
+
+      if(status != null && !status.isEmpty()) {
+        MaliciousEventDto.Status eventStatus = MaliciousEventDto.Status.valueOf(status.toUpperCase());
+        update = Updates.set("status", eventStatus.toString());
+      }
+      if (jiraTicketUrl != null && !jiraTicketUrl.isEmpty()) {
+        update = Updates.set("jiraTicketUrl", jiraTicketUrl);
+      }
 
       Document query = buildQuery(eventIds, filterMap, "update");
       if (query == null) {
         return 0;
       }
 
-      String logMessage = String.format("Updating events %s to status: %s",
-          getQueryDescription(eventIds, filterMap), status);
+      String logMessage = String.format("Updating events %s to status: %s and jiraTicketUrl: %s",
+          getQueryDescription(eventIds, filterMap), status, jiraTicketUrl != null && !jiraTicketUrl.isEmpty() ? jiraTicketUrl : "null");
       logger.info(logMessage);
 
       long modifiedCount = maliciousEventDao.getCollection(accountId).updateMany(query, update).getModifiedCount();

@@ -112,7 +112,11 @@ public class TestTemplateUtils {
             GlobalEnums.TestCategory.SYSTEM_PROMPT_LEAKAGE,
             GlobalEnums.TestCategory.VECTOR_AND_EMBEDDING_WEAKNESSES,
             GlobalEnums.TestCategory.MISINFORMATION,
-            GlobalEnums.TestCategory.UNBOUNDED_CONSUMPTION
+            GlobalEnums.TestCategory.UNBOUNDED_CONSUMPTION,
+            TestCategory.AGENTIC_BUSINESS_ALIGNMENT,
+            TestCategory.AGENTIC_HALLUCINATION_AND_TRUSTWORTHINESS,
+            TestCategory.AGENTIC_SAFETY,
+            TestCategory.AGENTIC_SECURITY,
         };
 
         switch (contextSource) {
