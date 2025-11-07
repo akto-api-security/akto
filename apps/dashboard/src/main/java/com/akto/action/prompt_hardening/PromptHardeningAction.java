@@ -13,6 +13,8 @@ import com.akto.dao.prompt_hardening.PromptHardeningYamlTemplateDao;
 import com.akto.dto.test_editor.Category;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.gpt.handlers.gpt_prompts.PromptHardeningTestHandler;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.BasicDBObject;
@@ -20,6 +22,16 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
 public class PromptHardeningAction extends UserAction {
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(PromptHardeningAction.class, LogDb.DASHBOARD);
+
+    // Security: Maximum input lengths to prevent DoS attacks
+    private static final int MAX_PROMPT_LENGTH = 50000;  // ~50KB for system prompts
+    private static final int MAX_USER_INPUT_LENGTH = 10000;  // ~10KB for user inputs
+    private static final int MAX_ATTACK_PATTERN_LENGTH = 5000;  // Per attack pattern
+    private static final int MAX_ATTACK_PATTERNS_COUNT = 50;  // Max number of attack patterns
+    private static final int MAX_TEMPLATE_CONTENT_LENGTH = 100000;  // ~100KB for templates
+    private static final int MAX_VULNERABILITY_CONTEXT_LENGTH = 20000;  // ~20KB
 
     private Map<String, Object> promptsObj;
     private String content;
@@ -120,16 +132,70 @@ public class PromptHardeningAction extends UserAction {
     }
 
     /**
+     * Validates and sanitizes input strings for security
+     * @param input Input string to validate
+     * @param fieldName Name of the field for error messages
+     * @param maxLength Maximum allowed length
+     * @throws Exception if validation fails
+     */
+    private void validateInput(String input, String fieldName, int maxLength) throws Exception {
+        if (input == null || input.trim().isEmpty()) {
+            throw new Exception(fieldName + " cannot be empty");
+        }
+        
+        if (input.length() > maxLength) {
+            throw new Exception(fieldName + " exceeds maximum length of " + maxLength + " characters");
+        }
+    }
+
+    /**
+     * Sanitizes error messages to prevent information leakage
+     * @param error Original error message
+     * @return Sanitized error message safe for frontend display
+     */
+    private String sanitizeErrorMessage(String error) {
+        if (error == null) {
+            return "An unexpected error occurred. Please try again.";
+        }
+        
+        // Log the original error for debugging
+        loggerMaker.info("Prompt hardening error occurred: " + error);
+        
+        // Remove sensitive information patterns
+        String sanitized = error;
+        
+        // Remove file paths
+        sanitized = sanitized.replaceAll("(/[^\\s]+)+", "[path]");
+        
+        // Remove API keys or tokens (common patterns)
+        sanitized = sanitized.replaceAll("(?i)(api[_-]?key|token|secret|password)[\"']?\\s*[:=]\\s*[\"']?[a-zA-Z0-9_-]+", "$1=[REDACTED]");
+        
+        // Remove stack trace information
+        if (sanitized.contains("at ") && sanitized.contains(".java:")) {
+            sanitized = "An internal error occurred. Please contact support if the issue persists.";
+        }
+        
+        // Provide generic message for common LLM errors
+        if (sanitized.toLowerCase().contains("openai") || 
+            sanitized.toLowerCase().contains("azure") ||
+            sanitized.toLowerCase().contains("llm") ||
+            sanitized.toLowerCase().contains("rate limit")) {
+            return "AI service temporarily unavailable. Please try again in a moment.";
+        }
+        
+        return sanitized;
+    }
+
+    /**
      * Saves or updates a prompt hardening template
      */
     public String savePrompt() {
         try {
-            if (content == null || content.trim().isEmpty()) {
-                throw new Exception("Content cannot be empty");
-            }
+            validateInput(content, "Content", MAX_TEMPLATE_CONTENT_LENGTH);
+            validateInput(templateId, "Template ID", 255);
             
-            if (templateId == null || templateId.trim().isEmpty()) {
-                throw new Exception("Template ID cannot be empty");
+            if (category != null && category.length() > 255) {
+                throw new Exception("Category name exceeds maximum length of 255 characters");
             }
 
             int now = Context.now();
@@ -233,6 +299,33 @@ public class PromptHardeningAction extends UserAction {
         return value;
     }
 
+    private String extractPromptTemplate(BasicDBObject detectionRulesObj) {
+        if (detectionRulesObj == null || !detectionRulesObj.containsKey("matchers")) {
+            return null;
+        }
+
+        @SuppressWarnings("unchecked")
+        List<BasicDBObject> matchers = (List<BasicDBObject>) detectionRulesObj.get("matchers");
+        if (matchers == null) {
+            return null;
+        }
+
+        for (BasicDBObject matcher : matchers) {
+            if (matcher == null) {
+                continue;
+            }
+            String type = matcher.getString("type");
+            if (type != null && type.equalsIgnoreCase("prompt")) {
+                String promptTemplate = matcher.getString("prompt");
+                if (promptTemplate != null && !promptTemplate.trim().isEmpty()) {
+                    return promptTemplate;
+                }
+            }
+        }
+
+        return null;
+    }
+
     /**
      * Toggles the inactive status of a prompt template
      */
@@ -265,55 +358,91 @@ public class PromptHardeningAction extends UserAction {
 
     /**
      * Tests a system prompt against attack patterns using Azure OpenAI
-     * This endpoint simulates an AI agent with the given system prompt and evaluates
-     * whether it's vulnerable to the provided attack patterns
+     * NEW FLOW:
+     * 1. User must provide userInput (either manually or via generateMaliciousUserInput button)
+     * 2. Simulate AI agent response with the system prompt and user input
+     * 3. Use LLM to analyze if the response is vulnerable (replaces regex detection)
      */
     public String testSystemPrompt() {
         try {
-            // Validate inputs
-            if (systemPrompt == null || systemPrompt.trim().isEmpty()) {
-                throw new Exception("System prompt is required");
-            }
+            // Validate system prompt and user input
+            validateInput(systemPrompt, "System prompt", MAX_PROMPT_LENGTH);
+            validateInput(userInput, "User input", MAX_USER_INPUT_LENGTH);
             
-            if (userInput == null || userInput.trim().isEmpty()) {
-                throw new Exception("User input is required");
-            }
-            
-            // If attackPatterns is null or empty, use userInput as the attack
+            // Validate attack patterns - they are required for LLM-based detection
             if (attackPatterns == null || attackPatterns.isEmpty()) {
-                attackPatterns = new ArrayList<>();
-                attackPatterns.add(userInput);
+                throw new Exception("Attack patterns are required for vulnerability testing");
             }
             
-            // Create query data for the handler
+            if (attackPatterns.size() > MAX_ATTACK_PATTERNS_COUNT) {
+                throw new Exception("Number of attack patterns exceeds maximum of " + MAX_ATTACK_PATTERNS_COUNT);
+            }
+            
+            for (int i = 0; i < attackPatterns.size(); i++) {
+                String pattern = attackPatterns.get(i);
+                if (pattern != null && pattern.length() > MAX_ATTACK_PATTERN_LENGTH) {
+                    throw new Exception("Attack pattern " + (i + 1) + " exceeds maximum length of " + MAX_ATTACK_PATTERN_LENGTH);
+                }
+            }
+            
+            // Convert detection rules if provided (used for custom LLM prompt templates or legacy regex)
+            BasicDBObject detectionRulesObj = null;
+            if (detectionRules != null && !detectionRules.isEmpty()) {
+                detectionRulesObj = convertToBasicDBObject(detectionRules);
+            }
+            
+            // Check rate limit before making LLM calls
+            if (!checkRateLimit("testSystemPrompt")) {
+                throw new Exception("Rate limit exceeded. Please try again in a few moments.");
+            }
+            
+            // STEP 1: Simulate AI agent response with system prompt and user input
             BasicDBObject queryData = new BasicDBObject();
             queryData.put("systemPrompt", systemPrompt);
             queryData.put("userInput", userInput);
-            queryData.put("attackPatterns", attackPatterns);
             
-            // Call the LLM handler
             PromptHardeningTestHandler handler = new PromptHardeningTestHandler();
             BasicDBObject response = handler.handle(queryData);
             
-            // Check for errors
+            // Check for errors and sanitize
             if (response.containsKey("error")) {
-                throw new Exception(response.getString("error"));
+                String rawError = response.getString("error");
+                loggerMaker.error("LLM test error: " + rawError);
+                throw new Exception(sanitizeErrorMessage(rawError));
             }
             
             // Get the agent response
             String agentResponse = response.getString("agentResponse");
             
-            // Convert detection rules if provided (frontend parses YAML using js-yaml)
-            BasicDBObject detectionRulesObj = null;
-            if (detectionRules != null) {
-                detectionRulesObj = convertToBasicDBObject(detectionRules);
-            }
+            // STEP 2: Use LLM to analyze if response is vulnerable (NEW APPROACH)
+            BasicDBObject analysis;
             
-            // Analyze vulnerability
-            BasicDBObject analysis = PromptHardeningTestHandler.analyzeVulnerability(
-                agentResponse, 
-                detectionRulesObj
-            );
+            String promptTemplate = extractPromptTemplate(detectionRulesObj);
+            if (promptTemplate != null) {
+                loggerMaker.info("Using template-driven LLM vulnerability detection");
+                analysis = PromptHardeningTestHandler.analyzeVulnerabilityWithLLM(
+                    agentResponse,
+                    attackPatterns,
+                    userInput,
+                    promptTemplate
+                );
+            } else if (detectionRulesObj != null) {
+                // Legacy path: Use regex-based detection (will be removed in future)
+                loggerMaker.info("Using legacy regex-based detection");
+                analysis = PromptHardeningTestHandler.analyzeVulnerability(
+                    agentResponse, 
+                    detectionRulesObj
+                );
+            } else {
+                // NEW PATH: Use LLM-based detection (recommended)
+                loggerMaker.info("Using LLM-based vulnerability detection");
+                analysis = PromptHardeningTestHandler.analyzeVulnerabilityWithLLM(
+                    agentResponse,
+                    attackPatterns,
+                    userInput,
+                    null
+                );
+            }
             
             // Build result
             testResult = new HashMap<>();
@@ -325,7 +454,9 @@ public class PromptHardeningAction extends UserAction {
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             e.printStackTrace();
-            addActionError(e.getMessage());
+            // Use sanitized error message for user-facing errors
+            String sanitizedError = sanitizeErrorMessage(e.getMessage());
+            addActionError(sanitizedError);
             return ERROR.toUpperCase();
         }
     }
@@ -428,14 +559,108 @@ public class PromptHardeningAction extends UserAction {
     }
 
     /**
+     * Simple in-memory rate limiter using a sliding window approach
+     * Maps user ID + operation to list of timestamps
+     */
+    private static final Map<String, List<Long>> rateLimitMap = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final int RATE_LIMIT_WINDOW_SECONDS = 60;  // 1 minute window
+    private static final int MAX_REQUESTS_PER_WINDOW = 10;  // 10 requests per minute
+    
+    /**
+     * Checks if the current user has exceeded the rate limit for the given operation
+     * @param operation The operation name (e.g., "testSystemPrompt", "hardenSystemPrompt")
+     * @return true if request is allowed, false if rate limit exceeded
+     */
+    private boolean checkRateLimit(String operation) {
+        try {
+            String userId = getSUser() != null ? String.valueOf(getSUser().getId()) : "anonymous";
+            String key = userId + ":" + operation;
+            long now = System.currentTimeMillis();
+            long windowStart = now - (RATE_LIMIT_WINDOW_SECONDS * 1000L);
+            
+            // Get or create timestamp list for this user+operation
+            rateLimitMap.putIfAbsent(key, new java.util.concurrent.CopyOnWriteArrayList<>());
+            List<Long> timestamps = rateLimitMap.get(key);
+            
+            // Remove timestamps outside the window
+            timestamps.removeIf(timestamp -> timestamp < windowStart);
+            
+            // Check if limit exceeded
+            if (timestamps.size() >= MAX_REQUESTS_PER_WINDOW) {
+                loggerMaker.info("Rate limit exceeded for user " + userId + " on operation " + operation);
+                return false;
+            }
+            
+            // Add current timestamp
+            timestamps.add(now);
+            
+            return true;
+        } catch (Exception e) {
+            // If rate limiting fails, log but allow the request
+            loggerMaker.error("Rate limit check failed: " + e.getMessage());
+            return true;
+        }
+    }
+
+    /**
+     * Generates malicious user input from attack patterns using LLM
+     * This is called when user clicks "Auto-generate prompt" button
+     */
+    public String generateMaliciousUserInput() {
+        try {
+            // Validate attack patterns
+            if (attackPatterns == null || attackPatterns.isEmpty()) {
+                throw new Exception("Attack patterns are required to generate malicious input");
+            }
+            
+            if (attackPatterns.size() > MAX_ATTACK_PATTERNS_COUNT) {
+                throw new Exception("Number of attack patterns exceeds maximum of " + MAX_ATTACK_PATTERNS_COUNT);
+            }
+            
+            for (int i = 0; i < attackPatterns.size(); i++) {
+                String pattern = attackPatterns.get(i);
+                if (pattern != null && pattern.length() > MAX_ATTACK_PATTERN_LENGTH) {
+                    throw new Exception("Attack pattern " + (i + 1) + " exceeds maximum length of " + MAX_ATTACK_PATTERN_LENGTH);
+                }
+            }
+            
+            // Check rate limit before making LLM call
+            if (!checkRateLimit("generateMaliciousUserInput")) {
+                throw new Exception("Rate limit exceeded. Please try again in a few moments.");
+            }
+            
+            // Generate malicious user input from attack patterns
+            String generatedInput = PromptHardeningTestHandler.generateMaliciousUserInput(attackPatterns);
+            
+            // Return the generated input
+            userInput = generatedInput;
+            
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            e.printStackTrace();
+            // Use sanitized error message for user-facing errors
+            String sanitizedError = sanitizeErrorMessage(e.getMessage());
+            addActionError(sanitizedError);
+            return ERROR.toUpperCase();
+        }
+    }
+
+    /**
      * Hardens a system prompt by adding security measures using LLM
      * Takes a vulnerable prompt and returns a hardened version
      */
     public String hardenSystemPrompt() {
         try {
-            // Validate inputs
-            if (systemPrompt == null || systemPrompt.trim().isEmpty()) {
-                throw new Exception("System prompt is required");
+            // Validate inputs with length checks
+            validateInput(systemPrompt, "System prompt", MAX_PROMPT_LENGTH);
+            
+            if (vulnerabilityContext != null && vulnerabilityContext.length() > MAX_VULNERABILITY_CONTEXT_LENGTH) {
+                throw new Exception("Vulnerability context exceeds maximum length of " + MAX_VULNERABILITY_CONTEXT_LENGTH);
+            }
+            
+            // Check rate limit before making LLM call
+            if (!checkRateLimit("hardenSystemPrompt")) {
+                throw new Exception("Rate limit exceeded. Please try again in a few moments.");
             }
             
             // Call the handler to harden the prompt
@@ -447,7 +672,9 @@ public class PromptHardeningAction extends UserAction {
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             e.printStackTrace();
-            addActionError(e.getMessage());
+            // Use sanitized error message for user-facing errors
+            String sanitizedError = sanitizeErrorMessage(e.getMessage());
+            addActionError(sanitizedError);
             return ERROR.toUpperCase();
         }
     }

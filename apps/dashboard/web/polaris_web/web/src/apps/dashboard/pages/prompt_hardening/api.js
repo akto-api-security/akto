@@ -58,6 +58,14 @@ const promptHardeningApi = {
         })
     },
 
+    generateMaliciousUserInput: async (attackPatterns) => {
+        return await request({
+            url: '/api/generateMaliciousUserInput',
+            method: 'post',
+            data: { attackPatterns }
+        })
+    },
+
     hardenSystemPrompt: async (systemPrompt, vulnerabilityContext = null) => {
         const data = { systemPrompt }
         
