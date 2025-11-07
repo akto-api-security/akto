@@ -708,6 +708,17 @@ prettifyEpoch(epoch) {
     return collectionsObj
   },
 
+  mapCollectionIdToRegistryStatus(collections) {
+    let registryStatusObj = {}
+    collections.forEach((collection)=>{
+      if(!registryStatusObj[collection.id] && collection.registryStatus){
+        registryStatusObj[collection.id] = collection.registryStatus
+      }
+    })
+
+    return registryStatusObj
+  },
+
   mapCollectionIdsToTagName(collections) {
         const allTagCollectionsMap = {};
               collections
@@ -960,6 +971,16 @@ toMethodUrlString({method,url, shouldParse =false}){
   }
   return method + " " + url;
 },
+
+toMethodUrlApiCollectionIdString({ method, url, apiCollectionId, shouldParse = false }) {
+  if (shouldParse) {
+    const finalMethod = getMethod(url, method);
+    const finalUrl = observeFunc.getTruncatedUrl(url);
+    return finalMethod + " " + finalUrl + " " + apiCollectionId;
+  }
+  return method + " " + url + " " + apiCollectionId;
+},
+
 toMethodUrlObject(str){
 
   if(!str){
@@ -967,6 +988,14 @@ toMethodUrlObject(str){
   }
 
   return {method:str.split(" ")[0], url:str.split(" ")[1]}
+},
+
+toMethodUrlApiCollectionIdObject(str){
+  if(!str){
+    return {method:"", url:"", apiCollectionId:0}  
+  }
+
+  return {method:str.split(" ")[0], url:str.split(" ")[1], apiCollectionId:str.split(" ")[2]}
 },
 validateMethod(methodName) {
   let m = methodName.toUpperCase()
@@ -1768,9 +1797,11 @@ joinWordsWithUnderscores(input) {
   async refreshApiCollections() {
     let apiCollections = await homeFunctions.getAllCollections()
     const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
+    const collectionsRegistryStatusMap = func.mapCollectionIdToRegistryStatus(apiCollections)
 
     PersistStore.getState().setAllCollections(apiCollections);
     PersistStore.getState().setCollectionsMap(allCollectionsMap);
+    PersistStore.getState().setCollectionsRegistryStatusMap(collectionsRegistryStatusMap);
   },
 
   convertParamToDotNotation(str) {
@@ -1811,9 +1842,11 @@ joinWordsWithUnderscores(input) {
   async refreshApiCollections() {
     let apiCollections = await homeFunctions.getAllCollections()
     const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
+    const collectionsRegistryStatusMap = func.mapCollectionIdToRegistryStatus(apiCollections)
 
     PersistStore.getState().setAllCollections(apiCollections);
     PersistStore.getState().setCollectionsMap(allCollectionsMap);
+    PersistStore.getState().setCollectionsRegistryStatusMap(collectionsRegistryStatusMap);
   },
   transformString(inputString) {
     let transformedString = inputString.replace(/^\//, '').replace(/\/$/, '').replace(/#$/, '');

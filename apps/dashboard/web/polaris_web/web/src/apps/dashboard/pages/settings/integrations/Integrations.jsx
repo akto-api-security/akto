@@ -13,6 +13,7 @@ import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs';
 import { useNavigate} from 'react-router-dom'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards';
 import func from "@/util/func"
+import { isAgenticSecurityCategory, isMCPSecurityCategory } from '../../../../main/labelHelper'
 
 function Integrations() {
 
@@ -144,6 +145,12 @@ function Integrations() {
       source: '/public/wizard.svg'
     }
 
+    let mcpRegistryObj ={
+      id: 'mcp_registry',
+      name:'MCP Registry',
+      source: '/public/mcp.svg'
+    }
+
     let awsWafObj ={
       id: 'aws_waf',
       name:'AWS WAF',
@@ -222,7 +229,7 @@ function Integrations() {
     const trafficItems = [burpSuiteObj, postmanObj];
     const reportingItems = [githubAppObj];
     const cicdItems = [jenkinsObj, azuredevopsObj, gitlabObj, githubactionsObj, ciCdObj];
-    const aiItems = [aktoGptObj, agentConfigObj];
+    const aiItems = [aktoGptObj, agentConfigObj, mcpRegistryObj];
     const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj, gmailWebhooksObj];
     const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj, serviceNowObj];
     const wafItems = [awsWafObj, f5WafObj, cloudflareWafObj];

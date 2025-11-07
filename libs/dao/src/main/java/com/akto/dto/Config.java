@@ -37,7 +37,7 @@ public abstract class Config {
     public String id;
 
     public enum ConfigType {
-        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, GOOGLE_SAML, AWS_WAF, SPLUNK_SIEM, AKTO_DASHBOARD_HOST_URL, CLOUDFLARE_WAF, RSA_KP;
+        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, GOOGLE_SAML, AWS_WAF, SPLUNK_SIEM, AKTO_DASHBOARD_HOST_URL, CLOUDFLARE_WAF, RSA_KP, MCP_REGISTRY;
     }
 
     public ConfigType configType;
@@ -1004,5 +1004,50 @@ public abstract class Config {
                 Filters.eq(OktaConfig.ORGANIZATION_DOMAIN, domain)
         );
         return config;
+    }
+
+    @Getter
+    @Setter
+    @BsonDiscriminator
+    public static class McpRegistryConfig extends Config {
+
+        public static final String REGISTRIES = "registries";
+        public static final String CONFIG_ID = ConfigType.MCP_REGISTRY.name();
+
+        private List<McpRegistry> registries;
+
+        public McpRegistryConfig() {
+            this.configType = ConfigType.MCP_REGISTRY;
+            this.id = CONFIG_ID;
+        }
+
+        public McpRegistryConfig(List<McpRegistry> registries, int accountId) {
+            this.registries = registries;
+            this.id = accountId + "_" + CONFIG_ID;
+            this.configType = ConfigType.MCP_REGISTRY;
+        }
+
+        @Getter
+        @Setter
+        public static class McpRegistry {
+            public static final String ID = "id";
+            public static final String NAME = "name";
+            public static final String URL = "url";
+            public static final String IS_DEFAULT = "isDefault";
+
+            private String id;
+            private String name;
+            private String url;
+            private boolean isDefault;
+
+            public McpRegistry() {}
+
+            public McpRegistry(String id, String name, String url, boolean isDefault) {
+                this.id = id;
+                this.name = name;
+                this.url = url;
+                this.isDefault = isDefault;
+            }
+        }
     }
 }

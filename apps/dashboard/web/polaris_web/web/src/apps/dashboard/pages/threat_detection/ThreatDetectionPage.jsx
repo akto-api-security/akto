@@ -207,6 +207,7 @@ function ThreatDetectionPage() {
     const [moreInfoData, setMoreInfoData] = useState({})
     const [currentEventId, setCurrentEventId] = useState('')
     const [currentEventStatus, setCurrentEventStatus] = useState('')
+    const [currentJiraTicketUrl, setCurrentJiraTicketUrl] = useState('')
     const [triggerTableRefresh, setTriggerTableRefresh] = useState(0)
     const initialVal = values.ranges[3]
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
@@ -320,6 +321,7 @@ function ThreatDetectionPage() {
                 setCurrentRefId(data?.refId)
                 setCurrentEventId(data?.id)
                 setCurrentEventStatus(data?.status || '')
+                setCurrentJiraTicketUrl(data?.jiraTicketUrl || '')
                 setShowDetails(true)
                 setMoreInfoData({
                     url: data.url,
@@ -417,6 +419,7 @@ function ThreatDetectionPage() {
                 eventId={currentEventId}
                 eventStatus={currentEventStatus}
                 onStatusUpdate={handleStatusUpdate}
+                jiraTicketUrl={currentJiraTicketUrl}
             />
             
 

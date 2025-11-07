@@ -69,6 +69,9 @@ public class ApiCollection {
     String mcpTransportType;
     public static final String MCP_TRANSPORT_TYPE = "mcpTransportType";
 
+    String registryStatus;
+    public static final String REGISTRY_STATUS = "registryStatus";
+
     private static final List<String> ENV_KEYWORDS_WITH_DOT = Arrays.asList(
         "staging", "preprod", "qa", "demo", "dev", "test", "svc", 
         "localhost", "local", "intranet", "lan", "example", "invalid", 
@@ -448,5 +451,13 @@ public class ApiCollection {
 
     public void setMcpTransportType(String mcpTransportType) {
         this.mcpTransportType = mcpTransportType;
+    }
+
+    public String getRegistryStatus() {
+        return registryStatus;
+    }
+
+    public void setRegistryStatus(String registryStatus) {
+        this.registryStatus = registryStatus;
     }
 }

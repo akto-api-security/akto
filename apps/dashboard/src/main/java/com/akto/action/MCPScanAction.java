@@ -120,7 +120,7 @@ public class MCPScanAction extends UserAction {
                         Context.accountId.set(accountId);
                         loggerMaker.info("Starting MCP sync job for collection: {} with host: {} and MCP endpoint: {}",
                             createdCollection.getId(), createdCollection.getHostName(), createdCollection.getSseCallbackUrl());
-                        McpToolsSyncJobExecutor.INSTANCE.runJobforCollection(createdCollection, apiConfig, authHeader);
+                        new McpToolsSyncJobExecutor().runJobforCollection(createdCollection, apiConfig, authHeader);
                     }
                 }, 0, TimeUnit.SECONDS);
 

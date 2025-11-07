@@ -102,6 +102,32 @@ public class ThreatDetector {
         return false;
     }
 
+
+    public boolean shouldIgnoreApi(FilterConfig apiFilter, RawApi rawApi, ApiInfoKey apiInfoKey) {
+        if (apiFilter.getIgnore() == null) {
+            return false; // No ignore section, don't ignore
+        }
+        
+        try {
+            // Create a temporary FilterConfig with just the ignore condition as the filter
+            FilterConfig tempFilter = new FilterConfig();
+            tempFilter.setId(apiFilter.getId() + "_ignore");
+            tempFilter.setFilter(apiFilter.getIgnore());
+            tempFilter.setWordLists(apiFilter.getWordLists());
+            
+            // If the ignore condition matches, we should ignore this API
+            boolean matchesIgnore = validateFilterForRequest(tempFilter, rawApi, apiInfoKey);
+            if (matchesIgnore) {
+                logger.debug("API matches ignore condition for filterId {}, apiInfoKey {}", 
+                    apiFilter.getId(), apiInfoKey.toString());
+            }
+            return matchesIgnore;
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error checking ignore condition for filterId " + apiFilter.getId());
+            return false; // On error, don't ignore
+        }
+    }
+
     
 
     private boolean validateFilterForRequest(

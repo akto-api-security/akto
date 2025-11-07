@@ -28,12 +28,12 @@ public class KafkaBenchmark {
     public static String FILE_PATH = "sample-payloads/";
     public static String payloadFormat = "json";
     public static String payloadSize = payloadSizes.get(0);
-    public static long numRecords = 410000L;
+    public static long numRecords = 41L;
     
     
     
     public static final String THREAT_TOPIC = "akto.api.logs2";
-    public static final String KAFKA_URL = "localhost:29092";
+    public static final String KAFKA_URL = "localhost:19092";
     private static final String CONSUMER_GROUP_ID = "akto.threat_detection";
     private static KafkaConfig internalKafkaConfig =
         KafkaConfig.newBuilder()
@@ -55,6 +55,7 @@ public class KafkaBenchmark {
         System.out.printf("\n\n*******Running KafkaBenchmark******\n\n");
         System.out.println(String.format("Payload size: %s, Number of records: %,d", payloadSize, numRecords));
         dumpRecords(payloadSize, numRecords);
+        Thread.sleep(numRecords * 1000);
 
         // timeFunction(() -> {
         // buildRecords(1024, 100000L);
@@ -97,7 +98,7 @@ public class KafkaBenchmark {
         Map<String, StringList> requestHeaders = new HashMap<>();
         requestHeaders.put("content-type", StringList.newBuilder().addValues("application/json").build());
         requestHeaders.put("authorization", StringList.newBuilder().addValues("Bearer token").build());
-        requestHeaders.put("user-agent", StringList.newBuilder().addValues("KafkaBenchmark/1.0").build());
+        requestHeaders.put("user-agent", StringList.newBuilder().addValues("KafkaBenchmark/1.0/alert('XSS')").build());
         requestHeaders.put("x-forwarded-for", StringList.newBuilder().addValues("14.143.179.162").build());
             
         // Add response headers
@@ -123,7 +124,7 @@ public class KafkaBenchmark {
             .setDirection("INBOUND")
             .setIsPending(false)
             .setSource("MIRRORING")
-            .setAktoVxlanId("vxlan-id");
+            .setAktoVxlanId("1313121");
         
         for (long i = 0; i < numRecords; i++) {
             if (i%100 == 0) {

@@ -430,7 +430,6 @@ public class DashboardRouter implements ARouter {
                 // Determine which type of update to perform
                 List<String> eventIds = null;
                 Map<String, Object> filterMap = null;
-
                 if (req.hasEventId()) {
                     // Single event update
                     eventIds = java.util.Arrays.asList(req.getEventId());
@@ -449,7 +448,8 @@ public class DashboardRouter implements ARouter {
                     ctx.get("accountId"),
                     eventIds,
                     filterMap,
-                    req.getStatus()
+                    req.getStatus(),
+                    req.getJiraTicketUrl()
                 );
 
                 UpdateMaliciousEventStatusResponse resp = UpdateMaliciousEventStatusResponse.newBuilder()
