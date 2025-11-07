@@ -108,13 +108,18 @@ public class RedactSampleData {
         }
     }
 
+
     // never use this function directly. This alters the httpResponseParams
     public static String redact(HttpResponseParams httpResponseParams, final boolean redactAll) throws Exception {
+        redactHttpResponseParams(httpResponseParams,redactAll);
+        return convertHttpRespToOriginalString(httpResponseParams);
+    }
+
+    public static void redactHttpResponseParams(HttpResponseParams httpResponseParams, final boolean redactAll) throws Exception {
         // response headers
         Map<String, List<String>> responseHeaders = httpResponseParams.getHeaders();
         if (responseHeaders == null) responseHeaders = new HashMap<>();
         handleHeaders(responseHeaders, redactAll);
-
         // response payload
         String responsePayload = httpResponseParams.getPayload();
         if (responsePayload == null) responsePayload = "{}";
@@ -130,14 +135,11 @@ public class RedactSampleData {
         } catch (Exception e) {
             responsePayload = "{}";
         }
-
         httpResponseParams.setPayload(responsePayload);
-
         // request headers
         Map<String, List<String>> requestHeaders = httpResponseParams.requestParams.getHeaders();
         if (requestHeaders == null) requestHeaders = new HashMap<>();
         handleHeaders(requestHeaders, redactAll);
-
         // request payload
         String requestPayload = httpResponseParams.requestParams.getPayload();
         //query params
@@ -166,17 +168,13 @@ public class RedactSampleData {
         } catch (Exception e) {
             requestPayload = "{}";
         }
-
         httpResponseParams.requestParams.setPayload(requestPayload);
-
         // ip
         if(redactAll) {
             httpResponseParams.setSourceIP(redactValue);
         }
-
-        return convertHttpRespToOriginalString(httpResponseParams);
-
     }
+
 
     public static void change(String parentName, JsonNode parent, String newValue, boolean redactAll, boolean isGraphqlModified) {
         if (parent == null) return;
