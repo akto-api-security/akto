@@ -225,7 +225,7 @@ public class CustomDataTypeAction extends UserAction{
         }
 
         SingleTypeInfo.fetchCustomDataTypes(Context.accountId.get());
-        SingleTypeInfo.SubType currentSubType = getCustomDataTypeMap(Context.accountId.get()).get(aktoDataType.getName()).toSubType();
+        SingleTypeInfo.SubType currentSubType = customDataType.toSubType();
 
         if(redacted){
             int accountId = Context.accountId.get();
@@ -498,11 +498,9 @@ public class CustomDataTypeAction extends UserAction{
 
             loggerMaker.debugAndAddToDb("Found " + apiInfoKeys.size() + " apiInfoKeys for subType:" + subType.getName(), LogDb.DASHBOARD);
             List<Bson> query = new ArrayList<>();
-            List<Bson> querySensitive = new ArrayList<>();
             for(ApiInfo.ApiInfoKey key : apiInfoKeys){
                 Bson basicFilter = ApiInfoDao.getFilter(key);
                 query.add(basicFilter);
-                querySensitive.add(Filters.and(basicFilter, Filters.eq("_id." + SingleTypeInfo.SUB_TYPE, subType.getName())));
             }
             if(!modifySampleData){
                 UpdateResult updateResult = SampleDataDao.instance.updateManyNoUpsert(Filters.or(query), Updates.set("samples", Collections.emptyList()));
@@ -515,14 +513,16 @@ public class CustomDataTypeAction extends UserAction{
                 for(SampleData sampleData : sampleDataList){
                     List<String> newSamples = handleRedactionForSamples(sampleData.getSamples());
                     sampleData.setSamples(newSamples);
-                    writesForSampleData.add(new UpdateOneModel<>(Filters.eq("_id", sampleData.getId()), Updates.set("samples", newSamples)));
+                    Bson filter = Filters.and(Filters.eq("_id.url", sampleData.getId().getUrl()), Filters.eq("_id.method", sampleData.getId().getMethod()), Filters.eq("_id.apiCollectionId", sampleData.getId().getApiCollectionId()));
+                    writesForSampleData.add(new UpdateOneModel<>(filter, Updates.set("samples", newSamples)));
                 }
 
-                List<SensitiveSampleData> sensitiveSampleDataList = SensitiveSampleDataDao.instance.findAll(Filters.or(querySensitive));
+                List<SensitiveSampleData> sensitiveSampleDataList = SensitiveSampleDataDao.instance.findAll(Filters.or(query));
                 for(SensitiveSampleData sensitiveSampleData : sensitiveSampleDataList){
                     List<String> newSamples = handleRedactionForSamples(sensitiveSampleData.getSampleData());
                     sensitiveSampleData.setSampleData(newSamples);
-                    writesForSensitiveSampleData.add(new UpdateOneModel<>(Filters.eq("_id", sensitiveSampleData.getId()), Updates.set("sampleData", newSamples)));
+                    Bson filter = Filters.and(Filters.eq("_id.url", sensitiveSampleData.getId().getUrl()), Filters.eq("_id.method", sensitiveSampleData.getId().getMethod()), Filters.eq("_id.apiCollectionId", sensitiveSampleData.getId().getApiCollectionId()), Filters.eq("_id.subType", subType.getName()));
+                    writesForSensitiveSampleData.add(new UpdateOneModel<>(filter, Updates.set("sampleData", newSamples)));
                 }
             }
             if(!writesForSampleData.isEmpty()){

@@ -2544,47 +2544,47 @@ public class InitializerListener implements ServletContextListener {
                 SingleTypeInfo.init();
 
                 int now = Context.now();
-                if (true || runJobFunctionsAnyway) {
+                if (runJobFunctions || runJobFunctionsAnyway) {
 
                     logger.debug("Starting init functions and scheduling jobs at " + now);
 
                     AccountTask.instance.executeTask(new Consumer<Account>() {
                         @Override
                         public void accept(Account account) {
-                            // runInitializerFunctions();
+                            runInitializerFunctions();
                         }
                     }, "context-initializer-secondary");
                     logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
                     setUpWebhookScheduler();
                     logger.warn("Started traffic alert schedulers", LogDb.DASHBOARD);
-                    // setUpTrafficAlertScheduler();
+                    setUpTrafficAlertScheduler();
                     logger.warn("Started daily schedulers", LogDb.DASHBOARD);
-                    // setUpDailyScheduler();
+                    setUpDailyScheduler();
                     if (DashboardMode.isMetered()) {
-                        // setupUsageScheduler();
+                        setupUsageScheduler();
                     }
-                    // updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
-                    // syncCronInfo.setUpUpdateCronScheduler();
-                    // setUpTestEditorTemplatesScheduler();
-                    // JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
-                    // updateApiGroupsForAccounts(); 
-                    // setupAutomatedApiGroupsScheduler();
+                    updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
+                    syncCronInfo.setUpUpdateCronScheduler();
+                    setUpTestEditorTemplatesScheduler();
+                    JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
+                    updateApiGroupsForAccounts(); 
+                    setupAutomatedApiGroupsScheduler();
                     if(runJobFunctionsAnyway) {
-                        // crons.trafficAlertsScheduler();
-                        // crons.insertHistoricalDataJob();
-                        // if(DashboardMode.isOnPremDeployment()){
-                        //     crons.insertHistoricalDataJobForOnPrem();
-                        // }
+                        crons.trafficAlertsScheduler();
+                        crons.insertHistoricalDataJob();
+                        if(DashboardMode.isOnPremDeployment()){
+                            crons.insertHistoricalDataJobForOnPrem();
+                        }
 
-                        // trimCappedCollectionsJob();
-                        // setUpPiiAndTestSourcesScheduler();
-                        // cleanInventoryJobRunner();
-                        // setUpDefaultPayloadRemover();
-                        // setUpDependencyFlowScheduler();
-                        // tokenGeneratorCron.tokenGeneratorScheduler();
-                        // crons.deleteTestRunsScheduler();
-                        // setUpUpdateCustomCollections();
-                        // setUpFillCollectionIdArrayJob();
+                        trimCappedCollectionsJob();
+                        setUpPiiAndTestSourcesScheduler();
+                        cleanInventoryJobRunner();
+                        setUpDefaultPayloadRemover();
+                        setUpDependencyFlowScheduler();
+                        tokenGeneratorCron.tokenGeneratorScheduler();
+                        crons.deleteTestRunsScheduler();
+                        setUpUpdateCustomCollections();
+                        setUpFillCollectionIdArrayJob();
                                                
 
                         // CleanInventory.cleanInventoryJobRunner();
