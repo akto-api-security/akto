@@ -26,8 +26,7 @@ const headings = [
     {
         text: "MCP component name",
         value: "resourceName",
-        title: "MCP component name",
-        type: CellType.TEXT
+        title: "MCP component name"
     },
     {
         text: "Collection name",

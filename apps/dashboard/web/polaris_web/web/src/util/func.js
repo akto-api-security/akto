@@ -1797,11 +1797,9 @@ joinWordsWithUnderscores(input) {
   async refreshApiCollections() {
     let apiCollections = await homeFunctions.getAllCollections()
     const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
-    const collectionsRegistryStatusMap = func.mapCollectionIdToRegistryStatus(apiCollections)
 
     PersistStore.getState().setAllCollections(apiCollections);
     PersistStore.getState().setCollectionsMap(allCollectionsMap);
-    PersistStore.getState().setCollectionsRegistryStatusMap(collectionsRegistryStatusMap);
   },
 
   convertParamToDotNotation(str) {
@@ -1838,15 +1836,6 @@ joinWordsWithUnderscores(input) {
       first = false
     })
     return url;
-  },
-  async refreshApiCollections() {
-    let apiCollections = await homeFunctions.getAllCollections()
-    const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
-    const collectionsRegistryStatusMap = func.mapCollectionIdToRegistryStatus(apiCollections)
-
-    PersistStore.getState().setAllCollections(apiCollections);
-    PersistStore.getState().setCollectionsMap(allCollectionsMap);
-    PersistStore.getState().setCollectionsRegistryStatusMap(collectionsRegistryStatusMap);
   },
   transformString(inputString) {
     let transformedString = inputString.replace(/^\//, '').replace(/\/$/, '').replace(/#$/, '');
