@@ -345,18 +345,34 @@ function EndpointShieldMetadata() {
 
     // Handle log mode change
     const handleLogModeChange = useCallback(async (newMode) => {
+        if (logMode === newMode) return; // Prevent unnecessary changes
+        
+        console.log(`Switching to ${newMode} mode for agent:`, selectedAgent?.agentId);
         setLogMode(newMode);
         if (!selectedAgent) return;
         
+        // Keep the logs panel expanded during mode switch
+        const wasExpanded = isLogsExpanded;
+        
+        // Clear existing logs first for immediate feedback
+        setAgentLogs([]);
+        setDisplayedLogs([]);
+        
         if (newMode === LOG_MODES.CURRENT) {
+            console.log('Starting live fetching...');
             await startLiveFetching(selectedAgent.agentId);
         } else {
+            console.log('Fetching historical logs...', { startTimestamp, endTimestamp });
             stopLiveFetching();
             // Fetch historical logs using date range
             const historicalLogs = await fetchAgentLogs(selectedAgent.agentId, startTimestamp, endTimestamp);
+            console.log('Historical logs fetched:', historicalLogs.length);
             setAgentLogs(historicalLogs);
         }
-    }, [selectedAgent, startLiveFetching, stopLiveFetching, fetchAgentLogs, startTimestamp, endTimestamp]);
+        
+        // Ensure logs panel stays in the same state
+        setIsLogsExpanded(wasExpanded);
+    }, [logMode, selectedAgent, isLogsExpanded, startLiveFetching, stopLiveFetching, fetchAgentLogs, startTimestamp, endTimestamp]);
 
     // Handle agent row click to open flyout with details
     const handleRowClick = useCallback(async (agent) => {
@@ -452,43 +468,43 @@ function EndpointShieldMetadata() {
             <div
                 className={`rounded-lg overflow-hidden border border-[#C9CCCF] bg-[#F6F6F7] p-2 flex flex-col ${isLogsExpanded ? "gap-1" : "gap-0"}`}
             >
-                <Button
-                    variant="plain"
-                    fullWidth
-                    onClick={() => setIsLogsExpanded(!isLogsExpanded)}
-                    textAlign="left"
-                    style={{ backgroundColor: '#F6F6F7' }}
-                >
-                    <HorizontalStack gap="2" align="start">
-                        <motion.div animate={{ rotate: isLogsExpanded ? 0 : 270 }} transition={{ duration: ANIMATION_DURATION }}>
-                            <CaretDownMinor height={20} width={20} />
-                        </motion.div>
+                <HorizontalStack gap="2" align="space-between" wrap={false}>
+                    <Button
+                        variant="plain"
+                        onClick={() => setIsLogsExpanded(!isLogsExpanded)}
+                        textAlign="left"
+                        style={{ backgroundColor: '#F6F6F7' }}
+                    >
                         <HorizontalStack gap="2" align="start">
-                            <Text as="dd">
-                                Agent
-                            </Text>
-                            <HorizontalStack gap="1">
-                                <Button 
-                                    size="micro" 
-                                    variant={logMode === LOG_MODES.CURRENT ? "primary" : "tertiary"}
-                                    onClick={() => handleLogModeChange(LOG_MODES.CURRENT)}
-                                >
-                                    Current
-                                </Button>
-                                <Button 
-                                    size="micro" 
-                                    variant={logMode === LOG_MODES.HISTORICAL ? "primary" : "tertiary"}
-                                    onClick={() => handleLogModeChange(LOG_MODES.HISTORICAL)}
-                                >
-                                    Historical
-                                </Button>
-                            </HorizontalStack>
-                            {logMode === LOG_MODES.CURRENT && isLiveFetching && (
-                                <Badge tone="success">Live</Badge>
-                            )}
+                            <motion.div animate={{ rotate: isLogsExpanded ? 0 : 270 }} transition={{ duration: ANIMATION_DURATION }}>
+                                <CaretDownMinor height={20} width={20} />
+                            </motion.div>
+                            <Text as="dd">Agent</Text>
                         </HorizontalStack>
+                    </Button>
+                    <HorizontalStack gap="1">
+                        <Button 
+                            size="micro" 
+                            pressed={logMode === LOG_MODES.CURRENT}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleLogModeChange(LOG_MODES.CURRENT);
+                            }}
+                        >
+                            Live
+                        </Button>
+                        <Button 
+                            size="micro" 
+                            pressed={logMode === LOG_MODES.HISTORICAL}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleLogModeChange(LOG_MODES.HISTORICAL);
+                            }}
+                        >
+                            All Time
+                        </Button>
                     </HorizontalStack>
-                </Button>
+                </HorizontalStack>
 
                 <AnimatePresence>
                     <motion.div
