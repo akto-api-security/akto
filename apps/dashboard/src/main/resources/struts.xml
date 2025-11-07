@@ -526,7 +526,7 @@
             </result>
         </action>
 
-        <action name="api/getMcpServersByAgent" class="com.akto.action.monitoring.EndpointShieldServerAction" method="getMcpServersByAgent">
+        <action name="api/getMcpServersByAgent" class="com.akto.action.monitoring.EndpointShieldAgentAction" method="getMcpServersByAgent">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -549,7 +549,7 @@
             </result>
         </action>
 
-        <action name="api/getAgentLogs" class="com.akto.action.monitoring.EndpointShieldServerAction" method="fetchAgentLogs">
+        <action name="api/getAgentLogs" class="com.akto.action.monitoring.EndpointShieldAgentAction" method="fetchAgentLogs">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">

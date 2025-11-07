@@ -91,6 +91,19 @@ const LOG_TIMESTAMP_WIDTH = "180px";
 const LOG_LEVEL_WIDTH = "60px";
 const DEFAULT_VALUE = '-';
 
+// Log fetching modes
+const LOG_MODES = {
+    CURRENT: 'CURRENT',
+    HISTORICAL: 'HISTORICAL'
+};
+
+// Log limits to prevent performance issues
+const LOG_LIMITS = {
+    MAX_LOGS_DISPLAYED: 1000,   // Maximum logs to display in UI
+    MAX_LOGS_FETCHED: 5000,     // Maximum logs to fetch from API
+    LIVE_LOG_LIMIT: 500         // Maximum logs to keep in live mode
+};
+
 const convertDataIntoTableFormat = (agentData) => {
     return {
         ...agentData,
@@ -140,6 +153,9 @@ function EndpointShieldMetadata() {
     const [agentLogs, setAgentLogs] = useState([]);
     const [displayedLogs, setDisplayedLogs] = useState([]);
     const [isLogsExpanded, setIsLogsExpanded] = useState(true);
+    const [logMode, setLogMode] = useState(LOG_MODES.CURRENT);
+    const [isLiveFetching, setIsLiveFetching] = useState(false);
+    const [liveInterval, setLiveInterval] = useState(null);
     const [description, setDescription] = useState("");
     const [isEditingDescription, setIsEditingDescription] = useState(false);
     const [editableDescription, setEditableDescription] = useState("");
@@ -238,6 +254,110 @@ function EndpointShieldMetadata() {
         func.setToast(true, false, "Description saved");
     }, [editableDescription]);
 
+    // Fetch agent logs with optional time range
+    const fetchAgentLogs = useCallback(async (agentId, startTime, endTime) => {
+        try {
+            const logsResponse = await settingRequests.getAgentLogs(agentId, startTime, endTime);
+            // Transform API response to match expected format
+            const transformedLogs = (logsResponse.agentLogs || []).map(log => ({
+                timestamp: log.timestamp,
+                level: log.level || 'INFO',
+                message: log.log || log.message
+            }));
+            // Sort logs by timestamp (newest first, will be reversed later for display)
+            let sortedLogs = transformedLogs.sort((a, b) => b.timestamp - a.timestamp);
+            
+            // Apply log limit cap
+            if (sortedLogs.length > LOG_LIMITS.MAX_LOGS_FETCHED) {
+                sortedLogs = sortedLogs.slice(0, LOG_LIMITS.MAX_LOGS_FETCHED);
+                console.warn(`Log count exceeded limit. Showing latest ${LOG_LIMITS.MAX_LOGS_FETCHED} logs.`);
+            }
+            
+            return sortedLogs;
+        } catch (error) {
+            console.error("Error fetching agent logs:", error);
+            // Fallback to dummy data if API fails
+            const logsData = getAgentLogs(agentId);
+            return logsData.slice(0, LOG_LIMITS.MAX_LOGS_FETCHED);
+        }
+    }, []);
+
+    // Start live log fetching
+    const startLiveFetching = useCallback(async (agentId) => {
+        if (liveInterval) {
+            clearInterval(liveInterval);
+        }
+        
+        setIsLiveFetching(true);
+        
+        // Track the last timestamp to fetch only new logs
+        let lastFetchTimestamp = Math.floor(Date.now() / 1000);
+        
+        const interval = setInterval(async () => {
+            try {
+                // Fetch only new logs since last fetch
+                const now = Math.floor(Date.now() / 1000);
+                const newLogs = await fetchAgentLogs(agentId, lastFetchTimestamp, now);
+                
+                if (newLogs.length > 0) {
+                    setAgentLogs(prevLogs => {
+                        // Add new logs to the beginning (they're already sorted newest first)
+                        const updatedLogs = [...newLogs, ...prevLogs];
+                        
+
+                        const uniqueLogs = updatedLogs.filter((log, index, arr) => 
+                            arr.findIndex(l => l.timestamp === log.timestamp && l.message === log.message) === index
+                        );
+                        
+                        // Keep only the latest logs within the limit
+                        return uniqueLogs.slice(0, LOG_LIMITS.LIVE_LOG_LIMIT);
+                    });
+                    
+                    // Update last fetch timestamp to the newest log's timestamp
+                    lastFetchTimestamp = newLogs[0].timestamp;
+                }
+            } catch (error) {
+                console.error("Error in live log fetching:", error);
+            }
+        }, 10000); // Fetch every 10 seconds (reduced frequency for better UX)
+        
+        setLiveInterval(interval);
+        
+        // Initial fetch for live mode
+        const now = Math.floor(Date.now() / 1000);
+        const oneHourAgo = now - (60 * 60); // Last hour for initial load
+        const initialLogs = await fetchAgentLogs(agentId, oneHourAgo, now);
+        setAgentLogs(initialLogs.slice(0, LOG_LIMITS.LIVE_LOG_LIMIT));
+        
+        if (initialLogs.length > 0) {
+            lastFetchTimestamp = initialLogs[0].timestamp;
+        }
+    }, [liveInterval, fetchAgentLogs]);
+
+    // Stop live log fetching
+    const stopLiveFetching = useCallback(() => {
+        if (liveInterval) {
+            clearInterval(liveInterval);
+            setLiveInterval(null);
+        }
+        setIsLiveFetching(false);
+    }, [liveInterval]);
+
+    // Handle log mode change
+    const handleLogModeChange = useCallback(async (newMode) => {
+        setLogMode(newMode);
+        if (!selectedAgent) return;
+        
+        if (newMode === LOG_MODES.CURRENT) {
+            await startLiveFetching(selectedAgent.agentId);
+        } else {
+            stopLiveFetching();
+            // Fetch historical logs using date range
+            const historicalLogs = await fetchAgentLogs(selectedAgent.agentId, startTimestamp, endTimestamp);
+            setAgentLogs(historicalLogs);
+        }
+    }, [selectedAgent, startLiveFetching, stopLiveFetching, fetchAgentLogs, startTimestamp, endTimestamp]);
+
     // Handle agent row click to open flyout with details
     const handleRowClick = useCallback(async (agent) => {
         setSelectedAgent(agent);
@@ -256,54 +376,58 @@ function EndpointShieldMetadata() {
             setMcpServers([]);
         }
 
-        try {
-            // Get logs from API
-            const logsResponse = await settingRequests.getAgentLogs(agent.agentId);
-            // Transform API response to match expected format
-            const transformedLogs = (logsResponse.agentLogs || []).map(log => ({
-                timestamp: log.timestamp,
-                level: log.level || 'INFO',
-                message: log.log || log.message
-            }));
-            // Reverse logs array so oldest appears first in the UI
-            const reversedLogs = [...transformedLogs].reverse();
-            setAgentLogs(reversedLogs);
-            
-            if (transformedLogs.length === 0) {
-                console.log("No logs found for agent:", agent.agentId);
-            }
-        } catch (error) {
-            console.error("Error fetching agent logs:", error);
-            // Fallback to dummy data if API fails
-            const logsData = getAgentLogs(agent.agentId);
-            const reversedLogs = [...logsData].reverse();
-            setAgentLogs(reversedLogs);
+        // Fetch logs based on current mode
+        if (logMode === LOG_MODES.CURRENT) {
+            await startLiveFetching(agent.agentId);
+        } else {
+            const historicalLogs = await fetchAgentLogs(agent.agentId, startTimestamp, endTimestamp);
+            setAgentLogs(historicalLogs);
         }
         setDisplayedLogs([]);
         setDescription("");
         setEditableDescription("");
         setIsEditingDescription(false);
         setShowFlyout(true);
-    }, []);
+    }, [logMode, startLiveFetching, fetchAgentLogs, startTimestamp, endTimestamp]);
 
-    // Simulate live log streaming
+    // Cleanup interval when component unmounts or flyout closes
+    useEffect(() => {
+        return () => {
+            if (liveInterval) {
+                clearInterval(liveInterval);
+            }
+        };
+    }, [liveInterval]);
+
+    useEffect(() => {
+        if (!showFlyout) {
+            stopLiveFetching();
+        }
+    }, [showFlyout, stopLiveFetching]);
+
+    // Handle log display based on mode
     useEffect(() => {
         if (agentLogs.length === 0 || !showFlyout) {
+            setDisplayedLogs([]);
             return;
         }
 
-        let currentIndex = 0;
-        const interval = setInterval(() => {
-            if (currentIndex < agentLogs.length) {
-                setDisplayedLogs(prev => [...prev, agentLogs[currentIndex]]);
-                currentIndex++;
-            } else {
-                clearInterval(interval);
+        if (logMode === LOG_MODES.HISTORICAL) {
+            // For historical mode, show all logs immediately (newest first) with display limit
+            const limitedLogs = agentLogs.slice(0, LOG_LIMITS.MAX_LOGS_DISPLAYED);
+            if (agentLogs.length > LOG_LIMITS.MAX_LOGS_DISPLAYED) {
+                console.warn(`Display limit reached. Showing ${LOG_LIMITS.MAX_LOGS_DISPLAYED} out of ${agentLogs.length} logs.`);
             }
-        }, LOG_STREAMING_DELAY_MS);
-
-        return () => clearInterval(interval);
-    }, [agentLogs, showFlyout]);
+            setDisplayedLogs(limitedLogs);
+        } else {
+            // For current mode, show logs immediately (newest first) - no streaming animation
+            const limitedLogs = agentLogs.slice(0, LOG_LIMITS.MAX_LOGS_DISPLAYED);
+            if (agentLogs.length > LOG_LIMITS.MAX_LOGS_DISPLAYED) {
+                console.warn(`Display limit reached. Showing ${LOG_LIMITS.MAX_LOGS_DISPLAYED} out of ${agentLogs.length} logs.`);
+            }
+            setDisplayedLogs(limitedLogs);
+        }
+    }, [agentLogs, showFlyout, logMode]);
 
     const renderLogs = () => {
         // If no logs were fetched at all, show "No logs found"
@@ -343,7 +467,25 @@ function EndpointShieldMetadata() {
                             <Text as="dd">
                                 Agent
                             </Text>
-                            <Badge tone="info">Current</Badge>
+                            <HorizontalStack gap="1">
+                                <Button 
+                                    size="micro" 
+                                    variant={logMode === LOG_MODES.CURRENT ? "primary" : "tertiary"}
+                                    onClick={() => handleLogModeChange(LOG_MODES.CURRENT)}
+                                >
+                                    Current
+                                </Button>
+                                <Button 
+                                    size="micro" 
+                                    variant={logMode === LOG_MODES.HISTORICAL ? "primary" : "tertiary"}
+                                    onClick={() => handleLogModeChange(LOG_MODES.HISTORICAL)}
+                                >
+                                    Historical
+                                </Button>
+                            </HorizontalStack>
+                            {logMode === LOG_MODES.CURRENT && isLiveFetching && (
+                                <Badge tone="success">Live</Badge>
+                            )}
                         </HorizontalStack>
                     </HorizontalStack>
                 </Button>
@@ -364,10 +506,10 @@ function EndpointShieldMetadata() {
                             <AnimatePresence initial={false}>
                                 {displayedLogs.map((log, index) => (
                                     <motion.div
-                                        key={`${index}-${log.message}`}
-                                        initial={{ opacity: 0, y: -10 }}
+                                        key={`${log.timestamp}-${log.message}-${index}`}
+                                        initial={logMode === LOG_MODES.CURRENT ? { opacity: 0, y: -5 } : false}
                                         animate={{ opacity: 1, y: 0 }}
-                                        transition={{ duration: ANIMATION_DURATION }}
+                                        transition={{ duration: 0.3, ease: "easeOut" }}
                                         className="ml-3 p-0.5 hover:bg-[var(--background-selected)]"
                                     >
                                         <HorizontalStack gap="3" align="start">

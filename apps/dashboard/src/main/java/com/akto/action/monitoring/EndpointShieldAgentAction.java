@@ -12,8 +12,11 @@ import com.mongodb.client.model.Filters;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Comparator;
 
-public class EndpointShieldServerAction extends UserAction {
+public class EndpointShieldAgentAction extends UserAction {
+    private static final int MAX_LOGS_LIMIT = 10000; // Maximum logs to fetch from database
+    
     private String agentId;
     private String deviceId;
     private List<EndpointShieldServer> mcpServers;
@@ -144,10 +147,10 @@ public class EndpointShieldServerAction extends UserAction {
                 startTime = now - (24 * 60 * 60); // 24 hours ago
             }
             
-            LoggerMaker loggerMaker = new LoggerMaker(EndpointShieldServerAction.class, LogDb.ENDPOINT_SHIELD);
+            LoggerMaker loggerMaker = new LoggerMaker(EndpointShieldAgentAction.class, LogDb.ENDPOINT_SHIELD);
             agentLogs = loggerMaker.fetchLogRecords(startTime, endTime, LogDb.ENDPOINT_SHIELD);
             
-            // Filter logs by agentId if needed (since the DAO query might return all logs)
+            // Filter logs by agentId and apply sorting with limit
             agentLogs = agentLogs.stream()
                 .filter(log -> {
                     if (log instanceof EndpointShieldLog) {
@@ -156,6 +159,8 @@ public class EndpointShieldServerAction extends UserAction {
                     }
                     return false;
                 })
+                .sorted(Comparator.comparing(Log::getTimestamp).reversed()) // Sort by timestamp descending (newest first)
+                .limit(MAX_LOGS_LIMIT) // Apply upper cap
                 .collect(java.util.stream.Collectors.toList());
                 
             return SUCCESS.toUpperCase();
