@@ -9,6 +9,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.util.Constants;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.traffic.SampleData;
@@ -33,8 +34,6 @@ public class MergingLogic {
 
     public static final int STRING_MERGING_THRESHOLD = 10;
     private static final String AKTO_MCP_SERVER_TAG = "mcp-server";
-    private static final String ROUTING_TAG_SUFFIX = "-agoda-routing";
-    private static final int ROUTING_SKIP_ACCOUNT_ID = 1736798101;
     private static final LoggerMaker loggerMaker = new LoggerMaker(MergingLogic.class);
 
     private static Set<MergedUrls> mergedUrls = new HashSet<>();
@@ -241,11 +240,12 @@ public class MergingLogic {
                     LogDb.DB_ABS);
                 return new ApiMergerResult(new HashMap<>());
             }
-            if (Context.accountId.get() == ROUTING_SKIP_ACCOUNT_ID &&
+            if (Context.accountId.get() == Constants.ROUTING_SKIP_ACCOUNT_ID &&
                 apiCollection.getTagsList().stream()
-                .anyMatch(t -> t.getKeyName() != null && t.getKeyName().endsWith(ROUTING_TAG_SUFFIX))) {
+                .anyMatch(t -> t.getKeyName() != null &&
+                    Constants.ROUTING_TAG_SUFFIXES.stream().anyMatch(suffix -> t.getKeyName().endsWith(suffix)))) {
                 loggerMaker.infoAndAddToDb(
-                    "Skipping merging for API collection " + apiCollectionId + " in account " + ROUTING_SKIP_ACCOUNT_ID + " as it has a tag ending with " + ROUTING_TAG_SUFFIX,
+                    "Skipping merging for API collection " + apiCollectionId + " in account " + Constants.ROUTING_SKIP_ACCOUNT_ID + " as it has a tag ending with one of: " + Constants.ROUTING_TAG_SUFFIXES,
                     LogDb.DB_ABS);
                 return new ApiMergerResult(new HashMap<>());
             }

@@ -123,6 +123,11 @@ public class DbLayer {
 
     private static final ConcurrentHashMap<Integer, Integer> lastUpdatedTsMap = new ConcurrentHashMap<>();
 
+    // Cache for filtered collection IDs (without routing tags)
+    private static volatile List<Integer> filteredCollectionIdsCache = null;
+    private static volatile long filteredCollectionIdsCacheTimestamp = 0;
+    private static final long CACHE_TTL_MS = 60 * 60 * 1000; // 60 minutes
+
     private static int getLastUpdatedTsForAccount(int accountId) {
         return lastUpdatedTsMap.computeIfAbsent(accountId, k -> 0);
     }
@@ -378,8 +383,58 @@ public class DbLayer {
         Bson filterForHostHeader = SingleTypeInfoDao.filterForHostHeader(-1,false);
         Bson filterForSkip = Filters.gt("_id", objectId);
         Bson finalFilter = objectId == null ? filterForHostHeader : Filters.and(filterForHostHeader, filterForSkip);
+
+        // Filter out collections with routing tag suffixes for specific account
+        if (Context.accountId.get() == Constants.ROUTING_SKIP_ACCOUNT_ID) {
+            List<Integer> filteredCollectionIds = getFilteredCollectionIds();
+            Bson collectionFilter = Filters.in(SingleTypeInfo._API_COLLECTION_ID, filteredCollectionIds);
+            finalFilter = Filters.and(finalFilter, collectionFilter);
+        }
+
         int limit = 1000;
         return SingleTypeInfoDao.instance.findAll(finalFilter, 0, limit, Sorts.ascending("_id"), Projections.exclude(SingleTypeInfo._VALUES));
+    }
+
+    private static List<Integer> getFilteredCollectionIds() {
+        long currentTime = System.currentTimeMillis();
+
+        // Check if cache is valid
+        if (filteredCollectionIdsCache != null &&
+            (currentTime - filteredCollectionIdsCacheTimestamp) < CACHE_TTL_MS) {
+            return filteredCollectionIdsCache;
+        }
+
+        // Cache miss or expired - rebuild cache
+        synchronized (DbLayer.class) {
+            // Double-check after acquiring lock
+            if (filteredCollectionIdsCache != null &&
+                (currentTime - filteredCollectionIdsCacheTimestamp) < CACHE_TTL_MS) {
+                return filteredCollectionIdsCache;
+            }
+
+            List<Integer> apiCollectionIds = fetchApiCollectionIds();
+            List<Integer> filteredCollectionIds = new ArrayList<>();
+
+            for (Integer collectionId : apiCollectionIds) {
+                ApiCollection collection = ApiCollectionsDao.instance.getMeta(collectionId);
+                if (collection != null && collection.getTagsList() != null) {
+                    boolean hasRoutingTag = collection.getTagsList().stream()
+                        .anyMatch(t -> t.getKeyName() != null &&
+                            Constants.ROUTING_TAG_SUFFIXES.stream().anyMatch(suffix -> t.getKeyName().endsWith(suffix)));
+                    if (!hasRoutingTag) {
+                        filteredCollectionIds.add(collectionId);
+                    }
+                } else {
+                    filteredCollectionIds.add(collectionId);
+                }
+            }
+
+            // Update cache
+            filteredCollectionIdsCache = filteredCollectionIds;
+            filteredCollectionIdsCacheTimestamp = currentTime;
+
+            return filteredCollectionIds;
+        }
     }
 
     public static List<Integer> fetchApiCollectionIds() {
