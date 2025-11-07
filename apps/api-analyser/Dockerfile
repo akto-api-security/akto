@@ -1,3 +1,4 @@
+# TODO: openjdk:latest is no more. upgrade when using this module.
 FROM openjdk
 WORKDIR /app
 
