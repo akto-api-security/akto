@@ -37,6 +37,9 @@ public class LogsEndpointShieldDao extends AccountsContextDao<LogsEndpointShield
         
         String[] agentFieldNames = {LogsEndpointShield.AGENT_ID};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), agentFieldNames, false);
+
+        String[] deviceIdName = {LogsEndpointShield.DEVICE_ID};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), deviceIdName, false);
     }
 
     @Override
