@@ -2,19 +2,18 @@ package com.akto.dto;
 
 import com.akto.dto.testing.TLSAuthParam;
 import com.akto.dto.type.RequestTemplate;
+import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.alibaba.fastjson2.JSON;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 
-import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.Setter;
 import okhttp3.Headers;
 import okhttp3.HttpUrl;
 import java.net.URI;
 import java.util.*;
-import org.apache.commons.lang3.StringUtils;
 
 public class OriginalHttpRequest {
 
@@ -410,6 +409,32 @@ public class OriginalHttpRequest {
             }
         }
         return builder.build();
+    }
+
+    public String fetchHeadersJsonString() {
+        Map<String, List<String>> headersMap = this.getHeaders();
+        List<String> forbiddenHeaders = Arrays.asList("content-length", "accept-encoding");
+        if (headersMap == null)
+            headersMap = new HashMap<>();
+        headersMap.put(Constants.AKTO_IGNORE_FLAG, Collections.singletonList("0"));
+        Map<String, String> filteredHeaders = new HashMap<>();
+        for (String headerName : headersMap.keySet()) {
+            if (forbiddenHeaders.contains(headerName))
+                continue;
+            if (headerName.contains(" "))
+                continue;
+            if(headerName.startsWith(":")) continue;
+            List<String> headerValueList = headersMap.get(headerName);
+            if (headerValueList == null || headerValueList.isEmpty())
+                continue;
+            for (String headerValue : headerValueList) {
+                if (headerValue == null)
+                    continue;
+                filteredHeaders.put(headerName, headerValue);
+                break;
+            }
+        }
+        return gson.toJson(filteredHeaders);
     }
 
     @Override
