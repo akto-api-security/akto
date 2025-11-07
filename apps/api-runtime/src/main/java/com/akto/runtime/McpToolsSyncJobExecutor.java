@@ -80,8 +80,6 @@ public class McpToolsSyncJobExecutor {
     private ServerCapabilities mcpServerCapabilities = null;
     private String mcpSessionId = null;
 
-    public static final McpToolsSyncJobExecutor INSTANCE = new McpToolsSyncJobExecutor();
-
     public McpToolsSyncJobExecutor() {
         Json.mapper().registerModule(new SimpleModule().addSerializer(new JsonNodeExampleSerializer()));
     }
@@ -458,6 +456,8 @@ public class McpToolsSyncJobExecutor {
             return new Pair<>(rpcResponse, responseParams);
         }
 
+        logger.info("No response for {} method. skipping....", mcpMethod);
+
         return new Pair<>(new JSONRPCResponse(
             McpSchema.JSONRPC_VERSION, null, Collections.emptyMap(), null
         ), null);
@@ -542,7 +542,9 @@ public class McpToolsSyncJobExecutor {
                 String sessionId = HttpRequestResponseUtils.getHeaderValue(response.getHeaders(), "mcp-session-id");
                 if (StringUtils.isNotBlank(sessionId)) {
                     mcpSessionId = sessionId;
-                    logger.debug("Extracted mcp-session-id from response");
+                    logger.info("Extracted mcp-session-id from response");
+                } else {
+                    logger.info("No mcp sessionId found. skipping adding mcp session id in subsequent requests");
                 }
 
                 // Check if response is text/event-stream and extract JSON-RPC from it
