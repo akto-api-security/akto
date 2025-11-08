@@ -743,6 +743,8 @@ const settingRequests = {
                 startTime,
                 endTime
             }
+        })
+    },
     addMcpRegistryIntegration(registries) {
         return request({
             url: '/api/addMcpRegistryIntegration',
