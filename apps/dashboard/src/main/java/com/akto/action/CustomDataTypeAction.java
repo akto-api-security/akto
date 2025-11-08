@@ -44,7 +44,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static com.akto.dto.type.SingleTypeInfo.fetchCustomDataTypes;
-import static com.akto.dto.type.SingleTypeInfo.getCustomDataTypeMap;
 import static com.akto.dto.type.SingleTypeInfo.subTypeMap;
 import static com.akto.utils.Utils.extractJsonResponse;
 
@@ -514,15 +513,15 @@ public class CustomDataTypeAction extends UserAction{
                     List<String> newSamples = handleRedactionForSamples(sampleData.getSamples());
                     sampleData.setSamples(newSamples);
                     Bson filter = Filters.and(Filters.eq("_id.url", sampleData.getId().getUrl()), Filters.eq("_id.method", sampleData.getId().getMethod()), Filters.eq("_id.apiCollectionId", sampleData.getId().getApiCollectionId()));
-                    writesForSampleData.add(new UpdateOneModel<>(filter, Updates.set("samples", newSamples)));
+                    writesForSampleData.add(new UpdateManyModel<>(filter, Updates.set("samples", newSamples)));
                 }
 
                 List<SensitiveSampleData> sensitiveSampleDataList = SensitiveSampleDataDao.instance.findAll(Filters.or(query));
                 for(SensitiveSampleData sensitiveSampleData : sensitiveSampleDataList){
                     List<String> newSamples = handleRedactionForSamples(sensitiveSampleData.getSampleData());
                     sensitiveSampleData.setSampleData(newSamples);
-                    Bson filter = Filters.and(Filters.eq("_id.url", sensitiveSampleData.getId().getUrl()), Filters.eq("_id.method", sensitiveSampleData.getId().getMethod()), Filters.eq("_id.apiCollectionId", sensitiveSampleData.getId().getApiCollectionId()), Filters.eq("_id.subType", subType.getName()));
-                    writesForSensitiveSampleData.add(new UpdateOneModel<>(filter, Updates.set("sampleData", newSamples)));
+                    Bson filter = Filters.and(Filters.eq("_id.url", sensitiveSampleData.getId().getUrl()), Filters.eq("_id.method", sensitiveSampleData.getId().getMethod()), Filters.eq("_id.apiCollectionId", sensitiveSampleData.getId().getApiCollectionId()));
+                    writesForSensitiveSampleData.add(new UpdateManyModel<>(filter, Updates.set("sampleData", newSamples)));
                 }
             }
             if(!writesForSampleData.isEmpty()){
