@@ -44,6 +44,25 @@ export default function Header() {
     const dashboardCategory = PersistStore.getState().dashboardCategory;
     const setDashboardCategory = PersistStore.getState().setDashboardCategory
 
+    useEffect(() => {
+        if (window.beamer_config) {
+            const isSaas = window.IS_SAAS === 'true';
+            const isAgentic = dashboardCategory === 'Agentic Security';
+
+            const productId = isAgentic
+                ? (isSaas ? 'ijUqfdSQ80078' : 'shUignSe80215')
+                : (isSaas ? 'cJtNevEq80216' : 'rggteHBr72897');
+
+            if (window.beamer_config.product_id !== productId) {
+                window.beamer_config.product_id = productId;
+                if (window.Beamer) {
+                    window.Beamer.destroy();
+                    window.Beamer.init();
+                }
+            }
+        }
+    }, [dashboardCategory]);
+
     /* Search bar */
     //const allRoutes = Store((state) => state.allRoutes)
     const allCollections = PersistStore((state) => state.allCollections)
