@@ -189,10 +189,8 @@ function TestsTablePage() {
     const fetchAllTests = async () => {
         try {
             let categoriesName = Object.keys(categoryMap);
-            if(dashboardCategory === "MCP Security" && func.isDemoAccount()){
+            if(dashboardCategory === "MCP Security"){
                 categoriesName = mcpCategories;
-            } else if(dashboardCategory === "Agentic Security" && func.isDemoAccount()){
-                categoriesName = [...llmCategories, ...mcpCategories];
             } else {
                 categoriesName = Object.keys(categoryMap);
             }
@@ -200,12 +198,12 @@ function TestsTablePage() {
                 subCategories: [],
                 categories: []
             }
+
             if ((localSubCategoryMap && Object.keys(localSubCategoryMap).length > 0 ) && categoriesName.length > 0) {
                 metaDataObj = {
                     subCategories: Object.values(localSubCategoryMap),
                     categories: Object.keys(categoryMap)
                 }
-                
             } else { 
                 metaDataObj = await transform.getAllSubcategoriesData(false, "testEditor")
                 categoriesName = metaDataObj?.categories.map(x => x.name)

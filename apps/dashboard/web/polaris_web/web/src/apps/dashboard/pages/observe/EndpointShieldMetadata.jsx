@@ -12,8 +12,7 @@ import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCard
 import GithubServerTable from "../../components/tables/GithubServerTable";
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
 import { CellType } from "../../components/tables/rows/GithubRow";
-import { getMcpServersByAgent, getAgentLogs } from "./dummyData";
-import EndpointShieldMetadataDemo from "./EndpointShieldMetadataDemo";
+import { getAgentLogs } from "./dummyData";
 import settingRequests from "../settings/api";
 import PersistStore from "../../../main/PersistStore";
 import { mapLabel } from "../../../main/labelHelper";
@@ -92,6 +91,19 @@ const LOG_TIMESTAMP_WIDTH = "180px";
 const LOG_LEVEL_WIDTH = "60px";
 const DEFAULT_VALUE = '-';
 
+// Log fetching modes
+const LOG_MODES = {
+    CURRENT: 'CURRENT',
+    HISTORICAL: 'HISTORICAL'
+};
+
+// Log limits to prevent performance issues
+const LOG_LIMITS = {
+    MAX_LOGS_DISPLAYED: 1000,   // Maximum logs to display in UI
+    MAX_LOGS_FETCHED: 5000,     // Maximum logs to fetch from API
+    LIVE_LOG_LIMIT: 500         // Maximum logs to keep in live mode
+};
+
 const convertDataIntoTableFormat = (agentData) => {
     return {
         ...agentData,
@@ -130,13 +142,6 @@ const getMetadataFields = (agent) => [
 ];
 
 function EndpointShieldMetadata() {
-    const isDemoAccount = func.isDemoAccount();
-
-    // Show demo version for demo accounts
-    if (isDemoAccount) {
-        return <EndpointShieldMetadataDemo />;
-    }
-
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5]);
@@ -148,6 +153,9 @@ function EndpointShieldMetadata() {
     const [agentLogs, setAgentLogs] = useState([]);
     const [displayedLogs, setDisplayedLogs] = useState([]);
     const [isLogsExpanded, setIsLogsExpanded] = useState(true);
+    const [logMode, setLogMode] = useState(LOG_MODES.CURRENT);
+    const [isLiveFetching, setIsLiveFetching] = useState(false);
+    const [liveInterval, setLiveInterval] = useState(null);
     const [description, setDescription] = useState("");
     const [isEditingDescription, setIsEditingDescription] = useState(false);
     const [editableDescription, setEditableDescription] = useState("");
@@ -246,45 +254,208 @@ function EndpointShieldMetadata() {
         func.setToast(true, false, "Description saved");
     }, [editableDescription]);
 
+    // Fetch agent logs with optional time range
+    const fetchAgentLogs = useCallback(async (agentId, startTime, endTime) => {
+        try {
+            const logsResponse = await settingRequests.getAgentLogs(agentId, startTime, endTime);
+            // Transform API response to match expected format
+            const transformedLogs = (logsResponse.agentLogs || []).map(log => ({
+                timestamp: log.timestamp,
+                level: log.level || 'INFO',
+                message: log.log || log.message
+            }));
+            // Sort logs by timestamp (newest first, will be reversed later for display)
+            let sortedLogs = transformedLogs.sort((a, b) => b.timestamp - a.timestamp);
+            
+            // Apply log limit cap
+            if (sortedLogs.length > LOG_LIMITS.MAX_LOGS_FETCHED) {
+                sortedLogs = sortedLogs.slice(0, LOG_LIMITS.MAX_LOGS_FETCHED);
+                console.warn(`Log count exceeded limit. Showing latest ${LOG_LIMITS.MAX_LOGS_FETCHED} logs.`);
+            }
+            
+            return sortedLogs;
+        } catch (error) {
+            console.error("Error fetching agent logs:", error);
+            // Fallback to dummy data if API fails
+            const logsData = getAgentLogs(agentId);
+            return logsData.slice(0, LOG_LIMITS.MAX_LOGS_FETCHED);
+        }
+    }, []);
+
+    // Start live log fetching
+    const startLiveFetching = useCallback(async (agentId) => {
+        if (liveInterval) {
+            clearInterval(liveInterval);
+        }
+        
+        setIsLiveFetching(true);
+        
+        // Track the last timestamp to fetch only new logs
+        let lastFetchTimestamp = Math.floor(Date.now() / 1000);
+        
+        const interval = setInterval(async () => {
+            try {
+                // Fetch only new logs since last fetch
+                const now = Math.floor(Date.now() / 1000);
+                const newLogs = await fetchAgentLogs(agentId, lastFetchTimestamp, now);
+                
+                if (newLogs.length > 0) {
+                    setAgentLogs(prevLogs => {
+                        // Add new logs to the beginning (they're already sorted newest first)
+                        const updatedLogs = [...newLogs, ...prevLogs];
+                        
+
+                        const uniqueLogs = updatedLogs.filter((log, index, arr) => 
+                            arr.findIndex(l => l.timestamp === log.timestamp && l.message === log.message) === index
+                        );
+                        
+                        // Keep only the latest logs within the limit
+                        return uniqueLogs.slice(0, LOG_LIMITS.LIVE_LOG_LIMIT);
+                    });
+                    
+                    // Update last fetch timestamp to the newest log's timestamp
+                    lastFetchTimestamp = newLogs[0].timestamp;
+                }
+            } catch (error) {
+                console.error("Error in live log fetching:", error);
+            }
+        }, 10000); // Fetch every 10 seconds (reduced frequency for better UX)
+        
+        setLiveInterval(interval);
+        
+        // Initial fetch for live mode
+        const now = Math.floor(Date.now() / 1000);
+        const oneHourAgo = now - (60 * 60); // Last hour for initial load
+        const initialLogs = await fetchAgentLogs(agentId, oneHourAgo, now);
+        setAgentLogs(initialLogs.slice(0, LOG_LIMITS.LIVE_LOG_LIMIT));
+        
+        if (initialLogs.length > 0) {
+            lastFetchTimestamp = initialLogs[0].timestamp;
+        }
+    }, [liveInterval, fetchAgentLogs]);
+
+    // Stop live log fetching
+    const stopLiveFetching = useCallback(() => {
+        if (liveInterval) {
+            clearInterval(liveInterval);
+            setLiveInterval(null);
+        }
+        setIsLiveFetching(false);
+    }, [liveInterval]);
+
+    // Handle log mode change
+    const handleLogModeChange = useCallback(async (newMode) => {
+        if (logMode === newMode) return; // Prevent unnecessary changes
+        
+        console.log(`Switching to ${newMode} mode for agent:`, selectedAgent?.agentId);
+        setLogMode(newMode);
+        if (!selectedAgent) return;
+        
+        // Keep the logs panel expanded during mode switch
+        const wasExpanded = isLogsExpanded;
+        
+        // Clear existing logs first for immediate feedback
+        setAgentLogs([]);
+        setDisplayedLogs([]);
+        
+        if (newMode === LOG_MODES.CURRENT) {
+            console.log('Starting live fetching...');
+            await startLiveFetching(selectedAgent.agentId);
+        } else {
+            console.log('Fetching historical logs...', { startTimestamp, endTimestamp });
+            stopLiveFetching();
+            // Fetch historical logs using date range
+            const historicalLogs = await fetchAgentLogs(selectedAgent.agentId, startTimestamp, endTimestamp);
+            console.log('Historical logs fetched:', historicalLogs.length);
+            setAgentLogs(historicalLogs);
+        }
+        
+        // Ensure logs panel stays in the same state
+        setIsLogsExpanded(wasExpanded);
+    }, [logMode, selectedAgent, isLogsExpanded, startLiveFetching, stopLiveFetching, fetchAgentLogs, startTimestamp, endTimestamp]);
+
     // Handle agent row click to open flyout with details
-    const handleRowClick = useCallback((agent) => {
+    const handleRowClick = useCallback(async (agent) => {
         setSelectedAgent(agent);
 
-        // Get MCP servers and logs from dummy data
-        const serversData = getMcpServersByAgent(agent.agentId, agent.deviceId);
-        const logsData = getAgentLogs(agent.agentId);
+        try {
+            // Get MCP servers from API
+            const serversResponse = await settingRequests.getMcpServersByAgent(agent.agentId, agent.deviceId);
+            const servers = serversResponse.mcpServers || [];
+            setMcpServers(servers);
+            
+            if (servers.length === 0) {
+                console.log("No MCP servers found for agent:", agent.agentId);
+            }
+        } catch (error) {
+            console.error("Error fetching MCP servers:", error);
+            setMcpServers([]);
+        }
 
-        setMcpServers(serversData);
-        // Reverse logs array so oldest appears first in the UI
-        const reversedLogs = [...logsData].reverse();
-        setAgentLogs(reversedLogs);
+        // Fetch logs based on current mode
+        if (logMode === LOG_MODES.CURRENT) {
+            await startLiveFetching(agent.agentId);
+        } else {
+            const historicalLogs = await fetchAgentLogs(agent.agentId, startTimestamp, endTimestamp);
+            setAgentLogs(historicalLogs);
+        }
         setDisplayedLogs([]);
         setDescription("");
         setEditableDescription("");
         setIsEditingDescription(false);
         setShowFlyout(true);
-    }, []);
+    }, [logMode, startLiveFetching, fetchAgentLogs, startTimestamp, endTimestamp]);
 
-    // Simulate live log streaming
+    // Cleanup interval when component unmounts or flyout closes
+    useEffect(() => {
+        return () => {
+            if (liveInterval) {
+                clearInterval(liveInterval);
+            }
+        };
+    }, [liveInterval]);
+
+    useEffect(() => {
+        if (!showFlyout) {
+            stopLiveFetching();
+        }
+    }, [showFlyout, stopLiveFetching]);
+
+    // Handle log display based on mode
     useEffect(() => {
         if (agentLogs.length === 0 || !showFlyout) {
+            setDisplayedLogs([]);
             return;
         }
 
-        let currentIndex = 0;
-        const interval = setInterval(() => {
-            if (currentIndex < agentLogs.length) {
-                setDisplayedLogs(prev => [...prev, agentLogs[currentIndex]]);
-                currentIndex++;
-            } else {
-                clearInterval(interval);
+        if (logMode === LOG_MODES.HISTORICAL) {
+            // For historical mode, show all logs immediately (newest first) with display limit
+            const limitedLogs = agentLogs.slice(0, LOG_LIMITS.MAX_LOGS_DISPLAYED);
+            if (agentLogs.length > LOG_LIMITS.MAX_LOGS_DISPLAYED) {
+                console.warn(`Display limit reached. Showing ${LOG_LIMITS.MAX_LOGS_DISPLAYED} out of ${agentLogs.length} logs.`);
             }
-        }, LOG_STREAMING_DELAY_MS);
-
-        return () => clearInterval(interval);
-    }, [agentLogs, showFlyout]);
+            setDisplayedLogs(limitedLogs);
+        } else {
+            // For current mode, show logs immediately (newest first) - no streaming animation
+            const limitedLogs = agentLogs.slice(0, LOG_LIMITS.MAX_LOGS_DISPLAYED);
+            if (agentLogs.length > LOG_LIMITS.MAX_LOGS_DISPLAYED) {
+                console.warn(`Display limit reached. Showing ${LOG_LIMITS.MAX_LOGS_DISPLAYED} out of ${agentLogs.length} logs.`);
+            }
+            setDisplayedLogs(limitedLogs);
+        }
+    }, [agentLogs, showFlyout, logMode]);
 
     const renderLogs = () => {
+        // If no logs were fetched at all, show "No logs found"
+        if (!agentLogs || agentLogs.length === 0) {
+            return (
+                <Box padding="4" background="bg-surface">
+                    <Text variant="bodyMd" color="subdued" alignment="center">No logs found</Text>
+                </Box>
+            );
+        }
+        
+        // If logs exist but none are displayed yet (still streaming), show loading
         if (!displayedLogs || displayedLogs.length === 0) {
             return (
                 <Box padding="4" background="bg-surface">
@@ -297,25 +468,43 @@ function EndpointShieldMetadata() {
             <div
                 className={`rounded-lg overflow-hidden border border-[#C9CCCF] bg-[#F6F6F7] p-2 flex flex-col ${isLogsExpanded ? "gap-1" : "gap-0"}`}
             >
-                <Button
-                    variant="plain"
-                    fullWidth
-                    onClick={() => setIsLogsExpanded(!isLogsExpanded)}
-                    textAlign="left"
-                    style={{ backgroundColor: '#F6F6F7' }}
-                >
-                    <HorizontalStack gap="2" align="start">
-                        <motion.div animate={{ rotate: isLogsExpanded ? 0 : 270 }} transition={{ duration: ANIMATION_DURATION }}>
-                            <CaretDownMinor height={20} width={20} />
-                        </motion.div>
+                <HorizontalStack gap="2" align="space-between" wrap={false}>
+                    <Button
+                        variant="plain"
+                        onClick={() => setIsLogsExpanded(!isLogsExpanded)}
+                        textAlign="left"
+                        style={{ backgroundColor: '#F6F6F7' }}
+                    >
                         <HorizontalStack gap="2" align="start">
-                            <Text as="dd">
-                                Agent
-                            </Text>
-                            <Badge tone="info">Current</Badge>
+                            <motion.div animate={{ rotate: isLogsExpanded ? 0 : 270 }} transition={{ duration: ANIMATION_DURATION }}>
+                                <CaretDownMinor height={20} width={20} />
+                            </motion.div>
+                            <Text as="dd">Agent</Text>
                         </HorizontalStack>
+                    </Button>
+                    <HorizontalStack gap="1">
+                        <Button 
+                            size="micro" 
+                            pressed={logMode === LOG_MODES.CURRENT}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleLogModeChange(LOG_MODES.CURRENT);
+                            }}
+                        >
+                            Live
+                        </Button>
+                        <Button 
+                            size="micro" 
+                            pressed={logMode === LOG_MODES.HISTORICAL}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleLogModeChange(LOG_MODES.HISTORICAL);
+                            }}
+                        >
+                            All Time
+                        </Button>
                     </HorizontalStack>
-                </Button>
+                </HorizontalStack>
 
                 <AnimatePresence>
                     <motion.div
@@ -333,10 +522,10 @@ function EndpointShieldMetadata() {
                             <AnimatePresence initial={false}>
                                 {displayedLogs.map((log, index) => (
                                     <motion.div
-                                        key={`${index}-${log.message}`}
-                                        initial={{ opacity: 0, y: -10 }}
+                                        key={`${log.timestamp}-${log.message}-${index}`}
+                                        initial={logMode === LOG_MODES.CURRENT ? { opacity: 0, y: -5 } : false}
                                         animate={{ opacity: 1, y: 0 }}
-                                        transition={{ duration: ANIMATION_DURATION }}
+                                        transition={{ duration: 0.3, ease: "easeOut" }}
                                         className="ml-3 p-0.5 hover:bg-[var(--background-selected)]"
                                     >
                                         <HorizontalStack gap="3" align="start">
@@ -379,7 +568,7 @@ function EndpointShieldMetadata() {
     const mcpServersHeaders = [
         createSimpleHeader("Server Name", "serverName"),
         createSimpleHeader("Server URL", "serverUrl"),
-        createSimpleHeader("Last Seen", "lastSeenFormatted")
+        createSimpleHeader("Last Updated", "lastSeenFormatted")
     ];
 
     // Memoize table data transformation to avoid recalculation on every render
@@ -409,21 +598,27 @@ function EndpointShieldMetadata() {
         content: 'MCP Servers',
         component: (
             <Box paddingBlockStart={"4"}>
-                <GithubSimpleTable
-                    key="mcp-servers-table"
-                    data={mcpServersTableData}
-                    resourceName={{ singular: "server", plural: "servers" }}
-                    headers={mcpServersHeaders}
-                    headings={mcpServersHeaders}
-                    useNewRow={true}
-                    condensedHeight={true}
-                    hideQueryField={true}
-                    loading={false}
-                    pageLimit={10}
-                    showFooter={false}
-                    onRowClick={handleServerClick}
-                    rowClickable={true}
-                />
+                {mcpServersTableData.length === 0 ? (
+                    <Box padding="4" background="bg-surface">
+                        <Text variant="bodyMd" color="subdued" alignment="center">No servers found</Text>
+                    </Box>
+                ) : (
+                    <GithubSimpleTable
+                        key="mcp-servers-table"
+                        data={mcpServersTableData}
+                        resourceName={{ singular: "server", plural: "servers" }}
+                        headers={mcpServersHeaders}
+                        headings={mcpServersHeaders}
+                        useNewRow={true}
+                        condensedHeight={true}
+                        hideQueryField={true}
+                        loading={false}
+                        pageLimit={10}
+                        showFooter={false}
+                        onRowClick={handleServerClick}
+                        rowClickable={true}
+                    />
+                )}
             </Box>
         ),
         panelID: 'mcp-servers-panel',

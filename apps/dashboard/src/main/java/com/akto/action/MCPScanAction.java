@@ -1,6 +1,5 @@
 package com.akto.action;
 
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Collections;
 import java.util.HashSet;
@@ -8,10 +7,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import com.akto.dao.MCollection;
-import com.akto.dao.McpAuditInfoDao;
 import com.akto.dto.McpAuditInfo;
-import com.mongodb.BasicDBObject;
 import org.bson.conversions.Bson;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
@@ -61,7 +57,7 @@ public class MCPScanAction extends UserAction {
                 loggerMaker.info("ApiCollection already exists for host: " + hostName, LogDb.DASHBOARD);
             } else {
                 loggerMaker.info("Creating ApiCollection for host: " + hostName, LogDb.DASHBOARD);  
-                createdCollection = new ApiCollection(collectionId, hostName, Context.now(), new HashSet<>(), hostName, 0, false, true, mcpEndpoint);
+                createdCollection = new ApiCollection(collectionId, null, Context.now(), new HashSet<>(), hostName, 0, false, true, mcpEndpoint);
                 ApiCollectionsDao.instance.insertOne(createdCollection);
 
                 try {
@@ -120,12 +116,12 @@ public class MCPScanAction extends UserAction {
                         Context.accountId.set(accountId);
                         loggerMaker.info("Starting MCP sync job for collection: {} with host: {} and MCP endpoint: {}",
                             createdCollection.getId(), createdCollection.getHostName(), createdCollection.getSseCallbackUrl());
-                        McpToolsSyncJobExecutor.INSTANCE.runJobforCollection(createdCollection, apiConfig, authHeader);
+                        new McpToolsSyncJobExecutor().runJobforCollection(createdCollection, apiConfig, authHeader);
                     }
                 }, 0, TimeUnit.SECONDS);
 
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error in MCP tools sync job: " + e.getMessage(), LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("Error in MCP tools sync job: " + e.getMessage());
                 return Action.ERROR.toUpperCase();
             }
 

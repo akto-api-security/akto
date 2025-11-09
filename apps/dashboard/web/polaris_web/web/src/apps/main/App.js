@@ -98,6 +98,7 @@ import AWSWaf from "../dashboard/pages/settings/integrations/AWSWaf";
 import AgentConfig from "../dashboard/pages/settings/integrations/AgentConfig";
 import AzureBoards from "../dashboard/pages/settings/integrations/AzureBoards";
 import ServiceNow from "../dashboard/pages/settings/integrations/ServiceNow";
+import McpRegistry from "../dashboard/pages/settings/integrations/McpRegistry";
 import CloudflareWaf from "../dashboard/pages/settings/integrations/CloudflareWaf";
 import UndoDemergedApis from "../dashboard/pages/settings/undo_demerged_apis/UndoDemergedApis";
 import GmailWebhookCore from "../dashboard/pages/settings/integrations/gmailWebhooks/GmailWebhookCore";
@@ -401,6 +402,10 @@ const router = createBrowserRouter([
                     {
                         path: "integrations/akto_gpt",
                         element: <AktoGPT/>,
+                    },
+                    {
+                        path: "integrations/mcp_registry",
+                        element: <McpRegistry/>,
                     },
                     {
                         path: "integrations/github_sso",

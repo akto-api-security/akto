@@ -526,6 +526,52 @@
             </result>
         </action>
 
+        <action name="api/getMcpServersByAgent" class="com.akto.action.monitoring.EndpointShieldAgentAction" method="getMcpServersByAgent">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">LOGS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+
+            <result name="SUCCESS" type="json"/>
+
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/getAgentLogs" class="com.akto.action.monitoring.EndpointShieldAgentAction" method="fetchAgentLogs">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">LOGS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+
+            <result name="SUCCESS" type="json"/>
+
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="signup-email" class="com.akto.action.SignupAction" method="registerViaEmail">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -5668,7 +5714,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">TEST_RESULTS</param>
+                <param name="featureLabel">TEST_RUN_RESULTS</param>
                 <param name="accessType">READ</param>
             </interceptor-ref>
 
@@ -6444,7 +6490,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">TEST_RESULTS</param>
+                <param name="featureLabel">TEST_RUN_RESULTS</param>
                 <param name="accessType">READ</param>
             </interceptor-ref>
 
@@ -11051,6 +11097,25 @@
             </result>
         </action>
 
+        <action name="api/addMcpRegistryIntegration"
+            class="com.akto.action.McpRegistryAction" method="addMcpRegistryIntegration">
+            <interceptor-ref name="json" />
+            <interceptor-ref name="defaultStack" />
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param
+                    name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json"> </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param
+                    name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/saveAgentModel" class="com.akto.action.agents.ModelAction" method="saveAgentModel">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -11788,7 +11853,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS" type="json">
-                <param name="root">result</param>
+                <param name="includeProperties">jiraTicketUrl</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>

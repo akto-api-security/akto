@@ -47,6 +47,8 @@ import com.opensymphony.xwork2.Action;
 
 import java.net.URI;
 import java.util.function.Function;
+
+import lombok.Getter;
 import lombok.Setter;
 
 import java.io.File;
@@ -64,6 +66,7 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
+import com.akto.action.threat_detection.SuspectSampleDataAction;
 import com.akto.dao.AccountSettingsDao;
 
 import static com.akto.utils.jira.Utils.buildAdditionalIssueFieldsForJira;
@@ -97,6 +100,13 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
     @Setter
     private String actionItemType;
+
+    @Getter
+    @Setter
+    private String threatEventId;
+
+    @Getter @Setter
+    private String jiraTicketUrl;
 
     private Map<String,List<BasicDBObject>> projectAndIssueMap;
     private Map<String, ProjectMapping> projectMappings;
@@ -1329,13 +1339,25 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
                 Pair<String, String> pair = getJiraTicketUrlPair(responsePayload, jiraIntegration.getBaseUrl());
                 this.jiraTicketKey = pair.getSecond();
-                String jiraTicketUrl = pair.getFirst();
+                this.jiraTicketUrl = pair.getFirst();
                 if (!StringUtils.isEmpty(this.actionItemType)) {
                     storeTicketUrlInAccountSettings(jiraTicketUrl);
                 }
 
             } catch (Exception e) {
                 // TODO: handle exception
+                loggerMaker.errorAndAddToDb("Error creating general Jira ticket: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+                return Action.ERROR.toUpperCase();
+            }
+
+            if(!StringUtils.isEmpty(this.threatEventId)) {
+               // utilise the updateMaliciousEventStatus to update the jiraTicket url in the malicious event
+               SuspectSampleDataAction suspectSampleDataAction = new SuspectSampleDataAction();
+               suspectSampleDataAction.setEventId(this.threatEventId);
+               String result = suspectSampleDataAction.updateMaliciousEventJiraUrl(this.threatEventId, jiraTicketUrl);
+               if(!result.equals(Action.SUCCESS.toUpperCase())) {
+                addActionError("Error updating malicious event Jira URL: " + result);
+               }
             }
             return Action.SUCCESS.toUpperCase();
 

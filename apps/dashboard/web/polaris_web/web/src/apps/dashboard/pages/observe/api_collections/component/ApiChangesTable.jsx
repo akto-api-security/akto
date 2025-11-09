@@ -99,12 +99,18 @@ function ApiChangesTable(props) {
         await api.loadRecentEndpoints(startTimeStamp, endTimeStamp, skip, limit, filters, filterOperators, queryValue).then(async(res)=> {
           const apiInfos = res.endpoints
           total = res.totalCount
-          await api.fetchSensitiveParamsForEndpoints(apiInfos.map((x) => {return x?.id?.url})).then(allSensitiveFields => {
-              const sensitiveParams = allSensitiveFields?.data?.endpoints
-              const mappedData = transform.fillSensitiveParams(sensitiveParams, apiInfos.map((x)=> {return x?.id}));
-              const normalData = func.mergeApiInfoAndApiCollection(mappedData, apiInfos, apiCollectionMap,{});
-              ret = transform.prettifyEndpointsData(normalData);
-        })
+          try {
+            const allSensitiveFields = await api.fetchSensitiveParamsForEndpoints(apiInfos.map((x) => {return x?.id?.url}))
+            const sensitiveParams = allSensitiveFields?.data?.endpoints
+            const mappedData = transform.fillSensitiveParams(sensitiveParams, apiInfos.map((x)=> {return x?.id}));
+            const normalData = func.mergeApiInfoAndApiCollection(mappedData, apiInfos, apiCollectionMap,{});
+            ret = transform.prettifyEndpointsData(normalData);
+          } catch (error) {
+            // If sensitive params fetch fails, still process the data without sensitive params
+            const mappedData = transform.fillSensitiveParams(undefined, apiInfos.map((x)=> {return x?.id}));
+            const normalData = func.mergeApiInfoAndApiCollection(mappedData, apiInfos, apiCollectionMap,{});
+            ret = transform.prettifyEndpointsData(normalData);
+          }
         setLoading(false)
       })
       setNewEndpointsCount((prev)=> {

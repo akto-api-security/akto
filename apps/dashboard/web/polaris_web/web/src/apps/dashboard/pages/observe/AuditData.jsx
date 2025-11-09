@@ -15,6 +15,7 @@ import { Icon } from "@shopify/polaris";
 import settingRequests from "../settings/api";
 import PersistStore from "../../../main/PersistStore";
 import ConditionalApprovalModal from "../../components/modals/ConditionalApprovalModal";
+import RegistryBadge from "../../components/shared/RegistryBadge";
 
 const headings = [
     {
@@ -25,8 +26,7 @@ const headings = [
     {
         text: "MCP component name",
         value: "resourceName",
-        title: "MCP component name",
-        type: CellType.TEXT
+        title: "MCP component name"
     },
     {
         text: "Collection name",
@@ -122,13 +122,44 @@ const resourceName = {
     plural: 'audit records',
 };
 
-const convertDataIntoTableFormat = (auditRecord, collectionName) => {
+const stripDeviceIdFromName = (name, allCollections, collectionId) => {
+    if (!name || !allCollections || !collectionId) {
+        return name;
+    }
+    
+    // Find the collection by ID
+    const collection = allCollections.find(col => col.id === collectionId);
+    if (!collection || !collection.envType || !Array.isArray(collection.envType)) {
+        return name;
+    }
+    
+    // Check if any envType has source "ENDPOINT" (case insensitive)
+    const hasEndpointSource = collection.envType.some(env => 
+        env.value && env.value.toLowerCase() === 'endpoint'
+    );
+    
+    if (!hasEndpointSource) {
+        return name;
+    }
+
+    const dotIndex = name.indexOf('.');
+    if (dotIndex > 0 && dotIndex < name.length - 1) {
+        // Return everything after the first dot
+        return name.substring(dotIndex + 1);
+    }
+    
+    return name;
+};
+
+const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegistry) => {
+    const allCollections = PersistStore.getState().allCollections;
     let temp = {...auditRecord}
     temp['typeComp'] = (
         <MethodBox method={""} url={auditRecord?.type.toLowerCase() || "TOOL"}/>
     )
     
     temp['apiAccessTypesComp'] = temp?.apiAccessTypes && temp?.apiAccessTypes.length > 0 && temp?.apiAccessTypes.join(', ') ;
+    temp['resourceName'] = stripDeviceIdFromName(temp?.resourceName, allCollections, temp?.hostCollectionId);
     temp['lastDetectedComp'] = func.prettifyEpoch(temp?.lastDetected)
     temp['updatedTimestampComp'] = func.prettifyEpoch(temp?.updatedTimestamp)
     temp['approvedAtComp'] = func.prettifyEpoch(temp?.approvedAt)
@@ -180,7 +211,12 @@ const convertDataIntoTableFormat = (auditRecord, collectionName) => {
                 )}
             </VerticalStack>
     )
-    temp['collectionName'] = collectionName;
+    temp['collectionName'] = (
+        <HorizontalStack gap="2" align="center">
+            <Text>{stripDeviceIdFromName(collectionName, allCollections, temp?.hostCollectionId)}</Text>
+            {collectionRegistry === "available" && <RegistryBadge />}
+        </HorizontalStack>
+    );
     return temp;
 }
 
@@ -197,6 +233,7 @@ function AuditData() {
     const startTimestamp = getTimeEpoch("since")
     const endTimestamp = getTimeEpoch("until")
     const collectionsMap = PersistStore(state => state.collectionsMap)
+    const collectionsRegistryStatusMap = PersistStore(state => state.collectionsRegistryStatusMap)
 
     function disambiguateLabel(key, value) {
         switch (key) {
@@ -263,8 +300,14 @@ function AuditData() {
             const res = await api.fetchAuditData(sortKey, sortOrder, skip, limit, finalFilters, filterOperators)
             if (res && res.auditData) {
                 res.auditData.forEach((auditRecord) => {
+                    // Get collection name and registry status from separate maps
                     const collectionName = collectionsMap[auditRecord?.hostCollectionId] || "Unknown Collection";
-                    const dataObj = convertDataIntoTableFormat(auditRecord, collectionName)
+                    const collectionRegistryStatus = collectionsRegistryStatusMap[auditRecord?.hostCollectionId];
+                    const dataObj = convertDataIntoTableFormat(
+                        auditRecord, 
+                        collectionName, 
+                        collectionRegistryStatus
+                    )
                     ret.push(dataObj);
                 })
                 total = res.total || 0;
