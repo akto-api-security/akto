@@ -46,15 +46,18 @@ export default function Header() {
 
     useEffect(() => {
         if (window.beamer_config) {
-            const isSaas = window.IS_SAAS === 'true';
+            const isOnPrem = window.DASHBOARD_MODE === 'ON_PREM';
             const isAgentic = dashboardCategory === 'Agentic Security';
 
             const productId = isAgentic
-                ? (isSaas ? 'ijUqfdSQ80078' : 'shUignSe80215')
-                : (isSaas ? 'cJtNevEq80216' : 'rggteHBr72897');
+                ? (isOnPrem ? 'shUignSe80215' : 'ijUqfdSQ80078')
+                : (isOnPrem ? 'rggteHBr72897' : 'cJtNevEq80216');
 
-            if (window.beamer_config.product_id !== productId) {
+            const filterTag = isOnPrem ? 'onprem' : 'saas';
+
+            if (window.beamer_config.product_id !== productId || window.beamer_config.filter !== filterTag) {
                 window.beamer_config.product_id = productId;
+                window.beamer_config.filter = filterTag;
                 if (window.Beamer) {
                     window.Beamer.destroy();
                     window.Beamer.init();
