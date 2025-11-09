@@ -40,6 +40,8 @@ import java.util.*;
 import static com.akto.utils.Utils.createRequestFile;
 import static com.akto.utils.Utils.getTestResultFromTestingRunResult;
 
+import static com.akto.utils.AzureBoardsUtils.getAccountAzureBoardFields;
+
 public class AzureBoardsIntegrationAction extends UserAction {
 
     private String azureBoardsBaseUrl;
@@ -378,6 +380,19 @@ public class AzureBoardsIntegrationAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    Map<String, Map<String, BasicDBList>> createWorkItemFieldMetaData;
+    public String fetchCreateWorkItemFieldMetaData() {
+        AzureBoardsIntegration azureBoardsIntegration = AzureBoardsIntegrationDao.instance.findOne(new BasicDBObject());
+        if(azureBoardsIntegration == null) {
+            addActionError("Azure Boards is not integrated.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        createWorkItemFieldMetaData = getAccountAzureBoardFields();
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String removeAzureBoardsIntegration() {
         AzureBoardsIntegrationDao.instance.deleteAll(new BasicDBObject());
         return Action.SUCCESS.toUpperCase();
@@ -465,5 +480,13 @@ public class AzureBoardsIntegrationAction extends UserAction {
 
     public void setErrorMessage(String errorMessage) {
         this.errorMessage = errorMessage;
+    }
+
+    public Map<String, Map<String, BasicDBList>> getCreateWorkItemFieldMetaData() {
+        return createWorkItemFieldMetaData;
+    }
+
+    public void setCreateWorkItemFieldMetaData(Map<String, Map<String, BasicDBList>> createWorkItemFieldMetaData) {
+        this.createWorkItemFieldMetaData = createWorkItemFieldMetaData;
     }
 }
