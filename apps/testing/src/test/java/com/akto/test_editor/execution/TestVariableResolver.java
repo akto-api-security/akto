@@ -54,7 +54,7 @@ public class TestVariableResolver {
         varMap.put("wordList_specialCharacters", Arrays.asList(".", "$", "/"));
         String key = "${changed_body_value}${specialCharacters}${randomVar}";
 
-        List<Object> result = VariableResolver.resolveWordListVar(key, varMap);
+        List<String> result = VariableResolver.resolveWordListVar(key, varMap);
         assertEquals(Arrays.asList("${changed_body_value}.${randomVar}", "${changed_body_value}$${randomVar}", "${changed_body_value}/${randomVar}"), result);
 
 
@@ -84,7 +84,29 @@ public class TestVariableResolver {
         key = "${changed_body_value}${specialCharacters}${names}";
 
         result = VariableResolver.resolveWordListVar(key, varMap);
-        assertEquals(Arrays.asList("${changed_body_value}.${names}", "${changed_body_value}$${names}", "${changed_body_value}/${names}"), result);
+        assertEquals(Arrays.asList("${changed_body_value}..", "${changed_body_value}.$", "${changed_body_value}./",
+                "${changed_body_value}$.", "${changed_body_value}$$", "${changed_body_value}$/",
+                "${changed_body_value}/.", "${changed_body_value}/$", "${changed_body_value}//"), result);
+
+        varMap = new HashMap<>();
+        varMap.put("changed_body_value", "akto");
+        varMap.put("randomVar", "random");
+        varMap.put("wordList_specialCharacters", Arrays.asList(".", "$", "/"));
+        varMap.put("wordList_names", Arrays.asList(".", "$", "/"));
+        key = "${changed_body_value}";
+
+        result = VariableResolver.resolveWordListVar(key, varMap);
+        assertEquals(Arrays.asList("${changed_body_value}"), result);
+
+        varMap = new HashMap<>();
+        varMap.put("changed_body_value", "akto");
+        varMap.put("randomVar", "random");
+        varMap.put("wordList_specialCharacters", Arrays.asList(".", "$", "/"));
+        varMap.put("wordList_names", Arrays.asList(".", "$", "/"));
+        key = "nothing here";
+
+        result = VariableResolver.resolveWordListVar(key, varMap);
+        assertEquals(Arrays.asList("nothing here"), result);
     }
 
 }
