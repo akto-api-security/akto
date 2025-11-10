@@ -21,6 +21,11 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
 public class PromptHardeningAction extends UserAction {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(PromptHardeningAction.class, LogDb.DASHBOARD);
@@ -455,103 +460,6 @@ public class PromptHardeningAction extends UserAction {
             addActionError(sanitizedError);
             return ERROR.toUpperCase();
         }
-    }
-
-    // Getters and Setters
-    public Map<String, Object> getPromptsObj() {
-        return promptsObj;
-    }
-
-    public void setPromptsObj(Map<String, Object> promptsObj) {
-        this.promptsObj = promptsObj;
-    }
-
-    public String getContent() {
-        return content;
-    }
-
-    public void setContent(String content) {
-        this.content = content;
-    }
-
-    public String getTemplateId() {
-        return templateId;
-    }
-
-    public void setTemplateId(String templateId) {
-        this.templateId = templateId;
-    }
-
-    public String getCategory() {
-        return category;
-    }
-
-    public void setCategory(String category) {
-        this.category = category;
-    }
-
-    public boolean isInactive() {
-        return inactive;
-    }
-
-    public void setInactive(boolean inactive) {
-        this.inactive = inactive;
-    }
-
-    public String getSystemPrompt() {
-        return systemPrompt;
-    }
-
-    public void setSystemPrompt(String systemPrompt) {
-        this.systemPrompt = systemPrompt;
-    }
-
-    public String getUserInput() {
-        return userInput;
-    }
-
-    public void setUserInput(String userInput) {
-        this.userInput = userInput;
-    }
-
-    public List<String> getAttackPatterns() {
-        return attackPatterns;
-    }
-
-    public void setAttackPatterns(List<String> attackPatterns) {
-        this.attackPatterns = attackPatterns;
-    }
-
-    public Map<String, Object> getDetectionRules() {
-        return detectionRules;
-    }
-
-    public void setDetectionRules(Map<String, Object> detectionRules) {
-        this.detectionRules = detectionRules;
-    }
-
-    public Map<String, Object> getTestResult() {
-        return testResult;
-    }
-
-    public void setTestResult(Map<String, Object> testResult) {
-        this.testResult = testResult;
-    }
-
-    public String getVulnerabilityContext() {
-        return vulnerabilityContext;
-    }
-
-    public void setVulnerabilityContext(String vulnerabilityContext) {
-        this.vulnerabilityContext = vulnerabilityContext;
-    }
-
-    public String getHardenedPrompt() {
-        return hardenedPrompt;
-    }
-
-    public void setHardenedPrompt(String hardenedPrompt) {
-        this.hardenedPrompt = hardenedPrompt;
     }
 
     /**
