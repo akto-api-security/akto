@@ -1,7 +1,8 @@
 services:
   python-service:
-    image: public.ecr.aws/aktosecurity/akto-agent-guard-executor:1.12.1_local
-    platform: linux/amd64
+    build:
+      context: ./python-service/container
+      dockerfile: Dockerfile
     container_name: agent-guard-python
     ports:
       - "127.0.0.1:8092:8092"
@@ -28,8 +29,9 @@ services:
       - agent-guard-network
 
   go-service:
-    image: public.ecr.aws/aktosecurity/akto-agent-guard-engine:1.12.1_local
-    platform: linux/amd64
+    build:
+      context: ./go-service/container
+      dockerfile: Dockerfile
     container_name: agent-guard-go
     ports:
       - "127.0.0.1:8091:8091"
