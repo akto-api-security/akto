@@ -293,7 +293,7 @@ export default function LeftNav() {
                 ],
                 key: "5",
             },
-            ...(dashboardCategory === "Agentic Security"? [{
+            ...(dashboardCategory === "Agentic Security" && func.isDemoAccount() ? [{
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
                         Prompt Hardening
