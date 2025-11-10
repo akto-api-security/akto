@@ -50,7 +50,6 @@ const headings = [
     title: "Created on",
     value: "createdTs",
     type: CellType.TEXT,
-    sortActive: true,
   },
   {
     text: "Updated on",

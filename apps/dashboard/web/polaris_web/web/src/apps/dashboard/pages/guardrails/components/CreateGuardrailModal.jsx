@@ -412,10 +412,10 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         pattern: r.pattern,
                         behavior: r.behavior.toLowerCase() // Ensure consistent case
                     })), // New format (with behavior)
-                ...(enableLlmRule && llmRule ? {
+                ...(enableLlmRule && llmRule.trim() ? {
                     llmRule: {
                         enabled: true,
-                        userPrompt: llmRule
+                        userPrompt: llmRule.trim()
                     }
                 } : {}),
                 selectedMcpServers: selectedMcpServers, // Old format (just IDs)
