@@ -430,6 +430,8 @@ function GuardrailPolicies() {
                 contentFiltering: guardrailData.contentFilters || {},
                 applyOnResponse: guardrailData.applyOnResponse || false,
                 applyOnRequest: guardrailData.applyOnRequest || false,
+                url: guardrailData.url || null,
+                confidenceScore: guardrailData.confidenceScore || null,
                 active: true
             };
 

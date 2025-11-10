@@ -77,13 +77,36 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [applyOnResponse, setApplyOnResponse] = useState(false);
     const [applyOnRequest, setApplyOnRequest] = useState(false);
     
+    // Step 7: URL and Confidence Score
+    const [url, setUrl] = useState("");
+    const [confidenceScore, setConfidenceScore] = useState(25); // Start with 25 (first checkpoint)
+    
     // Collections data
     const [mcpServers, setMcpServers] = useState([]);
     const [agentServers, setAgentServers] = useState([]);
     const [collectionsLoading, setCollectionsLoading] = useState(false);
     
+    // URL validation
+    const [urlError, setUrlError] = useState("");
+    
     // Get collections from PersistStore
     const allCollections = PersistStore(state => state.allCollections);
+    
+    // URL validation function (same pattern as McpRegistry.jsx)
+    const validateUrl = (url) => {
+        const urlPattern = /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/;
+        return urlPattern.test(url);
+    };
+    
+    // Handle URL input with validation
+    const handleUrlChange = (value) => {
+        setUrl(value);
+        if (value && value.trim() && !validateUrl(value.trim())) {
+            setUrlError("Invalid URL format. Must be a valid http or https URL");
+        } else {
+            setUrlError("");
+        }
+    };
 
     // Sub-modal states
     const [showAddTopicModal, setShowAddTopicModal] = useState(false);
@@ -158,6 +181,12 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                     return `${serverSummary.join(", ")}${appSettings}`;
                 })()
                 : null
+        },
+        { 
+            number: 7, 
+            title: "URL and Confidence Score", 
+            optional: true,
+            summary: url ? `URL: ${url.substring(0, 30)}${url.length > 30 ? '...' : ''}, Confidence: ${confidenceScore}` : null
         }
     ];
 
@@ -253,6 +282,9 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setSelectedAgentServers([]);
         setApplyOnResponse(false);
         setApplyOnRequest(false);
+        setUrl("");
+        setConfidenceScore(25);
+        setUrlError("");
     };
 
     const populateFormForEdit = (policy) => {
@@ -322,6 +354,17 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         }
         setApplyOnResponse(policy.applyOnResponse || false);
         setApplyOnRequest(policy.applyOnRequest || false);
+        
+        // URL and Confidence Score
+        setUrl(policy.url || "");
+        // Map existing confidence score to nearest checkpoint
+        const existingScore = policy.confidenceScore || policy.riskScore || 25;
+        const checkpoints = [25, 50, 75, 100];
+        const nearestCheckpoint = checkpoints.reduce((prev, curr) => 
+            Math.abs(curr - existingScore) < Math.abs(prev - existingScore) ? curr : prev
+        );
+        setConfidenceScore(nearestCheckpoint);
+        setUrlError(""); // Reset URL error when editing
     };
 
     const handleClose = () => {
@@ -400,20 +443,11 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 selectedAgentServersV2: transformedAgentServers, // New format (with names)
                 applyOnResponse,
                 applyOnRequest,
+                url: url || null,
+                confidenceScore: confidenceScore,
                 // Add edit mode information
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
             };
-
-            // Debug: Log the data being sent
-            console.log("=== FRONTEND DEBUG: Data being sent to backend ===");
-            console.log("Full guardrailData:", JSON.stringify(guardrailData, null, 2));
-            console.log("regexPatterns:", guardrailData.regexPatterns);
-            console.log("regexPatternsV2:", guardrailData.regexPatternsV2);
-            console.log("selectedMcpServers:", guardrailData.selectedMcpServers);
-            console.log("selectedMcpServersV2:", guardrailData.selectedMcpServersV2);
-            console.log("selectedAgentServers:", guardrailData.selectedAgentServers);
-            console.log("selectedAgentServersV2:", guardrailData.selectedAgentServersV2);
-            console.log("=== END FRONTEND DEBUG ===");
             
             await onSave(guardrailData);
             handleClose();
@@ -906,6 +940,49 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         </LegacyCard>
     );
 
+    const renderStep7 = () => (
+        <LegacyCard sectioned>
+            <VerticalStack gap="4">
+                <Text variant="headingMd">URL and Confidence Score</Text>
+                <Text variant="bodyMd" tone="subdued">
+                    Configure the URL and confidence score for this guardrail policy.
+                </Text>
+
+                <FormLayout>
+                    <TextField
+                        label="URL"
+                        value={url}
+                        onChange={handleUrlChange}
+                        placeholder="https://example.com/api/endpoint"
+                        helpText="Enter the URL where this guardrail should be applied"
+                        error={urlError}
+                    />
+                    
+                    <VerticalStack gap="2">
+                        <HorizontalStack align="space-between">
+                            <Text variant="bodyMd" fontWeight="medium">Confidence Score</Text>
+                            <Text variant="bodyMd" fontWeight="bold" color="critical">{confidenceScore}</Text>
+                        </HorizontalStack>
+                        <RangeSlider
+                            label=""
+                            value={confidenceScore === 25 ? 0 : confidenceScore === 50 ? 1 : confidenceScore === 75 ? 2 : 3}
+                            min={0}
+                            max={3}
+                            step={1}
+                            output
+                            onChange={(value) => {
+                                const levels = [25, 50, 75, 100];
+                                setConfidenceScore(levels[value]);
+                            }}
+                        />
+                        <Text variant="bodySm" color="subdued">
+                            Select confidence level
+                        </Text>
+                    </VerticalStack>
+                </FormLayout>
+            </VerticalStack>
+        </LegacyCard>
+    );
 
     const renderCurrentStep = () => {
         switch (currentStep) {
@@ -915,6 +992,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             case 4: return renderStep4();
             case 5: return renderStep5();
             case 6: return renderStep6();
+            case 7: return renderStep7();
             default: return renderStep1();
         }
     };
@@ -940,18 +1018,18 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     };
 
     const getPrimaryAction = () => {
-        if (currentStep === 6) {
+        if (currentStep === 7) {
             return {
                 content: isEditMode ? "Update Guardrail" : "Create Guardrail",
                 onAction: handleSave,
                 loading: loading,
-                disabled: !name.trim() || !blockedMessage.trim()
+                disabled: !name.trim() || !blockedMessage.trim() || urlError
             };
-        } else if (currentStep < 6) {
+        } else if (currentStep < 7) {
             return {
                 content: "Next",
                 onAction: handleNext,
-                disabled: currentStep === 1 && (!name.trim() || !blockedMessage.trim())
+                disabled: (currentStep === 1 && (!name.trim() || !blockedMessage.trim()))
             };
         }
         return null;

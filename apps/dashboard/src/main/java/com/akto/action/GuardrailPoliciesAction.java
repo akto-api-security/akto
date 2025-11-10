@@ -101,6 +101,8 @@ public class GuardrailPoliciesAction extends UserAction {
             updates.add(Updates.set("selectedAgentServersV2", policy.getSelectedAgentServersV2()));
             updates.add(Updates.set("applyOnResponse", policy.isApplyOnResponse()));
             updates.add(Updates.set("applyOnRequest", policy.isApplyOnRequest()));
+            updates.add(Updates.set("url", policy.getUrl()));
+            updates.add(Updates.set("confidenceScore", policy.getConfidenceScore()));
             updates.add(Updates.set("active", policy.isActive()));
             
             // Only set createdBy and createdTimestamp on insert
