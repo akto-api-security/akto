@@ -81,20 +81,17 @@ const PromptResponse = () => {
             }
             
             try {
-                // Use JSON_SCHEMA to prevent arbitrary JS object construction (security fix)
-                const parsedYaml = jsYaml.load(yamlContent, { schema: jsYaml.JSON_SCHEMA });
-                
+                const parsedYaml = jsYaml.load(yamlContent, { schema: jsYaml.JSON_SCHEMA })
+
                 if (parsedYaml.attack_pattern && Array.isArray(parsedYaml.attack_pattern)) {
-                    attackPatterns = parsedYaml.attack_pattern;
+                    attackPatterns = parsedYaml.attack_pattern
                 }
-                
+
                 if (parsedYaml.detection) {
-                    detectionRules = parsedYaml.detection;
+                    detectionRules = parsedYaml.detection
                 }
-            } catch (e) {
-                // Log YAML parsing errors for debugging
-                console.warn("YAML parsing failed, using fallback:", e.message);
-                // Continue with fallback
+            } catch (_error) {
+                // Continue with fallback behaviour
             }
         }
         
@@ -138,11 +135,10 @@ const PromptResponse = () => {
                 throw new Error("Invalid response from server");
             }
         } catch (error) {
-            console.error("Hardened prompt test error:", error);
             setToastConfig({
                 isActive: true,
                 isError: true,
-                message: "Failed to test hardened prompt."
+                message: error?.message || "Failed to test hardened prompt."
             });
         } finally {
             setIsLoading(false);
@@ -176,22 +172,17 @@ const PromptResponse = () => {
             }
             
             try {
-                // Use JSON_SCHEMA to prevent arbitrary JS object construction (security fix)
                 const parsedYaml = jsYaml.load(yamlContent, { schema: jsYaml.JSON_SCHEMA })
-                
-                // Extract attack patterns
+
                 if (parsedYaml.attack_pattern && Array.isArray(parsedYaml.attack_pattern)) {
                     attackPatterns = parsedYaml.attack_pattern
                 }
-                
-                // Extract detection rules (can include custom prompt templates)
+
                 if (parsedYaml.detection) {
                     detectionRules = parsedYaml.detection
                 }
-            } catch (e) {
-                // Log YAML parsing errors for debugging
-                console.warn("YAML parsing failed, using fallback:", e.message);
-                // Continue with fallback
+            } catch (_error) {
+                // Continue with fallback behaviour
             }
         }
 
@@ -241,11 +232,10 @@ const PromptResponse = () => {
                 throw new Error("Invalid response from server")
             }
         } catch (error) {
-            console.error("Test error:", error)
             setToastConfig({
                 isActive: true,
                 isError: true,
-                message: "Failed to test prompt. Please try again."
+                message: error?.response?.actionErrors?.[0] || error?.message || "Failed to test prompt. Please try again."
             })
         } finally {
             setIsLoading(false)
@@ -331,8 +321,8 @@ const PromptResponse = () => {
                                         if (parsedYaml.attack_pattern && Array.isArray(parsedYaml.attack_pattern)) {
                                             attackPatterns = parsedYaml.attack_pattern;
                                         }
-                                    } catch (e) {
-                                        console.warn("YAML parsing failed:", e.message);
+                                    } catch (_error) {
+                                        attackPatterns = null;
                                     }
                                 }
                                 
@@ -359,11 +349,10 @@ const PromptResponse = () => {
                                         throw new Error("Failed to generate user input");
                                     }
                                 } catch (error) {
-                                    console.error("Generate input error:", error);
                                     setToastConfig({
                                         isActive: true,
                                         isError: true,
-                                        message: "Failed to generate malicious input. Please try again."
+                                        message: error?.message || "Failed to generate malicious input. Please try again."
                                     });
                                 } finally {
                                     setIsLoading(false);

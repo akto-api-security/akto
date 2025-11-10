@@ -32,25 +32,26 @@ const PromptHardening = () => {
     }
 
     const fetchAllPrompts = async () => {
+        let promptsFromBackend
         try {
-            // Fetch prompts from backend API using the standard request pattern
             const data = await api.fetchAllPrompts()
-            
-            // If backend returns data, use it; otherwise fall back to sample data
-            if (data && data.promptsObj) {
-                setPromptsObj(data.promptsObj)
-                
-                // Set default selected prompt if available
-                const firstCategory = Object.keys(data.promptsObj.customPrompts || {})[0]
-                if (firstCategory && data.promptsObj.customPrompts[firstCategory].length > 0) {
-                    setSelectedPrompt(data.promptsObj.customPrompts[firstCategory][0])
-                }
-                
-                setLoading(false)
-                return
+            promptsFromBackend = data?.promptsObj
+        } catch (_) {
+            promptsFromBackend = null
+        }
+
+        if (promptsFromBackend) {
+            setPromptsObj(promptsFromBackend)
+
+            const firstCategory = Object.keys(promptsFromBackend.customPrompts || {})
+                .find(category => (promptsFromBackend.customPrompts[category] || []).length > 0)
+
+            if (firstCategory) {
+                setSelectedPrompt(promptsFromBackend.customPrompts[firstCategory][0])
             }
-        } catch (error) {
-            console.error('Error fetching prompts from backend, using sample data:', error)
+
+            setLoading(false)
+            return
         }
 
         // Fallback to sample prompts data if backend call fails
@@ -767,10 +768,8 @@ notes: "Verifies rate limiting is working."`,
         setLoading(false)
     }
 
-    const addCustomPrompt = (e) => {
-        e.stopPropagation()
-        console.log("Add custom prompt")
-        // TODO: Implement add custom prompt functionality
+    const addCustomPrompt = (event) => {
+        event.stopPropagation()
     }
 
     const headerComp = (

@@ -125,7 +125,7 @@ public class PromptHardeningAction extends UserAction {
             
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
-            e.printStackTrace();
+            loggerMaker.error("Failed to fetch prompt hardening templates", e);
             addActionError(e.getMessage());
             return ERROR.toUpperCase();
         }
@@ -158,8 +158,7 @@ public class PromptHardeningAction extends UserAction {
             return "An unexpected error occurred. Please try again.";
         }
         
-        // Log the original error for debugging
-        loggerMaker.info("Prompt hardening error occurred: " + error);
+        loggerMaker.error("Prompt hardening error occurred: " + error);
         
         // Remove sensitive information patterns
         String sanitized = error;
@@ -241,7 +240,7 @@ public class PromptHardeningAction extends UserAction {
             
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
-            e.printStackTrace();
+            loggerMaker.error("Failed to save prompt hardening template", e);
             addActionError(e.getMessage());
             return ERROR.toUpperCase();
         }
@@ -262,7 +261,7 @@ public class PromptHardeningAction extends UserAction {
             
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
-            e.printStackTrace();
+            loggerMaker.error("Failed to delete prompt hardening template", e);
             addActionError(e.getMessage());
             return ERROR.toUpperCase();
         }
@@ -350,7 +349,7 @@ public class PromptHardeningAction extends UserAction {
             
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
-            e.printStackTrace();
+            loggerMaker.error("Failed to toggle prompt status", e);
             addActionError(e.getMessage());
             return ERROR.toUpperCase();
         }
@@ -419,7 +418,6 @@ public class PromptHardeningAction extends UserAction {
             
             String promptTemplate = extractPromptTemplate(detectionRulesObj);
             if (promptTemplate != null) {
-                loggerMaker.info("Using template-driven LLM vulnerability detection");
                 analysis = PromptHardeningTestHandler.analyzeVulnerabilityWithLLM(
                     agentResponse,
                     attackPatterns,
@@ -428,14 +426,12 @@ public class PromptHardeningAction extends UserAction {
                 );
             } else if (detectionRulesObj != null) {
                 // Legacy path: Use regex-based detection (will be removed in future)
-                loggerMaker.info("Using legacy regex-based detection");
                 analysis = PromptHardeningTestHandler.analyzeVulnerability(
                     agentResponse, 
                     detectionRulesObj
                 );
             } else {
                 // NEW PATH: Use LLM-based detection (recommended)
-                loggerMaker.info("Using LLM-based vulnerability detection");
                 analysis = PromptHardeningTestHandler.analyzeVulnerabilityWithLLM(
                     agentResponse,
                     attackPatterns,
@@ -453,7 +449,7 @@ public class PromptHardeningAction extends UserAction {
             
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
-            e.printStackTrace();
+            loggerMaker.error("Failed to test system prompt", e);
             // Use sanitized error message for user-facing errors
             String sanitizedError = sanitizeErrorMessage(e.getMessage());
             addActionError(sanitizedError);
@@ -587,7 +583,6 @@ public class PromptHardeningAction extends UserAction {
             
             // Check if limit exceeded
             if (timestamps.size() >= MAX_REQUESTS_PER_WINDOW) {
-                loggerMaker.info("Rate limit exceeded for user " + userId + " on operation " + operation);
                 return false;
             }
             
@@ -597,7 +592,7 @@ public class PromptHardeningAction extends UserAction {
             return true;
         } catch (Exception e) {
             // If rate limiting fails, log but allow the request
-            loggerMaker.error("Rate limit check failed: " + e.getMessage());
+            loggerMaker.error("Rate limit check failed", e);
             return true;
         }
     }
@@ -637,7 +632,7 @@ public class PromptHardeningAction extends UserAction {
             
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
-            e.printStackTrace();
+            loggerMaker.error("Failed to generate malicious user input", e);
             // Use sanitized error message for user-facing errors
             String sanitizedError = sanitizeErrorMessage(e.getMessage());
             addActionError(sanitizedError);
@@ -671,7 +666,7 @@ public class PromptHardeningAction extends UserAction {
             
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
-            e.printStackTrace();
+            loggerMaker.error("Failed to harden system prompt", e);
             // Use sanitized error message for user-facing errors
             String sanitizedError = sanitizeErrorMessage(e.getMessage());
             addActionError(sanitizedError);

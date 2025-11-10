@@ -132,8 +132,7 @@ public class PromptHardeningTestHandler extends AzureOpenAIPromptHandler {
                                 analysisDetail.append("✗ Regex match: ").append(matchDescription)
                                     .append(" (found: \"").append(truncate(regexMatcher.group(), 50)).append("\") | ");
                             }
-                        } catch (Exception e) {
-                            logger.error("Invalid regex pattern: " + pattern, e);
+                        } catch (Exception ignored) {
                             analysisDetail.append("⚠ Invalid regex pattern: ").append(pattern).append(" | ");
                         }
                     }
@@ -183,7 +182,6 @@ public class PromptHardeningTestHandler extends AzureOpenAIPromptHandler {
                 }
                 // Handle unknown matcher types
                 else {
-                    logger.warn("Unknown matcher type: " + type);
                     analysisDetail.append("⚠ Unknown matcher type: ").append(type).append(" | ");
                 }
             }
@@ -295,11 +293,9 @@ public class PromptHardeningTestHandler extends AzureOpenAIPromptHandler {
         String generatedInput = tempHandler.call(prompt.toString());
         
         if (generatedInput == null || generatedInput.equals("NOT_FOUND") || generatedInput.isEmpty()) {
-            logger.error("Failed to generate malicious user input from LLM");
             throw new Exception("Failed to generate malicious user input from LLM");
         }
         
-        logger.info("Successfully generated malicious user input of length: " + generatedInput.length());
         return generatedInput.trim();
     }
     
@@ -332,7 +328,6 @@ public class PromptHardeningTestHandler extends AzureOpenAIPromptHandler {
         String llmResponse = tempHandler.call(prompt);
         
         if (llmResponse == null || llmResponse.equals("NOT_FOUND") || llmResponse.isEmpty()) {
-            logger.error("Failed to get vulnerability analysis from LLM");
             throw new Exception("Failed to analyze vulnerability with LLM");
         }
         
@@ -374,10 +369,7 @@ public class PromptHardeningTestHandler extends AzureOpenAIPromptHandler {
             
             analysis.put("responseLength", agentResponse.length());
             
-            logger.info("LLM vulnerability analysis complete - isVulnerable: " + isVulnerable);
-            
-        } catch (Exception e) {
-            logger.error("Failed to parse LLM analysis response: " + llmResponse, e);
+        } catch (Exception ignored) {
             throw new Exception("Failed to parse vulnerability analysis from LLM");
         }
         
@@ -388,19 +380,17 @@ public class PromptHardeningTestHandler extends AzureOpenAIPromptHandler {
      * Helper method to extract JSON values
      */
     private static String extractJsonValue(String json, String key) {
-        try {
-            String searchKey = "\"" + key + "\":";
-            int startIdx = json.indexOf(searchKey);
-            if (startIdx == -1) return "unknown";
-            
-            startIdx = json.indexOf("\"", startIdx + searchKey.length()) + 1;
-            int endIdx = json.indexOf("\"", startIdx);
-            
-            if (startIdx > 0 && endIdx > startIdx) {
-                return json.substring(startIdx, endIdx);
-            }
-        } catch (Exception e) {
-            logger.warn("Failed to extract JSON value for key: " + key);
+        String searchKey = "\"" + key + "\":";
+        int startIdx = json.indexOf(searchKey);
+        if (startIdx == -1) {
+            return "unknown";
+        }
+
+        startIdx = json.indexOf("\"", startIdx + searchKey.length()) + 1;
+        int endIdx = json.indexOf("\"", startIdx);
+
+        if (startIdx > 0 && endIdx > startIdx) {
+            return json.substring(startIdx, endIdx);
         }
         return "unknown";
     }
@@ -522,11 +512,9 @@ public class PromptHardeningTestHandler extends AzureOpenAIPromptHandler {
         // The call() method already extracts the content from the JSON response
         // and returns just the text content (not the full JSON)
         if (hardenedPrompt == null || hardenedPrompt.equals("NOT_FOUND") || hardenedPrompt.isEmpty()) {
-            logger.error("Failed to generate hardened prompt from LLM - received null or empty response");
             throw new Exception("Failed to generate hardened prompt from LLM");
         }
         
-        logger.info("Successfully generated hardened prompt of length: " + hardenedPrompt.length());
         return hardenedPrompt.trim();
     }
 }

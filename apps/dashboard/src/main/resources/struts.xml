@@ -9049,6 +9049,9 @@
         <action name="api/fetchAllPrompts" class="com.akto.action.prompt_hardening.PromptHardeningAction" method="fetchAllPrompts">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AI_AGENTS</param>
+            </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ</param>
@@ -9070,6 +9073,9 @@
         <action name="api/savePrompt" class="com.akto.action.prompt_hardening.PromptHardeningAction" method="savePrompt">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AI_AGENTS</param>
+            </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ_WRITE</param>
@@ -9092,6 +9098,9 @@
         <action name="api/deletePrompt" class="com.akto.action.prompt_hardening.PromptHardeningAction" method="deletePrompt">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AI_AGENTS</param>
+            </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ_WRITE</param>
@@ -9114,6 +9123,9 @@
         <action name="api/togglePromptStatus" class="com.akto.action.prompt_hardening.PromptHardeningAction" method="togglePromptStatus">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AI_AGENTS</param>
+            </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ_WRITE</param>
@@ -9136,6 +9148,9 @@
         <action name="api/testSystemPrompt" class="com.akto.action.prompt_hardening.PromptHardeningAction" method="testSystemPrompt">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AI_AGENTS</param>
+            </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ</param>
@@ -9158,6 +9173,9 @@
         <action name="api/generateMaliciousUserInput" class="com.akto.action.prompt_hardening.PromptHardeningAction" method="generateMaliciousUserInput">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AI_AGENTS</param>
+            </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ</param>
@@ -9180,6 +9198,9 @@
         <action name="api/hardenSystemPrompt" class="com.akto.action.prompt_hardening.PromptHardeningAction" method="hardenSystemPrompt">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AI_AGENTS</param>
+            </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ</param>
