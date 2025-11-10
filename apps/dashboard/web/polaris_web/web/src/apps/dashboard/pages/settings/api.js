@@ -724,6 +724,27 @@ const settingRequests = {
             }
         })
     },
+    getMcpServersByAgent(agentId, deviceId) {
+        return request({
+            url: '/api/getMcpServersByAgent',
+            method: 'post',
+            data: {
+                agentId,
+                deviceId
+            }
+        })
+    },
+    getAgentLogs(agentId, startTime, endTime) {
+        return request({
+            url: '/api/getAgentLogs',
+            method: 'post',
+            data: {
+                agentId,
+                startTime,
+                endTime
+            }
+        })
+    },
     addMcpRegistryIntegration(registries) {
         return request({
             url: '/api/addMcpRegistryIntegration',

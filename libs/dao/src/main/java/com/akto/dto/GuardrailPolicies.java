@@ -47,8 +47,10 @@ public class GuardrailPolicies {
     
     // Step 5: Content Filtering
     private Map<String, Object> contentFiltering;
-    
-    // Step 6: Server and application settings (old format - backward compatibility)
+
+    private LLMRule llmRule;
+
+    // Step 7: Server and application settings (old format - backward compatibility)
     private List<String> selectedMcpServers;
     private List<String> selectedAgentServers;
     
@@ -58,7 +60,11 @@ public class GuardrailPolicies {
     private boolean applyOnResponse;
     private boolean applyOnRequest;
     
-    // Step 7: Review and Finish
+    // Step 7: URL and Confidence Score
+    private String url;
+    private double confidenceScore;
+    
+    // Step 8: Review and Finish
     private boolean active;
 
     public String getHexId() {
@@ -108,13 +114,14 @@ public class GuardrailPolicies {
         return new java.util.ArrayList<>();
     }
 
-    public GuardrailPolicies(String name, String description, String blockedMessage, String severity, int createdTimestamp, 
-                           int updatedTimestamp, String createdBy, String updatedBy, String selectedCollection, 
+    public GuardrailPolicies(String name, String description, String blockedMessage, String severity, int createdTimestamp,
+                           int updatedTimestamp, String createdBy, String updatedBy, String selectedCollection,
                            String selectedModel, List<DeniedTopic> deniedTopics, List<PiiType> piiTypes,
-                           List<String> regexPatterns, List<RegexPattern> regexPatternsV2, Map<String, Object> contentFiltering, 
+                           List<String> regexPatterns, List<RegexPattern> regexPatternsV2, Map<String, Object> contentFiltering,
+                           LLMRule llmRule,
                            List<String> selectedMcpServers, List<String> selectedAgentServers,
                            List<SelectedServer> selectedMcpServersV2, List<SelectedServer> selectedAgentServersV2,
-                           boolean applyOnResponse, boolean applyOnRequest, boolean active) {
+                           boolean applyOnResponse, boolean applyOnRequest, String url, double confidenceScore, boolean active) {
         this.name = name;
         this.description = description;
         this.blockedMessage = blockedMessage;
@@ -130,12 +137,15 @@ public class GuardrailPolicies {
         this.regexPatterns = regexPatterns;
         this.regexPatternsV2 = regexPatternsV2;
         this.contentFiltering = contentFiltering;
+        this.llmRule = llmRule;
         this.selectedMcpServers = selectedMcpServers;
         this.selectedAgentServers = selectedAgentServers;
         this.selectedMcpServersV2 = selectedMcpServersV2;
         this.selectedAgentServersV2 = selectedAgentServersV2;
         this.applyOnResponse = applyOnResponse;
         this.applyOnRequest = applyOnRequest;
+        this.url = url;
+        this.confidenceScore = confidenceScore;
         this.active = active;
     }
 
@@ -190,6 +200,21 @@ public class GuardrailPolicies {
         public SelectedServer(String id, String name) {
             this.id = id;
             this.name = name;
+        }
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class LLMRule {
+        private boolean enabled;
+        private String userPrompt;
+        private double confidenceScore;
+
+        public LLMRule(boolean enabled, String userPrompt, double confidenceScore) {
+            this.enabled = enabled;
+            this.userPrompt = userPrompt;
+            this.confidenceScore = confidenceScore;
         }
     }
 }
