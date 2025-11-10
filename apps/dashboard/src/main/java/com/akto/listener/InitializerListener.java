@@ -3509,6 +3509,11 @@ public class InitializerListener implements ServletContextListener {
                 Map<String, byte[]> allYamlTemplates = TestTemplateUtils.getZipFromMultipleRepoAndBranch(getAktoDefaultTestLibs());
                 AccountTask.instance.executeTask((account) -> {
                     try {
+
+                        if (account.getId() == 1753372418) {
+                            return;
+                        }
+
                         logger.infoAndAddToDb("Updating Test Editor Templates for accountId: " + account.getId(), LogDb.DASHBOARD);
                         processTemplateFilesZip(testingTemplates, Constants._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
                         if (!DashboardMode.isMetered()) return;
