@@ -1481,7 +1481,7 @@ const quickStartFunc = {
             chromeExtensionObj, firefoxExtensionObj, safariExtensionObj
         ]
 
-       if(func.checkLocal()){
+       if(func.checkLocal() || func.isLimitedAccount()){
            return {
                "Manual": manual
            }
@@ -1532,7 +1532,7 @@ const quickStartFunc = {
 
     getConnectorsList: function () {
 
-        if(func.checkLocal()){
+        if(func.checkLocal() || func.isLimitedAccount()){
             return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj]
         }
 
