@@ -158,7 +158,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             number: 6,
             title: "LLM-based Rule",
             optional: true,
-            summary: enableLlmRule ? `Enabled${llmRule ? ` - ${llmRule.substring(0, 30)}${llmRule.length > 30 ? '...' : ''}` : ''}` : null
+            summary: enableLlmRule ? `Enabled${llmRule ? ` - ${llmRule.substring(0, 30)}${llmRule.length > 30 ? '...,' : ','}` : ','} Confidence: ${llmConfidenceScore.toFixed(2)}` : null
         },
         {
             number: 7,
