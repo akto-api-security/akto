@@ -83,7 +83,7 @@
                 </script>
                 <script>
                     var beamer_config = {
-                        product_id : 'TEEsyHNL42222', //DO NOT CHANGE: This is your product code on Beamer
+                        product_id: 'cJtNevEq80216',
                         selector: '#beamer-btn',
                         top: 0,
                         left: 0,
