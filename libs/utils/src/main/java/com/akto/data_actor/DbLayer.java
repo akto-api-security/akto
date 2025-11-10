@@ -100,6 +100,7 @@ import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.RuntimeMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
+import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
@@ -123,9 +124,9 @@ public class DbLayer {
 
     private static final ConcurrentHashMap<Integer, Integer> lastUpdatedTsMap = new ConcurrentHashMap<>();
 
-    // Cache for filtered collection IDs (without routing tags)
-    private static volatile List<Integer> filteredCollectionIdsCache = null;
-    private static volatile long filteredCollectionIdsCacheTimestamp = 0;
+    // Cache for routing collection IDs (with routing tags)
+    private static volatile Set<Integer> routingCollectionIdsCache = null;
+    private static volatile long routingCollectionIdsCacheTimestamp = 0;
     private static final long CACHE_TTL_MS = 60 * 60 * 1000; // 60 minutes
 
     private static int getLastUpdatedTsForAccount(int accountId) {
@@ -380,40 +381,74 @@ public class DbLayer {
 //    }
 
     public static List<SingleTypeInfo> fetchStiBasedOnHostHeaders(ObjectId objectId) {
-        Bson filterForHostHeader = SingleTypeInfoDao.filterForHostHeader(-1,false);
-        Bson filterForSkip = Filters.gt("_id", objectId);
-        Bson finalFilter = objectId == null ? filterForHostHeader : Filters.and(filterForHostHeader, filterForSkip);
+        List<SingleTypeInfo> results = new ArrayList<>();
+        ObjectId currentObjectId = objectId;
+        Set<Integer> routingCollectionIds = null;
 
-        // Filter out collections with routing tag suffixes for specific account
         if (Context.accountId.get() == Constants.ROUTING_SKIP_ACCOUNT_ID) {
-            List<Integer> filteredCollectionIds = getFilteredCollectionIds();
-            Bson collectionFilter = Filters.in(SingleTypeInfo._API_COLLECTION_ID, filteredCollectionIds);
-            finalFilter = Filters.and(finalFilter, collectionFilter);
+            routingCollectionIds = getRoutingCollectionIds();
         }
 
-        int limit = 1000;
-        return SingleTypeInfoDao.instance.findAll(finalFilter, 0, limit, Sorts.ascending("_id"), Projections.exclude(SingleTypeInfo._VALUES));
+        // Loop and discard template URLs from collections belonging to routing tags
+        // Keep fetching until we get a non-empty list or exhaust documents
+        while (results.isEmpty()) {
+            Bson filterForHostHeader = SingleTypeInfoDao.filterForHostHeader(-1, false);
+            Bson filterForSkip = currentObjectId == null ? null : Filters.gt("_id", currentObjectId);
+            Bson finalFilter = filterForSkip == null ? filterForHostHeader : Filters.and(filterForHostHeader, filterForSkip);
+
+            int limit = 1000;
+            List<SingleTypeInfo> batch = SingleTypeInfoDao.instance.findAll(finalFilter, 0, limit, Sorts.ascending("_id"), Projections.exclude(SingleTypeInfo._VALUES));
+
+            if (batch.isEmpty()) {
+                break; // Exhausted all documents
+            }
+
+            // Always update cursor to last item in batch
+            currentObjectId = batch.get(batch.size() - 1).getId();
+
+            // Filter out template URLs from routing collections
+            if (routingCollectionIds != null) {
+                for (SingleTypeInfo sti : batch) {
+                    if (!routingCollectionIds.contains(sti.getApiCollectionId())) {
+                        // Not from routing collection - keep everything
+                        results.add(sti);
+                    } else if (!APICatalog.isTemplateUrl(sti.getUrl())) {
+                        // From routing collection but static URL - keep it
+                        results.add(sti);
+                    }
+                    // From routing collection AND template URL - discard
+                }
+            } else {
+                results.addAll(batch);
+            }
+
+            if (batch.size() < limit) {
+                break; // Last page reached
+            }
+        }
+
+        return results;
     }
 
-    private static List<Integer> getFilteredCollectionIds() {
+    private static Set<Integer> getRoutingCollectionIds() {
         long currentTime = System.currentTimeMillis();
 
         // Check if cache is valid
-        if (filteredCollectionIdsCache != null &&
-            (currentTime - filteredCollectionIdsCacheTimestamp) < CACHE_TTL_MS) {
-            return filteredCollectionIdsCache;
+        if (routingCollectionIdsCache != null &&
+            (currentTime - routingCollectionIdsCacheTimestamp) < CACHE_TTL_MS) {
+            return routingCollectionIdsCache;
         }
 
         // Cache miss or expired - rebuild cache
         synchronized (DbLayer.class) {
             // Double-check after acquiring lock
-            if (filteredCollectionIdsCache != null &&
-                (currentTime - filteredCollectionIdsCacheTimestamp) < CACHE_TTL_MS) {
-                return filteredCollectionIdsCache;
+            if (routingCollectionIdsCache != null &&
+                (currentTime - routingCollectionIdsCacheTimestamp) < CACHE_TTL_MS) {
+                return routingCollectionIdsCache;
             }
 
             List<Integer> apiCollectionIds = fetchApiCollectionIds();
-            List<Integer> filteredCollectionIds = new ArrayList<>();
+            Set<Integer> routingCollectionIds = new HashSet<>();
 
             for (Integer collectionId : apiCollectionIds) {
                 ApiCollection collection = ApiCollectionsDao.instance.getMeta(collectionId);
@@ -421,19 +456,17 @@ public class DbLayer {
                     boolean hasRoutingTag = collection.getTagsList().stream()
                         .anyMatch(t -> t.getKeyName() != null &&
                             Constants.ROUTING_TAG_SUFFIXES.stream().anyMatch(suffix -> t.getKeyName().endsWith(suffix)));
-                    if (!hasRoutingTag) {
-                        filteredCollectionIds.add(collectionId);
+                    if (hasRoutingTag) {
+                        routingCollectionIds.add(collectionId);
                     }
-                } else {
-                    filteredCollectionIds.add(collectionId);
                 }
             }
 
             // Update cache
-            filteredCollectionIdsCache = filteredCollectionIds;
-            filteredCollectionIdsCacheTimestamp = currentTime;
+            routingCollectionIdsCache = routingCollectionIds;
+            routingCollectionIdsCacheTimestamp = currentTime;
 
-            return filteredCollectionIds;
+            return routingCollectionIds;
         }
     }
 
