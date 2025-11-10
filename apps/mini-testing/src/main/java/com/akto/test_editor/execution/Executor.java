@@ -189,7 +189,7 @@ public class Executor {
                 TestResult res = null;
                 if (AgentClient.isRawApiValidForAgenticTest(testReq)) {
                     // execute agentic test here
-                    res = agentClient.executeAgenticTest(testReq);
+                    res = agentClient.executeAgenticTest(testReq, apiInfoKey.getApiCollectionId());
                 }else{
                     List<String> contentType = origRawApi.getRequest().getHeaders().getOrDefault("content-type", new ArrayList<>());
                     String contentTypeString = "";
@@ -655,7 +655,8 @@ public class Executor {
                 }
             case "conversations_list":
                 List<String> conversationsList = (List<String>) value;
-                return Operations.addHeader(rawApi, "x-agent-conversations", String.join(",", conversationsList));
+                rawApi.setConversationsList(conversationsList);
+                return Operations.addHeader(rawApi, Constants.AKTO_AGENT_CONVERSATIONS , "0");
             case "attach_file":
                 return Operations.addHeader(rawApi, Constants.AKTO_ATTACH_FILE , key.toString());
             case "add_body_param":

@@ -42,12 +42,20 @@ public class AgentClient {
         this.agentBaseUrl = agentBaseUrl.endsWith("/") ? agentBaseUrl.substring(0, agentBaseUrl.length() - 1) : agentBaseUrl;
     }
 
-    public TestResult executeAgenticTest(RawApi rawApi) throws Exception {
+    public TestResult executeAgenticTest(RawApi rawApi, int apiCollectionId) throws Exception {
         String conversationId = UUID.randomUUID().toString();
-        String prompts = rawApi.getRequest().getHeaders().get("x-agent-conversations").get(0);
-        List<String> promptsList = Arrays.asList(prompts.split(","));
+        List<String> promptsList = rawApi.getConversationsList();
         String testMode = getTestModeFromRole();
         
+        try {
+            /*
+             * the rawApi already has been modified by the testRole, 
+             * and should have the updated auth request headers
+             */
+            AgenticUtils.checkAndInitializeAgent(conversationId, rawApi, apiCollectionId);
+        } catch(Exception e){
+        }
+
         try {
             List<AgentConversationResult> conversationResults = processConversations(promptsList, conversationId, testMode);
             
@@ -55,6 +63,7 @@ public class AgentClient {
             List<String> errors = new ArrayList<>();
             
             TestResult testResult = new TestResult();
+            // TODO: Fill in message field
             testResult.setMessage(null);
             testResult.setConversationId(conversationId);
             testResult.setResultTypeAgentic(true);
@@ -84,7 +93,7 @@ public class AgentClient {
         }
     }
     
-    public List<AgentConversationResult> processConversations(List<String> prompts, String conversationId, String testMode) throws Exception {
+    private List<AgentConversationResult> processConversations(List<String> prompts, String conversationId, String testMode) throws Exception {
         List<AgentConversationResult> results = new ArrayList<>();
         int index = 0;
         int totalRequests = prompts.size();
@@ -102,7 +111,7 @@ public class AgentClient {
         return results;
     }
     
-    public AgentConversationResult sendChatRequest(String prompt, String conversationId, String testMode, boolean isLastRequest) throws Exception {
+    private AgentConversationResult sendChatRequest(String prompt, String conversationId, String testMode, boolean isLastRequest) throws Exception {
         Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest);
         
         try (Response response = agentHttpClient.newCall(request).execute()) {
@@ -172,12 +181,13 @@ public class AgentClient {
         try {
             dataActor.storeConversationResults(conversationResults);
         } catch (Exception e) {
-            loggerMaker.error("Error storing conversation results: " + e.getMessage());
+            loggerMaker.errorAndAddToDb("Error storing conversation results: " + e.getMessage());
         }
     }
 
     public static boolean isRawApiValidForAgenticTest(RawApi rawApi) {
-        return rawApi.getRequest().getHeaders().containsKey("x-agent-conversations");
+        List<String> temp = rawApi.getConversationsList();
+        return (temp != null && !temp.isEmpty());
     }
     
     public boolean performHealthCheck() {
@@ -192,8 +202,24 @@ public class AgentClient {
         }
     }
     public void initializeAgent(String sseUrl, String authorizationToken) {
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("sseUrl", sseUrl);
+        requestBody.put("authorization", authorizationToken);
+        initializeAgent(requestBody);
+    }
+
+    public void initializeAgent(String sessionUrl, String requestHeaders, String apiRequestBody, String conversationId) {
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("sessionUrl", sessionUrl);
+        requestBody.put("requestHeaders", requestHeaders);
+        requestBody.put("requestBody", apiRequestBody);
+        requestBody.put("conversationId", conversationId);
+        initializeAgent(requestBody);
+    }
+
+    public void initializeAgent(Map<String, Object> requestBody) {
         try {
-            Request initRequest = buildOkHttpInitializeRequest(sseUrl, authorizationToken);
+            Request initRequest = buildOkHttpInitializeRequest(requestBody);
             try (Response response = agentHttpClient.newCall(initRequest).execute()) {
                 if (!response.isSuccessful()) {
                     loggerMaker.errorAndAddToDb("Agent initialization failed with status: " + response.code());
@@ -212,18 +238,15 @@ public class AgentClient {
                 .build();
     }
     
-    
-    private Request buildOkHttpInitializeRequest(String sseUrl, String authorizationToken) {
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("sseUrl", sseUrl);
-        requestBody.put("authorization", authorizationToken);
-        
-        String body;
+    private Request buildOkHttpInitializeRequest(Map<String, Object> requestBody) {
+
+        String body = "";
         try {
             body = objectMapper.writeValueAsString(requestBody);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error serializing initialize request body: " + e.getMessage());
-            body = "{\"sseUrl\":\"" + sseUrl.replace("\"", "\\\"") + "\"}";
+            // TODO: Fix at sse URL.
+            // body = "{\"sseUrl\":\"" + sseUrl.replace("\"", "\\\"") + "\"}";
         }
         
         RequestBody requestBodyObj = RequestBody.create(body, MediaType.parse("application/json"));

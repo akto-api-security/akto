@@ -11,10 +11,11 @@ import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
-
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.BodyOperator;
 import com.akto.dao.test_editor.TestEditorEnums.CollectionOperands;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
@@ -261,13 +262,19 @@ public final class FilterAction {
         if (rawApi == null || rawApi.getRequest() == null) {
             return new DataOperandsFilterResponse(false, null, null, null);
         }
-        boolean isMcpRequest = McpRequestResponseUtils.isMcpRequest(rawApi);
-        if (isMcpRequest) {
-            return new DataOperandsFilterResponse(true, null, null, null);
-        } else {
-            return new DataOperandsFilterResponse(false, null, null, null, "The request is not an MCP request");
+        int apiCollectionId = filterActionRequest.getApiInfoKey().getApiCollectionId();
+        ApiCollection apiCollection = dataActor.fetchApiCollectionMeta(apiCollectionId);
+        if (apiCollection == null) {
+            return new DataOperandsFilterResponse(false, null, null, null, "API collection not found");
         }
+        if (apiCollection.isGenAICollection() ||
+                apiCollection.isMcpCollection() ||
+                apiCollection.isGuardRailCollection()) {
+            return new DataOperandsFilterResponse(true, null, null, null);
+        }
+        return new DataOperandsFilterResponse(false, null, null, null, "The request is not an Agentic request");
     }
+
     public DataOperandsFilterResponse applyFilterOnRequestPayload(FilterActionRequest filterActionRequest) {
 
         RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();

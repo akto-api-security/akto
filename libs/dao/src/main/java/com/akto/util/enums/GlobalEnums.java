@@ -21,6 +21,9 @@ public class GlobalEnums {
 
     /* Category of tests perfomred */
     public enum TestCategory {
+
+        // whenever adding a new test category, please ensure that if mcp or LLM is used, update the list of categories in TestTemplateUtils.java which will be used to fetch templates in fetchAllSubCategories
+
         BOLA("BOLA", Severity.HIGH, "Broken Object Level Authorization (BOLA)", "BOLA"),
         NO_AUTH("NO_AUTH", Severity.HIGH, "Broken User Authentication (BUA)", "Broken Authentication"),
         BFLA("BFLA", Severity.HIGH, "Broken Function Level Authorization (BFLA)", "Broken Function Level Authorization"),
@@ -44,7 +47,35 @@ public class GlobalEnums {
         LFI("LFI", Severity.HIGH, "Local File Inclusion (LFI)", "Local File Inclusion"),
         XSS("XSS", Severity.HIGH, "Cross-site scripting (XSS)", "Cross-site scripting"),
         IIM("IIM", Severity.HIGH, "Improper Inventory Management (IIM)", "Improper Inventory Management"),
-        LLM("LLM",Severity.HIGH,"LLM (Large Language Models) Top 10","LLM");
+        LLM("LLM",Severity.HIGH,"LLM (Large Language Models) Top 10","LLM"),
+        INJECT("INJECT", Severity.MEDIUM, "Injection Attacks (INJECT)", "Injection Attacks"),
+        INPUT("INPUT", Severity.MEDIUM, "Input Validation (INPUT)", "Input Validation"),
+        PROMPT_INJECTION("PROMPT_INJECTION", Severity.HIGH, "Prompt Injection", "PromptInjection"),
+        SENSITIVE_INFORMATION_DISCLOSURE("SENSITIVE_INFORMATION_DISCLOSURE", Severity.HIGH, "Sensitive Information Disclosure", "SensitiveInformationDisclosure"),
+        SUPPLY_CHAIN("SUPPLY_CHAIN", Severity.HIGH, "Supply Chain", "SupplyChain"),
+        DATA_AND_MODEL_POISONING("DATA_AND_MODEL_POISONING", Severity.HIGH, "DataAndModelPoisoning", "DataAndModelPoisoning"),
+        IMPROPER_OUTPUT_HANDLING("IMPROPER_OUTPUT_HANDLING", Severity.HIGH, "ImproperOutputHandling", "ImproperOutputHandling"),
+        EXCESSIVE_AGENCY("EXCESSIVE_AGENCY", Severity.HIGH, "Excessive Agency", "ExcessiveAgency"),
+        SYSTEM_PROMPT_LEAKAGE("SYSTEM_PROMPT_LEAKAGE", Severity.HIGH, "System Prompt Leakage", "SystemPromptLeakage"),
+        VECTOR_AND_EMBEDDING_WEAKNESSES("VECTOR_AND_EMBEDDING_WEAKNESSES", Severity.HIGH, "Vector and Embedding Weaknesses", "VectorAndEmbeddingWeaknesses"),
+        MISINFORMATION("MISINFORMATION", Severity.HIGH, "Misinformation", "Misinformation"),
+        UNBOUNDED_CONSUMPTION("UNBOUNDED_CONSUMPTION", Severity.HIGH, "Unbounded Consumption", "UnboundedConsumption"),
+        MCP_PROMPT_INJECTION("MCP_PROMPT_INJECTION", Severity.HIGH, "MCP - Prompt Injection", "MCP_PROMPT_INJECTION"),
+        MCP_TOOL_POISONING("MCP_TOOL_POISONING", Severity.HIGH, "MCP - Tool Poisoning", "MCP_TOOL_POISONING"),
+        MCP_PRIVILEGE_ABUSE("MCP_PRIVILEGE_ABUSE", Severity.HIGH, "MCP - Privilege Abuse", "MCP_PRIVILEGE_ABUSE"),
+        MCP_INDIRECT_PROMPT_INJECTION("MCP_INDIRECT_PROMPT_INJECTION", Severity.HIGH, "MCP - Indirect Prompt Injection", "MCP_INDIRECT_PROMPT_INJECTION"),
+        MCP_SENSITIVE_DATA_LEAKAGE("MCP_SENSITIVE_DATA_LEAKAGE", Severity.HIGH, "MCP - Data Leak", "MCP_SENSITIVE_DATA_LEAKAGE"),
+        MCP_DOS("MCP_DOS", Severity.HIGH, "MCP - Denial of Service", "MCP_DOS"),
+        MCP_AUTH("MCP_AUTH", Severity.HIGH, "MCP - Broken Authentication", "MCP_AUTH"),
+        MCP_MALICIOUS_CODE_EXECUTION("MCP_MALICIOUS_CODE_EXECUTION", Severity.HIGH, "MCP - Malicious Code Execution", "MCP_MALICIOUS_CODE_EXECUTION"),
+        MCP("MCP", Severity.HIGH, "Model Context Protocol (MCP) Security", "MCP"),
+        MCP_INPUT_VALIDATION("MCP_INPUT_VALIDATION", Severity.HIGH, "MCP - Input Validation", "MCP_INPUT_VALIDATION"),
+        MCP_FUNCTION_MANIPULATION("MCP_FUNCTION_MANIPULATION", Severity.CRITICAL, "Model Context Protocol (MCP) Security - Function Call Manipulation", "MCP_FUNC_MANIP"),
+        MCP_SECURITY("MCP_SECURITY", Severity.HIGH, "Model Context Protocol (MCP) Security", "MCP_SEC"),
+        AGENTIC_BUSINESS_ALIGNMENT("AGENTIC_BUSINESS_ALIGNMENT", Severity.HIGH, "Agent Business Alignment", "AGENTIC_BUSINESS_ALIGNMENT"),
+        AGENTIC_HALLUCINATION_AND_TRUSTWORTHINESS("AGENTIC_HALLUCINATION_AND_TRUSTWORTHINESS", Severity.HIGH, "Agent Hallucination and Trustworthiness", "AGENTIC_HALLUCINATION_AND_TRUSTWORTHINESS"),
+        AGENTIC_SAFETY("AGENTIC_SAFETY", Severity.HIGH, "Agent Safety", "AGENTIC_SAFETY"),
+        AGENTIC_SECURITY("AGENTIC_SECURITY", Severity.HIGH, "Agent Security", "AGENTIC_SECURITY");
 
         private final String name;
         private final Severity severity;
@@ -108,6 +139,30 @@ public class GlobalEnums {
         CUSTOM
     }
 
+    public enum TemplatePlan {
+        FREE, STANDARD, PRO, ENTERPRISE
+    }
+    public enum TemplateFeatureAccess {
+        PRO_TESTS, ENTERPRISE_TESTS
+    }
+    public enum TemplateNature {
+        INTRUSIVE, NON_INTRUSIVE
+    }
+    public enum TemplateDuration {
+        SLOW, FAST
+    }
+
+    public enum ENCODING_TYPE{
+        BASE_64_ENCODED, JWT
+    }
+
+    public enum TicketSource {
+        JIRA, AZURE_BOARDS, SERVICENOW
+    }
+
+    public enum CONTEXT_SOURCE {
+        API, MCP, GEN_AI, AGENTIC
+    }
 
     /* ********************************************************************** */
 }
