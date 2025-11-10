@@ -277,7 +277,6 @@ public class TestExecutor {
 
             // create count down latch to know when inserting kafka records are completed.
             CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
-            AgenticUtils.checkAndInitializeAgent(Main.extractApiCollectionIds(apiInfoKeyList), false, null);
             int tempRunTime = 10 * 60;
             if(!Constants.IS_NEW_TESTING_ENABLED){
                 tempRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();

@@ -10,7 +10,8 @@ import com.mongodb.BasicDBList;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
 
-import javax.naming.LimitExceededException;
+import lombok.Getter;
+import lombok.Setter;
 
 public class RawApi {
 
@@ -18,6 +19,9 @@ public class RawApi {
     private OriginalHttpResponse response;
     private String originalMessage;
     static ObjectMapper om = new ObjectMapper();
+    @Getter
+    @Setter
+    private List<String> conversationsList;
 
     public RawApi(OriginalHttpRequest request, OriginalHttpResponse response, String originalMessage) {
         this.request = request;

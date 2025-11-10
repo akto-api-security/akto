@@ -67,7 +67,7 @@ public class VariableResolver {
             return (List) keyContext;
         }
 
-        if (VariableResolver.isWordListVariable(key, varMap)) {
+        if (key instanceof String && VariableResolver.isWordListVariable(key, varMap)) {
             varList = (List) VariableResolver.resolveWordListVar(key.toString(), varMap);
             for (int i = 0; i < varList.size(); i++) {
                 List<Object> vals = VariableResolver.resolveExpression(varMap, varList.get(i).toString());
@@ -96,7 +96,7 @@ public class VariableResolver {
             List<Object> keyList = (List) key;
             int index = 0;
             for (Object k: keyList) {
-                List<Object> v = VariableResolver.resolveExpression(varMap, k.toString());
+                List<Object> v = VariableResolver.resolveExpression(varMap, k);
                 if (v != null && v.size() > 0) {
                     keyList.set(index, v.get(0).toString());
                 }
@@ -151,7 +151,8 @@ public class VariableResolver {
                         expressionList.remove(index);
                         List<Object> valList = (List) val;
                         for (int i = expressionList.size(); i < valList.size(); i++) {
-                            Object v = param.replaceFirst("(\\$\\{[^}]*\\})", valList.get(i).toString());
+                            String finalVal = (valList.get(i) instanceof String) ? ((String) valList.get(i)) : valList.get(i).toString();
+                            Object v = param.replaceFirst("(\\$\\{[^}]*\\})", Matcher.quoteReplacement(finalVal));
                             expressionList.add(v);
                         }
                     }
@@ -517,7 +518,7 @@ public class VariableResolver {
         return false;
     }
 
-    public static List<Object> resolveWordListVar(String key, Map<String, Object> varMap) {
+    public static List<String> resolveWordListVar(String key, Map<String, Object> varMap) {
         String expression = key.toString();
 
         List<String> wordList = new ArrayList<>();
@@ -525,6 +526,8 @@ public class VariableResolver {
 
         Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
         Matcher matcher = pattern.matcher(expression);
+        List<String> result = new ArrayList<>();
+        result.add(expression);
         while (matcher.find()) {
             try {
                 String match = matcher.group(0);
@@ -536,22 +539,21 @@ public class VariableResolver {
                 if (isWordListVar) {
                     wordList = (List<String>) varMap.get("wordList_" + match);
                     wordListKey = originalKey;
-                    break;
+                    List<String> tempResult = new ArrayList<>();
+                    for (String temp : result) {
+                        for (Object word : wordList) {
+                            // TODO: handle case to use numbers as well.
+                            String tempWord = temp.replace(wordListKey, word.toString());
+                            expression = tempWord;
+                            tempResult.add(tempWord);
+                        }
+                    }
+                    result = tempResult;
+                    matcher = pattern.matcher(expression);
                 }
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        }
-
-        List<Object> result = new ArrayList<>();
-        for (Object word : wordList) {
-            String replaced = expression.replace(wordListKey, word.toString());
-            Object finalWord = replaced;
-            try {
-                finalWord = convertStringToNumber(replaced);
-            } catch (Exception e) {
-            }
-            result.add(finalWord);
         }
         return result;
     }
