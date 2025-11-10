@@ -431,6 +431,8 @@ function GuardrailPolicies() {
                 ...(guardrailData.llmRule ? { llmRule: guardrailData.llmRule } : {}),
                 applyOnResponse: guardrailData.applyOnResponse || false,
                 applyOnRequest: guardrailData.applyOnRequest || false,
+                url: guardrailData.url || '',
+                confidenceScore: guardrailData.confidenceScore || 0,
                 active: true
             };
 
