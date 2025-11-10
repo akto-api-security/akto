@@ -203,10 +203,12 @@ public class GuardrailPolicies {
     public static class LLMRule {
         private boolean enabled;
         private String userPrompt;
+        private double confidenceScore;
 
-        public LLMRule(boolean enabled, String userPrompt) {
+        public LLMRule(boolean enabled, String userPrompt, double confidenceScore) {
             this.enabled = enabled;
             this.userPrompt = userPrompt;
+            this.confidenceScore = confidenceScore;
         }
     }
 }

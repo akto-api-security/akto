@@ -71,9 +71,10 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [piiTypes, setPiiTypes] = useState([]);
     const [regexPatterns, setRegexPatterns] = useState([]);
 
-    // Step 6: LLM-based guardrails
+    // Step 6: LLM-based Rule
     const [llmRule, setLlmRule] = useState("");
     const [enableLlmRule, setEnableLlmRule] = useState(false);
+    const [confidenceScore, setConfidenceScore] = useState(0.5);
 
     // Step 7: Server and application settings
     const [selectedMcpServers, setSelectedMcpServers] = useState([]);
@@ -132,7 +133,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         },
         {
             number: 6,
-            title: "LLM-based guardrails",
+            title: "LLM-based Rule",
             optional: true,
             summary: enableLlmRule ? `Enabled${llmRule ? ` - ${llmRule.substring(0, 30)}${llmRule.length > 30 ? '...' : ''}` : ''}` : null
         },
@@ -258,6 +259,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setRegexPatterns([]);
         setLlmRule("");
         setEnableLlmRule(false);
+        setConfidenceScore(0.5);
         setSelectedMcpServers([]);
         setSelectedAgentServers([]);
         setApplyOnResponse(false);
@@ -315,13 +317,14 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             setRegexPatterns([]);
         }
 
-        // LLM-based guardrails
         if (policy.llmRule) {
             setEnableLlmRule(policy.llmRule.enabled || false);
             setLlmRule(policy.llmRule.userPrompt || "");
+            setConfidenceScore(policy.llmRule.confidenceScore !== undefined ? policy.llmRule.confidenceScore : 0.5);
         } else {
             setEnableLlmRule(false);
             setLlmRule("");
+            setConfidenceScore(0.5);
         }
 
         // Server settings - prefer V2 format with names, fallback to old format
@@ -415,7 +418,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 ...(enableLlmRule && llmRule.trim() ? {
                     llmRule: {
                         enabled: true,
-                        userPrompt: llmRule.trim()
+                        userPrompt: llmRule.trim(),
+                        confidenceScore: confidenceScore
                     }
                 } : {}),
                 selectedMcpServers: selectedMcpServers, // Old format (just IDs)
@@ -877,14 +881,32 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 />
 
                 {enableLlmRule && (
-                    <TextField
-                        label="Rule description"
-                        value={llmRule}
-                        onChange={setLlmRule}
-                        multiline={5}
-                        placeholder="Describe the rule you want the LLM to enforce. For example: 'Block any requests related to financial advice or investment recommendations.'"
-                        helpText="Provide clear instructions for the LLM on what content should be blocked or allowed."
-                    />
+                    <>
+                        <TextField
+                            label="Rule description"
+                            value={llmRule}
+                            onChange={setLlmRule}
+                            multiline={5}
+                            placeholder="Describe the rule you want the LLM to enforce. For example: 'Block any requests related to financial advice or investment recommendations.'"
+                            helpText="Provide clear instructions for the LLM on what content should be blocked or allowed."
+                        />
+
+                        <Box>
+                            <Text variant="bodyMd" fontWeight="medium">Confidence Score: {confidenceScore.toFixed(2)}</Text>
+                            <Box paddingBlockStart="2">
+                                <RangeSlider
+                                    label=""
+                                    value={confidenceScore}
+                                    min={0}
+                                    max={1}
+                                    step={0.01}
+                                    output
+                                    onChange={setConfidenceScore}
+                                    helpText="Set the confidence threshold (0-1). Higher values require more confidence from the LLM to block content."
+                                />
+                            </Box>
+                        </Box>
+                    </>
                 )}
             </VerticalStack>
         </LegacyCard>
