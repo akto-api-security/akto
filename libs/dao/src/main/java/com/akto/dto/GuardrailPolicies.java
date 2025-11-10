@@ -58,7 +58,11 @@ public class GuardrailPolicies {
     private boolean applyOnResponse;
     private boolean applyOnRequest;
     
-    // Step 7: Review and Finish
+    // Step 7: URL and Confidence Score
+    private String url;
+    private double confidenceScore;
+    
+    // Step 8: Review and Finish
     private boolean active;
 
     public String getHexId() {
@@ -114,7 +118,7 @@ public class GuardrailPolicies {
                            List<String> regexPatterns, List<RegexPattern> regexPatternsV2, Map<String, Object> contentFiltering, 
                            List<String> selectedMcpServers, List<String> selectedAgentServers,
                            List<SelectedServer> selectedMcpServersV2, List<SelectedServer> selectedAgentServersV2,
-                           boolean applyOnResponse, boolean applyOnRequest, boolean active) {
+                           boolean applyOnResponse, boolean applyOnRequest, String url, double confidenceScore, boolean active) {
         this.name = name;
         this.description = description;
         this.blockedMessage = blockedMessage;
@@ -136,6 +140,8 @@ public class GuardrailPolicies {
         this.selectedAgentServersV2 = selectedAgentServersV2;
         this.applyOnResponse = applyOnResponse;
         this.applyOnRequest = applyOnRequest;
+        this.url = url;
+        this.confidenceScore = confidenceScore;
         this.active = active;
     }
 
