@@ -242,8 +242,8 @@ public class MergingLogic {
             }
             if (Context.accountId.get() == Constants.ROUTING_SKIP_ACCOUNT_ID &&
                 apiCollection.getTagsList().stream()
-                .anyMatch(t -> t.getKeyName() != null &&
-                    Constants.ROUTING_TAG_SUFFIXES.stream().anyMatch(suffix -> t.getKeyName().endsWith(suffix)))) {
+                .anyMatch(t -> t.getValue() != null &&
+                    Constants.ROUTING_TAG_SUFFIXES.stream().anyMatch(suffix -> t.getValue().endsWith(suffix)))) {
                 loggerMaker.infoAndAddToDb(
                     "Skipping merging for API collection " + apiCollectionId + " in account " + Constants.ROUTING_SKIP_ACCOUNT_ID + " as it has a tag ending with one of: " + Constants.ROUTING_TAG_SUFFIXES,
                     LogDb.DB_ABS);
