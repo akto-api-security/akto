@@ -405,8 +405,8 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
     public List<ApiInfo.ApiInfoKey> fetchEndpointsBySubType(SingleTypeInfo.SubType subType, int skip, int limit) {
         Bson filter = Filters.eq("subType", subType.getName());
         List<Bson> pipeline = getPipelineForEndpoints(filter);
-        pipeline.add(Aggregates.limit(limit));
         pipeline.add(Aggregates.skip(skip));
+        pipeline.add(Aggregates.limit(limit));
         return processPipelineForEndpoint(pipeline);
     }
 
@@ -426,8 +426,8 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         );
 
         pipeline.add(Aggregates.project(projections));
-        pipeline.add(Aggregates.group(groupedId));
         pipeline.add(Aggregates.sort(Sorts.descending(SingleTypeInfo._TIMESTAMP)));
+        pipeline.add(Aggregates.group(groupedId));
         return pipeline;
     }
 
