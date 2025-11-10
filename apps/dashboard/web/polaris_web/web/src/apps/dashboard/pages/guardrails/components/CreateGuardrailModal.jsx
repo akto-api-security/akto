@@ -71,7 +71,11 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [piiTypes, setPiiTypes] = useState([]);
     const [regexPatterns, setRegexPatterns] = useState([]);
 
-    // Step 6: Server and application settings
+    // Step 6: LLM-based guardrails
+    const [llmRule, setLlmRule] = useState("");
+    const [enableLlmRule, setEnableLlmRule] = useState(false);
+
+    // Step 7: Server and application settings
     const [selectedMcpServers, setSelectedMcpServers] = useState([]);
     const [selectedAgentServers, setSelectedAgentServers] = useState([]);
     const [applyOnResponse, setApplyOnResponse] = useState(false);
@@ -92,45 +96,51 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [editingTopic, setEditingTopic] = useState(null);
 
     const getStepsWithSummary = () => [
-        { 
-            number: 1, 
-            title: "Provide guardrail details", 
+        {
+            number: 1,
+            title: "Provide guardrail details",
             optional: false,
             summary: name ? `${name}${description ? ` - ${description.substring(0, 30)}${description.length > 30 ? '...' : ''}` : ''}` : null
         },
-        { 
-            number: 2, 
-            title: "Configure content filters", 
+        {
+            number: 2,
+            title: "Configure content filters",
             optional: true,
-            summary: (enableHarmfulCategories || enablePromptAttacks) 
+            summary: (enableHarmfulCategories || enablePromptAttacks)
                 ? `${enableHarmfulCategories ? 'Harmful categories' : ''}${enableHarmfulCategories && enablePromptAttacks ? ', ' : ''}${enablePromptAttacks ? 'Prompt attacks' : ''}`
                 : null
         },
-        { 
-            number: 3, 
-            title: "Add denied topics", 
+        {
+            number: 3,
+            title: "Add denied topics",
             optional: true,
             summary: deniedTopics.length > 0 ? `${deniedTopics.length} topic${deniedTopics.length !== 1 ? 's' : ''}` : null
         },
-        { 
-            number: 4, 
-            title: "Add word filters", 
+        {
+            number: 4,
+            title: "Add word filters",
             optional: true,
-            summary: (filterProfanity || customWords.length > 0 || regexPatterns.length > 0) 
+            summary: (filterProfanity || customWords.length > 0 || regexPatterns.length > 0)
                 ? `${filterProfanity ? 'Profanity' : ''}${filterProfanity && customWords.length > 0 ? ', ' : ''}${customWords.length > 0 ? `${customWords.length} custom word${customWords.length !== 1 ? 's' : ''}` : ''}${(filterProfanity || customWords.length > 0) && regexPatterns.length > 0 ? ', ' : ''}${regexPatterns.length > 0 ? `${regexPatterns.length} regex pattern${regexPatterns.length !== 1 ? 's' : ''}` : ''}`
                 : null
         },
-        { 
-            number: 5, 
-            title: "Add sensitive information filters", 
+        {
+            number: 5,
+            title: "Add sensitive information filters",
             optional: true,
             summary: piiTypes.length > 0 ? `${piiTypes.length} PII type${piiTypes.length !== 1 ? 's' : ''}` : null
         },
-        { 
-            number: 6, 
-            title: "Server and application settings", 
+        {
+            number: 6,
+            title: "LLM-based guardrails",
+            optional: true,
+            summary: enableLlmRule ? `Enabled${llmRule ? ` - ${llmRule.substring(0, 30)}${llmRule.length > 30 ? '...' : ''}` : ''}` : null
+        },
+        {
+            number: 7,
+            title: "Server and application settings",
             optional: false,
-            summary: (selectedMcpServers.length > 0 || selectedAgentServers.length > 0) 
+            summary: (selectedMcpServers.length > 0 || selectedAgentServers.length > 0)
                 ? (() => {
                     const serverSummary = [];
                     if (selectedMcpServers.length > 0) {
@@ -153,7 +163,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         const agentMore = selectedAgentServers.length > 2 ? ` +${selectedAgentServers.length - 2}` : '';
                         serverSummary.push(`Agent: ${agentNames.join(", ")}${agentMore}`);
                     }
-                    const appSettings = (applyOnRequest || applyOnResponse) ? 
+                    const appSettings = (applyOnRequest || applyOnResponse) ?
                         ` - ${applyOnRequest ? 'Req' : ''}${applyOnRequest && applyOnResponse ? '/' : ''}${applyOnResponse ? 'Res' : ''}` : '';
                     return `${serverSummary.join(", ")}${appSettings}`;
                 })()
@@ -189,9 +199,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const filterCollections = () => {
         setCollectionsLoading(true);
         try {
-            console.log("allCollections:", allCollections);
-            console.log("Sample collection structure:", allCollections[0]);
-
             const mcpServerCollections = allCollections.filter(collection => {
                 const hasMcpEnvType = collection.envType && collection.envType.some(envType =>
                     envType.keyName === 'mcp-server' && envType.value === 'MCP Server'
@@ -249,6 +256,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setNewWord("");
         setPiiTypes([]);
         setRegexPatterns([]);
+        setLlmRule("");
+        setEnableLlmRule(false);
         setSelectedMcpServers([]);
         setSelectedAgentServers([]);
         setApplyOnResponse(false);
@@ -305,7 +314,16 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         } else {
             setRegexPatterns([]);
         }
-        
+
+        // LLM-based guardrails
+        if (policy.llmRule) {
+            setEnableLlmRule(policy.llmRule.enabled || false);
+            setLlmRule(policy.llmRule.userPrompt || "");
+        } else {
+            setEnableLlmRule(false);
+            setLlmRule("");
+        }
+
         // Server settings - prefer V2 format with names, fallback to old format
         if (policy.selectedMcpServersV2 && policy.selectedMcpServersV2.length > 0) {
             // Extract IDs from V2 format for form population
@@ -342,7 +360,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     };
 
     const handleSkipToServers = () => {
-        setCurrentStep(6);
+        setCurrentStep(7);
     };
 
     const handleSave = async () => {
@@ -394,6 +412,12 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         pattern: r.pattern,
                         behavior: r.behavior.toLowerCase() // Ensure consistent case
                     })), // New format (with behavior)
+                ...(enableLlmRule && llmRule ? {
+                    llmRule: {
+                        enabled: true,
+                        userPrompt: llmRule
+                    }
+                } : {}),
                 selectedMcpServers: selectedMcpServers, // Old format (just IDs)
                 selectedAgentServers: selectedAgentServers, // Old format (just IDs)
                 selectedMcpServersV2: transformedMcpServers, // New format (with names)
@@ -404,17 +428,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
             };
 
-            // Debug: Log the data being sent
-            console.log("=== FRONTEND DEBUG: Data being sent to backend ===");
-            console.log("Full guardrailData:", JSON.stringify(guardrailData, null, 2));
-            console.log("regexPatterns:", guardrailData.regexPatterns);
-            console.log("regexPatternsV2:", guardrailData.regexPatternsV2);
-            console.log("selectedMcpServers:", guardrailData.selectedMcpServers);
-            console.log("selectedMcpServersV2:", guardrailData.selectedMcpServersV2);
-            console.log("selectedAgentServers:", guardrailData.selectedAgentServers);
-            console.log("selectedAgentServersV2:", guardrailData.selectedAgentServersV2);
-            console.log("=== END FRONTEND DEBUG ===");
-            
             await onSave(guardrailData);
             handleClose();
         } catch (error) {
@@ -851,6 +864,35 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const renderStep6 = () => (
         <LegacyCard sectioned>
             <VerticalStack gap="4">
+                <Text variant="headingMd">LLM-based Rule</Text>
+                <Text variant="bodyMd" tone="subdued">
+                    Configure an LLM-based rule to evaluate and filter content using natural language instructions.
+                </Text>
+
+                <Checkbox
+                    label="Enable LLM-based rule"
+                    checked={enableLlmRule}
+                    onChange={setEnableLlmRule}
+                    helpText="When enabled, an LLM will evaluate content based on your custom rule text."
+                />
+
+                {enableLlmRule && (
+                    <TextField
+                        label="Rule description"
+                        value={llmRule}
+                        onChange={setLlmRule}
+                        multiline={5}
+                        placeholder="Describe the rule you want the LLM to enforce. For example: 'Block any requests related to financial advice or investment recommendations.'"
+                        helpText="Provide clear instructions for the LLM on what content should be blocked or allowed."
+                    />
+                )}
+            </VerticalStack>
+        </LegacyCard>
+    );
+
+    const renderStep7 = () => (
+        <LegacyCard sectioned>
+            <VerticalStack gap="4">
                 <Text variant="headingMd">Server and application settings</Text>
                 <Text variant="bodyMd" tone="subdued">
                     Configure which servers the guardrail should be applied to and specify whether it applies to requests, responses, or both.
@@ -915,13 +957,14 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             case 4: return renderStep4();
             case 5: return renderStep5();
             case 6: return renderStep6();
+            case 7: return renderStep7();
             default: return renderStep1();
         }
     };
 
     const getModalActions = () => {
         const actions = [];
-        
+
         if (currentStep > 1) {
             actions.push({
                 content: "Previous",
@@ -929,7 +972,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             });
         }
 
-        if (currentStep > 1 && currentStep < 6) {
+        if (currentStep > 1 && currentStep < 7) {
             actions.push({
                 content: "Skip to Server settings",
                 onAction: handleSkipToServers
@@ -940,14 +983,14 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     };
 
     const getPrimaryAction = () => {
-        if (currentStep === 6) {
+        if (currentStep === 7) {
             return {
                 content: isEditMode ? "Update Guardrail" : "Create Guardrail",
                 onAction: handleSave,
                 loading: loading,
                 disabled: !name.trim() || !blockedMessage.trim()
             };
-        } else if (currentStep < 6) {
+        } else if (currentStep < 7) {
             return {
                 content: "Next",
                 onAction: handleNext,

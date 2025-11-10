@@ -47,8 +47,10 @@ public class GuardrailPolicies {
     
     // Step 5: Content Filtering
     private Map<String, Object> contentFiltering;
-    
-    // Step 6: Server and application settings (old format - backward compatibility)
+
+    private LLMRule llmRule;
+
+    // Step 7: Server and application settings (old format - backward compatibility)
     private List<String> selectedMcpServers;
     private List<String> selectedAgentServers;
     
@@ -108,10 +110,11 @@ public class GuardrailPolicies {
         return new java.util.ArrayList<>();
     }
 
-    public GuardrailPolicies(String name, String description, String blockedMessage, String severity, int createdTimestamp, 
-                           int updatedTimestamp, String createdBy, String updatedBy, String selectedCollection, 
+    public GuardrailPolicies(String name, String description, String blockedMessage, String severity, int createdTimestamp,
+                           int updatedTimestamp, String createdBy, String updatedBy, String selectedCollection,
                            String selectedModel, List<DeniedTopic> deniedTopics, List<PiiType> piiTypes,
-                           List<String> regexPatterns, List<RegexPattern> regexPatternsV2, Map<String, Object> contentFiltering, 
+                           List<String> regexPatterns, List<RegexPattern> regexPatternsV2, Map<String, Object> contentFiltering,
+                           LLMRule llmRule,
                            List<String> selectedMcpServers, List<String> selectedAgentServers,
                            List<SelectedServer> selectedMcpServersV2, List<SelectedServer> selectedAgentServersV2,
                            boolean applyOnResponse, boolean applyOnRequest, boolean active) {
@@ -130,6 +133,7 @@ public class GuardrailPolicies {
         this.regexPatterns = regexPatterns;
         this.regexPatternsV2 = regexPatternsV2;
         this.contentFiltering = contentFiltering;
+        this.llmRule = llmRule;
         this.selectedMcpServers = selectedMcpServers;
         this.selectedAgentServers = selectedAgentServers;
         this.selectedMcpServersV2 = selectedMcpServersV2;
@@ -190,6 +194,19 @@ public class GuardrailPolicies {
         public SelectedServer(String id, String name) {
             this.id = id;
             this.name = name;
+        }
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class LLMRule {
+        private boolean enabled;
+        private String userPrompt;
+
+        public LLMRule(boolean enabled, String userPrompt) {
+            this.enabled = enabled;
+            this.userPrompt = userPrompt;
         }
     }
 }

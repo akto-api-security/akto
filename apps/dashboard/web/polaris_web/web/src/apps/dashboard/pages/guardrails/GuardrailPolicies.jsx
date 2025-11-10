@@ -428,6 +428,8 @@ function GuardrailPolicies() {
                 // Add V2 field for enhanced regex data
                 regexPatternsV2: guardrailData.regexPatternsV2 || [],
                 contentFiltering: guardrailData.contentFilters || {},
+                // Add LLM policy if present
+                ...(guardrailData.llmRule ? { llmRule: guardrailData.llmRule } : {}),
                 applyOnResponse: guardrailData.applyOnResponse || false,
                 applyOnRequest: guardrailData.applyOnRequest || false,
                 active: true
