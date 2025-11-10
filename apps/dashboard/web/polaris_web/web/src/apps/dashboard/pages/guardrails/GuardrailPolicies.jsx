@@ -75,51 +75,6 @@ const headings = [
   }
 ];
 
-const sortOptions = [
-  {
-    label: "Created on",
-    value: "createdTs asc",
-    directionLabel: "Newest",
-    sortKey: "createdTs",
-    columnIndex: 4,
-  },
-  {
-    label: "Created on",
-    value: "createdTs desc",
-    directionLabel: "Oldest",
-    sortKey: "createdTs",
-    columnIndex: 4,
-  },
-  {
-    label: "Updated on",
-    value: "updatedTs asc",
-    directionLabel: "Newest",
-    sortKey: "updatedTs",
-    columnIndex: 5,
-  },
-  {
-    label: "Updated on",
-    value: "updatedTs desc",
-    directionLabel: "Oldest",
-    sortKey: "updatedTs",
-    columnIndex: 5,
-  },
-  {
-    label: "Status",
-    value: "status asc",
-    directionLabel: "Active first",
-    sortKey: "status",
-    columnIndex: 3,
-  },
-  {
-    label: "Status",
-    value: "status desc",
-    directionLabel: "Inactive first",
-    sortKey: "status",
-    columnIndex: 3,
-  },
-];
-
 function GuardrailPolicies() {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [policyData, setPolicyData] = useState([]);
@@ -488,10 +443,9 @@ function GuardrailPolicies() {
             hideQueryField={true}
             hidePagination={true}
             showFooter={false}
-            sortOptions={sortOptions}
-            emptyStateMarkup={emptyStateMarkup}   
-            onRowClick={rowClicked}    
-            rowClickable={true} 
+            emptyStateMarkup={emptyStateMarkup}
+            onRowClick={rowClicked}
+            rowClickable={true}
             getActions={getActionsList}
             hasRowActions={true}
             hardCodedKey={true}
