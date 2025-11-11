@@ -82,15 +82,25 @@
 
                 </script>
                 <script>
+                    var isOnPrem = window.DASHBOARD_MODE === 'ON_PREM';
+                    var isAgentic = dashboardCategory === 'Agentic Security';
+
+                    var productId = isAgentic
+                        ? (isOnPrem ? 'shUignSe80215' : 'ijUqfdSQ80078')
+                        : (isOnPrem ? 'rggteHBr72897' : 'cJtNevEq80216');
+
+                    var filterTag = isOnPrem ? 'onprem' : 'saas';
+
                     var beamer_config = {
-                        product_id: 'cJtNevEq80216',
+                        product_id: productId,
+                        filter: filterTag,
                         selector: '#beamer-btn',
                         top: 0,
                         left: 0,
                         lazy: true
                     };
                 </script>
-                <script type="text/javascript" src="https://app.getbeamer.com/js/beamer-embed.js" defer="defer"></script>                
+                <script type="text/javascript" src="https://app.getbeamer.com/js/beamer-embed.js" defer="defer"></script>
                 <div id="root"></div>
                 <script src="/dist/main.js"></script>
             </body>

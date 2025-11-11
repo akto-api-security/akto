@@ -429,6 +429,7 @@ public class TestExecutor {
                                     break;
                                 }
                                 if(Context.now() - prevCalcTime > relaxingTime){
+                                    Main.sendSlackAlertForFailedTest(accountId, "Relaxing time reached in case of old testing => " + relaxingTime + " minutes, stopping tests with count left: " + totalTestsToBeExecuted.get());
                                     loggerMaker.infoAndAddToDb("Relaxing time reached => " + relaxingTime + " minutes, stopping tests with count left: " + totalTestsToBeExecuted.get());
                                     break;
                                 }                               

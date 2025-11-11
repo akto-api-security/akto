@@ -44,6 +44,7 @@ export default function Header() {
     const dashboardCategory = PersistStore.getState().dashboardCategory;
     const setDashboardCategory = PersistStore.getState().setDashboardCategory
 
+    const logoSrc = dashboardCategory === "Agentic Security" ? "/public/white_logo.svg" : "/public/akto_name_with_logo.svg";
     const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {};
     const mcpSecurityGranted =
         stiggFeatures?.SECURITY_TYPE_MCP?.isGranted ??
@@ -288,7 +289,7 @@ export default function Header() {
                     <Box paddingInlineStart={3} paddingInlineEnd={3}>
                         <HorizontalStack gap={4} wrap={false}>
                             <div style={{ cursor: 'pointer' }} onClick={() => window.location.href = "/dashboard/observe/inventory"} className='logo'>
-                                <img src="/public/akto_name_with_logo.svg" alt="Akto Logo" style={{ maxWidth: '78px' }} />
+                                <img src={logoSrc} alt="Akto Logo" style={{ maxWidth: '78px' }} />
                             </div>
 
                             <Box minWidth='170px'>
