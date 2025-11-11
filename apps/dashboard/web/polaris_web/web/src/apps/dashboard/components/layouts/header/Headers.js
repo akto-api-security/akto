@@ -44,7 +44,6 @@ export default function Header() {
     const dashboardCategory = PersistStore.getState().dashboardCategory;
     const setDashboardCategory = PersistStore.getState().setDashboardCategory
 
-    
     /* Search bar */
     //const allRoutes = Store((state) => state.allRoutes)
     const allCollections = PersistStore((state) => state.allCollections)
