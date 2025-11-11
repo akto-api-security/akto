@@ -33,6 +33,7 @@ import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
+import com.akto.utils.McpServer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import io.swagger.oas.inflector.examples.ExampleBuilder;
@@ -102,9 +103,9 @@ public class McpToolsSyncJobExecutor {
                 List<HttpResponseParams> initResponseList = initializeMcpServerCapabilities(apiCollection,
                     normalizedSampleDataSet);
                 List<HttpResponseParams> toolsResponseList = handleMcpToolsDiscovery(apiCollection,
-                    normalizedSampleDataSet);
+                    normalizedSampleDataSet, false, null);
                 List<HttpResponseParams> resourcesResponseList = handleMcpResourceDiscovery(apiCollection,
-                    normalizedSampleDataSet);
+                    normalizedSampleDataSet, false, null);
                 List<HttpResponseParams> responseParamsToProcess = new ArrayList<>();
                 responseParamsToProcess.addAll(initResponseList);
                 responseParamsToProcess.addAll(toolsResponseList);
@@ -153,59 +154,81 @@ public class McpToolsSyncJobExecutor {
         return responseParamsList;
     }
 
-    private List<HttpResponseParams> handleMcpToolsDiscovery(ApiCollection apiCollection,
-        Set<String> normalizedSampleDataSet) {
-        String host = apiCollection.getHostName();
+    public List<HttpResponseParams> handleMcpToolsDiscovery(ApiCollection apiCollection,
+                                                             Set<String> normalizedSampleDataSet, boolean isRecon, McpServer mcpServer) {
 
+        String host ="";
+        List<HttpResponseParams> responseParamsList = new ArrayList<>();
+        if(isRecon) {
+            host = mcpServer.getIp() + ":" + mcpServer.getPort();
+            responseParamsList = getHttpResponseParamsforTools(mcpServer.getTools(), mcpServer.getUrl(), Source.MCP_RECON, host, Collections.EMPTY_SET);
+        }
+        else {
+            host = apiCollection.getHostName();
+            try {
+                if (mcpServerCapabilities != null && mcpServerCapabilities.getTools() == null) {
+                    logger.debug("Skipping tools discovery as MCP server capabilities do not support tools.");
+                    return responseParamsList;
+                }
+
+                Pair<JSONRPCResponse, HttpResponseParams> toolsListResponsePair = getMcpMethodResponse(
+                        host, McpSchema.METHOD_TOOLS_LIST, MCP_TOOLS_LIST_REQUEST_JSON, apiCollection);
+
+                if (toolsListResponsePair.getSecond() != null && !normalizedSampleDataSet.contains(
+                        McpSchema.METHOD_TOOLS_LIST)) {
+                    responseParamsList.add(toolsListResponsePair.getSecond());
+                }
+                logger.debug("Received tools/list response. Processing tools.....");
+
+                ListToolsResult toolsResult = JSONUtils.fromJson(toolsListResponsePair.getFirst().getResult(),
+                        ListToolsResult.class);
+
+                if (toolsResult != null && !CollectionUtils.isEmpty(toolsResult.getTools())) {
+                    int id = 2;
+                    String urlWithQueryParams = toolsListResponsePair.getSecond().getRequestParams().getURL();
+                    responseParamsList = getHttpResponseParamsforTools(toolsResult.getTools(), urlWithQueryParams, Source.MIRRORING, host, normalizedSampleDataSet);
+                } else {
+                    logger.debug("Skipping as List Tools Result is null or Tools are empty");
+                }
+            } catch (Exception e) {
+                logger.error("Error while discovering mcp tools for hostname: {}", host, e);
+            }
+
+        }
+        return responseParamsList;
+    }
+
+    private List<HttpResponseParams> getHttpResponseParamsforTools(List<Tool> tools, String url, Source source, String host,
+                                                                     Set<String> normalizedSampleDataSet) {
         List<HttpResponseParams> responseParamsList = new ArrayList<>();
         try {
-            if (mcpServerCapabilities != null && mcpServerCapabilities.getTools() == null) {
-                logger.debug("Skipping tools discovery as MCP server capabilities do not support tools.");
-                return responseParamsList;
-            }
+            int id = 1;
+            String toolsCallRequestHeaders = buildHeaders(host);
+            for (Tool tool : tools) {
 
-            Pair<JSONRPCResponse, HttpResponseParams> toolsListResponsePair = getMcpMethodResponse(
-                host, McpSchema.METHOD_TOOLS_LIST, MCP_TOOLS_LIST_REQUEST_JSON, apiCollection);
+                if (!normalizedSampleDataSet.isEmpty() && normalizedSampleDataSet.contains(McpSchema.METHOD_TOOLS_CALL + "/" + tool.getName())) {
+                    logger.debug("Skipping tool {} as it is already present in the db.", tool.getName());
+                    continue;
+                }
 
-            if (toolsListResponsePair.getSecond() != null && !normalizedSampleDataSet.contains(
-                McpSchema.METHOD_TOOLS_LIST)) {
-                responseParamsList.add(toolsListResponsePair.getSecond());
-            }
-            logger.debug("Received tools/list response. Processing tools.....");
-
-            ListToolsResult toolsResult = JSONUtils.fromJson(toolsListResponsePair.getFirst().getResult(),
-                ListToolsResult.class);
-
-            if (toolsResult != null && !CollectionUtils.isEmpty(toolsResult.getTools())) {
-                int id = 2;
-                String urlWithQueryParams = toolsListResponsePair.getSecond().getRequestParams().getURL();
-                String toolsCallRequestHeaders = buildHeaders(host);
-
-                for (Tool tool : toolsResult.getTools()) {
-                    if (normalizedSampleDataSet.contains(McpSchema.METHOD_TOOLS_CALL + "/" + tool.getName())) {
-                        logger.debug("Skipping tool {} as it is already present in the db.", tool.getName());
-                        continue;
-                    }
-                    JSONRPCRequest request = new JSONRPCRequest(
+                JSONRPCRequest request = new JSONRPCRequest(
                         McpSchema.JSONRPC_VERSION,
                         McpSchema.METHOD_TOOLS_CALL,
                         id++,
-                        new CallToolRequest(tool.getName(), generateExampleArguments(tool.getInputSchema()))
-                    );
+                        new CallToolRequest(tool.getName(), McpToolsSyncJobExecutor.generateExampleArguments(tool.getInputSchema()))
+                );
 
-                    HttpResponseParams toolsCallHttpResponseParams = convertToAktoFormat(apiCollection.getId(),
-                        urlWithQueryParams,
+                HttpResponseParams toolsCallHttpResponseParams = McpToolsSyncJobExecutor.convertToAktoFormat(0,
+                        url,
                         toolsCallRequestHeaders,
                         HttpMethod.POST.name(),
                         mapper.writeValueAsString(request),
                         new OriginalHttpResponse("", Collections.emptyMap(), HttpStatus.SC_OK));
 
-                    if (toolsCallHttpResponseParams != null) {
-                        responseParamsList.add(toolsCallHttpResponseParams);
-                    }
+                if (toolsCallHttpResponseParams != null) {
+                    toolsCallHttpResponseParams.setSource(source);
+                    responseParamsList.add(toolsCallHttpResponseParams);
                 }
-            } else {
-                logger.debug("Skipping as List Tools Result is null or Tools are empty");
             }
         } catch (Exception e) {
             logger.error("Error while discovering mcp tools for hostname: {}", host, e);
@@ -213,58 +236,81 @@ public class McpToolsSyncJobExecutor {
         return responseParamsList;
     }
 
-    private List<HttpResponseParams> handleMcpResourceDiscovery(ApiCollection apiCollection,
-        Set<String> normalizedSampleDataSet) {
-        String host = apiCollection.getHostName();
+    public List<HttpResponseParams> handleMcpResourceDiscovery(ApiCollection apiCollection,
+        Set<String> normalizedSampleDataSet, boolean isRecon, McpServer mcpServer) {
 
+        String host ="";
+        List<HttpResponseParams> responseParamsList = new ArrayList<>();
+
+        if(isRecon) {
+            host = mcpServer.getIp() + ":" + mcpServer.getPort();
+            responseParamsList = getHttpResponseParamsforResource(mcpServer.getResources(), mcpServer.getUrl(), Source.MCP_RECON, host, Collections.EMPTY_SET);
+        }
+        else {
+            host = apiCollection.getHostName();
+            try {
+                if (mcpServerCapabilities != null && mcpServerCapabilities.getResources() == null) {
+                    logger.debug("Skipping resources discovery as MCP server capabilities do not support resources.");
+                    return responseParamsList;
+                }
+                Pair<JSONRPCResponse, HttpResponseParams> resourcesListResponsePair = getMcpMethodResponse(
+                        host, McpSchema.METHOD_RESOURCES_LIST, MCP_RESOURCE_LIST_REQUEST_JSON, apiCollection);
+
+                if (resourcesListResponsePair.getSecond() != null && !normalizedSampleDataSet.contains(
+                        McpSchema.METHOD_RESOURCES_LIST)) {
+                    responseParamsList.add(resourcesListResponsePair.getSecond());
+                }
+                logger.debug("Received resources/list response. Processing resources.....");
+
+                ListResourcesResult resourcesResult = JSONUtils.fromJson(resourcesListResponsePair.getFirst().getResult(),
+                        ListResourcesResult.class);
+
+                if (resourcesResult != null && !CollectionUtils.isEmpty(resourcesResult.getResources())) {
+                    int id = 2;
+                    String urlWithQueryParams = resourcesListResponsePair.getSecond().getRequestParams().getURL();
+
+                    responseParamsList = getHttpResponseParamsforResource(resourcesResult.getResources(), urlWithQueryParams, Source.MIRRORING, host, normalizedSampleDataSet);
+                } else {
+                    logger.debug("Skipping as List Resource Result is null or Resources are empty");
+                }
+            } catch (Exception e) {
+                logger.error("Error while discovering mcp resources for hostname: {}", host, e);
+            }
+
+        }
+        return responseParamsList;
+    }
+
+    private List<HttpResponseParams> getHttpResponseParamsforResource(List<Resource> resources, String url, Source source, String host, Set<String> normalizedSampleDataSet) {
         List<HttpResponseParams> responseParamsList = new ArrayList<>();
         try {
-            if (mcpServerCapabilities != null && mcpServerCapabilities.getResources() == null) {
-                logger.debug("Skipping resources discovery as MCP server capabilities do not support resources.");
-                return responseParamsList;
-            }
-            Pair<JSONRPCResponse, HttpResponseParams> resourcesListResponsePair = getMcpMethodResponse(
-                host, McpSchema.METHOD_RESOURCES_LIST, MCP_RESOURCE_LIST_REQUEST_JSON, apiCollection);
+            int id = 1;
+            String resourceCallRequestHeaders = buildHeaders(host);
+            for (Resource resource : resources) {
 
-            if (resourcesListResponsePair.getSecond() != null && !normalizedSampleDataSet.contains(
-                McpSchema.METHOD_RESOURCES_LIST)) {
-                responseParamsList.add(resourcesListResponsePair.getSecond());
-            }
-            logger.debug("Received resources/list response. Processing resources.....");
+                if (normalizedSampleDataSet.contains(McpSchema.METHOD_RESOURCES_READ + "/" + resource.getUri())) {
+                    logger.debug("Skipping resource {} as it is already present in the db.", resource.getUri());
+                    continue;
+                }
 
-            ListResourcesResult resourcesResult = JSONUtils.fromJson(resourcesListResponsePair.getFirst().getResult(),
-                ListResourcesResult.class);
-
-            if (resourcesResult != null && !CollectionUtils.isEmpty(resourcesResult.getResources())) {
-                int id = 2;
-                String urlWithQueryParams = resourcesListResponsePair.getSecond().getRequestParams().getURL();
-                String toolsCallRequestHeaders = buildHeaders(host);
-
-                for (Resource resource : resourcesResult.getResources()) {
-                    if (normalizedSampleDataSet.contains(McpSchema.METHOD_RESOURCES_READ + "/" + resource.getUri())) {
-                        logger.debug("Skipping resource {} as it is already present in the db.", resource.getUri());
-                        continue;
-                    }
-                    JSONRPCRequest request = new JSONRPCRequest(
+                JSONRPCRequest request = new JSONRPCRequest(
                         McpSchema.JSONRPC_VERSION,
                         McpSchema.METHOD_RESOURCES_READ,
                         id++,
                         new ReadResourceRequest(resource.getUri())
-                    );
+                );
 
-                    HttpResponseParams readResourceHttpResponseParams = convertToAktoFormat(apiCollection.getId(),
-                        urlWithQueryParams,
-                        toolsCallRequestHeaders,
+                HttpResponseParams readResourceHttpResponseParams = McpToolsSyncJobExecutor.convertToAktoFormat(0,
+                        url,
+                        resourceCallRequestHeaders,
                         HttpMethod.POST.name(),
                         mapper.writeValueAsString(request),
                         new OriginalHttpResponse("", Collections.emptyMap(), HttpStatus.SC_OK));
 
-                    if (readResourceHttpResponseParams != null) {
-                        responseParamsList.add(readResourceHttpResponseParams);
-                    }
+                if (readResourceHttpResponseParams != null) {
+                    readResourceHttpResponseParams.setSource(source);
+                    responseParamsList.add(readResourceHttpResponseParams);
                 }
-            } else {
-                logger.debug("Skipping as List Resource Result is null or Resources are empty");
             }
         } catch (Exception e) {
             logger.error("Error while discovering mcp resources for hostname: {}", host, e);
