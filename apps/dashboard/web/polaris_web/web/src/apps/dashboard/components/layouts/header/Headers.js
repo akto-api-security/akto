@@ -44,6 +44,35 @@ export default function Header() {
     const dashboardCategory = PersistStore.getState().dashboardCategory;
     const setDashboardCategory = PersistStore.getState().setDashboardCategory
 
+    const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {};
+    const mcpSecurityGranted =
+        stiggFeatures?.SECURITY_TYPE_MCP?.isGranted ??
+        stiggFeatures?.MCP_SECURITY?.isGranted;
+    const agenticSecurityGranted =
+        stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted ??
+        stiggFeatures?.AGENTIC_SECURITY?.isGranted;
+
+    const disabledDashboardCategories = useMemo(() => {
+        const disabled = [];
+        if (mcpSecurityGranted === false) {
+            disabled.push("MCP Security");
+        }
+        if (agenticSecurityGranted === false) {
+            disabled.push("Agentic Security");
+        }
+        return disabled;
+    }, [mcpSecurityGranted, agenticSecurityGranted]);
+
+    const dropdownInitial = disabledDashboardCategories.includes(dashboardCategory)
+        ? "API Security"
+        : (dashboardCategory || "API Security");
+
+    useEffect(() => {
+        if (disabledDashboardCategories.includes(dashboardCategory) && dashboardCategory !== "API Security") {
+            setDashboardCategory("API Security");
+        }
+    }, [dashboardCategory, disabledDashboardCategories, setDashboardCategory]);
+
     useEffect(() => {
         if (window.beamer_config) {
             const isOnPrem = window.DASHBOARD_MODE === 'ON_PREM';
@@ -269,8 +298,9 @@ export default function Header() {
                                         { value: "MCP Security", label: "MCP Security", id: "mcp-security" },
                                         { value: "Agentic Security", label: "Agentic Security", id: "agentic-security" },
                                     ]}
-                                    initial={dashboardCategory || "API Security"}
+                                    initial={dropdownInitial}
                                     selected={(val) => handleDashboardChange(val)}
+                                    disabledOptions={disabledDashboardCategories}
                                 />
                             </Box>
                         </HorizontalStack>
