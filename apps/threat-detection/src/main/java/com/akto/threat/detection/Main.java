@@ -178,7 +178,6 @@ public class Main {
 
     public static void initCustomDataTypeScheduler(){
         Account account = dataActor.fetchActiveAccount();
-        Context.accountId.set(account.getId());
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 List<CustomDataType> customDataTypes = dataActor.fetchCustomDataTypes();
@@ -187,6 +186,7 @@ public class Main {
                 List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
                 SingleTypeInfo.fetchCustomDataTypes(account.getId(),customDataTypes,aktoDataTypes);
                 SingleTypeInfo.fetchCustomAuthTypes(account.getId(), customAuthTypes);
+
             }
         }, 0, 5, TimeUnit.MINUTES);
     }

@@ -9,14 +9,13 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
-import com.akto.dao.ApiCollectionsDao;
 import com.akto.dto.*;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.enums.RedactionType;
-import com.mongodb.client.model.Filters;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -33,8 +32,6 @@ import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.api_protection_parse_layer.AggregationRules;
 import com.akto.dto.api_protection_parse_layer.Rule;
 import com.akto.dto.monitoring.FilterConfig;
-import com.akto.dto.test_editor.Category;
-import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.URLMethods;
 import com.akto.hybrid_parsers.HttpCallParser;
@@ -49,8 +46,6 @@ import com.akto.proto.generated.threat_detection.message.sample_request.v1.Schem
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.RatelimitConfig.RatelimitConfigItem;
 import com.akto.proto.http_response_param.v1.HttpResponseParam;
 import com.akto.proto.http_response_param.v1.StringList;
-import com.akto.rules.TestPlugin;
-import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.threat.detection.cache.ApiCountCacheLayer;
 import com.akto.threat.detection.cache.RedisBackedCounterCache;
 import com.akto.threat.detection.constants.KafkaTopic;
@@ -112,12 +107,7 @@ public class MaliciousTrafficDetectorTask implements Task {
   private int recordsReadCount = 0;
   private long lastRecordCountLogTime = System.currentTimeMillis();
 
-  // Cache for AccountSettings with TTL
-  private AccountSettings cachedAccountSettings = null;
-  private long accountSettingsCacheExpiry = 0;
-  private static final long ACCOUNT_SETTINGS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes TTL
-
-  public MaliciousTrafficDetectorTask(
+    public MaliciousTrafficDetectorTask(
       KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient, DistributionCalculator distributionCalculator, boolean apiDistributionEnabled) throws Exception {
     this.kafkaConfig = trafficConfig;
 
@@ -186,6 +176,10 @@ public class MaliciousTrafficDetectorTask implements Task {
                 recordsReadCount = 0;
                 lastRecordCountLogTime = currentTime;
               }
+
+              AccountSettings accountSettings = dataActor.fetchAccountSettings();
+              Context.accountId.set(accountSettings.getId());
+              Context.isRedactPayload.set(accountSettings.isRedactPayload());
 
               for (ConsumerRecord<String, byte[]> record : records) {
                 HttpResponseParam httpResponseParam = HttpResponseParam.parseFrom(record.value());
@@ -266,42 +260,6 @@ public class MaliciousTrafficDetectorTask implements Task {
     return apiFilters;
   }
 
-
-
-  /**
-   * Fetches AccountSettings with TTL-based caching (similar to Redis TTL).
-   * The cached value expires after ACCOUNT_SETTINGS_CACHE_TTL_MS milliseconds.
-   * If API fails, returns the old cached value (stale data is better than no data).
-   *
-   * @return AccountSettings object, either from cache or freshly fetched
-   */
-  private AccountSettings getAccountSettingsWithTTL() {
-    long currentTime = System.currentTimeMillis();
-
-    // Check if cache is valid (not expired)
-    if (cachedAccountSettings != null && currentTime < accountSettingsCacheExpiry) {
-      return cachedAccountSettings;
-    }
-
-    // Cache expired or empty, fetch fresh data
-    try {
-      AccountSettings freshSettings = dataActor.fetchAccountSettings();
-      cachedAccountSettings = freshSettings;
-      accountSettingsCacheExpiry = currentTime + ACCOUNT_SETTINGS_CACHE_TTL_MS;
-      logger.debugAndAddToDb("AccountSettings cached with TTL, expires in " + (ACCOUNT_SETTINGS_CACHE_TTL_MS / 1000) + " seconds");
-      return cachedAccountSettings;
-    } catch (Exception e) {
-      logger.errorAndAddToDb(e, "Error while fetching account settings");
-      // Return stale cache if available (old value on failure)
-      if (cachedAccountSettings != null) {
-        logger.warnAndAddToDb("Returning stale AccountSettings due to fetch error");
-        return cachedAccountSettings;
-      }
-      // If no cache exists at all, return null
-      return null;
-    }
-  }
-
   private String getApiSchema(int apiCollectionId) {
     String apiSchema = null;
     try {
@@ -372,15 +330,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     if (!ignoredEventFilters.isEmpty()) {
       isIgnoredEvent = threatDetector.isIgnoredEvent(ignoredEventFilters, rawApi, apiInfoKey);
     }
-
-    AccountSettings accountSettings = getAccountSettingsWithTTL();
-    if (accountSettings != null) {
-        Context.accountId.set(accountSettings.getId());
-    }
-    RedactionType redactionType = accountSettings != null
-            ? getRedactionType(accountSettings, responseParam.getRequestParams().getHeaders())
-            : RedactionType.NONE;
-
+    RedactionType redactionType = getRedactionType(responseParam.getRequestParams().getHeaders());
       if (apiDistributionEnabled) {
       String apiCollectionIdStr = Integer.toString(apiCollectionId);
       String distributionKey = Utils.buildApiDistributionKey(apiCollectionIdStr, url, method.toString());
@@ -628,13 +578,12 @@ public class MaliciousTrafficDetectorTask implements Task {
   /**
    * Determines the redaction type based on account settings and host information.
    *
-   * @param accountSettings The account settings object
    * @param headers Request headers map
    * @return RedactionType indicating the level of redaction to apply
    */
-  private RedactionType getRedactionType(AccountSettings accountSettings, Map<String, List<String>> headers) {
+  private RedactionType getRedactionType(Map<String, List<String>> headers) {
     try {
-      if (accountSettings.isRedactPayload()) {
+      if (Context.isRedactPayload.get() != null && Context.isRedactPayload.get()) {
         return RedactionType.REDACT_ALL;
       }
       // Extract host from headers
@@ -646,7 +595,7 @@ public class MaliciousTrafficDetectorTask implements Task {
               return RedactionType.REDACT_BY_API_COLLECTION;
           }
       }
-      if(SingleTypeInfo.isCustomDataTypeAvailable(accountSettings.getId())){
+      if(SingleTypeInfo.isCustomDataTypeAvailable(Context.accountId.get())){
           return RedactionType.REDACT_BY_CUSTOM_FIELD;
       }
     return  RedactionType.NONE;
