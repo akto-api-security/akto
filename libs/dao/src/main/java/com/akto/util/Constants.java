@@ -35,5 +35,5 @@ public class Constants {
 
     // Constants for routing tag filtering
     public static final int ROUTING_SKIP_ACCOUNT_ID = 1736798101;
-    public static final List<String> ROUTING_TAG_SUFFIXES = Arrays.asList("booking-creation", "booking-query", "cashout-api", "ebe_creditcard_service_netcore", "partner-credit-card-api");
+    public static final List<String> ROUTING_TAG_SUFFIXES = Arrays.asList("booking-creation", "booking-query", "cashout-api", "ebe-creditcard-service-netcore", "partner-credit-card-api");
 }

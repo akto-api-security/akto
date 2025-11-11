@@ -452,13 +452,8 @@ public class DbLayer {
 
             for (Integer collectionId : apiCollectionIds) {
                 ApiCollection collection = ApiCollectionsDao.instance.getMeta(collectionId);
-                if (collection != null && collection.getTagsList() != null) {
-                    boolean hasRoutingTag = collection.getTagsList().stream()
-                        .anyMatch(t -> t.getValue() != null &&
-                            Constants.ROUTING_TAG_SUFFIXES.stream().anyMatch(suffix -> t.getValue().endsWith(suffix)));
-                    if (hasRoutingTag) {
-                        routingCollectionIds.add(collectionId);
-                    }
+                if (ApiCollectionsDao.hasRoutingTags(collection)) {
+                    routingCollectionIds.add(collectionId);
                 }
             }
 

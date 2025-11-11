@@ -265,5 +265,25 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
 
             return endpoints;
         }
-    }    
+    }
+
+    /**
+     * Checks if an API collection has tags ending with routing suffixes for a specific account.
+     * @param apiCollection The API collection to check
+     * @return true if collection has routing tags and account matches, false otherwise
+     */
+    public static boolean hasRoutingTags(ApiCollection apiCollection) {
+        if (apiCollection == null || apiCollection.getTagsList() == null) {
+            return false;
+        }
+
+        // Only check for specific account
+        if (Context.accountId.get() != Constants.ROUTING_SKIP_ACCOUNT_ID) {
+            return false;
+        }
+
+        return apiCollection.getTagsList().stream()
+            .anyMatch(t -> t.getValue() != null &&
+                Constants.ROUTING_TAG_SUFFIXES.stream().anyMatch(suffix -> t.getValue().endsWith(suffix)));
+    }
 }
