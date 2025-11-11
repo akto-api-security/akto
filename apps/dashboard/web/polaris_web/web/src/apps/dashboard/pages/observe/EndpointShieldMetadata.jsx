@@ -153,7 +153,7 @@ function EndpointShieldMetadata() {
     const [agentLogs, setAgentLogs] = useState([]);
     const [displayedLogs, setDisplayedLogs] = useState([]);
     const [isLogsExpanded, setIsLogsExpanded] = useState(true);
-    const [logMode, setLogMode] = useState(LOG_MODES.CURRENT);
+    const [logMode, setLogMode] = useState(LOG_MODES.HISTORICAL);
     const [isLiveFetching, setIsLiveFetching] = useState(false);
     const [liveInterval, setLiveInterval] = useState(null);
     const [description, setDescription] = useState("");
