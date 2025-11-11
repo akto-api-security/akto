@@ -52,6 +52,7 @@
                     window.ACCOUNTS = JSON.parse('${requestScope.accounts}' || '{}');
                     window.ACTIVE_ACCOUNT = +'${requestScope.activeAccount}';
                     window.DASHBOARD_MODE = '${requestScope.dashboardMode}';
+                    window.DASHBOARD_CATEGORY = '${requestScope.dashboardCategory}';
                     window.ACCESS_TOKEN = '${accessToken}';
                     window.SIGNUP_INVITATION_CODE = '${signupInvitationCode}'
                     window.SIGNUP_EMAIL_ID = '${signupEmailId}'
@@ -83,7 +84,7 @@
                 </script>
                 <script>
                     var isOnPrem = window.DASHBOARD_MODE === 'ON_PREM';
-                    var isAgentic = dashboardCategory === 'Agentic Security';
+                    var isAgentic = window.DASHBOARD_CATEGORY === 'Agentic Security';
 
                     var productId = isAgentic
                         ? (isOnPrem ? 'shUignSe80215' : 'ijUqfdSQ80078')
