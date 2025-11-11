@@ -13,6 +13,7 @@ import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip";
 import TooltipText from "../../../components/shared/TooltipText";
 import LocalStore from "../../../../main/LocalStorageStore";
 import ShowListInBadge from "../../../components/shared/ShowListInBadge";
+import { getDashboardCategory } from "../../../../main/labelHelper";
 
 const sortOptions = [
     { label: 'Severity', value: 'severity asc', directionLabel: 'Highest', sortKey: 'severityVal', columnIndex: 2 },
@@ -20,6 +21,36 @@ const sortOptions = [
     { label: 'Test', value: 'test asc', directionLabel: 'A-Z', sortKey: 'name', columnIndex: 1 },
     { label: 'Test', value: 'test desc', directionLabel: 'Z-A', sortKey: 'name', columnIndex: 1 },
 ];
+
+const llmCategories = [
+    "LLM",
+    "LLM01",
+    "PROMPT_INJECTION",
+    "SENSITIVE_INFORMATION_DISCLOSURE",
+    "SUPPLY_CHAIN",
+    "DATA_AND_MODEL_POISONING",
+    "IMPROPER_OUTPUT_HANDLING",
+    "EXCESSIVE_AGENCY",
+    "SYSTEM_PROMPT_LEAKAGE",
+    "VECTOR_AND_EMBEDDING_WEAKNESSES",
+    "MISINFORMATION",
+    "UNBOUNDED_CONSUMPTION"
+]
+
+const mcpCategories = [
+    "MCP_AUTH",
+    "MCP_INPUT_VALIDATION",
+    "MCP_DOS",
+    "MCP_SENSITIVE_DATA_LEAKAGE",
+    "MCP_TOOL_POISONING",
+    "MCP_PROMPT_INJECTION",
+    "MCP_PRIVILEGE_ABUSE",
+    "MCP_INDIRECT_PROMPT_INJECTION",
+    "MCP_MALICIOUS_CODE_EXECUTION",
+    "MCP_FUNCTION_MANIPULATION",
+    "MCP_SECURITY",
+    "MCP"
+]
 
 const severityObj = {
     "Critical": "Immediate action; exploitable with severe impact",
@@ -104,6 +135,7 @@ function TestsTablePage() {
     const [data, setData] = useState({ 'all': [], 'by_akto': [], 'custom': [], 'inactive': [] })
     const localSubCategoryMap = LocalStore.getState().subCategoryMap
     const categoryMap = LocalStore.getState().categoryMap;
+    const dashboardCategory = getDashboardCategory();
 
     const severityOrder = { CRITICAL: 5, HIGH: 4, MEDIUM: 3, LOW: 2, dynamic_severity: 1 };
 
@@ -157,16 +189,21 @@ function TestsTablePage() {
     const fetchAllTests = async () => {
         try {
             let categoriesName = Object.keys(categoryMap);
+            if(dashboardCategory === "MCP Security"){
+                categoriesName = mcpCategories;
+            } else {
+                categoriesName = Object.keys(categoryMap);
+            }
             let metaDataObj = {
                 subCategories: [],
                 categories: []
             }
+
             if ((localSubCategoryMap && Object.keys(localSubCategoryMap).length > 0 ) && categoriesName.length > 0) {
                 metaDataObj = {
                     subCategories: Object.values(localSubCategoryMap),
                     categories: Object.keys(categoryMap)
                 }
-                
             } else { 
                 metaDataObj = await transform.getAllSubcategoriesData(false, "testEditor")
                 categoriesName = metaDataObj?.categories.map(x => x.name)

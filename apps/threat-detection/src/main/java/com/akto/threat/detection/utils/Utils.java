@@ -40,11 +40,14 @@ public class Utils {
         return ipApiRateLimitFilter;
     }
 
-    public static SampleMaliciousRequest buildSampleMaliciousRequest(String actor, HttpResponseParams responseParam, FilterConfig apiFilter, RawApiMetadata metadata, List<SchemaConformanceError> errors, boolean successfulExploit) {
+    public static SampleMaliciousRequest buildSampleMaliciousRequest(String actor, HttpResponseParams responseParam, FilterConfig apiFilter, RawApiMetadata metadata, List<SchemaConformanceError> errors, boolean successfulExploit, boolean ignoredEvent) {
         Metadata.Builder metadataBuilder = Metadata.newBuilder();
         if(errors != null && !errors.isEmpty()) {
             metadataBuilder.addAllSchemaErrors(errors);
         }
+        
+        // Determine status based on ignoredEvent flag
+        String status = ignoredEvent ? com.akto.util.ThreatDetectionConstants.IGNORED : com.akto.util.ThreatDetectionConstants.ACTIVE;
         
         SampleMaliciousRequest.Builder maliciousReqBuilder = SampleMaliciousRequest.newBuilder()
             .setUrl(responseParam.getRequestParams().getURL())
@@ -54,7 +57,8 @@ public class Utils {
             .setApiCollectionId(responseParam.getRequestParams().getApiCollectionId())
             .setTimestamp(responseParam.getTime())
             .setFilterId(apiFilter.getId())
-            .setSuccessfulExploit(successfulExploit);
+            .setSuccessfulExploit(successfulExploit)
+            .setStatus(status);
 
         metadataBuilder.setCountryCode(metadata.getCountryCode());
         maliciousReqBuilder.setMetadata(metadataBuilder.build());

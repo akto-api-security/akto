@@ -89,6 +89,7 @@ import ThreatApiPage from "../dashboard/pages/threat_detection/ThreatApiPage";
 import ThreatActorPage from "../dashboard/pages/threat_detection/ThreatActorPage";
 import ThreatPolicyPage from "../dashboard/pages/threat_detection/ThreatPolicyPage";
 import ConfigureExploitsPage from "../dashboard/pages/threat_detection/ConfigureExploitsPage";
+import ConfigureIgnoredEventsPage from "../dashboard/pages/threat_detection/ConfigureIgnoredEventsPage";
 import TestSuite from "../dashboard/pages/testing/testSuite/TestSuite";
 import TestsTablePage from "../dashboard/pages/test_editor/tests_table/TestsTablePage";
 import Splunk from "../dashboard/pages/settings/integrations/Splunk";
@@ -96,6 +97,8 @@ import F5Waf from "../dashboard/pages/settings/integrations/F5Waf";
 import AWSWaf from "../dashboard/pages/settings/integrations/AWSWaf";
 import AgentConfig from "../dashboard/pages/settings/integrations/AgentConfig";
 import AzureBoards from "../dashboard/pages/settings/integrations/AzureBoards";
+import ServiceNow from "../dashboard/pages/settings/integrations/ServiceNow";
+import McpRegistry from "../dashboard/pages/settings/integrations/McpRegistry";
 import CloudflareWaf from "../dashboard/pages/settings/integrations/CloudflareWaf";
 import UndoDemergedApis from "../dashboard/pages/settings/undo_demerged_apis/UndoDemergedApis";
 import GmailWebhookCore from "../dashboard/pages/settings/integrations/gmailWebhooks/GmailWebhookCore";
@@ -277,6 +280,11 @@ const router = createBrowserRouter([
                                 path: "configure-exploits",
                                 element: <ConfigureExploitsPage/>
                             }
+                            ,
+                            {
+                                path: "configure-ignored-events",
+                                element: <ConfigureIgnoredEventsPage/>
+                            }
                         ]
                     },
                     {
@@ -384,12 +392,20 @@ const router = createBrowserRouter([
                         element: <AzureBoards/>,
                     },
                     {
+                        path: "integrations/servicenow",
+                        element: <ServiceNow/>,
+                    },
+                    {
                         path: "integrations/akto_apis",
                         element: <ApiTokens/>,
                     },
                     {
                         path: "integrations/akto_gpt",
                         element: <AktoGPT/>,
+                    },
+                    {
+                        path: "integrations/mcp_registry",
+                        element: <McpRegistry/>,
                     },
                     {
                         path: "integrations/github_sso",

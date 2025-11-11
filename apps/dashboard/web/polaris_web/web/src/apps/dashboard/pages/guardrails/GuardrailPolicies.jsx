@@ -183,6 +183,51 @@ function GuardrailPolicies() {
         return "Content Safety";
     };
 
+    // Helper function to get effective regex patterns with fallback logic
+    const getEffectiveRegexPatterns = (policy) => {
+        if (policy.regexPatternsV2?.length > 0) {
+            return policy.regexPatternsV2;
+        }
+        // Convert old format to new format for compatibility
+        if (policy.regexPatterns?.length > 0) {
+            return policy.regexPatterns.map(pattern => ({
+                pattern: pattern,
+                behavior: 'block' // Default behavior for old data
+            }));
+        }
+        return [];
+    };
+
+    // Helper function to get effective selected MCP servers with fallback logic
+    const getEffectiveSelectedMcpServers = (policy) => {
+        if (policy.selectedMcpServersV2?.length > 0) {
+            return policy.selectedMcpServersV2;
+        }
+        // Convert old format to new format for compatibility
+        if (policy.selectedMcpServers?.length > 0) {
+            return policy.selectedMcpServers.map(serverId => ({
+                id: serverId,
+                name: serverId // ID as name for old data
+            }));
+        }
+        return [];
+    };
+
+    // Helper function to get effective selected Agent servers with fallback logic
+    const getEffectiveSelectedAgentServers = (policy) => {
+        if (policy.selectedAgentServersV2?.length > 0) {
+            return policy.selectedAgentServersV2;
+        }
+        // Convert old format to new format for compatibility
+        if (policy.selectedAgentServers?.length > 0) {
+            return policy.selectedAgentServers.map(serverId => ({
+                id: serverId,
+                name: serverId // ID as name for old data
+            }));
+        }
+        return [];
+    };
+
     const generateStatusWithSummary = (policy) => {
         const status = policy.active ? "Active" : "Inactive";
         
@@ -211,7 +256,17 @@ function GuardrailPolicies() {
         const wordFilters = [];
         if (policy.wordFilters?.profanity) wordFilters.push("Profanity");
         if (policy.wordFilters?.custom?.length > 0) wordFilters.push(`${policy.wordFilters.custom.length} Custom Words`);
-        if (policy.regexPatterns?.length > 0) wordFilters.push(`${policy.regexPatterns.length} Regex Patterns`);
+        
+        // Use effective regex patterns - prefer V2 format with behavior, fallback to old format
+        const effectiveRegexPatterns = getEffectiveRegexPatterns(policy);
+        if (effectiveRegexPatterns?.length > 0) {
+            const blockCount = effectiveRegexPatterns.filter(r => r.behavior === 'block').length;
+            const maskCount = effectiveRegexPatterns.filter(r => r.behavior === 'mask').length;
+            const regexSummary = [];
+            if (blockCount > 0) regexSummary.push(`${blockCount} Block`);
+            if (maskCount > 0) regexSummary.push(`${maskCount} Mask`);
+            wordFilters.push(`Regex: ${regexSummary.join(', ')}`);
+        }
         if (wordFilters.length > 0) {
             details.push({ label: "Word Filters", value: wordFilters.join(", ") });
         }
@@ -226,13 +281,16 @@ function GuardrailPolicies() {
             });
         }
 
-        // Server configuration details
+        // Server configuration details using effective methods
         const serverDetails = [];
-        if (policy.selectedMcpServers?.length > 0) {
-            serverDetails.push(`${policy.selectedMcpServers.length} MCP Server${policy.selectedMcpServers.length > 1 ? 's' : ''}`);
+        const effectiveMcpServers = getEffectiveSelectedMcpServers(policy);
+        const effectiveAgentServers = getEffectiveSelectedAgentServers(policy);
+        
+        if (effectiveMcpServers.length > 0) {
+            serverDetails.push(`${effectiveMcpServers.length} MCP Server${effectiveMcpServers.length > 1 ? 's' : ''}`);
         }
-        if (policy.selectedAgentServers?.length > 0) {
-            serverDetails.push(`${policy.selectedAgentServers.length} Agent Server${policy.selectedAgentServers.length > 1 ? 's' : ''}`);
+        if (effectiveAgentServers.length > 0) {
+            serverDetails.push(`${effectiveAgentServers.length} Agent Server${effectiveAgentServers.length > 1 ? 's' : ''}`);
         }
         if (serverDetails.length > 0) {
             details.push({ label: "Target Servers", value: serverDetails.join(", ") });
@@ -361,12 +419,21 @@ function GuardrailPolicies() {
                 severity: severity.toUpperCase(),
                 selectedMcpServers: guardrailData.selectedMcpServers || [],
                 selectedAgentServers: guardrailData.selectedAgentServers || [],
+                // Add V2 fields for enhanced server data
+                selectedMcpServersV2: guardrailData.selectedMcpServersV2 || [],
+                selectedAgentServersV2: guardrailData.selectedAgentServersV2 || [],
                 deniedTopics: guardrailData.deniedTopics || [],
                 piiTypes: guardrailData.piiFilters || [],
                 regexPatterns: guardrailData.regexPatterns || [],
+                // Add V2 field for enhanced regex data
+                regexPatternsV2: guardrailData.regexPatternsV2 || [],
                 contentFiltering: guardrailData.contentFilters || {},
+                // Add LLM policy if present
+                ...(guardrailData.llmRule ? { llmRule: guardrailData.llmRule } : {}),
                 applyOnResponse: guardrailData.applyOnResponse || false,
                 applyOnRequest: guardrailData.applyOnRequest || false,
+                url: guardrailData.url || '',
+                confidenceScore: guardrailData.confidenceScore || 0,
                 active: true
             };
 
@@ -423,9 +490,9 @@ function GuardrailPolicies() {
             hidePagination={true}
             showFooter={false}
             sortOptions={sortOptions}
-            emptyStateMarkup={emptyStateMarkup}   
-            onRowClick={rowClicked}    
-            rowClickable={true} 
+            emptyStateMarkup={emptyStateMarkup}
+            onRowClick={rowClicked}
+            rowClickable={true}
             getActions={getActionsList}
             hasRowActions={true}
             hardCodedKey={true}

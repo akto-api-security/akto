@@ -46,6 +46,7 @@ const initialState = {
     active: '',
     allCollections: [], // Persist only this
     collectionsMap: {},
+    collectionsRegistryStatusMap: {},// Keep in memory (not persisted)
     tagCollectionsMap: {},// Keep in memory (not persisted)
     hostNameMap: {}, // Keep in memory (not persisted)
     lastFetchedInfo: { lastRiskScoreInfo: 0, lastSensitiveInfo: 0 },
@@ -113,6 +114,14 @@ let persistStore = (set, get) => ({
             set({ collectionsMap });
         } catch (error) {
             console.error("Error setting collectionsMap:", error);
+        }
+    },
+
+    setCollectionsRegistryStatusMap: (collectionsRegistryStatusMap) => {
+        try {
+            set({ collectionsRegistryStatusMap });
+        } catch (error) {
+            console.error("Error setting collectionsRegistryStatusMap:", error);
         }
     },
 

@@ -26,7 +26,8 @@ public class MaliciousEventDto {
   private Boolean successfulExploit;
   private Status status;
   private Label label;
-
+  private String host;
+  private String jiraTicketUrl;
 
   public enum EventType {
     SINGLE,
@@ -66,6 +67,8 @@ public class MaliciousEventDto {
     this.status = builder.status != null ? builder.status : Status.ACTIVE;
     this.successfulExploit = builder.successfulExploit;
     this.label = builder.label;
+    this.host = builder.host;
+    this.jiraTicketUrl = builder.jiraTicketUrl;
   }
 
   public static class Builder {
@@ -88,7 +91,8 @@ public class MaliciousEventDto {
     private Status status;
     private Boolean successfulExploit;
     private Label label;
-
+    private String host;
+    private String jiraTicketUrl;
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
       return this;
@@ -181,6 +185,16 @@ public class MaliciousEventDto {
 
     public Builder setLabel(Label label) {
       this.label = label;
+      return this;
+    }
+
+    public Builder setHost(String host) {
+      this.host = host;
+      return this;
+    }
+
+    public Builder setJiraTicketUrl(String jiraTicketUrl) {
+      this.jiraTicketUrl = jiraTicketUrl;
       return this;
     }
 
@@ -351,6 +365,22 @@ public class MaliciousEventDto {
 
   public void setLabel(Label label) {
     this.label = label;
+  }
+
+  public String getHost() {
+    return host;
+  }
+
+  public void setHost(String host) {
+    this.host = host;
+  }
+
+  public String getJiraTicketUrl() {
+    return jiraTicketUrl;
+  }
+
+  public void setJiraTicketUrl(String jiraTicketUrl) {
+    this.jiraTicketUrl = jiraTicketUrl;
   }
 
 }

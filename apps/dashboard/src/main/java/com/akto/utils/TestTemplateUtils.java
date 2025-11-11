@@ -112,22 +112,24 @@ public class TestTemplateUtils {
             GlobalEnums.TestCategory.SYSTEM_PROMPT_LEAKAGE,
             GlobalEnums.TestCategory.VECTOR_AND_EMBEDDING_WEAKNESSES,
             GlobalEnums.TestCategory.MISINFORMATION,
-            GlobalEnums.TestCategory.UNBOUNDED_CONSUMPTION
+            GlobalEnums.TestCategory.UNBOUNDED_CONSUMPTION,
+            TestCategory.AGENTIC_BUSINESS_ALIGNMENT,
+            TestCategory.AGENTIC_HALLUCINATION_AND_TRUSTWORTHINESS,
+            TestCategory.AGENTIC_SAFETY,
+            TestCategory.AGENTIC_SECURITY,
         };
 
         switch (contextSource) {
             case MCP:
-                return mcpCategories;
+                return Arrays.stream(allCategories)
+                .filter(category ->  !Arrays.asList(llmCategories).contains(category))
+                .toArray(TestCategory[]::new);
 
             case GEN_AI:
                 return llmCategories;
             
             case AGENTIC:
-                // Combine both MCP and GEN_AI categories for agentic context
-                TestCategory[] agenticCategories = new TestCategory[mcpCategories.length + llmCategories.length];
-                System.arraycopy(mcpCategories, 0, agenticCategories, 0, mcpCategories.length);
-                System.arraycopy(llmCategories, 0, agenticCategories, mcpCategories.length, llmCategories.length);
-                return agenticCategories;
+                return allCategories;
             
             default:
                 return Arrays.stream(allCategories)

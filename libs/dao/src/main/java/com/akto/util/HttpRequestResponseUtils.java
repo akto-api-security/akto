@@ -335,5 +335,28 @@ public class HttpRequestResponseUtils {
             decryptedMap.put("payload", decodedString);
         }
         return decryptedMap;
-    } 
+    }
+
+    /**
+     * Get header value from headers map using case-insensitive comparison
+     * @param headers The headers map
+     * @param headerName The header name to search for
+     * @return The first value of the header if found, null otherwise
+     */
+    public static String getHeaderValue(Map<String, List<String>> headers, String headerName) {
+        if (headers == null || headers.isEmpty() || headerName == null) {
+            return null;
+        }
+
+        for (String key : headers.keySet()) {
+            if (key != null && key.equalsIgnoreCase(headerName)) {
+                List<String> values = headers.get(key);
+                if (values != null && !values.isEmpty()) {
+                    return values.get(0);
+                }
+            }
+        }
+
+        return null;
+    }
 }

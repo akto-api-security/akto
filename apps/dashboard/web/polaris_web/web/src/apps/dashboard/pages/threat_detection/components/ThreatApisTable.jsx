@@ -21,6 +21,11 @@ const headers = [
     title: labelMap[PersistStore.getState().dashboardCategory]["Endpoint"],
   },
   {
+    text: "Host",
+    value: "host",
+    title: "Host",
+  },
+  {
     text: "Malicious Actors",
     value: "actorsCount",
     title: "Malicious Actors",
@@ -107,6 +112,7 @@ function ThreatApiTable({ currDateRange, rowClicked }) {
         actorsCount: x.actorsCount,
         requestsCount: x.requestsCount,
         discoveredAt: func.prettifyEpoch(x.discoveredAt),
+        host: x.host || "-",
         api: (
           <GetPrettifyEndpoint 
             {...(!isMCPSecurityCategory() && { method: x.method })}

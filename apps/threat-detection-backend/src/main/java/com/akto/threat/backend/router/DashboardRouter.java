@@ -62,6 +62,9 @@ public class DashboardRouter implements ARouter {
         if (!protoFilter.getLatestAttackList().isEmpty()) {
             filterMap.put("latestAttack", new ArrayList<>(protoFilter.getLatestAttackList()));
         }
+        if (!protoFilter.getHostsList().isEmpty()) {
+            filterMap.put("hosts", new ArrayList<>(protoFilter.getHostsList()));
+        }
         if (protoFilter.hasStatusFilter()) {
             filterMap.put("statusFilter", protoFilter.getStatusFilter());
         }
@@ -427,7 +430,6 @@ public class DashboardRouter implements ARouter {
                 // Determine which type of update to perform
                 List<String> eventIds = null;
                 Map<String, Object> filterMap = null;
-
                 if (req.hasEventId()) {
                     // Single event update
                     eventIds = java.util.Arrays.asList(req.getEventId());
@@ -446,7 +448,8 @@ public class DashboardRouter implements ARouter {
                     ctx.get("accountId"),
                     eventIds,
                     filterMap,
-                    req.getStatus()
+                    req.getStatus(),
+                    req.getJiraTicketUrl()
                 );
 
                 UpdateMaliciousEventStatusResponse resp = UpdateMaliciousEventStatusResponse.newBuilder()

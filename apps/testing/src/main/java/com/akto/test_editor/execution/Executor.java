@@ -31,6 +31,7 @@ import com.akto.gpt.handlers.gpt_prompts.TestExecutorModifier;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
+import com.akto.test_editor.TestingUtilsSingleton;
 import com.akto.test_editor.Utils;
 import com.akto.util.Constants;
 import com.akto.util.CookieTransformer;
@@ -204,7 +205,7 @@ public class Executor {
                 TestResult res = null;
                 if (AgentClient.isRawApiValidForAgenticTest(testReq)) {
                     // execute agentic test here
-                    res = agentClient.executeAgenticTest(testReq);
+                    res = agentClient.executeAgenticTest(testReq, apiInfoKey.getApiCollectionId());
                 }else{
                     String url = testReq.getRequest().getUrl();
                     if (url.contains("sampl-aktol-1exannwybqov-67928726")) {
@@ -487,6 +488,7 @@ public class Executor {
         try {
             int accountId = Context.accountId.get();
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
+            // FeatureAccess featureAccess = FeatureAccess.fullAccess;
             if (featureAccess.getIsGranted()) {
 
                 String request = Utils.buildRequestIHttpFormat(rawApi);
@@ -521,6 +523,7 @@ public class Executor {
                     }
                     queryData.put(TestExecutorModifier._OPERATION, operation);
                     BasicDBObject generatedData = new TestExecutorModifier().handle(queryData);
+                    // now as the prompt handles operation type too, we need to parse the generated data for the operation type
                     generatedOperationKeyValuePairs = parseGeneratedKeyValues(generatedData, operationTypeLower, value);
                 }
             }
@@ -529,18 +532,21 @@ public class Executor {
             loggerMaker.errorAndAddToDb(e, "error invoking operation " + operationType + " " + e.getMessage());
         }
 
+        boolean isMcpRequest = TestingUtilsSingleton.getInstance().isMcpRequest(apiInfoKey, rawApi);
         try {
             if (generatedOperationKeyValuePairs != null && !generatedOperationKeyValuePairs.isEmpty()) {
                 ExecutorSingleOperationResp resp = new ExecutorSingleOperationResp(false, "AI generated operation key value pairs, executing them");
                 for (BasicDBObject generatedPair : generatedOperationKeyValuePairs) {
                     String generatedKey = generatedPair.keySet().iterator().next();
                     Object generatedValue = generatedPair.get(generatedKey);
-                    resp = runOperation(operationType, rawApi, generatedKey, generatedValue, varMap, authMechanism, customAuthTypes, apiInfoKey);
+                    resp = runOperation(operationType, rawApi, generatedKey, generatedValue, varMap, authMechanism, customAuthTypes, apiInfoKey, isMcpRequest);
                 }
                 return resp;
             }
 
-            ExecutorSingleOperationResp resp = runOperation(operationType, rawApi, key, value, varMap, authMechanism, customAuthTypes, apiInfoKey);
+            
+
+            ExecutorSingleOperationResp resp = runOperation(operationType, rawApi, key, value, varMap, authMechanism, customAuthTypes, apiInfoKey, isMcpRequest);
             return resp;
         } catch (Exception e) {
             return new ExecutorSingleOperationResp(false, "error executing executor operation " + e.getMessage());
@@ -603,6 +609,8 @@ public class Executor {
         return removed;
     }
 
+    // Add support to also update the URL ID 
+    // use case for an ai agent.
     public synchronized static ExecutorSingleOperationResp modifyAuthTokenInRawApi(TestRoles testRole, RawApi rawApi) {
         AuthMechanism authMechanismForRole = testRole.findMatchingAuthMechanism(rawApi);
 
@@ -722,9 +730,12 @@ public class Executor {
         }
     }
 
-    public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey) {
+    public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey, boolean isMcpRequest) {
         switch (operationType.toLowerCase()) {
             case "send_ssrf_req":
+                if (isMcpRequest) {
+                    return new ExecutorSingleOperationResp(false, "SSRF is not supported for MCP requests");
+                }
                 String keyValue = key.toString().replaceAll("\\$\\{random_uuid\\}", "");
                 String url = Utils.extractValue(keyValue, "url=");
                 String redirectUrl = Utils.extractValue(keyValue, "redirect_url=");
@@ -747,6 +758,9 @@ public class Executor {
                 return Operations.addHeader(rawApi, "x-agent-conversations", String.join(",", conversationsList));
                 
             case "attach_file":
+                if (isMcpRequest) {
+                    return new ExecutorSingleOperationResp(false, "DDOS is not supported for MCP requests");
+                }
                 return Operations.addHeader(rawApi, Constants.AKTO_ATTACH_FILE , key.toString());
 
             case "modify_header":
@@ -945,7 +959,7 @@ public class Executor {
                 }
                 return new ExecutorSingleOperationResp(true, "");
             default:
-                return Utils.modifySampleDataUtil(operationType, rawApi, key, value, varMap, apiInfoKey);
+                return Utils.modifySampleDataUtil(operationType, rawApi, key, value, varMap, apiInfoKey, isMcpRequest);
 
         }
     }

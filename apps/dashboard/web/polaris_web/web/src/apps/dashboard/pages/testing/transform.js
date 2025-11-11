@@ -438,9 +438,9 @@ const transform = {
     return details.replace(/{{percentageMatch}}/g, func.prettifyShort(percentageMatch))
   },
 
-  fillMoreInformation(category, moreInfoSections, affectedEndpoints, jiraIssueUrl, createJiraTicket) {
+  getJiraComponent(jiraIssueUrl) {
     var key = /[^/]*$/.exec(jiraIssueUrl)[0];
-    const jiraComponent = jiraIssueUrl?.length > 0 ? (
+    return jiraIssueUrl?.length > 0 ? (
       <Box>
               <Tag>
                   <HorizontalStack gap={1}>
@@ -454,6 +454,10 @@ const transform = {
                 </Tag>
           </Box>
     ) : <Text> No Jira ticket created. Click on the top right button to create a new ticket.</Text>
+  },
+
+  fillMoreInformation(category, moreInfoSections, affectedEndpoints, jiraIssueUrl, createJiraTicket) {
+    const jiraComponent = this.getJiraComponent(jiraIssueUrl)
     
     //<Box width="300px"><Button onClick={createJiraTicket} plain disabled={window.JIRA_INTEGRATED != "true"}>Click here to create a new ticket</Button></Box>
     let filledSection = []
@@ -604,7 +608,7 @@ const transform = {
           if (collectionMap[collectionId]) {
             let apiKeyInfoList = []
             collectionMap[collectionId].forEach(apiKeyInfo => {
-              apiKeyInfoList.push({ 'url': apiKeyInfo['url'], 'method': apiKeyInfo['method'], 'apiCollectionId': Number(collectionId) })
+              apiKeyInfoList.push({ 'url': apiKeyInfo['url'], 'method': apiKeyInfo['method'], 'apiCollectionId': Number(apiKeyInfo['apiCollectionId']) })
               found = true
             })
             if (apiKeyInfoList.length > 0) {
@@ -629,12 +633,10 @@ const transform = {
         for (var index = 0; index < valueFromPredicate.length; index++) {
           let apiEndpoint = {
             method: valueFromPredicate[index]['method'],
-            url: valueFromPredicate[index]['url']
+            url: valueFromPredicate[index]['url'],
+            apiCollectionId: valueFromPredicate[index]['apiCollectionId']
           }
-          apiInfoKeyList.push({
-            method: apiEndpoint.method,
-            url: apiEndpoint.url
-          })
+          apiInfoKeyList.push(apiEndpoint)
         }
         valueForCondition[collectionId] = apiInfoKeyList
         conditions.push({ operator: operator, type: e.type, value: valueForCondition })
@@ -1018,7 +1020,7 @@ getTestingRunResultUrl(testingResult){
   return finalMethod + " " + truncatedUrl
   
 },
-getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoardsWorkItemUrl){
+getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoardsWorkItemUrl, serviceNowTicketUrl, servicenowTicketId){
   if(apiInfo == null || apiInfo === undefined){
     apiInfo = {
       allAuthTypesFound: [],
@@ -1054,7 +1056,7 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoards
       <Tag>
           <HorizontalStack gap={1}>
             <Avatar size="extraSmall" shape='round' source="/public/logo_jira.svg" />
-            <Link url={jiraIssueUrl}>
+            <Link target="_blank" url={jiraIssueUrl}>
               <Text>
                 {key}
               </Text>
@@ -1070,9 +1072,24 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoards
       <Tag>
         <HorizontalStack gap={1}>
           <Avatar size="extraSmall" shape='round' source="/public/azure-boards.svg" />
-          <Link url={azureBoardsWorkItemUrl}>
+          <Link target="_blank" url={azureBoardsWorkItemUrl}>
             <Text>
               {azureBoardsWorkItemUrl?.split("/")?.[azureBoardsWorkItemUrl?.split("/")?.length - 1]}
+            </Text>
+          </Link>
+        </HorizontalStack>
+      </Tag>
+    </Box>
+  ) : null
+
+  const serviceNowComp = serviceNowTicketUrl?.length > 0 ? (
+    <Box>
+      <Tag>
+        <HorizontalStack gap={1}>
+          <Avatar size="extraSmall" shape='round' source="/public/servicenow.svg" />
+          <Link target="_blank" url={serviceNowTicketUrl}>
+            <Text>
+              {servicenowTicketId || "View Ticket"}
             </Text>
           </Link>
         </HorizontalStack>
@@ -1117,18 +1134,33 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoards
       title: "Detected",
       value: <TextComp value={func.prettifyEpoch(apiInfo.lastSeen)} />,
       tooltipContent: "Discovered time of the API"
-    },
-    {
+    }
+  ]
+
+  if(jiraComponent != null) {
+    rowItems.push({
       title: "Jira ticket",
       value: jiraComponent,
       tooltipContent:"Jira ticket number attached to the testing run issue"
-    },
-    {
+    })
+  }
+
+  if(azureBoardsComp != null) {
+    rowItems.push({
       title: "Azure work item",
       value: azureBoardsComp,
       tooltipContent: "Azure boards work item number attached to the testing run issue"
-    }
-  ]
+    })
+  }
+
+  if(serviceNowComp != null) {
+    rowItems.push({
+      title: "ServiceNow ticket",
+      value: serviceNowComp,
+      tooltipContent: "ServiceNow ticket attached to the testing run issue"
+    })
+  }
+
   return rowItems
 },
 

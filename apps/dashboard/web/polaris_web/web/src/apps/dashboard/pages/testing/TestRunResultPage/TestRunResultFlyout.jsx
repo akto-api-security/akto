@@ -21,14 +21,17 @@ import MarkdownViewer from '../../../components/shared/MarkdownViewer.jsx'
 import InlineEditableText from '../../../components/shared/InlineEditableText.jsx'
 import ChatInterface from '../../../components/shared/ChatInterface.jsx'
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper.js'
+import ApiGroups from '../../../components/shared/ApiGroups'
+import ForbiddenRole from '../../../components/shared/ForbiddenRole'
 
 function TestRunResultFlyout(props) {
 
 
-    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, conversations} = props
+    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, conversations, showForbidden} = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
+    const [apiInfo, setApiInfo] = useState({})
     const [popoverActive, setPopoverActive] = useState(false)
     const [modalActive, setModalActive] = useState(false)
     const [jiraProjectMaps,setJiraProjectMap] = useState({})
@@ -40,12 +43,17 @@ function TestRunResultFlyout(props) {
     const [projectId, setProjectId] = useState('')
     const [workItemType, setWorkItemType] = useState('')
 
+    const [serviceNowModalActive, setServiceNowModalActive] = useState(false)
+    const [serviceNowTables, setServiceNowTables] = useState([])
+    const [serviceNowTable, setServiceNowTable] = useState('')
+
     const [description, setDescription] = useState("")
     const [editDescription, setEditDescription] = useState("")
     const [isEditingDescription, setIsEditingDescription] = useState(false)
 
     const [vulnerabilityAnalysisError, setVulnerabilityAnalysisError] = useState(null)
     const [refreshFlag, setRefreshFlag] = useState(Date.now().toString())
+    const [labelsText, setLabelsText] = useState("")
     
     const fetchRemediationInfo = useCallback (async (testId) => {
         if (testId && testId.length > 0) {
@@ -58,10 +66,11 @@ function TestRunResultFlyout(props) {
     })
 
     const fetchApiInfo = useCallback( async(apiInfoKey) => {
-        let apiInfo = {}
+        let apiInfoData = {}
         if(apiInfoKey !== null){
             await api.fetchEndpoint(apiInfoKey).then((res) => {
-                apiInfo = JSON.parse(JSON.stringify(res))
+                apiInfoData = JSON.parse(JSON.stringify(res))
+                setApiInfo(apiInfoData)
             })
             let sensitiveParam = ""
             const sensitiveParamsSet = new Set();
@@ -79,7 +88,8 @@ function TestRunResultFlyout(props) {
                     index++
                 })
             })
-            setRowItems(transform.getRowInfo(issueDetails.severity,apiInfo,issueDetails.jiraIssueUrl,sensitiveParam,issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl))
+
+            setRowItems(transform.getRowInfo(issueDetails.severity,apiInfoData,issueDetails.jiraIssueUrl,sensitiveParam,issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl, issueDetails.servicenowIssueUrl, issueDetails.ticketId))
         }
     },[issueDetails])
 
@@ -156,9 +166,11 @@ function TestRunResultFlyout(props) {
         setModalActive(!modalActive)
     }
 
-    const handleSaveAction = (id) => {
+    const handleSaveAction = (id, labels) => {
         if(projId.length > 0 && issueType.length > 0){
-            createJiraTicket(id, projId, issueType)
+            // Use labels parameter if provided, otherwise fall back to state
+            const labelsToUse = labels !== undefined ? labels : labelsText;
+            createJiraTicket(id, projId, issueType, labelsToUse)
             setModalActive(false)
         }else{
             func.setToast(true, true, "Invalid project id or issue type")
@@ -193,6 +205,35 @@ function TestRunResultFlyout(props) {
             func.setToast(true, true, "Invalid project id or work item type")
         }
         setBoardsModalActive(false)
+    }
+
+    const handleServiceNowClick = async() => {
+        if(!serviceNowModalActive){
+            const serviceNowIntegration = await settingFunctions.fetchServiceNowIntegration()
+            if(serviceNowIntegration.tableNames && serviceNowIntegration.tableNames.length > 0){
+                setServiceNowTables(serviceNowIntegration.tableNames)
+                setServiceNowTable(serviceNowIntegration.tableNames[0])
+            }
+        }
+        setServiceNowModalActive(!serviceNowModalActive)
+    }
+
+    const handleServiceNowTicketCreation = async(id) => {
+        if(serviceNowTable && serviceNowTable.length > 0){
+            func.setToast(true, false, "Please wait while we create your ServiceNow ticket.")
+            await issuesApi.createServiceNowTicket(issueDetails.id, serviceNowTable).then((res) => {
+                if(res?.errorMessage) {
+                    func.setToast(true, false, res?.errorMessage)
+                } else {
+                    func.setToast(true, false, "ServiceNow ticket created successfully")
+                }
+            }).catch((err) => {
+                func.setToast(true, true, err?.response?.data?.errorMessage || "Error creating ServiceNow ticket")
+            })
+        }else{
+            func.setToast(true, true, "Invalid ServiceNow table")
+        }
+        setServiceNowModalActive(false)
     }
     
     const issues = [{
@@ -293,14 +334,15 @@ function TestRunResultFlyout(props) {
                         <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
                         <Text color="subdued" variant="bodySm">{selectedTestRunResult?.testCategory}</Text>
                     </HorizontalStack>
+                    <ApiGroups collectionIds={apiInfo?.collectionIds} />
                 </VerticalStack>
                 <HorizontalStack gap={2} wrap={false}>
                     <ActionsComp />
 
-                    {selectedTestRunResult && selectedTestRunResult.vulnerable && 
+                    {selectedTestRunResult && selectedTestRunResult.vulnerable &&
                         <HorizontalStack gap={2} wrap={false}>
                             <JiraTicketCreationModal
-                                activator={<Button id={"create-jira-ticket-button"} primary onClick={handleJiraClick} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>Create Jira Ticket</Button>}
+                                activator={window.JIRA_INTEGRATED === 'true' ? <Button id={"create-jira-ticket-button"} primary onClick={handleJiraClick} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>Create Jira Ticket</Button> : <></>}
                                 modalActive={modalActive}
                                 setModalActive={setModalActive}
                                 handleSaveAction={handleSaveAction}
@@ -310,6 +352,8 @@ function TestRunResultFlyout(props) {
                                 projId={projId}
                                 issueType={issueType}
                                 issueId={issueDetails.id}
+                                labelsText={labelsText}
+                                setLabelsText={setLabelsText}
                             />
                             <JiraTicketCreationModal
                                 activator={window.AZURE_BOARDS_INTEGRATED === 'true' ? <Button id={"create-azure-boards-ticket-button"} primary onClick={handleAzureBoardClick} disabled={azureBoardsWorkItemUrl !== "" || window.AZURE_BOARDS_INTEGRATED !== "true"}>Create Work Item</Button> : <></>}
@@ -323,6 +367,19 @@ function TestRunResultFlyout(props) {
                                 setIssueType={setWorkItemType}
                                 issueId={issueDetails.id}
                                 isAzureModal={true}
+                            />
+                            <JiraTicketCreationModal
+                                activator={window.SERVICENOW_INTEGRATED === 'true' ? <Button id={"create-servicenow-ticket-button"} primary onClick={handleServiceNowClick} disabled={serviceNowTicketUrl !== "" || window.SERVICENOW_INTEGRATED !== "true"}>Create ServiceNow Ticket</Button> : <></>}
+                                modalActive={serviceNowModalActive}
+                                setModalActive={setServiceNowModalActive}
+                                handleSaveAction={handleServiceNowTicketCreation}
+                                jiraProjectMaps={serviceNowTables}
+                                setProjId={setServiceNowTable}
+                                setIssueType={() => {}}
+                                projId={serviceNowTable}
+                                issueType=""
+                                issueId={issueDetails.id}
+                                isServiceNowModal={true}
                             />
                         </HorizontalStack>
                     }
@@ -664,9 +721,9 @@ function TestRunResultFlyout(props) {
         />
     )
 
-    const currentComponents = [
-        <TitleComponent/>, tabsComponent
-    ]
+    const currentComponents = showForbidden 
+        ? [<Box padding="4"><ForbiddenRole /></Box>]
+        : [<TitleComponent/>, tabsComponent]
 
     const title = isIssuePage ? "Issue details" : mapLabel('Test result', getDashboardCategory())
 

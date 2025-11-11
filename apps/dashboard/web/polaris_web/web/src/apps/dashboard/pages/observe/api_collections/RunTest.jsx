@@ -160,6 +160,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
         }
         let categories = metaDataObj.categories
+        categories = func.sortByCategoryPriority(categories, 'name')
+        const categoriesNames = categories.map(category => category.name)
         let businessLogicSubcategories = metaDataObj.subCategories.filter((subCategory) => {return !subCategory.inactive})
         const testRolesResponse = await testingApi.fetchTestRoles()
         var testRoles = testRolesResponse.testRoles.map(testRole => {
@@ -180,20 +182,27 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
 
         Object.keys(processMapCategoryToSubcategory).map(category => {
-            const selectedTests = []
+            if(categoriesNames.includes(category)){
+                const selectedTests = []
 
-            mapCategoryToSubcategory[category]["selected"].map(test => selectedTests.push(test.value))
-            processMapCategoryToSubcategory[category].forEach((test, index, arr) => {
-                arr[index]["selected"] = selectedTests.includes(test.value)
-            })
+                mapCategoryToSubcategory[category]["selected"].map(test => selectedTests.push(test.value))
+                processMapCategoryToSubcategory[category].forEach((test, index, arr) => {
+                    arr[index]["selected"] = selectedTests.includes(test.value)
+                })
+            }else{
+                delete processMapCategoryToSubcategory[category];
+            }
+            
         })
         const testName = createTestName(apiCollectionName, processMapCategoryToSubcategory);
+        // determine selectedCategory based on the same priority ordering
+        const sortedCategoryKeys = func.sortByCategoryPriority(Object.keys(processMapCategoryToSubcategory))
         //Auth Mechanism
         let authMechanismPresent = false
         const authMechanismDataResponse = await testingApi.fetchAuthMechanismData()
         if (authMechanismDataResponse.authMechanism)
             authMechanismPresent = true
-        testingApi.fetchMiniTestingServiceNames().then(({miniTestingServiceNames}) => {
+            testingApi.fetchMiniTestingServiceNames().then(({miniTestingServiceNames}) => {
             const miniTestingServiceNamesOptions = (miniTestingServiceNames || []).map(name => {
                 return {
                     label: name,
@@ -208,7 +217,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 ...prev,
                 categories: categories,
                 tests: processMapCategoryToSubcategory,
-                selectedCategory: Object.keys(processMapCategoryToSubcategory).length > 0 ? Object.keys(processMapCategoryToSubcategory)[0] : "",
+                selectedCategory: sortedCategoryKeys.length > 0 ? sortedCategoryKeys[0] : "",
                 testName: testName,
                 authMechanismPresent: authMechanismPresent
             };

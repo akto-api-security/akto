@@ -37,6 +37,11 @@ const headers = [
     value: "latestIp",
   },
   {
+    text: "Latest Host",
+    title: "Latest Host",
+    value: "latestHost",
+  },
+  {
     text: "Latest " + labelMap[PersistStore.getState().dashboardCategory]["API"],
     title: "Latest " + labelMap[PersistStore.getState().dashboardCategory]["API"],
     value: "latestApi",
@@ -87,10 +92,9 @@ const sortOptions = [
   },
 ];
 
-let filters = [];
-
 function ThreatActorTable({ data, currDateRange, handleRowClick }) {
   const [loading, setLoading] = useState(false);
+  const [filters, setFilters] = useState([]);
 
   const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
@@ -121,7 +125,7 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
     let total = 0;
     let ret = [];
     try {
-      const res = await api.fetchThreatActors(skip, sort, filters.latestAttack || [], filters.country || [], startTimestamp, endTimestamp, filters.actorId || []);
+      const res = await api.fetchThreatActors(skip, sort, filters.latestAttack || [], filters.country || [], startTimestamp, endTimestamp, filters.actorId || [], filters.host || []);
       total = res.total;
       if (res?.actors?.length === 0) {
         return { value: [], total: 0 };
@@ -166,12 +170,12 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
           ...x,
           actor: formatActorId(x.id),
           latestIp: formatActorId(x.latestApiIp),
+          latestHost: x.latestApiHost || "-",
           discoveredAt: x.discoveredAt ? dayjs(x.discoveredAt*1000).format('YYYY-MM-DD, HH:mm:ss A') : "-",
           sensitiveData: sensitiveData && sensitiveData.length > 0 ? observeFunc.prettifySubtypes(sensitiveData, false) : "-",
           latestAttack: x.latestAttack || "-",
           accessType: accessTypes.length > 0 ? getAccessType(accessTypes) : "-",
           status: "Active",
-          latestAttack: x.latestAttack || "-",
           country: (
             <Tooltip
               content={x.country || "Unknown"}
@@ -241,7 +245,16 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
       label: x,
       value: x
     }));
-    filters = [
+    
+    // Extract unique hosts from the fetched data
+    let hostChoices = [];
+    if (res?.host && Array.isArray(res.host) && res.host.length > 0) {
+      hostChoices = res.host
+        .filter(host => host && host.trim() !== '' && host !== '-')
+        .map(x => ({ label: x, value: x }));
+    }
+    
+    setFilters([
       {
         key: 'actorId',
         label: 'Actor Id',
@@ -262,8 +275,16 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
         type: 'select',
         choices: countryChoices,
         multiple: true
+      },
+      {
+        key: 'host',
+        label: 'Host',
+        title: 'Host',
+        choices: hostChoices,
+        multiple: true,
+        type: 'select',
       }
-    ]
+    ]);
   }
 
   useEffect(() => {

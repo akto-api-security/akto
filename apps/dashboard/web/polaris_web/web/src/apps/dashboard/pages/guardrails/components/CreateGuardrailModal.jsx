@@ -30,6 +30,7 @@ import {
 } from "@shopify/polaris-icons";
 import AddDeniedTopicModal from "./AddDeniedTopicModal";
 import AddPiiTypeModal from "./AddPiiTypeModal";
+import AddRegexPatternModal from "./AddRegexPatternModal";
 import DropdownSearch from "../../../components/shared/DropdownSearch";
 import api from "../api";
 import PersistStore from '../../../../main/PersistStore';
@@ -69,9 +70,17 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     // Step 5: Sensitive information filters
     const [piiTypes, setPiiTypes] = useState([]);
     const [regexPatterns, setRegexPatterns] = useState([]);
-    const [newRegexPattern, setNewRegexPattern] = useState("");
 
-    // Step 6: Server and application settings
+    // Step 6: LLM-based Rule
+    const [llmRule, setLlmRule] = useState("");
+    const [enableLlmRule, setEnableLlmRule] = useState(false);
+    const [llmConfidenceScore, setLlmConfidenceScore] = useState(0.5);
+
+    // Step 7: URL and Confidence Score
+    const [url, setUrl] = useState("");
+    const [confidenceScore, setConfidenceScore] = useState(25); // Start with 25 (first checkpoint)
+
+    // Step 8: Server and application settings
     const [selectedMcpServers, setSelectedMcpServers] = useState([]);
     const [selectedAgentServers, setSelectedAgentServers] = useState([]);
     const [applyOnResponse, setApplyOnResponse] = useState(false);
@@ -82,55 +91,112 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [agentServers, setAgentServers] = useState([]);
     const [collectionsLoading, setCollectionsLoading] = useState(false);
     
+    // URL validation
+    const [urlError, setUrlError] = useState("");
+    
     // Get collections from PersistStore
     const allCollections = PersistStore(state => state.allCollections);
+    
+    // URL validation function (same pattern as McpRegistry.jsx)
+    const validateUrl = (url) => {
+        const urlPattern = /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/;
+        return urlPattern.test(url);
+    };
+    
+    // Handle URL input with validation
+    const handleUrlChange = (value) => {
+        setUrl(value);
+        if (value && value.trim() && !validateUrl(value.trim())) {
+            setUrlError("Invalid URL format. Must be a valid http or https URL");
+        } else {
+            setUrlError("");
+        }
+    };
 
     // Sub-modal states
     const [showAddTopicModal, setShowAddTopicModal] = useState(false);
     const [showAddPiiModal, setShowAddPiiModal] = useState(false);
+    const [showAddRegexModal, setShowAddRegexModal] = useState(false);
     const [editingTopic, setEditingTopic] = useState(null);
 
     const getStepsWithSummary = () => [
-        { 
-            number: 1, 
-            title: "Provide guardrail details", 
+        {
+            number: 1,
+            title: "Provide guardrail details",
             optional: false,
             summary: name ? `${name}${description ? ` - ${description.substring(0, 30)}${description.length > 30 ? '...' : ''}` : ''}` : null
         },
-        { 
-            number: 2, 
-            title: "Configure content filters", 
+        {
+            number: 2,
+            title: "Configure content filters",
             optional: true,
-            summary: (enableHarmfulCategories || enablePromptAttacks) 
+            summary: (enableHarmfulCategories || enablePromptAttacks)
                 ? `${enableHarmfulCategories ? 'Harmful categories' : ''}${enableHarmfulCategories && enablePromptAttacks ? ', ' : ''}${enablePromptAttacks ? 'Prompt attacks' : ''}`
                 : null
         },
-        { 
-            number: 3, 
-            title: "Add denied topics", 
+        {
+            number: 3,
+            title: "Add denied topics",
             optional: true,
             summary: deniedTopics.length > 0 ? `${deniedTopics.length} topic${deniedTopics.length !== 1 ? 's' : ''}` : null
         },
-        { 
-            number: 4, 
-            title: "Add word filters", 
+        {
+            number: 4,
+            title: "Add word filters",
             optional: true,
-            summary: (filterProfanity || customWords.length > 0 || regexPatterns.length > 0) 
+            summary: (filterProfanity || customWords.length > 0 || regexPatterns.length > 0)
                 ? `${filterProfanity ? 'Profanity' : ''}${filterProfanity && customWords.length > 0 ? ', ' : ''}${customWords.length > 0 ? `${customWords.length} custom word${customWords.length !== 1 ? 's' : ''}` : ''}${(filterProfanity || customWords.length > 0) && regexPatterns.length > 0 ? ', ' : ''}${regexPatterns.length > 0 ? `${regexPatterns.length} regex pattern${regexPatterns.length !== 1 ? 's' : ''}` : ''}`
                 : null
         },
-        { 
-            number: 5, 
-            title: "Add sensitive information filters", 
+        {
+            number: 5,
+            title: "Add sensitive information filters",
             optional: true,
             summary: piiTypes.length > 0 ? `${piiTypes.length} PII type${piiTypes.length !== 1 ? 's' : ''}` : null
         },
-        { 
-            number: 6, 
-            title: "Server and application settings", 
+        {
+            number: 6,
+            title: "LLM-based Rule",
+            optional: true,
+            summary: enableLlmRule ? `Enabled${llmRule ? ` - ${llmRule.substring(0, 30)}${llmRule.length > 30 ? '...,' : ','}` : ','} Confidence: ${llmConfidenceScore.toFixed(2)}` : null
+        },
+        {
+            number: 7,
+            title: "URL and Confidence Score",
+            optional: true,
+            summary: url ? `URL: ${url.substring(0, 30)}${url.length > 30 ? '...' : ''}, Confidence: ${confidenceScore}` : null
+        },
+        {
+            number: 8,
+            title: "Server and application settings",
             optional: false,
-            summary: (selectedMcpServers.length > 0 || selectedAgentServers.length > 0) 
-                ? `${selectedMcpServers.length} MCP, ${selectedAgentServers.length} Agent${(applyOnRequest || applyOnResponse) ? ` - ${applyOnRequest ? 'Req' : ''}${applyOnRequest && applyOnResponse ? '/' : ''}${applyOnResponse ? 'Res' : ''}` : ''}`
+            summary: (selectedMcpServers.length > 0 || selectedAgentServers.length > 0)
+                ? (() => {
+                    const serverSummary = [];
+                    if (selectedMcpServers.length > 0) {
+                        const mcpNames = selectedMcpServers
+                            .map(serverId => {
+                                const server = mcpServers.find(s => s.value === serverId);
+                                return server ? server.label : serverId;
+                            })
+                            .slice(0, 2);
+                        const mcpMore = selectedMcpServers.length > 2 ? ` +${selectedMcpServers.length - 2}` : '';
+                        serverSummary.push(`MCP: ${mcpNames.join(", ")}${mcpMore}`);
+                    }
+                    if (selectedAgentServers.length > 0) {
+                        const agentNames = selectedAgentServers
+                            .map(serverId => {
+                                const server = agentServers.find(s => s.value === serverId);
+                                return server ? server.label : serverId;
+                            })
+                            .slice(0, 2);
+                        const agentMore = selectedAgentServers.length > 2 ? ` +${selectedAgentServers.length - 2}` : '';
+                        serverSummary.push(`Agent: ${agentNames.join(", ")}${agentMore}`);
+                    }
+                    const appSettings = (applyOnRequest || applyOnResponse) ?
+                        ` - ${applyOnRequest ? 'Req' : ''}${applyOnRequest && applyOnResponse ? '/' : ''}${applyOnResponse ? 'Res' : ''}` : '';
+                    return `${serverSummary.join(", ")}${appSettings}`;
+                })()
                 : null
         }
     ];
@@ -163,9 +229,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const filterCollections = () => {
         setCollectionsLoading(true);
         try {
-            console.log("allCollections:", allCollections);
-            console.log("Sample collection structure:", allCollections[0]);
-
             const mcpServerCollections = allCollections.filter(collection => {
                 const hasMcpEnvType = collection.envType && collection.envType.some(envType =>
                     envType.keyName === 'mcp-server' && envType.value === 'MCP Server'
@@ -223,7 +286,12 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setNewWord("");
         setPiiTypes([]);
         setRegexPatterns([]);
-        setNewRegexPattern("");
+        setLlmRule("");
+        setEnableLlmRule(false);
+        setLlmConfidenceScore(0.5);
+        setUrl("");
+        setConfidenceScore(25);
+        setUrlError("");
         setSelectedMcpServers([]);
         setSelectedAgentServers([]);
         setApplyOnResponse(false);
@@ -267,12 +335,55 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         // PII filters
         setPiiTypes(policy.piiTypes || []);
         
-        // Regex patterns
-        setRegexPatterns(policy.regexPatterns || []);
-        
-        // Server settings
-        setSelectedMcpServers(policy.selectedMcpServers || []);
-        setSelectedAgentServers(policy.selectedAgentServers || []);
+        // Regex patterns - prefer V2 format with behavior, fallback to old format
+        if (policy.regexPatternsV2 && policy.regexPatternsV2.length > 0) {
+            setRegexPatterns(policy.regexPatternsV2);
+        } else if (policy.regexPatterns && policy.regexPatterns.length > 0) {
+            // Convert old format to new format with default behavior
+            const convertedPatterns = policy.regexPatterns.map(pattern => ({
+                pattern: pattern,
+                behavior: "block" // Default behavior for old data
+            }));
+            setRegexPatterns(convertedPatterns);
+        } else {
+            setRegexPatterns([]);
+        }
+
+        if (policy.llmRule) {
+            setEnableLlmRule(policy.llmRule.enabled || false);
+            setLlmRule(policy.llmRule.userPrompt || "");
+            setLlmConfidenceScore(policy.llmRule.confidenceScore !== undefined ? policy.llmRule.confidenceScore : 0.5);
+        } else {
+            setEnableLlmRule(false);
+            setLlmRule("");
+            setLlmConfidenceScore(0.5);
+        }
+
+        // URL and Confidence Score
+        setUrl(policy.url || "");
+        // Map existing confidence score to nearest checkpoint
+        const existingScore = policy.confidenceScore || policy.riskScore || 25;
+        const checkpoints = [25, 50, 75, 100];
+        const nearestCheckpoint = checkpoints.reduce((prev, curr) =>
+            Math.abs(curr - existingScore) < Math.abs(prev - existingScore) ? curr : prev
+        );
+        setConfidenceScore(nearestCheckpoint);
+        setUrlError(""); // Reset URL error when editing
+
+        // Server settings - prefer V2 format with names, fallback to old format
+        if (policy.selectedMcpServersV2 && policy.selectedMcpServersV2.length > 0) {
+            // Extract IDs from V2 format for form population
+            setSelectedMcpServers(policy.selectedMcpServersV2.map(server => server.id));
+        } else {
+            setSelectedMcpServers(policy.selectedMcpServers || []);
+        }
+
+        if (policy.selectedAgentServersV2 && policy.selectedAgentServersV2.length > 0) {
+            // Extract IDs from V2 format for form population
+            setSelectedAgentServers(policy.selectedAgentServersV2.map(server => server.id));
+        } else {
+            setSelectedAgentServers(policy.selectedAgentServers || []);
+        }
         setApplyOnResponse(policy.applyOnResponse || false);
         setApplyOnRequest(policy.applyOnRequest || false);
     };
@@ -295,12 +406,33 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     };
 
     const handleSkipToServers = () => {
-        setCurrentStep(6);
+        setCurrentStep(8);
     };
 
     const handleSave = async () => {
         setLoading(true);
         try {
+            // Transform selectedMcpServers and selectedAgentServers to include both ID and name
+            const transformedMcpServers = selectedMcpServers
+                .filter(serverId => serverId) // Filter out empty values
+                .map(serverId => {
+                    const server = mcpServers.find(s => s.value === serverId || s.value === serverId.toString());
+                    return {
+                        id: serverId.toString(),
+                        name: server ? server.label : serverId.toString()
+                    };
+                });
+
+            const transformedAgentServers = selectedAgentServers
+                .filter(serverId => serverId) // Filter out empty values  
+                .map(serverId => {
+                    const server = agentServers.find(s => s.value === serverId || s.value === serverId.toString());
+                    return {
+                        id: serverId.toString(),
+                        name: server ? server.label : serverId.toString()
+                    };
+                });
+
             const guardrailData = {
                 name,
                 description,
@@ -316,9 +448,29 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                     custom: customWords
                 },
                 piiFilters: piiTypes,
-                regexPatterns: regexPatterns,
-                selectedMcpServers,
-                selectedAgentServers,
+                // Save in both old and new formats for backward compatibility
+                regexPatterns: regexPatterns
+                    .filter(r => r && r.pattern) // Ensure valid regex objects
+                    .map(r => r.pattern), // Old format (just patterns)
+                regexPatternsV2: regexPatterns
+                    .filter(r => r && r.pattern && r.behavior) // Ensure valid regex objects with behavior
+                    .map(r => ({
+                        pattern: r.pattern,
+                        behavior: r.behavior.toLowerCase() // Ensure consistent case
+                    })), // New format (with behavior)
+                ...(enableLlmRule && llmRule.trim() ? {
+                    llmRule: {
+                        enabled: true,
+                        userPrompt: llmRule.trim(),
+                        confidenceScore: llmConfidenceScore
+                    }
+                } : {}),
+                url: url || null,
+                confidenceScore: confidenceScore,
+                selectedMcpServers: selectedMcpServers, // Old format (just IDs)
+                selectedAgentServers: selectedAgentServers, // Old format (just IDs)
+                selectedMcpServersV2: transformedMcpServers, // New format (with names)
+                selectedAgentServersV2: transformedAgentServers, // New format (with names)
                 applyOnResponse,
                 applyOnRequest,
                 // Add edit mode information
@@ -361,15 +513,12 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setPiiTypes(piiTypes.filter((_, i) => i !== index));
     };
 
-    const addRegexPattern = () => {
-        if (newRegexPattern.trim() && !regexPatterns.includes(newRegexPattern.trim())) {
-            setRegexPatterns([...regexPatterns, newRegexPattern.trim()]);
-            setNewRegexPattern("");
-        }
+    const addRegexPattern = (regexData) => {
+        setRegexPatterns([...regexPatterns, regexData]);
     };
 
-    const removeRegexPattern = (pattern) => {
-        setRegexPatterns(regexPatterns.filter(p => p !== pattern));
+    const removeRegexPattern = (index) => {
+        setRegexPatterns(regexPatterns.filter((_, i) => i !== index));
     };
 
     const handleSaveTopic = (topicData) => {
@@ -389,6 +538,11 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const handleSavePii = (piiData) => {
         setPiiTypes([...piiTypes, piiData]);
         setShowAddPiiModal(false);
+    };
+
+    const handleSaveRegex = (regexData) => {
+        setRegexPatterns([...regexPatterns, regexData]);
+        setShowAddRegexModal(false);
     };
 
     const renderStepIndicator = () => (
@@ -721,41 +875,34 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                     <VerticalStack gap="3">
                         <Text variant="headingMd">Regex patterns</Text>
                         <Text variant="bodyMd" tone="subdued">
-                            Add up to 10 regex patterns to filter custom types of sensitive information for your specific use case. A blocked message will show if user input or model responses match these patterns.
+                            Add up to 10 regex patterns to filter custom types of sensitive information for your specific use case.
                         </Text>
                         
-                        <HorizontalStack gap="2">
-                            <div style={{ flexGrow: 1 }}>
-                                <TextField
-                                    value={newRegexPattern}
-                                    onChange={setNewRegexPattern}
-                                    placeholder="Example - \d{3}-\d{2}-\d{4} (SSN pattern)"
-                                    helpText="Enter a valid regex pattern"
-                                />
-                            </div>
-                            <Button onClick={addRegexPattern} disabled={!newRegexPattern.trim()}>
-                                Add pattern
-                            </Button>
+                        <HorizontalStack align="space-between">
+                            <Text variant="headingMd">Regex patterns ({regexPatterns.length})</Text>
+                            <HorizontalStack gap="2">
+                                <Button onClick={() => setRegexPatterns([])}>Delete all</Button>
+                                <Button primary onClick={() => setShowAddRegexModal(true)}>Add regex pattern</Button>
+                            </HorizontalStack>
                         </HorizontalStack>
 
                         {regexPatterns.length > 0 && (
-                            <Box>
-                                <Text variant="headingMd">View and edit regex patterns ({regexPatterns.length})</Text>
-                                <Box paddingBlockStart="2">
-                                    <VerticalStack gap="2">
-                                        {regexPatterns.map((pattern, index) => (
-                                            <HorizontalStack key={index} align="space-between" blockAlign="center">
-                                                <Text variant="bodyMd" fontWeight="medium">{pattern}</Text>
-                                                <Button
-                                                    icon={DeleteMajor}
-                                                    variant="plain"
-                                                    onClick={() => removeRegexPattern(pattern)}
-                                                />
-                                            </HorizontalStack>
-                                        ))}
-                                    </VerticalStack>
-                                </Box>
-                            </Box>
+                            <div style={{ border: "1px solid #d1d5db", borderRadius: "8px", overflow: "hidden" }}>
+                                <DataTable
+                                    columnContentTypes={['text', 'text', 'text']}
+                                    headings={['Regex Pattern', 'Guardrail behavior', 'Actions']}
+                                    rows={regexPatterns.map((regex, index) => [
+                                        regex.pattern || 'Invalid pattern',
+                                        regex.behavior ? regex.behavior.charAt(0).toUpperCase() + regex.behavior.slice(1) : 'Unknown',
+                                        <Button
+                                            key={index}
+                                            icon={DeleteMajor}
+                                            variant="plain"
+                                            onClick={() => removeRegexPattern(index)}
+                                        />
+                                    ])}
+                                />
+                            </div>
                         )}
                     </VerticalStack>
                 </Box>
@@ -764,6 +911,97 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     );
 
     const renderStep6 = () => (
+        <LegacyCard sectioned>
+            <VerticalStack gap="4">
+                <Text variant="headingMd">LLM-based Rule</Text>
+                <Text variant="bodyMd" tone="subdued">
+                    Configure an LLM-based rule to evaluate and filter content using natural language instructions.
+                </Text>
+
+                <Checkbox
+                    label="Enable LLM-based rule"
+                    checked={enableLlmRule}
+                    onChange={setEnableLlmRule}
+                    helpText="When enabled, an LLM will evaluate content based on your custom rule text."
+                />
+
+                {enableLlmRule && (
+                    <>
+                        <TextField
+                            label="Rule description"
+                            value={llmRule}
+                            onChange={setLlmRule}
+                            multiline={5}
+                            placeholder="Describe the rule you want the LLM to enforce. For example: 'Block any requests related to financial advice or investment recommendations.'"
+                            helpText="Provide clear instructions for the LLM on what content should be blocked or allowed."
+                        />
+
+                        <Box>
+                            <Text variant="bodyMd" fontWeight="medium">Confidence Score: {llmConfidenceScore.toFixed(2)}</Text>
+                            <Box paddingBlockStart="2">
+                                <RangeSlider
+                                    label=""
+                                    value={llmConfidenceScore}
+                                    min={0}
+                                    max={1}
+                                    step={0.01}
+                                    output
+                                    onChange={setLlmConfidenceScore}
+                                    helpText="Set the confidence threshold (0-1). Higher values require more confidence from the LLM to block content."
+                                />
+                            </Box>
+                        </Box>
+                    </>
+                )}
+            </VerticalStack>
+        </LegacyCard>
+    );
+
+    const renderStep7 = () => (
+        <LegacyCard sectioned>
+            <VerticalStack gap="4">
+                <Text variant="headingMd">URL and Confidence Score</Text>
+                <Text variant="bodyMd" tone="subdued">
+                    Configure the URL and confidence score for this guardrail policy.
+                </Text>
+
+                <FormLayout>
+                    <TextField
+                        label="URL"
+                        value={url}
+                        onChange={handleUrlChange}
+                        placeholder="https://example.com/api/endpoint"
+                        helpText="Enter the URL where this guardrail should be applied"
+                        error={urlError}
+                    />
+                    
+                    <VerticalStack gap="2">
+                        <HorizontalStack align="space-between">
+                            <Text variant="bodyMd" fontWeight="medium">Confidence Score</Text>
+                            <Text variant="bodyMd" fontWeight="bold" color="critical">{confidenceScore}</Text>
+                        </HorizontalStack>
+                        <RangeSlider
+                            label=""
+                            value={confidenceScore === 25 ? 0 : confidenceScore === 50 ? 1 : confidenceScore === 75 ? 2 : 3}
+                            min={0}
+                            max={3}
+                            step={1}
+                            output
+                            onChange={(value) => {
+                                const levels = [25, 50, 75, 100];
+                                setConfidenceScore(levels[value]);
+                            }}
+                        />
+                        <Text variant="bodySm" color="subdued">
+                            Select confidence level
+                        </Text>
+                    </VerticalStack>
+                </FormLayout>
+            </VerticalStack>
+        </LegacyCard>
+    );
+
+    const renderStep8 = () => (
         <LegacyCard sectioned>
             <VerticalStack gap="4">
                 <Text variant="headingMd">Server and application settings</Text>
@@ -821,7 +1059,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         </LegacyCard>
     );
 
-
     const renderCurrentStep = () => {
         switch (currentStep) {
             case 1: return renderStep1();
@@ -830,13 +1067,15 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             case 4: return renderStep4();
             case 5: return renderStep5();
             case 6: return renderStep6();
+            case 7: return renderStep7();
+            case 8: return renderStep8();
             default: return renderStep1();
         }
     };
 
     const getModalActions = () => {
         const actions = [];
-        
+
         if (currentStep > 1) {
             actions.push({
                 content: "Previous",
@@ -844,7 +1083,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             });
         }
 
-        if (currentStep > 1 && currentStep < 6) {
+        if (currentStep > 1 && currentStep < 8) {
             actions.push({
                 content: "Skip to Server settings",
                 onAction: handleSkipToServers
@@ -855,18 +1094,18 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     };
 
     const getPrimaryAction = () => {
-        if (currentStep === 6) {
+        if (currentStep === 8) {
             return {
                 content: isEditMode ? "Update Guardrail" : "Create Guardrail",
                 onAction: handleSave,
                 loading: loading,
-                disabled: !name.trim() || !blockedMessage.trim()
+                disabled: !name.trim() || !blockedMessage.trim() || urlError
             };
-        } else if (currentStep < 6) {
+        } else if (currentStep < 8) {
             return {
                 content: "Next",
                 onAction: handleNext,
-                disabled: currentStep === 1 && (!name.trim() || !blockedMessage.trim())
+                disabled: (currentStep === 1 && (!name.trim() || !blockedMessage.trim()))
             };
         }
         return null;
@@ -916,6 +1155,12 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 isOpen={showAddPiiModal}
                 onClose={() => setShowAddPiiModal(false)}
                 onSave={handleSavePii}
+            />
+
+            <AddRegexPatternModal
+                isOpen={showAddRegexModal}
+                onClose={() => setShowAddRegexModal(false)}
+                onSave={handleSaveRegex}
             />
         </>
     );

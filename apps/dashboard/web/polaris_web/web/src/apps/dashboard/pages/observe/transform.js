@@ -407,6 +407,17 @@ const transform = {
         }
     },
 
+    getColorForStatus(key){
+        switch(key.toUpperCase()){
+            case "ACTIVE": return "#EF864C"
+            case "UNDER_REVIEW": return "#F6C564"
+            case "IGNORED": return "#6FD1A6"
+            case "TOTAL": return "#7F56D9"
+            default:
+                return "#6FD1A6";
+        }
+    },
+
     getStatus(riskScore){
         if(riskScore >= 4.5){
             return "critical"
@@ -550,7 +561,7 @@ const transform = {
 
     getTruncatedUrl(url){
         const category = getDashboardCategory();
-        if(category.includes("MCP")){
+        if(category.includes("MCP") || category.includes("Agentic")){
             try {
                 const s = String(url);
                 const [path, tail = ""] = s.split(/(?=[?#])/); // keep ? or # in tail

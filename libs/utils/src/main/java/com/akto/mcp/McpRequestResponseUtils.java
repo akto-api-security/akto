@@ -1,15 +1,21 @@
 package com.akto.mcp;
 
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.MCollection;
 import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.McpAuditInfo;
 import com.akto.dto.RawApi;
+import com.akto.dto.billing.FeatureAccess;
+import com.akto.gpt.handlers.gpt_prompts.McpMethodAnalyzer;
+import com.akto.gpt.handlers.gpt_prompts.TestExecutorModifier;
 import com.akto.jsonrpc.JsonRpcUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mcp.McpJsonRpcModel.McpParams;
+import com.akto.test_editor.TestingUtilsSingleton;
 import com.akto.util.Pair;
 import com.akto.utils.JsonUtils;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -160,7 +166,7 @@ public final class McpRequestResponseUtils {
             BasicDBObject findQuery = new BasicDBObject();
             findQuery.put("type", auditInfo.getType());
             findQuery.put("resourceName", auditInfo.getResourceName());
-            findQuery.put("hostCollectionId", auditInfo.getHostCollectionId());
+           // findQuery.put("hostCollectionId", auditInfo.getHostCollectionId());  //removing this check for now to avoid auditing same mcp servers from different hosts
 
             McpAuditInfo existingRecord = McpAuditInfoDao.instance.findOne(findQuery);
 
@@ -182,4 +188,164 @@ public final class McpRequestResponseUtils {
             logger.error("Error handling MCP audit data log", e);
         }
     }
+    public static BasicDBObject removeMcpRelatedParams(BasicDBObject reqObj) {
+        if (reqObj == null) {
+            return new BasicDBObject();
+        }
+        
+        BasicDBObject cleanedObj = new BasicDBObject();
+        for (String key : reqObj.keySet()) {
+            if (isMcpRelatedField(key)) {
+                continue;
+            } else if ("params".equals(key)) {
+                Object paramsValue = reqObj.get(key);
+                if (paramsValue instanceof BasicDBObject) {
+                    BasicDBObject paramsObj = (BasicDBObject) paramsValue;
+                    BasicDBObject cleanedParams = new BasicDBObject();
+                    for (String paramKey : paramsObj.keySet()) {
+                        if (!"name".equals(paramKey)) {
+                            cleanedParams.put(paramKey, paramsObj.get(paramKey));
+                        }
+                    }
+                    cleanedObj.put(key, cleanedParams);
+                } else {
+                    cleanedObj.put(key, paramsValue);
+                }
+            } else {
+                cleanedObj.put(key, reqObj.get(key));
+            }
+        }
+        
+        return cleanedObj;
+    }
+    
+    private static boolean isMcpRelatedField(String fieldName) {
+        return "jsonrpc".equals(fieldName) || 
+               "method".equals(fieldName) || 
+               "id".equals(fieldName);
+    }
+
+    public static String analyzeMcpRequestMethod(ApiInfo.ApiInfoKey apiInfoKey, String requestBody) {
+        if (apiInfoKey == null || requestBody == null) {
+            return "POST";
+        }
+
+        FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(Context.accountId.get(),
+        TestExecutorModifier._AKTO_GPT_AI);
+        if (!featureAccess.getIsGranted()) {
+            return "POST";
+        }
+        
+        try {
+            BasicDBObject queryData = new BasicDBObject();
+            queryData.put(TestExecutorModifier._REQUEST, requestBody);
+            queryData.put("apiInfoKey", apiInfoKey);
+            
+            McpMethodAnalyzer analyzer = new McpMethodAnalyzer();
+            BasicDBObject response = analyzer.handle(queryData);
+            
+            if (response != null && response.containsKey("method")) {
+                String method = response.getString("method");
+                if (method != null && !method.trim().isEmpty()) {
+                    return method.toUpperCase();
+                }
+            }
+        } catch (Exception e) {
+            // Log error and fallback to POST
+            System.err.println("Error analyzing MCP request method: " + e.getMessage());
+        }
+        
+        return "POST";
+    }
+
+    public static String parseResponse(String contentType, String body) {
+        if (body == null || body.trim().isEmpty()) {
+            return "{\"error\":true,\"message\":\"Empty response\"}";
+        }
+
+        String trimmed = body.trim();
+
+        try {
+            if (contentType != null && contentType.toLowerCase().contains("event-stream")
+                    || trimmed.startsWith("data:") || trimmed.contains("event:")) {
+                return extractSseJson(trimmed);
+            }
+            if (trimmed.startsWith("{") && trimmed.endsWith("}")
+                    || trimmed.startsWith("[") && trimmed.endsWith("]")) {
+                return trimmed; // Already valid JSON
+            }
+            if (trimmed.toLowerCase().contains("<html") || trimmed.toLowerCase().contains("<!doctype")) {
+                return "{\"error\":true,\"message\":\"HTML response\"}";
+            }
+            return "{\"error\":true,\"message\":\"error message: " + TestingUtilsSingleton.escapeJsonString(trimmed) + "\"}";
+
+        } catch (Exception e) {
+            return "{\"error\":true,\"message\":\"error message: " + TestingUtilsSingleton.escapeJsonString(e.getMessage()) + "\"}";
+        }
+    }
+
+    private static String extractSseJson(String sse) {
+        String[] lines = sse.split("\\r?\\n");
+
+        String currentEvent = null;
+        String currentId = null;
+        Integer currentRetry = null;
+        StringBuilder currentData = new StringBuilder();
+        List<BasicDBObject> events = new ArrayList<>();
+
+        for (String line : lines) {
+            line = line.trim();
+            if (line.isEmpty()) {
+                // Blank line signifies the end of the current event, push it to the events list
+                if (currentData.length() > 0 || currentEvent != null || currentId != null || currentRetry != null) {
+                    BasicDBObject eventJson = new BasicDBObject();
+                    eventJson.append("data", currentData.toString().trim());
+                    events.add(eventJson);
+                }
+                // Reset for next event
+                currentEvent = null;
+                currentId = null;
+                currentRetry = null;
+                currentData.setLength(0); // clear the current data
+            } else if (line.startsWith(":")) {
+                // Comment line, ignore
+                continue;
+            } else {
+                // Parse the fields
+                int idx = line.indexOf(":");
+                if (idx != -1) {
+                    String field = line.substring(0, idx).trim();
+                    String value = line.substring(idx + 1).trim();
+
+                    switch (field) {
+                        case "event":
+                            currentEvent = value;
+                            break;
+                        case "id":
+                            currentId = value;
+                            break;
+                        case "retry":
+                            try {
+                                currentRetry = Integer.parseInt(value);
+                            } catch (NumberFormatException ignore) {
+                            }
+                            break;
+                        default:
+                            currentData.append(value).append("\n");
+                            break;
+                    }
+                }
+            }
+        }
+
+        // Final flush for the last event if there was no blank line
+        if (currentData.length() > 0 || currentEvent != null || currentId != null || currentRetry != null) {
+            BasicDBObject eventJson = new BasicDBObject();
+            eventJson.append("data", currentData.toString().trim());
+            events.add(eventJson);
+        }
+
+        return new BasicDBObject().append("events", events).toJson();
+    }
+
 }

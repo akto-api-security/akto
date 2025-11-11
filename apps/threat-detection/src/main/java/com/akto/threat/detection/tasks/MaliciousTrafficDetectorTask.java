@@ -104,8 +104,13 @@ public class MaliciousTrafficDetectorTask implements Task {
   private boolean apiDistributionEnabled;
   private ApiCountCacheLayer apiCacheCountLayer;
   private static List<FilterConfig> successfulExploitFilters = new ArrayList<>();
+  private static List<FilterConfig> ignoredEventFilters = new ArrayList<>();
   private final AtomicInteger applyFilterLogCount = new AtomicInteger(0);
   private static final int MAX_APPLY_FILTER_LOGS = 1000;
+
+  // Kafka records per minute tracking
+  private int recordsReadCount = 0;
+  private long lastRecordCountLogTime = System.currentTimeMillis();
 
   public MaliciousTrafficDetectorTask(
       KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient, DistributionCalculator distributionCalculator, boolean apiDistributionEnabled) throws Exception {
@@ -164,6 +169,19 @@ public class MaliciousTrafficDetectorTask implements Task {
                     Duration.ofMillis(kafkaConfig.getConsumerConfig().getPollDurationMilli()));
 
             try {
+              int recordCount = records.count();
+              recordsReadCount += recordCount;
+
+              // Log records per minute
+              long currentTime = System.currentTimeMillis();
+              long timeDiff = currentTime - lastRecordCountLogTime;
+              if (timeDiff >= 60000) { // 60 seconds = 1 minute
+                logger.warnAndAddToDb("Kafka records read in last minute: " + recordsReadCount +
+                                      " (avg " + String.format("%.2f", recordsReadCount / (timeDiff / 1000.0)) + " records/sec)");
+                recordsReadCount = 0;
+                lastRecordCountLogTime = currentTime;
+              }
+
               for (ConsumerRecord<String, byte[]> record : records) {
                 HttpResponseParam httpResponseParam = HttpResponseParam.parseFrom(record.value());
                 if(MAX_KAFKA_DEBUG_MSGS > 0){
@@ -203,6 +221,11 @@ public class MaliciousTrafficDetectorTask implements Task {
     return hosts.contains(Constants.AKTO_THREAT_PROTECTION_BACKEND_HOST);
   }
 
+  private boolean isDebugRequest(HttpResponseParams responseParam) {
+    Map<String, List<String>> headers = responseParam.getRequestParams().getHeaders();
+    return headers != null && headers.get("x-debug-trace") != null;
+  }
+
   private Map<String, FilterConfig> getFilters() {
     int now = (int) (System.currentTimeMillis() / 1000);
     if (now - filterLastUpdatedAt < filterUpdateIntervalSec) {
@@ -217,15 +240,22 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     // Extract successful exploit filters
     successfulExploitFilters.clear();
+    // Extract ignored event filters
+    ignoredEventFilters.clear();
 
     Iterator<Map.Entry<String, FilterConfig>> iterator = apiFilters.entrySet().iterator();
     while (iterator.hasNext()) {
         Map.Entry<String, FilterConfig> entry = iterator.next();
         FilterConfig filter = entry.getValue();
-        if (filter.getInfo() != null && filter.getInfo().getCategory() != null &&
-            Constants.THREAT_PROTECTION_SUCCESSFUL_EXPLOIT_CATEGORY.equalsIgnoreCase(filter.getInfo().getCategory().getName())) {
-            successfulExploitFilters.add(filter);
-            iterator.remove();
+        if (filter.getInfo() != null && filter.getInfo().getCategory() != null) {
+            String categoryName = filter.getInfo().getCategory().getName();
+            if (Constants.THREAT_PROTECTION_SUCCESSFUL_EXPLOIT_CATEGORY.equalsIgnoreCase(categoryName)) {
+                successfulExploitFilters.add(filter);
+                iterator.remove();
+            } else if (Constants.THREAT_PROTECTION_IGNORED_EVENTS_CATEGORY.equalsIgnoreCase(categoryName)) {
+                ignoredEventFilters.add(filter);
+                iterator.remove();
+            }
         }
     }
     return apiFilters;
@@ -300,6 +330,11 @@ public class MaliciousTrafficDetectorTask implements Task {
     if (!successfulExploitFilters.isEmpty()) {
       successfulExploit = threatDetector.isSuccessfulExploit(successfulExploitFilters, rawApi, apiInfoKey);
     }
+    // Check IgnoredEvents category filters
+    boolean isIgnoredEvent = false;
+    if (!ignoredEventFilters.isEmpty()) {
+      isIgnoredEvent = threatDetector.isIgnoredEvent(ignoredEventFilters, rawApi, apiInfoKey);
+    }
 
     if (apiDistributionEnabled) {
       String apiCollectionIdStr = Integer.toString(apiCollectionId);
@@ -322,7 +357,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
         // Send event to BE.
         SampleMaliciousRequest maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam,
-            ipApiRateLimitFilter, metadata, errors, successfulExploit);
+            ipApiRateLimitFilter, metadata, errors, successfulExploit, isIgnoredEvent);
         generateAndPushMaliciousEventRequest(ipApiRateLimitFilter, actor, responseParam, maliciousReq,
             EventType.EVENT_TYPE_AGGREGATED);
 
@@ -334,14 +369,16 @@ public class MaliciousTrafficDetectorTask implements Task {
     for (FilterConfig apiFilter : apiFilters.values()) {
       boolean hasPassedFilter = false;
 
-      logger.debug("Evaluating filter condition for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
+      if(isDebugRequest(responseParam)){
+        logger.debugAndAddToDb("Evaluating filter condition for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
+      }
 
       // Skip this filter, as it's handled by apiDistributionenabled
       if(apiFilter.getId().equals(ipApiRateLimitFilter.getId())){
         continue;
       }
 
-
+      // Evaluate filter first (ignore and filter are independent conditions)
       if(apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
         logger.debug("SchemaConform filter found for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
         String apiSchema = getApiSchema(apiCollectionId);
@@ -358,15 +395,27 @@ public class MaliciousTrafficDetectorTask implements Task {
       }else {
         hasPassedFilter = threatDetector.applyFilter(apiFilter, responseParam, rawApi, apiInfoKey);
 
-        if (applyFilterLogCount.get() < MAX_APPLY_FILTER_LOGS) {
+        if (applyFilterLogCount.get() < MAX_APPLY_FILTER_LOGS || isDebugRequest(responseParam)) {
           logger.warnAndAddToDb("applyFilter - apiInfoKey: " + apiInfoKey.toString() +
                                 ", filterId: " + apiFilter.getId() +
-                                ", result: " + hasPassedFilter);
+                                ", result: " + hasPassedFilter + 
+                                ", statusCode " + responseParam.getStatusCode());
           applyFilterLogCount.incrementAndGet();
         }
       }
 
-      // If a request passes any of the filter, then it's a malicious request,
+      // If filter matches, check ignore condition
+      // If both filter AND ignore match, don't treat it as a threat (ignore wins)
+      if (hasPassedFilter) {
+        boolean shouldIgnore = threatDetector.shouldIgnoreApi(apiFilter, rawApi, apiInfoKey);
+        if (shouldIgnore) {
+          logger.debugAndAddToDb("Filter matched but ignore condition also matched for url " + apiInfoKey.getUrl() + 
+              " filterId " + apiFilter.getId() + " - skipping threat detection");
+          continue; // Don't send as threat if ignore matches
+        }
+      }
+
+      // If a request passes the filter and ignore doesn't match, then it's a malicious request,
       // and so we push it to kafka
       if (hasPassedFilter) {
         logger.debugAndAddToDb("filter condition satisfied for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
@@ -389,7 +438,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
         SampleMaliciousRequest maliciousReq = null;
         if (!isAggFilter || !apiFilter.getInfo().getSubCategory().equalsIgnoreCase("API_LEVEL_RATE_LIMITING")) {
-          maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors, successfulExploit);
+          maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors, successfulExploit, isIgnoredEvent);
         }
 
         if (!isAggFilter) {
@@ -407,7 +456,7 @@ public class MaliciousTrafficDetectorTask implements Task {
               }
               shouldNotify = this.apiCountWindowBasedThresholdNotifier.calcApiCount(apiHitCountKey, responseParam.getTime(), rule);
               if (shouldNotify) {
-                maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors, successfulExploit);
+                maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors, successfulExploit, isIgnoredEvent);
               }
           } else {
               shouldNotify = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule);
@@ -428,12 +477,22 @@ public class MaliciousTrafficDetectorTask implements Task {
 
   }
 
+  
+
   private void generateAndPushMaliciousEventRequest(
       FilterConfig apiFilter,
       String actor,
       HttpResponseParams responseParam,
       SampleMaliciousRequest maliciousReq,
       EventType eventType) {
+    
+    // Extract host from request headers
+    String host = null;
+    Map<String, List<String>> requestHeaders = responseParam.getRequestParams().getHeaders();
+    if (requestHeaders != null && requestHeaders.containsKey("host") && !requestHeaders.get("host").isEmpty()) {
+      host = requestHeaders.get("host").get(0);
+    }
+    
     MaliciousEventMessage maliciousEvent =
         MaliciousEventMessage.newBuilder()
             .setFilterId(apiFilter.getId())
@@ -452,6 +511,8 @@ public class MaliciousTrafficDetectorTask implements Task {
             .setMetadata(maliciousReq.getMetadata())
             .setType("Rule-Based")
             .setSuccessfulExploit(maliciousReq.getSuccessfulExploit())
+            .setStatus(maliciousReq.getStatus())
+            .setHost(host != null ? host : "")
             .build();
     MaliciousEventKafkaEnvelope envelope =
         MaliciousEventKafkaEnvelope.newBuilder()

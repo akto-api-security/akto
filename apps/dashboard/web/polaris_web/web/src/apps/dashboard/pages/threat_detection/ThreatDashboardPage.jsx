@@ -11,7 +11,6 @@ import { produce } from 'immer';
 import func from '@/util/func';
 import values from "@/util/values";
 import ChartypeComponent from '../testing/TestRunsPage/ChartypeComponent';
-import dummyData from './dummyData';
 import observeFunc from '../observe/transform';
 import ThreatWorldMap from './components/ThreatWorldMap';
 import ThreatSankeyChart from './components/ThreatSankeyChart';
@@ -84,8 +83,6 @@ function ThreatDashboardPage() {
                             activeThreats: activeActorsValue,
                         },
                         previousPeriod: {
-                            // These would need to come from a separate API call with previous period timestamps
-                            // For now, using dummy data or setting to 0
                             totalAnalysed: 0,
                             totalAttacks: 0,
                             totalCriticalActors: 0,
@@ -104,9 +101,37 @@ function ThreatDashboardPage() {
 
             // Row 2: Sankey Chart and Map use APIs (handled in their components)
             
-            // Row 3: Threat Status - use dummy data for now
-            const statusData = dummyData.getThreatStatusData()
-            setThreatStatusBreakdown(statusData)
+            // Row 3: Threat Status - Use actual data from backend
+            if (summaryResponse) {
+                const totalActive = summaryResponse.totalActiveStatus || 0
+                const totalIgnored = summaryResponse.totalIgnoredStatus || 0
+                const totalUnderReview = summaryResponse.totalUnderReviewStatus || 0
+                const total = totalActive + totalIgnored + totalUnderReview
+
+                const statusData = {
+                    "Active": {
+                        "text": totalActive,
+                        "color": observeFunc.getColorForStatus("Active"),
+                        "filterKey": "Active"
+                    },
+                    "Under Review": {
+                        "text": totalUnderReview,
+                        "color": observeFunc.getColorForStatus("UNDER_REVIEW"),
+                        "filterKey": "Under Review"
+                    },
+                    "Ignored": {
+                        "text": totalIgnored,
+                        "color": observeFunc.getColorForStatus("Ignored"),
+                        "filterKey": "Ignored"
+                    },
+                    "Total": {
+                        "text": total,
+                        "color": observeFunc.getColorForStatus("Total"),
+                        "filterKey": "Total"
+                    }
+                }
+                setThreatStatusBreakdown(statusData)
+            }
 
             // Severity Distribution - Use API
             try {
@@ -160,21 +185,22 @@ function ThreatDashboardPage() {
                 setSeverityDistribution(emptyFormattedSeverity)
             }
 
-            // Row 4: Top Attacked Hosts and APIs
-            // Top Attacked Hosts - Use dummy data
-            const hostsData = dummyData.getTopHostsData()
-            setTopAttackedHosts(hostsData)
-
-            // Top Attacked APIs - Use API
+            // Row 4: Top Attacked Hosts and APIs via common API
             try {
-                const topApisResponse = await api.fetchThreatTopNData(startTimestamp, endTimestamp, [], 5)
-                if (topApisResponse?.topApis && Array.isArray(topApisResponse.topApis)) {
-                    setTopAttackedApis(topApisResponse.topApis)
+                const topResponse = await api.fetchThreatTopNData(startTimestamp, endTimestamp, [], 5)
+                if (topResponse?.topApis && Array.isArray(topResponse.topApis)) {
+                    setTopAttackedApis(topResponse.topApis)
+                } else {
+                    setTopAttackedApis([])
+                }
+                if (topResponse?.topHosts && Array.isArray(topResponse.topHosts)) {
+                    setTopAttackedHosts(topResponse.topHosts)
+                } else {
+                    setTopAttackedHosts([])
                 }
             } catch (err) {
-                //console.error('Error fetching top APIs:', err)
-                // Fall back to empty state
                 setTopAttackedApis([])
+                setTopAttackedHosts([])
             }
 
         } catch (error) {
@@ -219,7 +245,7 @@ function ThreatDashboardPage() {
 
     const summaryCards = [
         {
-            title: 'Total Analysed',
+            title: 'Total Attacks',
             data: observeFunc.formatNumberWithCommas(summaryMetrics.currentPeriod.totalAnalysed),
             variant: 'heading2xl',
             byLineComponent: generateChangeIndicator(
@@ -229,7 +255,7 @@ function ThreatDashboardPage() {
             smoothChartComponent: (<SmoothAreaChart tickPositions={[summaryMetrics.previousPeriod.totalAnalysed, summaryMetrics.currentPeriod.totalAnalysed]} />),
         },
         {
-            title: 'Total Attacks',
+            title: 'Successful Attacks',
             data: observeFunc.formatNumberWithCommas(summaryMetrics.currentPeriod.totalAttacks),
             variant: 'heading2xl',
             color: 'critical',
@@ -354,8 +380,7 @@ function ThreatDashboardPage() {
     const generateHostTableRows = (hosts) => {
         return hosts.map((host) => ([
             <Text variant='bodyMd'>{host.host}</Text>,
-            <Text variant='bodySm' alignment='end'>{host.attacks}</Text>,
-            <Text variant='bodySm' alignment='end'>{host.apis}</Text>
+            <Text variant='bodySm' alignment='end'>{host.attacks}</Text>
         ]))
     }
 
@@ -380,8 +405,8 @@ function ThreatDashboardPage() {
             component={
                 <Box>
                     <DataTable
-                        columnContentTypes={['text', 'numeric', 'numeric']}
-                        headings={['Host', 'Attacks', 'APIs']}
+                        columnContentTypes={['text', 'numeric']}
+                        headings={['Host', 'Attacks']}
                         rows={generateHostTableRows(topAttackedHosts)}
                         hoverable={false}
                         increasedTableDensity

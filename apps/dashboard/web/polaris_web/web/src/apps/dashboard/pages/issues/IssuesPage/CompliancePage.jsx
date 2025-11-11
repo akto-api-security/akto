@@ -190,6 +190,10 @@ function CompliancePage() {
     const [projectId, setProjectId] = useState('')
     const [workItemType, setWorkItemType] = useState('')
 
+    const [serviceNowModalActive, setServiceNowModalActive] = useState(false)
+    const [serviceNowTables, setServiceNowTables] = useState([])
+    const [serviceNowTable, setServiceNowTable] = useState('')
+
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
 
@@ -278,10 +282,14 @@ function CompliancePage() {
 
     filtersOptions = func.getCollectionFilters(filtersOptions)
 
-    const handleSaveJiraAction = () => {
+    const handleSaveJiraAction = (issueId, labels) => {
         let jiraMetaData;
         try {
             jiraMetaData = issuesFunctions.prepareAdditionalIssueFieldsJiraMetaData(projId, issueType);
+            // Use labels parameter if provided
+            if (labels !== undefined && labels && labels.trim()) {
+                jiraMetaData.labels = labels.trim();
+            }
         } catch (error) {
             setToast(true, true, "Please fill all required fields before creating a Jira ticket.");
             resetResourcesSelected()
@@ -311,6 +319,30 @@ function CompliancePage() {
                 }
                 resetResourcesSelected()
             })
+    }
+
+    const createServiceNowTicketBulk = (items) => {
+        setSelectedIssuesItems(items)
+        settingFunctions.fetchServiceNowIntegration().then((serviceNowIntegration) => {
+            if(serviceNowIntegration.tableNames && serviceNowIntegration.tableNames.length > 0){
+                setServiceNowTables(serviceNowIntegration.tableNames)
+                setServiceNowTable(serviceNowIntegration.tableNames[0])
+            }
+            setServiceNowModalActive(true)
+        })
+    }
+
+    const handleSaveBulkServiceNowTicketsAction = () => {
+        setToast(true, false, "Please wait while we create your ServiceNow tickets.")
+        setServiceNowModalActive(false)
+        api.bulkCreateServiceNowTickets(selectedIssuesItems, serviceNowTable).then((res) => {
+            if(res?.errorMessage) {
+                setToast(true, false, res?.errorMessage)
+            } else {
+                setToast(true, false, `${selectedIssuesItems.length} ServiceNow ticket${selectedIssuesItems.length === 1 ? "" : "s"} created.`)
+            }
+            resetResourcesSelected()
+        })
     }
 
     let promotedBulkActions = (selectedResources) => {
@@ -397,6 +429,11 @@ function CompliancePage() {
             content: 'Create azure work item',
             onAction: () => { createAzureBoardWorkItemBulk() },
             disabled: (window.AZURE_BOARDS_INTEGRATED === 'false')
+        },
+        {
+            content: 'Create ServiceNow ticket',
+            onAction: () => { createServiceNowTicketBulk(items) },
+            disabled: (window.SERVICENOW_INTEGRATED === 'false')
         }]
         
         let reopen =  [{
@@ -739,6 +776,18 @@ function CompliancePage() {
                 projId={projectId}
                 issueType={workItemType}
                 isAzureModal={true}
+            />
+
+            <JiraTicketCreationModal
+                modalActive={serviceNowModalActive}
+                setModalActive={setServiceNowModalActive}
+                handleSaveAction={handleSaveBulkServiceNowTicketsAction}
+                jiraProjectMaps={serviceNowTables}
+                setProjId={setServiceNowTable}
+                setIssueType={() => {}}
+                projId={serviceNowTable}
+                issueType=""
+                isServiceNowModal={true}
             />
         </>
     )

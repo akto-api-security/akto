@@ -88,6 +88,11 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
         return ApiCollectionsDao.instance.findAll(Filters.in("_id", apiCollectionIds), Projections.exclude("urls"));
     }
 
+    public ApiCollection getMetaForId(int apiCollectionId) {
+        return ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId),
+                Projections.exclude("urls"));
+    }
+
     public Map<Integer, ApiCollection> getApiCollectionsMetaMap() {
         Map<Integer, ApiCollection> apiCollectionsMap = new HashMap<>();
         List<ApiCollection> metaAll = getMetaAll();

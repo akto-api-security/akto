@@ -27,6 +27,7 @@ import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.db.ActorInfoModel;
 import com.akto.threat.backend.dto.RateLimitConfigDTO;
+import com.akto.util.ThreatDetectionConstants;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
 import com.akto.threat.backend.utils.ThreatUtils;
 import com.google.protobuf.TextFormat;
@@ -183,10 +184,15 @@ public class ThreatActorService {
             .append("latestApiEndpoint", new Document("$first", "$latestApiEndpoint"))
             .append("latestApiMethod", new Document("$first", "$latestApiMethod"))
             .append("latestApiIp", new Document("$first", "$latestApiIp"))
+            .append("latestApiHost", new Document("$first", "$host"))
             .append("country", new Document("$first", "$country"))
             .append("discoveredAt", new Document("$first", "$detectedAt"))
             .append("latestSubCategory", new Document("$first", "$filterId"))
         ));
+
+        if (!filter.getHostsList().isEmpty()) {
+            pipeline.add(new Document("$match", new Document("latestApiHost", new Document("$in", filter.getHostsList()))));
+        }
 
         // Facet: count and paginated result
         List<Document> facetStages = Arrays.asList(
@@ -224,6 +230,7 @@ public class ThreatActorService {
                         .setSubCategory(event.getFilterId())
                         .setSeverity(event.getSeverity())
                         .setMethod(event.getLatestApiMethod().name())
+                        .setHost(event.getHost() != null ? event.getHost() : "")
                         .build());
                 }
             }
@@ -233,6 +240,7 @@ public class ThreatActorService {
                 .setLatestApiEndpoint(doc.getString("latestApiEndpoint"))
                 .setLatestApiMethod(doc.getString("latestApiMethod"))
                 .setLatestApiIp(doc.getString("latestApiIp"))
+                .setLatestApiHost(doc.getString("latestApiHost") != null ? doc.getString("latestApiHost") : "")
                 .setDiscoveredAt(doc.getLong("discoveredAt"))
                 .setCountry(doc.getString("country"))
                 .setLatestSubcategory(doc.getString("latestSubCategory"))
@@ -356,7 +364,7 @@ public class ThreatActorService {
                 int c = d.getInteger("count", 0);
                 if ("ACTIVE".equalsIgnoreCase(status)) {
                     totalActive = c;
-                } else if ("IGNORED".equalsIgnoreCase(status)) {
+                } else if (ThreatDetectionConstants.IGNORED.equalsIgnoreCase(status)) {
                     totalIgnored = c;
                 } else if ("UNDER_REVIEW".equalsIgnoreCase(status)) {
                     totalUnderReview = c;
@@ -640,20 +648,22 @@ public class ThreatActorService {
 
     List<Document> pipeline = new ArrayList<>();
 
-    // Match stage
-    Document match = new Document();
-    if (latestAttackList != null && !latestAttackList.isEmpty()) {
-      match.append("filterId", new Document("$in", latestAttackList));
-    }
-    if (startTs > 0 || endTs > 0) {
-      Document tsRange = new Document();
-      if (startTs > 0) tsRange.append("$gte", startTs);
-      if (endTs > 0) tsRange.append("$lte", endTs);
-      match.append("detectedAt", tsRange);
-    }
-    if (!match.isEmpty()) {
-      pipeline.add(new Document("$match", match));
-    }
+        // Match stage (only apply time range filter; ignore latestAttackList)
+        Document match = new Document();
+        
+        if (latestAttackList != null && !latestAttackList.isEmpty()) {
+            match.append("filterId", new Document("$in", latestAttackList));
+        }
+
+        if (startTs > 0 || endTs > 0) {
+            Document tsRange = new Document();
+            if (startTs > 0) tsRange.append("$gte", startTs);
+            if (endTs > 0) tsRange.append("$lte", endTs);
+            match.append("detectedAt", tsRange);
+        }
+        if (!match.isEmpty()) {
+            pipeline.add(new Document("$match", match));
+        }
 
     // Group by endpoint and method, count attacks, get max severity
     pipeline.add(new Document("$group",
@@ -687,7 +697,7 @@ public class ThreatActorService {
     pipeline.add(new Document("$sort", new Document("attacks", -1)));
 
     // Limit results
-    pipeline.add(new Document("$limit", limit > 0 ? limit : 10));
+    pipeline.add(new Document("$limit", limit > 0 ? limit : 5));
 
     List<FetchTopNDataResponse.TopApiData> topApis = new ArrayList<>();
 
@@ -704,8 +714,41 @@ public class ThreatActorService {
       }
     }
 
+    // Build pipeline for top hosts based on 'host' field
+    List<Document> hostPipeline = new ArrayList<>();
+    if (!match.isEmpty()) {
+      hostPipeline.add(new Document("$match", match));
+    }
+    // Only consider documents where host exists and is not empty
+    hostPipeline.add(new Document("$match", new Document("host", new Document("$ne", null))));
+    hostPipeline.add(new Document("$match", new Document("host", new Document("$ne", ""))));
+
+    hostPipeline.add(new Document("$group",
+        new Document("_id", "$host")
+            .append("attacks", new Document("$sum", 1))));
+
+    hostPipeline.add(new Document("$project",
+        new Document("host", "$_id")
+            .append("attacks", 1)));
+
+    hostPipeline.add(new Document("$sort", new Document("attacks", -1)));
+    hostPipeline.add(new Document("$limit", limit > 0 ? limit : 5));
+
+    List<FetchTopNDataResponse.TopHostData> topHosts = new ArrayList<>();
+    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, hostPipeline).cursor()) {
+      while (cursor.hasNext()) {
+        Document doc = cursor.next();
+        topHosts.add(
+            FetchTopNDataResponse.TopHostData.newBuilder()
+                .setHost(doc.getString("host"))
+                .setAttacks(doc.getInteger("attacks", 0))
+                .build());
+      }
+    }
+
     return FetchTopNDataResponse.newBuilder()
         .addAllTopApis(topApis)
+        .addAllTopHosts(topHosts)
         .build();
   }
 }

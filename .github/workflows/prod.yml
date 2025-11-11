@@ -140,12 +140,6 @@ jobs:
             echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"
           fi
 
-          if [[ "${{ github.event.inputs.testing }}" == "true" ]]; then
-            cd ../testing-cli
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG_2 . --push
-            echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG"
-          fi
-
           if [[ "${{ github.event.inputs.billing }}" == "true" ]]; then
             cd ../billing
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-billing:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-billing:$IMAGE_TAG_2 . --push
