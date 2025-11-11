@@ -44,28 +44,7 @@ export default function Header() {
     const dashboardCategory = PersistStore.getState().dashboardCategory;
     const setDashboardCategory = PersistStore.getState().setDashboardCategory
 
-    useEffect(() => {
-        if (window.beamer_config) {
-            const isOnPrem = window.DASHBOARD_MODE === 'ON_PREM';
-            const isAgentic = dashboardCategory === 'Agentic Security';
-
-            const productId = isAgentic
-                ? (isOnPrem ? 'shUignSe80215' : 'ijUqfdSQ80078')
-                : (isOnPrem ? 'rggteHBr72897' : 'cJtNevEq80216');
-
-            const filterTag = isOnPrem ? 'onprem' : 'saas';
-
-            if (window.beamer_config.product_id !== productId || window.beamer_config.filter !== filterTag) {
-                window.beamer_config.product_id = productId;
-                window.beamer_config.filter = filterTag;
-                if (window.Beamer) {
-                    window.Beamer.destroy();
-                    window.Beamer.init();
-                }
-            }
-        }
-    }, [dashboardCategory]);
-
+    
     /* Search bar */
     //const allRoutes = Store((state) => state.allRoutes)
     const allCollections = PersistStore((state) => state.allCollections)
