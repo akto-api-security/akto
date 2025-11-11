@@ -9,6 +9,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.util.Constants;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.traffic.SampleData;
@@ -236,6 +237,12 @@ public class MergingLogic {
                 .anyMatch(t -> AKTO_MCP_SERVER_TAG.equals(t.getKeyName()))) {
                 loggerMaker.infoAndAddToDb(
                     "Skipping merging for API collection " + apiCollectionId + " as it is an MCP server",
+                    LogDb.DB_ABS);
+                return new ApiMergerResult(new HashMap<>());
+            }
+            if (ApiCollectionsDao.hasRoutingTags(apiCollection)) {
+                loggerMaker.infoAndAddToDb(
+                    "Skipping merging for API collection " + apiCollectionId + " in account " + Constants.ROUTING_SKIP_ACCOUNT_ID + " as it has a tag ending with one of: " + Constants.ROUTING_TAG_SUFFIXES,
                     LogDb.DB_ABS);
                 return new ApiMergerResult(new HashMap<>());
             }

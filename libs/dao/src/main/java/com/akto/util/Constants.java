@@ -1,5 +1,8 @@
 package com.akto.util;
 
+import java.util.Arrays;
+import java.util.List;
+
 public class Constants {
     private Constants() {}
 
@@ -29,4 +32,8 @@ public class Constants {
     public static final String STATUS_IN_PROGRESS = "In Progress";
     public static final String STATUS_COMPLETED = "Completed";
     public static final String STATUS_FAILED = "Failed";
+
+    // Constants for routing tag filtering
+    public static final int ROUTING_SKIP_ACCOUNT_ID = 1736798101;
+    public static final List<String> ROUTING_TAG_SUFFIXES = Arrays.asList("booking-creation", "booking-query", "cashout-api", "ebe-creditcard-service-netcore", "partner-credit-card-api");
 }
