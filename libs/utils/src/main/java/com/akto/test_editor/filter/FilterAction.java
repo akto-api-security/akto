@@ -72,6 +72,7 @@ public final class FilterAction {
         put("lte", new LesserThanEqFilter());
         put("not_contains_either", new NotContainsEitherFilter());
         put("contains_jwt", new ContainsJwt());
+        put("jwt_signing_alg", new JWTSigningAlg());
         put("cookie_expire_filter", new CookieExpireFilter());
         put("datatype", new DatatypeFilter());
         put("ssrf_url_hit", new SsrfUrlHitFilter());
