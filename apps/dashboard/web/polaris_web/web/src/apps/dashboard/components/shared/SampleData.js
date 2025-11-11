@@ -153,47 +153,60 @@ function highlightVulnerabilities(vulnerabilitySegments, ref) {
   if (!text) {
     return;
   }
+  
   let decorations = [];
   vulnerabilitySegments.forEach((segment, index) => {
     try {
       const model = ref.getModel();
       
-      // Method 1: Highlight by phrase (if available)
-      if (segment.phrase && typeof segment.phrase === 'string') {
-        const matches = model.findMatches(segment.phrase, false, true, false, null, true);
-        matches.forEach((match) => {
-          decorations.push({
-            range: match.range,
-            options: {
-              inlineClassName: "vulnerability-highlight",
-            }
-          });
-        });
+      let start = segment.start;
+      let end = segment.end;
+      let valid = (start !== undefined && end !== undefined && start >= 0 && end <= text.length && start < end);
+
+      // Always verify the substring matches the phrase if provided; else try recompute
+      let phrase = segment?.phrase;
+      if ((!phrase || typeof phrase !== 'string') && segment?.message && typeof segment.message === 'string') {
+        phrase = segment.message.replace(/\s*\[chars\s+\d+-\d+\]\s*$/, '');
       }
-      
-      // Method 2: Highlight by start and end segment
-      if (segment.start !== undefined && segment.end !== undefined && 
-        segment.start >= 0 && segment.end <= text.length && segment.start < segment.end) {
-      
-      // Convert character positions to line/column positions
-        const startPos = ref.getModel().getPositionAt(segment.start);
-        const endPos = ref.getModel().getPositionAt(segment.end);
-        
+      if (phrase && phrase.length > 0) {
+        if (!valid || text.slice(start, end) !== phrase) {
+          const idx = text.indexOf(phrase);
+          if (idx >= 0) {
+            start = idx;
+            end = idx + phrase.length;
+            valid = true;
+          } else {
+            valid = (start !== undefined && end !== undefined && start >= 0 && end <= text.length && start < end);
+          }
+        }
+      } else if (!valid) {
+        // No phrase available; keep only valid numeric ranges
+        valid = false;
+      }
+
+      if (valid) {
+        const startPos = model.getPositionAt(start);
+        const endPos = model.getPositionAt(end);
+        console.log(`🔴 Segment ${index}: start=${start}, end=${end}`);
         if (startPos && endPos) {
-          ref.createDecorationsCollection([{
+          decorations.push({
             range: new monaco.Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column),
             options: {
               inlineClassName: "vulnerability-highlight"
             }
-          }]);
+          });
         }
       }
     } catch (error) {
       console.error('Error creating vulnerability highlight:', error, segment);
     }
   });
+  
   if (decorations.length > 0) {
-    ref._vulnDecorations = [ref.createDecorationsCollection(decorations)];
+    console.log(`🔴 Creating ${decorations.length} vulnerability highlights`);
+    ref._vulnDecorations = ref.createDecorationsCollection(decorations);
+  } else {
+    console.log('🔴 No decorations created');
   }
 }
 

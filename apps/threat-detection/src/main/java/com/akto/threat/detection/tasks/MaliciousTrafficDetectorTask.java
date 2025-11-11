@@ -368,6 +368,8 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     for (FilterConfig apiFilter : apiFilters.values()) {
       boolean hasPassedFilter = false;
+      // Create a fresh errors list for each filter
+      List<SchemaConformanceError> errors = null;
 
       if(isDebugRequest(responseParam)){
         logger.debugAndAddToDb("Evaluating filter condition for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
@@ -419,6 +421,24 @@ public class MaliciousTrafficDetectorTask implements Task {
       // and so we push it to kafka
       if (hasPassedFilter) {
         logger.debugAndAddToDb("filter condition satisfied for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
+        
+        // Capture threat positions for LFI, OS Command Injection, and SSRF filters
+        String filterId = apiFilter.getId();
+        if (filterId.equals(ThreatDetector.LFI_FILTER_ID) || 
+            filterId.equals(ThreatDetector.OS_COMMAND_INJECTION_FILTER_ID) || 
+            filterId.equals(ThreatDetector.SSRF_FILTER_ID)) {
+
+          List<SchemaConformanceError> threatPositions = threatDetector.getThreatPositions(filterId, responseParam);
+
+          if (threatPositions != null && !threatPositions.isEmpty()) {
+            // Initialize errors list if null, or append to existing schema errors
+            if (errors == null) {
+              errors = new ArrayList<>();
+            }
+            errors.addAll(threatPositions);
+          }
+        }
+        
         // Later we will also add aggregation support
         // Eg: 100 4xx requests in last 10 minutes.
         // But regardless of whether request falls in aggregation or not,

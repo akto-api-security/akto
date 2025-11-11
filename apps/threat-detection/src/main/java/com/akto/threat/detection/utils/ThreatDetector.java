@@ -3,6 +3,7 @@ package com.akto.threat.detection.utils;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -194,6 +195,96 @@ public class ThreatDetector {
         }
 
         return ssrfTrie.containsMatch(httpResponseParams.getRequestParams().getPayload());
+    }
+
+    /**
+     * Get exact character positions where threats were detected
+     * Returns a list of SchemaConformanceError with location, positions, and matched keyword
+     */
+    public List<com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError> getThreatPositions(String filterId, HttpResponseParams httpResponseParams) {
+        List<com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError> errors = new ArrayList<>();
+        
+        if (httpResponseParams == null || httpResponseParams.getRequestParams() == null) {
+            return errors;
+        }
+
+        Trie trieToUse = null;
+        if (LFI_FILTER_ID.equals(filterId)) {
+            trieToUse = lfiTrie;
+        } else if (OS_COMMAND_INJECTION_FILTER_ID.equals(filterId)) {
+            trieToUse = osCommandInjectionTrie;
+        } else if (SSRF_FILTER_ID.equals(filterId)) {
+            trieToUse = ssrfTrie;
+        }
+
+        if (trieToUse == null) {
+            return errors;
+        }
+
+        // Check URL
+        String url = httpResponseParams.getRequestParams().getURL();
+        if (url != null) {
+            for (org.ahocorasick.trie.Emit emit : trieToUse.parseText(url)) {
+                if (emit != null && emit.getKeyword() != null) {
+                    com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError error = 
+                        com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError.newBuilder()
+                            .setMessage(String.format("%s [chars %d-%d]", emit.getKeyword(), emit.getStart(), emit.getEnd() + 1))
+                            .setSchemaPath(filterId)
+                            .setInstancePath("url")
+                            .setAttribute("threat_detected")
+                            .setLocation(com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError.Location.LOCATION_URL)
+                            .setStart(emit.getStart())
+                            .setEnd(emit.getEnd() + 1)
+                            .setPhrase(emit.getKeyword())
+                            .build();
+                    errors.add(error);
+                }
+            }
+        }
+
+        // Check Headers
+        String headers = String.valueOf(httpResponseParams.getRequestParams().getHeaders());
+        if (headers != null) {
+            for (org.ahocorasick.trie.Emit emit : trieToUse.parseText(headers)) {
+                if (emit != null && emit.getKeyword() != null) {
+                    com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError error = 
+                        com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError.newBuilder()
+                            .setMessage(String.format("%s [chars %d-%d]", emit.getKeyword(), emit.getStart(), emit.getEnd() + 1))
+                            .setSchemaPath(filterId)
+                            .setInstancePath("headers")
+                            .setAttribute("threat_detected")
+                            .setLocation(com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError.Location.LOCATION_HEADER)
+                            .setStart(emit.getStart())
+                            .setEnd(emit.getEnd() + 1)
+                            .setPhrase(emit.getKeyword())
+                            .build();
+                    errors.add(error);
+                }
+            }
+        }
+
+        // Check Payload
+        String payload = httpResponseParams.getRequestParams().getPayload();
+        if (payload != null) {
+            for (org.ahocorasick.trie.Emit emit : trieToUse.parseText(payload)) {
+                if (emit != null && emit.getKeyword() != null) {
+                    com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError error = 
+                        com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError.newBuilder()
+                            .setMessage(String.format("%s [chars %d-%d]", emit.getKeyword(), emit.getStart(), emit.getEnd() + 1))
+                            .setSchemaPath(filterId)
+                            .setInstancePath("payload")
+                            .setAttribute("threat_detected")
+                            .setLocation(com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError.Location.LOCATION_BODY)
+                            .setStart(emit.getStart())
+                            .setEnd(emit.getEnd() + 1)
+                            .setPhrase(emit.getKeyword())
+                            .build();
+                    errors.add(error);
+                }
+            }
+        }
+
+        return errors;
     }
 
 }
