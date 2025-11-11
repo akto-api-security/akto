@@ -98,7 +98,7 @@ export const labelMap = {
     "API Risk Score": "MCP components Risk Score",
     "Endpoint": "MCP component",
     "Threat Policy": "Guardrails Policy",
-    "API Threat Activity": "MCP Threat Activity",
+    "API Threat Activity": "MCP Guardrail Activity",
     "API changes": "Recent MCP components",
     "APIs Tested": "Tools tested",
     "APIs with most open issues": "MCP components with most open issues",
@@ -137,7 +137,8 @@ export const labelMap = {
     "tests selected": "probes selected",
     "testing": "scanning",
     "Test library":"Probe library",
-    "Endpoint Shield": "MCP Endpoint Shield"
+    "Endpoint Shield": "MCP Endpoint Shield",
+    "Threat": "Guardrail"
   },
   "Gen AI": {
     "API Security Posture": "AI Agent Security Posture",
@@ -237,7 +238,7 @@ export const labelMap = {
     "API Risk Score": "Agentic Risk Score",
     "Endpoint": "Agentic Component",
     "Threat Policy": "Agentic Guardrails Policy",
-    "API Threat Activity": "Agentic Threat Activity",
+    "API Threat Activity": "Agentic Guardrail Activity",
     "API changes": "Recent Agentic Components",
     "APIs Tested": "Agentic Components Tested",
     "APIs with most open issues": "Agentic Components with most open issues",
@@ -276,6 +277,7 @@ export const labelMap = {
     "tests selected": "probes selected",
     "testing": "scanning",
     "Test library":"Probe library",
-    "Endpoint Shield": "Agentic Endpoint Shield"
+    "Endpoint Shield": "Agentic Endpoint Shield",
+    "Threat": "Guardrail"
   },
 }

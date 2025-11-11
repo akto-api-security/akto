@@ -7,6 +7,7 @@ import values from "@/util/values";
 import {produce} from "immer"
 import func from "@/util/func";
 import {HorizontalGrid} from "@shopify/polaris";
+import { mapLabel, getDashboardCategory } from '../../../main/labelHelper';
 
 function ThreatPolicyPage() {
 
@@ -24,8 +25,8 @@ function ThreatPolicyPage() {
     return <PageWithMultipleCards
         title={
             <TitleWithInfo
-                titleText={"Threat Policy"}
-                tooltipContent={"Identify malicious requests with Akto's powerful threat detection capabilities"}
+                titleText={`${mapLabel("Threat", getDashboardCategory())} Policy`}
+                tooltipContent={`Identify malicious requests with Akto's powerful ${mapLabel("Threat", getDashboardCategory())} detection capabilities`}
             />
         }
         isFirstPage={true}

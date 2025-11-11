@@ -18,7 +18,8 @@ import threatDetectionFunc from "./transform";
 import InfoCard from "../dashboard/new_components/InfoCard";
 import BarGraph from "../../components/charts/BarGraph";
 import SessionStore from "../../../main/SessionStore";
-import { getDashboardCategory, isApiSecurityCategory, mapLabel } from "../../../main/labelHelper";
+import { getDashboardCategory, isApiSecurityCategory, mapLabel, getSubCategory, SUB_CATEGORY_ENDPOINT_SECURITY } from "../../../main/labelHelper";
+import PersistStore from "../../../main/PersistStore";
 import { useNavigate } from "react-router-dom";
 import LineChart from "../../components/charts/LineChart";
 import P95LatencyGraph from "../../components/charts/P95LatencyGraph";
@@ -84,6 +85,40 @@ const directionData = [
     }
 ]
 
+const directionData2 = [
+    {
+        name: 'Request',
+        data: [
+            [1722556800000, 9],  // Aug 1
+            [1725235200000, 16], // Sept 1
+            [1725580800000, 13], // Sept 5
+            [1725926400000, 6],  // Sept 9
+            [1726272000000, 19], // Sept 13
+            [1726617600000, 10], // Sept 17
+            [1726963200000, 17], // Sept 21
+            [1727308800000, 8],  // Sept 25
+            [1727654400000, 15], // Sept 29
+        ],
+        color: '#6200EA'
+    },
+    {
+        name: 'Response',
+        data: [
+            [1722556800000, 9],  // Aug 1
+            [1725235200000, 8],  // Sept 1
+            [1725580800000, 17], // Sept 5
+            [1725926400000, 12], // Sept 9
+            [1726272000000, 5],  // Sept 13
+            [1726617600000, 15], // Sept 17
+            [1726963200000, 9],  // Sept 21
+            [1727308800000, 19], // Sept 25
+            [1727654400000, 10], // Sept 29
+        ],
+        color: '#AF6CF6'
+    }
+]
+
+
 const flaggedData = [
     {
         name: 'Safe',
@@ -131,7 +166,68 @@ const flaggedData = [
     }
 ]
 
+const flaggedData2 = [
+    {
+        name: 'Safe',
+        data: [
+            [1722556800000, 53], // Aug 1
+            [1725235200000, 72], // Sept 1
+            [1725580800000, 70], // Sept 5
+            [1725926400000, 74], // Sept 9
+            [1726272000000, 32], // Sept 13
+            [1726617600000, 85], // Sept 17
+            [1726963200000, 88], // Sept 21
+            [1727308800000, 81], // Sept 25
+            [1727654400000, 95], // Sept 29
+        ],
+        color: '#AEE9D1'
+    },
+    {
+        name: 'Flagged',
+        data: [
+            [1722556800000, 21], // Aug 1 (12+9 from directionData)
+            [1725235200000, 24], // Sept 1 (16+8)
+            [1725580800000, 30], // Sept 5 (13+17)
+            [1725926400000, 18], // Sept 9 (6+12)
+            [1726272000000, 24], // Sept 13 (19+5)
+            [1726617600000, 25], // Sept 17 (10+15)
+            [1726963200000, 26], // Sept 21 (17+9)
+            [1727308800000, 27], // Sept 25 (8+19)
+            [1727654400000, 25], // Sept 29 (15+10)
+        ],
+        color: '#E45357'
+    }
+]
+
 const ChartComponent = ({ subCategoryCount, severityCountMap }) => {
+    // Get current subcategory to determine which dataset to use (reactive)
+    const currentSubCategory = PersistStore(state => state.subCategory);
+    const isEndpointSecurity = currentSubCategory === SUB_CATEGORY_ENDPOINT_SECURITY;
+    
+    // Add useEffect to track when component updates
+    useEffect(() => {
+    }, [currentSubCategory]);
+
+    // Temporary alert to ensure we see the values
+    if (typeof window !== 'undefined') {
+        console.warn('CHART COMPONENT RENDER - SubCategory:', currentSubCategory, 'IsEndpoint:', isEndpointSecurity);
+    }
+    
+    // Select appropriate data based on subcategory
+    const selectedDirectionData = isEndpointSecurity ? directionData2 : directionData;
+    const selectedFlaggedData = isEndpointSecurity ? flaggedData2 : flaggedData;
+
+    // Debug logging for development
+    if (process.env.NODE_ENV === 'development') {
+        console.log('ThreatDetectionPage chart data selection:', {
+            currentSubCategory,
+            isEndpointSecurity,
+            usingAlternateData: isEndpointSecurity,
+            directionDataFirstPoint: selectedDirectionData[0]?.data[0],
+            flaggedDataFirstPoint: selectedFlaggedData[0]?.data[0]
+        });
+    }
+    
     return (
       <VerticalStack gap={4} columns={2}>
         <HorizontalGrid gap={4} columns={2}>
@@ -140,10 +236,11 @@ const ChartComponent = ({ subCategoryCount, severityCountMap }) => {
             data={subCategoryCount}
           />
           <InfoCard
-                title={"Threats by severity"}
+                title={`${mapLabel("Threat", getDashboardCategory())} by severity ${getDashboardCategory() === "Agentic Security" ? `(${isEndpointSecurity ? 'Endpoint' : 'Cloud'})` : ''}`}
                 titleToolTip={`Number of ${mapLabel("APIs", getDashboardCategory())} per each category`}
                 component={
                     <BarGraph
+                        key={getDashboardCategory() === "Agentic Security" ? `severity-chart-${currentSubCategory}` : 'severity-chart-default'}
                         data={severityCountMap}
                         areaFillHex="true"
                         height={"280px"}
@@ -162,13 +259,14 @@ const ChartComponent = ({ subCategoryCount, severityCountMap }) => {
             />
         </HorizontalGrid>
         {
-            func.isDemoAccount() && !isApiSecurityCategory() ? <HorizontalGrid gap={4} columns={2}>
+            !isApiSecurityCategory() ? <HorizontalGrid gap={4} columns={2}>
                 <InfoCard
-                    title={`Threat Messages by Direction (Request/Response)`}
-                    titleToolTip="Number of threat messages found in requests vs responses over time"
+                    title={`${mapLabel("Threat", getDashboardCategory())} Messages by Direction (${isEndpointSecurity ? 'ENDPOINT' : 'CLOUD'} Data)`}
+                    titleToolTip={`Number of ${mapLabel("Threat", getDashboardCategory())} messages found in requests vs responses over time`}
                     component={
                         <LineChart
-                            data={directionData}
+                            key={`direction-chart-${currentSubCategory}`}
+                            data={selectedDirectionData}
                             exportingDisabled={true}
                             height={280}
                             yAxisTitle={`Number of messages`}
@@ -179,11 +277,12 @@ const ChartComponent = ({ subCategoryCount, severityCountMap }) => {
                     }
                 />
                 <InfoCard
-                    title={`Flagged/Safe messages`}
-                    titleToolTip="Number of messages flagged as threats vs those marked safe over time"
+                    title={`Flagged/Safe messages (${isEndpointSecurity ? 'ENDPOINT' : 'CLOUD'} Data)`}
+                    titleToolTip={`Number of messages flagged as ${mapLabel("Threat", getDashboardCategory())} vs those marked safe over time`}
                     component={
                         <LineChart
-                            data={flaggedData}
+                            key={`flagged-chart-${currentSubCategory}`}
+                            data={selectedFlaggedData}
                             exportingDisabled={true}
                             height={280}
                             yAxisTitle={`Number of messages`}
@@ -220,6 +319,12 @@ function ThreatDetectionPage() {
     const [latencyData, setLatencyData] = useState([]);
 
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
+    const currentSubCategory = PersistStore((state) => state.subCategory);
+
+    // Add useEffect to track subcategory changes in main component
+    useEffect(() => {
+        console.log('Main component useEffect - subcategory changed to:', currentSubCategory);
+    }, [currentSubCategory]);
 
     const startTimestamp = parseInt(currDateRange.period.since.getTime()/1000)
     const endTimestamp = parseInt(currDateRange.period.until.getTime()/1000)
@@ -238,6 +343,9 @@ function ThreatDetectionPage() {
             const totalDays = 60; // 2 months
             const intervalDays = 3; // Every 3 days
             const dataPoints = Math.floor(totalDays / intervalDays) + 1; // +1 to include today
+            
+            // Use the reactive subcategory from main component
+            const isEndpointSecurity = currentSubCategory === SUB_CATEGORY_ENDPOINT_SECURITY;
             
             // Predefined latency values for consistent demo data (total 20-30ms)
             const latencyValues = [
@@ -262,14 +370,33 @@ function ThreatDetectionPage() {
                 { incoming: 12.1, output: 14.8, total: 28.1 },
                 { incoming: 14.9, output: 8.7, total: 24.9 }
             ];
+
+            const latencyValues2 = [
+                            { incoming: 12.5, output: 8.2, total: 21.4 },
+                            { incoming: 15.3, output: 9.8, total: 25.7 },
+                            { incoming: 11.7, output: 7.4, total: 20.3 },
+                            { incoming: 10.3, output: 16.1, total: 27.9 },
+                            { incoming: 13.8, output: 8.6, total: 23.1 },
+                            { incoming: 14.6, output: 9.9, total: 25.5 },
+                            { incoming: 12.2, output: 7.5, total: 20.8 },
+                            { incoming: 11.4, output: 13.7, total: 26.4 },
+                            { incoming: 16.1, output: 9.5, total: 27.2 },
+                            { incoming: 13.5, output: 11.2, total: 25.8 },
+                            { incoming: 15.8, output: 9.6, total: 26.7 },
+                            { incoming: 12.1, output: 14.8, total: 28.1 },
+                            { incoming: 14.9, output: 8.7, total: 24.9 }
+                        ];
+            
+            // Select appropriate latency values based on subcategory
+            const selectedLatencyValues = isEndpointSecurity ? latencyValues2 : latencyValues;
             
             for (let i = 0; i < dataPoints; i++) {
                 const daysAgo = i * intervalDays;
                 const timestamp = now - (daysAgo * 24 * 60 * 60 * 1000);
                 
                 // Use deterministic values based on data point index
-                const latencyIndex = i % latencyValues.length;
-                const latency = latencyValues[latencyIndex];
+                const latencyIndex = i % selectedLatencyValues.length;
+                const latency = selectedLatencyValues[latencyIndex];
                 
                 data.push({
                     timestamp: Math.floor(timestamp / 1000), // Convert to seconds
@@ -284,7 +411,7 @@ function ThreatDetectionPage() {
             console.error('Error generating latency data:', error);
             return [];
         }
-    }, []);
+    }, [currentSubCategory]);
 
     /**
      * Handle latency click events from the P95LatencyGraph component
@@ -345,33 +472,77 @@ function ThreatDetectionPage() {
       useEffect(() => {
         const fetchThreatCategoryCount = async () => {
             setLoading(true);
-            const res = await api.fetchThreatCategoryCount(startTimestamp, endTimestamp);
-            const finalObj = threatDetectionFunc.getGraphsData(res);
-            setSubCategoryCount(finalObj.subCategoryCount);
-            setLoading(false);
-          };
+            
+            if (getDashboardCategory() === "Agentic Security") {
+                // Provide dummy data for subCategoryCount (TopThreatTypeChart will use its own dummy data for Agentic Security)
+                const dummySubCategoryCount = [
+                    { text: "Dummy Category", value: 1, color: "#ccc" }
+                ];
+                setSubCategoryCount(dummySubCategoryCount);
+                setLoading(false);
+            } else {
+                // Use real API data for API Security and other dashboard categories
+                const res = await api.fetchThreatCategoryCount(startTimestamp, endTimestamp);
+                const finalObj = threatDetectionFunc.getGraphsData(res);
+                setSubCategoryCount(finalObj.subCategoryCount);
+                setLoading(false);
+            }
+        };
 
           const fetchCountBySeverity = async () => {
             setLoading(true);
-            let severityMap = {
-                CRITICAL: 0,
-                HIGH: 0,
-                MEDIUM: 0,
-                LOW: 0,
+            
+            // Check if we're in Agentic Security to use dummy data
+            if (getDashboardCategory() === "Agentic Security") {
+                console.log("Using dummy severity data for Agentic Security");
+                
+                // Dummy severity data for Cloud Security (AI/ML threats tend to have more critical issues)
+                // Pattern: Higher critical/high counts due to AI model vulnerabilities
+                const cloudSeverityMap = {
+                    CRITICAL: 8,    // Model poisoning, prompt injection attacks
+                    HIGH: 15,       // Data exposure, adversarial examples
+                    MEDIUM: 12,     // Model extraction, inference manipulation
+                    LOW: 5,         // Minor configuration issues
+                };
+                
+                // Dummy severity data for Endpoint Security (More distributed across severities)
+                // Pattern: More medium/low threats due to system-level monitoring
+                const endpointSeverityMap = {
+                    CRITICAL: 4,    // System compromises, privilege escalation
+                    HIGH: 9,        // Unauthorized access, command injection
+                    MEDIUM: 18,     // Resource exhaustion, file tampering
+                    LOW: 13,        // Configuration drift, minor violations
+                };
+                
+                const isEndpointSecurity = currentSubCategory === SUB_CATEGORY_ENDPOINT_SECURITY;
+                const selectedSeverityMap = isEndpointSecurity ? endpointSeverityMap : cloudSeverityMap;
+                
+                console.log(`Using ${isEndpointSecurity ? 'Endpoint' : 'Cloud'} Security severity data:`, selectedSeverityMap);
+                
+                setSeverityCountMap(convertToGraphData(selectedSeverityMap));
+                setLoading(false);
+            } else {
+                // Use real API data for non-Agentic categories
+                let severityMap = {
+                    CRITICAL: 0,
+                    HIGH: 0,
+                    MEDIUM: 0,
+                    LOW: 0,
+                }
+                const res = await api.fetchCountBySeverity(startTimestamp, endTimestamp);
+                res.categoryCounts.forEach(({ subCategory, count }) => {
+                    severityMap[subCategory] = count;
+                });
+                setSeverityCountMap(convertToGraphData(severityMap));
+                setLoading(false);
             }
-            const res = await api.fetchCountBySeverity(startTimestamp, endTimestamp);
-            res.categoryCounts.forEach(({ subCategory, count }) => {
-                severityMap[subCategory] = count;
-            });
-            setSeverityCountMap(convertToGraphData(severityMap));
-            setLoading(false);
         };
 
         fetchThreatCategoryCount();
         fetchCountBySeverity();
         
         // Generate latency data for demo mode
-        if (isDemoMode) {
+        if (!isApiSecurityCategory()) {
             try {
                 const latency = generateLatencyData();
                 setLatencyData(latency);
@@ -380,16 +551,16 @@ function ThreatDetectionPage() {
                 setLatencyData([]);
             }
         }
-      }, [startTimestamp, endTimestamp, isDemoMode]);
+      }, [startTimestamp, endTimestamp, currentSubCategory]);
 
     const components = [
-        <ChartComponent subCategoryCount={subCategoryCount} severityCountMap={severityCountMap} />,
+        <ChartComponent key={currentSubCategory} subCategoryCount={subCategoryCount} severityCountMap={severityCountMap} />,
         // Add P95 latency graphs for MCP and AI Agent security in demo mode
-        ...(isDemoMode && !isApiSecurityCategory() ? [
+        ...(!isApiSecurityCategory() ? [
             <P95LatencyGraph
-                key="threat-detection-latency"
-                title="Threat Detection Latency"
-                subtitle="95th percentile latency metrics for threat-detection"
+                key={`threat-detection-latency-${currentSubCategory}`}
+                title={`${mapLabel("Threat", getDashboardCategory())} Detection Latency (${currentSubCategory})`}
+                subtitle={`95th percentile latency metrics for ${mapLabel("Threat", getDashboardCategory())}-detection`}
                 dataType="threat-security"
                 startTimestamp={startTimestamp}
                 endTimestamp={endTimestamp}
@@ -518,7 +689,7 @@ function ThreatDetectionPage() {
         title={
             <TitleWithInfo
                 titleText={mapLabel("API Threat Activity", getDashboardCategory())}
-                tooltipContent={"Identify malicious requests with Akto's powerful threat detection capabilities"}
+                tooltipContent={`Identify malicious requests with Akto's powerful ${mapLabel("Threat", getDashboardCategory())} detection capabilities`}
             />
         }
         isFirstPage={true}

@@ -120,6 +120,9 @@ export default function Header() {
     }
 
     const handleDashboardChange = (value) => {
+        // Preserve current subcategory selection
+        const currentSubCategory = PersistStore.getState().subCategory || 'Cloud Security';
+        
         PersistStore.getState().setAllCollections([]);
         PersistStore.getState().setCollectionsMap({});
         PersistStore.getState().setHostNameMap({});
@@ -128,6 +131,20 @@ export default function Header() {
         LocalStore.getState().setCategoryMap({}); 
         LocalStore.getState().setSubCategoryMap({});
         SessionStore.getState().setThreatFiltersMap({});
+        
+        // Set appropriate default subcategory for each dashboard category
+        if (value === "Agentic Security") {
+            // For Agentic Security, use Cloud Security as default on first load
+            const defaultSubCategory = currentSubCategory === 'Default' ? 'Cloud Security' : currentSubCategory;
+            PersistStore.getState().setSubCategory(defaultSubCategory);
+        } else if (value === "API Security") {
+            // For API Security, use Default subcategory (no filtering)
+            PersistStore.getState().setSubCategory('Default');
+        } else {
+            // For other categories, use Default subcategory
+            PersistStore.getState().setSubCategory('Default');
+        }
+        
         setDashboardCategory(value);
         window.location.reload();
         window.location.href("/dashboard/observe/inventory")
@@ -246,7 +263,6 @@ export default function Header() {
                                 <Dropdown
                                     menuItems={[
                                         { value: "API Security", label: "API Security", id: "api-security" },
-                                        { value: "MCP Security", label: "MCP Security", id: "mcp-security" },
                                         { value: "Agentic Security", label: "Agentic Security", id: "agentic-security" },
                                     ]}
                                     initial={dashboardCategory || "API Security"}

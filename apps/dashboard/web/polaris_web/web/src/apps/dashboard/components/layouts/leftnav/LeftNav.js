@@ -5,7 +5,6 @@ import {
     MarketingFilledMinor,
     ReportFilledMinor,
     DiamondAlertMinor,
-    StarFilledMinor,
     FinancesMinor,
     LockMajor,
     AutomationFilledMajor
@@ -17,7 +16,7 @@ import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
 import Store from "../../../store";
 import api from "../../../../signup/api";
-import { useMemo, useState} from "react";
+import { useMemo, useState, useEffect} from "react";
 import func from "@/util/func";
 import Dropdown from "../Dropdown";
 import SessionStore from "../../../../main/SessionStore";
@@ -39,10 +38,33 @@ export default function LeftNav() {
     const resetStore = LocalStore(state => state.resetStore);
     const resetSession = SessionStore(state => state.resetStore);
     const resetFields = IssuesStore(state => state.resetStore);
+    const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
+    const subcategory = PersistStore((state) => state.subCategory);
+    const setSubCategory = PersistStore((state) => state.setSubCategory);
 
-    const handleSelect = (selectedId) => {
-        setLeftNavSelected(selectedId);
-    };
+    // Set initial selection based on current path and subcategory
+    useEffect(() => {
+        const pathString = func.transformString(location.pathname);
+        const subCategoryIndex = subcategory === "Endpoint Security" ? "1" : "0";
+        const keyWithIndex = pathString + subCategoryIndex;
+        
+        // Only update if the current selection doesn't match
+        if (leftNavSelected !== keyWithIndex && leftNavSelected !== pathString) {
+            setLeftNavSelected(keyWithIndex);
+        }
+    }, [subcategory, location.pathname]);
+
+    const handleClick = (key, path, activeState, subcategoryValue = "Default") => {
+        const finalKey = subcategoryValue === "Endpoint Security" ? key + "_1" : key + "_0";
+        setLeftNavSelected(finalKey);
+        navigate(path);
+        setActive(activeState);
+        if (subcategoryValue && subcategoryValue !== subcategory) {
+            setSubCategory(subcategoryValue);
+            // Clear collections cache to trigger refresh when subcategory changes
+            PersistStore.getState().setAllCollections([]);
+        }
+    }
 
     const handleAccountChange = async (selected) => {
         resetAll();
@@ -52,63 +74,47 @@ export default function LeftNav() {
         await api.goToAccount(selected);
         func.setToast(true, false, `Switched to account ${accounts[selected]}`);
         window.location.href = '/dashboard/observe/inventory';
-    };
+    }
 
     const accountOptions = Object.keys(accounts).map(accountId => ({
         label: accounts[accountId],
         value: accountId
     }));
 
-    let reportsSubNavigationItems = [
-        {
-            label: "Issues",
-            onClick: () => {
-                navigate("/dashboard/reports/issues");
-                handleSelect("dashboard_reports_issues");
-                setActive("active");
-            },
-            selected: leftNavSelected === "dashboard_reports_issues",
-        }
-    ]
+    
 
-    if (window.USER_NAME.indexOf("@akto.io")) {
-        reportsSubNavigationItems.push({
-            label: "Compliance",
-            onClick: () => {
-                navigate("/dashboard/reports/compliance");
-                handleSelect("dashboard_reports_compliance");
-                setActive("active");
-            },
-            selected: leftNavSelected === "dashboard_reports_compliance",
-        })
-    }
-
-    const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
-
-    const navItems = useMemo(() => {
-        let items = [
+    const getMainNavItems = (subCategoryValue) => {
+        const subCategoryIndex = subCategoryValue === "Endpoint Security" ? "1" : "0";
+        const isCurrentSubCategory = subcategory === subCategoryValue;
+        
+        let reportsSubNavigationItems = [
             {
-                label: (!func.checkLocal()) ? (
-                    <Box paddingBlockEnd={"2"}>
-                        <Dropdown
-                            id={`select-account`}
-                            menuItems={accountOptions}
-                            initial={() => accounts[activeAccount]}
-                            selected={(type) => handleAccountChange(type)}
-                        />
-                    </Box>
-
-                ) : null
+                label: "Issues",
+                onClick: () => handleClick("dashboard_reports_issues", "/dashboard/reports/issues", "active", subCategoryValue),
+                selected: isCurrentSubCategory && (leftNavSelected === "dashboard_reports_issues" + subCategoryIndex || leftNavSelected === "dashboard_reports_issues"),
+            }
+        ]
+    
+        if (window.USER_NAME.indexOf("@akto.io")) {
+            reportsSubNavigationItems.push({
+                label: "Compliance",
+                onClick: () => handleClick("dashboard_reports_compliance", "/dashboard/reports/compliance", "active", subCategoryValue),
+                selected: isCurrentSubCategory && (leftNavSelected === "dashboard_reports_compliance" + subCategoryIndex || leftNavSelected === "dashboard_reports_compliance"),
+            })
+        }
+        return [
+            {
+                label: "Quick Start",
+                icon: AppsFilledMajor,
+                onClick: () => handleClick("dashboard_quick_start", "/dashboard/quick-start", "normal", subCategoryValue),
+                selected: isCurrentSubCategory && (leftNavSelected === "dashboard_quick_start" + subCategoryIndex || leftNavSelected === "dashboard_quick_start"),
+                key: "quick_start",
             },
             {
                 label: mapLabel("API Security Posture", dashboardCategory),
                 icon: ReportFilledMinor,
-                onClick: () => {
-                    handleSelect("dashboard_home");
-                    navigate("/dashboard/home");
-                    setActive("normal");
-                },
-                selected: leftNavSelected === "dashboard_home",
+                onClick: () => handleClick("dashboard_home", "/dashboard/home", "normal", subCategoryValue),
+                selected: isCurrentSubCategory && (leftNavSelected === "dashboard_home" + subCategoryIndex || leftNavSelected === "dashboard_home"),
                 key: "2",
             },
             {
@@ -118,7 +124,7 @@ export default function LeftNav() {
                         variant="bodyMd"
                         fontWeight="medium"
                         color={
-                            leftNavSelected.includes("observe")
+                            leftNavSelected.includes(subCategoryIndex) && leftNavSelected.includes("observe")
                                 ? active === "active"
                                     ? "subdued"
                                     : ""
@@ -129,66 +135,38 @@ export default function LeftNav() {
                     </Text>
                 ),
                 icon: InventoryFilledMajor,
-                onClick: () => {
-                    handleSelect("dashboard_observe_inventory");
-                    navigate("/dashboard/observe/inventory");
-                    setActive("normal");
-                },
-                selected: leftNavSelected.includes("_observe"),
+                onClick: () => handleClick("dashboard_observe_inventory", "/dashboard/observe/inventory", "normal", subCategoryValue),
+                selected: isCurrentSubCategory && leftNavSelected.includes("_observe"),
                 subNavigationItems: [
                     {
                         label: "Collections",
-                        onClick: () => {
-                            navigate("/dashboard/observe/inventory");
-                            handleSelect("dashboard_observe_inventory");
-                            setActive("active");
-                        },
-                        selected: leftNavSelected === "dashboard_observe_inventory",
+                        onClick: () => handleClick("dashboard_observe_inventory", "/dashboard/observe/inventory", "active", subCategoryValue),
+                        selected: isCurrentSubCategory && (leftNavSelected === "dashboard_observe_inventory" + subCategoryIndex || leftNavSelected === "dashboard_observe_inventory"),
                     },
                     {
                         label: "Recent Changes",
-                        onClick: () => {
-                            navigate("/dashboard/observe/changes");
-                            handleSelect("dashboard_observe_changes");
-                            setActive("active");
-                        },
-                        selected: leftNavSelected === "dashboard_observe_changes",
+                        onClick: () => handleClick("dashboard_observe_changes", "/dashboard/observe/changes", "active", subCategoryValue),
+                        selected: isCurrentSubCategory && (leftNavSelected === "dashboard_observe_changes" + subCategoryIndex || leftNavSelected === "dashboard_observe_changes"),
                     },
                     {
                         label: "Sensitive Data",
-                        onClick: () => {
-                            navigate("/dashboard/observe/sensitive");
-                            handleSelect("dashboard_observe_sensitive");
-                            setActive("active");
-                        },
-                        selected: leftNavSelected === "dashboard_observe_sensitive",
+                        onClick: () => handleClick("dashboard_observe_sensitive", "/dashboard/observe/sensitive", "active", subCategoryValue),
+                        selected: isCurrentSubCategory && (leftNavSelected === "dashboard_observe_sensitive" + subCategoryIndex || leftNavSelected === "dashboard_observe_sensitive"),
                     },
-                    ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AKTO_DAST?.isGranted && dashboardCategory == CATEGORY_API_SECURITY ? [{
+                    ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AKTO_DAST?.isGranted && dashboardCategory === CATEGORY_API_SECURITY ? [{
                         label: "DAST scans",
-                        onClick: () => {
-                            navigate("/dashboard/observe/dast-progress");
-                            handleSelect("dashboard_observe_dast_progress");
-                            setActive("active");
-                        },
-                        selected: leftNavSelected === "dashboard_observe_dast_progress"
+                        onClick: () => handleClick("dashboard_observe_dast_progress", "/dashboard/observe/dast-progress", "active", subCategoryValue),
+                        selected: leftNavSelected === "dashboard_observe_dast_progress" + subCategoryIndex,
                     }] : []),
                     ...((dashboardCategory === "MCP Security" || dashboardCategory === "Agentic Security") ? [{
                         label: "Audit Data",
-                        onClick: () => {
-                            navigate("/dashboard/observe/audit");
-                            handleSelect("dashboard_observe_audit");
-                            setActive("active");
-                        },
-                        selected: leftNavSelected === "dashboard_observe_audit",
+                        onClick: () => handleClick("dashboard_observe_audit", "/dashboard/observe/audit", "active", subCategoryValue),
+                        selected: leftNavSelected === "dashboard_observe_audit" + subCategoryIndex,
                     }] : []),
                     ...((dashboardCategory === "MCP Security" || dashboardCategory === "Agentic Security") ? [{
                         label: "Endpoint Shield",
-                        onClick: () => {
-                            navigate("/dashboard/observe/endpoint-shield");
-                            handleSelect("dashboard_observe_endpoint_shield");
-                            setActive("active");
-                        },
-                        selected: leftNavSelected === "dashboard_observe_endpoint_shield",
+                        onClick: () => handleClick("dashboard_observe_endpoint_shield", "/dashboard/observe/endpoint-shield", "active", subCategoryValue),
+                        selected: leftNavSelected === "dashboard_observe_endpoint_shield" + subCategoryIndex,
                     }] : []),
                 ],
                 key: "3",
@@ -200,7 +178,7 @@ export default function LeftNav() {
                         variant="bodyMd"
                         fontWeight="medium"
                         color={
-                            leftNavSelected.includes("testing")
+                            leftNavSelected.includes(subCategoryIndex) && leftNavSelected.includes("testing")
                                 ? active === "active"
                                     ? "subdued"
                                     : ""
@@ -211,48 +189,28 @@ export default function LeftNav() {
                     </Text>
                 ),
                 icon: MarketingFilledMinor,
-                onClick: () => {
-                    navigate("/dashboard/testing/");
-                    handleSelect("dashboard_testing");
-                    setActive("normal");
-                },
-                selected: leftNavSelected.includes("_testing"),
+                onClick: () => handleClick("dashboard_testing", "/dashboard/testing/", "normal", subCategoryValue),
+                selected: leftNavSelected.includes(subCategoryIndex) && leftNavSelected.includes("_testing"),
                 subNavigationItems: [
                     {
                         label: "Results",
-                        onClick: () => {
-                            navigate("/dashboard/testing/");
-                            handleSelect("dashboard_testing");
-                            setActive("active");
-                        },
-                        selected: leftNavSelected === "dashboard_testing",
+                        onClick: () => handleClick("dashboard_testing", "/dashboard/testing/", "active", subCategoryValue),
+                        selected: leftNavSelected === "dashboard_testing" + subCategoryIndex,
                     },
                     {
                         label: mapLabel("Test", dashboardCategory) + " Roles",
-                        onClick: () => {
-                            navigate("/dashboard/testing/roles");
-                            handleSelect("dashboard_testing_roles");
-                            setActive("active");
-                        },
-                        selected: leftNavSelected === "dashboard_testing_roles",
+                        onClick: () => handleClick("dashboard_testing_roles", "/dashboard/testing/roles", "active", subCategoryValue),
+                        selected: leftNavSelected === "dashboard_testing_roles" + subCategoryIndex,
                     },
                     {
                         label: "User Config",
-                        onClick: () => {
-                            navigate("/dashboard/testing/user-config");
-                            handleSelect("dashboard_testing_user_config");
-                            setActive("active");
-                        },
-                        selected: leftNavSelected === "dashboard_testing_user_config",
+                        onClick: () => handleClick("dashboard_testing_user_config", "/dashboard/testing/user-config", "active", subCategoryValue),
+                        selected: leftNavSelected === "dashboard_testing_user_config" + subCategoryIndex,
                     },
                     {
                         label:mapLabel("Test", dashboardCategory) + " Suite",
-                        onClick:()=>{
-                            navigate("/dashboard/testing/test-suite");
-                            handleSelect("dashboard_testing_test_suite");
-                            setActive("active");
-                        },
-                        selected: leftNavSelected === "dashboard_testing_test_suite",
+                        onClick: () => handleClick("dashboard_testing_test_suite", "/dashboard/testing/test-suite", "active", subCategoryValue),
+                        selected: leftNavSelected === "dashboard_testing_test_suite" + subCategoryIndex,
                     }
                 ],
                 key: "4",
@@ -265,30 +223,18 @@ export default function LeftNav() {
                     </Text>
                 ),
                 icon: FinancesMinor,
-                onClick: () => {
-                    handleSelect("dashboard_test_library_tests");
-                    navigate("/dashboard/test-library/tests");
-                    setActive("normal");
-                },
-                selected: leftNavSelected.includes("_test_library"),
+                onClick: () => handleClick("dashboard_test_library_tests", "/dashboard/test-library/tests", "normal", subCategoryValue),
+                selected: leftNavSelected.includes(subCategoryIndex) && leftNavSelected.includes("_test_library"),
                 subNavigationItems: [
                     {
                         label: mapLabel("More Tests", dashboardCategory),
-                        onClick: () => {
-                            navigate("/dashboard/test-library/tests");
-                            handleSelect("dashboard_test_library_tests");
-                            setActive("active");
-                        },
-                        selected: leftNavSelected === "dashboard_test_library_tests",
+                        onClick: () => handleClick("dashboard_test_library_tests", "/dashboard/test-library/tests", "active", subCategoryValue),
+                        selected: leftNavSelected === "dashboard_test_library_tests" + subCategoryIndex,
                     },
                     {
                         label: "Editor",
-                        onClick: () => {
-                            navigate("/dashboard/test-editor");
-                            handleSelect("dashboard_test_library_test_editor");
-                            setActive("active");
-                        },
-                        selected: leftNavSelected === "dashboard_test_library_test_editor",
+                        onClick: () => handleClick("dashboard_test_library_test_editor", "/dashboard/test-editor", "active", subCategoryValue),
+                        selected: leftNavSelected === "dashboard_test_library_test_editor" + subCategoryIndex,
                     },
                 ],
                 key: "5",
@@ -300,12 +246,8 @@ export default function LeftNav() {
                     </Text>
                 ),
                 icon: AutomationFilledMajor,
-                onClick: () => {
-                    handleSelect("dashboard_prompt_hardening");
-                    navigate("/dashboard/prompt-hardening");
-                    setActive("normal");
-                },
-                selected: leftNavSelected === "dashboard_prompt_hardening",
+                onClick: () => handleClick("dashboard_prompt_hardening", "/dashboard/prompt-hardening", "normal", subCategoryValue),
+                selected: leftNavSelected === "dashboard_prompt_hardening" + subCategoryIndex,
                 key: "prompt_hardening",
             }] : []),
             {
@@ -315,7 +257,7 @@ export default function LeftNav() {
                         variant="bodyMd"
                         fontWeight="medium"
                         color={
-                            leftNavSelected.includes("reports")
+                            leftNavSelected.includes(subCategoryIndex) && leftNavSelected.includes("reports")
                                 ? active === "active"
                                     ? "subdued"
                                     : ""
@@ -326,78 +268,50 @@ export default function LeftNav() {
                     </Text>
                 ),
                 icon: ReportFilledMinor,
-                onClick: () => {
-                    navigate("/dashboard/reports/issues");
-                    handleSelect("dashboard_reports_issues");
-                    setActive("normal");
-                },
-                selected: leftNavSelected.includes("_reports"),
+                onClick: () => handleClick("dashboard_reports_issues", "/dashboard/reports/issues", "normal", subCategoryValue),
+                selected: leftNavSelected.includes(subCategoryIndex) && leftNavSelected.includes("_reports"),
                 subNavigationItems: reportsSubNavigationItems,
                 key: "6",
             },
-            ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted  ? [{
+            ...( dashboardCategory === "API Security" ? [{
                     label: (
                         <Text variant="bodyMd" fontWeight="medium">
                             {mapLabel("Threat Detection", dashboardCategory)}
                         </Text>
                     ),
                     icon: DiamondAlertMinor,
-                    onClick: () => {
-                        handleSelect("dashboard_threat_actor");
-                        navigate("/dashboard/protection/threat-actor");
-                        setActive("normal");
-                    },
-                    selected: leftNavSelected.includes("_threat"),
+                    onClick: () => handleClick("dashboard_threat_actor", "/dashboard/protection/threat-actor", "normal", subCategoryValue),
+                    selected: leftNavSelected.includes(subCategoryIndex) && leftNavSelected.includes("_threat"),
                     url: "#",
                     key: "7",
                     subNavigationItems: [
                         ...(dashboardCategory === "API Security" ? [{
                             label: "Dashboard",
-                            onClick: () => {
-                                navigate("/dashboard/protection/threat-dashboard");
-                                handleSelect("dashboard_threat_dashboard");
-                                setActive("active");
-                            },
-                            selected: leftNavSelected === "dashboard_threat_dashboard",
+                            onClick: () => handleClick("dashboard_threat_dashboard", "/dashboard/protection/threat-dashboard", "active", subCategoryValue),
+                            selected: leftNavSelected === "dashboard_threat_dashboard" + subCategoryIndex,
                         }] : []),
                         {
                             label: "Threat Actors",
-                            onClick: () => {
-                                navigate("/dashboard/protection/threat-actor");
-                                handleSelect("dashboard_threat_actor");
-                                setActive("active");
-                            },
-                            selected: leftNavSelected === "dashboard_threat_actor",
+                            onClick: () => handleClick("dashboard_threat_actor", "/dashboard/protection/threat-actor", "active", subCategoryValue),
+                            selected: leftNavSelected === "dashboard_threat_actor" + subCategoryIndex,
                         },
                         {
                             label: "Threat Activity",
-                            onClick: () => {
-                                navigate("/dashboard/protection/threat-activity");
-                                handleSelect("dashboard_threat_activity");
-                                setActive("active");
-                            },
+                            onClick: () => handleClick("dashboard_threat_activity", "/dashboard/protection/threat-activity", "active", subCategoryValue),
                             selected:
-                                leftNavSelected === "dashboard_threat_activity",
+                                leftNavSelected === "dashboard_threat_activity" + subCategoryIndex,
                         },
                         {
                             label: `${mapLabel("APIs", dashboardCategory)} Under Threat`,
-                            onClick: () => {
-                                navigate("/dashboard/protection/threat-api");
-                                handleSelect("dashboard_threat_api");
-                                setActive("active");
-                            },
+                            onClick: () => handleClick("dashboard_threat_api", "/dashboard/protection/threat-api", "active", subCategoryValue),
                             selected:
-                                leftNavSelected === "dashboard_threat_api",
+                                leftNavSelected === "dashboard_threat_api" + subCategoryIndex,
                         },
                         {
                             label: "Threat Policy",
-                            onClick: () => {
-                                navigate("/dashboard/protection/threat-policy");
-                                handleSelect("dashboard_threat_policy");
-                                setActive("active");
-                            },
+                            onClick: () => handleClick("dashboard_threat_policy", "/dashboard/protection/threat-policy", "active", subCategoryValue),
                             selected:
-                                leftNavSelected === "dashboard_threat_policy",
+                                leftNavSelected === "dashboard_threat_policy" + subCategoryIndex,
                         },
                     ],
                 }] : []),
@@ -411,9 +325,9 @@ export default function LeftNav() {
             //     onClick: () => {
             //         handleSelect("agent_team_members");
             //         navigate("/dashboard/agent-team/members");
-            //         setActive("normal");
+            //         setActive("normal", subCategoryValue);
             //     },
-            //     selected: leftNavSelected.includes("agent_team"),
+            //     selected: leftNavSelected.includes(subCategoryIndex) && leftNavSelected.includes("agent_team"),
             //     url: "#",
             //     key: "8",
             // }] : []),
@@ -424,33 +338,32 @@ export default function LeftNav() {
                     </Text>
                 ),
                 icon: LockMajor,
-                onClick: () => {
-                    handleSelect("dashboard_mcp_guardrails");
-                    navigate("/dashboard/guardrails/activity");
-                    setActive("normal");
-                },
-                selected: leftNavSelected.includes("_guardrails"),
+                onClick: () => handleClick("dashboard_mcp_guardrails", "/dashboard/guardrails/activity", "normal", subCategoryValue),
+                selected: leftNavSelected.includes(subCategoryIndex) && (leftNavSelected.includes("_guardrails") || leftNavSelected.includes("_threat")),
                 url: "#",
                 key: "9",
                 subNavigationItems: [
                     {
-                        label: "Guardrails Activity",
-                        onClick: () => {
-                            navigate("/dashboard/guardrails/activity");
-                            handleSelect("dashboard_guardrails_activity");
-                            setActive("active");
-                        },
-                        selected: leftNavSelected === "dashboard_guardrails_activity",
+                        label: "Guardrail Activity",
+                        onClick: () => handleClick("dashboard_threat_activity", "/dashboard/protection/threat-activity", "active", subCategoryValue),
+                        selected:
+                            leftNavSelected === "dashboard_threat_activity" + subCategoryIndex,
                     },
                     {
                         label: "Guardrails Policies",
-                        onClick: () => {
-                            navigate("/dashboard/guardrails/policies");
-                            handleSelect("dashboard_guardrails_policies");
-                            setActive("active");
-                        },
+                        onClick: () => handleClick("dashboard_guardrails_policies", "/dashboard/guardrails/policies", "active", subCategoryValue),
                         selected:
-                            leftNavSelected === "dashboard_guardrails_policies",
+                            leftNavSelected === "dashboard_guardrails_policies" + subCategoryIndex,
+                    },
+                    {
+                        label: "Guardrail Actors",
+                        onClick: () => handleClick("dashboard_threat_actor", "/dashboard/protection/threat-actor", "active", subCategoryValue),
+                        selected: leftNavSelected === "dashboard_threat_actor" + subCategoryIndex,
+                    },
+                    {
+                        label: `${mapLabel("APIs", dashboardCategory)} Under Guardrail`,
+                        onClick: () => handleClick("dashboard_threat_api", "/dashboard/protection/threat-api", "active", subCategoryValue),
+                        selected: leftNavSelected === "dashboard_threat_api" + subCategoryIndex,
                     }
                 ]
 
@@ -462,33 +375,21 @@ export default function LeftNav() {
                     </Text>
                 ),
                 icon: LockMajor,
-                onClick: () => {
-                    handleSelect("dashboard_ai_agent_guardrails");
-                    navigate("/dashboard/guardrails/activity");
-                    setActive("normal");
-                },
-                selected: leftNavSelected.includes("_guardrails"),
+                onClick: () => handleClick("dashboard_ai_agent_guardrails", "/dashboard/guardrails/activity", "normal", subCategoryValue),
+                selected: leftNavSelected.includes(subCategoryIndex) && leftNavSelected.includes("_guardrails"),
                 url: "#",
                 key: "10",
                 subNavigationItems: [
                     {
                         label: "Guardrails Activity",
-                        onClick: () => {
-                            navigate("/dashboard/guardrails/activity");
-                            handleSelect("dashboard_guardrails_activity");
-                            setActive("active");
-                        },
-                        selected: leftNavSelected === "dashboard_guardrails_activity",
+                        onClick: () => handleClick("dashboard_guardrails_activity", "/dashboard/guardrails/activity", "active", subCategoryValue),
+                        selected: leftNavSelected === "dashboard_guardrails_activity" + subCategoryIndex,
                     },
                     {
                         label: "Guardrails Policies",
-                        onClick: () => {
-                            navigate("/dashboard/guardrails/policies");
-                            handleSelect("dashboard_guardrails_policies");
-                            setActive("active");
-                        },
+                        onClick: () => handleClick("dashboard_guardrails_policies", "/dashboard/guardrails/policies", "active", subCategoryValue),
                         selected:
-                            leftNavSelected === "dashboard_guardrails_policies",
+                            leftNavSelected === "dashboard_guardrails_policies" + subCategoryIndex,
                     }
                 ]
             }] : []),
@@ -499,55 +400,99 @@ export default function LeftNav() {
                     </Text>
                 ),
                 icon: LockMajor,
-                onClick: () => {
-                    handleSelect("dashboard_agentic_guardrails");
-                    navigate("/dashboard/guardrails/activity");
-                    setActive("normal");
-                },
-                selected: leftNavSelected.includes("_guardrails"),
+                onClick: () => handleClick("dashboard_threat_activity", "/dashboard/protection/threat-activity", "normal", subCategoryValue),
+                selected: leftNavSelected.includes(subCategoryIndex) && (leftNavSelected.includes("_guardrails") || leftNavSelected.includes("_threat")),
                 url: "#",
                 key: "11",
                 subNavigationItems: [
                     {
-                        label: "Guardrails Activity",
-                        onClick: () => {
-                            navigate("/dashboard/guardrails/activity");
-                            handleSelect("dashboard_guardrails_activity");
-                            setActive("active");
-                        },
-                        selected: leftNavSelected === "dashboard_guardrails_activity",
+                        label: "Guardrail Activity",
+                        onClick: () => handleClick("dashboard_threat_activity", "/dashboard/protection/threat-activity", "active", subCategoryValue),
+                        selected:
+                            leftNavSelected === "dashboard_threat_activity" + subCategoryIndex,
                     },
                     {
                         label: "Guardrails Policies",
-                        onClick: () => {
-                            navigate("/dashboard/guardrails/policies");
-                            handleSelect("dashboard_guardrails_policies");
-                            setActive("active");
-                        },
+                        onClick: () => handleClick("dashboard_guardrails_policies", "/dashboard/guardrails/policies", "active", subCategoryValue),
                         selected:
-                            leftNavSelected === "dashboard_guardrails_policies",
+                            leftNavSelected === "dashboard_guardrails_policies" + subCategoryIndex,
+                    },
+                    {
+                        label: "Guardrail Actors",
+                        onClick: () => handleClick("dashboard_threat_actor", "/dashboard/protection/threat-actor", "active", subCategoryValue),
+                        selected: leftNavSelected === "dashboard_threat_actor" + subCategoryIndex,
+                    },
+                    {
+                        label: `${mapLabel("APIs", dashboardCategory)} Under Guardrail`,
+                        onClick: () => handleClick("dashboard_threat_api", "/dashboard/protection/threat-api", "active", subCategoryValue),
+                        selected: leftNavSelected === "dashboard_threat_api" + subCategoryIndex,
                     }
+
                 ]
             }] : [])
+        ];
+    }
+
+    const navItems = useMemo(() => {
+
+        const accountSection = [
+            {
+                label: (!func.checkLocal()) ? (
+                    <Box paddingBlockEnd={"2"}>
+                        <Dropdown
+                            id={`select-account`}
+                            menuItems={accountOptions}
+                            initial={() => accounts[activeAccount]}
+                            selected={(type) => handleAccountChange(type)}
+                        />
+                    </Box>
+
+                ) : null
+            }
         ]
 
-        const exists = items.find(item => item.key === "quick_start")
-        if (!exists) {
-            items.splice(1, 0, {
-                label: "Quick Start",
-                icon: AppsFilledMajor,
-                onClick: () => {
-                    handleSelect("dashboard_quick_start")
-                    navigate("/dashboard/quick-start")
-                    setActive("normal")
+        const mainNavItems = getMainNavItems("Cloud Security");
+        const shouldShowDivisions = dashboardCategory === "MCP Security" || dashboardCategory === "Agentic Security";
+        
+        let allItems;
+        if (shouldShowDivisions) {
+            const apiSecurityItems = getMainNavItems("Endpoint Security");
+            allItems = [
+                ...accountSection,
+                {
+                    label: (
+                        <Box paddingBlockStart="4" paddingBlockEnd="2">
+                            <div style={{ color: '#000000', fontWeight: 'bold', fontSize: '16px' }}>
+                                Cloud Security
+                            </div>
+                        </Box>
+                    ),
+                    key: "cloud_header",
+                    disabled: true,
                 },
-                selected: leftNavSelected === "dashboard_quick_start",
-                key: "quick_start",
-            })
+                ...mainNavItems,
+                {
+                    label: (
+                        <Box paddingBlockStart="4" paddingBlockEnd="2">
+                            <div style={{ color: '#000000', fontWeight: 'bold', fontSize: '16px' }}>
+                                Endpoint Security
+                            </div>
+                        </Box>
+                    ),
+                    key: "endpoint_header", 
+                    disabled: true,
+                },
+                ...apiSecurityItems
+            ];
+        }else{
+            allItems = [
+                ...accountSection,
+                ...mainNavItems
+            ];
         }
 
-        return items
-    }, [dashboardCategory, leftNavSelected])
+        return allItems
+    }, [dashboardCategory, leftNavSelected, subcategory])
 
     const navigationMarkup = (
         <div className={`${active} ${dashboardCategory === "Agentic Security" ? "agentic-security-nav" : ""}`}>

@@ -163,5 +163,9 @@ public class GlobalEnums {
         API, MCP, GEN_AI, AGENTIC
     }
 
+    public enum SUB_CATEGORY_SOURCE {
+        DEFAULT, CLOUD_SECURITY, ENDPOINT_SECURITY;
+    }
+
     /* ********************************************************************** */
 }

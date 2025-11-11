@@ -17,6 +17,7 @@ import ThreatSankeyChart from './components/ThreatSankeyChart';
 import ThreatCategoryStackedChart from './components/ThreatCategoryStackedChart';
 import GetPrettifyEndpoint from '../observe/GetPrettifyEndpoint';
 import api from './api';
+import { mapLabel, getDashboardCategory } from '../../../main/labelHelper';
 
 
 function ThreatDashboardPage() {
@@ -341,8 +342,8 @@ function ThreatDashboardPage() {
                         pieInnerSize="50%"
                     />
             }
-            title="Threat Status"
-            titleToolTip="Distribution of threats by their current status"            
+            title={`${mapLabel("Threat", getDashboardCategory())} Status`}
+            titleToolTip={`Distribution of ${mapLabel("Threat", getDashboardCategory())} by their current status`}
         />
     )
 
@@ -362,8 +363,8 @@ function ThreatDashboardPage() {
                     pieInnerSize="50%"
                 />
             }
-            title="Threat Actors by Severity"
-            titleToolTip="Distribution of threat actors categorized by severity level"
+            title={`${mapLabel("Threat", getDashboardCategory())} Actors by Severity`}
+            titleToolTip={`Distribution of ${mapLabel("Threat", getDashboardCategory())} actors categorized by severity level`}
         />
     )
 
