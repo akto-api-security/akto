@@ -1,6 +1,10 @@
 package com.akto.threat.detection;
 
 import java.util.HashMap;
+import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import com.akto.DaoInit;
 import com.akto.RuntimeMode;
@@ -8,9 +12,11 @@ import com.akto.dao.context.Context;
 import com.akto.data_actor.ClientActor;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
+import com.akto.dto.*;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.kafka.KafkaConfig;
 import com.akto.kafka.KafkaConsumerConfig;
 import com.akto.kafka.KafkaProducerConfig;
@@ -38,34 +44,37 @@ public class Main {
 
   private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
-  public static void main(String[] args) throws Exception {
+  public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+
+
+    public static void main(String[] args) throws Exception {
 
     boolean isHybridDeployment = RuntimeMode.isHybridDeployment();
 
-    if (isHybridDeployment) {
-      while (true) {
+     if (isHybridDeployment) {
+       while (true) {
 
-        int accountId = ClientActor.getAccountId();
+         int accountId = ClientActor.getAccountId();
 
-        Organization organization = dataActor.fetchOrganization(accountId);
-        if (organization == null) {
-          logger.errorAndAddToDb("Organization not found for account id: " + accountId);
-          Thread.sleep(30000);
-          continue;
-        }
-        HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
-        if(featureWiseAllowed == null) {
-            featureWiseAllowed = new HashMap<>();
-        }
+         Organization organization = dataActor.fetchOrganization(accountId);
+         if (organization == null) {
+           logger.errorAndAddToDb("Organization not found for account id: " + accountId);
+           Thread.sleep(30000);
+           continue;
+         }
+         HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
+         if(featureWiseAllowed == null) {
+             featureWiseAllowed = new HashMap<>();
+         }
 
-        FeatureAccess allowed = featureWiseAllowed.getOrDefault("THREAT_DETECTION", FeatureAccess.noAccess);
-        if (allowed.getIsGranted()) {
-          break;
-        }
+         FeatureAccess allowed = featureWiseAllowed.getOrDefault("THREAT_DETECTION", FeatureAccess.noAccess);
+         if (allowed.getIsGranted()) {
+           break;
+         }
 
-        Thread.sleep(30000);
-      }
-    }
+         Thread.sleep(30000);
+       }
+     }
 
     RedisClient localRedis = null;
 
@@ -112,7 +121,7 @@ public class Main {
             .setValueSerializer(Serializer.BYTE_ARRAY)
             .build();
 
-
+    initCustomDataTypeScheduler();
     CmsCounterLayer.initialize(localRedis);
     DistributionCalculator distributionCalculator = new DistributionCalculator();
     DistributionDataForwardLayer distributionDataForwardLayer = new DistributionDataForwardLayer(localRedis, distributionCalculator);
@@ -167,4 +176,18 @@ public class Main {
     return redisClient;
   }
 
+    public static void initCustomDataTypeScheduler(){
+        Account account = dataActor.fetchActiveAccount();
+        Context.accountId.set(account.getId());
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                List<CustomDataType> customDataTypes = dataActor.fetchCustomDataTypes();
+                logger.info("customData type " + customDataTypes.size());
+                List<AktoDataType> aktoDataTypes = dataActor.fetchAktoDataTypes();
+                List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
+                SingleTypeInfo.fetchCustomDataTypes(account.getId(),customDataTypes,aktoDataTypes);
+                SingleTypeInfo.fetchCustomAuthTypes(account.getId(), customAuthTypes);
+            }
+        }, 0, 5, TimeUnit.MINUTES);
+    }
 }

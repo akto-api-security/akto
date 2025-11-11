@@ -1485,4 +1485,35 @@ public class ClientActor extends DataActor {
             return;
         }
     }
+
+    public ApiCollection fetchApiCollectionMeta(int apiCollectionId) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("apiCollectionId", apiCollectionId);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchApiCollectionMeta", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchApiCollectionMeta", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBObject apiCollection = (BasicDBObject) payloadObj.get("apiCollection");
+                apiCollection.remove("displayName");
+                apiCollection.remove("urlsCount");
+                apiCollection.remove("envType");
+                apiCollection.remove("tagsList");
+                return objectMapper.readValue(apiCollection.toJson(), ApiCollection.class);
+            } catch(Exception e) {
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchApiCollectionMeta" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
 }

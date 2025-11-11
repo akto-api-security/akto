@@ -1,5 +1,8 @@
 package com.akto.threat.detection.utils;
 
+import com.akto.enums.RedactionType;
+import com.akto.utils.RedactParser;
+
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -10,28 +13,24 @@ import com.akto.dto.RawApiMetadata;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.Category;
 import com.akto.dto.test_editor.Info;
-import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError;
 import com.akto.proto.http_response_param.v1.HttpResponseParam;
 import com.akto.proto.http_response_param.v1.StringList;
 import com.akto.threat.detection.constants.RedisKeyInfo;
-import com.akto.utils.RedactSampleData;
-
-import static com.akto.utils.RedactSampleData.redactHttpResponseParams;
 
 public class Utils {
 
     /**
      * Applies redaction to HttpResponseParams and converts to HttpResponseParam protobuf string
      */
-    private static String getRedactedPayload(HttpResponseParams responseParam) throws Exception{
+    private static String getRedactedPayload(HttpResponseParams responseParam, RedactionType redactionType) throws Exception{
         // Create a copy to avoid mutating the original
         HttpResponseParams copy = responseParam.copy();
         // Apply redaction
 
-        redactHttpResponseParams(copy, true);
+        RedactParser.redactHttpResponseParam(copy, redactionType);
 
 
         // Convert redacted HttpResponseParams to HttpResponseParam protobuf
@@ -101,7 +100,7 @@ public class Utils {
         return ipApiRateLimitFilter;
     }
 
-    public static SampleMaliciousRequest buildSampleMaliciousRequest(String actor, HttpResponseParams responseParam, FilterConfig apiFilter, RawApiMetadata metadata, List<SchemaConformanceError> errors, boolean successfulExploit, boolean ignoredEvent, boolean isRedactRequestResponseData) {
+    public static SampleMaliciousRequest buildSampleMaliciousRequest(String actor, HttpResponseParams responseParam, FilterConfig apiFilter, RawApiMetadata metadata, List<SchemaConformanceError> errors, boolean successfulExploit, boolean ignoredEvent, RedactionType redactionType) {
         Metadata.Builder metadataBuilder = Metadata.newBuilder();
         if (errors != null && !errors.isEmpty()) {
             metadataBuilder.addAllSchemaErrors(errors);
@@ -111,10 +110,10 @@ public class Utils {
         String status = ignoredEvent ? com.akto.util.ThreatDetectionConstants.IGNORED : com.akto.util.ThreatDetectionConstants.ACTIVE;
 
         String redactedPayload = responseParam.getOriginalMsg().get();
-        if (isRedactRequestResponseData) {
+        if (redactionType != RedactionType.NONE) {
             // Redact sensitive data from the payload
             try {
-                redactedPayload = getRedactedPayload(responseParam);
+                redactedPayload = getRedactedPayload(responseParam, redactionType);
             } catch (Exception e) {
                 // If redaction fails, fall back to original message
             }
