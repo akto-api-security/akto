@@ -2117,6 +2117,10 @@ public class DbAction extends ActionSupport {
         try {
             trrs = DbLayer.markTestRunResultSummaryFailed(testingRunResultSummaryId);
             trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
+            // send slack alert for failed state
+            int accountId = Context.accountId.get();
+            String customMessage = "Testing Run Result Summary Failed for Summary ID in markTestRunResultSummaryFailed: " + testingRunResultSummaryId;
+            SlackSender.sendFailedAlertToAkto(customMessage, accountId);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in markTestRunResultSummaryFailed " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -2158,7 +2162,13 @@ public class DbAction extends ActionSupport {
             }
             if (trrs != null && trrs.getTestingRunId() != null) {
                 trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
+                if(trrs.getTestResultsCount() == 0){
+                    String customMessage = "CRITICAL ERROR: No test results found for Summary ID: " + summaryId;
+                    SlackSender.sendFailedAlertToAkto(customMessage, Context.accountId.get());
+                }
             }
+
+            
         } catch (Exception e) {
             e.printStackTrace();
             loggerMaker.errorAndAddToDb(e, "Error in updateIssueCountInSummary " + e.toString());
@@ -2210,6 +2220,10 @@ public class DbAction extends ActionSupport {
     public String updateTestRunResultSummary() {
         try {
             DbLayer.updateTestRunResultSummary(summaryId);
+            // send slack alert for failed state
+            int accountId = Context.accountId.get();
+            String customMessage = "Testing Run Result Summary Failed for Summary ID: " + summaryId;
+            SlackSender.sendFailedAlertToAkto(customMessage, accountId);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in updateTestRunResultSummary " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -2429,6 +2443,10 @@ public class DbAction extends ActionSupport {
             trrs = DbLayer.updateIssueCountAndStateInSummary(summaryId, totalCountIssues, state);
             if (trrs != null && trrs.getTestingRunId() != null) {
                 trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
+            }
+            if(trrs != null && trrs.getTestResultsCount() == 0){
+                String customMessage = "CRITICAL ERROR: No test results found for Summary ID: " + summaryId;
+                SlackSender.sendFailedAlertToAkto(customMessage, Context.accountId.get());
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in updateIssueCountAndStateInSummary " + e.toString());

@@ -105,4 +105,23 @@ public class SlackSender {
        }
     }
 
+    public static void sendFailedAlertToAkto(String customMessage, int accountId){
+        Context.accountId.set(1000000);
+        String customMessageToSend = "Failed test: " + accountId + " Custom Message: " + customMessage;
+        SlackWebhook slackWebhook = SlackWebhooksDao.instance.findOne(
+            Filters.eq(Constants.ID, 10)
+        );
+        if (slackWebhook == null) {
+            Context.accountId.set(accountId);
+            return;
+        }
+        try {
+            String webhookUrl = slackWebhook.getWebhook();
+            Slack.getInstance().send(webhookUrl, customMessageToSend);
+        } catch (Exception e) {
+            // TODO: handle exception
+        }
+        Context.accountId.set(accountId);
+    }
+
 }
