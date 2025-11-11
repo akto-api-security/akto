@@ -12,10 +12,35 @@ import com.slack.api.webhook.WebhookResponse;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class SlackSender {
     private static final LoggerMaker loggerMaker = new LoggerMaker(SlackAlerts.class, LoggerMaker.LogDb.DASHBOARD);
     private static final ExecutorService executor = Executors.newFixedThreadPool(3);
+
+    private static String slackWebhookUrl;
+    public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+
+    static {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    if(slackWebhookUrl != null){
+                        return;
+                    }
+                    Context.accountId.set(1000000);
+                    SlackWebhook slackWebhook = SlackWebhooksDao.instance.findOne(Filters.eq("_id", 10));
+                    if(slackWebhook != null){
+                        slackWebhookUrl = slackWebhook.getWebhook();
+                    }
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Error in getting slack webhook url: " + e.getMessage());
+                }
+            }
+        }, 0, 5, TimeUnit.MINUTES);
+    }
 
     public static void sendAlert(int accountId, SlackAlerts alert) {
         sendAlert(accountId, alert, 0);
@@ -103,6 +128,18 @@ public class SlackSender {
             }
             Context.accountId.set(accountId);
        }
+    }
+
+    public static void sendFailedAlertToAkto(String customMessage, int accountId){
+        String customMessageToSend = "Failed test: " + accountId + " Custom Message: " + customMessage;
+        try {
+            if(slackWebhookUrl == null || slackWebhookUrl.isEmpty()){
+                return;
+            }
+            Slack.getInstance().send(slackWebhookUrl, customMessageToSend);
+        } catch (Exception e) {
+            // TODO: handle exception
+        }
     }
 
 }
