@@ -16,7 +16,8 @@ import transform from "../../testing/transform";
 
 function SampleDetails(props) {
     const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate } = props
-    let currentTemplateObj = threatFiltersMap[moreInfoData?.templateId]
+    const resolvedThreatFiltersMap = threatFiltersMap || {};
+    let currentTemplateObj = moreInfoData?.templateId ? resolvedThreatFiltersMap[moreInfoData?.templateId] : undefined;
 
     let severity = currentTemplateObj?.severity || "HIGH"
     const [remediationText, setRemediationText] = useState("")
