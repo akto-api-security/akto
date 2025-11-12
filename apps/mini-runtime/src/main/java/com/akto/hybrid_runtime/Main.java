@@ -261,7 +261,7 @@ public class Main {
         String isKubernetes = System.getenv("IS_KUBERNETES");
         if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
             loggerMaker.infoAndAddToDb("is_kubernetes: true");
-            kafkaBrokerUrl = System.getenv().getOrDefault("AKTO_KAFKA_BROKER_URL","127.0.0.1:29092");
+            kafkaBrokerUrl = System.getenv().getOrDefault("AKTO_KAFKA_BROKER_URL", "127.0.0.1:29092");
         }
         final String brokerUrlFinal = kafkaBrokerUrl;
         String groupIdConfig =  System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG") != null
