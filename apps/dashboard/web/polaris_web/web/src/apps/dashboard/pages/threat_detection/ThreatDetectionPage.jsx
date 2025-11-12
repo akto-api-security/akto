@@ -10,7 +10,7 @@ import SampleDetails from "./components/SampleDetails";
 import threatDetectionRequests from "./api";
 import tempFunc from "./dummyData";
 import NormalSampleDetails from "./components/NormalSampleDetails";
-import { HorizontalGrid, VerticalStack, HorizontalStack, Popover, Button, ActionList, Box, Icon, Badge, Text} from "@shopify/polaris";
+import { HorizontalGrid, VerticalStack, HorizontalStack, Popover, Button, ActionList, Box, Icon, Text, Spinner} from "@shopify/polaris";
 import { FileMinor } from '@shopify/polaris-icons';
 import TopThreatTypeChart from "./components/TopThreatTypeChart";
 import api from "./api";
@@ -19,7 +19,7 @@ import InfoCard from "../dashboard/new_components/InfoCard";
 import BarGraph from "../../components/charts/BarGraph";
 import SessionStore from "../../../main/SessionStore";
 import { getDashboardCategory, isApiSecurityCategory, mapLabel } from "../../../main/labelHelper";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import LineChart from "../../components/charts/LineChart";
 import P95LatencyGraph from "../../components/charts/P95LatencyGraph";
 import { LABELS } from "./constants";
@@ -201,6 +201,12 @@ const ChartComponent = ({ subCategoryCount, severityCountMap }) => {
 
 function ThreatDetectionPage() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const refIdFromQuery = searchParams.get("refId");
+    const eventTypeFromQuery = searchParams.get("eventType");
+    const actorFromQuery = searchParams.get("actor");
+    const filterIdFromQuery = searchParams.get("filterId");
+    const isFullPageModeFromUrl = Boolean(refIdFromQuery && eventTypeFromQuery && actorFromQuery && filterIdFromQuery);
     const [loading, setLoading] = useState(false);
     const [currentRefId, setCurrentRefId] = useState('')
     const [rowDataList, setRowDataList] = useState([])
@@ -218,6 +224,9 @@ function ThreatDetectionPage() {
     const [severityCountMap, setSeverityCountMap] = useState([]);
     const [moreActions, setMoreActions] = useState(false);
     const [latencyData, setLatencyData] = useState([]);
+    const [fullPageMode, setFullPageMode] = useState(false);
+    const [eventLoading, setEventLoading] = useState(false);
+    const [eventError, setEventError] = useState(null);
 
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
 
@@ -382,6 +391,170 @@ function ThreatDetectionPage() {
         }
       }, [startTimestamp, endTimestamp, isDemoMode]);
 
+      // Fetch event data when required query params are in URL
+      useEffect(() => {
+        if (!isFullPageModeFromUrl) {
+          setFullPageMode(false);
+          return;
+        }
+
+        setFullPageMode(true);
+        setEventLoading(true);
+        setEventError(null);
+
+        const fetchEventDetails = async () => {
+          try {
+            // Fetch detailed payloads using the query parameters
+            const payloadResponse = await threatDetectionRequests.fetchMaliciousRequest(
+              refIdFromQuery,
+              eventTypeFromQuery,
+              actorFromQuery,
+              filterIdFromQuery
+            );
+
+            setRowDataList(payloadResponse?.maliciousPayloadsResponses || []);
+            setCurrentRefId(refIdFromQuery);
+            setShowNewTab(true);
+            setShowDetails(true);
+
+            // Fetch supplemental metadata for the event to populate sidebar fields
+            let eventMetadata = null;
+            try {
+              const metadataResponse = await api.fetchSuspectSampleData(
+                0,
+                actorFromQuery ? [actorFromQuery] : [],
+                [],
+                [],
+                [],
+                { detectedAt: -1 },
+                0,
+                Math.floor(Date.now() / 1000),
+                filterIdFromQuery ? [filterIdFromQuery] : [],
+                200,
+                null,
+                null,
+                LABELS.THREAT,
+                []
+              );
+
+              eventMetadata = metadataResponse?.maliciousEvents?.find(
+                (ev) => ev.refId === refIdFromQuery
+              );
+            } catch (metadataError) {
+              console.error('Error fetching event metadata:', metadataError);
+            }
+
+            if (eventMetadata) {
+              setCurrentEventStatus(eventMetadata?.status || '');
+              setCurrentJiraTicketUrl(eventMetadata?.jiraTicketUrl || '');
+              setMoreInfoData({
+                url: eventMetadata?.url,
+                method: eventMetadata?.method,
+                apiCollectionId: eventMetadata?.apiCollectionId,
+                templateId: eventMetadata?.filterId,
+              });
+              setCurrentEventId(eventMetadata?.id || '');
+            } else {
+              setCurrentEventStatus('');
+              setCurrentJiraTicketUrl('');
+              setMoreInfoData({
+                url: undefined,
+                method: undefined,
+                apiCollectionId: undefined,
+                templateId: filterIdFromQuery,
+              });
+            }
+
+            setEventLoading(false);
+          } catch (error) {
+            console.error('Error fetching event:', error);
+            setEventError('Failed to load event. Please try again.');
+            setEventLoading(false);
+          }
+        };
+
+        fetchEventDetails();
+      }, [isFullPageModeFromUrl, refIdFromQuery, eventTypeFromQuery, actorFromQuery, filterIdFromQuery]);
+
+    // If in full page mode, only show event details
+    if (fullPageMode) {
+        if (eventLoading) {
+            return (
+                <PageWithMultipleCards
+                    title={
+                        <TitleWithInfo
+                            titleText={mapLabel("API Threat Activity", getDashboardCategory())}
+                            tooltipContent={"Identify malicious requests with Akto's powerful threat detection capabilities"}
+                        />
+                    }
+                    isFirstPage={true}
+                    components={[
+                        <Box padding="8" key="loading">
+                            <VerticalStack gap="4" align="center">
+                                <Spinner size="large" />
+                                <Text variant="headingMd">Loading event details...</Text>
+                            </VerticalStack>
+                        </Box>
+                    ]}
+                />
+            );
+        }
+
+        if (eventError) {
+            return (
+                <PageWithMultipleCards
+                    title={
+                        <TitleWithInfo
+                            titleText={mapLabel("API Threat Activity", getDashboardCategory())}
+                            tooltipContent={"Identify malicious requests with Akto's powerful threat detection capabilities"}
+                        />
+                    }
+                    isFirstPage={true}
+                    components={[
+                        <Box padding="8" key="error">
+                            <VerticalStack gap="4" align="center">
+                                <Text variant="headingMd" tone="critical">{eventError}</Text>
+                                <Button onClick={() => navigate('/dashboard/protection/threat-activity')}>
+                                    Go Back to Threat Activity
+                                </Button>
+                            </VerticalStack>
+                        </Box>
+                    ]}
+                />
+            );
+        }
+
+        return (
+            <PageWithMultipleCards
+                title={
+                    <TitleWithInfo
+                        titleText={mapLabel("API Threat Activity", getDashboardCategory())}
+                        tooltipContent={"Identify malicious requests with Akto's powerful threat detection capabilities"}
+                    />
+                }
+                isFirstPage={true}
+                components={[
+                    showNewTab && rowDataList.length > 0 ? <SampleDetails
+                        title={"Attacker payload"}
+                        showDetails={true}
+                        setShowDetails={() => {}}
+                        data={rowDataList}
+                        key={"sus-sample-details"}
+                        moreInfoData={moreInfoData}
+                        threatFiltersMap={threatFiltersMap}
+                        eventId={currentEventId}
+                        eventStatus={currentEventStatus}
+                        onStatusUpdate={handleStatusUpdate}
+                        jiraTicketUrl={currentJiraTicketUrl}
+                        fullPageMode={true}
+                        onNavigateBack={() => navigate('/dashboard/protection/threat-activity')}
+                    /> : null
+                ]}
+            />
+        );
+    }
+
+    // Normal mode - show table, charts, and sidebar
     const components = [
         <ChartComponent subCategoryCount={subCategoryCount} severityCountMap={severityCountMap} />,
         // Add P95 latency graphs for MCP and AI Agent security in demo mode
