@@ -124,8 +124,8 @@ function SampleDetails(props) {
     }, [moreInfoData?.templateId, data])
 
     useEffect(() => {
-        setJiraTicketUrl(jiraTicketUrl|| "")
-    }, [jiraTicketUrl])
+        setJiraTicketUrl(props.jiraTicketUrl || "")
+    }, [props.jiraTicketUrl])
 
     const openTest = (id) => {
         const navigateUrl = window.location.origin + "/dashboard/protection/threat-policy?policy=" + id
