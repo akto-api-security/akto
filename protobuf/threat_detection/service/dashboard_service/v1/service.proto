@@ -55,6 +55,7 @@ message ListMaliciousRequestsRequest {
       optional bool successful_exploit = 9;
       optional string label = 10;  // Common values: "threat", "guardrail"
       repeated string hosts = 11;  // Host header values for filtering
+      optional string latest_api_orig_regex = 12 [json_name = "latestApiOrigRegex"];
     }
 
     // The number of alerts to return

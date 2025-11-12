@@ -241,6 +241,10 @@ public class MaliciousEventService {
       query.append("host", new Document("$in", filter.getHostsList()));
     }
 
+    if (filter.hasLatestApiOrigRegex() && !filter.getLatestApiOrigRegex().isEmpty()) {
+      query.append("latestApiOrig", new Document("$regex", filter.getLatestApiOrigRegex()));
+    }
+
 
     if (!filter.getLatestAttackList().isEmpty()) {
       query.append("filterId", new Document("$in", filter.getLatestAttackList()));
@@ -479,6 +483,11 @@ public class MaliciousEventService {
     if (label != null && !label.isEmpty()) {
       MaliciousEventDto.Label labelEnum = convertStringLabelToModelLabel(label);
       applyLabelFilter(query, labelEnum);
+    }
+
+    String latestApiOrigRegex = (String) filter.get("latestApiOrigRegex");
+    if (latestApiOrigRegex != null && !latestApiOrigRegex.isEmpty()) {
+      query.append("latestApiOrig", new Document("$regex", latestApiOrigRegex));
     }
 
     return query;
