@@ -3,11 +3,10 @@ package com.akto.utils;
 import com.akto.dto.*;
 import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.enums.RedactionType;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.hybrid_parsers.HttpCallParser;
-import com.akto.hybrid_runtime.policies.AuthPolicy;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -21,29 +20,19 @@ import com.mongodb.BasicDBObject;
 import java.util.*;
 
 import static com.akto.dto.RawApi.convertHeaders;
+import static com.akto.runtime.utils.Utils.parseCookie;
 
-public class RedactSampleData {
+public class RedactParser {
     static ObjectMapper mapper = new ObjectMapper();
     static JsonFactory factory = mapper.getFactory();
-    private static final LoggerMaker loggerMaker = new LoggerMaker(RedactSampleData.class, LogDb.RUNTIME);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(RedactParser.class, LogDb.RUNTIME);
 
     public static final String redactValue = "****";
-
-    public static String redactIfRequired(String sample, boolean accountLevelRedact, boolean apiCollectionLevelRedact) throws Exception {
-        HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
-        HttpResponseParams.Source source = httpResponseParams.getSource();
-        if(source.equals(HttpResponseParams.Source.HAR) || source.equals(HttpResponseParams.Source.PCAP)) return sample;
-        return redact(httpResponseParams, accountLevelRedact || apiCollectionLevelRedact);
-    }
-
-    public static String redactDataTypes(String sample) throws Exception{
-        return redact(HttpCallParser.parseKafkaMessage(sample), false);
-    }
 
     public static String redactCookie(Map<String, List<String>> headers, String header) {
         String cookie = "";
         List<String> cookieList = headers.getOrDefault(header, new ArrayList<>());
-        Map<String, String> cookieMap = AuthPolicy.parseCookie(cookieList);
+        Map<String, String> cookieMap = parseCookie(cookieList);
         for (String cookieKey : cookieMap.keySet()) {
             cookie += cookieKey + "=" + redactValue + ";";
         }
@@ -53,9 +42,9 @@ public class RedactSampleData {
         return cookie;
     }
 
-    private static String handleQueryParams(String url, boolean redactAll, String redactValue) {
+    private static String handleQueryParams(String url, RedactionType redactionType, String redactValue) {
 
-        if (!redactAll || url == null || url.isEmpty()) {
+        if (redactionType == RedactionType.NONE || url == null || url.isEmpty()) {
             return url;
         }
         String finalUrl = url;
@@ -80,17 +69,27 @@ public class RedactSampleData {
         return finalUrl;
     }
 
-    private static void handleHeaders(Map<String, List<String>> responseHeaders, boolean redactAll) {
-        if(redactAll){
+    private static Map<String, List<String>> handleHeaders(Map<String, List<String>> responseHeaders, RedactionType redactionType) {
+        
+        Map<String, List<String>> tempHeaders = new HashMap<>();
+
+        if(redactionType == RedactionType.REDACT_ALL || redactionType == RedactionType.REDACT_BY_API_COLLECTION){
+            try{
             for (String header : responseHeaders.keySet()) {
-                if (header.equalsIgnoreCase(AuthPolicy.COOKIE_NAME)) {
+                if (header.equalsIgnoreCase("cookie")) {
                     String cookie = redactCookie(responseHeaders, header);
-                    responseHeaders.put(header, Collections.singletonList(cookie));
+                    tempHeaders.put(header, Collections.singletonList(cookie));
+                    continue;
+                }else if (header.equalsIgnoreCase("authorization")){
+                    tempHeaders.put(header, Collections.singletonList("Bearer " + redactValue));
                     continue;
                 }
-                responseHeaders.put(header, Collections.singletonList(redactValue));
+                tempHeaders.put(header, Collections.singletonList(redactValue));
             }
-            return;
+            } catch (Exception e){
+                loggerMaker.errorAndAddToDb(e, "unable to redact all headers");
+            }
+            return tempHeaders;
         }
         Set<Map.Entry<String, List<String>>> entries = responseHeaders.entrySet();
         for(Map.Entry<String, List<String>> entry : entries){
@@ -98,30 +97,34 @@ public class RedactSampleData {
             List<String> values = entry.getValue();
             SingleTypeInfo.SubType subType = KeyTypes.findSubType(values.get(0), key, null);
             if(SingleTypeInfo.isRedacted(subType.getName())){
-                if (key.equalsIgnoreCase(AuthPolicy.COOKIE_NAME)) {
+                if (key.equalsIgnoreCase("cookie")) {
                     String cookie = redactCookie(responseHeaders, key);
-                    responseHeaders.put(key, Collections.singletonList(cookie));
+                    tempHeaders.put(key, Collections.singletonList(cookie));
+                    continue;
+                }else if (key.equalsIgnoreCase("authorization")){
+                    tempHeaders.put(key, Collections.singletonList("Bearer " + redactValue));
                     continue;
                 }
-                responseHeaders.put(key, Collections.singletonList(redactValue));
+                tempHeaders.put(key, Collections.singletonList(redactValue));
             }
         }
+        return tempHeaders;
     }
 
-    // never use this function directly. This alters the httpResponseParams
-    public static String redact(HttpResponseParams httpResponseParams, final boolean redactAll) throws Exception {
+
+    public static void redactHttpResponseParam(HttpResponseParams httpResponseParams, RedactionType redactionType) throws Exception {
         // response headers
         Map<String, List<String>> responseHeaders = httpResponseParams.getHeaders();
         if (responseHeaders == null) responseHeaders = new HashMap<>();
-        handleHeaders(responseHeaders, redactAll);
-
+        responseHeaders = handleHeaders(responseHeaders, redactionType);
+        httpResponseParams.setHeaders(responseHeaders);
         // response payload
         String responsePayload = httpResponseParams.getPayload();
         if (responsePayload == null) responsePayload = "{}";
         try {
             JsonParser jp = factory.createParser(responsePayload);
             JsonNode node = mapper.readTree(jp);
-            change(null, node, redactValue, redactAll, false);
+            change(null, node, redactValue, redactionType, false);
             if (node != null) {
                 responsePayload = node.toString();
             } else {
@@ -130,24 +133,22 @@ public class RedactSampleData {
         } catch (Exception e) {
             responsePayload = "{}";
         }
-
         httpResponseParams.setPayload(responsePayload);
-
         // request headers
         Map<String, List<String>> requestHeaders = httpResponseParams.requestParams.getHeaders();
         if (requestHeaders == null) requestHeaders = new HashMap<>();
-        handleHeaders(requestHeaders, redactAll);
-
+        requestHeaders = handleHeaders(requestHeaders, redactionType);
+        httpResponseParams.getRequestParams().setHeaders(requestHeaders);
         // request payload
         String requestPayload = httpResponseParams.requestParams.getPayload();
         //query params
-        String url = handleQueryParams(httpResponseParams.requestParams.getURL(), redactAll, redactValue);
+        String url = handleQueryParams(httpResponseParams.requestParams.getURL(), redactionType, redactValue);
         httpResponseParams.requestParams.setUrl(url);
         if (requestPayload == null) requestPayload = "{}";
         try {
             // TODO: support subtype/collection wise redact for graphql
             boolean isGraphqlModified = false;
-            if (redactAll) {
+            if (redactionType != RedactionType.NONE) {
                 try {
                     requestPayload = GraphQLUtils.getUtils().modifyGraphqlStaticArguments(requestPayload, redactValue);
                     isGraphqlModified = true;
@@ -157,7 +158,7 @@ public class RedactSampleData {
             }
             JsonParser jp = factory.createParser(requestPayload);
             JsonNode node = mapper.readTree(jp);
-            change(null, node, redactValue, redactAll, isGraphqlModified);
+            change(null, node, redactValue, redactionType, isGraphqlModified);
             if (node != null) {
                 requestPayload= node.toString();
             } else {
@@ -166,19 +167,14 @@ public class RedactSampleData {
         } catch (Exception e) {
             requestPayload = "{}";
         }
-
         httpResponseParams.requestParams.setPayload(requestPayload);
-
         // ip
-        if(redactAll) {
+        if(redactionType == RedactionType.REDACT_ALL || redactionType == RedactionType.REDACT_BY_API_COLLECTION) {
             httpResponseParams.setSourceIP(redactValue);
         }
-
-        return convertHttpRespToOriginalString(httpResponseParams);
-
     }
-
-    public static void change(String parentName, JsonNode parent, String newValue, boolean redactAll, boolean isGraphqlModified) {
+    
+    public static void change(String parentName, JsonNode parent, String newValue, RedactionType redactionType, boolean isGraphqlModified) {
         if (parent == null) return;
 
         if (parent.isArray()) {
@@ -186,7 +182,7 @@ public class RedactSampleData {
             for(int i = 0; i < arrayNode.size(); i++) {
                 JsonNode arrayElement = arrayNode.get(i);
                 if (arrayElement.isValueNode()) {
-                    if(redactAll){
+                    if(redactionType == RedactionType.REDACT_ALL || redactionType == RedactionType.REDACT_BY_API_COLLECTION){
                         arrayNode.set(i, new TextNode(redactValue));
                     } else{
                         SingleTypeInfo.SubType subType = KeyTypes.findSubType(arrayElement.asText(), parentName, null);
@@ -195,7 +191,7 @@ public class RedactSampleData {
                         }
                     }
                 } else {
-                    change(parentName, arrayElement, newValue, redactAll, isGraphqlModified);
+                    change(parentName, arrayElement, newValue, redactionType, isGraphqlModified);
                 }
             }
         } else {
@@ -204,7 +200,7 @@ public class RedactSampleData {
                 String f = fieldNames.next();
                 JsonNode fieldValue = parent.get(f);
                 if (fieldValue.isValueNode()) {
-                    if(redactAll && !(isGraphqlModified && f.equalsIgnoreCase(HttpResponseParams.QUERY))){
+                    if((redactionType == RedactionType.REDACT_ALL || redactionType == RedactionType.REDACT_BY_API_COLLECTION) && !(isGraphqlModified && f.equalsIgnoreCase(HttpResponseParams.QUERY))){
                         ((ObjectNode) parent).put(f, newValue);
                     }
                     else {
@@ -215,7 +211,7 @@ public class RedactSampleData {
                     }
 
                 } else {
-                    change(f, fieldValue, newValue, redactAll, isGraphqlModified);
+                    change(f, fieldValue, newValue, redactionType, isGraphqlModified);
                 }
             }
         }
@@ -275,3 +271,5 @@ public class RedactSampleData {
     }
 
 }
+
+

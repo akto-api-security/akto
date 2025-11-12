@@ -9,9 +9,15 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
+import com.akto.dto.*;
+import com.akto.dto.type.SingleTypeInfo;
+import com.akto.enums.RedactionType;
+import com.akto.threat.detection.cache.AccountConfig;
+import com.akto.threat.detection.cache.AccountConfigurationCache;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -25,16 +31,9 @@ import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
-import com.akto.dto.ApiInfo;
-import com.akto.dto.HttpRequestParams;
-import com.akto.dto.HttpResponseParams;
-import com.akto.dto.RawApi;
-import com.akto.dto.RawApiMetadata;
 import com.akto.dto.api_protection_parse_layer.AggregationRules;
 import com.akto.dto.api_protection_parse_layer.Rule;
 import com.akto.dto.monitoring.FilterConfig;
-import com.akto.dto.test_editor.Category;
-import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.URLMethods;
 import com.akto.hybrid_parsers.HttpCallParser;
@@ -49,8 +48,6 @@ import com.akto.proto.generated.threat_detection.message.sample_request.v1.Schem
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.RatelimitConfig.RatelimitConfigItem;
 import com.akto.proto.http_response_param.v1.HttpResponseParam;
 import com.akto.proto.http_response_param.v1.StringList;
-import com.akto.rules.TestPlugin;
-import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.threat.detection.cache.ApiCountCacheLayer;
 import com.akto.threat.detection.cache.RedisBackedCounterCache;
 import com.akto.threat.detection.constants.KafkaTopic;
@@ -112,7 +109,7 @@ public class MaliciousTrafficDetectorTask implements Task {
   private int recordsReadCount = 0;
   private long lastRecordCountLogTime = System.currentTimeMillis();
 
-  public MaliciousTrafficDetectorTask(
+    public MaliciousTrafficDetectorTask(
       KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient, DistributionCalculator distributionCalculator, boolean apiDistributionEnabled) throws Exception {
     this.kafkaConfig = trafficConfig;
 
@@ -181,6 +178,10 @@ public class MaliciousTrafficDetectorTask implements Task {
                 recordsReadCount = 0;
                 lastRecordCountLogTime = currentTime;
               }
+
+              AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
+              Context.accountId.set(config.getAccountId());
+              Context.isRedactPayload.set(config.isRedacted());
 
               for (ConsumerRecord<String, byte[]> record : records) {
                 HttpResponseParam httpResponseParam = HttpResponseParam.parseFrom(record.value());
@@ -261,8 +262,6 @@ public class MaliciousTrafficDetectorTask implements Task {
     return apiFilters;
   }
 
-
-
   private String getApiSchema(int apiCollectionId) {
     String apiSchema = null;
     try {
@@ -298,8 +297,6 @@ public class MaliciousTrafficDetectorTask implements Task {
       logger.warnAndAddToDb("Dropping processing of record with no actor IP, account: " + responseParam.getAccountId());
       return;
     }
-
-    Context.accountId.set(Integer.parseInt(responseParam.getAccountId()));
     Map<String, FilterConfig> filters = this.getFilters();
     if (filters.isEmpty()) {
       logger.warnAndAddToDb("No filters found for account " + responseParam.getAccountId());
@@ -335,8 +332,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     if (!ignoredEventFilters.isEmpty()) {
       isIgnoredEvent = threatDetector.isIgnoredEvent(ignoredEventFilters, rawApi, apiInfoKey);
     }
-
-    if (apiDistributionEnabled) {
+      if (apiDistributionEnabled) {
       String apiCollectionIdStr = Integer.toString(apiCollectionId);
       String distributionKey = Utils.buildApiDistributionKey(apiCollectionIdStr, url, method.toString());
       String ipApiCmsKey = Utils.buildIpApiCmsDataKey(actor, apiCollectionIdStr, url, method.toString());
@@ -355,9 +351,10 @@ public class MaliciousTrafficDetectorTask implements Task {
         logger.debugAndAddToDb("Ratelimit hit for url " + apiInfoKey.getUrl() + " actor: " + actor + " ratelimitConfig "
             + ratelimitConfig.toString());
 
-        // Send event to BE.
+          RedactionType redactionType = getRedactionType(responseParam.getRequestParams().getHeaders());
+          // Send event to BE.
         SampleMaliciousRequest maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam,
-            ipApiRateLimitFilter, metadata, errors, successfulExploit, isIgnoredEvent);
+            ipApiRateLimitFilter, metadata, errors, successfulExploit, isIgnoredEvent, redactionType);
         generateAndPushMaliciousEventRequest(ipApiRateLimitFilter, actor, responseParam, maliciousReq,
             EventType.EVENT_TYPE_AGGREGATED);
 
@@ -419,7 +416,9 @@ public class MaliciousTrafficDetectorTask implements Task {
       // and so we push it to kafka
       if (hasPassedFilter) {
         logger.debugAndAddToDb("filter condition satisfied for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
-        // Later we will also add aggregation support
+        RedactionType redactionType = getRedactionType(responseParam.getRequestParams().getHeaders());
+
+          // Later we will also add aggregation support
         // Eg: 100 4xx requests in last 10 minutes.
         // But regardless of whether request falls in aggregation or not,
         // we still push malicious requests to kafka
@@ -436,9 +435,10 @@ public class MaliciousTrafficDetectorTask implements Task {
         String groupKey = apiFilter.getId();
         String aggKey = actor + "|" + groupKey;
 
+
         SampleMaliciousRequest maliciousReq = null;
         if (!isAggFilter || !apiFilter.getInfo().getSubCategory().equalsIgnoreCase("API_LEVEL_RATE_LIMITING")) {
-          maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors, successfulExploit, isIgnoredEvent);
+          maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors, successfulExploit, isIgnoredEvent, redactionType);
         }
 
         if (!isAggFilter) {
@@ -456,7 +456,7 @@ public class MaliciousTrafficDetectorTask implements Task {
               }
               shouldNotify = this.apiCountWindowBasedThresholdNotifier.calcApiCount(apiHitCountKey, responseParam.getTime(), rule);
               if (shouldNotify) {
-                maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors, successfulExploit, isIgnoredEvent);
+                maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors, successfulExploit, isIgnoredEvent, redactionType);
               }
           } else {
               shouldNotify = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule);
@@ -574,5 +574,58 @@ public class MaliciousTrafficDetectorTask implements Task {
         httpResponseParamProto.getDestIp(),
         httpResponseParamProto.getDirection(),
         lazyToString);
+  }
+
+
+  
+
+  /**
+   * Determines the redaction type based on account settings and host information.
+   *
+   * @param headers Request headers map
+   * @return RedactionType indicating the level of redaction to apply
+   */
+  private RedactionType getRedactionType(Map<String, List<String>> headers) {
+    try {
+      if (Context.isRedactPayload.get() != null && Context.isRedactPayload.get()) {
+        return RedactionType.REDACT_ALL;
+      }
+      // Extract host from headers
+      String host = extractHostFromHeaders(headers);
+      if (host != null && !host.isEmpty()) {
+        int hostHashCode = host.hashCode();
+          AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
+          Boolean isApiCollectionRedacted = config.isApiCollectionRedacted(hostHashCode);
+          if(isApiCollectionRedacted != null && isApiCollectionRedacted){
+              return RedactionType.REDACT_BY_API_COLLECTION;
+          }
+      }
+      if(SingleTypeInfo.isCustomDataTypeAvailable(Context.accountId.get())){
+          return RedactionType.REDACT_BY_CUSTOM_FIELD;
+      }
+    return  RedactionType.NONE;
+
+    } catch (Exception e) {
+      logger.errorAndAddToDb(e, "Error determining redaction type, defaulting to ALL");
+      return RedactionType.NONE;
+    }
+  }
+
+  /**
+   * Extracts host value from request headers.
+   * Checks in order: host, :authority, authority
+   *
+   * @param headers Request headers map
+   * @return Host value or null if not found
+   */
+  private String extractHostFromHeaders(Map<String, List<String>> headers) {
+    if (headers == null || headers.isEmpty()) {
+      return null;
+    }
+    List<String> hostValues = headers.get("host");
+    if (hostValues != null && !hostValues.isEmpty()) {
+      return hostValues.get(0);
+    }
+    return null;
   }
 }
