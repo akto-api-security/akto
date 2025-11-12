@@ -6,6 +6,9 @@ import DropdownSearch from "@/apps/dashboard/components/shared/DropdownSearch";
 const setCreateJiraIssueFieldMetaData = IssuesStore.getState().setCreateJiraIssueFieldMetaData;
 const updateDisplayJiraIssueFieldValues = IssuesStore.getState().updateDisplayJiraIssueFieldValues;
 
+const setCreateABWorkItemFieldMetaData = IssuesStore.getState().setCreateABWorkItemFieldMetaData;
+const updateDisplayABWorkItemFieldValues = IssuesStore.getState().updateDisplayABWorkItemFieldValues;
+
 const issuesFunctions = {
     getJiraFieldConfigurations: (field) => {
         const customFieldURI = field?.schema?.custom || "";
@@ -146,7 +149,146 @@ const issuesFunctions = {
         const additionalIssueFields = { customIssueFields: customIssueFields };
         const jiraMetaData = { additionalIssueFields: additionalIssueFields };
         return jiraMetaData;
-    }
+    },
+    fetchCreateABWorkItemFieldMetaData: async () => {
+        try {
+            if (IssuesStore.getState().createABWorkItemFieldMetaData && Object.keys(IssuesStore.getState().createABWorkItemFieldMetaData).length === 0) {
+                const response = await issuesApi.fetchCreateABWorkItemFieldMetaData()
+
+                if (response && Object.keys(response).length > 0) {
+                    setCreateABWorkItemFieldMetaData(response);
+                }
+            } else {
+                return IssuesStore.getState().createABWorkItemFieldMetaData;
+            }
+        } catch (error) {
+        }
+    },
+    getABFieldConfigurations: (field) => {
+        const { organizationFieldDetails, workItemTypeFieldDetails } = field;
+
+        const fieldReferenceName = organizationFieldDetails?.referenceName || "";
+        const fieldName = organizationFieldDetails?.name || "";
+        const fieldType = organizationFieldDetails?.type || "";
+        const isFieldPicklist = organizationFieldDetails?.isPicklist || false;
+        
+        const fieldDefaultValue = workItemTypeFieldDetails?.defaultValue || null;
+        const fieldAllowedValues = workItemTypeFieldDetails?.allowedValues || [];
+        const isFieldRequired = workItemTypeFieldDetails?.alwaysRequired || false;
+
+        const handleFieldChange = (fieldReferenceName, value) => {
+            updateDisplayABWorkItemFieldValues(fieldReferenceName, value)
+        } 
+
+        /* 
+         * Field types documentation: https://learn.microsoft.com/en-us/azure/devops/boards/queries/query-index-quick-ref?view=azure-devops#operators-and-macros-supported-for-each-data-type 
+         */
+        switch (fieldType) {
+            case "string":
+            case "html":
+                if (isFieldPicklist) {
+                    return {
+                        initialValue: fieldDefaultValue !== null ? fieldDefaultValue : "",
+                        getComponent: () => { return null }
+                    }
+                } else {
+                    return {
+                        initialValue: fieldDefaultValue !== null ? fieldDefaultValue : "",
+                        getComponent: () => {
+                            const displayABWorkItemFieldValues = IssuesStore(state => state.displayABWorkItemFieldValues);
+                            
+                            return (
+                                <TextField
+                                    key={fieldReferenceName}
+                                    label={fieldName}
+                                    value={displayABWorkItemFieldValues[fieldReferenceName] || ""}
+                                    onChange={(value) => handleFieldChange(fieldReferenceName, value)}
+                                    maxLength={fieldType === "string" ? 255 : 1000}
+                                    type="text"
+                                    showCharacterCount
+                                    requiredIndicator={isFieldRequired}
+                                />)
+                        }
+                    }
+                }
+            case "integer":
+            case "double":
+                // todo: handle case where there is no default value
+                if (isFieldPicklist) {
+                    return {
+                        initialValue: fieldDefaultValue !== null ? fieldDefaultValue : 0,
+                        getComponent: () => { return null }
+                    }
+                } else {
+                    return {
+                        initialValue: fieldDefaultValue !== null ? fieldDefaultValue : 0,
+                        getComponent: () => {
+                            const displayABWorkItemFieldValues = IssuesStore(state => state.displayABWorkItemFieldValues);
+                            
+                            return (
+                                <TextField
+                                    key={fieldReferenceName}
+                                    label={fieldName}
+                                    value={displayABWorkItemFieldValues[fieldReferenceName] || 0}
+                                    onChange={(value) => handleFieldChange(fieldReferenceName, value)}
+                                    type={fieldType === "integer" ? "integer" : "number"}
+                                    requiredIndicator={isFieldRequired}
+                                />)
+                        }
+                    }
+                }
+            case "boolean":
+            case "dateTime":
+            default: 
+                return {
+                    initialValue: null,
+                    getComponent: () => { return null }
+                }
+        }
+    },
+    prepareCustomABWorkItemFieldsPayload: (project, workItemType) => {
+        const displayABWorkItemFieldValues = IssuesStore.getState().displayABWorkItemFieldValues;
+        const createABWorkItemFieldMetaData = IssuesStore.getState().createABWorkItemFieldMetaData;
+        const workItemTypeFieldMetaDataList = createABWorkItemFieldMetaData?.[project]?.[workItemType] || [];
+
+        // Convert to map for easier lookup
+        const workItemTypeFieldMetaDataMap = workItemTypeFieldMetaDataList.reduce((acc, field) => {
+            const fieldReferenceName = field?.organizationFieldDetails?.referenceName;
+            const fieldType = field?.organizationFieldDetails?.type || "string";
+
+            const isFieldRequired = field?.workItemTypeFieldDetails?.alwaysRequired || false;
+            if (fieldReferenceName) {
+                acc[fieldReferenceName] = {
+                    fieldType: fieldType,
+                    isFieldRequired: isFieldRequired,
+                    ...field
+                };
+            }
+            return acc;
+        }, {});
+
+        const customABWorkItemFieldsPayload = [];
+        for (const [fieldReferenceName, fieldValue] of Object.entries(displayABWorkItemFieldValues)) {
+            const fieldMetaData = workItemTypeFieldMetaDataMap[fieldReferenceName];
+
+            // Fail validation if the field is required but has no value
+            if (fieldMetaData !== undefined) {
+                const isFieldRequired = fieldMetaData?.isFieldRequired || false;
+                if (isFieldRequired && fieldValue === null) {
+                    throw new Error();
+                }
+            }
+
+            const fieldType = fieldMetaData?.fieldType || "string";
+            customABWorkItemFieldsPayload.push({
+                referenceName: fieldReferenceName,
+                value: fieldValue,
+                type: fieldType
+            })
+        }
+
+        return customABWorkItemFieldsPayload;
+    },
 }
 
 export default issuesFunctions

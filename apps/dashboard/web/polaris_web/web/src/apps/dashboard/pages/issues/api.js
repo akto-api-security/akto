@@ -65,11 +65,11 @@ export default {
             data: {}
         })
     },
-    createAzureBoardsWorkItem(testingIssuesId, projectName, workItemType, aktoDashboardHostName) {
+    createAzureBoardsWorkItem(testingIssuesId, projectName, workItemType, aktoDashboardHostName, customABWorkItemFieldsPayload) {
         return request({
             url: 'api/createAzureBoardsWorkItem',
             method: 'post',
-            data: {testingIssuesId, projectName, workItemType, aktoDashboardHostName}
+            data: {testingIssuesId, projectName, workItemType, aktoDashboardHostName, customABWorkItemFieldsPayload}
         })
     },
     bulkCreateAzureWorkItems(testingIssuesIdList, projectName, workItemType, aktoDashboardHostName) {
@@ -77,6 +77,13 @@ export default {
             url: 'api/bulkCreateAzureWorkItems',
             method: 'post',
             data: {testingIssuesIdList, projectName, workItemType, aktoDashboardHostName}
+        })
+    },
+    fetchCreateABWorkItemFieldMetaData() {
+        return request({
+            url: 'api/fetchCreateABWorkItemFieldMetaData',
+            method: 'post',
+            data: {}
         })
     },
     createGeneralJiraTicket(payload) {

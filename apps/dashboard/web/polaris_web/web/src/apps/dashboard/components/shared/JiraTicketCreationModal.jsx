@@ -21,6 +21,23 @@ const DisplayJiraCreateIssueFields = ({ displayJiraIssueFieldMetadata }) => {
     )
 }
 
+const DisplayABCreateWorkItemFields = ({ displayABWorkItemFieldMetadata }) => {
+        return (
+            <FormLayout>
+                {displayABWorkItemFieldMetadata.map((field, idx) => {
+                    const fieldConfiguration = issuesFunctions.getABFieldConfigurations(field)
+                    const FieldComponent = fieldConfiguration.getComponent
+
+                    return (
+                        <div key={field.fieldId || idx}>
+                            <FieldComponent />
+                        </div>
+                    )
+                })}
+            </FormLayout>
+        )
+    }
+
 const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handleSaveAction, jiraProjectMaps, setProjId, setIssueType, projId, issueType, issueId, isAzureModal, isServiceNowModal, labelsText, setLabelsText }) => {
     const [isCreatingTicket, setIsCreatingTicket] = useState(false)
     const [displayJiraIssueFieldMetadata, setDisplayJiraIssueFieldMetadata] = useState([])
@@ -69,6 +86,37 @@ const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handl
     const handleLabelsChange = useCallback((val) => {
         setLocalLabelsText(val);
     }, [])
+
+    // Azure boards work item custom fields state and effects
+    const createABWorkItemFieldMetaData = IssuesStore((state) => state.createABWorkItemFieldMetaData)
+    const setDisplayABWorkItemFieldValues = IssuesStore((state) => state.setDisplayABWorkItemFieldValues)
+    const [ displayABWorkItemFieldMetadata, setDisplayABWorkItemFieldMetadata ] = useState([])
+
+    useEffect(() => {
+        if (isAzureModal && projId && issueType) {
+            const initialFieldMetaData = createABWorkItemFieldMetaData?.[projId]?.[issueType] || [];
+
+            const filteredFieldMetaData = initialFieldMetaData.filter(field => {
+                const fieldReferenceName = field?.organizationFieldDetails?.referenceName;
+                const isCustomField = (typeof fieldReferenceName === "string") && (fieldReferenceName.startsWith("Custom."));
+                return isCustomField;
+            });
+
+            setDisplayABWorkItemFieldMetadata(filteredFieldMetaData);
+
+            const initialValues = filteredFieldMetaData.reduce((acc, field) => {
+                const fieldConfiguration = issuesFunctions.getABFieldConfigurations(field);
+                const fieldReferenceName = field?.organizationFieldDetails?.referenceName;
+
+                if (typeof fieldReferenceName === "string") {
+                    acc[fieldReferenceName] = fieldConfiguration.initialValue;
+                }
+                return acc;
+            }, {});
+            
+            setDisplayABWorkItemFieldValues(initialValues);
+        }
+    }, [isAzureModal, projId, issueType, createABWorkItemFieldMetaData]);
 
     return (
         <Modal
@@ -145,6 +193,12 @@ const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handl
                                     autoComplete="off"
                                 />
                             }
+
+                            {isAzureModal && projId && issueType && displayABWorkItemFieldMetadata.length > 0 && (
+                                <DisplayABCreateWorkItemFields
+                                    displayABWorkItemFieldMetadata={displayABWorkItemFieldMetadata}
+                                />
+                            )}
                         </>
                     )}
                 </VerticalStack>
