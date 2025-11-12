@@ -25,11 +25,12 @@ const DisplayABCreateWorkItemFields = ({ displayABWorkItemFieldMetadata }) => {
         return (
             <FormLayout>
                 {displayABWorkItemFieldMetadata.map((field, idx) => {
+                    const fieldReferenceName = field?.organizationFieldDetails?.referenceName;
                     const fieldConfiguration = issuesFunctions.getABFieldConfigurations(field)
                     const FieldComponent = fieldConfiguration.getComponent
 
                     return (
-                        <div key={field.fieldId || idx}>
+                        <div key={fieldReferenceName || idx}>
                             <FieldComponent />
                         </div>
                     )

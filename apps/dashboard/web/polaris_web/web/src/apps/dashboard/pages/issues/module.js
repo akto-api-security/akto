@@ -2,6 +2,7 @@ import issuesApi from "@/apps/dashboard/pages/issues/api"
 import IssuesStore from '@/apps/dashboard/pages/issues/issuesStore';
 import { TextField } from "@shopify/polaris";
 import DropdownSearch from "@/apps/dashboard/components/shared/DropdownSearch";
+import Dropdown from "@/apps/dashboard/components/layouts/Dropdown";
 
 const setCreateJiraIssueFieldMetaData = IssuesStore.getState().setCreateJiraIssueFieldMetaData;
 const updateDisplayJiraIssueFieldValues = IssuesStore.getState().updateDisplayJiraIssueFieldValues;
@@ -189,6 +190,21 @@ const issuesFunctions = {
             updateDisplayABWorkItemFieldValues(fieldReferenceName, value)
         } 
 
+        const getPicklistFieldConfiguration = (fieldType, fieldDefaultValue, fieldAllowedValues) => {
+            const fallbackInitialValue = fieldType === "string" ? "" : 0;
+            const firstAllowedValue = fieldAllowedValues.length > 0 ? fieldAllowedValues[0] : fallbackInitialValue;
+            const initialValue = fieldDefaultValue !== null ? fieldDefaultValue : firstAllowedValue;
+            const menuItems = fieldAllowedValues.map((option) => ({   
+                label: option,
+                value: option
+            }));
+
+            return {
+                initialValue: initialValue,
+                menuItems: menuItems
+            }
+        }
+
         /* 
          * Field types documentation: https://learn.microsoft.com/en-us/azure/devops/boards/queries/query-index-quick-ref?view=azure-devops#operators-and-macros-supported-for-each-data-type 
          */
@@ -196,9 +212,20 @@ const issuesFunctions = {
             case "string":
             case "html":
                 if (isFieldPicklist) {
+                    const { initialValue, menuItems } = getPicklistFieldConfiguration(fieldType, fieldDefaultValue, fieldAllowedValues);
+
                     return {
-                        initialValue: fieldDefaultValue !== null ? fieldDefaultValue : "",
-                        getComponent: () => { return null }
+                        initialValue: initialValue,
+                        getComponent: () => { 
+                            return (
+                                <Dropdown
+                                    id={`${fieldReferenceName}-dropdown`}
+                                    label={fieldName}
+                                    menuItems={menuItems}
+                                    initial={initialValue}
+                                    selected={(value) => handleFieldChange(fieldReferenceName, value)}/>
+                            ) 
+                        }
                     }
                 } else {
                     return {
@@ -221,12 +248,22 @@ const issuesFunctions = {
                     }
                 }
             case "integer":
-            case "double":
-                // todo: handle case where there is no default value
+            case "double":  
                 if (isFieldPicklist) {
+                    const { initialValue, menuItems } = getPicklistFieldConfiguration(fieldType, fieldDefaultValue, fieldAllowedValues);
+
                     return {
-                        initialValue: fieldDefaultValue !== null ? fieldDefaultValue : 0,
-                        getComponent: () => { return null }
+                        initialValue: initialValue,
+                        getComponent: () => { 
+                            return (
+                                <Dropdown
+                                    id={`${fieldReferenceName}-dropdown`}
+                                    label={fieldName}
+                                    menuItems={menuItems}
+                                    initial={initialValue}
+                                    selected={(value) => handleFieldChange(fieldReferenceName, value)}/>
+                            ) 
+                        }
                     }
                 } else {
                     return {
