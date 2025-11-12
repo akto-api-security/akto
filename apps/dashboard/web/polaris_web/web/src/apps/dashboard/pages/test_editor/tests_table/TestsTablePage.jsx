@@ -34,7 +34,11 @@ const llmCategories = [
     "SYSTEM_PROMPT_LEAKAGE",
     "VECTOR_AND_EMBEDDING_WEAKNESSES",
     "MISINFORMATION",
-    "UNBOUNDED_CONSUMPTION"
+    "UNBOUNDED_CONSUMPTION",
+    "AGENTIC_BUSINESS_ALIGNMENT",
+    "AGENTIC_HALLUCINATION_AND_TRUSTWORTHINESS",
+    "AGENTIC_SAFETY",
+    "AGENTIC_SECURITY",
 ]
 
 const mcpCategories = [
@@ -191,7 +195,10 @@ function TestsTablePage() {
             let categoriesName = Object.keys(categoryMap);
             if(dashboardCategory === "MCP Security"){
                 categoriesName = mcpCategories;
-            } else {
+            } else if (dashboardCategory === "Agentic Security") {
+                categoriesName = [...llmCategories, ...mcpCategories];
+            }
+             else {
                 categoriesName = Object.keys(categoryMap);
             }
             let metaDataObj = {
@@ -231,7 +238,7 @@ function TestsTablePage() {
 
     useEffect(() => {
         fetchAllTests()
-    }, [])
+    }, [dashboardCategory])
 
 
     const resourceName = {
