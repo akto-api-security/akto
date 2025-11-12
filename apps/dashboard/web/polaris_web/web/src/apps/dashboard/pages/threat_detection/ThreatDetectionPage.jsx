@@ -18,7 +18,6 @@ import threatDetectionFunc from "./transform";
 import InfoCard from "../dashboard/new_components/InfoCard";
 import BarGraph from "../../components/charts/BarGraph";
 import SessionStore from "../../../main/SessionStore";
-import { getDashboardCategory, isApiSecurityCategory, mapLabel } from "../../../main/labelHelper";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { getDashboardCategory, isApiSecurityCategory, isDastCategory, mapLabel } from "../../../main/labelHelper";
 import LineChart from "../../components/charts/LineChart";
