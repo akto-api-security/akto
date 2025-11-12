@@ -1,10 +1,9 @@
 import { Badge, Box, Button, Divider, HorizontalStack, Modal, Text, Tooltip, VerticalStack, Popover, ActionList } from "@shopify/polaris";
-import { ArrowLeftMinor } from '@shopify/polaris-icons';
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
 import func from "@/util/func";
-import { useEffect, useState } from "react";
+import { useEffect, useState} from "react";
 import testingApi from "../../testing/api"
 import threatDetectionApi from "../api"
 import issuesApi from "../../issues/api"
@@ -16,13 +15,13 @@ import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreati
 import transform from "../../testing/transform";
 
 function SampleDetails(props) {
-    const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate, fullPageMode = false, onNavigateBack } = props
+    const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate, loading } = props
     let currentTemplateObj = threatFiltersMap[moreInfoData?.templateId]
 
     let severity = currentTemplateObj?.severity || "HIGH"
     const [remediationText, setRemediationText] = useState("")
     const [latestActivity, setLatestActivity] = useState([])
-    const [showModal, setShowModal] = useState(false);
+    const [showModal, setShowModal] = useState(false);  
     const [triageLoading, setTriageLoading] = useState(false);
     const [actionPopoverActive, setActionPopoverActive] = useState(false);
 
@@ -120,13 +119,13 @@ function SampleDetails(props) {
     }
 
     useEffect(() => {
-       fetchRemediationInfo()
-       aggregateActivity()
-    },[moreInfoData?.templateId, data])
+        fetchRemediationInfo();
+        aggregateActivity();
+    }, [fetchRemediationInfo, aggregateActivity]);
 
     useEffect(() => {
-        setJiraTicketUrl(props.jiraTicketUrl || "")
-    }, [props.jiraTicketUrl])
+        setJiraTicketUrl(jiraTicketUrl|| "")
+    }, [jiraTicketUrl])
 
     const openTest = (id) => {
         const navigateUrl = window.location.origin + "/dashboard/protection/threat-policy?policy=" + id
@@ -385,40 +384,12 @@ Reference URL: ${window.location.href}`.trim();
         <TitleComponent/>, tabsComponent
     ]
 
-    // Full page mode - render in page layout instead of sidebar
-    if (fullPageMode) {
-        return (
-            <Box background="bg" padding="4">
-                <VerticalStack gap="4">
-                    {/* Back button header */}
-                    <Box paddingBlockEnd="2">
-                        <Button
-                            icon={ArrowLeftMinor}
-                            onClick={onNavigateBack}
-                            plain
-                        >
-                            Back to Threat Activity
-                        </Button>
-                    </Box>
-                    {/* Content */}
-                    <Box>
-                        {currentComponents.map((component, index) => (
-                            <Box key={index}>
-                                {component}
-                            </Box>
-                        ))}
-                    </Box>
-                </VerticalStack>
-            </Box>
-        );
-    }
-
-    // Sidebar mode - use existing FlyLayout
     return <FlyLayout
         title={title || ""}
         show={showDetails}
         setShow={setShowDetails}
         components={currentComponents}
+        loading={loading}
     />
 }
 
