@@ -10,6 +10,7 @@ import graphql.util.TraverserContext;
 import graphql.util.TreeTransformerUtil;
 import graphql.validation.DocumentVisitor;
 import graphql.validation.LanguageTraversal;
+import org.mortbay.util.ajax.JSON;
 
 import java.util.*;
 
@@ -89,12 +90,11 @@ public class GraphQLUtils {//Singleton class
         Map mapOfRequestPayload = null;
         Object[] listOfRequestPayload = null;
         try {
-            Object obj = gson.fromJson(requestPayload, Object.class);
+            Object obj = JSON.parse(requestPayload);
             if (obj instanceof Map) {
                 mapOfRequestPayload = (Map) obj;
-            } else if (obj instanceof List) {
-                List list = (List) obj;
-                listOfRequestPayload = list.toArray(new Object[0]);
+            } else if (obj instanceof Object[]) {
+                listOfRequestPayload = (Object[]) obj;
             } else {
                 return responseParamsList;
             }
@@ -140,11 +140,10 @@ public class GraphQLUtils {//Singleton class
 
     private String editGraphqlField(String payload, String field, String value, String type, boolean unique) {
         String tempVariable = "__tempDummyVariableToReplace";
-        Object payloadObj = gson.fromJson(payload, Object.class);
+        Object payloadObj = JSON.parse(payload);
         Object[] payloadList;
-        if (payloadObj instanceof List) {
-            List<?> list = (List<?>) payloadObj;
-            payloadList = list.toArray(new Object[0]);
+        if (payloadObj instanceof Object[]) {
+            payloadList = (Object[]) payloadObj;
         } else {
             payloadList = new Object[]{payloadObj};
         }
@@ -292,7 +291,7 @@ public class GraphQLUtils {//Singleton class
                                 hashMap.put(HttpResponseParams.QUERY + key, map.get(key));
                             }
                             hashMap.remove(HttpResponseParams.QUERY);
-                            httpResponseParamsCopy.requestParams.setPayload(gson.toJson(hashMap));
+                            httpResponseParamsCopy.requestParams.setPayload(JSON.toString(hashMap));
                             responseParamsList.add(httpResponseParamsCopy);
                         } catch (Exception e) {
                             //eat exception, No changes to request payload, parse Exception
