@@ -5,7 +5,6 @@ import {
     MarketingFilledMinor,
     ReportFilledMinor,
     DiamondAlertMinor,
-    StarFilledMinor,
     FinancesMinor,
     LockMajor,
     AutomationFilledMajor
@@ -22,7 +21,7 @@ import func from "@/util/func";
 import Dropdown from "../Dropdown";
 import SessionStore from "../../../../main/SessionStore";
 import IssuesStore from "../../../pages/issues/issuesStore";
-import { CATEGORY_API_SECURITY, CATEGORY_DAST, mapLabel } from "../../../../main/labelHelper";
+import { CATEGORY_DAST, mapLabel } from "../../../../main/labelHelper";
 
 export default function LeftNav() {
     const navigate = useNavigate();
@@ -163,7 +162,7 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_sensitive",
                     },
-                    ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AKTO_DAST?.isGranted && dashboardCategory == CATEGORY_DAST ? [{
+                    ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AKTO_DAST?.isGranted && dashboardCategory === CATEGORY_DAST ? [{
                         label: "DAST scans",
                         onClick: () => {
                             navigate("/dashboard/observe/dast-progress");
@@ -335,7 +334,7 @@ export default function LeftNav() {
                 subNavigationItems: reportsSubNavigationItems,
                 key: "6",
             },
-            ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted  ? [{
+            ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted && dashboardCategory !== CATEGORY_DAST  ? [{
                     label: (
                         <Text variant="bodyMd" fontWeight="medium">
                             {mapLabel("Threat Detection", dashboardCategory)}
