@@ -183,9 +183,7 @@ public class Main {
                 List<CustomDataType> customDataTypes = dataActor.fetchCustomDataTypes();
                 logger.info("customData type " + customDataTypes.size());
                 List<AktoDataType> aktoDataTypes = dataActor.fetchAktoDataTypes();
-                List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
                 SingleTypeInfo.fetchCustomDataTypes(account.getId(),customDataTypes,aktoDataTypes);
-                SingleTypeInfo.fetchCustomAuthTypes(account.getId(), customAuthTypes);
 
             }
         }, 0, 5, TimeUnit.MINUTES);
