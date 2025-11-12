@@ -197,8 +197,6 @@ function TestRunResultFlyout(props) {
 
     const handleAzureBoardWorkitemCreation = async(id) => {
         if(projectId.length > 0 && workItemType.length > 0){
-            issuesFunctions.prepareCustomABWorkItemFieldsPayload(projectId, workItemType);
-
             let customABWorkItemFieldsPayload = [];
             try {
                 customABWorkItemFieldsPayload = issuesFunctions.prepareCustomABWorkItemFieldsPayload(projectId, workItemType);

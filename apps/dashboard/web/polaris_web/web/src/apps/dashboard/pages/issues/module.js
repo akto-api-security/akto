@@ -10,6 +10,15 @@ const setCreateABWorkItemFieldMetaData = IssuesStore.getState().setCreateABWorkI
 const updateDisplayABWorkItemFieldValues = IssuesStore.getState().updateDisplayABWorkItemFieldValues;
 
 const issuesFunctions = {
+    fetchIntegrationCustomFieldsMetadata: () => {
+        if (window.JIRA_INTEGRATED === 'true') {
+            issuesFunctions.fetchCreateIssueFieldMetaData()
+        }
+            
+        if (window.AZURE_BOARDS_INTEGRATED === 'true') {
+            issuesFunctions.fetchCreateABWorkItemFieldMetaData()
+        }
+    },
     getJiraFieldConfigurations: (field) => {
         const customFieldURI = field?.schema?.custom || "";
         const allowedValues = field?.allowedValues || [];

@@ -72,11 +72,11 @@ export default {
             data: {testingIssuesId, projectName, workItemType, aktoDashboardHostName, customABWorkItemFieldsPayload}
         })
     },
-    bulkCreateAzureWorkItems(testingIssuesIdList, projectName, workItemType, aktoDashboardHostName) {
+    bulkCreateAzureWorkItems(testingIssuesIdList, projectName, workItemType, aktoDashboardHostName, customABWorkItemFieldsPayload) {
         return request({
             url: 'api/bulkCreateAzureWorkItems',
             method: 'post',
-            data: {testingIssuesIdList, projectName, workItemType, aktoDashboardHostName}
+            data: {testingIssuesIdList, projectName, workItemType, aktoDashboardHostName, customABWorkItemFieldsPayload}
         })
     },
     fetchCreateABWorkItemFieldMetaData() {

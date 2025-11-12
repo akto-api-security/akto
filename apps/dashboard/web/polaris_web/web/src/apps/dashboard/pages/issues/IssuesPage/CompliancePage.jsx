@@ -309,6 +309,14 @@ function CompliancePage() {
     }
 
     const handleSaveBulkAzureWorkItemsAction = () => {
+            let customABWorkItemFieldsPayload = [];
+            try {
+                customABWorkItemFieldsPayload = issuesFunctions.prepareCustomABWorkItemFieldsPayload(projectId, workItemType);
+            } catch (error) {
+                setToast(true, true, "Please fill all required fields before creating a Azure boards work item.");
+                return;
+            }
+
             setToast(true, false, "Please wait while we create your Azure Boards Work Item.")
             setBoardsModalActive(false)
             api.bulkCreateAzureWorkItems(selectedIssuesItems, projectId, workItemType, window.location.origin).then((res) => {
@@ -532,10 +540,7 @@ function CompliancePage() {
   }, [subCategoryMap, apiCollectionMap])
 
     useEffect(() => {
-        // Fetch jira integration field metadata
-        if (window.JIRA_INTEGRATED === 'true') {
-            issuesFunctions.fetchCreateIssueFieldMetaData()
-        }
+        issuesFunctions.fetchIntegrationCustomFieldsMetadata();
     }, [])
   
 
