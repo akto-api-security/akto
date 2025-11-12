@@ -5,7 +5,7 @@ function LegendLabel() {
 
   const LegendItem = ({ label, color, borderColor }) => {
     return (
-      <HorizontalStack gap="2" align="center">
+      <HorizontalStack gap="2" align="start">
         <div style={{ width: '14px', height: '14px', borderRadius: '50%', backgroundColor: color, border: `1px solid ${borderColor}` }} />
         <Text variant="bodySm" color="subdued">{label}</Text>
       </HorizontalStack>
@@ -31,7 +31,7 @@ function LegendLabel() {
     ]
   
     return (
-      <HorizontalStack gap="4" align="center" wrap>
+      <HorizontalStack gap="4" align="start" wrap>
         {legendItems.map((item) => (
           <LegendItem key={item.label} {...item} />
         ))}
