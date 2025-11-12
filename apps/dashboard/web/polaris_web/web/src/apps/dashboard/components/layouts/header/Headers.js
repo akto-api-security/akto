@@ -50,6 +50,7 @@ export default function Header() {
         stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || true
     const mcpSecurityGranted =
         stiggFeatures?.MCP_SECURITY?.isGranted || true;
+    const dastGranted = func.checkForFeatureSaas("AKTO_DAST")
 
     const disabledDashboardCategories = useMemo(() => {
         const disabled = [];
@@ -58,6 +59,9 @@ export default function Header() {
         }
         if (agenticSecurityGranted === false) {
             disabled.push("Agentic Security");
+        }
+        if (dastGranted === false) {
+            disabled.push("DAST")
         }
         return disabled;
     }, [mcpSecurityGranted, agenticSecurityGranted]);
@@ -272,8 +276,8 @@ export default function Header() {
                                 <Dropdown
                                     menuItems={[
                                         { value: "API Security", label: "API Security", id: "api-security" },
-                                        { value: "MCP Security", label: "MCP Security", id: "mcp-security" },
                                         { value: "Agentic Security", label: "Agentic Security", id: "agentic-security" },
+                                        { value: "DAST", label: "DAST", id: "dast" },
                                     ]}
                                     initial={dropdownInitial}
                                     selected={(val) => handleDashboardChange(val)}

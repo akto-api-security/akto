@@ -131,6 +131,9 @@ public class TestTemplateUtils {
             case AGENTIC:
                 return allCategories;
             
+            // for DAST and API security
+            case DAST:
+            case API:
             default:
                 return Arrays.stream(allCategories)
                     .filter(category -> !Arrays.asList(mcpCategories).contains(category) && !Arrays.asList(llmCategories).contains(category))

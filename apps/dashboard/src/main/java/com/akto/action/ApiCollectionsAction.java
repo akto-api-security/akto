@@ -56,7 +56,6 @@ import com.opensymphony.xwork2.Action;
 
 import lombok.Setter;
 import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
-import static com.akto.util.Constants.AKTO_MCP_SERVER_TAG;
 import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.dto.type.URLMethods;
 
