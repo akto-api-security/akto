@@ -292,7 +292,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
   private void processRecord(HttpResponseParam record) throws Exception {
     HttpResponseParams responseParam = buildHttpResponseParam(record);
-    String actor = "14.143.179.162";
+    String actor = this.threatConfigEvaluator.getActorId(responseParam);
 
     if (actor == null || actor.isEmpty()) {
       logger.warnAndAddToDb("Dropping processing of record with no actor IP, account: " + responseParam.getAccountId());
