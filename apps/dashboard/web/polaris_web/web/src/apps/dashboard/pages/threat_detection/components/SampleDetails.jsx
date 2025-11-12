@@ -121,7 +121,7 @@ function SampleDetails(props) {
     useEffect(() => {
         fetchRemediationInfo();
         aggregateActivity();
-    }, [fetchRemediationInfo, aggregateActivity]);
+    }, [moreInfoData?.templateId, data])
 
     useEffect(() => {
         setJiraTicketUrl(jiraTicketUrl|| "")
