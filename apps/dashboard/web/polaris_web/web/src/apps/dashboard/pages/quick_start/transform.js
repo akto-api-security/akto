@@ -16,7 +16,7 @@ import GithubSource from "./components/GithubSource"
 import AktoJax from "./components/AktoJax"  
 import McpScan from "./components/McpScan" 
 import AiAgentScan from "./components/AiAgentScan"
-import { isGenAISecurityCategory, isMCPSecurityCategory, isAgenticSecurityCategory, isDastCategory } from "../../../main/labelHelper"
+import { isGenAISecurityCategory, isMCPSecurityCategory, isAgenticSecurityCategory, isDastCategory, isApiSecurityCategory } from "../../../main/labelHelper"
 import McpRecon from "./components/McpRecon"
 import McpProxy from "./components/McpProxy"
 import AwsLogAccountComponent from "./components/shared/AwsLogAccountComponent"
@@ -1501,7 +1501,7 @@ const quickStartFunc = {
             connectors["MCP Scan"] = mcpScan
         }
 
-        if (isDastCategory()) {
+        if (isDastCategory() || isApiSecurityCategory()) {
             connectors["DAST"] = crawler
         }
 
