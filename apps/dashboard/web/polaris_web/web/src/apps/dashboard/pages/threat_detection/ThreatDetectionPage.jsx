@@ -206,6 +206,8 @@ function ThreatDetectionPage() {
     const eventTypeFromQuery = searchParams.get("eventType");
     const actorFromQuery = searchParams.get("actor");
     const filterIdFromQuery = searchParams.get("filterId");
+    const filtersFromQuery = searchParams.get("filters");
+    const statusFromFilters = filtersFromQuery ? filtersFromQuery.replace(/#/g, "").toUpperCase() : "";
     const isFullPageModeFromUrl = Boolean(refIdFromQuery && eventTypeFromQuery && actorFromQuery && filterIdFromQuery);
     const [loading, setLoading] = useState(false);
     const [currentRefId, setCurrentRefId] = useState('')
@@ -352,6 +354,10 @@ function ThreatDetectionPage() {
     }
 
       useEffect(() => {
+        if (isFullPageModeFromUrl) {
+            return;
+        }
+
         const fetchThreatCategoryCount = async () => {
             setLoading(true);
             const res = await api.fetchThreatCategoryCount(startTimestamp, endTimestamp);
@@ -412,58 +418,21 @@ function ThreatDetectionPage() {
               filterIdFromQuery
             );
 
-            setRowDataList(payloadResponse?.maliciousPayloadsResponses || []);
+            const maliciousPayloads = payloadResponse?.maliciousPayloadsResponses || [];
+
+            setRowDataList(maliciousPayloads);
             setCurrentRefId(refIdFromQuery);
             setShowNewTab(true);
             setShowDetails(true);
-
-            // Fetch supplemental metadata for the event to populate sidebar fields
-            let eventMetadata = null;
-            try {
-              const metadataResponse = await api.fetchSuspectSampleData(
-                0,
-                actorFromQuery ? [actorFromQuery] : [],
-                [],
-                [],
-                [],
-                { detectedAt: -1 },
-                0,
-                Math.floor(Date.now() / 1000),
-                filterIdFromQuery ? [filterIdFromQuery] : [],
-                200,
-                null,
-                null,
-                LABELS.THREAT,
-                []
-              );
-
-              eventMetadata = metadataResponse?.maliciousEvents?.find(
-                (ev) => ev.refId === refIdFromQuery
-              );
-            } catch (metadataError) {
-              console.error('Error fetching event metadata:', metadataError);
-            }
-
-            if (eventMetadata) {
-              setCurrentEventStatus(eventMetadata?.status || '');
-              setCurrentJiraTicketUrl(eventMetadata?.jiraTicketUrl || '');
-              setMoreInfoData({
-                url: eventMetadata?.url,
-                method: eventMetadata?.method,
-                apiCollectionId: eventMetadata?.apiCollectionId,
-                templateId: eventMetadata?.filterId,
-              });
-              setCurrentEventId(eventMetadata?.id || '');
-            } else {
-              setCurrentEventStatus('');
-              setCurrentJiraTicketUrl('');
-              setMoreInfoData({
-                url: undefined,
-                method: undefined,
-                apiCollectionId: undefined,
-                templateId: filterIdFromQuery,
-              });
-            }
+            setCurrentEventStatus(statusFromFilters || '');
+            setCurrentJiraTicketUrl('');
+            setCurrentEventId('');
+            setMoreInfoData({
+              url: undefined,
+              method: undefined,
+              apiCollectionId: undefined,
+              templateId: filterIdFromQuery,
+            });
 
             setEventLoading(false);
           } catch (error) {
@@ -474,7 +443,7 @@ function ThreatDetectionPage() {
         };
 
         fetchEventDetails();
-      }, [isFullPageModeFromUrl, refIdFromQuery, eventTypeFromQuery, actorFromQuery, filterIdFromQuery]);
+      }, [isFullPageModeFromUrl, refIdFromQuery, eventTypeFromQuery, actorFromQuery, filterIdFromQuery, statusFromFilters]);
 
     // If in full page mode, only show event details
     if (fullPageMode) {
