@@ -22,7 +22,7 @@ import func from "@/util/func";
 import Dropdown from "../Dropdown";
 import SessionStore from "../../../../main/SessionStore";
 import IssuesStore from "../../../pages/issues/issuesStore";
-import { CATEGORY_API_SECURITY, mapLabel } from "../../../../main/labelHelper";
+import { CATEGORY_API_SECURITY, CATEGORY_DAST, mapLabel } from "../../../../main/labelHelper";
 
 export default function LeftNav() {
     const navigate = useNavigate();
@@ -163,7 +163,7 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_sensitive",
                     },
-                    ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AKTO_DAST?.isGranted && dashboardCategory == CATEGORY_API_SECURITY ? [{
+                    ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AKTO_DAST?.isGranted && dashboardCategory == CATEGORY_DAST ? [{
                         label: "DAST scans",
                         onClick: () => {
                             navigate("/dashboard/observe/dast-progress");
@@ -550,7 +550,7 @@ export default function LeftNav() {
     }, [dashboardCategory, leftNavSelected])
 
     const navigationMarkup = (
-        <div className={active}>
+        <div className={`${active} ${dashboardCategory === "Agentic Security" ? "agentic-security-nav" : ""}`}>
             <Navigation location="/">
                 <Navigation.Section
                     items={navItems}

@@ -20,6 +20,7 @@ import BarGraph from "../../components/charts/BarGraph";
 import SessionStore from "../../../main/SessionStore";
 import { getDashboardCategory, isApiSecurityCategory, mapLabel } from "../../../main/labelHelper";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
+import { getDashboardCategory, isApiSecurityCategory, isDastCategory, mapLabel } from "../../../main/labelHelper";
 import LineChart from "../../components/charts/LineChart";
 import P95LatencyGraph from "../../components/charts/P95LatencyGraph";
 import { LABELS } from "./constants";
@@ -162,7 +163,7 @@ const ChartComponent = ({ subCategoryCount, severityCountMap }) => {
             />
         </HorizontalGrid>
         {
-            func.isDemoAccount() && !isApiSecurityCategory() ? <HorizontalGrid gap={4} columns={2}>
+            func.isDemoAccount() && !(isApiSecurityCategory() || isDastCategory()) ? <HorizontalGrid gap={4} columns={2}>
                 <InfoCard
                     title={`Threat Messages by Direction (Request/Response)`}
                     titleToolTip="Number of threat messages found in requests vs responses over time"
@@ -496,7 +497,7 @@ function ThreatDetectionPage() {
     const components = [
         <ChartComponent subCategoryCount={subCategoryCount} severityCountMap={severityCountMap} />,
         // Add P95 latency graphs for MCP and AI Agent security in demo mode
-        ...(isDemoMode && !isApiSecurityCategory() ? [
+        ...(isDemoMode && !(isApiSecurityCategory() || isDastCategory()) ? [
             <P95LatencyGraph
                 key="threat-detection-latency"
                 title="Threat Detection Latency"

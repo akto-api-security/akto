@@ -16,6 +16,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mcp.McpJsonRpcModel.McpParams;
 import com.akto.test_editor.TestingUtilsSingleton;
+import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.Pair;
 import com.akto.utils.JsonUtils;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -44,10 +45,25 @@ public final class McpRequestResponseUtils {
     public static HttpResponseParams parseMcpResponseParams(HttpResponseParams responseParams) {
         String requestPayload = responseParams.getRequestParams().getPayload();
 
+        // Check if this is a JSON-RPC request first
+        if (!JsonRpcUtils.isJsonRpcRequest(responseParams)) {
+            return responseParams;
+        }
+
+        // Check if response is a JSON-RPC error - if yes, discard it
+        // This handles both recognized MCP methods and unrecognized/typo methods
+        // This handles both JSON and event-stream responses
+        if (isMcpErrorResponse(responseParams)) {
+            logger.info("Discarding JSON-RPC request with error response");
+            return null;
+        }
+
+        // Now check if it's a recognized MCP method for special handling
         Pair<Boolean, McpJsonRpcModel> mcpRequest = isMcpRequest(responseParams);
         if (!mcpRequest.getFirst()) {
             return responseParams;
         }
+
         handleMcpMethodCall(mcpRequest.getSecond(), requestPayload, responseParams);
         return responseParams;
     }
@@ -79,6 +95,70 @@ public final class McpRequestResponseUtils {
             return false;
         }
         return McpSchema.MCP_METHOD_SET.contains(mcpJsonRpcModel.getMethod());
+    }
+
+    private static boolean isMcpErrorResponse(HttpResponseParams responseParams) {
+        String responsePayload = responseParams.getPayload();
+        if (responsePayload == null || responsePayload.isEmpty()) {
+            return false;
+        }
+
+        String contentType = HttpRequestResponseUtils.getHeaderValue(
+            responseParams.getHeaders(), HttpRequestResponseUtils.CONTENT_TYPE
+        );
+
+        String jsonToCheck = responsePayload;
+
+        if (contentType != null && contentType.toLowerCase().contains(HttpRequestResponseUtils.TEXT_EVENT_STREAM_CONTENT_TYPE)) {
+            try {
+                String parsedSse = parseResponse(contentType, responsePayload);
+                BasicDBObject parsed = BasicDBObject.parse(parsedSse);
+                List<BasicDBObject> events = (List<BasicDBObject>) parsed.get("events");
+
+                if (events == null || events.isEmpty()) {
+                    return false;
+                }
+
+                jsonToCheck = events.get(0).getString("data");
+                if (jsonToCheck == null || jsonToCheck.isEmpty()) {
+                    return false;
+                }
+            } catch (Exception e) {
+                logger.debug("Error parsing event-stream for MCP error check: " + e.getMessage());
+                return false;
+            }
+        }
+
+        try {
+            JsonNode root = OBJECT_MAPPER.readTree(jsonToCheck);
+            if (root == null || !root.isObject()) {
+                return true;
+            }
+
+            JsonNode jsonrpcNode = root.get(McpSchema.MCP_JSONRPC_KEY);
+            if (jsonrpcNode == null || !McpSchema.JSONRPC_VERSION.equals(jsonrpcNode.asText())) {
+                return true;
+            }
+
+            if (root.has(McpSchema.MCP_ERROR_KEY) && !root.get(McpSchema.MCP_ERROR_KEY).isNull()) {
+                return true;
+            }
+
+            JsonNode resultNode = root.get(McpSchema.MCP_RESULT_KEY);
+            if (resultNode == null || resultNode.isNull() || resultNode.isMissingNode()) {
+                return true;
+            }
+
+            if (resultNode.isObject() && resultNode.has("isError")) {
+                JsonNode isErrorNode = resultNode.get("isError");
+                return isErrorNode.isBoolean() && isErrorNode.asBoolean();
+            }
+
+            return false;
+        } catch (Exception e) {
+            logger.debug("Error parsing JSON for MCP error check: " + e.getMessage());
+            return false;
+        }
     }
 
     private static void handleMcpMethodCall(McpJsonRpcModel mcpJsonRpcModel, String requestPayload,

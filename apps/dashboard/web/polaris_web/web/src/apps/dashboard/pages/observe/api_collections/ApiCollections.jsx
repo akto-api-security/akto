@@ -59,7 +59,8 @@ const headers = [
         value: "displayNameComp",
         filterKey: "displayName",
         textValue: 'displayName',
-        showFilter: true
+        showFilter: true,
+        titleWithTooltip: <HeadingWithTooltip content="These API groups are computed periodically" title={mapLabel("API collection name", getDashboardCategory())} />
     },
     {
         title: mapLabel("Total endpoints", getDashboardCategory()),
@@ -1070,29 +1071,32 @@ function ApiCollections(props) {
         return data.filter((x) => (!x?.deactivated && x?.type !== "API_GROUP" && x?.urlsCount > 1));
     }
 
+    // Use titleWithTooltip for Groups tab (selected === 2)
+    const dynamicHeaders = selected === 2 ? headers.map(h => h.titleWithTooltip ? {...h, title: h.titleWithTooltip} : h) : headers;
+
     const tableComponent = (
         centerView === CenterViewType.Tree ?
         <TreeViewTable
             collectionsArr={filterTreeViewData(normalData)}
             sortOptions={sortOptions}
             resourceName={resourceName}
-            tableHeaders={headers.filter((x) => x.shouldMerge !== undefined)}
+            tableHeaders={dynamicHeaders.filter((x) => x.shouldMerge !== undefined)}
             promotedBulkActions={promotedBulkActions}
         />:
         (centerView === CenterViewType.Table ?
         <GithubSimpleTable
             key={refreshData}
             pageLimit={100}
-            data={data[selectedTab]} 
+            data={data[selectedTab]}
             sortOptions={ selectedTab === 'groups' ? [...tempSortOptions, ...sortOptions] : sortOptions}
-            resourceName={resourceName} 
+            resourceName={resourceName}
             filters={[]}
-            disambiguateLabel={disambiguateLabel} 
-            headers={headers}
+            disambiguateLabel={disambiguateLabel}
+            headers={dynamicHeaders}
             selectable={true}
             promotedBulkActions={promotedBulkActions}
             mode={IndexFiltersMode.Default}
-            headings={headers}
+            headings={dynamicHeaders}
             useNewRow={true}
             condensedHeight={true}
             tableTabs={tableTabs}

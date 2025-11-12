@@ -44,7 +44,7 @@ public class GuardrailPoliciesAction extends UserAction {
             this.total = GuardrailPoliciesDao.instance.getTotalCount();
             
             loggerMaker.info("Fetched " + guardrailPolicies.size() + " guardrail policies out of " + total + " total");
-            
+
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching guardrail policies: " + e.getMessage(), LogDb.DASHBOARD);
@@ -95,6 +95,7 @@ public class GuardrailPoliciesAction extends UserAction {
             updates.add(Updates.set("regexPatterns", policy.getRegexPatterns()));
             updates.add(Updates.set("regexPatternsV2", policy.getRegexPatternsV2()));
             updates.add(Updates.set("contentFiltering", policy.getContentFiltering()));
+            updates.add(Updates.set("llmRule", policy.getLlmRule()));
             updates.add(Updates.set("selectedMcpServers", policy.getSelectedMcpServers()));
             updates.add(Updates.set("selectedAgentServers", policy.getSelectedAgentServers()));
             updates.add(Updates.set("selectedMcpServersV2", policy.getSelectedMcpServersV2()));
@@ -117,14 +118,14 @@ public class GuardrailPoliciesAction extends UserAction {
 
             // Perform upsert using updateOne with upsert option
             GuardrailPoliciesDao.instance.getMCollection().updateOne(
-                filter, 
+                filter,
                 Updates.combine(updates),
                 new UpdateOptions().upsert(true)
             );
             
             String action = (hexId != null && !hexId.isEmpty()) ? "Updated" : "Created";
             loggerMaker.info(action + " guardrail policy: " + policy.getName() + " by user: " + user.getLogin());
-            
+
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error creating guardrail policy: " + e.getMessage(), LogDb.DASHBOARD);

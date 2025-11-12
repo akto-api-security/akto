@@ -16,7 +16,7 @@ import GithubSource from "./components/GithubSource"
 import AktoJax from "./components/AktoJax"  
 import McpScan from "./components/McpScan" 
 import AiAgentScan from "./components/AiAgentScan"
-import { isApiSecurityCategory, isGenAISecurityCategory, isMCPSecurityCategory, isAgenticSecurityCategory } from "../../../main/labelHelper"
+import { isGenAISecurityCategory, isMCPSecurityCategory, isAgenticSecurityCategory, isDastCategory } from "../../../main/labelHelper"
 import McpRecon from "./components/McpRecon"
 import McpProxy from "./components/McpProxy"
 import AwsLogAccountComponent from "./components/shared/AwsLogAccountComponent"
@@ -1481,7 +1481,7 @@ const quickStartFunc = {
             chromeExtensionObj, firefoxExtensionObj, safariExtensionObj
         ]
 
-       if(func.checkLocal()){
+       if(func.checkLocal() || func.isLimitedAccount()){
            return {
                "Manual": manual
            }
@@ -1495,14 +1495,13 @@ const quickStartFunc = {
             connectors["AI Model Security"] = aiScanConnectors
             connectors["Browser Extension"] = browserExtensions
             connectors["Secure Web Networks"] = secureWebNetworks
-
         }
 
         if(isMCPSecurityCategory() || isAgenticSecurityCategory()){
             connectors["MCP Scan"] = mcpScan
         }
 
-        if(isApiSecurityCategory()){
+        if (isDastCategory()) {
             connectors["DAST"] = crawler
         }
 
@@ -1532,7 +1531,7 @@ const quickStartFunc = {
 
     getConnectorsList: function () {
 
-        if(func.checkLocal()){
+        if(func.checkLocal() || func.isLimitedAccount()){
             return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj]
         }
 

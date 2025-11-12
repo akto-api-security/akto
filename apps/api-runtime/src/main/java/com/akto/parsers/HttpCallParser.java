@@ -676,27 +676,23 @@ public class HttpCallParser {
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
 
             List<HttpResponseParams> responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
-            if (responseParamsList.isEmpty()) {
-                HttpResponseParams jsonRpcResponse = JsonRpcUtils.parseJsonRpcResponse(httpResponseParam);
-                HttpResponseParams mcpResponseParams = McpRequestResponseUtils.parseMcpResponseParams(jsonRpcResponse);
-                filteredResponseParams.add(mcpResponseParams);
-            } else {
+            if (!responseParamsList.isEmpty()) {
                 filteredResponseParams.addAll(responseParamsList);
                 loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + "new graphql endpoints in inventory",LogDb.RUNTIME);
-            }
-
-            /* Handle imperva response params (for VISA)
-                Visa has XML requests.
-                It works on single endpoint.
-                For VISA if domain is api.authorize.net (xml endpoint) and content-type json or xml, then we expand the
-                url and create separate HttpResponseParams object based on the root element of the xml payload.
-             */
-            List<HttpResponseParams> impervaResponseParamsList = ImpervaUtils.parseImpervaResponse(httpResponseParam);
-            if (impervaResponseParamsList.isEmpty()) {
-                filteredResponseParams.add(httpResponseParam);
+            } else if (JsonRpcUtils.isJsonRpcRequest(httpResponseParam)) {
+                HttpResponseParams jsonRpcResponse = JsonRpcUtils.parseJsonRpcResponse(httpResponseParam);
+                HttpResponseParams mcpResponseParams = McpRequestResponseUtils.parseMcpResponseParams(jsonRpcResponse);
+                if (mcpResponseParams != null) {
+                    filteredResponseParams.add(mcpResponseParams);
+                }
             } else {
-                filteredResponseParams.addAll(impervaResponseParamsList);
-                loggerMaker.infoAndAddToDb("Added " + impervaResponseParamsList.size() + "new imperva endpoints in inventory");
+                List<HttpResponseParams> impervaResponseParamsList = ImpervaUtils.parseImpervaResponse(httpResponseParam);
+                if (impervaResponseParamsList.isEmpty()) {
+                    filteredResponseParams.add(httpResponseParam);
+                } else {
+                    filteredResponseParams.addAll(impervaResponseParamsList);
+                    loggerMaker.infoAndAddToDb("Added " + impervaResponseParamsList.size() + "new imperva endpoints in inventory");
+                }
             }
 
             if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {

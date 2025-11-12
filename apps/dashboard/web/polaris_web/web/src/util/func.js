@@ -2295,6 +2295,9 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       if(pA !== pB) return pA - pB;
       return (nameA || '').localeCompare(nameB || '');
     })
+  },
+  isLimitedAccount(){
+    return window?.ACTIVE_ACCOUNT === 1753372418
   }
 }
 

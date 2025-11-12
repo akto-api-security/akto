@@ -130,7 +130,7 @@ public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunR
 
         String dbName = Context.accountId.get()+"";
         createCollectionIfAbsent(dbName, getCollName(), new CreateCollectionOptions());
-        
+
         Bson testingRunIndex = Indexes.ascending(TestingRunResultSummary.TESTING_RUN_ID);
         createIndexIfAbsent(dbName, getCollName(), testingRunIndex, new IndexOptions().name("testingRunId_1"));
 
@@ -139,6 +139,13 @@ public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunR
 
         fieldNames = new String[]{TestingRunResultSummary.END_TIMESTAMP};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
+
+        Bson compoundIndex = Indexes.compoundIndex(
+                Indexes.ascending(TestingRunResultSummary.TESTING_RUN_ID),
+                Indexes.descending(TestingRunResultSummary.START_TIMESTAMP)
+        );
+        createIndexIfAbsent(dbName, getCollName(), compoundIndex,
+                new IndexOptions().name("testingRunId_1_startTimestamp_-1"));
 
         IndexOptions sparseIndex = new IndexOptions().sparse(true);
 

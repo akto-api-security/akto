@@ -1,5 +1,6 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon, Tooltip } from "@shopify/polaris"
+import TitleWithInfo from "../../../components/shared/TitleWithInfo"
 import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
@@ -1361,12 +1362,16 @@ function ApiEndpoints(props) {
                                                 <InlineEditableText textValue={editableTitle} setTextValue={handleTitleChange} handleSaveClick={handleSaveClick} setIsEditing={setIsEditing} maxLength={24} />
                                             ) :
                                                 <div style={{ cursor: isApiGroup ? 'pointer' : 'default' }} onClick={isApiGroup ? () => { setIsEditing(true); } : undefined}>
-                                                    <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{ variant: 'headingLg' }} />
-                                                </div>}
+                                                    <TitleWithInfo
+                                                        titleComp={<TooltipText tooltip={pageTitle} text={pageTitle} textProps={{ variant: 'headingLg' }} />}
+                                                        tooltipContent={isApiGroup ? "This API group is computed periodically" : null}
+                                                    />
+                                                </div>
+                                            }
                                         </>
                                         <>
                                             {collectionTypeListComp}
-                                        </>  
+                                        </>
                                     </HorizontalStack>
                                     <HorizontalStack gap={2}>
                                         {isEditingDescription ? (
