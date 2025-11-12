@@ -145,68 +145,72 @@ function highlightHeaders(data, ref, getLineNumbers){
 }
 
 function highlightVulnerabilities(vulnerabilitySegments, ref) {
-  if (!vulnerabilitySegments || !Array.isArray(vulnerabilitySegments) || vulnerabilitySegments.length === 0) {
+  if (!ref || !Array.isArray(vulnerabilitySegments) || vulnerabilitySegments.length === 0) {
     return;
   }
 
+  const model = ref.getModel();
   const text = ref.getValue();
-  if (!text) {
+
+  if (!model || !text) {
     return;
   }
-  
-  let decorations = [];
-  vulnerabilitySegments.forEach((segment, index) => {
-    try {
-      const model = ref.getModel();
-      
-      let start = segment.start;
-      let end = segment.end;
-      let valid = (start !== undefined && end !== undefined && start >= 0 && end <= text.length && start < end);
 
-      // Always verify the substring matches the phrase if provided; else try recompute
-      let phrase = segment?.phrase;
-      if ((!phrase || typeof phrase !== 'string') && segment?.message && typeof segment.message === 'string') {
-        phrase = segment.message.replace(/\s*\[chars\s+\d+-\d+\]\s*$/, '');
-      }
-      if (phrase && phrase.length > 0) {
-        if (!valid || text.slice(start, end) !== phrase) {
+  const textLength = text.length;
+  const isValidRange = (start, end) => Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end <= textLength && start < end;
+  const resolvePhrase = (segment) => {
+    if (typeof segment?.phrase === 'string' && segment.phrase.length > 0) {
+      return segment.phrase;
+    }
+    if (typeof segment?.message === 'string' && segment.message.length > 0) {
+      return segment.message.replace(/\s*\[chars\s+\d+-\d+\]\s*$/, '');
+    }
+    return undefined;
+  };
+
+  const decorations = [];
+
+  vulnerabilitySegments.forEach((segment) => {
+    try {
+      let start = Number(segment?.start);
+      let end = Number(segment?.end);
+      const phrase = resolvePhrase(segment);
+
+      if (phrase) {
+        const phraseMatchesProvidedRange = isValidRange(start, end) && text.slice(start, end) === phrase;
+        if (!phraseMatchesProvidedRange) {
           const idx = text.indexOf(phrase);
           if (idx >= 0) {
             start = idx;
             end = idx + phrase.length;
-            valid = true;
-          } else {
-            valid = (start !== undefined && end !== undefined && start >= 0 && end <= text.length && start < end);
           }
         }
-      } else if (!valid) {
-        // No phrase available; keep only valid numeric ranges
-        valid = false;
       }
 
-      if (valid) {
-        const startPos = model.getPositionAt(start);
-        const endPos = model.getPositionAt(end);
-        console.log(`🔴 Segment ${index}: start=${start}, end=${end}`);
-        if (startPos && endPos) {
-          decorations.push({
-            range: new monaco.Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column),
-            options: {
-              inlineClassName: "vulnerability-highlight"
-            }
-          });
-        }
+      if (!isValidRange(start, end)) {
+        return;
       }
+
+      const startPos = model.getPositionAt(start);
+      const endPos = model.getPositionAt(end);
+
+      if (!startPos || !endPos) {
+        return;
+      }
+
+      decorations.push({
+        range: new monaco.Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column),
+        options: {
+          inlineClassName: "vulnerability-highlight"
+        }
+      });
     } catch (error) {
       console.error('Error creating vulnerability highlight:', error, segment);
     }
   });
-  
+
   if (decorations.length > 0) {
-    console.log(`🔴 Creating ${decorations.length} vulnerability highlights`);
     ref._vulnDecorations = ref.createDecorationsCollection(decorations);
-  } else {
-    console.log('🔴 No decorations created');
   }
 }
 

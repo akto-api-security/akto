@@ -26,8 +26,6 @@ function SampleDataComponent(props) {
     useEffect(()=>{
 
         // Metadata parsing: JSON only
-        let metadataParseUsed = 'none';
-
         let parsed;
         try{
           parsed = JSON.parse(sampleData?.message)
@@ -53,52 +51,54 @@ function SampleDataComponent(props) {
         let originalRequestJson = func.requestJson(originalParsed, sampleData?.highlightPaths || [])
 
         // --- Parse metadata to extract vulnerabilitySegments for threat highlighting ---
-        let vulnerabilitySegments = sampleData?.vulnerabilitySegments || [];
-        const segmentsProvidedInSample = Array.isArray(sampleData?.vulnerabilitySegments) && sampleData.vulnerabilitySegments.length > 0;
-        let segmentsFromMetadata = false;
-        // Prefer explicit prop; fallback to per-row metadata
-        const effectiveMetadata = (metadata !== undefined && metadata !== null) ? metadata : sampleData?.metadata;
-        console.log(effectiveMetadata, typeof effectiveMetadata);
-        // Parse metadata when it's a string (could be JSON string or protobuf text format)
-        if (effectiveMetadata && typeof effectiveMetadata === 'string') {
-            try {
-                // First try JSON.parse (metadata could already be JSON string)
-                const asJson = JSON.parse(effectiveMetadata);
-                if (asJson && Array.isArray(asJson.schemaErrors)) {
-                  vulnerabilitySegments = asJson.schemaErrors
-                    .filter(err => Number.isFinite(err.start) && Number.isFinite(err.end))
-                    .map(err => ({
-                      start: err.start,
-                      end: err.end,
-                      phrase: err.phrase,
-                      location: err.location,
-                      message: err.message
-                    }));
-                  segmentsFromMetadata = true;
-                  metadataParseUsed = 'json';
-                }
-            } catch (e) {
-                console.error('Error parsing metadata JSON:', e);
-            }
-        } else if (effectiveMetadata && effectiveMetadata.schemaErrors && Array.isArray(effectiveMetadata.schemaErrors)) {
-            // Handle if metadata is already parsed as JSON
-            vulnerabilitySegments = effectiveMetadata.schemaErrors
-              .filter(err => Number.isFinite(err.start) && Number.isFinite(err.end))
-              .map(err => ({
-                  start: err.start,
-                  end: err.end,
-                  phrase: err.phrase,
-                  location: err.location,
-                  message: err.message
-              }));
-            segmentsFromMetadata = true;
-            metadataParseUsed = 'json';
-        }
+        const normalizeSegments = (errors) => {
+          if (!Array.isArray(errors)) {
+            return undefined;
+          }
 
-        // Single log to indicate which path was used
-        if (metadataParseUsed !== 'none') {
-          console.log(`[ThreatHighlight] metadata parse mode used: ${metadataParseUsed}`);
-        }
+          const normalized = errors
+            .filter(err => Number.isFinite(err.start) && Number.isFinite(err.end))
+            .map(err => ({
+              start: err.start,
+              end: err.end,
+              phrase: err.phrase,
+              location: err.location,
+              message: err.message
+            }));
+
+          return normalized.length > 0 ? normalized : undefined;
+        };
+
+        const selectMetadataSegments = (rawMetadata) => {
+          if (!rawMetadata) {
+            return { segments: undefined, fromMetadata: false };
+          }
+
+          if (typeof rawMetadata === 'string') {
+            try {
+              const parsedMeta = JSON.parse(rawMetadata);
+              const segments = normalizeSegments(parsedMeta?.schemaErrors);
+              if (segments) {
+                return { segments, fromMetadata: true };
+              }
+            } catch (error) {
+              console.error('Error parsing metadata JSON:', error);
+            }
+          } else {
+            const segments = normalizeSegments(rawMetadata?.schemaErrors);
+            if (segments) {
+              return { segments, fromMetadata: true };
+            }
+          }
+
+          return { segments: undefined, fromMetadata: false };
+        };
+
+        const effectiveMetadata = metadata ?? sampleData?.metadata;
+        const { segments: metadataSegments, fromMetadata } = selectMetadataSegments(effectiveMetadata);
+        const baseSegments = Array.isArray(sampleData?.vulnerabilitySegments) ? sampleData.vulnerabilitySegments : [];
+        const vulnerabilitySegments = metadataSegments || baseSegments;
+        const segmentsFromMetadata = fromMetadata;
 
         if(isNewDiff){
             let lineReqObj = transform.getFirstLine(originalRequestJson?.firstLine,requestJson?.firstLine)
