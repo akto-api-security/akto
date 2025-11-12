@@ -292,7 +292,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
   private void processRecord(HttpResponseParam record) throws Exception {
     HttpResponseParams responseParam = buildHttpResponseParam(record);
-    String actor = this.threatConfigEvaluator.getActorId(responseParam);
+    String actor = "14.143.179.162";
 
     if (actor == null || actor.isEmpty()) {
       logger.warnAndAddToDb("Dropping processing of record with no actor IP, account: " + responseParam.getAccountId());
@@ -321,7 +321,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     if (this.apiCountWindowBasedThresholdNotifier != null) {
         this.apiCountWindowBasedThresholdNotifier.incrementApiHitcount(apiHitCountKey, responseParam.getTime(), RedisKeyInfo.API_COUNTER_SORTED_SET);
     }
-    
+
     List<SchemaConformanceError> errors = null; 
 
 
@@ -369,7 +369,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     for (FilterConfig apiFilter : apiFilters.values()) {
       boolean hasPassedFilter = false;
       // Create a fresh errors list for each filter
-      List<SchemaConformanceError> errors = null;
+      //List<SchemaConformanceError> errors = null;
 
       if(isDebugRequest(responseParam)){
         logger.debugAndAddToDb("Evaluating filter condition for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
