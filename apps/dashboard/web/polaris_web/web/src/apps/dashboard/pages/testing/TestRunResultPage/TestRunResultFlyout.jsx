@@ -5,7 +5,7 @@ import transform from '../transform'
 import SampleDataList from '../../../components/shared/SampleDataList'
 import SampleData from '../../../components/shared/SampleData'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
-import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link, Modal, InlineCode } from '@shopify/polaris'
+import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link} from '@shopify/polaris'
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
 import testingApi from "../api"
@@ -23,6 +23,7 @@ import ChatInterface from '../../../components/shared/ChatInterface.jsx'
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper.js'
 import ApiGroups from '../../../components/shared/ApiGroups'
 import ForbiddenRole from '../../../components/shared/ForbiddenRole'
+import LegendLabel from './LegendLabel.jsx'
 
 function TestRunResultFlyout(props) {
 
@@ -515,50 +516,7 @@ function TestRunResultFlyout(props) {
             <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
                 <VerticalStack gap="3">
                     <Box padding="3" background="bg-surface-secondary" borderRadius="2">
-                        <HorizontalStack gap="4" align="center" wrap>
-                            <HorizontalStack gap="2" align="center">
-                                <div 
-                                    style={{ 
-                                        width: '14px', 
-                                        height: '14px', 
-                                        borderRadius: '50%',
-                                        backgroundColor: 'rgba(0, 255, 0, 0.4)',
-                                        border: '1px solid #238636',
-                                        display: 'inline-block',
-                                        flexShrink: 0
-                                    }}
-                                />
-                                <Text variant="bodySm" color="subdued">Added</Text>
-                            </HorizontalStack>
-                            <HorizontalStack gap="2" align="center">
-                                <div 
-                                    style={{ 
-                                        width: '14px', 
-                                        height: '14px', 
-                                        borderRadius: '50%',
-                                        backgroundColor: 'rgba(255, 0, 0, 0.4)',
-                                        border: '1px solid #D72C0D',
-                                        display: 'inline-block',
-                                        flexShrink: 0
-                                    }}
-                                />
-                                <Text variant="bodySm" color="subdued">Removed</Text>
-                            </HorizontalStack>
-                            <HorizontalStack gap="2" align="center">
-                                <div 
-                                    style={{ 
-                                        width: '14px', 
-                                        height: '14px', 
-                                        borderRadius: '50%',
-                                        backgroundColor: '#FFEBD3',
-                                        border: '1px solid #916A00',
-                                        display: 'inline-block',
-                                        flexShrink: 0
-                                    }}
-                                />
-                                <Text variant="bodySm" color="subdued">Modified</Text>
-                            </HorizontalStack>
-                        </HorizontalStack>
+                        <LegendLabel/>
                     </Box>
                     <SampleDataList
                         key="Sample values"
