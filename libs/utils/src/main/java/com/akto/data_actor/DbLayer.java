@@ -489,7 +489,4 @@ public class DbLayer {
     public static void insertDataIngestionLog(Log log) {
         DataIngestionLogsDao.instance.insertOne(log);
     }
-    public static ApiCollection fetchApiCollectionMeta(int apiCollectionId) {
-        return ApiCollectionsDao.instance.getMeta(apiCollectionId);
-    }
 }
