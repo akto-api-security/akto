@@ -25,6 +25,9 @@ function SampleDataComponent(props) {
 
     useEffect(()=>{
 
+        // Metadata parsing: JSON only
+        let metadataParseUsed = 'none';
+
         let parsed;
         try{
           parsed = JSON.parse(sampleData?.message)
@@ -34,8 +37,8 @@ function SampleDataComponent(props) {
         if (parsed?.ip != null && parsed?.destIp != null) {
             setIpObj({sourceIP: parsed?.ip, destIP: parsed?.destIp})
         }
-        let responseJson = showResponse ? func.responseJson(parsed, sampleData?.highlightPaths || [], metadata) : {}
-        let requestJson = func.requestJson(parsed, sampleData?.highlightPaths || [], metadata)
+                let responseJson = showResponse ? func.responseJson(parsed, sampleData?.highlightPaths || [], metadata) : {}
+                let requestJson = func.requestJson(parsed, sampleData?.highlightPaths || [], metadata)
 
         let responseTime = parsed?.responseTime;
         setResponseTime(responseTime)
@@ -49,9 +52,53 @@ function SampleDataComponent(props) {
         let originalResponseJson = func.responseJson(originalParsed, sampleData?.highlightPaths || [])
         let originalRequestJson = func.requestJson(originalParsed, sampleData?.highlightPaths || [])
 
-        // --- PATCH: propagate vulnerabilitySegments from sampleData to both request and response ---
-        // This ensures SampleData receives the correct segments for highlighting
-        const vulnerabilitySegments = sampleData?.vulnerabilitySegments || [];
+        // --- Parse metadata to extract vulnerabilitySegments for threat highlighting ---
+        let vulnerabilitySegments = sampleData?.vulnerabilitySegments || [];
+        const segmentsProvidedInSample = Array.isArray(sampleData?.vulnerabilitySegments) && sampleData.vulnerabilitySegments.length > 0;
+        let segmentsFromMetadata = false;
+        // Prefer explicit prop; fallback to per-row metadata
+        const effectiveMetadata = (metadata !== undefined && metadata !== null) ? metadata : sampleData?.metadata;
+        console.log(effectiveMetadata, typeof effectiveMetadata);
+        // Parse metadata when it's a string (could be JSON string or protobuf text format)
+        if (effectiveMetadata && typeof effectiveMetadata === 'string') {
+            try {
+                // First try JSON.parse (metadata could already be JSON string)
+                const asJson = JSON.parse(effectiveMetadata);
+                if (asJson && Array.isArray(asJson.schemaErrors)) {
+                  vulnerabilitySegments = asJson.schemaErrors
+                    .filter(err => Number.isFinite(err.start) && Number.isFinite(err.end))
+                    .map(err => ({
+                      start: err.start,
+                      end: err.end,
+                      phrase: err.phrase,
+                      location: err.location,
+                      message: err.message
+                    }));
+                  segmentsFromMetadata = true;
+                  metadataParseUsed = 'json';
+                }
+            } catch (e) {
+                console.error('Error parsing metadata JSON:', e);
+            }
+        } else if (effectiveMetadata && effectiveMetadata.schemaErrors && Array.isArray(effectiveMetadata.schemaErrors)) {
+            // Handle if metadata is already parsed as JSON
+            vulnerabilitySegments = effectiveMetadata.schemaErrors
+              .filter(err => Number.isFinite(err.start) && Number.isFinite(err.end))
+              .map(err => ({
+                  start: err.start,
+                  end: err.end,
+                  phrase: err.phrase,
+                  location: err.location,
+                  message: err.message
+              }));
+            segmentsFromMetadata = true;
+            metadataParseUsed = 'json';
+        }
+
+        // Single log to indicate which path was used
+        if (metadataParseUsed !== 'none') {
+          console.log(`[ThreatHighlight] metadata parse mode used: ${metadataParseUsed}`);
+        }
 
         if(isNewDiff){
             let lineReqObj = transform.getFirstLine(originalRequestJson?.firstLine,requestJson?.firstLine)
@@ -72,8 +119,9 @@ function SampleDataComponent(props) {
             })
         }else{
             setSampleJsonData({ 
-                request: { message: transform.formatData(requestJson,"http"), original: transform.formatData(originalRequestJson,"http"), highlightPaths:requestJson?.highlightPaths }, 
-                response: showResponse ? { message: transform.formatData(responseJson,"http"), original: transform.formatData(originalResponseJson,"http"), highlightPaths:responseJson?.highlightPaths, vulnerabilitySegments } : {},
+                // If segments came from threat metadata, highlight in request; if they were provided by caller (e.g., LLM analysis), pass to both panes
+                request: { message: transform.formatData(requestJson,"http"), original: transform.formatData(originalRequestJson,"http"), highlightPaths:requestJson?.highlightPaths, vulnerabilitySegments }, 
+                response: showResponse ? { message: transform.formatData(responseJson,"http"), original: transform.formatData(originalResponseJson,"http"), highlightPaths:responseJson?.highlightPaths, ...(segmentsFromMetadata ? {} : {vulnerabilitySegments}) } : {},
             })
         }
       }, [sampleData, metadata])

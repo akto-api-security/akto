@@ -15,17 +15,20 @@
 }
 
 .vulnerability-highlight{
-    background-color: rgba(139, 69, 255, 0.2) !important;
-    color: #6B46C1 !important;
-    font-weight: 600 !important;
+    /* strong red inline highlight for detected vulnerabilities */
+    background-color: rgba(215, 43, 12, 0.18) !important; /* light red background */
+    color: #A91F0A !important; /* dark red text for contrast */
+    font-weight: 700 !important;
     border-radius: 2px !important;
-    padding: 1px 2px !important;
-    transition: all 0.2s ease !important;
+    padding: 1px 4px !important;
+    transition: all 0.12s ease !important;
+    box-shadow: inset 0 -1px 0 rgba(0,0,0,0.06);
+    border: 1px solid rgba(215,43,12,0.25) !important;
 }
 
 .vulnerability-highlight:hover{
-    background-color: rgba(139, 69, 255, 0.35) !important;
-    box-shadow: 0 0 8px rgba(139, 69, 255, 0.5) !important;
+    background-color: rgba(215, 43, 12, 0.28) !important;
+    box-shadow: 0 0 8px rgba(215,43,12,0.28) !important;
 }
 
 .deleted-block{
