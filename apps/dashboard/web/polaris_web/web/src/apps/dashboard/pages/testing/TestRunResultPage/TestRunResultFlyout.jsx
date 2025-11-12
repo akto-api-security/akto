@@ -513,32 +513,80 @@ function TestRunResultFlyout(props) {
         
         return (
             <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
-                <SampleDataList
-                    key="Sample values"
-                    heading={"Attempt"}
-                    minHeight={"30vh"}
-                    vertical={true}
-                    sampleData={
-                        selectedTestRunResult?.testResults.map((result, idx) => {
-                            if (result.errors && result.errors.length > 0) {
-                                let errorList = result.errors.join(", ");
-                                return { errorList: errorList }
-                            }
-                            // Add vulnerability highlights only for response
-                            let vulnerabilitySegments = vulnerabilityHighlights[idx] || [];
-                            if (result.originalMessage || result.message) {
-                                return {
-                                    originalMessage: result.originalMessage,
-                                    message: result.message,
-                                    vulnerabilitySegments
+                <VerticalStack gap="3">
+                    <Box padding="3" background="bg-surface-secondary" borderRadius="2">
+                        <HorizontalStack gap="4" align="center" wrap>
+                            <HorizontalStack gap="2" align="center">
+                                <div 
+                                    style={{ 
+                                        width: '14px', 
+                                        height: '14px', 
+                                        borderRadius: '50%',
+                                        backgroundColor: 'rgba(0, 255, 0, 0.4)',
+                                        border: '1px solid #238636',
+                                        display: 'inline-block',
+                                        flexShrink: 0
+                                    }}
+                                />
+                                <Text variant="bodySm" color="subdued">Added</Text>
+                            </HorizontalStack>
+                            <HorizontalStack gap="2" align="center">
+                                <div 
+                                    style={{ 
+                                        width: '14px', 
+                                        height: '14px', 
+                                        borderRadius: '50%',
+                                        backgroundColor: 'rgba(255, 0, 0, 0.4)',
+                                        border: '1px solid #D72C0D',
+                                        display: 'inline-block',
+                                        flexShrink: 0
+                                    }}
+                                />
+                                <Text variant="bodySm" color="subdued">Removed</Text>
+                            </HorizontalStack>
+                            <HorizontalStack gap="2" align="center">
+                                <div 
+                                    style={{ 
+                                        width: '14px', 
+                                        height: '14px', 
+                                        borderRadius: '50%',
+                                        backgroundColor: '#FFEBD3',
+                                        border: '1px solid #916A00',
+                                        display: 'inline-block',
+                                        flexShrink: 0
+                                    }}
+                                />
+                                <Text variant="bodySm" color="subdued">Modified</Text>
+                            </HorizontalStack>
+                        </HorizontalStack>
+                    </Box>
+                    <SampleDataList
+                        key="Sample values"
+                        heading={"Attempt"}
+                        minHeight={"30vh"}
+                        vertical={true}
+                        sampleData={
+                            selectedTestRunResult?.testResults.map((result, idx) => {
+                                if (result.errors && result.errors.length > 0) {
+                                    let errorList = result.errors.join(", ");
+                                    return { errorList: errorList }
                                 }
-                            }
-                            return { errorList: "No data found" }
-                        })}
-                    isNewDiff={true}
-                    vulnerable={selectedTestRunResult?.vulnerable}
-                    vulnerabilityAnalysisError={vulnerabilityAnalysisError}
-                />
+                                // Add vulnerability highlights only for response
+                                let vulnerabilitySegments = vulnerabilityHighlights[idx] || [];
+                                if (result.originalMessage || result.message) {
+                                    return {
+                                        originalMessage: result.originalMessage,
+                                        message: result.message,
+                                        vulnerabilitySegments
+                                    }
+                                }
+                                return { errorList: "No data found" }
+                            })}
+                        isNewDiff={true}
+                        vulnerable={selectedTestRunResult?.vulnerable}
+                        vulnerabilityAnalysisError={vulnerabilityAnalysisError}
+                    />
+                </VerticalStack>
             </Box>
         );
     });
@@ -556,7 +604,7 @@ function TestRunResultFlyout(props) {
         if (typeof selectedTestRunResult !== "object") return null;
         return {
             id: 'values',
-            content: "Values",
+            content: "Evidence",
             component: <ValuesTabContent />
         }
     }, [selectedTestRunResult, dataExpired, issueDetails, refreshFlag])
