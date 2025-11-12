@@ -3,7 +3,7 @@ import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
 import func from "@/util/func";
-import { useEffect, useState} from "react";
+import { useEffect, useState } from "react";
 import testingApi from "../../testing/api"
 import threatDetectionApi from "../api"
 import issuesApi from "../../issues/api"
@@ -15,7 +15,7 @@ import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreati
 import transform from "../../testing/transform";
 
 function SampleDetails(props) {
-    const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate, loading } = props
+    const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate } = props
     let currentTemplateObj = threatFiltersMap[moreInfoData?.templateId]
 
     let severity = currentTemplateObj?.severity || "HIGH"
@@ -119,8 +119,8 @@ function SampleDetails(props) {
     }
 
     useEffect(() => {
-        fetchRemediationInfo();
-        aggregateActivity();
+        fetchRemediationInfo()
+        aggregateActivity()
     }, [moreInfoData?.templateId, data])
 
     useEffect(() => {
@@ -389,7 +389,6 @@ Reference URL: ${window.location.href}`.trim();
         show={showDetails}
         setShow={setShowDetails}
         components={currentComponents}
-        loading={loading}
     />
 }
 
