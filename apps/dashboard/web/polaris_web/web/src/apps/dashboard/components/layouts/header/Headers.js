@@ -46,7 +46,6 @@ export default function Header() {
 
     const logoSrc = dashboardCategory === "Agentic Security" ? "/public/white_logo.svg" : "/public/akto_name_with_logo.svg";
     const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {};
-    console.log(stiggFeatures);
     const agenticSecurityGranted =
         stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || true
     const mcpSecurityGranted =
