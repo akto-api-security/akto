@@ -46,12 +46,11 @@ export default function Header() {
 
     const logoSrc = dashboardCategory === "Agentic Security" ? "/public/white_logo.svg" : "/public/akto_name_with_logo.svg";
     const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {};
-    const mcpSecurityGranted =
-        stiggFeatures?.SECURITY_TYPE_MCP?.isGranted ??
-        stiggFeatures?.MCP_SECURITY?.isGranted;
+    console.log(stiggFeatures);
     const agenticSecurityGranted =
-        stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted ??
-        stiggFeatures?.AGENTIC_SECURITY?.isGranted;
+        stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || true
+    const mcpSecurityGranted =
+        stiggFeatures?.MCP_SECURITY?.isGranted || true;
 
     const disabledDashboardCategories = useMemo(() => {
         const disabled = [];
