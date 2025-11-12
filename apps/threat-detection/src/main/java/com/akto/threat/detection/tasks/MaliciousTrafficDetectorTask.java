@@ -595,8 +595,8 @@ public class MaliciousTrafficDetectorTask implements Task {
       if (host != null && !host.isEmpty()) {
         int hostHashCode = host.hashCode();
           AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
-          ApiCollection apiCollection = config.getApiCollection(hostHashCode);
-          if(apiCollection != null && apiCollection.getRedact()){
+          Boolean isApiCollectionRedacted = config.isApiCollectionRedacted(hostHashCode);
+          if(isApiCollectionRedacted != null && isApiCollectionRedacted){
               return RedactionType.REDACT_BY_API_COLLECTION;
           }
       }

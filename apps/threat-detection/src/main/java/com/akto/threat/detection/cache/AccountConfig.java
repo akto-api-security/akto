@@ -13,7 +13,7 @@ import java.util.Map;
 public class AccountConfig {
     private final int accountId;
     private final boolean isRedacted;
-    private final Map<Integer, ApiCollection> apiCollections;
+    private final Map<Integer, Boolean> apiCollections;
 
     public AccountConfig(int accountId, boolean isRedacted, List<ApiCollection> apiCollections) {
         this.accountId = accountId;
@@ -24,7 +24,7 @@ public class AccountConfig {
 
     private void initMapApiCollectionsFromList(List<ApiCollection> apiCollections){
         for(ApiCollection apiCollection: apiCollections){
-            this.apiCollections.put(apiCollection.getId(), apiCollection);
+            this.apiCollections.put(apiCollection.getId(), apiCollection.getRedact());
         }
     }
 
@@ -45,7 +45,7 @@ public class AccountConfig {
     /**
      * Get all API collections mapped by collection ID
      */
-    public Map<Integer, ApiCollection> getApiCollections() {
+    public Map<Integer, Boolean> getApiCollections() {
         return apiCollections;
     }
 
@@ -55,7 +55,7 @@ public class AccountConfig {
      * @param collectionId The API collection ID
      * @return ApiCollection or null if not found
      */
-    public ApiCollection getApiCollection(int collectionId) {
+    public Boolean isApiCollectionRedacted(int collectionId) {
         return apiCollections != null ? apiCollections.get(collectionId) : null;
     }
 
