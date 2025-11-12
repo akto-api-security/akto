@@ -62,7 +62,7 @@ const SummaryCardComponent = ({
               ) : null}
                 {
                   func.isDemoAccount() && !isApiSecurityCategory() ? <></> :
-                    <VerticalStack>
+                    <VerticalStack gap={4}>
                       <HorizontalGrid columns={2} gap={4}>
                         <MemoizedApiCollectionCoverageGraph />
                         <MemoizedTestRunOverTimeGraph />

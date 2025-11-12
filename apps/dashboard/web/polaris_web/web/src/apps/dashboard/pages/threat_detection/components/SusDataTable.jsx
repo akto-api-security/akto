@@ -10,7 +10,6 @@ import dayjs from "dayjs";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
 import { formatActorId } from "../utils/formatUtils";
-import useTable from "../../../components/tables/TableContext";
 import threatDetectionRequests from "../api";
 import { LABELS } from "../constants";
 
