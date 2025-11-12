@@ -5,7 +5,7 @@ import transform from '../transform'
 import SampleDataList from '../../../components/shared/SampleDataList'
 import SampleData from '../../../components/shared/SampleData'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
-import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link, Modal, InlineCode } from '@shopify/polaris'
+import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link} from '@shopify/polaris'
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
 import testingApi from "../api"
@@ -23,6 +23,7 @@ import ChatInterface from '../../../components/shared/ChatInterface.jsx'
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper.js'
 import ApiGroups from '../../../components/shared/ApiGroups'
 import ForbiddenRole from '../../../components/shared/ForbiddenRole'
+import LegendLabel from './LegendLabel.jsx'
 
 function TestRunResultFlyout(props) {
 
@@ -513,32 +514,37 @@ function TestRunResultFlyout(props) {
         
         return (
             <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
-                <SampleDataList
-                    key="Sample values"
-                    heading={"Attempt"}
-                    minHeight={"30vh"}
-                    vertical={true}
-                    sampleData={
-                        selectedTestRunResult?.testResults.map((result, idx) => {
-                            if (result.errors && result.errors.length > 0) {
-                                let errorList = result.errors.join(", ");
-                                return { errorList: errorList }
-                            }
-                            // Add vulnerability highlights only for response
-                            let vulnerabilitySegments = vulnerabilityHighlights[idx] || [];
-                            if (result.originalMessage || result.message) {
-                                return {
-                                    originalMessage: result.originalMessage,
-                                    message: result.message,
-                                    vulnerabilitySegments
+                <VerticalStack gap="3">
+                    <Box padding="3" background="bg-surface-secondary" borderRadius="2">
+                        <LegendLabel/>
+                    </Box>
+                    <SampleDataList
+                        key="Sample values"
+                        heading={"Attempt"}
+                        minHeight={"30vh"}
+                        vertical={true}
+                        sampleData={
+                            selectedTestRunResult?.testResults.map((result, idx) => {
+                                if (result.errors && result.errors.length > 0) {
+                                    let errorList = result.errors.join(", ");
+                                    return { errorList: errorList }
                                 }
-                            }
-                            return { errorList: "No data found" }
-                        })}
-                    isNewDiff={true}
-                    vulnerable={selectedTestRunResult?.vulnerable}
-                    vulnerabilityAnalysisError={vulnerabilityAnalysisError}
-                />
+                                // Add vulnerability highlights only for response
+                                let vulnerabilitySegments = vulnerabilityHighlights[idx] || [];
+                                if (result.originalMessage || result.message) {
+                                    return {
+                                        originalMessage: result.originalMessage,
+                                        message: result.message,
+                                        vulnerabilitySegments
+                                    }
+                                }
+                                return { errorList: "No data found" }
+                            })}
+                        isNewDiff={true}
+                        vulnerable={selectedTestRunResult?.vulnerable}
+                        vulnerabilityAnalysisError={vulnerabilityAnalysisError}
+                    />
+                </VerticalStack>
             </Box>
         );
     });
@@ -556,7 +562,7 @@ function TestRunResultFlyout(props) {
         if (typeof selectedTestRunResult !== "object") return null;
         return {
             id: 'values',
-            content: "Values",
+            content: "Evidence",
             component: <ValuesTabContent />
         }
     }, [selectedTestRunResult, dataExpired, issueDetails, refreshFlag])
