@@ -541,8 +541,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       },
       ...(isRegexFilterEnabled ? [{
         key: 'latestApiOrigRegex',
-        label: "Latest API orig regex",
-        title: "Latest API orig regex",
+        label: "API regex",
+        title: "API regex",
         type: 'text',
         placeholder: 'Enter regex',
         choices: []
