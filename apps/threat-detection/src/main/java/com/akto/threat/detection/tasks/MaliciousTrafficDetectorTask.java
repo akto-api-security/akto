@@ -368,8 +368,8 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     for (FilterConfig apiFilter : apiFilters.values()) {
       boolean hasPassedFilter = false;
-      // Create a fresh errors list for each filter
-      //List<SchemaConformanceError> errors = null;
+       // Create a fresh vulnerable list for each filter
+      List<SchemaConformanceError> vulnerable = null;
 
       if(isDebugRequest(responseParam)){
         logger.debugAndAddToDb("Evaluating filter condition for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
@@ -391,8 +391,8 @@ public class MaliciousTrafficDetectorTask implements Task {
 
         }
 
-        errors = RequestValidator.validate(responseParam, apiSchema, apiInfoKey.toString());
-        hasPassedFilter = errors != null && !errors.isEmpty();
+        vulnerable = RequestValidator.validate(responseParam, apiSchema, apiInfoKey.toString());
+        hasPassedFilter = vulnerable != null && !vulnerable.isEmpty();
 
       }else {
         hasPassedFilter = threatDetector.applyFilter(apiFilter, responseParam, rawApi, apiInfoKey);
@@ -431,11 +431,11 @@ public class MaliciousTrafficDetectorTask implements Task {
           List<SchemaConformanceError> threatPositions = threatDetector.getThreatPositions(filterId, responseParam);
 
           if (threatPositions != null && !threatPositions.isEmpty()) {
-            // Initialize errors list if null, or append to existing schema errors
-            if (errors == null) {
-              errors = new ArrayList<>();
+            // Initialize vulnerable list if null, or append to existing schema errors
+            if (vulnerable == null) {
+              vulnerable = new ArrayList<>();
             }
-            errors.addAll(threatPositions);
+            vulnerable.addAll(threatPositions);
           }
         }
         
@@ -458,7 +458,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
         SampleMaliciousRequest maliciousReq = null;
         if (!isAggFilter || !apiFilter.getInfo().getSubCategory().equalsIgnoreCase("API_LEVEL_RATE_LIMITING")) {
-          maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors, successfulExploit, isIgnoredEvent);
+          maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, vulnerable, successfulExploit, isIgnoredEvent);
         }
 
         if (!isAggFilter) {
@@ -476,7 +476,7 @@ public class MaliciousTrafficDetectorTask implements Task {
               }
               shouldNotify = this.apiCountWindowBasedThresholdNotifier.calcApiCount(apiHitCountKey, responseParam.getTime(), rule);
               if (shouldNotify) {
-                maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors, successfulExploit, isIgnoredEvent);
+                maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, vulnerable, successfulExploit, isIgnoredEvent);
               }
           } else {
               shouldNotify = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule);

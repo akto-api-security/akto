@@ -221,70 +221,55 @@ public class ThreatDetector {
             return errors;
         }
 
-        // Check URL
-        String url = httpResponseParams.getRequestParams().getURL();
-        if (url != null) {
-            for (org.ahocorasick.trie.Emit emit : trieToUse.parseText(url)) {
-                if (emit != null && emit.getKeyword() != null) {
-                    com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError error = 
-                        com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError.newBuilder()
-                            .setMessage(String.format("%s [chars %d-%d]", emit.getKeyword(), emit.getStart(), emit.getEnd() + 1))
-                            .setSchemaPath(filterId)
-                            .setInstancePath("url")
-                            .setAttribute("threat_detected")
-                            .setLocation(com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError.Location.LOCATION_URL)
-                            .setStart(emit.getStart())
-                            .setEnd(emit.getEnd() + 1)
-                            .setPhrase(emit.getKeyword())
-                            .build();
-                    errors.add(error);
-                }
-            }
-        }
+        addThreatMatches(errors, trieToUse, httpResponseParams.getRequestParams().getURL(),
+                "url",
+                com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError.Location.LOCATION_URL,
+                filterId);
 
-        // Check Headers
-        String headers = String.valueOf(httpResponseParams.getRequestParams().getHeaders());
-        if (headers != null) {
-            for (org.ahocorasick.trie.Emit emit : trieToUse.parseText(headers)) {
-                if (emit != null && emit.getKeyword() != null) {
-                    com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError error = 
-                        com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError.newBuilder()
-                            .setMessage(String.format("%s [chars %d-%d]", emit.getKeyword(), emit.getStart(), emit.getEnd() + 1))
-                            .setSchemaPath(filterId)
-                            .setInstancePath("headers")
-                            .setAttribute("threat_detected")
-                            .setLocation(com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError.Location.LOCATION_HEADER)
-                            .setStart(emit.getStart())
-                            .setEnd(emit.getEnd() + 1)
-                            .setPhrase(emit.getKeyword())
-                            .build();
-                    errors.add(error);
-                }
-            }
-        }
+        addThreatMatches(errors, trieToUse, String.valueOf(httpResponseParams.getRequestParams().getHeaders()),
+                "headers",
+                com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError.Location.LOCATION_HEADER,
+                filterId);
 
-        // Check Payload
-        String payload = httpResponseParams.getRequestParams().getPayload();
-        if (payload != null) {
-            for (org.ahocorasick.trie.Emit emit : trieToUse.parseText(payload)) {
-                if (emit != null && emit.getKeyword() != null) {
-                    com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError error = 
-                        com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError.newBuilder()
-                            .setMessage(String.format("%s [chars %d-%d]", emit.getKeyword(), emit.getStart(), emit.getEnd() + 1))
-                            .setSchemaPath(filterId)
-                            .setInstancePath("payload")
-                            .setAttribute("threat_detected")
-                            .setLocation(com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError.Location.LOCATION_BODY)
-                            .setStart(emit.getStart())
-                            .setEnd(emit.getEnd() + 1)
-                            .setPhrase(emit.getKeyword())
-                            .build();
-                    errors.add(error);
-                }
-            }
-        }
+        addThreatMatches(errors, trieToUse, httpResponseParams.getRequestParams().getPayload(),
+                "payload",
+                com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError.Location.LOCATION_BODY,
+                filterId);
 
         return errors;
+    }
+
+    private void addThreatMatches(List<com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError> results,
+            Trie trie,
+            String text,
+            String instancePath,
+            com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError.Location location,
+            String filterId) {
+        if (trie == null || text == null) {
+            return;
+        }
+
+        // Stop after first detection per location to avoid duplicate reports
+        for (org.ahocorasick.trie.Emit emit : trie.parseText(text)) {
+            if (emit == null || emit.getKeyword() == null) {
+                continue;
+            }
+
+            com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError error =
+                com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError.newBuilder()
+                    .setMessage(String.format("%s [chars %d-%d]", emit.getKeyword(), emit.getStart(), emit.getEnd() + 1))
+                    .setSchemaPath(filterId)
+                    .setInstancePath(instancePath)
+                    .setAttribute("threat_detected")
+                    .setLocation(location)
+                    .setStart(emit.getStart())
+                    .setEnd(emit.getEnd() + 1)
+                    .setPhrase(emit.getKeyword())
+                    .build();
+            results.add(error);
+            // Stop after first detection in this location
+            break;
+        }
     }
 
 }
