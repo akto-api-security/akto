@@ -1501,7 +1501,7 @@ const quickStartFunc = {
             connectors["MCP Scan"] = mcpScan
         }
 
-        if (isDastCategory() || isApiSecurityCategory()) {
+        if (isDastCategory()) {
             connectors["DAST"] = crawler
         }
 
