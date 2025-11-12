@@ -105,6 +105,6 @@ public abstract class DataActor {
 
     public abstract void insertDataIngestionLog(Log log);
 
-    public abstract ApiCollection fetchApiCollectionMeta(int apiCollectionId);
+    public abstract List<ApiCollection> fetchAllApiCollections();
 
 }

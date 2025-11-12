@@ -247,8 +247,8 @@ public class DbActor extends DataActor {
         DbLayer.insertDataIngestionLog(log);
     }
 
-    public ApiCollection fetchApiCollectionMeta(int apiCollectionId) {
-        return DbLayer.fetchApiCollectionMeta(apiCollectionId);
+    public List<ApiCollection> fetchAllApiCollections() {
+        return DbLayer.fetchAllApiCollections();
     }
 
 

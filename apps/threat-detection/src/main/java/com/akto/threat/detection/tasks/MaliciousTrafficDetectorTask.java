@@ -16,6 +16,8 @@ import java.util.function.Supplier;
 import com.akto.dto.*;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.enums.RedactionType;
+import com.akto.threat.detection.cache.AccountConfig;
+import com.akto.threat.detection.cache.AccountConfigurationCache;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -177,9 +179,9 @@ public class MaliciousTrafficDetectorTask implements Task {
                 lastRecordCountLogTime = currentTime;
               }
 
-              AccountSettings accountSettings = dataActor.fetchAccountSettings();
-              Context.accountId.set(accountSettings.getId());
-              Context.isRedactPayload.set(accountSettings.isRedactPayload());
+              AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
+              Context.accountId.set(config.getAccountId());
+              Context.isRedactPayload.set(config.isRedacted());
 
               for (ConsumerRecord<String, byte[]> record : records) {
                 HttpResponseParam httpResponseParam = HttpResponseParam.parseFrom(record.value());
@@ -330,7 +332,6 @@ public class MaliciousTrafficDetectorTask implements Task {
     if (!ignoredEventFilters.isEmpty()) {
       isIgnoredEvent = threatDetector.isIgnoredEvent(ignoredEventFilters, rawApi, apiInfoKey);
     }
-    RedactionType redactionType = getRedactionType(responseParam.getRequestParams().getHeaders());
       if (apiDistributionEnabled) {
       String apiCollectionIdStr = Integer.toString(apiCollectionId);
       String distributionKey = Utils.buildApiDistributionKey(apiCollectionIdStr, url, method.toString());
@@ -350,7 +351,8 @@ public class MaliciousTrafficDetectorTask implements Task {
         logger.debugAndAddToDb("Ratelimit hit for url " + apiInfoKey.getUrl() + " actor: " + actor + " ratelimitConfig "
             + ratelimitConfig.toString());
 
-        // Send event to BE.
+          RedactionType redactionType = getRedactionType(responseParam.getRequestParams().getHeaders());
+          // Send event to BE.
         SampleMaliciousRequest maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam,
             ipApiRateLimitFilter, metadata, errors, successfulExploit, isIgnoredEvent, redactionType);
         generateAndPushMaliciousEventRequest(ipApiRateLimitFilter, actor, responseParam, maliciousReq,
@@ -414,7 +416,9 @@ public class MaliciousTrafficDetectorTask implements Task {
       // and so we push it to kafka
       if (hasPassedFilter) {
         logger.debugAndAddToDb("filter condition satisfied for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
-        // Later we will also add aggregation support
+        RedactionType redactionType = getRedactionType(responseParam.getRequestParams().getHeaders());
+
+          // Later we will also add aggregation support
         // Eg: 100 4xx requests in last 10 minutes.
         // But regardless of whether request falls in aggregation or not,
         // we still push malicious requests to kafka
@@ -590,7 +594,8 @@ public class MaliciousTrafficDetectorTask implements Task {
       String host = extractHostFromHeaders(headers);
       if (host != null && !host.isEmpty()) {
         int hostHashCode = host.hashCode();
-          ApiCollection apiCollection = dataActor.fetchApiCollectionMeta(hostHashCode);
+          AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
+          ApiCollection apiCollection = config.getApiCollection(hostHashCode);
           if(apiCollection != null && apiCollection.getRedact()){
               return RedactionType.REDACT_BY_API_COLLECTION;
           }
