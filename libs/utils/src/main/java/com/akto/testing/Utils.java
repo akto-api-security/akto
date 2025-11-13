@@ -154,8 +154,46 @@ public class Utils {
                     String val =  String.join(";", headers.get(headerName));
                     valuesMap.put(key, val);
             }
-            
-            
+
+            // Extract individual cookie keys from Cookie and Set-Cookie headers
+            if (headerName.equalsIgnoreCase("cookie") || headerName.equalsIgnoreCase("set-cookie")) {
+                for (String headerValue : headerValues) {
+                    if (headerValue == null || headerValue.isEmpty()) {
+                        continue;
+                    }
+
+                    // Parse cookies from the header value
+                    // Cookie format: "key1=value1; key2=value2"
+                    // Set-Cookie format: "key=value; Path=/; HttpOnly" (may have attributes)
+                    String[] cookiePairs = headerValue.split(";");
+                    for (String cookiePair : cookiePairs) {
+                        cookiePair = cookiePair.trim();
+                        int equalsIndex = cookiePair.indexOf('=');
+                        if (equalsIndex > 0) {
+                            String cookieKey = cookiePair.substring(0, equalsIndex).trim();
+                            String cookieValue = cookiePair.substring(equalsIndex + 1).trim();
+
+                            // Skip Set-Cookie attributes (Path, Domain, Secure, HttpOnly, SameSite, Max-Age, Expires)
+                            if (headerName.equalsIgnoreCase("set-cookie")) {
+                                if (cookieKey.equalsIgnoreCase("Path") ||
+                                    cookieKey.equalsIgnoreCase("Domain") ||
+                                    cookieKey.equalsIgnoreCase("Secure") ||
+                                    cookieKey.equalsIgnoreCase("HttpOnly") ||
+                                    cookieKey.equalsIgnoreCase("SameSite") ||
+                                    cookieKey.equalsIgnoreCase("Max-Age") ||
+                                    cookieKey.equalsIgnoreCase("Expires")) {
+                                    continue;
+                                }
+                            }
+
+                            // Store individual cookie key-value pair
+                            String cookieMapKey = nodeId + "." + reqOrResp + "." + "header" + "." + headerName + "." + cookieKey;
+                            valuesMap.put(cookieMapKey, cookieValue);
+                        }
+                    }
+                }
+            }
+
         }
     }
 
