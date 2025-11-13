@@ -35,8 +35,8 @@ function SampleDataComponent(props) {
         if (parsed?.ip != null && parsed?.destIp != null) {
             setIpObj({sourceIP: parsed?.ip, destIP: parsed?.destIp})
         }
-                let responseJson = showResponse ? func.responseJson(parsed, sampleData?.highlightPaths || [], metadata) : {}
-                let requestJson = func.requestJson(parsed, sampleData?.highlightPaths || [], metadata)
+        let responseJson = showResponse ? func.responseJson(parsed, sampleData?.highlightPaths || [], metadata) : {}
+        let requestJson = func.requestJson(parsed, sampleData?.highlightPaths || [], metadata)
 
         let responseTime = parsed?.responseTime;
         setResponseTime(responseTime)
