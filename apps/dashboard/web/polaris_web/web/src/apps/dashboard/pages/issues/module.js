@@ -1,6 +1,6 @@
 import issuesApi from "@/apps/dashboard/pages/issues/api"
 import IssuesStore from '@/apps/dashboard/pages/issues/issuesStore';
-import { TextField } from "@shopify/polaris";
+import { Checkbox, TextField } from "@shopify/polaris";
 import DropdownSearch from "@/apps/dashboard/components/shared/DropdownSearch";
 import Dropdown from "@/apps/dashboard/components/layouts/Dropdown";
 
@@ -284,6 +284,20 @@ const issuesFunctions = {
                     }
                 }
             case "boolean":
+                return {
+                    initialValue: fieldDefaultValue !== null ? fieldDefaultValue : false,
+                    getComponent: () => { 
+                        const displayABWorkItemFieldValues = IssuesStore(state => state.displayABWorkItemFieldValues);
+
+                        return (
+                            <Checkbox
+                                label={fieldName}
+                                checked={displayABWorkItemFieldValues[fieldReferenceName] || false}
+                                onChange={(newChecked) => handleFieldChange(fieldReferenceName, newChecked)}
+                            />
+                        ) 
+                    }
+                }
             case "dateTime":
             default: 
                 return {
