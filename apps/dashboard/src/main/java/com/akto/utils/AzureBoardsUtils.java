@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -19,6 +20,7 @@ import com.akto.dto.azure_boards_integration.AzureBoardsIntegration;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.ApiExecutor;
+import com.akto.util.Pair;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
@@ -30,6 +32,10 @@ public class AzureBoardsUtils {
 
     private static final String FIELDS_ENDPOINT = "/%s/_apis/wit/fields?api-version=%s";
     public static final String WORK_ITEM_TYPE_FIELDS_ENDPOINT = "/%s/%s/_apis/wit/workitemtypes/%s/fields?$expand=allowedValues&api-version=%s";
+
+    // Caching for Account Wise Azure Boards Integration Work Item Creation Fields
+    private static final ConcurrentHashMap<Integer, Pair<Map<String, Map<String, BasicDBList>>, Integer>> accountWiseABFields = new ConcurrentHashMap<>();
+    private static final int EXPIRY_TIME = 30 * 60; // 30 minutes
 
     // Thread pool for making calls to Azure Devops in parallel
     private static final ExecutorService adoPool = Executors.newFixedThreadPool(10);
@@ -236,11 +242,17 @@ public class AzureBoardsUtils {
     }
     
     public static Map<String, Map<String, BasicDBList>> getAccountAzureBoardFields() {
-        // todo: cache this result for some time to avoid frequent calls
-
+        Integer accountId = Context.accountId.get();
+        Pair<Map<String, Map<String, BasicDBList>>, Integer> cacheEntry = accountWiseABFields.get(accountId);
         Map<String, Map<String, BasicDBList>> createWorkItemFieldMetaData;
-        createWorkItemFieldMetaData = fetchAccountAzureBoardFields();
 
+         if (cacheEntry == null || (Context.now() - cacheEntry.getSecond() > EXPIRY_TIME)) {
+            createWorkItemFieldMetaData = fetchAccountAzureBoardFields();
+            accountWiseABFields.put(accountId, new Pair<>(createWorkItemFieldMetaData, Context.now()));
+        } else {
+            createWorkItemFieldMetaData = cacheEntry.getFirst();
+        }
+        
         return createWorkItemFieldMetaData; 
     }
 }
