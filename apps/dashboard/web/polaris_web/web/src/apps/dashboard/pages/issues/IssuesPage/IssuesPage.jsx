@@ -352,9 +352,17 @@ function IssuesPage() {
     }
 
     const handleSaveBulkAzureWorkItemsAction = () => {
+        let customABWorkItemFieldsPayload = [];
+        try {
+            customABWorkItemFieldsPayload = issuesFunctions.prepareCustomABWorkItemFieldsPayload(projectId, workItemType);
+        } catch (error) {
+            setToast(true, true, "Please fill all required fields before creating a Azure boards work item.");
+            return;
+        }
+
         setToast(true, false, "Please wait while we create your Azure Boards Work Item.")
         setBoardsModalActive(false)
-        api.bulkCreateAzureWorkItems(selectedIssuesItems, projectId, workItemType, window.location.origin).then((res) => {
+        api.bulkCreateAzureWorkItems(selectedIssuesItems, projectId, workItemType, window.location.origin, customABWorkItemFieldsPayload).then((res) => {
             if(res?.errorMessage) {
                 setToast(true, false, res?.errorMessage)
             } else {
@@ -638,11 +646,8 @@ function IssuesPage() {
 
 
     useEffect(() => {
-        // Fetch jira integration field metadata
         fetchIssuesByApisData()
-        if (window.JIRA_INTEGRATED === 'true') {
-            issuesFunctions.fetchCreateIssueFieldMetaData()
-        }
+        issuesFunctions.fetchIntegrationCustomFieldsMetadata();
     }, [])
 
 

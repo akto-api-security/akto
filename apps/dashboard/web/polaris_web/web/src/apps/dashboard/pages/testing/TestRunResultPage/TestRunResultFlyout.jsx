@@ -16,6 +16,7 @@ import "./style.css"
 import ActivityTracker from '../../dashboard/components/ActivityTracker'
 import observeFunc from "../../observe/transform.js"
 import settingFunctions from '../../settings/module.js'
+import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreationModal.jsx'
 import MarkdownViewer from '../../../components/shared/MarkdownViewer.jsx'
 import InlineEditableText from '../../../components/shared/InlineEditableText.jsx'
@@ -197,7 +198,15 @@ function TestRunResultFlyout(props) {
 
     const handleAzureBoardWorkitemCreation = async(id) => {
         if(projectId.length > 0 && workItemType.length > 0){
-            await issuesApi.createAzureBoardsWorkItem(issueDetails.id, projectId, workItemType, window.location.origin).then((res) => {
+            let customABWorkItemFieldsPayload = [];
+            try {
+                customABWorkItemFieldsPayload = issuesFunctions.prepareCustomABWorkItemFieldsPayload(projectId, workItemType);
+            } catch (error) {
+                setToast(true, true, "Please fill all required fields before creating a Azure boards work item.");
+                return;
+            }
+            
+            await issuesApi.createAzureBoardsWorkItem(issueDetails.id, projectId, workItemType, window.location.origin, customABWorkItemFieldsPayload).then((res) => {
                 func.setToast(true, false, "Work item created")
             }).catch((err) => {
                 func.setToast(true, true, err?.response?.data?.errorMessage || "Error creating work item")
