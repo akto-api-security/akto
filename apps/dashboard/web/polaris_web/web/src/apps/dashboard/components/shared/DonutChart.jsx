@@ -7,7 +7,7 @@ import PersistStore from '../../../main/PersistStore';
 import observeFunc from "../../pages/observe/transform"
 
 
-function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, subtitle}) {
+function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, subtitle, navUrlBuilder}) {
     const chartComponentRef = useRef(null)
     const navigate = useNavigate()
     const filtersMap = PersistStore(state => state.filtersMap)
@@ -112,7 +112,13 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, sub
 
                         click: (event) => {
                             const { point } = event;
-                            if(navUrl && navUrl ==='/dashboard/observe/sensitive/'){
+                            if (navUrlBuilder) {
+                                const builtUrl = navUrlBuilder(navUrl, point.filterValue)
+                                if (builtUrl) {
+                                    window.open(builtUrl, '_blank', 'noopener,noreferrer')
+                                }
+                            }
+                            else if(navUrl && navUrl ==='/dashboard/observe/sensitive/'){
                                 if(isRequest){
                                     const filterUrl = `${navUrl}${point.name}`
                                     let updatedFiltersMap = { ...filtersMap };
@@ -140,6 +146,8 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, sub
                                 updatedFiltersMap[filterUrl]['sort'] = [];
                                 setFiltersMap(updatedFiltersMap)
                                 navigate(`${navUrl}`);
+                            } else if (navUrl && navUrl === '/dashboard/observe/inventory') {
+                                window.open(navUrl, '_blank', 'noopener,noreferrer')
                             }
                         }
                     }
