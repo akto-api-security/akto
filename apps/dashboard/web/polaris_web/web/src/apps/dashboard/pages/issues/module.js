@@ -3,6 +3,7 @@ import IssuesStore from '@/apps/dashboard/pages/issues/issuesStore';
 import { Checkbox, TextField } from "@shopify/polaris";
 import DropdownSearch from "@/apps/dashboard/components/shared/DropdownSearch";
 import Dropdown from "@/apps/dashboard/components/layouts/Dropdown";
+import SingleDate from "../../components/layouts/SingleDate";
 
 const setCreateJiraIssueFieldMetaData = IssuesStore.getState().setCreateJiraIssueFieldMetaData;
 const updateDisplayJiraIssueFieldValues = IssuesStore.getState().updateDisplayJiraIssueFieldValues;
@@ -299,6 +300,55 @@ const issuesFunctions = {
                     }
                 }
             case "dateTime":
+                const formatABDate = (d) => {
+                    if (d instanceof Date && !isNaN(d)) {
+                        return d.toLocaleDateString(undefined, {
+                            month: 'numeric',
+                            day: 'numeric',
+                            year: 'numeric'
+                        });
+                    }
+                    return '';
+                }
+
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                const initialValue = formatABDate(tomorrow);
+
+                 return {
+                    initialValue: initialValue,
+                    getComponent: () => { 
+                        const displayABWorkItemFieldValues = IssuesStore(state => state.displayABWorkItemFieldValues);
+                        const currentValue = displayABWorkItemFieldValues[fieldReferenceName] || initialValue;
+                        let currentValueDate = new Date();
+                        try {
+                            const [mm, dd, yyyy] = currentValue.split("/");
+                            currentValueDate = new Date(yyyy, mm - 1, dd)
+                        } catch (error) {
+                            // do nothing
+                        }
+                        
+                        return (
+                            <SingleDate
+                                dispatch={(action) => {
+                                    const selectedDate = action?.obj?.selectedDate;
+
+                                    if (selectedDate instanceof Date && !isNaN(selectedDate)) {
+                                        const selectedDateString = formatABDate(selectedDate);
+                                        handleFieldChange(fieldReferenceName, selectedDateString);
+                                    }
+                                }}
+                                data={currentValueDate}
+                                dataKey="selectedDate"
+                                preferredPosition="above"
+                                disableDatesBefore={new Date(new Date().setDate(new Date().getDate()))}
+                                label="Select date"
+                                allowRange={false}
+                                readOnly={true}
+                            />
+                        )
+                    }
+                }
             default: 
                 return {
                     initialValue: null,
@@ -342,7 +392,7 @@ const issuesFunctions = {
             const fieldType = fieldMetaData?.fieldType || "string";
             customABWorkItemFieldsPayload.push({
                 referenceName: fieldReferenceName,
-                value: fieldValue,
+                value: fieldType !== "dateTime" ? fieldValue : `${fieldValue} 16:00`, // Add default time for dateTime fields
                 type: fieldType
             })
         }
