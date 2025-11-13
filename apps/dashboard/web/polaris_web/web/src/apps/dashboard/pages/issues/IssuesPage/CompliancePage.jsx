@@ -319,7 +319,7 @@ function CompliancePage() {
 
             setToast(true, false, "Please wait while we create your Azure Boards Work Item.")
             setBoardsModalActive(false)
-            api.bulkCreateAzureWorkItems(selectedIssuesItems, projectId, workItemType, window.location.origin).then((res) => {
+            api.bulkCreateAzureWorkItems(selectedIssuesItems, projectId, workItemType, window.location.origin, customABWorkItemFieldsPayload).then((res) => {
                 if(res?.errorMessage) {
                     setToast(true, false, res?.errorMessage)
                 } else {

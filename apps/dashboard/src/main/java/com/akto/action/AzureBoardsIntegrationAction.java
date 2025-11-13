@@ -410,9 +410,9 @@ public class AzureBoardsIntegrationAction extends UserAction {
         }
 
         if(existingIssues == testingIssuesIdList.size()) {
-            errorMessage = "All selected issues already have existing Jira tickets. No new tickets were created.";
+            errorMessage = "All selected issues already have existing work items. No new work items were created.";
         } else if(existingIssues > 0) {
-            errorMessage = "Jira tickets created for all selected issues, except for " + existingIssues + " issues that already have tickets.";
+            errorMessage = "Azure board work items created for all selected issues, except for " + existingIssues + " issues that already have work items.";
         }
 
         return Action.SUCCESS.toUpperCase();
