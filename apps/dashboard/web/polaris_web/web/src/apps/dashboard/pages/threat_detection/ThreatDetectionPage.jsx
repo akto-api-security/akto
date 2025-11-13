@@ -1,4 +1,4 @@
-import { useReducer, useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useReducer, useState, useEffect, useCallback, useMemo } from "react";
 import DateRangeFilter from "../../components/layouts/DateRangeFilter";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "../../components/shared/TitleWithInfo";
@@ -248,7 +248,6 @@ function ThreatDetectionPage() {
     const [latencyData, setLatencyData] = useState([]);
     const [detailsLoading, setDetailsLoading] = useState(false);
     const [pendingRowContext, setPendingRowContext] = useState(null);
-    const previousRefIdRef = useRef(null);
 
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
 
@@ -322,7 +321,6 @@ function ThreatDetectionPage() {
         setEventState(initialEventState);
         setPendingRowContext(null);
         setDetailsLoading(false);
-        previousRefIdRef.current = null;
 
         const params = new URLSearchParams(searchParams.toString());
         const keysToRemove = ['refId', 'eventType', 'actor', 'filterId', 'eventStatus'];
@@ -358,16 +356,6 @@ function ThreatDetectionPage() {
                 setShowDetails(!showDetails);
             }
             return;
-        }
-
-        // If clicking a different row while sidebar is open, reset state first
-        const isDifferentRow = eventState.currentRefId && eventState.currentRefId !== data.refId;
-        if (isDifferentRow) {
-            setEventState(initialEventState);
-            setPendingRowContext(null);
-            setDetailsLoading(true);
-            // Update ref to track the new refId
-            previousRefIdRef.current = data.refId;
         }
 
         setPendingRowContext({
@@ -514,26 +502,6 @@ function ThreatDetectionPage() {
         if (!hasParams || !queryParams.hasQueryEvent) {
             return;
         }
-        
-        // If this is a different refId than previous, reset state first
-        const urlRefId = urlParams.get("refId");
-        const previousRefId = previousRefIdRef.current;
-        if (previousRefId && previousRefId !== urlRefId) {
-            // Reset state for new event
-            setEventState(prev => ({
-                ...prev,
-                currentRefId: '',
-                rowDataList: [],
-                moreInfoData: {},
-                currentEventId: '',
-                currentEventStatus: '',
-                currentJiraTicketUrl: ''
-            }));
-            setPendingRowContext(null);
-        }
-        
-        // Update the ref to track current refId
-        previousRefIdRef.current = urlRefId;
         
         const isMountedRef = { current: true };
         fetchEventDetails(isMountedRef);
