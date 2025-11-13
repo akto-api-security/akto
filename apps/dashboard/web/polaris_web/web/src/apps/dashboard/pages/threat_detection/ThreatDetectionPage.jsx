@@ -1,4 +1,5 @@
-import { useReducer, useState, useEffect, useCallback } from "react";
+import { useReducer, useState, useEffect, useCallback, useMemo } from "react";
+import { saveAs } from "file-saver";
 import DateRangeFilter from "../../components/layouts/DateRangeFilter";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "../../components/shared/TitleWithInfo";
@@ -199,23 +200,41 @@ const ChartComponent = ({ subCategoryCount, severityCountMap }) => {
     );
   };
 
+// Initial state for event-related data (constant, defined outside component)
+const initialEventState = {
+    currentRefId: '',
+    rowDataList: [],
+    moreInfoData: {},
+    currentEventId: '',
+    currentEventStatus: '',
+    currentJiraTicketUrl: ''
+};
+
 function ThreatDetectionPage() {
     const navigate = useNavigate();
     const location = useLocation();
     const [searchParams] = useSearchParams();
-    const refIdFromQuery = searchParams.get("refId");
-    const eventTypeFromQuery = searchParams.get("eventType");
-    const actorFromQuery = searchParams.get("actor");
-    const filterIdFromQuery = searchParams.get("filterId");
-    const filtersFromQuery = searchParams.get("filters");
-    const statusFromFilters = filtersFromQuery ? filtersFromQuery.replace(/#/g, "").toUpperCase() : "";
-    const hasQueryEvent = Boolean(refIdFromQuery && eventTypeFromQuery && actorFromQuery && filterIdFromQuery);
-    const [currentRefId, setCurrentRefId] = useState('')
-    const [rowDataList, setRowDataList] = useState([])
-    const [moreInfoData, setMoreInfoData] = useState({})
-    const [currentEventId, setCurrentEventId] = useState('')
-    const [currentEventStatus, setCurrentEventStatus] = useState('')
-    const [currentJiraTicketUrl, setCurrentJiraTicketUrl] = useState('')
+    
+    // Consolidate query parameters into a single object
+    const queryParams = useMemo(() => {
+        const filtersFromQuery = searchParams.get("filters");
+        return {
+            refId: searchParams.get("refId"),
+            eventType: searchParams.get("eventType"),
+            actor: searchParams.get("actor"),
+            filterId: searchParams.get("filterId"),
+            filters: filtersFromQuery,
+            status: filtersFromQuery ? filtersFromQuery.replace(/#/g, "").toUpperCase() : "",
+            hasQueryEvent: Boolean(
+                searchParams.get("refId") && 
+                searchParams.get("eventType") && 
+                searchParams.get("actor") && 
+                searchParams.get("filterId")
+            )
+        };
+    }, [searchParams]);
+    
+    const [eventState, setEventState] = useState(initialEventState);
     const [triggerTableRefresh, setTriggerTableRefresh] = useState(0)
     const initialVal = values.ranges[3]
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
@@ -298,12 +317,7 @@ function ThreatDetectionPage() {
 
     const clearEventState = useCallback(() => {
         setShowNewTab(false);
-        setRowDataList([]);
-        setCurrentRefId('');
-        setCurrentEventId('');
-        setCurrentEventStatus('');
-        setCurrentJiraTicketUrl('');
-        setMoreInfoData({});
+        setEventState(initialEventState);
         setPendingRowContext(null);
         setDetailsLoading(false);
 
@@ -369,22 +383,26 @@ function ThreatDetectionPage() {
         setShowDetails(true);
         setShowNewTab(true);
         setDetailsLoading(true);
-        setRowDataList([]);
-        setCurrentEventId(data.id || '');
-        setCurrentEventStatus(data.status || '');
-        setCurrentJiraTicketUrl(data.jiraTicketUrl || '');
-        setMoreInfoData({
-            url: data.url || '',
-            method: data.method || '',
-            apiCollectionId: data.apiCollectionId,
-            templateId: data.filterId,
+        setEventState({
+            currentRefId: data.refId,
+            rowDataList: [],
+            moreInfoData: {
+                url: data.url || '',
+                method: data.method || '',
+                apiCollectionId: data.apiCollectionId,
+                templateId: data.filterId,
+            },
+            currentEventId: data.id || '',
+            currentEventStatus: data.status || '',
+            currentJiraTicketUrl: data.jiraTicketUrl || ''
         });
 
-        navigate(`${location.pathname}?${params.toString()}`, { replace: currentRefId === data.refId });
+        // Update URL with query parameters
+        navigate(`${location.pathname}?${params.toString()}`, { replace: eventState.currentRefId === data.refId });
     }
 
     const handleStatusUpdate = (newStatus) => {
-        setCurrentEventStatus(newStatus)
+        setEventState(prev => ({ ...prev, currentEventStatus: newStatus }))
         // Force table refresh by incrementing the trigger
         setTriggerTableRefresh(prev => prev + 1)
     }
@@ -426,71 +444,69 @@ function ThreatDetectionPage() {
       }, [startTimestamp, endTimestamp, isDemoMode, generateLatencyData]);
 
       // Fetch event data when required query params are in URL
-      useEffect(() => {
-        if (!hasQueryEvent) {
+      const fetchEventDetails = useCallback(async (isMountedRef) => {
+        if (!queryParams.hasQueryEvent) {
             return;
         }
 
-        const rowContext = pendingRowContext && pendingRowContext.refId === refIdFromQuery ? pendingRowContext : null;
+        const rowContext = pendingRowContext && pendingRowContext.refId === queryParams.refId ? pendingRowContext : null;
         setShowDetails(true);
         setShowNewTab(true);
+        setDetailsLoading(true);
+        
+        try {
+          const payloadResponse = await threatDetectionRequests.fetchMaliciousRequest(
+            queryParams.refId,
+            queryParams.eventType,
+            queryParams.actor,
+            queryParams.filterId
+          );
 
-        let isMounted = true;
+          if (!isMountedRef.current) {
+              return;
+          }
+          const maliciousPayloads = payloadResponse?.maliciousPayloadsResponses || [];
 
-        const fetchEventDetails = async () => {
-          setDetailsLoading(true);
-          try {
-            const payloadResponse = await threatDetectionRequests.fetchMaliciousRequest(
-              refIdFromQuery,
-              eventTypeFromQuery,
-              actorFromQuery,
-              filterIdFromQuery
-            );
-
-            if (!isMounted) {
-                return;
-            }
-            const maliciousPayloads = payloadResponse?.maliciousPayloadsResponses || [];
-
-            setRowDataList(maliciousPayloads);
-            setCurrentRefId(refIdFromQuery);
-            setCurrentEventId(rowContext?.eventId || '');
-            setCurrentEventStatus(statusFromFilters || rowContext?.status || '');
-            setCurrentJiraTicketUrl(rowContext?.jiraTicketUrl || '');
-            setMoreInfoData({
+          setEventState({
+            currentRefId: queryParams.refId,
+            rowDataList: maliciousPayloads,
+            moreInfoData: {
               url: rowContext?.url || '',
               method: rowContext?.method || '',
               apiCollectionId: rowContext?.apiCollectionId,
-              templateId: filterIdFromQuery,
-            });
-          } catch (error) {
-            console.error('Error fetching event:', error);
-            if (isMounted) {
-                func.setToast(true, true, 'Failed to load event. Please try again.');
-                handleDetailsVisibility(false);
-            }
-          } finally {
-            if (isMounted) {
-                setDetailsLoading(false);
-            }
+              templateId: queryParams.filterId,
+            },
+            currentEventId: rowContext?.eventId || '',
+            currentEventStatus: queryParams.status || rowContext?.status || '',
+            currentJiraTicketUrl: rowContext?.jiraTicketUrl || ''
+          });
+        } catch (error) {
+          console.error('Error fetching event:', error);
+          if (isMountedRef.current) {
+              func.setToast(true, true, 'Failed to load event. Please try again.');
+              handleDetailsVisibility(false);
           }
-        };
-
-        fetchEventDetails();
-
-        return () => {
-            isMounted = false;
-        };
+        } finally {
+          if (isMountedRef.current) {
+              setDetailsLoading(false);
+          }
+        }
       }, [
-        hasQueryEvent,
-        refIdFromQuery,
-        eventTypeFromQuery,
-        actorFromQuery,
-        filterIdFromQuery,
-        statusFromFilters,
+        queryParams,
         pendingRowContext,
         handleDetailsVisibility
       ]);
+
+      useEffect(() => {
+        if (!queryParams.hasQueryEvent) {
+            return;
+        }
+        const isMountedRef = { current: true };
+        fetchEventDetails(isMountedRef);
+        return () => {
+            isMountedRef.current = false;
+        };
+      }, [queryParams.hasQueryEvent, fetchEventDetails]);
 
     // Normal mode - show table, charts, and sidebar
     const components = [
@@ -523,14 +539,14 @@ function ThreatDetectionPage() {
                 title={"Attacker payload"}
                 showDetails={showDetails}
                 setShowDetails={handleDetailsVisibility}
-                data={rowDataList}
+                data={eventState.rowDataList}
                 key={"sus-sample-details"}
-                moreInfoData={moreInfoData}
+                moreInfoData={eventState.moreInfoData}
                 threatFiltersMap={threatFiltersMap}
-                eventId={currentEventId}
-                eventStatus={currentEventStatus}
+                eventId={eventState.currentEventId}
+                eventStatus={eventState.currentEventStatus}
                 onStatusUpdate={handleStatusUpdate}
-                jiraTicketUrl={currentJiraTicketUrl}
+                jiraTicketUrl={eventState.currentJiraTicketUrl}
                 loading={detailsLoading}
             />
             
