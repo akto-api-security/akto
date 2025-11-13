@@ -217,14 +217,16 @@ function ThreatDetectionPage() {
     
     // Consolidate query parameters into a single object
     const queryParams = useMemo(() => {
-        const filtersFromQuery = searchParams.get("filters");
+        const eventStatusFromQuery = searchParams.get("eventStatus");
+        // Support legacy 'filters' param for backward compatibility
+        const legacyFilters = searchParams.get("filters");
+        const statusValue = eventStatusFromQuery || (legacyFilters ? legacyFilters.replace(/#/g, "").toUpperCase() : "");
         return {
             refId: searchParams.get("refId"),
             eventType: searchParams.get("eventType"),
             actor: searchParams.get("actor"),
             filterId: searchParams.get("filterId"),
-            filters: filtersFromQuery,
-            status: filtersFromQuery ? filtersFromQuery.replace(/#/g, "").toUpperCase() : "",
+            status: statusValue,
             hasQueryEvent: Boolean(
                 searchParams.get("refId") && 
                 searchParams.get("eventType") && 
@@ -322,7 +324,7 @@ function ThreatDetectionPage() {
         setDetailsLoading(false);
 
         const params = new URLSearchParams(searchParams.toString());
-        const keysToRemove = ['refId', 'eventType', 'actor', 'filterId', 'filters'];
+        const keysToRemove = ['refId', 'eventType', 'actor', 'filterId', 'eventStatus'];
         let hasChanges = false;
         keysToRemove.forEach((key) => {
             if (params.has(key)) {
@@ -486,7 +488,16 @@ function ThreatDetectionPage() {
       ]);
 
       useEffect(() => {
-        if (!queryParams.hasQueryEvent) {
+        // Check both queryParams and location.search to handle timing issues
+        const urlParams = new URLSearchParams(location.search);
+        const hasParams = Boolean(
+          urlParams.get("refId") && 
+          urlParams.get("eventType") && 
+          urlParams.get("actor") && 
+          urlParams.get("filterId")
+        );
+        
+        if (!hasParams || !queryParams.hasQueryEvent) {
             return;
         }
         const isMountedRef = { current: true };
@@ -494,7 +505,7 @@ function ThreatDetectionPage() {
         return () => {
             isMountedRef.current = false;
         };
-      }, [queryParams.hasQueryEvent, fetchEventDetails]);
+      }, [queryParams.hasQueryEvent, fetchEventDetails, location.search]);
 
     // Normal mode - show table, charts, and sidebar
     const components = [

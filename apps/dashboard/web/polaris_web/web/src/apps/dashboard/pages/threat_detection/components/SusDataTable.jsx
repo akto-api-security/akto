@@ -466,7 +466,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         params.set("actor", x.actor);
         params.set("filterId", x.filterId);
         if (x.status) {
-          params.set("filters", `#${x.status.toLowerCase()}`);
+          params.set("eventStatus", x.status.toUpperCase());
         }
         nextUrl = `${location.pathname}?${params.toString()}`;
       }
