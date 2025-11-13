@@ -102,13 +102,13 @@ function SampleDetails(props) {
         component: (
             <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
                 <SampleDataList
-                    key="Sample values"
+                    key={`Sample values-${eventId || 'default'}`}
                     heading={"Attempt"}
                     minHeight={"30vh"}
                     vertical={true}
-                    sampleData={data?.map((result) => {
+                    sampleData={data && Array.isArray(data) && data.length > 0 ? data.map((result) => {
                         return { message: result.orig, highlightPaths: [], metadata: result.metadata }
-                    })}
+                    }) : []}
                 />
             </Box>)
     }
@@ -375,7 +375,7 @@ Reference URL: ${window.location.href}`.trim();
 
     const tabsComponent = (
         <LayoutWithTabs
-            key={"tabs-comp"}
+            key={`tabs-comp-${eventId || 'default'}`}
             tabs={ window.location.href.indexOf("guardrails") > -1 ? [ValuesTab] : [overviewTab, timelineTab, ValuesTab, remediationTab]}
             currTab = {() => {}}
         />

@@ -574,7 +574,7 @@ function ThreatDetectionPage() {
                 showDetails={showDetails}
                 setShowDetails={handleDetailsVisibility}
                 data={eventState.rowDataList}
-                key={"sus-sample-details"}
+                key={`sus-sample-details-${eventState.currentRefId || 'default'}`}
                 moreInfoData={eventState.moreInfoData}
                 threatFiltersMap={threatFiltersMap}
                 eventId={eventState.currentEventId}
