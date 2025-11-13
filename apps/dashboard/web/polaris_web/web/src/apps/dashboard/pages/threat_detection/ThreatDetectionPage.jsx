@@ -357,18 +357,6 @@ function ThreatDetectionPage() {
             return;
         }
 
-        const params = new URLSearchParams(searchParams.toString());
-        params.set("refId", data.refId);
-        params.set("eventType", data.eventType);
-        params.set("actor", data.actor);
-        params.set("filterId", data.filterId);
-        const statusFilter = data.status ? `#${data.status.toLowerCase()}` : "";
-        if (statusFilter.length > 0) {
-            params.set("filters", statusFilter);
-        } else {
-            params.delete("filters");
-        }
-
         setPendingRowContext({
             refId: data.refId,
             url: data.url,
@@ -396,9 +384,9 @@ function ThreatDetectionPage() {
             currentEventStatus: data.status || '',
             currentJiraTicketUrl: data.jiraTicketUrl || ''
         });
-
-        // Update URL with query parameters
-        navigate(`${location.pathname}?${params.toString()}`, { replace: eventState.currentRefId === data.refId });
+        if (data.nextUrl) {
+            navigate(data.nextUrl, { replace: eventState.currentRefId === data.refId });
+        }
     }
 
     const handleStatusUpdate = (newStatus) => {
