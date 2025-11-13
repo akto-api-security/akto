@@ -52,7 +52,8 @@ public class KafkaUtils {
             if (lowerHeaders.contains("hollywoodbets") ||
                 lowerHeaders.contains("betsolutions") ||
                 lowerHeaders.contains("betnix") ||
-                lowerHeaders.contains("betsoft")) {
+                lowerHeaders.contains("betsoft") ||
+                lowerHeaders.contains("security-finance")) {
                 return true;
             }
         }
