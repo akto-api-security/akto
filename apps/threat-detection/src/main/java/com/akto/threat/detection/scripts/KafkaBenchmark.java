@@ -33,7 +33,7 @@ public class KafkaBenchmark {
     
     
     public static final String THREAT_TOPIC = "akto.api.logs2";
-    public static final String KAFKA_URL = "localhost:19092";
+    public static final String KAFKA_URL = "localhost:9092";
     private static final String CONSUMER_GROUP_ID = "akto.threat_detection";
     private static KafkaConfig internalKafkaConfig =
         KafkaConfig.newBuilder()

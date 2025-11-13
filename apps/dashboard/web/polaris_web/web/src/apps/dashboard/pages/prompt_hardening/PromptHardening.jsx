@@ -13,6 +13,7 @@ import PromptHardeningStore from "./promptHardeningStore"
 import PersistStore from "../../../main/PersistStore"
 
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
+import api from "./api"
 
 import "./PromptHardening.css"
 
@@ -31,7 +32,29 @@ const PromptHardening = () => {
     }
 
     const fetchAllPrompts = async () => {
-        // Initialize with sample prompts data structured like test editor
+        let promptsFromBackend
+        try {
+            const data = await api.fetchAllPrompts()
+            promptsFromBackend = data?.promptsObj
+        } catch (_) {
+            promptsFromBackend = null
+        }
+
+        if (promptsFromBackend) {
+            setPromptsObj(promptsFromBackend)
+
+            const firstCategory = Object.keys(promptsFromBackend.customPrompts || {})
+                .find(category => (promptsFromBackend.customPrompts[category] || []).length > 0)
+
+            if (firstCategory) {
+                setSelectedPrompt(promptsFromBackend.customPrompts[firstCategory][0])
+            }
+
+            setLoading(false)
+            return
+        }
+
+        // Fallback to sample prompts data if backend call fails
         const samplePrompts = {
             customPrompts: {
                 "Prompt Injection": [
@@ -745,10 +768,8 @@ notes: "Verifies rate limiting is working."`,
         setLoading(false)
     }
 
-    const addCustomPrompt = (e) => {
-        e.stopPropagation()
-        console.log("Add custom prompt")
-        // TODO: Implement add custom prompt functionality
+    const addCustomPrompt = (event) => {
+        event.stopPropagation()
     }
 
     const headerComp = (

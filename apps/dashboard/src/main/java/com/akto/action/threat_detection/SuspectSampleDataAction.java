@@ -7,8 +7,6 @@ import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.type.URLMethods;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
-import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.UpdateMaliciousEventStatusRequest;
-import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.UpdateMaliciousEventStatusResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DeleteMaliciousEventsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DeleteMaliciousEventsResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsRequest.Filter;
@@ -67,6 +65,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   @Getter @Setter String deleteMessage;
   @Getter @Setter int deletedCount;
   @Getter @Setter List<String> hosts;
+  @Getter @Setter String latestApiOrigRegex;
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -115,6 +114,10 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
     if (this.hosts != null && !this.hosts.isEmpty()) {
       filter.put("hosts", this.hosts);
+    }
+
+    if (this.latestApiOrigRegex != null && !this.latestApiOrigRegex.isEmpty()) {
+      filter.put("latestApiOrigRegex", this.latestApiOrigRegex);
     }
 
     List<String> templates = getTemplates(latestAttack);
@@ -266,6 +269,10 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     }
     if (this.label != null && !this.label.isEmpty()) {
       filterBuilder.setLabel(this.label);
+    }
+
+    if (this.latestApiOrigRegex != null && !this.latestApiOrigRegex.isEmpty()) {
+      filterBuilder.setLatestApiOrigRegex(this.latestApiOrigRegex);
     }
 
     if (this.startTimestamp > 0 || this.endTimestamp > 0) {

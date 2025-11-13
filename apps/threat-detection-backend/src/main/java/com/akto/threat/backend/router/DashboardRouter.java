@@ -79,6 +79,10 @@ public class DashboardRouter implements ARouter {
             filterMap.put("detected_at_time_range", timeRange);
         }
 
+        if (protoFilter.hasLatestApiOrigRegex() && !protoFilter.getLatestApiOrigRegex().isEmpty()) {
+            filterMap.put("latestApiOrigRegex", protoFilter.getLatestApiOrigRegex());
+        }
+
         return filterMap;
     }
 

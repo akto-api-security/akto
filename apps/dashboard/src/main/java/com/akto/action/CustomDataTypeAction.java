@@ -491,11 +491,11 @@ public class CustomDataTypeAction extends UserAction{
         while (true) {
             List<ApiInfo.ApiInfoKey> apiInfoKeys = SingleTypeInfoDao.instance.fetchEndpointsBySubType(subType, skip, limit);
             if(apiInfoKeys.isEmpty()){
-                loggerMaker.debugAndAddToDb("No apiInfoKeys left for subType:" + subType.getName(), LogDb.DASHBOARD);
+                loggerMaker.infoAndAddToDb("No apiInfoKeys left for subType:" + subType.getName(), LogDb.DASHBOARD);
                 break;
             }
 
-            loggerMaker.debugAndAddToDb("Found " + apiInfoKeys.size() + " apiInfoKeys for subType:" + subType.getName(), LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("Found " + apiInfoKeys.size() + " apiInfoKeys for subType:" + subType.getName() + " and skip:" + skip, LogDb.DASHBOARD);
             List<Bson> query = new ArrayList<>();
             for(ApiInfo.ApiInfoKey key : apiInfoKeys){
                 Bson basicFilter = ApiInfoDao.getFilter(key);
@@ -525,10 +525,13 @@ public class CustomDataTypeAction extends UserAction{
                 }
             }
             if(!writesForSampleData.isEmpty()){
-                SampleDataDao.instance.getMCollection().bulkWrite(writesForSampleData);
+                BulkWriteResult result =  SampleDataDao.instance.getMCollection().bulkWrite(writesForSampleData);
+                loggerMaker.infoAndAddToDb("Redaction results: matched count:" + result.getMatchedCount() + " modified count:" + result.getModifiedCount() + " samples modified in sd for subType:" + subType.getName());
             }
             if(!writesForSensitiveSampleData.isEmpty()){
-                SensitiveSampleDataDao.instance.getMCollection().bulkWrite(writesForSensitiveSampleData);
+                
+                BulkWriteResult resultSensitive = SensitiveSampleDataDao.instance.getMCollection().bulkWrite(writesForSensitiveSampleData);
+                loggerMaker.infoAndAddToDb("Redaction results: matched count:" + resultSensitive.getMatchedCount() + " modified count:" + resultSensitive.getModifiedCount() + " sensitive samples modified in sd for subType:" + subType.getName());
             }
             writesForSampleData.clear();
             writesForSensitiveSampleData.clear();
