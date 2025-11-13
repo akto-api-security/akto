@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Divider, HorizontalStack, Modal, Text, Tooltip, VerticalStack, Popover, ActionList, Tag } from "@shopify/polaris";
+import { Badge, Box, Button, Divider, HorizontalStack, Modal, Text, Tooltip, VerticalStack, Popover, ActionList } from "@shopify/polaris";
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
@@ -16,12 +16,13 @@ import transform from "../../testing/transform";
 
 function SampleDetails(props) {
     const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate } = props
-    let currentTemplateObj = threatFiltersMap[moreInfoData?.templateId]
+    const resolvedThreatFiltersMap = threatFiltersMap || {};
+    let currentTemplateObj = moreInfoData?.templateId ? resolvedThreatFiltersMap[moreInfoData?.templateId] : undefined;
 
     let severity = currentTemplateObj?.severity || "HIGH"
     const [remediationText, setRemediationText] = useState("")
     const [latestActivity, setLatestActivity] = useState([])
-    const [showModal, setShowModal] = useState(false);
+    const [showModal, setShowModal] = useState(false);  
     const [triageLoading, setTriageLoading] = useState(false);
     const [actionPopoverActive, setActionPopoverActive] = useState(false);
 
@@ -119,9 +120,9 @@ function SampleDetails(props) {
     }
 
     useEffect(() => {
-       fetchRemediationInfo()
-       aggregateActivity()
-    },[moreInfoData?.templateId, data])
+        fetchRemediationInfo()
+        aggregateActivity()
+    }, [moreInfoData?.templateId, data])
 
     useEffect(() => {
         setJiraTicketUrl(props.jiraTicketUrl || "")
