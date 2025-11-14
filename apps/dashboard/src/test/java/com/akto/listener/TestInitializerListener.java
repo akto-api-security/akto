@@ -23,6 +23,9 @@ import com.mongodb.client.model.Filters;
 import org.bson.types.ObjectId;
 import org.junit.Test;
 
+import java.lang.reflect.Method;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 import static org.junit.Assert.*;
@@ -112,7 +115,42 @@ public class TestInitializerListener extends MongoBasedTest {
         assertNotNull(testingRunIssues);
 
     }
-    
+
+    @Test
+    public void testBuildApiThreatsTeamsWebhookBodyAddsThreatUrl() throws Exception {
+        StringBuilder body = new StringBuilder();
+        String sectionName = "API Threat payloads";
+
+        Map<String, Object> event = new LinkedHashMap<>();
+        event.put("refId", "ref-123");
+        event.put("eventType", "SINGLE");
+        event.put("actor", "14.143.179.162");
+        event.put("filterId", "XSS");
+        event.put("status", "ACTIVE");
+
+        List<Object> value = Collections.singletonList(event);
+
+        Method method = InitializerListener.class.getDeclaredMethod(
+                "buildApiThreatsTeamsWebhookBody",
+                StringBuilder.class,
+                String.class,
+                Object.class
+        );
+        method.setAccessible(true);
+        method.invoke(null, body, sectionName, value);
+
+        String result = body.toString();
+        String expectedUrl = Constants.DEFAULT_AKTO_DASHBOARD_URL
+                + "/dashboard/protection/threat-activity?refId="
+                + URLEncoder.encode("ref-123", StandardCharsets.UTF_8.toString())
+                + "&eventType=" + URLEncoder.encode("SINGLE", StandardCharsets.UTF_8.toString())
+                + "&actor=" + URLEncoder.encode("14.143.179.162", StandardCharsets.UTF_8.toString())
+                + "&filterId=" + URLEncoder.encode("XSS", StandardCharsets.UTF_8.toString());
+
+        assertTrue(result.contains("Threat Activity URL"));
+        assertTrue(result.contains(expectedUrl));
+    }
+
     @Test
     public void testSaveTestEditorYaml() {
         YamlTemplateDao.instance.getMCollection().drop();
