@@ -12,9 +12,10 @@ message Metadata {
 
 message SchemaConformanceError {
   enum Location {
-    LOCATION_URL = 0;
-    LOCATION_HEADER = 1;
-    LOCATION_BODY = 2;
+    LOCATION_UNSPECIFIED = 0;
+    LOCATION_URL = 1;
+    LOCATION_HEADER = 2;
+    LOCATION_BODY = 3;
   }
   
   string schema_path = 1;
