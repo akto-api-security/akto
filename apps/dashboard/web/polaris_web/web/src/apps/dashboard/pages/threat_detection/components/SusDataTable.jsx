@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import api from "../api";
 import { CellType } from "../../../components/tables/rows/GithubRow";
@@ -87,6 +88,7 @@ const sortOptions = [
 let filters = [];
 
 function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABELS.THREAT }) {
+  const location = useLocation();
   const getTimeEpoch = (key) => {
     return Math.floor(Date.parse(currDateRange.period[key]) / 1000);
   };
@@ -462,6 +464,21 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     let total = res.total;
     let ret = res?.maliciousEvents.map((x) => {
       const severity = threatFiltersMap[x?.filterId]?.severity || "HIGH"
+      
+      // Build nextUrl for table navigation (similar to prepareTestRunResult)
+      let nextUrl = null;
+      if (x.refId && x.eventType && x.actor && x.filterId) {
+        const params = new URLSearchParams();
+        params.set("refId", x.refId);
+        params.set("eventType", x.eventType);
+        params.set("actor", x.actor);
+        params.set("filterId", x.filterId);
+        if (x.status) {
+          params.set("eventStatus", x.status.toUpperCase());
+        }
+        nextUrl = `${location.pathname}?${params.toString()}`;
+      }
+      
       return {
         ...x,
         id: x.id,
@@ -485,7 +502,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         severityComp: (<div className={`badge-wrapper-${severity}`}>
                           <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                       </div>
-        )
+        ),
+        nextUrl: nextUrl
       };
     });
     setLoading(false);
