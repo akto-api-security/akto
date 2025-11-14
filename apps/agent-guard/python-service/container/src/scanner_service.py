@@ -26,6 +26,7 @@ except:
     pass
 
 from llm_guard import input_scanners, output_scanners
+from intent_analyzer import IntentAnalysisScanner
 
 logging.basicConfig(
     level=logging.INFO,
@@ -61,6 +62,7 @@ PROMPT_SCANNERS = {
     "BanTopics": input_scanners.BanTopics,
     "Code": input_scanners.Code,
     "Gibberish": input_scanners.Gibberish,
+    "IntentAnalysis": IntentAnalysisScanner,
     "Language": input_scanners.Language,
     "PromptInjection": input_scanners.PromptInjection,
     "Secrets": input_scanners.Secrets,
