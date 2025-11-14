@@ -2,16 +2,14 @@ package com.akto.threat.backend.cron;
 
 import com.akto.log.LoggerMaker;
 import com.akto.dao.context.Context;
-import com.mongodb.MongoBulkWriteException;
+import com.akto.threat.backend.dao.ArchivedMaliciousEventDao;
+import com.akto.threat.backend.dao.MaliciousEventDao;
+import com.akto.threat.backend.dao.ThreatConfigurationDao;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
-import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.InsertOneModel;
-import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.Sorts;
-import com.mongodb.client.model.WriteModel;
 import org.bson.Document;
 
 import java.time.Duration;
@@ -27,8 +25,6 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
 
     private static final LoggerMaker logger = new LoggerMaker(ArchiveOldMaliciousEventsCron.class);
 
-    private static final String SOURCE_COLLECTION = "malicious_events";
-    private static final String DEST_COLLECTION = "archived_malicious_events";
     private static final int BATCH_SIZE = 5000;
     private static final long DEFAULT_RETENTION_DAYS = 60L; // default, can be overridden from DB
     private static final long MIN_RETENTION_DAYS = 30L;
@@ -98,17 +94,13 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
     }
 
     private void archiveOldMaliciousEvents(String dbName, long nowSeconds) {
-        MongoDatabase db = mongoClient.getDatabase(dbName);
-        if (!ensureCollectionExists(db, DEST_COLLECTION)) {
-            logger.infoAndAddToDb("Archive collection missing, skipping db: " + dbName, LoggerMaker.LogDb.RUNTIME);
-            return;
-        }
+        String accountId = dbName;
 
-        long retentionDays = fetchRetentionDays(db);
+        long retentionDays = fetchRetentionDays(accountId);
         long threshold = nowSeconds - (retentionDays * 24 * 60 * 60);
 
-        MongoCollection<Document> source = db.getCollection(SOURCE_COLLECTION, Document.class);
-        MongoCollection<Document> dest = db.getCollection(DEST_COLLECTION, Document.class);
+        MongoCollection<Document> source = MaliciousEventDao.instance.getDocumentCollection(accountId);
+        MongoCollection<Document> dest = ArchivedMaliciousEventDao.instance.getCollection(accountId);
 
         int totalMoved = 0;
         long deletesThisIteration = 0L;
@@ -133,9 +125,9 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
                 ids.add(doc.get("_id"));
             }
 
-            asyncUpsertToArchive(batch, dest, dbName);
+            asyncUpsertToArchive(batch, accountId);
 
-            long deleted = deleteByIds(source, ids, dbName);
+            long deleted = deleteByIds(source, ids, accountId);
             totalMoved += (int) deleted;
             deletesThisIteration += deleted;
 
@@ -159,7 +151,7 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
         // Enforce collection size cap by trimming oldest docs beyond 400k.
         try {
             if (deletesThisIteration < MAX_DELETES_PER_ITERATION) {
-                trimCollectionIfExceedsCap(dbName, source, dest);
+                trimCollectionIfExceedsCap(accountId, source, dest);
             } else {
                 logger.infoAndAddToDb("Skipping trim step as delete cap reached in db " + dbName, LoggerMaker.LogDb.RUNTIME);
             }
@@ -168,10 +160,9 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
         }
     }
 
-    private long fetchRetentionDays(MongoDatabase db) {
+    private long fetchRetentionDays(String accountId) {
         try {
-            MongoCollection<Document> cfg = db.getCollection("threat_configuration", Document.class);
-            Document doc = cfg.find().first();
+            Document doc = ThreatConfigurationDao.instance.getCollection(accountId).find().first();
             if (doc == null) return DEFAULT_RETENTION_DAYS;
             Object val = doc.get("archivalDays");
             if (val instanceof Number) {
@@ -182,30 +173,18 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
                 return days;
             }
         } catch (Exception e) {
-            logger.errorAndAddToDb("Failed fetching archivalDays from threat_configuration for db " + db.getName() + ": " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+            logger.errorAndAddToDb("Failed fetching archivalDays from threat_configuration for account " + accountId + ": " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
         }
         return DEFAULT_RETENTION_DAYS;
     }
 
-    private boolean ensureCollectionExists(MongoDatabase db, String collectionName) {
-        try {
-            Document first = db.listCollections(Document.class)
-                    .filter(Filters.eq("name", collectionName))
-                    .first();
-            return first != null;
-        } catch (Exception e) {
-            logger.errorAndAddToDb("Error checking existence for collection: " + collectionName + " in db " + db.getName() + ": " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
-            return false;
-        }
-    }
-
-    private void trimCollectionIfExceedsCap(String dbName, MongoCollection<Document> source, MongoCollection<Document> dest) {
+    private void trimCollectionIfExceedsCap(String accountId, MongoCollection<Document> source, MongoCollection<Document> dest) {
         long approxCount = source.countDocuments();
 
         if (approxCount <= MAX_SOURCE_DOCS) return;
 
         long totalDeleted = 0L;
-        logger.infoAndAddToDb("Starting overflow trim in db " + dbName + ": approxCount=" + approxCount + ", overCap=" + (approxCount - MAX_SOURCE_DOCS), LoggerMaker.LogDb.RUNTIME);
+        logger.infoAndAddToDb("Starting overflow trim in account " + accountId + ": approxCount=" + approxCount + ", overCap=" + (approxCount - MAX_SOURCE_DOCS), LoggerMaker.LogDb.RUNTIME);
 
         while (true) {
             int batch = BATCH_SIZE;
@@ -223,13 +202,13 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
 
             if (oldestDocs.isEmpty()) break;
 
-            asyncUpsertToArchive(oldestDocs, dest, dbName);
+            asyncUpsertToArchive(oldestDocs, accountId);
 
             Set<Object> ids = new HashSet<>();
             for (Document d : oldestDocs) {
                 ids.add(d.get("_id"));
             }
-            long deleted = deleteByIds(source, ids, dbName);
+            long deleted = deleteByIds(source, ids, accountId);
 
             totalDeleted += deleted;
 
@@ -238,36 +217,31 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
         }
 
         if (totalDeleted > 0) {
-            logger.infoAndAddToDb("Completed overflow trim in db " + dbName + ": deleted=" + totalDeleted, LoggerMaker.LogDb.RUNTIME);
+            logger.infoAndAddToDb("Completed overflow trim in account " + accountId + ": deleted=" + totalDeleted, LoggerMaker.LogDb.RUNTIME);
         }
     }
 
-    private void asyncUpsertToArchive(List<Document> docs, MongoCollection<Document> dest, String dbName) {
+    private void asyncUpsertToArchive(List<Document> docs, String accountId) {
         if (docs == null || docs.isEmpty()) return;
-        List<WriteModel<Document>> writes = new ArrayList<>(docs.size());
-        for (Document doc : docs) {
-            writes.add(new InsertOneModel<>(doc));
-        }
-        final List<WriteModel<Document>> writeSnapshot = new ArrayList<>(writes);
+        final List<Document> docsSnapshot = new ArrayList<>(docs);
+        final String accountIdFinal = accountId;
         this.scheduler.submit(() -> {
             try {
-                dest.bulkWrite(writeSnapshot, new BulkWriteOptions().ordered(false));
-            } catch (MongoBulkWriteException bwe) {
-                logger.errorAndAddToDb("Async bulk write error archiving to " + DEST_COLLECTION + " in db " + dbName + ": " + bwe.getMessage(), LoggerMaker.LogDb.RUNTIME);
+                ArchivedMaliciousEventDao.instance.bulkInsert(accountIdFinal, docsSnapshot);
             } catch (Exception e) {
-                logger.errorAndAddToDb("Async error writing archive batch in db " + dbName + ": " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+                logger.errorAndAddToDb("Async error writing archive batch in account " + accountIdFinal + ": " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
             }
         });
     }
 
-    private long deleteByIds(MongoCollection<Document> source, Set<Object> ids, String dbName) {
+    private long deleteByIds(MongoCollection<Document> source, Set<Object> ids, String accountId) {
         if (ids == null || ids.isEmpty()) return 0L;
         try {
             long deleted = source.deleteMany(Filters.in("_id", ids)).getDeletedCount();
-            logger.infoAndAddToDb("Deleted " + deleted + " documents from source in db " + dbName, LoggerMaker.LogDb.RUNTIME);
+            logger.infoAndAddToDb("Deleted " + deleted + " documents from source in account " + accountId, LoggerMaker.LogDb.RUNTIME);
             return deleted;
         } catch (Exception e) {
-            logger.errorAndAddToDb("Failed to delete documents from source in db " + dbName + ": " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+            logger.errorAndAddToDb("Failed to delete documents from source in account " + accountId + ": " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
             return 0L;
         }
     }

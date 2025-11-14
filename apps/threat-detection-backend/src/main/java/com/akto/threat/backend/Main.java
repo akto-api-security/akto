@@ -9,12 +9,14 @@ import com.akto.kafka.KafkaConsumerConfig;
 import com.akto.kafka.KafkaProducerConfig;
 import com.akto.kafka.Serializer;
 import com.akto.log.LoggerMaker;
+import com.akto.threat.backend.dao.MaliciousEventDao;
+import com.akto.threat.backend.dao.ThreatDetectionDaoInit;
 import com.akto.threat.backend.service.ApiDistributionDataService;
+import com.akto.threat.backend.dao.ApiDistributionDataDao;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
 import com.akto.threat.backend.tasks.FlushMessagesToDB;
-import com.akto.threat.backend.cron.ArchiveOldMaliciousEventsCron;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.ReadPreference;
@@ -29,8 +31,6 @@ public class Main {
   private static final LoggerMaker logger = new LoggerMaker(Main.class);
 
   public static void main(String[] args) throws Exception {
-
-    DaoInit.init(new ConnectionString(System.getenv("AKTO_MONGO_CONN")));
 
     ConnectionString connectionString =
         new ConnectionString(System.getenv("AKTO_THREAT_PROTECTION_MONGO_CONN"));
@@ -48,6 +48,13 @@ public class Main {
             .build();
 
     MongoClient threatProtectionMongo = MongoClients.create(clientSettings);
+
+    // Initialize legacy DaoInit for AuthenticationInterceptor (ConfigsDao)
+    // ConfigsDao uses CommonContextDao which connects to "common" database
+    DaoInit.init(connectionString);
+
+    ThreatDetectionDaoInit.init(threatProtectionMongo);
+
     KafkaConfig internalKafkaConfig =
         KafkaConfig.newBuilder()
             .setBootstrapServers(System.getenv("THREAT_EVENTS_KAFKA_BROKER_URL"))
@@ -67,21 +74,13 @@ public class Main {
     new FlushMessagesToDB(internalKafkaConfig, threatProtectionMongo).run();
 
     MaliciousEventService maliciousEventService =
-        new MaliciousEventService(internalKafkaConfig, threatProtectionMongo);
+        new MaliciousEventService(internalKafkaConfig, MaliciousEventDao.instance);
 
-    ThreatActorService threatActorService = new ThreatActorService(threatProtectionMongo);
-    ThreatApiService threatApiService = new ThreatApiService(threatProtectionMongo);
-    ApiDistributionDataService apiDistributionDataService = new ApiDistributionDataService(threatProtectionMongo);
+    ThreatActorService threatActorService = new ThreatActorService(threatProtectionMongo, MaliciousEventDao.instance);
+    ThreatApiService threatApiService = new ThreatApiService(MaliciousEventDao.instance);
+    ApiDistributionDataService apiDistributionDataService = new ApiDistributionDataService(ApiDistributionDataDao.instance);
 
     new BackendVerticle(maliciousEventService, threatActorService, threatApiService, apiDistributionDataService).start();
-
-    try {
-      logger.infoAndAddToDb("Starting ArchiveOldMaliciousEventsCron for all databases", LoggerMaker.LogDb.RUNTIME);
-      new ArchiveOldMaliciousEventsCron(threatProtectionMongo).cron();
-      logger.infoAndAddToDb("Scheduled ArchiveOldMaliciousEventsCron", LoggerMaker.LogDb.RUNTIME);
-    } catch (Exception e) {
-      logger.errorAndAddToDb("Error starting ArchiveOldMaliciousEventsCron: " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
-    }
   }
 
 }
