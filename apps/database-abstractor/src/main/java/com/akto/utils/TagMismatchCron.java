@@ -1,18 +1,26 @@
 package com.akto.utils;
 
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
-import com.akto.data_actor.DbLayer;
 import com.akto.dto.Account;
-import com.akto.dto.AccountSettings;
-import com.akto.dto.dependency_flow.DependencyFlow;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.Key;
 import com.akto.log.LoggerMaker;
 import com.akto.util.AccountTask;
 import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.UpdateOneModel;
+import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.WriteModel;
+import org.bson.conversions.Bson;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -23,6 +31,7 @@ public class TagMismatchCron {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TagMismatchCron.class, LoggerMaker.LogDb.CYBORG);
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    public static final List<Integer> TAGS_MISMATCH_ACCOUNT_IDS = Arrays.asList(1736798101, 1718042191);
 
     public void runCron() {
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -30,6 +39,9 @@ public class TagMismatchCron {
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
+                        if(!TAGS_MISMATCH_ACCOUNT_IDS.contains(t.getId())){
+                            return;
+                        }
                         evaluateTagsMismatch(t.getId());
                     }
                 }, "evaluateTagsMismatch");
@@ -72,6 +84,75 @@ public class TagMismatchCron {
     }
 
     /**
+     * Handles mismatched samples by updating ApiCollection tags in bulk.
+     * Adds or updates "tags-mismatch" tag for all affected collections.
+     *
+     * @param mismatchedSamples List of SampleData objects that have tag mismatches
+     */
+    private void handleMismatchedSamples(List<SampleData> mismatchedSamples) {
+        if (mismatchedSamples == null || mismatchedSamples.isEmpty()) {
+            return;
+        }
+
+        try {
+            // Extract unique apiCollectionIds
+            Set<Integer> uniqueCollectionIds = new HashSet<>();
+            for (SampleData sampleData : mismatchedSamples) {
+                uniqueCollectionIds.add(sampleData.getId().getApiCollectionId());
+            }
+
+            if (uniqueCollectionIds.isEmpty()) {
+                return;
+            }
+
+            // Create the tag to insert/update
+            CollectionTags tagsMismatchTag = new CollectionTags(
+                Context.now(),
+                "tags-mismatch",
+                "true",
+                CollectionTags.TagSource.USER
+            );
+
+            // Build bulk write operations
+            List<WriteModel<com.akto.dto.ApiCollection>> bulkOperations = new ArrayList<>();
+
+            for (Integer collectionId : uniqueCollectionIds) {
+                Bson filter = Filters.eq("_id", collectionId);
+
+                // First remove any existing tag with keyName="tags-mismatch"
+                Bson pullUpdate = Updates.pull(
+                    com.akto.dto.ApiCollection.TAGS_STRING,
+                    Filters.eq(CollectionTags.KEY_NAME, "tags-mismatch")
+                );
+
+                // Then push the new tag
+                Bson pushUpdate = Updates.push(
+                    com.akto.dto.ApiCollection.TAGS_STRING,
+                    tagsMismatchTag
+                );
+
+                // Combine both operations
+                Bson combinedUpdate = Updates.combine(pullUpdate, pushUpdate);
+
+                bulkOperations.add(new UpdateOneModel<>(filter, combinedUpdate));
+            }
+
+            // Execute bulk write
+            if (!bulkOperations.isEmpty()) {
+                ApiCollectionsDao.instance.getMCollection().bulkWrite(bulkOperations);
+                loggerMaker.infoAndAddToDb(
+                    String.format("Updated tags-mismatch tag for %d API collections", uniqueCollectionIds.size())
+                );
+            }
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(
+                String.format("Error in handleMismatchedSamples: %s", e.toString())
+            );
+        }
+    }
+
+    /**
      * Process all SampleData documents for the given account and evaluate tags mismatch.
      * Uses cursor-based pagination with batch size of 1000.
      */
@@ -83,15 +164,26 @@ public class TagMismatchCron {
             int batchSize = 1000;
             int totalProcessed = 0;
             int mismatchCount = 0;
+            int skip = 0;
 
-            MongoCursor<SampleData> cursor = SampleDataDao.instance.getMCollection()
-                .find()
-                .batchSize(batchSize)
-                .iterator();
+            while (true) {
+                List<SampleData> batch = SampleDataDao.instance.getMCollection()
+                    .find()
+                    .skip(skip)
+                    .limit(batchSize)
+                    .into(new ArrayList<>());
 
-            try {
-                while (cursor.hasNext()) {
-                    SampleData sampleData = cursor.next();
+                if (batch.isEmpty()) {
+                    break;
+                }
+
+                loggerMaker.infoAndAddToDb(
+                    String.format("Processing batch at skip %d with %d documents", skip, batch.size())
+                );
+
+                List<SampleData> mismatchedSamples = new ArrayList<>();
+
+                for (SampleData sampleData : batch) {
                     totalProcessed++;
 
                     List<String> samples = sampleData.getSamples();
@@ -99,16 +191,25 @@ public class TagMismatchCron {
                         boolean mismatch = isTagsMismatch(samples);
                         if (mismatch) {
                             mismatchCount++;
+                            mismatchedSamples.add(sampleData);
                             Key id = sampleData.getId();
-                            loggerMaker.errorAndAddToDb(
-                                String.format("Tags mismatch detected - apiCollectionId: %d, method: %s, url: %s, responseCode: %d",
-                                    id.getApiCollectionId(), id.getMethod(), id.getUrl(), id.getResponseCode())
+                            loggerMaker.infoAndAddToDb(
+                                String.format("Tags mismatch detected - apiCollectionId: %d, method: %s, url: %sd",
+                                    id.getApiCollectionId(), id.getMethod(), id.getUrl())
                             );
                         }
                     }
                 }
-            } finally {
-                cursor.close();
+
+                // Handle mismatched samples for this batch
+                handleMismatchedSamples(mismatchedSamples);
+
+                skip += batchSize;
+
+                loggerMaker.infoAndAddToDb(
+                    String.format("Completed batch, total processed so far: %d, mismatches so far: %d",
+                        totalProcessed, mismatchCount)
+                );
             }
 
             loggerMaker.infoAndAddToDb(
