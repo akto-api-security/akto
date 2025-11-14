@@ -38,7 +38,7 @@ public class Cron {
                     }, "mergingCron");
                 }                
             }
-        }, 0, 10, TimeUnit.MINUTES);
+        }, 10000, 100000, TimeUnit.MINUTES);
 
     }
 
