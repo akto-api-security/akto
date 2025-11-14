@@ -1,6 +1,7 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import ThreatActorConfigComponent from "./ThreatActorConfig.jsx"
 import RatelimitConfigComponent from "./RatelimitConfigComponent.jsx"
+import ArchivalConfigComponent from "./ArchivalConfigComponent.jsx"
 
 function ThreatConfiguration() {
 
@@ -14,6 +15,11 @@ function ThreatConfiguration() {
             title={"Rate Limit Configuration"}
             description={"Configure rate limiting rules to protect your APIs from abuse."}
             key={"ratelimitConfig"}
+        />,
+        <ArchivalConfigComponent
+            title={"Archival Configuration"}
+            description={"Choose how long to retain malicious events before archival."}
+            key={"archivalConfig"}
         />
     ];
 

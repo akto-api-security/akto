@@ -6,6 +6,7 @@ import com.mongodb.client.AggregateIterable;
 import com.mongodb.client.MongoCollection;
 import org.bson.Document;
 import org.bson.conversions.Bson;
+import com.akto.threat.backend.utils.ThreatUtils;
 
 import java.util.List;
 
@@ -39,7 +40,16 @@ public class MaliciousEventDao extends AccountBasedDao<MaliciousEventDto> {
             .aggregate(pipeline);
     }
 
+    public MongoCollection<Document> getDocumentCollection(String accountId) {
+        return getDatabase(accountId)
+            .getCollection(getCollectionName(), Document.class);
+    }
+
     public long countDocuments(String accountId, Bson filter) {
         return getCollection(accountId).countDocuments(filter);
+    }
+
+    public void createIndexIfAbsent(String accountId) {
+        ThreatUtils.createIndexIfAbsent(accountId, this);
     }
 }

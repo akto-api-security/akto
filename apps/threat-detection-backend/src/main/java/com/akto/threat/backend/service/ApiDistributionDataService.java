@@ -15,7 +15,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Bu
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchApiDistributionDataRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchApiDistributionDataResponse;
 import com.akto.threat.backend.db.ApiDistributionDataModel;
-import com.mongodb.client.MongoClient;
+import com.akto.threat.backend.dao.ApiDistributionDataDao;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.BulkWriteOptions;
@@ -28,10 +28,10 @@ import com.mongodb.client.model.WriteModel;
 public class ApiDistributionDataService {
     
     private static final LoggerMaker logger = new LoggerMaker(ApiDistributionDataService.class);
-    private final MongoClient mongoClient;
+    private final ApiDistributionDataDao apiDistributionDataDao;
 
-    public ApiDistributionDataService(MongoClient mongoClient) {
-        this.mongoClient = mongoClient;
+    public ApiDistributionDataService(ApiDistributionDataDao apiDistributionDataDao) {
+        this.apiDistributionDataDao = apiDistributionDataDao;
     }
 
     public ApiDistributionDataResponsePayload saveApiDistributionData(String accountId, ApiDistributionDataRequestPayload payload) {
@@ -60,9 +60,7 @@ public class ApiDistributionDataService {
             bulkUpdates.add(new UpdateOneModel<>(filter, update, options));
         }
 
-        this.mongoClient
-            .getDatabase(accountId + "")
-            .getCollection("api_distribution_data", ApiDistributionDataModel.class)
+        apiDistributionDataDao.getCollection(accountId)
             .bulkWrite(bulkUpdates, new BulkWriteOptions().ordered(false));
 
         return ApiDistributionDataResponsePayload.newBuilder().build();
@@ -70,10 +68,7 @@ public class ApiDistributionDataService {
 
     public FetchApiDistributionDataResponse getDistributionStats(String accountId, FetchApiDistributionDataRequest fetchApiDistributionDataRequest) {
 
-        MongoCollection<ApiDistributionDataModel> coll =
-        this.mongoClient
-            .getDatabase(accountId)
-            .getCollection("api_distribution_data", ApiDistributionDataModel.class);
+        MongoCollection<ApiDistributionDataModel> coll = apiDistributionDataDao.getCollection(accountId);
 
         Bson filter = Filters.and(
             Filters.eq("apiCollectionId", fetchApiDistributionDataRequest.getApiCollectionId()),
