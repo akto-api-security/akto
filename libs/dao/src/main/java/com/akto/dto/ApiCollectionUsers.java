@@ -32,6 +32,7 @@ import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.testing.SensitiveDataEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.testing.custom_groups.AllAPIsGroup;
 import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
@@ -176,6 +177,9 @@ public class ApiCollectionUsers {
             }
             Bson finalFilter = filter.equals(Filters.empty()) ? matchFilter : Filters.and(matchFilter, filter);
             filtersMap.put(type, finalFilter);
+        }
+        if(apiCollectionId == AllAPIsGroup.ALL_APIS_GROUP_ID && remove){
+            return;
         }
         updateCollectionsForCollectionId(filtersMap, update);
     }
