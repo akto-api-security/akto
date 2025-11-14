@@ -1,4 +1,4 @@
-import { useReducer, useState, useEffect, useCallback } from "react";
+import { useReducer, useState, useEffect, useCallback, useMemo } from "react";
 import DateRangeFilter from "../../components/layouts/DateRangeFilter";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "../../components/shared/TitleWithInfo";
@@ -10,7 +10,7 @@ import SampleDetails from "./components/SampleDetails";
 import threatDetectionRequests from "./api";
 import tempFunc from "./dummyData";
 import NormalSampleDetails from "./components/NormalSampleDetails";
-import { HorizontalGrid, VerticalStack, HorizontalStack, Popover, Button, ActionList, Box, Icon, Badge, Text} from "@shopify/polaris";
+import { HorizontalGrid, VerticalStack, HorizontalStack, Popover, Button, ActionList, Box, Icon } from "@shopify/polaris";
 import { FileMinor } from '@shopify/polaris-icons';
 import TopThreatTypeChart from "./components/TopThreatTypeChart";
 import api from "./api";
@@ -18,8 +18,8 @@ import threatDetectionFunc from "./transform";
 import InfoCard from "../dashboard/new_components/InfoCard";
 import BarGraph from "../../components/charts/BarGraph";
 import SessionStore from "../../../main/SessionStore";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { getDashboardCategory, isApiSecurityCategory, isDastCategory, mapLabel } from "../../../main/labelHelper";
-import { useNavigate } from "react-router-dom";
 import LineChart from "../../components/charts/LineChart";
 import P95LatencyGraph from "../../components/charts/P95LatencyGraph";
 import { LABELS } from "./constants";
@@ -199,15 +199,43 @@ const ChartComponent = ({ subCategoryCount, severityCountMap }) => {
     );
   };
 
+// Initial state for event-related data (constant, defined outside component)
+const initialEventState = {
+    currentRefId: '',
+    rowDataList: [],
+    moreInfoData: {},
+    currentEventId: '',
+    currentEventStatus: '',
+    currentJiraTicketUrl: ''
+};
+
 function ThreatDetectionPage() {
     const navigate = useNavigate();
-    const [loading, setLoading] = useState(false);
-    const [currentRefId, setCurrentRefId] = useState('')
-    const [rowDataList, setRowDataList] = useState([])
-    const [moreInfoData, setMoreInfoData] = useState({})
-    const [currentEventId, setCurrentEventId] = useState('')
-    const [currentEventStatus, setCurrentEventStatus] = useState('')
-    const [currentJiraTicketUrl, setCurrentJiraTicketUrl] = useState('')
+    const location = useLocation();
+    const [searchParams] = useSearchParams();
+    
+    // Consolidate query parameters into a single object
+    const queryParams = useMemo(() => {
+        const eventStatusFromQuery = searchParams.get("eventStatus");
+        // Support legacy 'filters' param for backward compatibility
+        const legacyFilters = searchParams.get("filters");
+        const statusValue = eventStatusFromQuery || (legacyFilters ? legacyFilters.replace(/#/g, "").toUpperCase() : "");
+        return {
+            refId: searchParams.get("refId"),
+            eventType: searchParams.get("eventType"),
+            actor: searchParams.get("actor"),
+            filterId: searchParams.get("filterId"),
+            status: statusValue,
+            hasQueryEvent: Boolean(
+                searchParams.get("refId") && 
+                searchParams.get("eventType") && 
+                searchParams.get("actor") && 
+                searchParams.get("filterId")
+            )
+        };
+    }, [searchParams]);
+    
+    const [eventState, setEventState] = useState(initialEventState);
     const [triggerTableRefresh, setTriggerTableRefresh] = useState(0)
     const initialVal = values.ranges[3]
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
@@ -218,6 +246,8 @@ function ThreatDetectionPage() {
     const [severityCountMap, setSeverityCountMap] = useState([]);
     const [moreActions, setMoreActions] = useState(false);
     const [latencyData, setLatencyData] = useState([]);
+    const [detailsLoading, setDetailsLoading] = useState(false);
+    const [pendingRowContext, setPendingRowContext] = useState(null);
 
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
 
@@ -286,73 +316,94 @@ function ThreatDetectionPage() {
         }
     }, []);
 
-    /**
-     * Handle latency click events from the P95LatencyGraph component
-     * @param {string} latencyType - Type of latency clicked (incoming, output, total)
-     */
-    const handleLatencyClick = useCallback((latencyType) => {
-        // In production, this could trigger analytics events or navigate to detailed views
-        // For now, we'll just log the event for debugging purposes
-        if (process.env.NODE_ENV === 'development') {
-            console.log('Latency clicked:', latencyType);
-        }
-    }, []);
+    const clearEventState = useCallback(() => {
+        setShowNewTab(false);
+        setEventState(initialEventState);
+        setPendingRowContext(null);
+        setDetailsLoading(false);
 
-    const rowClicked = async(data) => {
-        if(data?.refId === undefined || data?.refId.length === 0){
+        const params = new URLSearchParams(searchParams.toString());
+        const keysToRemove = ['refId', 'eventType', 'actor', 'filterId', 'eventStatus'];
+        let hasChanges = false;
+        keysToRemove.forEach((key) => {
+            if (params.has(key)) {
+                params.delete(key);
+                hasChanges = true;
+            }
+        });
+        if (hasChanges) {
+            const newSearch = params.toString();
+            navigate(newSearch ? `${location.pathname}?${newSearch}` : location.pathname, { replace: true });
+        }
+    }, [location.pathname, navigate, searchParams]);
+
+    const handleDetailsVisibility = useCallback((visible) => {
+        setShowDetails(visible);
+        if (!visible) {
+            clearEventState();
+        }
+    }, [clearEventState]);
+
+    const rowClicked = (data) => {
+        if (!data?.refId) {
+            clearEventState();
             const tempData = tempFunc.getSampleDataOfUrl(data.url);
             const sameRow = func.deepComparison(tempData, sampleData);
             if (!sameRow) {
-                setSampleData([{"message": JSON.stringify(tempData),  "highlightPaths": []}])
-                setShowDetails(true)
+                setSampleData([{ "message": JSON.stringify(tempData), "highlightPaths": [] }]);
+                setShowDetails(true);
             } else {
-                setShowDetails(!showDetails)
+                setShowDetails(!showDetails);
             }
-            setShowNewTab(false)
-        }else{
-            setShowNewTab(true)
-            const sameRow = currentRefId === data?.refId
-            if (!sameRow) {
-                let rowData = [];
-                await threatDetectionRequests.fetchMaliciousRequest(data?.refId, data?.eventType, data?.actor, data?.filterId).then((res) => {
-                    rowData = [...res.maliciousPayloadsResponses]
-                }) 
-                setRowDataList(rowData)
-                setCurrentRefId(data?.refId)
-                setCurrentEventId(data?.id)
-                setCurrentEventStatus(data?.status || '')
-                setCurrentJiraTicketUrl(data?.jiraTicketUrl || '')
-                setShowDetails(true)
-                setMoreInfoData({
-                    url: data.url,
-                    method: data.method,
-                    apiCollectionId: data.apiCollectionId,
-                    templateId: data.filterId,
-                })
-            } else {
-                setShowDetails(!showDetails)
-            }
+            return;
         }
-        
-      }
+
+        setPendingRowContext({
+            refId: data.refId,
+            url: data.url,
+            method: data.method,
+            apiCollectionId: data.apiCollectionId,
+            templateId: data.filterId,
+            status: data.status || '',
+            eventId: data.id || '',
+            jiraTicketUrl: data.jiraTicketUrl || ''
+        });
+
+        setShowDetails(true);
+        setShowNewTab(true);
+        setDetailsLoading(true);
+        setEventState({
+            currentRefId: data.refId,
+            rowDataList: [],
+            moreInfoData: {
+                url: data.url || '',
+                method: data.method || '',
+                apiCollectionId: data.apiCollectionId,
+                templateId: data.filterId,
+            },
+            currentEventId: data.id || '',
+            currentEventStatus: data.status || '',
+            currentJiraTicketUrl: data.jiraTicketUrl || ''
+        });
+        if (data.nextUrl) {
+            navigate(data.nextUrl, { replace: eventState.currentRefId === data.refId });
+        }
+    }
 
     const handleStatusUpdate = (newStatus) => {
-        setCurrentEventStatus(newStatus)
+        setEventState(prev => ({ ...prev, currentEventStatus: newStatus }))
         // Force table refresh by incrementing the trigger
         setTriggerTableRefresh(prev => prev + 1)
     }
 
       useEffect(() => {
         const fetchThreatCategoryCount = async () => {
-            setLoading(true);
             const res = await api.fetchThreatCategoryCount(startTimestamp, endTimestamp);
             const finalObj = threatDetectionFunc.getGraphsData(res);
             setSubCategoryCount(finalObj.subCategoryCount);
-            setLoading(false);
           };
 
           const fetchCountBySeverity = async () => {
-            setLoading(true);
             let severityMap = {
                 CRITICAL: 0,
                 HIGH: 0,
@@ -364,7 +415,6 @@ function ThreatDetectionPage() {
                 severityMap[subCategory] = count;
             });
             setSeverityCountMap(convertToGraphData(severityMap));
-            setLoading(false);
         };
 
         fetchThreatCategoryCount();
@@ -380,8 +430,87 @@ function ThreatDetectionPage() {
                 setLatencyData([]);
             }
         }
-      }, [startTimestamp, endTimestamp, isDemoMode]);
+      }, [startTimestamp, endTimestamp, isDemoMode, generateLatencyData]);
 
+      // Fetch event data when required query params are in URL
+      const fetchEventDetails = useCallback(async (isMountedRef) => {
+        if (!queryParams.hasQueryEvent) {
+            return;
+        }
+
+        // Always show loading state when fetching new event
+        setShowDetails(true);
+        setShowNewTab(true);
+        setDetailsLoading(true);
+        
+        // Get row context from pendingRowContext if it matches, otherwise use queryParams
+        const rowContext = pendingRowContext && pendingRowContext.refId === queryParams.refId ? pendingRowContext : null;
+        
+        try {
+          const payloadResponse = await threatDetectionRequests.fetchMaliciousRequest(
+            queryParams.refId,
+            queryParams.eventType,
+            queryParams.actor,
+            queryParams.filterId
+          );
+
+          if (!isMountedRef.current) {
+              return;
+          }
+          const maliciousPayloads = payloadResponse?.maliciousPayloadsResponses || [];
+
+          setEventState({
+            currentRefId: queryParams.refId,
+            rowDataList: maliciousPayloads,
+            moreInfoData: {
+              url: rowContext?.url || '',
+              method: rowContext?.method || '',
+              apiCollectionId: rowContext?.apiCollectionId,
+              templateId: queryParams.filterId,
+            },
+            currentEventId: rowContext?.eventId || '',
+            currentEventStatus: queryParams.status || rowContext?.status || '',
+            currentJiraTicketUrl: rowContext?.jiraTicketUrl || ''
+          });
+        } catch (error) {
+          console.error('Error fetching event:', error);
+          if (isMountedRef.current) {
+              func.setToast(true, true, 'Failed to load event. Please try again.');
+              handleDetailsVisibility(false);
+          }
+        } finally {
+          if (isMountedRef.current) {
+              setDetailsLoading(false);
+          }
+        }
+      }, [
+        queryParams,
+        pendingRowContext,
+        handleDetailsVisibility
+      ]);
+
+      useEffect(() => {
+        // Check both queryParams and location.search to handle timing issues
+        const urlParams = new URLSearchParams(location.search);
+        const hasParams = Boolean(
+          urlParams.get("refId") && 
+          urlParams.get("eventType") && 
+          urlParams.get("actor") && 
+          urlParams.get("filterId")
+        );
+        
+        if (!hasParams || !queryParams.hasQueryEvent) {
+            return;
+        }
+        
+        const isMountedRef = { current: true };
+        fetchEventDetails(isMountedRef);
+        return () => {
+            isMountedRef.current = false;
+        };
+      }, [queryParams.hasQueryEvent, queryParams.refId, fetchEventDetails, location.search]);
+
+    // Normal mode - show table, charts, and sidebar
     const components = [
         <ChartComponent subCategoryCount={subCategoryCount} severityCountMap={severityCountMap} />,
         // Add P95 latency graphs for MCP and AI Agent security in demo mode
@@ -405,21 +534,22 @@ function ThreatDetectionPage() {
         !showNewTab ? <NormalSampleDetails
             title={"Attacker payload"}
             showDetails={showDetails}
-            setShowDetails={setShowDetails}
+            setShowDetails={handleDetailsVisibility}
             sampleData={sampleData}
             key={"sus-sample-details"}
         /> :  <SampleDetails
                 title={"Attacker payload"}
                 showDetails={showDetails}
-                setShowDetails={setShowDetails}
-                data={rowDataList}
-                key={"sus-sample-details"}
-                moreInfoData={moreInfoData}
+                setShowDetails={handleDetailsVisibility}
+                data={eventState.rowDataList}
+                key={`sus-sample-details-${eventState.currentRefId || 'default'}`}
+                moreInfoData={eventState.moreInfoData}
                 threatFiltersMap={threatFiltersMap}
-                eventId={currentEventId}
-                eventStatus={currentEventStatus}
+                eventId={eventState.currentEventId}
+                eventStatus={eventState.currentEventStatus}
                 onStatusUpdate={handleStatusUpdate}
-                jiraTicketUrl={currentJiraTicketUrl}
+                jiraTicketUrl={eventState.currentJiraTicketUrl}
+                loading={detailsLoading}
             />
             
 

@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Divider, HorizontalStack, Modal, Text, Tooltip, VerticalStack, Popover, ActionList, Tag } from "@shopify/polaris";
+import { Badge, Box, Button, Divider, HorizontalStack, Modal, Text, Tooltip, VerticalStack, Popover, ActionList } from "@shopify/polaris";
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
@@ -16,12 +16,13 @@ import transform from "../../testing/transform";
 
 function SampleDetails(props) {
     const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate } = props
-    let currentTemplateObj = threatFiltersMap[moreInfoData?.templateId]
+    const resolvedThreatFiltersMap = threatFiltersMap || {};
+    let currentTemplateObj = moreInfoData?.templateId ? resolvedThreatFiltersMap[moreInfoData?.templateId] : undefined;
 
     let severity = currentTemplateObj?.severity || "HIGH"
     const [remediationText, setRemediationText] = useState("")
     const [latestActivity, setLatestActivity] = useState([])
-    const [showModal, setShowModal] = useState(false);
+    const [showModal, setShowModal] = useState(false);  
     const [triageLoading, setTriageLoading] = useState(false);
     const [actionPopoverActive, setActionPopoverActive] = useState(false);
 
@@ -101,13 +102,13 @@ function SampleDetails(props) {
         component: (
             <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
                 <SampleDataList
-                    key="Sample values"
+                    key={`Sample values-${eventId || 'default'}`}
                     heading={"Attempt"}
                     minHeight={"30vh"}
                     vertical={true}
-                    sampleData={data?.map((result) => {
+                    sampleData={data && Array.isArray(data) && data.length > 0 ? data.map((result) => {
                         return { message: result.orig, highlightPaths: [], metadata: result.metadata }
-                    })}
+                    }) : []}
                 />
             </Box>)
     }
@@ -119,9 +120,9 @@ function SampleDetails(props) {
     }
 
     useEffect(() => {
-       fetchRemediationInfo()
-       aggregateActivity()
-    },[moreInfoData?.templateId, data])
+        fetchRemediationInfo()
+        aggregateActivity()
+    }, [moreInfoData?.templateId, data])
 
     useEffect(() => {
         setJiraTicketUrl(props.jiraTicketUrl || "")
@@ -374,7 +375,7 @@ Reference URL: ${window.location.href}`.trim();
 
     const tabsComponent = (
         <LayoutWithTabs
-            key={"tabs-comp"}
+            key={`tabs-comp-${eventId || 'default'}`}
             tabs={ window.location.href.indexOf("guardrails") > -1 ? [ValuesTab] : [overviewTab, timelineTab, ValuesTab, remediationTab]}
             currTab = {() => {}}
         />
