@@ -106,7 +106,6 @@ function ThreatDashboardPage() {
                 const totalActive = summaryResponse.totalActiveStatus || 0
                 const totalIgnored = summaryResponse.totalIgnoredStatus || 0
                 const totalUnderReview = summaryResponse.totalUnderReviewStatus || 0
-                const total = totalActive + totalIgnored + totalUnderReview
 
                 const statusData = {
                     "Active": {
@@ -124,11 +123,6 @@ function ThreatDashboardPage() {
                         "color": observeFunc.getColorForStatus("Ignored"),
                         "filterKey": "Ignored"
                     },
-                    "Total": {
-                        "text": total,
-                        "color": observeFunc.getColorForStatus("Total"),
-                        "filterKey": "Total"
-                    }
                 }
                 setThreatStatusBreakdown(statusData)
             }

@@ -313,7 +313,7 @@ public class ThreatActorService {
                     new Document("$sum", 
                         new Document("$cond", 
                             Arrays.asList(
-                                new Document("$eq", Arrays.asList("$severity", "HIGH")),
+                                new Document("$eq", Arrays.asList("$severity", "CRITICAL")),
                                 1,
                                 0))))));
 
@@ -351,6 +351,7 @@ public class ThreatActorService {
         if (!matchConditions.isEmpty()) {
             statusPipeline.add(new Document("$match", matchConditions));
         }
+        // Group by status and actor to get distinct actors per status
         statusPipeline.add(new Document("$group",
             new Document("_id", "$status").append("count", new Document("$sum", 1))));
 
@@ -665,33 +666,30 @@ public class ThreatActorService {
             pipeline.add(new Document("$match", match));
         }
 
-    // Group by endpoint and method, count attacks, get max severity
+    // Group by endpoint, method, and severity to get separate rows per severity level
+    // First, add a stage to normalize severity (handle null, case-insensitive)
+    pipeline.add(new Document("$addFields",
+        new Document("normalizedSeverity",
+            new Document("$ifNull", Arrays.asList(
+                new Document("$toUpper", "$severity"),
+                "UNKNOWN"
+            ))
+        )
+    ));
+    
+    // Group by endpoint, method, and severity to get count per severity
     pipeline.add(new Document("$group",
-        new Document("_id", new Document("endpoint", "$latestApiEndpoint").append("method", "$latestApiMethod"))
-            .append("attacks", new Document("$sum", 1))
-            .append("maxSeverityPriority",
-                new Document("$max",
-                    new Document("$switch",
-                        new Document("branches", Arrays.asList(
-                            new Document("case", new Document("$eq", Arrays.asList("$severity", "CRITICAL"))).append("then", 4),
-                            new Document("case", new Document("$eq", Arrays.asList("$severity", "HIGH"))).append("then", 3),
-                            new Document("case", new Document("$eq", Arrays.asList("$severity", "MEDIUM"))).append("then", 2),
-                            new Document("case", new Document("$eq", Arrays.asList("$severity", "LOW"))).append("then", 1)))
-                        .append("default", 0))))));
+        new Document("_id", new Document("endpoint", "$latestApiEndpoint")
+            .append("method", "$latestApiMethod")
+            .append("severity", "$normalizedSeverity"))
+            .append("attacks", new Document("$sum", 1))));
 
-    // Project to convert severity priority back to string
+    // Project to flatten the structure
     pipeline.add(new Document("$project",
         new Document("endpoint", "$_id.endpoint")
             .append("method", "$_id.method")
             .append("attacks", 1)
-            .append("severity",
-                new Document("$switch",
-                    new Document("branches", Arrays.asList(
-                        new Document("case", new Document("$eq", Arrays.asList("$maxSeverityPriority", 4))).append("then", "CRITICAL"),
-                        new Document("case", new Document("$eq", Arrays.asList("$maxSeverityPriority", 3))).append("then", "HIGH"),
-                        new Document("case", new Document("$eq", Arrays.asList("$maxSeverityPriority", 2))).append("then", "MEDIUM"),
-                        new Document("case", new Document("$eq", Arrays.asList("$maxSeverityPriority", 1))).append("then", "LOW")))
-                    .append("default", "UNKNOWN")))));
+            .append("severity", "$_id.severity")));
 
     // Sort by attacks descending
     pipeline.add(new Document("$sort", new Document("attacks", -1)));
