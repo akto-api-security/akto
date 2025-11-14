@@ -1,5 +1,7 @@
 package com.akto.threat.backend.cron;
 
+import com.akto.threat.backend.dao.AccountBasedDao;
+import com.akto.threat.backend.constants.MongoDBCollection;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
@@ -40,45 +42,74 @@ public class ArchiveOldMaliciousEventsCronTest {
     private ArchiveOldMaliciousEventsCron cron;
 
     @Before
-    public void setup() {
+    public void setup() throws Exception {
         cron = new ArchiveOldMaliciousEventsCron(mongoClient);
+        // Initialize DAO with mocked client for testing using reflection
+        java.lang.reflect.Field clientsField = AccountBasedDao.class.getDeclaredField("clients");
+        clientsField.setAccessible(true);
+        MongoClient[] clients = (MongoClient[]) clientsField.get(null);
+        clients[0] = mongoClient;
     }
 
     @Test
     public void testFetchRetentionDays_DefaultWhenMissing() throws Exception {
-        when(mongoDatabase.getCollection(eq("threat_configuration"), eq(Document.class))).thenReturn(cfgCollection);
-        when(cfgCollection.find()).thenReturn(mock(com.mongodb.client.FindIterable.class));
-        when(cfgCollection.find().first()).thenReturn(null);
+        String accountId = "1000000";
+        
+        // Mock the MongoDB chain: client -> database -> collection -> find
+        when(mongoClient.getDatabase(accountId)).thenReturn(mongoDatabase);
+        when(mongoDatabase.getCollection(eq(MongoDBCollection.ThreatDetection.THREAT_CONFIGURATION), eq(Document.class)))
+            .thenReturn(cfgCollection);
+        
+        @SuppressWarnings("unchecked")
+        com.mongodb.client.FindIterable<Document> findIterable = mock(com.mongodb.client.FindIterable.class);
+        when(cfgCollection.find()).thenReturn(findIterable);
+        when(findIterable.first()).thenReturn(null);
 
-        Method m = ArchiveOldMaliciousEventsCron.class.getDeclaredMethod("fetchRetentionDays", MongoDatabase.class);
+        Method m = ArchiveOldMaliciousEventsCron.class.getDeclaredMethod("fetchRetentionDays", String.class);
         m.setAccessible(true);
-        long days = (long) m.invoke(cron, mongoDatabase);
+        long days = (long) m.invoke(cron, accountId);
         assertEquals(60L, days);
     }
 
     @Test
     public void testFetchRetentionDays_Valid90() throws Exception {
-        when(mongoDatabase.getCollection(eq("threat_configuration"), eq(Document.class))).thenReturn(cfgCollection);
-        when(cfgCollection.find()).thenReturn(mock(com.mongodb.client.FindIterable.class));
+        String accountId = "1000000";
+        
+        // Mock the MongoDB chain: client -> database -> collection -> find
+        when(mongoClient.getDatabase(accountId)).thenReturn(mongoDatabase);
+        when(mongoDatabase.getCollection(eq(MongoDBCollection.ThreatDetection.THREAT_CONFIGURATION), eq(Document.class)))
+            .thenReturn(cfgCollection);
+        
+        @SuppressWarnings("unchecked")
+        com.mongodb.client.FindIterable<Document> findIterable = mock(com.mongodb.client.FindIterable.class);
+        when(cfgCollection.find()).thenReturn(findIterable);
         Document cfg = new Document("archivalDays", 90);
-        when(cfgCollection.find().first()).thenReturn(cfg);
+        when(findIterable.first()).thenReturn(cfg);
 
-        Method m = ArchiveOldMaliciousEventsCron.class.getDeclaredMethod("fetchRetentionDays", MongoDatabase.class);
+        Method m = ArchiveOldMaliciousEventsCron.class.getDeclaredMethod("fetchRetentionDays", String.class);
         m.setAccessible(true);
-        long days = (long) m.invoke(cron, mongoDatabase);
+        long days = (long) m.invoke(cron, accountId);
         assertEquals(90L, days);
     }
 
     @Test
     public void testFetchRetentionDays_InvalidFallsBack() throws Exception {
-        when(mongoDatabase.getCollection(eq("threat_configuration"), eq(Document.class))).thenReturn(cfgCollection);
-        when(cfgCollection.find()).thenReturn(mock(com.mongodb.client.FindIterable.class));
+        String accountId = "1000000";
+        
+        // Mock the MongoDB chain: client -> database -> collection -> find
+        when(mongoClient.getDatabase(accountId)).thenReturn(mongoDatabase);
+        when(mongoDatabase.getCollection(eq(MongoDBCollection.ThreatDetection.THREAT_CONFIGURATION), eq(Document.class)))
+            .thenReturn(cfgCollection);
+        
+        @SuppressWarnings("unchecked")
+        com.mongodb.client.FindIterable<Document> findIterable = mock(com.mongodb.client.FindIterable.class);
+        when(cfgCollection.find()).thenReturn(findIterable);
         Document cfg = new Document("archivalDays", 15);
-        when(cfgCollection.find().first()).thenReturn(cfg);
+        when(findIterable.first()).thenReturn(cfg);
 
-        Method m = ArchiveOldMaliciousEventsCron.class.getDeclaredMethod("fetchRetentionDays", MongoDatabase.class);
+        Method m = ArchiveOldMaliciousEventsCron.class.getDeclaredMethod("fetchRetentionDays", String.class);
         m.setAccessible(true);
-        long days = (long) m.invoke(cron, mongoDatabase);
+        long days = (long) m.invoke(cron, accountId);
         assertEquals(60L, days);
     }
 
@@ -93,10 +124,12 @@ public class ArchiveOldMaliciousEventsCronTest {
         }
 
         // Mock find().sort().limit().cursor()
+        @SuppressWarnings("unchecked")
         com.mongodb.client.FindIterable<Document> findIt = mock(com.mongodb.client.FindIterable.class);
         when(sourceCollection.find()).thenReturn(findIt);
         when(findIt.sort(any())).thenReturn(findIt);
         when(findIt.limit(anyInt())).thenReturn(findIt);
+        @SuppressWarnings("unchecked")
         MongoCursor<Document> cursor = mock(MongoCursor.class);
         when(findIt.cursor()).thenReturn(cursor);
         // Cursor iteration
