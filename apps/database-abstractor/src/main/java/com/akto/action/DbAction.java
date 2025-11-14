@@ -84,7 +84,6 @@ import java.util.regex.Pattern;
 
 public class DbAction extends ActionSupport {
     static final ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
-    static final ExecutorService tagsMismatchExecutor = Executors.newCachedThreadPool();
     private static final Set<String> IGNORED_SUB_TYPES = new HashSet<>(Arrays.asList(
         "GENERIC", "FLOAT", "NULL", "INTEGER_32", "FALSE", "TRUE", "INTEGER_64", "UUID", "DICT"
     ));
