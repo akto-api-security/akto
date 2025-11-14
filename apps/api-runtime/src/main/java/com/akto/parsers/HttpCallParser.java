@@ -23,6 +23,7 @@ import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.graphql.GraphQLUtils;
+import com.akto.imperva.ImpervaUtils;
 import com.akto.jsonrpc.JsonRpcUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -675,13 +676,23 @@ public class HttpCallParser {
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
 
             List<HttpResponseParams> responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
-            if (responseParamsList.isEmpty()) {
-                HttpResponseParams jsonRpcResponse = JsonRpcUtils.parseJsonRpcResponse(httpResponseParam);
-                HttpResponseParams mcpResponseParams = McpRequestResponseUtils.parseMcpResponseParams(jsonRpcResponse);
-                filteredResponseParams.add(mcpResponseParams);
-            } else {
+            if (!responseParamsList.isEmpty()) {
                 filteredResponseParams.addAll(responseParamsList);
                 loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + "new graphql endpoints in inventory",LogDb.RUNTIME);
+            } else if (JsonRpcUtils.isJsonRpcRequest(httpResponseParam)) {
+                HttpResponseParams jsonRpcResponse = JsonRpcUtils.parseJsonRpcResponse(httpResponseParam);
+                HttpResponseParams mcpResponseParams = McpRequestResponseUtils.parseMcpResponseParams(jsonRpcResponse);
+                if (mcpResponseParams != null) {
+                    filteredResponseParams.add(mcpResponseParams);
+                }
+            } else {
+                List<HttpResponseParams> impervaResponseParamsList = ImpervaUtils.parseImpervaResponse(httpResponseParam);
+                if (impervaResponseParamsList.isEmpty()) {
+                    filteredResponseParams.add(httpResponseParam);
+                } else {
+                    filteredResponseParams.addAll(impervaResponseParamsList);
+                    loggerMaker.infoAndAddToDb("Added " + impervaResponseParamsList.size() + "new imperva endpoints in inventory");
+                }
             }
 
             if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {

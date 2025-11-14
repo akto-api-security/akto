@@ -5,7 +5,7 @@ import transform from '../transform'
 import SampleDataList from '../../../components/shared/SampleDataList'
 import SampleData from '../../../components/shared/SampleData'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
-import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link, Modal, InlineCode } from '@shopify/polaris'
+import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link} from '@shopify/polaris'
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
 import testingApi from "../api"
@@ -16,17 +16,24 @@ import "./style.css"
 import ActivityTracker from '../../dashboard/components/ActivityTracker'
 import observeFunc from "../../observe/transform.js"
 import settingFunctions from '../../settings/module.js'
+import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreationModal.jsx'
 import MarkdownViewer from '../../../components/shared/MarkdownViewer.jsx'
 import InlineEditableText from '../../../components/shared/InlineEditableText.jsx'
+import ChatInterface from '../../../components/shared/ChatInterface.jsx'
+import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper.js'
+import ApiGroups from '../../../components/shared/ApiGroups'
+import ForbiddenRole from '../../../components/shared/ForbiddenRole'
+import LegendLabel from './LegendLabel.jsx'
 
 function TestRunResultFlyout(props) {
 
 
-    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl} = props
+    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, conversations, showForbidden} = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
+    const [apiInfo, setApiInfo] = useState({})
     const [popoverActive, setPopoverActive] = useState(false)
     const [modalActive, setModalActive] = useState(false)
     const [jiraProjectMaps,setJiraProjectMap] = useState({})
@@ -38,14 +45,17 @@ function TestRunResultFlyout(props) {
     const [projectId, setProjectId] = useState('')
     const [workItemType, setWorkItemType] = useState('')
 
+    const [serviceNowModalActive, setServiceNowModalActive] = useState(false)
+    const [serviceNowTables, setServiceNowTables] = useState([])
+    const [serviceNowTable, setServiceNowTable] = useState('')
+
     const [description, setDescription] = useState("")
     const [editDescription, setEditDescription] = useState("")
     const [isEditingDescription, setIsEditingDescription] = useState(false)
 
     const [vulnerabilityAnalysisError, setVulnerabilityAnalysisError] = useState(null)
-
-    // modify testing run result and headers
-    const infoStateFlyout = infoState && infoState.length > 0 ? infoState.filter((item) => item.title !== 'Jira') : []
+    const [refreshFlag, setRefreshFlag] = useState(Date.now().toString())
+    const [labelsText, setLabelsText] = useState("")
     
     const fetchRemediationInfo = useCallback (async (testId) => {
         if (testId && testId.length > 0) {
@@ -58,10 +68,11 @@ function TestRunResultFlyout(props) {
     })
 
     const fetchApiInfo = useCallback( async(apiInfoKey) => {
-        let apiInfo = {}
+        let apiInfoData = {}
         if(apiInfoKey !== null){
             await api.fetchEndpoint(apiInfoKey).then((res) => {
-                apiInfo = JSON.parse(JSON.stringify(res))
+                apiInfoData = JSON.parse(JSON.stringify(res))
+                setApiInfo(apiInfoData)
             })
             let sensitiveParam = ""
             const sensitiveParamsSet = new Set();
@@ -79,7 +90,8 @@ function TestRunResultFlyout(props) {
                     index++
                 })
             })
-            setRowItems(transform.getRowInfo(issueDetails.severity,apiInfo,issueDetails.jiraIssueUrl,sensitiveParam,issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl))
+
+            setRowItems(transform.getRowInfo(issueDetails.severity,apiInfoData,issueDetails.jiraIssueUrl,sensitiveParam,issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl, issueDetails.servicenowIssueUrl, issueDetails.ticketId))
         }
     },[issueDetails])
 
@@ -156,9 +168,11 @@ function TestRunResultFlyout(props) {
         setModalActive(!modalActive)
     }
 
-    const handleSaveAction = (id) => {
+    const handleSaveAction = (id, labels) => {
         if(projId.length > 0 && issueType.length > 0){
-            createJiraTicket(id, projId, issueType)
+            // Use labels parameter if provided, otherwise fall back to state
+            const labelsToUse = labels !== undefined ? labels : labelsText;
+            createJiraTicket(id, projId, issueType, labelsToUse)
             setModalActive(false)
         }else{
             func.setToast(true, true, "Invalid project id or issue type")
@@ -184,7 +198,15 @@ function TestRunResultFlyout(props) {
 
     const handleAzureBoardWorkitemCreation = async(id) => {
         if(projectId.length > 0 && workItemType.length > 0){
-            await issuesApi.createAzureBoardsWorkItem(issueDetails.id, projectId, workItemType, window.location.origin).then((res) => {
+            let customABWorkItemFieldsPayload = [];
+            try {
+                customABWorkItemFieldsPayload = issuesFunctions.prepareCustomABWorkItemFieldsPayload(projectId, workItemType);
+            } catch (error) {
+                setToast(true, true, "Please fill all required fields before creating a Azure boards work item.");
+                return;
+            }
+            
+            await issuesApi.createAzureBoardsWorkItem(issueDetails.id, projectId, workItemType, window.location.origin, customABWorkItemFieldsPayload).then((res) => {
                 func.setToast(true, false, "Work item created")
             }).catch((err) => {
                 func.setToast(true, true, err?.response?.data?.errorMessage || "Error creating work item")
@@ -193,6 +215,35 @@ function TestRunResultFlyout(props) {
             func.setToast(true, true, "Invalid project id or work item type")
         }
         setBoardsModalActive(false)
+    }
+
+    const handleServiceNowClick = async() => {
+        if(!serviceNowModalActive){
+            const serviceNowIntegration = await settingFunctions.fetchServiceNowIntegration()
+            if(serviceNowIntegration.tableNames && serviceNowIntegration.tableNames.length > 0){
+                setServiceNowTables(serviceNowIntegration.tableNames)
+                setServiceNowTable(serviceNowIntegration.tableNames[0])
+            }
+        }
+        setServiceNowModalActive(!serviceNowModalActive)
+    }
+
+    const handleServiceNowTicketCreation = async(id) => {
+        if(serviceNowTable && serviceNowTable.length > 0){
+            func.setToast(true, false, "Please wait while we create your ServiceNow ticket.")
+            await issuesApi.createServiceNowTicket(issueDetails.id, serviceNowTable).then((res) => {
+                if(res?.errorMessage) {
+                    func.setToast(true, false, res?.errorMessage)
+                } else {
+                    func.setToast(true, false, "ServiceNow ticket created successfully")
+                }
+            }).catch((err) => {
+                func.setToast(true, true, err?.response?.data?.errorMessage || "Error creating ServiceNow ticket")
+            })
+        }else{
+            func.setToast(true, true, "Invalid ServiceNow table")
+        }
+        setServiceNowModalActive(false)
     }
     
     const issues = [{
@@ -293,14 +344,15 @@ function TestRunResultFlyout(props) {
                         <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
                         <Text color="subdued" variant="bodySm">{selectedTestRunResult?.testCategory}</Text>
                     </HorizontalStack>
+                    <ApiGroups collectionIds={apiInfo?.collectionIds} />
                 </VerticalStack>
                 <HorizontalStack gap={2} wrap={false}>
                     <ActionsComp />
 
-                    {selectedTestRunResult && selectedTestRunResult.vulnerable && 
+                    {selectedTestRunResult && selectedTestRunResult.vulnerable &&
                         <HorizontalStack gap={2} wrap={false}>
                             <JiraTicketCreationModal
-                                activator={<Button id={"create-jira-ticket-button"} primary onClick={handleJiraClick} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>Create Jira Ticket</Button>}
+                                activator={window.JIRA_INTEGRATED === 'true' ? <Button id={"create-jira-ticket-button"} primary onClick={handleJiraClick} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>Create Jira Ticket</Button> : <></>}
                                 modalActive={modalActive}
                                 setModalActive={setModalActive}
                                 handleSaveAction={handleSaveAction}
@@ -310,6 +362,8 @@ function TestRunResultFlyout(props) {
                                 projId={projId}
                                 issueType={issueType}
                                 issueId={issueDetails.id}
+                                labelsText={labelsText}
+                                setLabelsText={setLabelsText}
                             />
                             <JiraTicketCreationModal
                                 activator={window.AZURE_BOARDS_INTEGRATED === 'true' ? <Button id={"create-azure-boards-ticket-button"} primary onClick={handleAzureBoardClick} disabled={azureBoardsWorkItemUrl !== "" || window.AZURE_BOARDS_INTEGRATED !== "true"}>Create Work Item</Button> : <></>}
@@ -323,6 +377,19 @@ function TestRunResultFlyout(props) {
                                 setIssueType={setWorkItemType}
                                 issueId={issueDetails.id}
                                 isAzureModal={true}
+                            />
+                            <JiraTicketCreationModal
+                                activator={window.SERVICENOW_INTEGRATED === 'true' ? <Button id={"create-servicenow-ticket-button"} primary onClick={handleServiceNowClick} disabled={serviceNowTicketUrl !== "" || window.SERVICENOW_INTEGRATED !== "true"}>Create ServiceNow Ticket</Button> : <></>}
+                                modalActive={serviceNowModalActive}
+                                setModalActive={setServiceNowModalActive}
+                                handleSaveAction={handleServiceNowTicketCreation}
+                                jiraProjectMaps={serviceNowTables}
+                                setProjId={setServiceNowTable}
+                                setIssueType={() => {}}
+                                projId={serviceNowTable}
+                                issueType=""
+                                issueId={issueDetails.id}
+                                isServiceNowModal={true}
                             />
                         </HorizontalStack>
                     }
@@ -345,27 +412,18 @@ function TestRunResultFlyout(props) {
     // Move state outside to prevent reset on component recreation
     const hasAnalyzedRef = useRef(false);
     const [vulnerabilityHighlights, setVulnerabilityHighlights] = useState({});
-    const [isAnalyzing, setIsAnalyzing] = useState(false);
-    
-    // Reset analysis flag and highlights when test result changes
-    useEffect(() => {
-        hasAnalyzedRef.current = false;
-        setVulnerabilityHighlights({});
-        setIsAnalyzing(false);
-    }, [selectedTestRunResult?.id]);
     
     // Component that handles vulnerability analysis only when mounted
     const ValuesTabContent = React.memo(() => {
         
         useEffect(() => {
             // Check if vulnerability highlighting is enabled (use existing GPT feature flag)
-            const isVulnerabilityHighlightingEnabled = window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"] && 
-                window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"]?.isGranted === true;
+            //const isVulnerabilityHighlightingEnabled = window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"] && 
+            //    window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"]?.isGranted === true;
+            const isVulnerabilityHighlightingEnabled = false;
 
             if (!hasAnalyzedRef.current && selectedTestRunResult?.vulnerable && selectedTestRunResult?.testResults && isVulnerabilityHighlightingEnabled) {
                 hasAnalyzedRef.current = true;
-                
-                setIsAnalyzing(true);
                 setVulnerabilityAnalysisError(null);
 
                 const timeoutId = setTimeout(() => {
@@ -427,6 +485,9 @@ function TestRunResultFlyout(props) {
                                         ...prev,
                                         [idx]: enhancedSegments
                                     }));
+                                    setTimeout(() => {
+                                        setRefreshFlag(Date.now().toString());
+                                    }, 10)
                                 } else {
                                     setVulnerabilityHighlights(prev => {
                                         const newState = { ...prev };
@@ -444,13 +505,12 @@ function TestRunResultFlyout(props) {
                     });
                 
                     Promise.allSettled(analysisPromises).finally(() => {
-                        setIsAnalyzing(false);
                     });
                 }, 60);
 
                 return () => clearTimeout(timeoutId);
             }
-        }, [selectedTestRunResult?.id]);
+        }, [selectedTestRunResult?.id,]);
         
         if (dataExpired && !selectedTestRunResult?.vulnerable) {
             return dataExpiredComponent;
@@ -463,46 +523,60 @@ function TestRunResultFlyout(props) {
         
         return (
             <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
-                <SampleDataList
-                    key="Sample values"
-                    heading={"Attempt"}
-                    minHeight={"30vh"}
-                    vertical={true}
-                    sampleData={useMemo(() => {
-                        return selectedTestRunResult?.testResults.map((result, idx) => {
-                            if (result.errors && result.errors.length > 0) {
-                                let errorList = result.errors.join(", ");
-                                return { errorList: errorList }
-                            }
-                            // Add vulnerability highlights only for response
-                            let vulnerabilitySegments = vulnerabilityHighlights[idx] || [];
-                            if (result.originalMessage || result.message) {
-                                return {
-                                    originalMessage: result.originalMessage,
-                                    message: result.message,
-                                    vulnerabilitySegments
+                <VerticalStack gap="3">
+                    <Box padding="3" background="bg-surface-secondary" borderRadius="2">
+                        <LegendLabel/>
+                    </Box>
+                    <SampleDataList
+                        key="Sample values"
+                        heading={"Attempt"}
+                        minHeight={"30vh"}
+                        vertical={true}
+                        sampleData={
+                            selectedTestRunResult?.testResults.map((result, idx) => {
+                                if (result.errors && result.errors.length > 0) {
+                                    let errorList = result.errors.join(", ");
+                                    return { errorList: errorList }
                                 }
-                            }
-                            return { errorList: "No data found" }
-                        });
-                    }, [selectedTestRunResult?.testResults, vulnerabilityHighlights])}
-                    isNewDiff={true}
-                    vulnerable={selectedTestRunResult?.vulnerable}
-                    isAnalyzingVulnerabilities={isAnalyzing}
-                    vulnerabilityAnalysisError={vulnerabilityAnalysisError}
-                />
+                                // Add vulnerability highlights only for response
+                                let vulnerabilitySegments = vulnerabilityHighlights[idx] || [];
+                                if (result.originalMessage || result.message) {
+                                    return {
+                                        originalMessage: result.originalMessage,
+                                        message: result.message,
+                                        vulnerabilitySegments
+                                    }
+                                }
+                                return { errorList: "No data found" }
+                            })}
+                        isNewDiff={true}
+                        vulnerable={selectedTestRunResult?.vulnerable}
+                        vulnerabilityAnalysisError={vulnerabilityAnalysisError}
+                    />
+                </VerticalStack>
             </Box>
         );
     });
+
+    const conversationTab = useMemo(() => {
+        if (typeof selectedTestRunResult !== "object") return null;
+        return {
+            id: 'evidence',
+            content: "Evidence",
+            component: <ChatInterface conversations={conversations} sort={false}/>
+        }
+    }, [selectedTestRunResult, conversations])
     
     const ValuesTab = useMemo(() => {
         if (typeof selectedTestRunResult !== "object") return null;
         return {
             id: 'values',
-            content: "Values",
+            content: "Evidence",
             component: <ValuesTabContent />
         }
-    }, [selectedTestRunResult, dataExpired, issueDetails])
+    }, [selectedTestRunResult, dataExpired, issueDetails, refreshFlag])
+
+    const finalResultTab = conversations?.length > 0 ? conversationTab : ValuesTab
 
     function RowComp ({cardObj}){
         const {title, value, tooltipContent} = cardObj
@@ -524,6 +598,38 @@ function TestRunResultFlyout(props) {
         <GridRows columns={3} items={rowItems} CardComponent={RowComp} />
     )
 
+    function MoreInformationComp({ infoState }){
+        infoState = infoState.filter((item) => item.title !== 'Jira')
+
+        return(
+            <VerticalStack gap={"2"}>
+                {
+                    infoState.map((item, index) => {
+                        const {title, content, tooltipContent, icon} = item
+
+                        if (content === null || content === undefined || content === "") return null
+
+                        return (
+                            <VerticalStack gap={"5"} key={index}>
+                                <VerticalStack gap={"2"} >
+                                    <HorizontalStack gap="1_5-experimental">
+                                        <Box><Icon source={icon} color='subdued' /></Box>
+                                        <TitleWithInfo
+                                            textProps={{ variant: "bodyMd", fontWeight: "semibold", color: "subdued" }}
+                                            titleText={title}
+                                            tooltipContent={tooltipContent}
+                                        />
+                                    </HorizontalStack>
+                                    {content}
+                                </VerticalStack>
+                            </VerticalStack>
+                        )
+                    })
+                }
+            </VerticalStack>
+        )
+    }
+
     const overviewComp = (
         <Box padding={"4"}>
             <VerticalStack gap={"5"}>
@@ -542,6 +648,12 @@ function TestRunResultFlyout(props) {
                 </VerticalStack>
                 <Divider />
                 {testResultDetailsComp}  
+                {infoState && typeof infoState === 'object' && infoState.length > 0 ? (
+                    <>
+                        <Divider />
+                        <MoreInformationComp infoState={infoState} />
+                    </>
+                ) : null}
             </VerticalStack>
         </Box>
     )
@@ -614,21 +726,21 @@ function TestRunResultFlyout(props) {
         </Box>
     }
 
-    const attemptTab = !selectedTestRunResult.testResults ? errorTab : ValuesTab
+    const attemptTab = !selectedTestRunResult.testResults ? errorTab : finalResultTab
 
     const tabsComponent = (
         <LayoutWithTabs
             key={issueDetails?.id}
-            tabs={issueDetails?.id ? [overviewTab,timelineTab,ValuesTab, remediationTab].filter(Boolean): [attemptTab]}
+            tabs={issueDetails?.id ? [overviewTab,timelineTab,finalResultTab, remediationTab].filter(Boolean): [attemptTab]}
             currTab = {() => {}}
         />
     )
 
-    const currentComponents = [
-        <TitleComponent/>, tabsComponent
-    ]
+    const currentComponents = showForbidden 
+        ? [<Box padding="4"><ForbiddenRole /></Box>]
+        : [<TitleComponent/>, tabsComponent]
 
-    const title = isIssuePage ? "Issue details" : "Test result"
+    const title = isIssuePage ? "Issue details" : mapLabel('Test result', getDashboardCategory())
 
     return (
         <FlyLayout

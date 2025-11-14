@@ -73,8 +73,24 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
         return (ret != null && ret.size() > 0) ? ret.get(0) : null;
     }
 
+    public void updateTransportType(ApiCollection apiCollection, String transportType) {
+        try {
+            Bson filter = Filters.eq(ApiCollection.ID, apiCollection.getId());
+            Bson update = Updates.set(ApiCollection.MCP_TRANSPORT_TYPE, transportType);
+            ApiCollectionsDao.instance.updateOne(filter, update);
+            apiCollection.setMcpTransportType(transportType);
+        } catch (Exception e) {
+        }
+    }
+
+
     public List<ApiCollection> getMetaForIds(List<Integer> apiCollectionIds) {
         return ApiCollectionsDao.instance.findAll(Filters.in("_id", apiCollectionIds), Projections.exclude("urls"));
+    }
+
+    public ApiCollection getMetaForId(int apiCollectionId) {
+        return ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId),
+                Projections.exclude("urls"));
     }
 
     public Map<Integer, ApiCollection> getApiCollectionsMetaMap() {

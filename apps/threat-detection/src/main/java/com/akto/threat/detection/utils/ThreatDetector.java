@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.ahocorasick.trie.Trie;
@@ -78,6 +79,56 @@ public class ThreatDetector {
         }
 
     }
+
+    public boolean isSuccessfulExploit(List<FilterConfig> successfulExploitFilters,
+            RawApi rawApi, ApiInfoKey apiInfoKey) {
+        for (FilterConfig filter : successfulExploitFilters) {
+            if (validateFilterForRequest(filter, rawApi, apiInfoKey)) {
+                logger.debug("Exploit successful for ApiInfo {}, filterId {}", apiInfoKey.toString(), filter.getId());
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean isIgnoredEvent(List<FilterConfig> ignoredEventFilters,
+            RawApi rawApi, ApiInfoKey apiInfoKey) {
+        for (FilterConfig filter : ignoredEventFilters) {
+            if (validateFilterForRequest(filter, rawApi, apiInfoKey)) {
+                logger.debug("Event should be ignored for ApiInfo {}, filterId {}", apiInfoKey.toString(), filter.getId());
+                return true;
+            }
+        }
+        return false;
+    }
+
+
+    public boolean shouldIgnoreApi(FilterConfig apiFilter, RawApi rawApi, ApiInfoKey apiInfoKey) {
+        if (apiFilter.getIgnore() == null) {
+            return false; // No ignore section, don't ignore
+        }
+        
+        try {
+            // Create a temporary FilterConfig with just the ignore condition as the filter
+            FilterConfig tempFilter = new FilterConfig();
+            tempFilter.setId(apiFilter.getId() + "_ignore");
+            tempFilter.setFilter(apiFilter.getIgnore());
+            tempFilter.setWordLists(apiFilter.getWordLists());
+            
+            // If the ignore condition matches, we should ignore this API
+            boolean matchesIgnore = validateFilterForRequest(tempFilter, rawApi, apiInfoKey);
+            if (matchesIgnore) {
+                logger.debug("API matches ignore condition for filterId {}, apiInfoKey {}", 
+                    apiFilter.getId(), apiInfoKey.toString());
+            }
+            return matchesIgnore;
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error checking ignore condition for filterId " + apiFilter.getId());
+            return false; // On error, don't ignore
+        }
+    }
+
+    
 
     private boolean validateFilterForRequest(
             FilterConfig apiFilter, RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey) {

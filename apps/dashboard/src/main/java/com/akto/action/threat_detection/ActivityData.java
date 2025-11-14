@@ -7,13 +7,15 @@ public class ActivityData {
     private String subCategory;
     private long detectedAt;
     private String method;
+    private String host;
 
-    public ActivityData(String url, String severity, String subCategory, long detectedAt, String method) {
+    public ActivityData(String url, String severity, String subCategory, long detectedAt, String method, String host) {
         this.url = url;
         this.severity = severity;
         this.subCategory = subCategory;
         this.detectedAt = detectedAt;
         this.method = method;
+        this.host = host;
     }
 
     public String getUrl() {
@@ -49,4 +51,11 @@ public class ActivityData {
         this.method = method;
     }
 
+    public String getHost() {
+        return host;
+    }
+
+    public void setHost(String host) {
+        this.host = host;
+    }
 }

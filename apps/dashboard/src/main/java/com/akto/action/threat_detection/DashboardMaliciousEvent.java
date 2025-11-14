@@ -20,8 +20,11 @@ public class DashboardMaliciousEvent {
   private String eventType;
   private String payload;
   private String metadata;
+  private boolean successfulExploit;
   private String status;
-
+  private String label;
+  private String host;
+  private String jiraTicketUrl;
   public DashboardMaliciousEvent() {}
 
   public DashboardMaliciousEvent(
@@ -41,7 +44,11 @@ public class DashboardMaliciousEvent {
       String eventType,
       String payload,
       String metadata,
-      String status) {
+      boolean successfulExploit,
+      String status,
+      String label,
+      String host,
+      String jiraTicketUrl) {
     this.id = id;
     this.actor = actor;
     this.filter_id = filter;
@@ -58,7 +65,11 @@ public class DashboardMaliciousEvent {
     this.eventType = eventType;
     this.payload = payload;
     this.metadata = metadata;
+    this.successfulExploit = successfulExploit;
     this.status = status;
+    this.label = label;
+    this.host = host;
+    this.jiraTicketUrl = jiraTicketUrl;
   }
 
   public String getId() {
@@ -189,12 +200,44 @@ public class DashboardMaliciousEvent {
     this.metadata = metadata;
   }
 
+  public boolean getSuccessfulExploit() {
+    return successfulExploit;
+  }
+
+  public void setSuccessfulExploit(boolean successfulExploit) {
+    this.successfulExploit = successfulExploit;
+  }
+
   public String getStatus() {
     return status;
   }
 
   public void setStatus(String status) {
     this.status = status;
+  }
+
+  public String getLabel() {
+    return label;
+  }
+
+  public void setLabel(String label) {
+    this.label = label;
+  }
+
+  public String getHost() {
+    return host;
+  }
+
+  public void setHost(String host) {
+    this.host = host;
+  }
+
+  public String getJiraTicketUrl() {
+    return jiraTicketUrl;
+  }
+
+  public void setJiraTicketUrl(String jiraTicketUrl) {
+    this.jiraTicketUrl = jiraTicketUrl;
   }
 
 }

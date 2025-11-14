@@ -7,6 +7,8 @@ import com.akto.dao.DashboardLogsDao;
 import com.akto.dao.LogsDao;
 import com.akto.dao.PupeteerLogsDao;
 import com.akto.dao.RuntimeLogsDao;
+import com.akto.dao.monitoring.EndpointShieldLogsDao;
+import com.akto.dto.monitoring.EndpointShieldLog;
 import com.akto.RuntimeMode;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
@@ -91,7 +93,7 @@ public class LoggerMaker  {
     }
 
     public enum LogDb {
-        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, THREAT_DETECTION, PUPPETEER, DATA_INGESTION
+        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, THREAT_DETECTION, PUPPETEER, DATA_INGESTION, ENDPOINT_SHIELD
     }
 
     private static AccountSettings accountSettings = null;
@@ -169,6 +171,7 @@ public class LoggerMaker  {
         return err;
     }
 
+    @Deprecated
     public void errorAndAddToDb(String err, LogDb db) {
         try {
             err = basicError(err, db);
@@ -323,6 +326,10 @@ public class LoggerMaker  {
                 break;
             case THREAT_DETECTION:
                 logs = ProtectionLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+                break;
+            case ENDPOINT_SHIELD:
+                List<EndpointShieldLog> endpointShieldLogs = EndpointShieldLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP, EndpointShieldLog.AGENT_ID, EndpointShieldLog.DEVICE_ID, EndpointShieldLog.LEVEL));
+                logs = new ArrayList<>(endpointShieldLogs);
                 break;
             default:
                 break;

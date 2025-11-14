@@ -5,15 +5,39 @@ import ConcentricCirclesChart from '../../../components/shared/ConcentricCircles
 import observeFunc from "../../observe/transform"
 import TooltipText from '../../../components/shared/TooltipText'
 
-function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNormal, boxHeight, navUrl, isRequest, chartOnLeft, dataTableWidth, boxPadding, pieInnerSize, chartSize, spaceBetween}) {
+function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNormal, boxHeight, navUrl, isRequest, chartOnLeft, dataTableWidth, boxPadding, pieInnerSize, chartSize, spaceBetween, navUrlBuilder}) {
+    const handleNavigation = React.useCallback((filterValue) => {
+        if (!navUrl && !navUrlBuilder) return
+        const destination = navUrlBuilder ? navUrlBuilder(navUrl, filterValue) : navUrl
+        if (!destination) return
+        window.open(destination, '_blank', 'noopener,noreferrer')
+    }, [navUrl, navUrlBuilder])
     let tableRows = []
     if(data && Object.keys(data).length > 0)
     {
         Object.keys(data).forEach((key,index)=>{
+            const filterValue = data[key]?.filterValue
+            const hasNavigation = Boolean(navUrl || navUrlBuilder)
+            const isClickable = hasNavigation && (navUrlBuilder ? Boolean(filterValue) : Boolean(navUrl))
+            const interactionProps = isClickable ? {
+                onClick: () => handleNavigation(filterValue),
+                onKeyDown: (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        handleNavigation(filterValue)
+                    }
+                },
+                role: 'button',
+                tabIndex: 0
+            } : {}
             let comp = [
                 (
                     <Box >
-                        <div style={{display: "flex", gap: "8px", alignItems: "center", maxWidth: '200px'}} key={index}>
+                        <div
+                            style={{display: "flex", gap: "8px", alignItems: "center", maxWidth: '200px', cursor: isClickable ? 'pointer' : 'auto'}}
+                            key={index}
+                            {...interactionProps}
+                        >
                             <span style={{background: data[key]?.color, borderRadius: "50%", width: "8px", height: "8px"}} />
                             <Box width='150px'>
                                 <TooltipText tooltip={key} text={key}/>
@@ -22,7 +46,11 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
                     </Box>
                 ),
                 <HorizontalStack gap={1} wrap={false}>
-                    <Box width='30px'>
+                    <Box
+                        width='30px'
+                        {...interactionProps}
+                        style={{cursor: isClickable ? 'pointer' : 'auto'}}
+                    >
                         <Text>{observeFunc.formatNumberWithCommas(data[key]?.text)}</Text>
                     </Box>
                     {data[key].dataTableComponent ? data[key].dataTableComponent : null}
@@ -39,7 +67,7 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
 
     const chartComponent = (
 
-        isNormal ? <DonutChart navUrl={navUrl} data={chartData}  title={charTitle}  subtitle={chartSubtitle} type={title} size={chartSize || 210} isRequest={isRequest} pieInnerSize={pieInnerSize}/> : <ConcentricCirclesChart data={chartData} title={charTitle} size={210} subtitle={chartSubtitle} />
+        isNormal ? <DonutChart navUrl={navUrl} navUrlBuilder={navUrlBuilder} data={chartData}  title={charTitle}  subtitle={chartSubtitle} type={title} size={chartSize || 210} isRequest={isRequest} pieInnerSize={pieInnerSize}/> : <ConcentricCirclesChart data={chartData} title={charTitle} size={210} subtitle={chartSubtitle} />
     )
 
     return (

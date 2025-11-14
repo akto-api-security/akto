@@ -8,7 +8,6 @@ function TokenValidator() {
     let navigate = useNavigate()
     const accessToken = SessionStore(state => state.accessToken)
   useEffect(() => {
-    console.log(accessToken)
     if (accessToken === null || accessToken === '') {
         navigate('/login')
     } else {

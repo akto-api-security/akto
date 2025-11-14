@@ -4,6 +4,7 @@ import SingleTestRunPage from "../dashboard/pages/testing/SingleTestRunPage/Sing
 import AllSensitiveData from "../dashboard/pages/observe/AllSensitiveData/AllSensitiveData";
 import ApiCollections from "../dashboard/pages/observe/api_collections/ApiCollections";
 import ApiQuery from "../dashboard/pages/observe/api_collections/APIQuery";
+import DebugEndpointsMode from "../dashboard/pages/observe/api_collections/DebugEndpointsMode";
 import ApiEndpoints from "../dashboard/pages/observe/api_collections/ApiEndpoints";
 import SensitiveDataExposure from "../dashboard/pages/observe/SensitiveDataExposure/SensitiveDataExposure";
 import SingleRequest from "../dashboard/pages/observe/SingleRequest/SingleRequest";
@@ -30,6 +31,7 @@ import About from "../dashboard/pages/settings/about/About";
 import ThreatConfiguration from "../dashboard/pages/settings/threat_configuration/ThreatConfiguration";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
 import TestEditor from "../dashboard/pages/test_editor/TestEditor";
+import PromptHardening from "../dashboard/pages/prompt_hardening/PromptHardening";
 import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
 import IssuesPage from "../dashboard/pages/issues/IssuesPage/IssuesPage";
 import CompliancePage from "../dashboard/pages/issues/IssuesPage/CompliancePage";
@@ -55,6 +57,7 @@ import ApiChanges from "../dashboard/pages/observe/api_collections/ApiChanges";
 import Store from "../dashboard/store";
 import {generateSearchData} from "@/util/searchItems"
 import {useEffect, useMemo} from "react";
+import func from "@/util/func";
 import CICD from "../dashboard/pages/settings/integrations/CICD";
 import ErrorComponent from "../dashboard/components/shared/ErrorComponent";
 import OktaIntegration from "../dashboard/pages/settings/integrations/OktaIntegration";
@@ -85,6 +88,8 @@ import AuditLogs from "../dashboard/pages/settings/audit_logs/AuditLogs";
 import ThreatApiPage from "../dashboard/pages/threat_detection/ThreatApiPage";
 import ThreatActorPage from "../dashboard/pages/threat_detection/ThreatActorPage";
 import ThreatPolicyPage from "../dashboard/pages/threat_detection/ThreatPolicyPage";
+import ConfigureExploitsPage from "../dashboard/pages/threat_detection/ConfigureExploitsPage";
+import ConfigureIgnoredEventsPage from "../dashboard/pages/threat_detection/ConfigureIgnoredEventsPage";
 import TestSuite from "../dashboard/pages/testing/testSuite/TestSuite";
 import TestsTablePage from "../dashboard/pages/test_editor/tests_table/TestsTablePage";
 import Splunk from "../dashboard/pages/settings/integrations/Splunk";
@@ -92,15 +97,22 @@ import F5Waf from "../dashboard/pages/settings/integrations/F5Waf";
 import AWSWaf from "../dashboard/pages/settings/integrations/AWSWaf";
 import AgentConfig from "../dashboard/pages/settings/integrations/AgentConfig";
 import AzureBoards from "../dashboard/pages/settings/integrations/AzureBoards";
+import ServiceNow from "../dashboard/pages/settings/integrations/ServiceNow";
+import McpRegistry from "../dashboard/pages/settings/integrations/McpRegistry";
 import CloudflareWaf from "../dashboard/pages/settings/integrations/CloudflareWaf";
 import UndoDemergedApis from "../dashboard/pages/settings/undo_demerged_apis/UndoDemergedApis";
 import GmailWebhookCore from "../dashboard/pages/settings/integrations/gmailWebhooks/GmailWebhookCore";
 import GmailWebhook from "../dashboard/pages/settings/integrations/gmailWebhooks/GmailWebhook";
 import McpSecurityPage from "../dashboard/pages/mcp-security/McpSecurityPage.jsx";
 import AuditData from "../dashboard/pages/observe/AuditData";
-import ComingSoonPage from "../dashboard/components/shared/ComingSoonPage";
+import EndpointShieldMetadata from "../dashboard/pages/observe/EndpointShieldMetadata";
 import GuardrailDetection    from "../dashboard/pages/guardrails/GuardrailDetection";
+import GuardrailDetectionDemo from "../dashboard/pages/guardrails/GuardrailDetectionDemo";
 import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies";
+import ThreatDashboardPage from "../dashboard/pages/threat_detection/ThreatDashboardPage";
+import OpenApiAgentTester from "../dashboard/pages/observe/OpenApiAgentTester";
+import DastProgress from "../dashboard/pages/observe/api_collections/DastProgress.jsx";
+import DastProgressSingle from "../dashboard/pages/observe/api_collections/DastProgressSingle.jsx";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -174,6 +186,10 @@ const router = createBrowserRouter([
                                 element: <ApiQuery/>
                             },
                             {
+                                path: "debug-endpoints",
+                                element: <DebugEndpointsMode/>
+                            },
+                            {
                                 path: "changes",
                                 element: <ApiChanges/>
                             },
@@ -196,8 +212,23 @@ const router = createBrowserRouter([
                             {
                                 path: "audit",
                                 element: <AuditData/>
-
-                            }
+                            },
+                            {
+                                path: "endpoint-shield",
+                                element: <EndpointShieldMetadata/>
+                            },
+                            {
+                                path: ":apiCollectionId/open-api-upload",
+                                element: <OpenApiAgentTester/>
+                            },
+                            {
+                                path: "dast-progress",
+                                element: <DastProgress />
+                            },
+                            {
+                                path: "dast-progress/:crawlId",
+                                element: <DastProgressSingle />
+                            },
                         ]
                     },
                     {
@@ -225,6 +256,10 @@ const router = createBrowserRouter([
                         path: "protection",
                         children: [
                             {
+                                path: "threat-dashboard",
+                                element: <ThreatDashboardPage/>
+                            },
+                            {
                                 path: "threat-activity",
                                 element: <ThreatDetectionPage/>
                             },
@@ -239,6 +274,16 @@ const router = createBrowserRouter([
                             {
                                 path: "threat-policy",
                                 element: <ThreatPolicyPage/>
+                            }
+                            ,
+                            {
+                                path: "configure-exploits",
+                                element: <ConfigureExploitsPage/>
+                            }
+                            ,
+                            {
+                                path: "configure-ignored-events",
+                                element: <ConfigureIgnoredEventsPage/>
                             }
                         ]
                     },
@@ -264,7 +309,7 @@ const router = createBrowserRouter([
                         children: [
                             {
                                 path: "activity",
-                                element: <GuardrailDetection/>
+                                element: func.isDemoAccount() ? <GuardrailDetectionDemo/> : <GuardrailDetection/>
                             },
                             {
                                 path: "policies",
@@ -347,12 +392,20 @@ const router = createBrowserRouter([
                         element: <AzureBoards/>,
                     },
                     {
+                        path: "integrations/servicenow",
+                        element: <ServiceNow/>,
+                    },
+                    {
                         path: "integrations/akto_apis",
                         element: <ApiTokens/>,
                     },
                     {
                         path: "integrations/akto_gpt",
                         element: <AktoGPT/>,
+                    },
+                    {
+                        path: "integrations/mcp_registry",
+                        element: <McpRegistry/>,
                     },
                     {
                         path: "integrations/github_sso",
@@ -471,6 +524,14 @@ const router = createBrowserRouter([
             {
                 path: "test-editor",
                 element: <TestEditor/>
+            },
+            {
+                path: "prompt-hardening/:promptId",
+                element: <PromptHardening/>
+            },
+            {
+                path: "prompt-hardening",
+                element: <PromptHardening/>
             },
             {
                 path: "onboarding",

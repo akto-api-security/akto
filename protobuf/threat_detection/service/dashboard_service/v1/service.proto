@@ -28,6 +28,10 @@ message ListMaliciousRequestsResponse {
       string event_type_val = 16;
       string metadata = 17;
       string status = 18;
+      bool successful_exploit = 19;
+      string label = 20;  // Common values: "threat", "guardrail"
+      string host = 21;   // Host header from the request
+      string jira_ticket_url = 22;  // URL of associated Jira ticket
     }
     repeated MaliciousEvent malicious_events = 1;
     uint64 total = 2;
@@ -48,6 +52,10 @@ message ListMaliciousRequestsRequest {
       repeated string sub_category = 6;
       repeated string latest_attack = 7;
       optional string status_filter = 8;
+      optional bool successful_exploit = 9;
+      optional string label = 10;  // Common values: "threat", "guardrail"
+      repeated string hosts = 11;  // Host header values for filtering
+      optional string latest_api_orig_regex = 12 [json_name = "latestApiOrigRegex"];
     }
 
     // The number of alerts to return
@@ -63,6 +71,7 @@ message FetchAlertFiltersResponse {
   repeated string actors = 1;
   repeated string urls = 2;
   repeated string sub_category = 3;
+  repeated string hosts = 4;
 }
 
 message ListThreatActorsRequest {
@@ -72,6 +81,7 @@ message ListThreatActorsRequest {
     optional TimeRangeFilter detected_at_time_range = 3;
     repeated string latest_attack = 4;
     repeated string country = 5;
+    repeated string hosts = 6;  // Host header values for filtering
   }
 
   optional uint32 skip = 1;
@@ -89,6 +99,7 @@ message ListThreatActorResponse {
     uint64 detected_at = 3;
     string severity = 4;
     string method = 5;
+    string host = 6;
   }
   message ThreatActor {
     string id = 1;
@@ -99,6 +110,7 @@ message ListThreatActorResponse {
     string country = 6;
     repeated ActivityData activity_data = 7;
     string latest_subcategory = 8;
+    string latest_api_host = 9;
   }
   repeated ThreatActor actors = 1;
   uint64 total = 2;
@@ -141,6 +153,7 @@ message ListThreatApiResponse {
     uint64 discovered_at = 3;
     uint32 actors_count = 4;
     uint32 requests_count = 5;
+    string host = 6;
   }
 
   repeated ThreatApi apis = 1;
@@ -175,6 +188,7 @@ message ThreatActorFilterResponse {
   repeated string sub_categories = 1;
   repeated string countries = 2;
   repeated string actor_id = 3;
+  repeated string host = 4;
 }
 
 message ThreatCategoryWiseCountResponse {
@@ -216,6 +230,12 @@ message DailyActorsCountResponse {
   }
 
   repeated ActorsCount actors_counts = 1;
+  uint32 total_analysed = 2;
+  uint32 total_attacks = 3;
+  uint32 critical_actors_count = 4;
+  uint32 total_active = 5;
+  uint32 total_ignored = 6;
+  uint32 total_under_review = 7;
 }
 
 message ThreatActivityTimelineRequest {
@@ -262,7 +282,8 @@ message UpdateMaliciousEventStatusRequest {
   repeated string event_ids = 2;  // For bulk update by IDs
   optional ListMaliciousRequestsRequest.Filter filter = 3;  // For filtered update
 
-  string status = 4;  // The new status to set
+  optional string status = 4;  // The new status to set
+  optional string jira_ticket_url = 5;  // Jira ticket URL to associate with the event(s)
 }
 
 message UpdateMaliciousEventStatusResponse {
@@ -358,4 +379,28 @@ message BucketStats {
   optional int32 p25 = 4;
   optional int32 p50 = 5; // median
   optional int32 p75 = 6;
+}
+
+message FetchTopNDataRequest {
+  uint32 start_ts = 1;
+  uint32 end_ts = 2;
+  repeated string latest_attack = 3;
+  uint32 limit = 4;
+}
+
+message FetchTopNDataResponse {
+  message TopApiData {
+    string endpoint = 1;
+    string method = 2;
+    uint32 attacks = 3;
+    string severity = 4;
+  }
+
+  message TopHostData {
+    string host = 1;
+    uint32 attacks = 2;
+  }
+
+  repeated TopApiData top_apis = 1;
+  repeated TopHostData top_hosts = 2;
 }

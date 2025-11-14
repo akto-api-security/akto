@@ -40,14 +40,21 @@ export default {
         });
         return resp;
     },
-    async updateAuditData(hexId, remarks) {
-            const resp = await request({
-                url: '/api/updateAuditData',
-                method: 'post',
-                data: { hexId, remarks }
-            });
-            return resp;
-        },
+    async updateAuditData(hexId, remarks, approvalData = null) {
+        const data = { hexId };
+        if (approvalData) {
+            data.approvalData = approvalData;
+        } else {
+            data.remarks = remarks;
+        }
+        
+        const resp = await request({
+            url: '/api/updateAuditData',
+            method: 'post',
+            data: data
+        });
+        return resp;
+    },
 
     async fetchDataTypeNames() {
         const resp = await request({
@@ -954,6 +961,17 @@ export default {
     async getApiSequences(apiCollectionId) {
         const resp = await request({
             url: '/api/getApiSequences',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId
+            }
+        })
+        return resp
+    },
+
+    async fetchMcpToolsApiCalls(apiCollectionId) {
+        const resp = await request({
+            url: '/api/fetchMcpToolsApiCalls',
             method: 'post',
             data: {
                 apiCollectionId: apiCollectionId

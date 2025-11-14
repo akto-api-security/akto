@@ -1,10 +1,10 @@
-package com.akto.threat.backend.db;
+package com.akto.dto.threat_detection_backend;
 
 import com.akto.dto.type.URLMethods;
 
 import java.util.UUID;
 
-public class MaliciousEventModel {
+public class MaliciousEventDto {
 
   private String id;
   private String filterId;
@@ -23,8 +23,11 @@ public class MaliciousEventModel {
   private String refId;
   private String severity;
   private String metadata;
+  private Boolean successfulExploit;
   private Status status;
-
+  private Label label;
+  private String host;
+  private String jiraTicketUrl;
 
   public enum EventType {
     SINGLE,
@@ -37,9 +40,14 @@ public class MaliciousEventModel {
     IGNORED
   }
 
-  public MaliciousEventModel() {}
+  public enum Label {
+    THREAT,
+    GUARDRAIL
+  }
 
-  private MaliciousEventModel(Builder builder) {
+  public MaliciousEventDto() {}
+
+  private MaliciousEventDto(Builder builder) {
     this.id = UUID.randomUUID().toString();
     this.filterId = builder.filterId;
     this.actor = builder.actor;
@@ -56,8 +64,11 @@ public class MaliciousEventModel {
     this.severity = builder.severity;
     this.type = builder.type;
     this.refId = builder.refId;
-    this.metadata = builder.metadata;
     this.status = builder.status != null ? builder.status : Status.ACTIVE;
+    this.successfulExploit = builder.successfulExploit;
+    this.label = builder.label;
+    this.host = builder.host;
+    this.jiraTicketUrl = builder.jiraTicketUrl;
   }
 
   public static class Builder {
@@ -78,7 +89,10 @@ public class MaliciousEventModel {
     private String severity;
     private String metadata;
     private Status status;
-
+    private Boolean successfulExploit;
+    private Label label;
+    private String host;
+    private String jiraTicketUrl;
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
       return this;
@@ -159,13 +173,33 @@ public class MaliciousEventModel {
       return this;
     }
 
+    public Builder setSuccessfulExploit(Boolean successfulExploit) {
+      this.successfulExploit = successfulExploit;
+      return this;
+    }
+
     public Builder setStatus(Status status) {
       this.status = status;
       return this;
     }
 
-    public MaliciousEventModel build() {
-      return new MaliciousEventModel(this);
+    public Builder setLabel(Label label) {
+      this.label = label;
+      return this;
+    }
+
+    public Builder setHost(String host) {
+      this.host = host;
+      return this;
+    }
+
+    public Builder setJiraTicketUrl(String jiraTicketUrl) {
+      this.jiraTicketUrl = jiraTicketUrl;
+      return this;
+    }
+
+    public MaliciousEventDto build() {
+      return new MaliciousEventDto(this);
     }
   }
 
@@ -175,6 +209,14 @@ public class MaliciousEventModel {
 
   public void setMetadata(String metadata) {
     this.metadata = metadata;
+  }
+
+  public Boolean getSuccessfulExploit() {
+    return successfulExploit;
+  }
+
+  public void setSuccessfulExploit(Boolean successfulExploit) {
+    this.successfulExploit = successfulExploit;
   }
 
   public String getId() {
@@ -315,6 +357,30 @@ public class MaliciousEventModel {
 
   public void setStatus(Status status) {
     this.status = status;
+  }
+
+  public Label getLabel() {
+    return label;
+  }
+
+  public void setLabel(Label label) {
+    this.label = label;
+  }
+
+  public String getHost() {
+    return host;
+  }
+
+  public void setHost(String host) {
+    this.host = host;
+  }
+
+  public String getJiraTicketUrl() {
+    return jiraTicketUrl;
+  }
+
+  public void setJiraTicketUrl(String jiraTicketUrl) {
+    this.jiraTicketUrl = jiraTicketUrl;
   }
 
 }

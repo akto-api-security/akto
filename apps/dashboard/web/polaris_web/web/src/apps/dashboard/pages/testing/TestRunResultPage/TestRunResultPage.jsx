@@ -65,6 +65,7 @@ function TestRunResultPage(props) {
   const [issueDetails, setIssueDetails] = useState({});
   const [jiraIssueUrl, setJiraIssueUrl] = useState({});
   const [azureBoardsWorkItemUrl, setAzureBoardsWorkItemUrl] = useState({});
+  const [serviceNowTicketUrl, setServiceNowTicketUrl] = useState({});
   const subCategoryMap = LocalStore(state => state.subCategoryMap);
   const params = useParams();
   const hexId = params.hexId;
@@ -75,6 +76,9 @@ function TestRunResultPage(props) {
   const [showDetails, setShowDetails] = useState(true)
   const [remediation, setRemediation] = useState("")
   const hostNameMap = PersistStore(state => state.hostNameMap)
+
+  const [conversations, setConversations] = useState([])
+  const [showForbidden, setShowForbidden] = useState(false)
 
   const useFlyout = location.pathname.includes("test-editor") ? false : true
 
@@ -114,10 +118,10 @@ function TestRunResultPage(props) {
     
   }
 
-  async function createJiraTicketApiCall(hostStr, endPointStr, issueUrl, issueDescription, issueTitle, testingIssueId,projId, issueType, additionalIssueFields) {
+  async function createJiraTicketApiCall(hostStr, endPointStr, issueUrl, issueDescription, issueTitle, testingIssueId,projId, issueType, additionalIssueFields, labels) {
     
     const jiraMetaData = {
-      issueTitle,hostStr,endPointStr,issueUrl,issueDescription,testingIssueId, additionalIssueFields
+      issueTitle,hostStr,endPointStr,issueUrl,issueDescription,testingIssueId, additionalIssueFields, labels
     }
     let jiraInteg = await api.createJiraTicket(jiraMetaData, projId, issueType);
     return jiraInteg.jiraTicketKey
@@ -128,14 +132,42 @@ function TestRunResultPage(props) {
   }
 
   async function fetchData() {
-    if (hexId2 != undefined) {
-      if (testingRunResult == undefined) {
-        let res = await api.fetchTestRunResultDetails(hexId2)
-        testingRunResult = res.testingRunResult;
+    if (hexId2 !== undefined) {
+      try {
+        if (testingRunResult === undefined) {
+          let res = await api.fetchTestRunResultDetails(hexId2)
+          testingRunResult = res.testingRunResult;
+        }
+      } catch (error) {
+        if (error?.response?.status === 403 || error?.status === 403) {
+          setShowForbidden(true);
+          setLoading(false);
+          return;
+        }
+        throw error;
       }
-      if (runIssues == undefined) {
-        let res = await api.fetchIssueFromTestRunResultDetails(hexId2)
-        runIssues = res.runIssues;
+      try {
+        if (runIssues === undefined) {
+          let res = await api.fetchIssueFromTestRunResultDetails(hexId2)
+          runIssues = res.runIssues;
+        }
+      } catch (error) {
+        if (error?.response?.status === 403 || error?.status === 403) {
+          setShowForbidden(true);
+          setLoading(false);
+          return;
+        }
+        throw error;
+      }
+      if(testingRunResult?.testResults?.length > 0){
+        let conversationId = testingRunResult.testResults[0].conversationId;
+        if(conversationId){
+          let res = await api.fetchConversationsFromConversationId(conversationId);
+          if(res && res.length > 0){
+            const conversationsList = transform.prepareConversationsList(res)
+            setConversations(conversationsList);
+          }
+        }
       }
       setShowDetails(true)
     }
@@ -144,7 +176,7 @@ function TestRunResultPage(props) {
     setLoading(false);
   }, 500)
 }
-  async function createJiraTicket(issueId, projId, issueType){
+  async function createJiraTicket(issueId, projId, issueType, labels){
 
     if (Object.keys(issueId).length === 0) {
       return
@@ -182,7 +214,7 @@ function TestRunResultPage(props) {
       return;
     }
 
-    await createJiraTicketApiCall("Host - "+hostName, pathname, window.location.href, description, issueTitle, issueId, projId, issueType, additionalIssueFields).then(async(res)=> {
+    await createJiraTicketApiCall("Host - "+hostName, pathname, window.location.href, description, issueTitle, issueId, projId, issueType, additionalIssueFields, labels).then(async(res)=> {
       if(res?.errorMessage) {
         setToast(true, true, res?.errorMessage)
       }
@@ -221,9 +253,11 @@ function TestRunResultPage(props) {
       })
       let jiraIssueCopy = runIssues.jiraIssueUrl || "";
       let azureBoardsWorkItemUrlCopy = runIssues.azureBoardsWorkItemUrl || "";
+      let serviceNowTicketUrlCopy = runIssues.servicenowIssueUrl || "";
       const moreInfoSections = transform.getInfoSectionsHeaders()
       setJiraIssueUrl(jiraIssueCopy)
       setAzureBoardsWorkItemUrl(azureBoardsWorkItemUrlCopy)
+      setServiceNowTicketUrl(serviceNowTicketUrlCopy)
       setInfoState(transform.fillMoreInformation(subCategoryMap[runIssues?.id?.testSubCategory],moreInfoSections, runIssuesArr, jiraIssueCopy, onClickButton))
       setRemediation(subCategoryMap[runIssues?.id?.testSubCategory]?.remediation)
       // setJiraIssueUrl(jiraIssueUrl)
@@ -243,19 +277,22 @@ function TestRunResultPage(props) {
     <TestRunResultFlyout
       selectedTestRunResult={selectedTestRunResult}
       remediationSrc={remediation}
-      testingRunResult={testingRunResult} 
-      loading={loading} 
-      issueDetails={issueDetails} 
-      getDescriptionText={getDescriptionText} 
-      infoState={infoState} 
-      createJiraTicket={createJiraTicket} 
-      jiraIssueUrl={jiraIssueUrl} 
-      hexId={hexId} 
+      testingRunResult={testingRunResult}
+      loading={loading}
+      issueDetails={issueDetails}
+      getDescriptionText={getDescriptionText}
+      infoState={infoState}
+      createJiraTicket={createJiraTicket}
+      jiraIssueUrl={jiraIssueUrl}
+      hexId={hexId}
       source={props?.source}
       setShowDetails={setShowDetails}
       showDetails={showDetails}
       isIssuePage={location.pathname.includes("issues")}
       azureBoardsWorkItemUrl={azureBoardsWorkItemUrl}
+      serviceNowTicketUrl={serviceNowTicketUrl}
+      conversations={conversations}
+      showForbidden={showForbidden}
     />
     </>
     :

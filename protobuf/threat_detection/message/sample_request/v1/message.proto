@@ -26,6 +26,8 @@ message SampleMaliciousRequest {
   string payload = 6;
   string filter_id = 7;
   Metadata metadata = 8; 
+  bool successful_exploit = 9;
+  string status = 10;
 }
 
 message SampleRequestKafkaEnvelope {

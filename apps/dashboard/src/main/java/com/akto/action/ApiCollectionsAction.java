@@ -56,7 +56,6 @@ import com.opensymphony.xwork2.Action;
 
 import lombok.Setter;
 import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
-import static com.akto.util.Constants.AKTO_MCP_SERVER_TAG;
 import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.dto.type.URLMethods;
 
@@ -600,9 +599,13 @@ public class ApiCollectionsAction extends UserAction {
 
         List<String> sensitiveSubtypesInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
         this.sensitiveUrlsInResponse = SingleTypeInfoDao.instance.getSensitiveApisCount(sensitiveSubtypes, true, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
-
         sensitiveSubtypes.addAll(sensitiveSubtypesInRequest);
-        this.sensitiveSubtypesInCollection = SingleTypeInfoDao.instance.getSensitiveSubtypesDetectedForCollection(sensitiveSubtypes);
+        if(type!= null && type.equals("topSensitive")){
+            this.sensitiveSubtypesInUrl = SingleTypeInfoDao.instance.getSensitiveSubtypesDetectedForUrl(sensitiveSubtypes);
+        }else {
+            this.sensitiveSubtypesInCollection = SingleTypeInfoDao.instance.getSensitiveSubtypesDetectedForCollection(sensitiveSubtypes);
+        }
+
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -1344,6 +1347,70 @@ public class ApiCollectionsAction extends UserAction {
                 
         }
 
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchMcpToolsApiCalls() {
+        CONTEXT_SOURCE currentContextSource = Context.contextSource.get();
+
+        if(currentContextSource.equals(CONTEXT_SOURCE.API)) {
+            addActionError("Invalid dashboard category: " + currentContextSource.name());
+            return ERROR.toUpperCase();
+        }
+
+        List<ApiInfo> mcpToolsList = ApiInfoDao.instance.findAll(
+            Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId),
+            Projections.include(Constants.ID)
+        );
+
+        Map<ApiInfoKey, List<ApiInfoKey>> toolApiCallsMap = new HashMap<>();
+
+        // Collect all tool names in a single list
+        List<String> allMcpToolNames = new ArrayList<>();
+        Map<String, ApiInfoKey> toolNameToKeyMap = new HashMap<>();
+
+        for(ApiInfo mcpToolInfo : mcpToolsList) {
+            String toolUrl = mcpToolInfo.getId().getUrl();
+            String[] urlSegments = toolUrl.split("/");
+            String mcpToolName = urlSegments[urlSegments.length - 1];
+
+            allMcpToolNames.add(mcpToolName);
+            toolNameToKeyMap.put(mcpToolName, mcpToolInfo.getId());
+
+            // Initialize empty list for each tool
+            toolApiCallsMap.put(mcpToolInfo.getId(), new ArrayList<>());
+        }
+
+        // Single DB call to get all API calls for all tools at once
+        if (!allMcpToolNames.isEmpty()) {
+            Context.contextSource.set(CONTEXT_SOURCE.API);
+
+            List<ApiInfo> allApiCalls = ApiInfoDao.instance.findAll(
+                Filters.in(ApiInfo.PARENT_MCP_TOOL_NAMES, allMcpToolNames),
+                Projections.include(Constants.ID, ApiInfo.PARENT_MCP_TOOL_NAMES)
+            );
+
+            // Group API calls by their parent tool names
+            for(ApiInfo apiCall : allApiCalls) {
+                List<String> parentToolNames = apiCall.getParentMcpToolNames();
+                if (parentToolNames != null) {
+                    for (String toolName : parentToolNames) {
+                        ApiInfoKey toolKey = toolNameToKeyMap.get(toolName);
+                        if (toolKey != null) {
+                            toolApiCallsMap.get(toolKey).add(apiCall.getId());
+                        }
+                    }
+                }
+            }
+        }
+
+        Context.contextSource.set(currentContextSource);
+
+        if(this.response == null) {
+            this.response = new BasicDBObject();
+        }
+        this.response.put("toolApiCallsMap", toolApiCallsMap);
 
         return Action.SUCCESS.toUpperCase();
     }

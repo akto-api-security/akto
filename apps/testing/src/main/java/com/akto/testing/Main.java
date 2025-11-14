@@ -125,6 +125,18 @@ public class Main {
         emptyCountIssuesMap.put(Severity.LOW.toString(), 0);
     }
 
+    public static void sendSlackAlertForFailedTest(int accountId, String customMessage){
+        if(StringUtils.hasLength(AKTO_SLACK_WEBHOOK)){
+            try {
+                String slackMessage = "Test failed for accountId: " + accountId + "\n with reason and details: " + customMessage;
+                CustomTextAlert customTextAlert = new CustomTextAlert(slackMessage);
+                SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
+            } catch (Exception e) {
+                loggerMaker.error("Error sending slack alert for failed test", e);
+            }
+        }
+    }
+
     private static TestingRunResultSummary createTRRSummaryIfAbsent(TestingRun testingRun, int start){
         ObjectId testingRunId = new ObjectId(testingRun.getHexId());
 
@@ -482,15 +494,6 @@ public class Main {
 
                     // mark the test completed here
                     testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId);
-
-                    if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) && !isTestingRunForDemoCollection(testingRun)) {
-                        try {
-                            CustomTextAlert customTextAlert = new CustomTextAlert("Test completed for accountId=" + accountId + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " : @Arjun you are up now. Make your time worth it. :)");
-                            SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
-                        } catch (Exception e) {
-                            loggerMaker.error("Error sending slack alert for completion of test", e);
-                        }
-                    }
                 }
 
                 deleteScheduler.execute(() -> {
@@ -615,6 +618,8 @@ public class Main {
                             Filters.eq(Constants.ID, testingRun.getId()),
                             Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
 
+                    sendSlackAlertForFailedTest(accountId, "Overrage detected, TRR_ID: " + testingRun.getHexId() + " TRRS_ID: " + summaryId.toHexString());
+
                     if (isTestingRunResultRerunCase) {
                         // For TRR-rerun case, delete the rerun summary and clean up configurations
                         TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummariesDao.ID, trrs.getId()));
@@ -721,6 +726,7 @@ public class Main {
                                         Updates.set(TestingRunResultSummary.STATE, State.FAILED),
                                         Updates.set(TestingRunResultSummary.COUNT_ISSUES, finalCountMap)
                                     );
+                                    String customMessage = "Test stuck for a long time, TRR_ID: " + testingRun.getHexId() + " TRRS_ID: " + testingRunResultSummary.getHexId();
                                     if(countFailedSummaries >= (MAX_RETRIES_FOR_FAILED_SUMMARIES - 1)){
                                         updateForSummary = Updates.combine(
                                             Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
@@ -729,6 +735,9 @@ public class Main {
                                         );
                                         loggerMaker.infoAndAddToDb("Max retries level reached for TRR_ID: " + testingRun.getHexId(), LogDb.TESTING);
                                         maxRetriesReached = true;
+                                        customMessage += " Max retries level reached";
+                                    }else{
+                                        customMessage += " Max retries level not reached, count failed summaries: " + countFailedSummaries;
                                     }
 
                                     TestingRunResultSummary summary = TestingRunResultSummariesDao.instance.updateOneNoUpsert(
@@ -738,6 +747,7 @@ public class Main {
                                             ),
                                             updateForSummary
                                     );
+                                    sendSlackAlertForFailedTest(accountId, customMessage);
                                     if (summary == null) {
                                         loggerMaker.debugAndAddToDb("Skipping because some other thread picked it up, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
                                         return;
@@ -766,6 +776,7 @@ public class Main {
 
                                 int countFailedSummaries = (int) TestingRunResultSummariesDao.instance.count(filterCountFailed);
                                 Bson updateForSummary = Updates.set(TestingRunResultSummary.STATE, State.FAILED);
+                                String customMessage = "No executions made for this test, will need to restart it, TRR_ID: " + testingRun.getHexId() + " TRRS_ID: " + testingRunResultSummary.getHexId();
 
                                 if(countFailedSummaries >= (MAX_RETRIES_FOR_FAILED_SUMMARIES - 1)){
                                     updateForSummary = Updates.combine(
@@ -774,6 +785,9 @@ public class Main {
                                     );
                                     loggerMaker.infoAndAddToDb("Max retries level reached for TRR_ID: " + testingRun.getHexId(), LogDb.TESTING);
                                     maxRetriesReached = true;
+                                    customMessage += " Max retries level reached";
+                                }else{
+                                    customMessage += " Max retries level not reached, count failed summaries: " + countFailedSummaries;
                                 }
                                 TestingRunResultSummary summary = TestingRunResultSummariesDao.instance.updateOneNoUpsert(
                                     Filters.and(
@@ -781,6 +795,7 @@ public class Main {
                                         Filters.eq(TestingRunResultSummary.STATE, State.RUNNING)
                                     ), updateForSummary
                                 );
+                                sendSlackAlertForFailedTest(accountId, customMessage);
                                 if (summary == null) {
                                     loggerMaker.debugAndAddToDb("Skipping because some other thread picked it up, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
                                     return;
@@ -826,11 +841,6 @@ public class Main {
                     RequiredConfigs.initiate();
                     int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
                     
-                    if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) && !isTestingRunForDemoCollection(testingRun)) {
-                        CustomTextAlert customTextAlert = new CustomTextAlert("Test started: accountId=" + Context.accountId.get() + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " time=" + maxRunTime);
-                        SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
-                    }
-
                     if(!maxRetriesReached){
                         // init producer and the consumer here
                         // producer for testing is currently calls init functions from test-executor
@@ -847,15 +857,6 @@ public class Main {
                     loggerMaker.errorAndAddToDb(e, "Error in init " + e);
                 }
                 testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId);
-                if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) && !isTestingRunForDemoCollection(testingRun)) {
-                    try {
-                        CustomTextAlert customTextAlert = new CustomTextAlert("Test completed for accountId=" + accountId + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " : @Arjun you are up now. Make your time worth it. :)");
-                        SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
-                    } catch (Exception e) {
-                        loggerMaker.error("Error sending slack alert for completion of test", e);
-                    }
-                    
-                }
                 /*
                  * In case the testing run results start overflowing
                  * due to being a capped collection,

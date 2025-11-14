@@ -13,7 +13,7 @@ import transform from './customDiffEditor';
 
 function SampleDataComponent(props) {
 
-    const { type, sampleData, minHeight, showDiff, isNewDiff, metadata } = props;
+    const { type, sampleData, minHeight, showDiff, isNewDiff, metadata, readOnly = false, getEditorData = () => {}, showResponse = true } = props;
     const [sampleJsonData, setSampleJsonData] = useState({ request: { message: "" }, response: { message: "" } });
     const [popoverActive, setPopoverActive] = useState({});
     const [lineNumbers, setLineNumbers] = useState({request: [], response: []})
@@ -24,6 +24,7 @@ function SampleDataComponent(props) {
     const ref = useRef(null)
 
     useEffect(()=>{
+
         let parsed;
         try{
           parsed = JSON.parse(sampleData?.message)
@@ -33,8 +34,7 @@ function SampleDataComponent(props) {
         if (parsed?.ip != null && parsed?.destIp != null) {
             setIpObj({sourceIP: parsed?.ip, destIP: parsed?.destIp})
         }
-        
-        let responseJson = func.responseJson(parsed, sampleData?.highlightPaths || [], metadata)
+        let responseJson = showResponse ? func.responseJson(parsed, sampleData?.highlightPaths || [], metadata) : {}
         let requestJson = func.requestJson(parsed, sampleData?.highlightPaths || [], metadata)
 
         let responseTime = parsed?.responseTime;
@@ -48,6 +48,10 @@ function SampleDataComponent(props) {
         }
         let originalResponseJson = func.responseJson(originalParsed, sampleData?.highlightPaths || [])
         let originalRequestJson = func.requestJson(originalParsed, sampleData?.highlightPaths || [])
+
+        // --- PATCH: propagate vulnerabilitySegments from sampleData to both request and response ---
+        // This ensures SampleData receives the correct segments for highlighting
+        const vulnerabilitySegments = sampleData?.vulnerabilitySegments || [];
 
         if(isNewDiff){
             let lineReqObj = transform.getFirstLine(originalRequestJson?.firstLine,requestJson?.firstLine)
@@ -64,12 +68,12 @@ function SampleDataComponent(props) {
 
             setSampleJsonData({
                 request: requestData,
-                response: { ...responseData, vulnerabilitySegments: sampleData?.vulnerabilitySegments }
+                response: { ...responseData, vulnerabilitySegments }
             })
         }else{
             setSampleJsonData({ 
                 request: { message: transform.formatData(requestJson,"http"), original: transform.formatData(originalRequestJson,"http"), highlightPaths:requestJson?.highlightPaths }, 
-                response: { message: transform.formatData(responseJson,"http"), original: transform.formatData(originalResponseJson,"http"), highlightPaths:responseJson?.highlightPaths, vulnerabilitySegments: sampleData?.vulnerabilitySegments },
+                response: showResponse ? { message: transform.formatData(responseJson,"http"), original: transform.formatData(originalResponseJson,"http"), highlightPaths:responseJson?.highlightPaths, vulnerabilitySegments } : {},
             })
         }
       }, [sampleData, metadata])
@@ -177,8 +181,6 @@ function SampleDataComponent(props) {
 
     const getLineNumbers = (linesArr) =>{
         setLineNumbers((prev)=>{
-            // prev[type] = linesArr.slice();
-            // console.log(prev[type].length, type);
             return {...prev, [type]: linesArr.slice()}
         })
     }
@@ -254,7 +256,7 @@ function SampleDataComponent(props) {
                 </Box>
             </LegacyCard.Section>
             <LegacyCard.Section flush>
-                <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} useDynamicHeight={props?.useDynamicHeight || false} showDiff={showDiff} editorLanguage="custom_http" currLine={currentLineActive} getLineNumbers={getLineNumbers}/>
+                {sampleJsonData[type] ? <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} useDynamicHeight={props?.useDynamicHeight || false} showDiff={showDiff} editorLanguage="custom_http" currLine={currentLineActive} getLineNumbers={getLineNumbers} readOnly={readOnly} getEditorData={getEditorData}/> : null}
             </LegacyCard.Section>
         </Box>
     )

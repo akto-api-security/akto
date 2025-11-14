@@ -1,7 +1,6 @@
 package com.akto.action.testing;
 
 import com.akto.action.UserAction;
-import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -16,9 +15,6 @@ import lombok.Getter;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import com.mongodb.ConnectionString;
-import com.akto.DaoInit;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -100,7 +96,8 @@ public class TestResultsStatsAction extends UserAction {
 
             String description = describePattern(resolvedRegex);
 
-            this.count = getCountByPattern(testingRunResultSummaryId, resolvedRegex);
+            this.count = getCountByPattern(testingRunResultSummaryId, resolvedRegex)
+                    + getCountByPatternMultiExecResults(testingRunResultSummaryId, resolvedRegex);
 
             loggerMaker.debugAndAddToDb(
                     "Found " + count + " requests matching " + description + " for test summary: "
@@ -201,6 +198,26 @@ public class TestResultsStatsAction extends UserAction {
         return resultCount;
     }
 
+    private int getCountByPatternMultiExecResults(ObjectId testingRunResultSummaryId, String regex) {
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(Filters.and(
+                        Filters.eq("testRunResultSummaryId", testingRunResultSummaryId),
+                        Filters.eq("vulnerable", false),
+                        Filters.exists("testResults.nodeResultMap.x1.message", true))));
+        pipeline.add(Aggregates.sort(Sorts.descending("endTimestamp")));
+        pipeline.add(Aggregates.limit(10000));
+        pipeline.add(Aggregates.match(Filters.regex("testResults.nodeResultMap.x1.message", regex, "i")));
+        pipeline.add(Aggregates.count("count"));
+        MongoCursor<BasicDBObject> cursor = TestingRunResultDao.instance.getMCollection()
+                .aggregate(pipeline, BasicDBObject.class).cursor();
+        int resultCount = 0;
+        if (cursor.hasNext()) {
+            BasicDBObject result = cursor.next();
+            resultCount = result.getInt("count", 0);
+        }
+        cursor.close();
+        return resultCount;
+    }
 
     private void explainAggregationPipeline(List<Bson> pipeline) {
         try {

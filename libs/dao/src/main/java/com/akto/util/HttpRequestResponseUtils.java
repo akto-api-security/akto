@@ -40,6 +40,9 @@ public class HttpRequestResponseUtils {
     public static final String TEXT_EVENT_STREAM_CONTENT_TYPE = "text/event-stream";
     public static final String CONTENT_TYPE = "CONTENT-TYPE";
     public static final String APPLICATION_JSON = "application/json";
+    public static final String APPLICATION_XML = "application/xml";
+    public static final String APPLICATION_SOAP_XML = "application/soap+xml";
+
     public static final String HEADER_ACCEPT = "accept";
 
     public static List<SingleTypeInfo> generateSTIsFromPayload(int apiCollectionId, String url, String method,String body, int responseCode) {
@@ -332,5 +335,28 @@ public class HttpRequestResponseUtils {
             decryptedMap.put("payload", decodedString);
         }
         return decryptedMap;
-    } 
+    }
+
+    /**
+     * Get header value from headers map using case-insensitive comparison
+     * @param headers The headers map
+     * @param headerName The header name to search for
+     * @return The first value of the header if found, null otherwise
+     */
+    public static String getHeaderValue(Map<String, List<String>> headers, String headerName) {
+        if (headers == null || headers.isEmpty() || headerName == null) {
+            return null;
+        }
+
+        for (String key : headers.keySet()) {
+            if (key != null && key.equalsIgnoreCase(headerName)) {
+                List<String> values = headers.get(key);
+                if (values != null && !values.isEmpty()) {
+                    return values.get(0);
+                }
+            }
+        }
+
+        return null;
+    }
 }

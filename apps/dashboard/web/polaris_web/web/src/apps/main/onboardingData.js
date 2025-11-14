@@ -404,6 +404,10 @@ const learnMoreObject = {
                 content:"How to configure Threat Actor",
                 value:"https://docs.akto.io/api-protection/concepts/threat-actors"
             },
+            {
+                content: "How to configure Dynamic Rate Limits",
+                value: "https://docs.akto.io/api-protection/concepts/api-rate-limit"
+            }
         ],
     },
     dashboard_settings_tags:{
@@ -707,6 +711,22 @@ const learnMoreObject = {
             }
         ]
     },
+    dashboard_protection_configure_exploits: {
+        docsLink: [
+            {
+                content: "How to configure Successful Exploits",
+                value: "https://docs.akto.io/api-protection/concepts/successful-exploits"
+            }
+        ]
+    },
+    dashboard_protection_configure_ignored_events: {
+        docsLink: [
+            {
+                content: "How to configure Ignored Events",
+                value: "https://docs.akto.io/api-protection/concepts/threat-ignored-events"
+            }
+        ]
+    }
 }
 
 export { HOMEDASHBOARD_VIDEO_LENGTH, HOMEDASHBOARD_VIDEO_URL, HOMEDASHBOARD_VIDEO_THUMBNAIL,

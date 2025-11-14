@@ -28,6 +28,10 @@ public class Constants {
     public static final String P90_CACHE_KEY = "p90";
     public static final String MAX_REQUESTS_CACHE_KEY= "max_requests";
 
+    // Threat module constants
+    public static final String THREAT_PROTECTION_SUCCESSFUL_EXPLOIT_CATEGORY = "SuccessfulExploit";
+    public static final String THREAT_PROTECTION_IGNORED_EVENTS_CATEGORY = "IgnoredEvent";
+
     public static final String AWS_ACCOUNT_ID = "AWS_ACCOUNT_ID";
 
     public static final int ONE_MONTH_TIMESTAMP = (60 * 60 * 24 * 30) ;
@@ -58,12 +62,14 @@ public class Constants {
     public static final String UNDERSCORE = "_";
     public static final String AKTO_AGENT_NAME = "AKTO-AI-agents";
     public static final Model AKTO_AGENT_MODEL = new Model(AKTO_AGENT_NAME, ModelType.AZURE_OPENAI, new HashMap<>());
+    public static final String AGENT_BASE_URL = StringUtils.hasLength(System.getenv("AGENT_BASE_URL")) ? System.getenv("AGENT_BASE_URL") : "http://localhost:5500";
 
     public final static String _AKTO = "AKTO";
 
     public final static String DEFAULT_AKTO_DASHBOARD_URL = "https://app.akto.io";
     public static final String AKTO_DISCOVERED_APIS_COLLECTION = "shadow_apis";
     public static final String AKTO_MCP_SERVER_TAG = "mcp-server";
+    public static final String AKTO_DAST_TAG = "dast";
     public static final String AKTO_GEN_AI_TAG = "gen-ai";
     public static final String AKTO_GUARD_RAIL_TAG = "guard-rail";
     public static final String AKTO_MCP_TOOLS_TAG = "mcp-tool";

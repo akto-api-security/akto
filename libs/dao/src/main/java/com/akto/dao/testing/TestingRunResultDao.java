@@ -70,10 +70,6 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         );
     }
 
-    public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters) {
-        return fetchLatestTestingRunResult(filters, 10_000);
-    }
-
     private Bson getLatestTestingRunResultProjections() {
         return Projections.include(
                 TestingRunResult.TEST_RUN_ID,
@@ -96,7 +92,7 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                 getLatestTestingRunResultProjections()
             );
 
-        return fetchLatestTestingRunResult(filters, limit, 0, Arrays.asList(Aggregates.project(projections)));
+        return fetchLatestTestingRunResult(filters, limit, 0, Arrays.asList(Aggregates.project(projections)), false);
     }
 
     public List<TestingRunResult> fetchLatestTestingRunResultWithCustomAggregations(Bson filters, int limit, int skip, Bson customSort) {
@@ -120,23 +116,25 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                 ))
         );
 
-        return fetchLatestTestingRunResult(filters, limit, skip, Arrays.asList(Aggregates.project(projections), addSeverityValueStage, customSort));
+        return fetchLatestTestingRunResult(filters, limit, skip, Arrays.asList(Aggregates.project(projections), addSeverityValueStage, customSort), true);
     }
 
-    public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit, int skip, List<Bson> customAggregation) {
+    public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit, int skip, List<Bson> customAggregation, boolean skipCollectionFilter) {
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(filters));
-        try {
-            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if (collectionIds != null) {
-                pipeline.add(Aggregates.match(Filters.in(getFilterKeyString(), collectionIds)));
+        if (!skipCollectionFilter) {
+            try {
+                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+                if (collectionIds != null) {
+                    pipeline.add(Aggregates.match(Filters.in(getFilterKeyString(), collectionIds)));
+                }
+            } catch (Exception e) {
             }
-        } catch (Exception e) {
         }
         pipeline.add(Aggregates.sort(Sorts.descending(Constants.ID)));
+        pipeline.addAll(customAggregation);
         pipeline.add(Aggregates.skip(skip));
         pipeline.add(Aggregates.limit(limit));
-        pipeline.addAll(customAggregation);
         MongoCursor<BasicDBObject> cursor = this.getMCollection()
                 .aggregate(pipeline, BasicDBObject.class).cursor();
         List<TestingRunResult> testingRunResults = new ArrayList<>();
@@ -325,11 +323,11 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
             // Fail count: vulnerable  
             Accumulators.sum("failCount", new BasicDBObject("$cond", Arrays.asList(
                 new BasicDBObject("$eq", Arrays.asList("$vulnerable", true)), 1, 0))),
-            // Skip detection: check if errorsList exists and has elements
+            // Skip detection: check if testResults.errors exists and has elements
             Accumulators.sum("skipCount", new BasicDBObject("$cond", Arrays.asList(
                 new BasicDBObject("$and", Arrays.asList(
-                    new BasicDBObject("$isArray", "$errorsList"),
-                    new BasicDBObject("$gt", Arrays.asList(new BasicDBObject("$size", "$errorsList"), 0))
+                    new BasicDBObject("$isArray", "$testResults.errors"),
+                    new BasicDBObject("$gt", Arrays.asList(new BasicDBObject("$size", "$testResults.errors"), 0))
                 )), 1, 0)))
         ));
         
@@ -356,8 +354,9 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
             
             while (cursor.hasNext()) {
                 BasicDBObject result = cursor.next();
+                String categoryName = result.getString("categoryName");
                 Map<String, Object> categoryScore = new HashMap<>();
-                categoryScore.put("categoryName", result.getString("categoryName"));
+                categoryScore.put("categoryName", categoryName);
                 categoryScore.put("pass", result.getInt("passCount", 0));
                 categoryScore.put("fail", result.getInt("failCount", 0));
                 categoryScore.put("skip", result.getInt("skipCount", 0));
@@ -367,5 +366,6 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         
         return results;
     }
+
 
 }
