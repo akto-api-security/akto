@@ -9,8 +9,7 @@ import org.json.JSONObject;
 
 import com.mongodb.BasicDBObject;
 
-public class TestExecutorModifier extends PromptHandler {
-
+public class TestExecutorModifier extends AzureOpenAIPromptHandler {
 
     private static final LoggerMaker logger = new LoggerMaker(TestExecutorModifier.class, LogDb.TESTING);
     static final int MAX_QUERY_LENGTH = 100000;
@@ -81,6 +80,10 @@ public class TestExecutorModifier extends PromptHandler {
             .append("- Example: { \"delete_body_param\": \"param1\" }\n")
             .append("- Example: { \"modify_header\": {\"header1\": \"value1\"} }\n")
             .append("- Example: { \"modify_url\": \"https://example.com/product?id=5 OR 1=1\" }\n")
+            .append("- Example: { \"add_header\": {\"key\": \"value1\"} }\n")
+            .append("- Example: { \"add_body_param\": {\"key\": \"value1\"} }\n")
+            .append("- Give preference to the operation given in the prompt, but not strictly as operation can be of modify nature but key would not be there to modify in the api request shared to you, be intelligent about the operations to be performed.\n")
+            .append("- Check the key location for choosing the operation to be performed, if key belongs to headers, then choose the operation from the list of operations given for headers, if key belongs to body, then choose the operation from the list of operations given for body, if key belongs to url, then choose the operation from the list of operations given for url, if key belongs to query params, then choose the operation from the list of operations given for query params.\n")
             .append("- Example: { \"modify_body_param\": {\"key\": \"value1\"} }\n")
             .append("- Return ONLY the JSON or " + _NOT_FOUND + " — nothing else.");
         return promptBuilder.toString();

@@ -3989,6 +3989,51 @@ public class ClientActor extends DataActor {
         return null;
     }
 
+    @Override
+    public String getLLMResponseV2(JSONObject promptPayload) {
+        try {
+            JSONObject requestJson = new JSONObject();
+            requestJson.put("llmPayload", promptPayload);
+
+            OriginalHttpRequest request = new OriginalHttpRequest(
+                url + "/getLLMResponseV2",
+                "",
+                "POST",
+                requestJson.toString(),
+                buildHeaders(),
+                ""
+            );
+
+            loggerMaker.debug("Sending request to LLM server: {}", requestJson);
+
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+
+            if (response == null) {
+                loggerMaker.errorAndAddToDb("Response object is null from LLM server", LoggerMaker.LogDb.TESTING);
+                return null;
+            }
+
+            String responsePayload = response.getBody();
+
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("Non-2xx response in getLLMResponse: " + response.getStatusCode(), LoggerMaker.LogDb.TESTING);
+                return null;
+            }
+
+            if (responsePayload == null || responsePayload.trim().isEmpty()) {
+                loggerMaker.errorAndAddToDb("Empty or null response body from LLM server", LoggerMaker.LogDb.TESTING);
+                return null;
+            }
+
+            loggerMaker.debug("Received response from LLM server: {}", responsePayload);
+            return responsePayload;
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Exception in getLLMResponse." , LoggerMaker.LogDb.TESTING);
+        }
+        return null;
+    }
+
     public List<SlackWebhook> fetchSlackWebhooks() {
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/getSlackWebhooks", "", "POST",  "", headers, "");

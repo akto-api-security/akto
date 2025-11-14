@@ -17,9 +17,9 @@ public abstract class PromptHandler {
 
     private static final LoggerMaker logger = new LoggerMaker(PromptHandler.class, LogDb.TESTING);
     private static final String OLLAMA_MODEL = "llama3:8b";
-    private static final Double temperature = 0.1;
-    private static final int max_tokens = 4000;
-    private static final Object llmLock = new Object();
+    static final Double temperature = 0.1;
+    static final int max_tokens = 10000;
+    static final Object llmLock = new Object();
     private static final int CHUNK_SIZE = 10000;
     private static final String CONTEXT_DELIMITER = "****";
 
