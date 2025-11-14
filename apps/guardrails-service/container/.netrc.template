@@ -1,0 +1,3 @@
+machine github.com
+login x-access-token
+password YOUR_GITHUB_TOKEN_HERE
