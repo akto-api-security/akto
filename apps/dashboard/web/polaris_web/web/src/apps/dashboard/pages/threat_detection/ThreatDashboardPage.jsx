@@ -1,6 +1,6 @@
 import React, { useEffect, useReducer, useState, useCallback } from 'react'
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
-import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Text, VerticalStack, Badge } from '@shopify/polaris';
+import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Text, VerticalStack, Badge, Checkbox, Button, Popover, ActionList } from '@shopify/polaris';
 import SummaryCard from '../dashboard/new_components/SummaryCard';
 import { ArrowUpMinor, ArrowDownMinor } from '@shopify/polaris-icons';
 import InfoCard from '../dashboard/new_components/InfoCard';
@@ -21,6 +21,9 @@ import api from './api';
 
 function ThreatDashboardPage() {
     const [loading, setLoading] = useState(true);
+    const [status, setStatus] = useState(''); // Default: show all
+    const [onlySuccessfulExploits, setOnlySuccessfulExploits] = useState(false); // Default: show all
+    const [statusPopoverActive, setStatusPopoverActive] = useState(false);
     
     // Summary metrics state
     const [summaryMetrics, setSummaryMetrics] = useState({
@@ -64,7 +67,7 @@ function ThreatDashboardPage() {
             // Row 1: Summary metrics - Use getDailyThreatActorsCount API
             let summaryResponse = null
             try {
-                summaryResponse = await api.getDailyThreatActorsCount(startTimestamp, endTimestamp, [])
+                summaryResponse = await api.getDailyThreatActorsCount(startTimestamp, endTimestamp, [], onlySuccessfulExploits, status)
                 if (summaryResponse) {
                     // Use actorsCounts latest entry for active actors similar to ThreatSummary.jsx
                     let activeActorsValue = summaryResponse.totalActive || 0
@@ -135,7 +138,7 @@ function ThreatDashboardPage() {
 
             // Severity Distribution - Use API
             try {
-                const severityResponse = await api.fetchCountBySeverity(startTimestamp, endTimestamp)
+                const severityResponse = await api.fetchCountBySeverity(startTimestamp, endTimestamp, [], onlySuccessfulExploits, status)
                 
                 if (severityResponse?.categoryCounts && Array.isArray(severityResponse.categoryCounts)) {
                     const categoryCounts = severityResponse.categoryCounts
@@ -187,7 +190,7 @@ function ThreatDashboardPage() {
 
             // Row 4: Top Attacked Hosts and APIs via common API
             try {
-                const topResponse = await api.fetchThreatTopNData(startTimestamp, endTimestamp, [], 5)
+                const topResponse = await api.fetchThreatTopNData(startTimestamp, endTimestamp, [], 5, onlySuccessfulExploits, status)
                 if (topResponse?.topApis && Array.isArray(topResponse.topApis)) {
                     setTopAttackedApis(topResponse.topApis)
                 } else {
@@ -218,7 +221,7 @@ function ThreatDashboardPage() {
         } finally {
             setLoading(false)
         }
-    }, [startTimestamp, endTimestamp])
+    }, [startTimestamp, endTimestamp, onlySuccessfulExploits, status])
 
 
     useEffect(() => {
@@ -300,6 +303,8 @@ function ThreatDashboardPage() {
         <ThreatSankeyChart
             startTimestamp={startTimestamp}
             endTimestamp={endTimestamp}
+            successfulExploit={onlySuccessfulExploits}
+            status={status}
         />
     )
 
@@ -308,6 +313,8 @@ function ThreatDashboardPage() {
         <ThreatWorldMap
             startTimestamp={startTimestamp}
             endTimestamp={endTimestamp}
+            successfulExploit={onlySuccessfulExploits}
+            status={status}
             style={{
                 width: "100%",
                 marginRight: "auto",
@@ -447,7 +454,12 @@ function ThreatDashboardPage() {
 
     // Row 3: Stacked category breakdown (uses same API as Sankey)
     const row3Cards = (
-        <ThreatCategoryStackedChart startTimestamp={startTimestamp} endTimestamp={endTimestamp} />
+        <ThreatCategoryStackedChart 
+            startTimestamp={startTimestamp} 
+            endTimestamp={endTimestamp} 
+            successfulExploit={onlySuccessfulExploits}
+            status={status}
+        />
     )
 
     const dashboardRows = [
@@ -482,7 +494,64 @@ function ThreatDashboardPage() {
                     }
                     isFirstPage={true}
                     components={pageContent}
-                    primaryAction={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
+                    primaryAction={
+                        <HorizontalStack gap="4" align="end">
+                            <Button
+                                pressed={onlySuccessfulExploits}
+                                onClick={() => setOnlySuccessfulExploits(!onlySuccessfulExploits)}
+                            >
+                                Only successful Attacks
+                            </Button>
+                            <Popover
+                                active={statusPopoverActive}
+                                activator={
+                                    <Button onClick={() => setStatusPopoverActive(!statusPopoverActive)} disclosure>
+                                        {status === '' ? 'All Statuses' : status === 'ACTIVE' ? 'Active' : status === 'UNDER_REVIEW' ? 'Under Review' : 'Ignored'}
+                                    </Button>
+                                }
+                                onClose={() => setStatusPopoverActive(false)}
+                            >
+                                <Popover.Pane>
+                                    <ActionList
+                                        items={[
+                                            {
+                                                content: 'All Statuses',
+                                                onAction: () => {
+                                                    setStatus('');
+                                                    setStatusPopoverActive(false);
+                                                }
+                                            },
+                                            {
+                                                content: 'Active',
+                                                onAction: () => {
+                                                    setStatus('ACTIVE');
+                                                    setStatusPopoverActive(false);
+                                                }
+                                            },
+                                            {
+                                                content: 'Under Review',
+                                                onAction: () => {
+                                                    setStatus('UNDER_REVIEW');
+                                                    setStatusPopoverActive(false);
+                                                }
+                                            },
+                                            {
+                                                content: 'Ignored',
+                                                onAction: () => {
+                                                    setStatus('IGNORED');
+                                                    setStatusPopoverActive(false);
+                                                }
+                                            }
+                                        ]}
+                                    />
+                                </Popover.Pane>
+                            </Popover>
+                            <DateRangeFilter
+                                initialDispatch={currDateRange}
+                                dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })}
+                            />
+                        </HorizontalStack>
+                    }
                 />
             }
         </Box>

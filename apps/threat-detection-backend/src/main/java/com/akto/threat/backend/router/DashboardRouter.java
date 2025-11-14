@@ -384,7 +384,9 @@ public class DashboardRouter implements ARouter {
                         ctx.get("accountId"),
                         req.getStartTs(),
                         req.getEndTs(),
-                        req.getLatestAttackList()
+                        req.getLatestAttackList(),
+                        req.hasSuccessfulExploit() ? req.getSuccessfulExploit() : null,
+                        req.hasStatus() && !req.getStatus().isEmpty() ? req.getStatus() : null
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
@@ -410,7 +412,9 @@ public class DashboardRouter implements ARouter {
                         ctx.get("accountId"),
                         req.getStartTs(),
                         req.getEndTs(),
-                        req.getLatestAttackList()
+                        req.getLatestAttackList(),
+                        req.hasSuccessfulExploit() ? req.getSuccessfulExploit() : null,
+                        req.hasStatus() && !req.getStatus().isEmpty() ? req.getStatus() : null
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
@@ -539,7 +543,9 @@ public class DashboardRouter implements ARouter {
                         req.getStartTs(),
                         req.getEndTs(),
                         req.getLatestAttackList(),
-                        req.getLimit()
+                        req.getLimit(),
+                        req.hasSuccessfulExploit() ? req.getSuccessfulExploit() : null,
+                        req.hasStatus() && !req.getStatus().isEmpty() ? req.getStatus() : null
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
