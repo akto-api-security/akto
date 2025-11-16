@@ -29,7 +29,14 @@ public abstract class AzureOpenAIPromptHandler {
             validate(queryData);
             String prompt = getPrompt(queryData);
             String rawResponse = call(prompt);
-            BasicDBObject resp = processResponse(rawResponse);
+            // Extract content from Azure OpenAI response format
+            JSONObject jsonResponse = new JSONObject(rawResponse);
+            JSONArray choices = jsonResponse.getJSONArray("choices");
+            JSONObject firstChoice = choices.getJSONObject(0);
+            JSONObject message = firstChoice.getJSONObject("message");
+            String content = message.getString("content");
+            String cleanJson = cleanJSON(content);
+            BasicDBObject resp = processResponse(cleanJson);
             return resp;
         } catch (ValidationException exception) {
             logger.error("Validation error: " + exception.getMessage());
@@ -67,7 +74,7 @@ public abstract class AzureOpenAIPromptHandler {
         
         payload.put("messages", messages);
         synchronized (PromptHandler.llmLock) {
-            return DataActorFactory.fetchInstance().getLLMPromptResponse(payload);
+            return DataActorFactory.fetchInstance().getLLMResponseV2(payload);
         }
     }
     
