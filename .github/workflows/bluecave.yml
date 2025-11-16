@@ -1,0 +1,41 @@
+name: Blue Cave
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  bluecave-report:
+    runs-on: ubuntu-22.04
+    if: (github.actor != 'dependabot[bot]')
+    permissions:
+      contents: read
+    steps:
+      - name: Setup Bolt
+        uses: koalalab-inc/bolt@v1
+
+      - uses: actions/checkout@v2
+      - uses: actions/setup-java@v2
+        with:
+          distribution: "adopt"
+          java-version: "8"
+          architecture: x64
+      - name: Setup Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "29.2"
+      - uses: bufbuild/buf-action@v1
+        with:
+          setup_only: true
+
+      - name: Run Tests
+        run: mvn --no-transfer-progress -B test
+
+      - name: Analyze and Report Coverage to Blue Cave
+        continue-on-error: true
+        env:
+          BLUECAVE_TOKEN: ${{ secrets.BLUECAVE_TOKEN }}
+          PR_SHA: ${{ github.event.pull_request.head.sha }}
+        run: mvn -B bluecave:report

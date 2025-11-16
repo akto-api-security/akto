@@ -42,7 +42,11 @@
 
     <build>
         <plugins>
-
+            <plugin>
+                <groupId>io.bluecave</groupId>
+                <artifactId>bluecave-maven-plugin</artifactId>
+                <version>0.1.3</version>
+            </plugin>
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>flatten-maven-plugin</artifactId>
@@ -94,8 +98,8 @@
 					</execution>
 					<execution>
 						<id>report</id>
-						<phase>prepare-package</phase>
-						<goals>
+                        <phase>prepare-package</phase>
+                        <goals>
 							<goal>report</goal>
 						</goals>
 					</execution>
