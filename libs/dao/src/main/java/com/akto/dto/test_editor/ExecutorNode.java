@@ -62,6 +62,7 @@ public class ExecutorNode {
     public String fetchConditionalString(String key) {
         ObjectMapper m = new ObjectMapper();
         String str = "";
+        Object obj = null;
         try {
             Map<String,Object> mapValues = m.convertValue(this.getValues(), Map.class);
             str = (String) mapValues.get(key);
@@ -70,9 +71,9 @@ public class ExecutorNode {
                 List<Object> listValues = (List<Object>) this.getValues();
                 for (int i = 0; i < listValues.size(); i++) {
                     Map<String,Object> mapValues = m.convertValue(listValues.get(i), Map.class);
-                    str = (String) mapValues.get(key);
-                    if (str != null) {
-                        break;
+                    obj = mapValues.get(key);
+                    if (obj != null) {
+                        str = obj.toString();
                     }
                 }
             } catch (Exception er) {

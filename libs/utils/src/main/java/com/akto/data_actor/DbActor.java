@@ -640,6 +640,12 @@ public class DbActor extends DataActor {
     }
 
     @Override
+    public String getLLMResponseV2(JSONObject promptPayload) {
+        // no implementation needed.
+        return null;
+    }
+
+    @Override
     public void updateModuleInfo(ModuleInfo moduleInfo) {
     }
 

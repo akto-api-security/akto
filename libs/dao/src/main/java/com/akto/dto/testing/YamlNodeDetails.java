@@ -37,8 +37,8 @@ public class YamlNodeDetails extends WorkflowNodeDetails {
 
     public YamlNodeDetails(String testId, FilterNode validatorNode, ExecutorNode executorNode, 
             List<CustomAuthType> customAuthTypes, AuthMechanism authMechanism, 
-            RawApi rawApi, ApiInfoKey apiInfoKey, String originalMessage, String success, String failure) {
-        super(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod(), "", null, WorkflowNodeDetails.Type.API, false, 0, 0, 0, "", "");
+            RawApi rawApi, ApiInfoKey apiInfoKey, String originalMessage, String success, String failure, int wait) {
+        super(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod(), "", null, WorkflowNodeDetails.Type.API, false, wait, 0, 0, "", "");
         this.testId = testId;
         this.validatorNode = validatorNode;
         this.executorNode = executorNode;

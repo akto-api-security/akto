@@ -5,16 +5,24 @@ import java.util.List;
 import java.util.Map;
 
 import com.akto.dao.test_editor.TestEditorEnums;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.api_workflow.Node;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.testing.*;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.test_editor.execution.Memory;
 import com.akto.test_editor.filter.Filter;
 
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
 public class ConditionalGraphExecutor extends GraphExecutor {
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ConditionalGraphExecutor.class, LogDb.TESTING);
     
     public GraphExecutorResult executeGraph(GraphExecutorRequest graphExecutorRequest, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
 
@@ -32,6 +40,19 @@ public class ConditionalGraphExecutor extends GraphExecutor {
         boolean success = false;
 
         WorkflowTestResult.NodeResult nodeResult;
+        try {
+            int waitInSeconds = node.getWaitInSeconds();
+            if (waitInSeconds > 0) {
+                if (waitInSeconds > 100) {
+                    waitInSeconds = 100;
+                }
+                loggerMaker.infoAndAddToDb("encountered sleep command in node " + node.getId() + " sleeping for " + waitInSeconds + " seconds");
+                Thread.sleep(waitInSeconds * 1000);
+            }
+        } catch (Exception e) {
+            // TODO: handle exception
+        }
+
         nodeResult = Utils.executeNode(node, graphExecutorRequest.getValuesMap(), debug, testLogs, memory);
 
         graphExecutorRequest.getWorkflowTestResult().getNodeResultMap().put(node.getId(), nodeResult);

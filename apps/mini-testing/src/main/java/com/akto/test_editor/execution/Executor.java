@@ -345,6 +345,12 @@ public class Executor {
 
             String successNodeId = reqNode.fetchConditionalString("success");
             String failureNodeId = reqNode.fetchConditionalString("failure");
+            String waitInSecondsStr = reqNode.fetchConditionalString("wait");
+            int waitInSeconds = 0;
+            try {
+                waitInSeconds = Integer.parseInt(waitInSecondsStr);
+            } catch (Exception e) {
+            }
 
             if (testId != null) {
                 JSONObject json = new JSONObject() ;
@@ -354,10 +360,10 @@ public class Executor {
                 json.put("requestHeaders", rawApi.getRequest().getHeaders().toString());
                 json.put("type", "");
                 
-                YamlNodeDetails yamlNodeDetails = new YamlNodeDetails(testId, null, reqNode, customAuthTypes, authMechanism, rawApi, apiInfoKey, rawApi.getOriginalMessage(), successNodeId, failureNodeId);
+                YamlNodeDetails yamlNodeDetails = new YamlNodeDetails(testId, null, reqNode, customAuthTypes, authMechanism, rawApi, apiInfoKey, rawApi.getOriginalMessage(), successNodeId, failureNodeId, waitInSeconds);
                 mapNodeIdToWorkflowNodeDetails.put(source, yamlNodeDetails);
             } else {
-                YamlNodeDetails yamlNodeDetails = new YamlNodeDetails(null, validatorNode, reqNode, customAuthTypes, authMechanism, rawApi, apiInfoKey, rawApi.getOriginalMessage(), successNodeId, failureNodeId);
+                YamlNodeDetails yamlNodeDetails = new YamlNodeDetails(null, validatorNode, reqNode, customAuthTypes, authMechanism, rawApi, apiInfoKey, rawApi.getOriginalMessage(), successNodeId, failureNodeId, waitInSeconds);
                 mapNodeIdToWorkflowNodeDetails.put(source, yamlNodeDetails);
             }
 
@@ -481,39 +487,34 @@ public class Executor {
         List<BasicDBObject> generatedOperationKeyValuePairs = new ArrayList<>();
         if (generatedData.containsKey(operationType)) {
             Object generatedValue = generatedData.get(operationType);
-            if (generatedValue instanceof String) {
-                String generatedKey = generatedValue.toString();
-                generatedOperationKeyValuePairs.add(new BasicDBObject(generatedKey, value));
-            } else if (generatedValue instanceof JSONObject) {
-                JSONObject generatedObj = (JSONObject) generatedValue;
-                for (String k : generatedObj.keySet()) {
-                    generatedOperationKeyValuePairs.add(new BasicDBObject(k, generatedObj.get(k)));
-                }
-            } else if (generatedValue instanceof JSONArray) {
-                JSONArray generatedArray = (JSONArray) generatedValue;
-                for (int i = 0; i < generatedArray.length(); i++) {
-                    Object generatedValueAtIndex = generatedArray.get(i);
-                    if(generatedValueAtIndex instanceof String) {
-                        String generatedKey = generatedValueAtIndex.toString();
-                        generatedOperationKeyValuePairs.add(new BasicDBObject(generatedKey, value));
-                        continue;
-                    } else if (generatedValueAtIndex instanceof JSONObject) {
-                        JSONObject generatedObj = (JSONObject) generatedValueAtIndex;
-                        for (String k : generatedObj.keySet()) {
-                            generatedOperationKeyValuePairs.add(new BasicDBObject(k, generatedObj.get(k)));
-                        }
-                        continue;
-                    }
-                }
-            } else {
-                loggerMaker.errorAndAddToDb("operation " + operationType + " returned unexpected type: " + generatedValue.getClass().getName());
-            }
+            parseGeneratedValueRecursively(generatedValue, generatedOperationKeyValuePairs, value, null);
         } else {
             loggerMaker.errorAndAddToDb("operation " + operationType + " not found in generated response");
         }
         return generatedOperationKeyValuePairs;
     }
 
+    private void parseGeneratedValueRecursively(Object obj, List<BasicDBObject> result, Object value, String parentKey) {
+        if (obj instanceof JSONObject) {
+            JSONObject jsonObject = (JSONObject) obj;
+            for (String key : jsonObject.keySet()) {
+                Object nestedValue = jsonObject.get(key);
+                parseGeneratedValueRecursively(nestedValue, result, value, key);
+            }
+        } else if (obj instanceof JSONArray) {
+            JSONArray jsonArray = (JSONArray) obj;
+            for (int i = 0; i < jsonArray.length(); i++) {
+                Object arrayElement = jsonArray.get(i);
+                parseGeneratedValueRecursively(arrayElement, result, value, null);
+            }
+        } else if (obj instanceof String) {
+            String generatedValue = obj.toString();
+            result.add(new BasicDBObject(parentKey, generatedValue));
+        } else {
+            // For other types, add the key-value pair directly
+            result.add(new BasicDBObject(parentKey, obj.toString()));
+        }
+    }
 
     private static boolean removeAuthIfNotChanged(RawApi originalRawApi, RawApi testRawApi, String authMechanismHeaderKey, List<CustomAuthType> customAuthTypes) {
         boolean removed = false;
