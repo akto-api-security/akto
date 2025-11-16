@@ -298,6 +298,12 @@ public class Executor {
 
             String successNodeId = reqNode.fetchConditionalString("success");
             String failureNodeId = reqNode.fetchConditionalString("failure");
+            String waitInSecondsStr = reqNode.fetchConditionalString("wait");
+            int waitInSeconds = 0;
+            try {
+                waitInSeconds = Integer.parseInt(waitInSecondsStr);
+            } catch (Exception e) {
+            }
 
             if (testId != null) {
                 JSONObject json = new JSONObject() ;
@@ -307,10 +313,10 @@ public class Executor {
                 json.put("requestHeaders", rawApi.getRequest().getHeaders().toString());
                 json.put("type", "");
                 
-                YamlNodeDetails yamlNodeDetails = new YamlNodeDetails(testId, null, reqNode, customAuthTypes, authMechanism, rawApi, apiInfoKey, rawApi.getOriginalMessage(), successNodeId, failureNodeId);
+                YamlNodeDetails yamlNodeDetails = new YamlNodeDetails(testId, null, reqNode, customAuthTypes, authMechanism, rawApi, apiInfoKey, rawApi.getOriginalMessage(), successNodeId, failureNodeId, waitInSeconds);
                 mapNodeIdToWorkflowNodeDetails.put(source, yamlNodeDetails);
             } else {
-                YamlNodeDetails yamlNodeDetails = new YamlNodeDetails(null, validatorNode, reqNode, customAuthTypes, authMechanism, rawApi, apiInfoKey, rawApi.getOriginalMessage(), successNodeId, failureNodeId);
+                YamlNodeDetails yamlNodeDetails = new YamlNodeDetails(null, validatorNode, reqNode, customAuthTypes, authMechanism, rawApi, apiInfoKey, rawApi.getOriginalMessage(), successNodeId, failureNodeId, waitInSeconds);
                 mapNodeIdToWorkflowNodeDetails.put(source, yamlNodeDetails);
             }
 
