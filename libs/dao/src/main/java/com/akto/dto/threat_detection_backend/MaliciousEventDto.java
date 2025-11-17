@@ -68,6 +68,7 @@ public class MaliciousEventDto {
     this.successfulExploit = builder.successfulExploit;
     this.label = builder.label;
     this.host = builder.host;
+    this.metadata = builder.metadata;
     this.jiraTicketUrl = builder.jiraTicketUrl;
   }
 
