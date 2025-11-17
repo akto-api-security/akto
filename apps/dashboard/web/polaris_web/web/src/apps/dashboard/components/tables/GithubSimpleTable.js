@@ -5,8 +5,14 @@ import tableFunc from "./transform";
 function GithubSimpleTable(props) {
 
     const [filters, setFilters] = useState([])
+
+    // OPTIMIZATION: Don't stringify entire dataset - just use data length as key
+    // JSON.stringify on 17k items takes ~1000ms and forces full remount
+    const tableKey = props.hardCodedKey ? "hardCodedKey" : `table_${props.data?.length || 0}`;
+    // console.log("SIMPLE_TABLE_DEBUG: Rendering with key:", tableKey, "data length:", props.data?.length);
+
     return <GithubServerTable
-        key={props.hardCodedKey ? "hardCodedKey" : JSON.stringify(props.data ? props.data : "{}")} // passing any value as a "key" re-renders the component when the value is changed.
+        key={tableKey}
         pageLimit={props.pageLimit}
         fetchData={(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => tableFunc.fetchDataSync(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue, setFilters, props)}
         sortOptions={props.sortOptions} 

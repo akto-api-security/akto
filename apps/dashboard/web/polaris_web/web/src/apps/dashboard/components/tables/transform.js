@@ -1,8 +1,15 @@
 import func from "@/util/func";
 import PersistStore from "../../../main/PersistStore";
+import { times } from "lodash";
+
+// Cache for filter choices to avoid recomputing on every render
+const filterChoicesCache = new Map();
 
 const tableFunc = {
     fetchDataSync: function (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue, setFilters, props){
+        const fetchStartTime = performance.now();
+        console.log(`🔍 [FETCH_PERF] fetchDataSync called with ${props.data?.length} items, skip: ${skip}, limit: ${limit}`);
+
         // Early return for empty data
         if (!props.data || props.data.length === 0) {
             setFilters([]);
@@ -13,44 +20,65 @@ const tableFunc = {
         const actualTotal = props.data._actualTotal;
 
         let localFilters = func.prepareFilters(props.data,props.filters);
-        
-        // Optimize filter generation - cache results if data hasn't changed
-        const dataLength = props.data.length;
-        
-        let filtersFromHeaders = props.headers.filter((header) => {
-          return header.showFilter
-        }).map((header) => {
-          let key = header.filterKey || header.value
-          let label = header.filterLabel || header.text
-          
-          // Use Set for better performance with large datasets
-          let uniqueValues = new Set();
-          
-          for (let i = 0; i < props.data.length; i++) {
-            let value = props.data[i][key];
-            if (value instanceof Set) {
-              value.forEach(v => uniqueValues.add(v));
-            } else if (value instanceof Array) {
-              value.forEach(v => uniqueValues.add(v));
-            } else if (typeof value !== 'undefined') {
-              uniqueValues.add(value);
+
+        // Create cache key based on data length and headers
+        const cacheKey = `${props.data.length}_${props.headers.map(h => h.value).join('_')}`;
+
+        // console.log("TABLE_DEBUG: Building filtersFromHeaders...");
+        const filtersStartTime = performance.now();
+
+        let filtersFromHeaders;
+        if (filterChoicesCache.has(cacheKey)) {
+          console.log(`✅ [FETCH_PERF] Using cached filters`);
+          filtersFromHeaders = filterChoicesCache.get(cacheKey);
+        } else {
+          console.log(`🔨 [FETCH_PERF] Building filters from ${props.data.length} items...`);
+          const filterBuildStart = performance.now();
+
+          filtersFromHeaders = props.headers.filter((header) => {
+            return header.showFilter
+          }).map((header) => {
+            const headerStartTime = performance.now();
+            let key = header.filterKey || header.value
+            let label = header.filterLabel || header.text
+
+            // Use Set for better performance with large datasets
+            let uniqueValues = new Set();
+
+            for (let i = 0; i < props.data.length; i++) {
+              let value = props.data[i][key];
+              if (value instanceof Set) {
+                value.forEach(v => uniqueValues.add(v));
+              } else if (value instanceof Array) {
+                value.forEach(v => uniqueValues.add(v));
+              } else if (typeof value !== 'undefined') {
+                uniqueValues.add(value);
+              }
             }
-          }
-          
-          // Convert to array and sort only once
-          let distinctItems = Array.from(uniqueValues);
-          distinctItems.sort();
-          
-          let choices = distinctItems.map((item) => ({label: item, value: item}));
-          
-          return {
-            key: key,
-            label: label,
-            title: label,
-            choices: choices,
-          };
-        })
-        
+
+            // Convert to array and sort only once
+            let distinctItems = Array.from(uniqueValues);
+            distinctItems.sort();
+
+            let choices = distinctItems.map((item) => ({label: item, value: item}));
+
+            console.log(`   Filter "${key}" took ${(performance.now() - headerStartTime).toFixed(2)}ms`);
+
+            return {
+              key: key,
+              label: label,
+              title: label,
+              choices: choices,
+            };
+          })
+
+          // Cache the result for future calls
+          filterChoicesCache.set(cacheKey, filtersFromHeaders);
+          console.log(`🔨 [FETCH_PERF] All filters built in ${(performance.now() - filterBuildStart).toFixed(2)}ms`);
+        }
+
+        // console.log("TABLE_DEBUG: All filters built in", (performance.now() - filtersStartTime).toFixed(2), "ms");
+
         localFilters = localFilters.concat(filtersFromHeaders)
         localFilters = localFilters.filter((filter) => filter.choices.length > 0)
         setFilters(localFilters);
@@ -71,6 +99,7 @@ const tableFunc = {
           let pageLimit = limit;
           let final2Data = tempData && tempData.length <= pageLimit ? tempData :
           tempData.slice(page * pageLimit, Math.min((page + 1) * pageLimit, tempData.length))
+          // console.log("TABLE_DEBUG: ✅ fetchDataSync completed in", (Date.now()), "ms");
 
           return {value:final2Data,total:tempData.length, fullDataIds: tempData.map((x) => {return {id: x?.id}})}
         }
@@ -125,14 +154,17 @@ const tableFunc = {
         }
 
           // Sort only if we have data and a sort key
+          const sortStart = performance.now();
           if (tempData.length > 0 && dataSortKey) {
+            console.log(`🔄 [FETCH_PERF] Sorting ${tempData.length} items...`);
             tempData = func.sortFunc(tempData, dataSortKey, sortOrder, props?.treeView !== undefined ? true : false)
+            console.log(`🔄 [FETCH_PERF] Sorting took ${(performance.now() - sortStart).toFixed(2)}ms`);
           }
-          
+
           if(props.getFilteredItems){
             props.getFilteredItems(tempData)
           }
-  
+
           let finalData = props.useModifiedData ? props.modifyData(tempData, filters || {}) : tempData
 
           // Optimize pagination calculations
@@ -147,6 +179,9 @@ const tableFunc = {
 
           // Use actualTotal if provided (for memory-optimized large datasets), otherwise use calculated length
           const reportedTotal = actualTotal !== undefined ? actualTotal : totalLength;
+
+          const fetchTotalTime = performance.now() - fetchStartTime;
+          console.log(`✅ [FETCH_PERF] fetchDataSync completed in ${fetchTotalTime.toFixed(2)}ms - returning ${final2Data.length} items`);
 
           return {value: final2Data, total: reportedTotal, fullDataIds: fullDataIds}
     },

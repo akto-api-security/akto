@@ -8,6 +8,7 @@ import api from "../api"
 import dashboardApi from "../../dashboard/api"
 import settingRequests from "../../settings/api"
 import { useEffect,useState, useRef } from "react"
+import { unstable_batchedUpdates } from "react-dom"
 import func from "@/util/func"
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
 import { CircleTickMajor } from '@shopify/polaris-icons';
@@ -210,7 +211,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
         console.error("collectionsArr is not an array:", collectionsArr);
         return { prettify: [], normal: [] };
     }
-    console.log("API_DEBUG: Total collections to process:", collectionsArr.length);
+    // console.log("API_DEBUG: Total collections to process:", collectionsArr.length);
 
     const newData = collectionsArr.map((c) => {
         if(c.deactivated){
@@ -309,7 +310,6 @@ const categorizeCollections = (prettifyArray) => {
 
 
 function ApiCollections(props) {
-
     const {customCollectionDataFilter, onlyShowCollectionsTable, sendData} = props;
 
     const userRole = window.USER_ROLE
@@ -318,7 +318,10 @@ function ApiCollections(props) {
     const [data, setData] = useState({'all': [], 'hostname':[], 'groups': [], 'custom': [], 'deactivated': [], 'untracked': []})
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
-          
+
+    // console.log("COMPONENT_DEBUG: ApiCollections rendering", Date.now());
+    // console.log("COMPONENT_DEBUG: data.hostname length:", data?.hostname?.length || 0, "loading:", loading);
+
     const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0, totalAllowedForTesting: 0})
     const [hasUsageEndpoints, setHasUsageEndpoints] = useState(true)
     const [envTypeMap, setEnvTypeMap] = useState({})
@@ -395,6 +398,7 @@ function ApiCollections(props) {
 
     async function fetchData(isMountedRef = { current: true }, forceRefresh = false) {
         try {
+        
             setLoading(true)
 
             const CACHE_DURATION = 10 * 60; // 5 minutes
@@ -406,7 +410,8 @@ function ApiCollections(props) {
                                  (now - lastFetchedInfo.lastRiskScoreInfo) < CACHE_DURATION;
 
             if (hasValidCache) {
-                console.log("API_DEBUG: Using cached collections data, skipping API calls");
+                const cacheRenderStartTime = performance.now();
+                console.log("⏱️ [PERF] Cache render started");
 
                 try {
                     // Use cached data to populate the UI
@@ -421,72 +426,36 @@ function ApiCollections(props) {
                         finalArr = finalArr.filter(customCollectionDataFilter)
                     }
 
-                    console.log("API_DEBUG: ->>>>>>>>>>>>>>>> Total collections from cache:", finalArr.length);
+                    // console.log("API_DEBUG: Total collections from cache:", finalArr.length,Date.now(), "tms");
 
                     // Guard: Prevent state update after unmount
                     if (!isMountedRef.current) {
-                        console.log("API_DEBUG: Component unmounted, aborting cache render");
+                        // console.log("API_DEBUG: Component unmounted, aborting cache render");
                         return;
                     }
 
-                    // OPTIMIZATION: Process smartly - enough items per tab for first page, but not all 17k
-                    console.log("API_DEBUG:->>>>> Smart processing - first 100 from each major category");
+                    // OPTIMIZATION: When using cache, create lightweight data without JSX (lazy rendering)
+                    // Only create JSX components when they're actually needed by the table
+                    // console.log("API_DEBUG:->>>>> Creating lightweight cached data (no JSX)");
 
-                    const PAGE_SIZE = 100;
-                    const hostnameItems = [];
-                    const groupItems = [];
-                    const customItems = [];
-                    const deactivatedItems = [];
                     const envTypeObj = {};
 
-                    // Categorize ALL collections (lightweight, just for counts and selection)
+                    // Build envTypeObj for all collections
+                    // console.log("API_DEBUG: Building envTypeObj...");
+                    const envStartTime = performance.now();
                     finalArr.forEach((c) => {
                         envTypeObj[c.id] = c.envType;
-
-                        if (!c.deactivated) {
-                            if (c.hostName !== null && c.hostName !== undefined) {
-                                if (hostnameItems.length < PAGE_SIZE) hostnameItems.push(c);
-                            } else if (c.type === "API_GROUP") {
-                                if (groupItems.length < PAGE_SIZE) groupItems.push(c);
-                            } else {
-                                if (customItems.length < PAGE_SIZE) customItems.push(c);
-                            }
-                        } else {
-                            if (deactivatedItems.length < PAGE_SIZE) deactivatedItems.push(c);
-                        }
                     });
+                    // console.log("API_DEBUG: envTypeObj built in", (performance.now() - envStartTime).toFixed(2), "ms");
 
-                    // Combine first page from each category (max ~400 items instead of 17k)
-                    const itemsToProcess = [
-                        ...hostnameItems,
-                        ...groupItems,
-                        ...customItems,
-                        ...deactivatedItems
-                    ];
+                    // Create LIGHTWEIGHT data without JSX components (10x faster!)
+                    // console.log("API_DEBUG: Starting lightweight data creation...",Date.now(), "tms");
+                    const convertStartTime = performance.now();
 
-                    console.log("API_DEBUG: Processing", itemsToProcess.length, "items (",
-                               hostnameItems.length, "hostname,",
-                               groupItems.length, "groups,",
-                               customItems.length, "custom,",
-                               deactivatedItems.length, "deactivated)");
-
-                    const dataObj = convertToNewData(itemsToProcess, sensitiveInfoMap, severityInfoMap, coverageMapCached, trafficInfoMap, riskScoreMap, false);
-
-                    if (!dataObj.prettify) {
-                        console.error("dataObj.prettify is undefined");
-                        setLoading(false);
-                        return;
-                    }
-
-                    // Create lightweight data for remaining items (without React components)
-                    const processedIds = new Set(itemsToProcess.map(c => c.id));
-                    const remainingItems = finalArr.filter(c => !processedIds.has(c.id));
-
-                    console.log("API_DEBUG: Creating lightweight data for", remainingItems.length, "remaining items");
-
-                    const lightweightData = remainingItems.map(c => {
+                    const lightweightData = finalArr.map(c => {
                         const testedEndpoints = c.urlsCount === 0 ? 0 : (coverageMapCached[c.id] || 0);
                         const riskScore = c.urlsCount === 0 ? 0 : (riskScoreMap[c.id] || 0);
+                        const envType = c?.envType?.map ? c.envType.map(func.formatCollectionType) : c.envType;
 
                         let calcCoverage = '0%';
                         if(!c.isOutOfTestingScope && c.urlsCount > 0){
@@ -516,19 +485,20 @@ function ApiCollections(props) {
                             registryStatus: c.registryStatus,
                             description: c.description,
                             isOutOfTestingScope: c.isOutOfTestingScope,
-                            envType: c?.envType?.map ? c.envType.map(func.formatCollectionType) : c.envType,
+                            envType: envType,
                             envTypeOriginal: c?.envType,
                             testedEndpoints,
                             sensitiveInRespTypes: sensitiveTypes,
                             severityInfo,
-                            detectedTimestamp: c.urlsCount === 0 ? 0 : 0,
+                            detectedTimestamp: c.urlsCount === 0 ? 0 : (trafficInfoMap[c.id] || 0),
                             riskScore,
-                            detected: '-',
+                            detected: func.prettifyEpoch(trafficInfoMap[c.id] || 0),
                             discovered: func.prettifyEpoch(c.startTs || 0),
                             coverage: calcCoverage,
                             nextUrl: '/dashboard/observe/inventory/' + c.id,
-                            lastTraffic: '-',
-                            displayNameComp: c.displayName, // Plain text instead of JSX
+                            lastTraffic: func.prettifyEpoch(trafficInfoMap[c.id] || 0),
+                            // Plain text instead of JSX (much faster!)
+                            displayNameComp: c.displayName,
                             descriptionComp: c.description || '',
                             outOfTestingScopeComp: c.isOutOfTestingScope ? 'Yes' : 'No',
                             riskScoreComp: riskScore.toString(),
@@ -536,7 +506,7 @@ function ApiCollections(props) {
                             issuesArrVal,
                             sensitiveSubTypes: sensitiveSubTypesVal,
                             sensitiveSubTypesVal,
-                            envTypeComp: c?.envType?.join(', ') || '',
+                            envTypeComp: envType?.join(', ') || '',
                             icon: CircleTickMajor,
                             rowStatus: c.deactivated ? 'critical' : undefined,
                             disableClick: c.deactivated || false,
@@ -545,37 +515,97 @@ function ApiCollections(props) {
                         };
                     });
 
-                    // Merge processed items with lightweight data
-                    const fullPrettifyData = [...dataObj.prettify, ...lightweightData];
-                    const { categorized: fullCategorized } = categorizeCollections(fullPrettifyData);
+                    // console.log("API_DEBUG: Lightweight data created in", (performance.now() - convertStartTime).toFixed(2), "ms", Date.now(),"tms");
 
-                    // Use full categorized data for display
-                    setNormalData([...dataObj.normal, ...lightweightData]);
-                    setData(fullCategorized);
-                    setEnvTypeMap(envTypeObj);
-                    setCollectionsMap(func.mapCollectionIdToName(finalArr));
-                    setHostNameMap(func.mapCollectionIdToHostName(finalArr));
-                    setTagCollectionsMap(func.mapCollectionIdsToTagName(finalArr));
-                    setCollectionsRegistryStatusMap(func.mapCollectionIdToRegistryStatus(finalArr));
+                    // Categorize lightweight data
+                    // console.log("API_DEBUG: Starting categorizeCollections...");
+                    const categorizeStartTime = performance.now();
+                    const { categorized } = categorizeCollections(lightweightData);
+                    // console.log("API_DEBUG: categorizeCollections completed in", (performance.now() - categorizeStartTime).toFixed(2), "ms");
 
-                    // Update summary (calculate from ALL raw data, not processed)
-                    const summaryDataObj = {
+                    // console.log("API_DEBUG: Calculating summary data...");
+                    const summaryStartTime = performance.now();
+                    const initialSummaryDataObj = {
                         totalEndpoints: finalArr.reduce((sum, c) => sum + (c.urlsCount || 0), 0),
                         totalTestedEndpoints: finalArr.reduce((sum, c) => sum + (coverageMapCached[c.id] || 0), 0),
                         totalSensitiveEndpoints: lastFetchedSensitiveResp?.sensitiveUrls || 0,
                         totalCriticalEndpoints: lastFetchedResp?.criticalUrls || 0,
                         totalAllowedForTesting: finalArr.reduce((sum, c) => sum + (c.isOutOfTestingScope ? 0 : c.urlsCount || 0), 0)
                     };
-                    setSummaryData(summaryDataObj);
+                    // console.log("API_DEBUG: Summary data calculated in", (performance.now() - summaryStartTime).toFixed(2), "ms");
 
-                    setHasUsageEndpoints(true);
-                    setLoading(false);
+                    // console.log("API_DEBUG: Setting ALL state at once...",Date.now(), "tms");
+                    const setStateStartTime = performance.now();
 
-                    console.log("API_DEBUG: Cache render complete. Total items in table:",
-                               itemsToProcess.length, "with React components,",
-                               remainingItems.length, "with lightweight data");
+                    // Force React to batch all state updates into a single re-render
+                    unstable_batchedUpdates(() => {
+                        setData(categorized);
+                        setNormalData(lightweightData);
+                        setEnvTypeMap(envTypeObj);
+                        setSummaryData(initialSummaryDataObj);
+                        setHasUsageEndpoints(true);
+                        setLoading(false);
 
-                    return; // Exit early, no API calls and NO background processing!
+                        console.log(`📊 [PERF] State updated with ${categorized.hostname?.length || 0} items`);
+                    });
+
+                    // console.log("API_DEBUG: Creating maps from", finalArr.length, "collections...",Date.now(), "tms");
+                    const mapStartTime = performance.now();
+
+                    // Check if maps are already cached in PersistStore
+                    const cachedCollectionsMap = PersistStore.getState().collectionsMap;
+                    const cachedHostNameMap = PersistStore.getState().hostNameMap;
+                    const cachedTagCollectionsMap = PersistStore.getState().tagCollectionsMap;
+                    const cachedRegistryStatusMap = PersistStore.getState().collectionsRegistryStatusMap;
+
+                    // Only calculate maps if they're not cached or cache is stale
+                    if (cachedCollectionsMap && Object.keys(cachedCollectionsMap).length > 0) {
+                        // console.log("API_DEBUG: Using cached maps from PersistStore - skipping state updates");
+                        // Maps are already in PersistStore, don't call setters to avoid triggering re-renders
+                    } else {
+                        // // console.log("API_DEBUG: Cache miss - calculating maps (will store async)");
+                        // Calculate maps but DON'T call setters yet - do it asynchronously after render
+                        const collectionsMapNew = func.mapCollectionIdToName(finalArr);
+                        // console.log("API_DEBUG: - mapCollectionIdToName:", (performance.now() - mapStartTime).toFixed(2), "ms");
+
+                        const map2StartTime = performance.now();
+                        const hostNameMapNew = func.mapCollectionIdToHostName(finalArr);
+                        // // console.log("API_DEBUG: - mapCollectionIdToHostName:", (performance.now() - map2StartTime).toFixed(2), "ms");
+
+                        const map3StartTime = performance.now();
+                        const tagCollectionsMapNew = func.mapCollectionIdsToTagName(finalArr);
+                        // // console.log("API_DEBUG: - mapCollectionIdsToTagName:", (performance.now() - map3StartTime).toFixed(2), "ms");
+
+                        const map4StartTime = performance.now();
+                        const registryStatusMapNew = func.mapCollectionIdToRegistryStatus(finalArr);
+                        // // console.log("API_DEBUG: - mapCollectionIdToRegistryStatus:", (performance.now() - map4StartTime).toFixed(2), "ms");
+
+                        // Store in PersistStore asynchronously AFTER the UI has rendered
+                        setTimeout(() => {
+                            // console.log("API_DEBUG: Storing maps in PersistStore async...",Date.now(), "tms");
+                            const asyncStoreStartTime = performance.now();
+                            setCollectionsMap(collectionsMapNew);
+                            setHostNameMap(hostNameMapNew);
+                            setTagCollectionsMap(tagCollectionsMapNew);
+                            setCollectionsRegistryStatusMap(registryStatusMapNew);
+                            // console.log("API_DEBUG: Maps stored in", (performance.now() - asyncStoreStartTime).toFixed(2), "ms");
+                        }, 0);
+                    }
+
+                    // console.log("API_DEBUG: State and maps set in", (performance.now() - setStateStartTime).toFixed(2), "ms");
+
+                    const totalCacheRenderTime = performance.now() - cacheRenderStartTime;
+                    console.log(`⏱️ [PERF] Cache data processed in ${totalCacheRenderTime.toFixed(2)}ms (${finalArr.length} items)`);
+
+                    // Use double requestAnimationFrame to measure after actual browser paint
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            const paintTime = performance.now() - cacheRenderStartTime;
+                            console.log(`✅ [PERF] Table visible on screen at ${paintTime.toFixed(2)}ms`);
+                        });
+                    });
+
+                    return; // Exit early, no API calls!
                 } catch (error) {
                     console.error("API_DEBUG: Error processing cached data:", error);
                     // Fall through to fetch fresh data if cache processing fails
@@ -583,7 +613,7 @@ function ApiCollections(props) {
                 }
             }
 
-            console.log("API_DEBUG: Cache miss or expired, fetching fresh data");
+            // console.log("API_DEBUG: Cache miss or expired, fetching fresh data");
 
             // Build all API promises to run in parallel
             const shouldCallHeavyApis = (now - lastFetchedInfo.lastRiskScoreInfo) >= (5 * 60)
@@ -981,7 +1011,7 @@ function ApiCollections(props) {
     }
 
     useEffect(() => {
-        console.log("API_DEBUG:HELLO 1")
+        // console.log("API_DEBUG:HELLO 1")
         const isMountedRef = { current: true };
 
         fetchData(isMountedRef, false); // Use cache on mount
@@ -1325,11 +1355,11 @@ function ApiCollections(props) {
       const summaryItems = [
         {
             title: mapLabel("Total APIs", getDashboardCategory()),
-            data: transform.formatNumberWithCommas(totalAPIs),
+            data: transform.formatNumberWithCommas(summaryData.totalEndpoints || 0),
         },
         {
             title: mapLabel("Critical APIs", getDashboardCategory()),
-            data: transform.formatNumberWithCommas(summaryData.totalCriticalEndpoints),
+            data: transform.formatNumberWithCommas(summaryData.totalCriticalEndpoints || 0),
         },
         {
             title: mapLabel("Tested APIs (Coverage)", getDashboardCategory()),
@@ -1337,7 +1367,7 @@ function ApiCollections(props) {
         },
         {
             title: mapLabel("Sensitive in response APIs", getDashboardCategory()),
-            data: transform.formatNumberWithCommas(summaryData.totalSensitiveEndpoints),
+            data: transform.formatNumberWithCommas(summaryData.totalSensitiveEndpoints || 0),
         }
     ]
 
