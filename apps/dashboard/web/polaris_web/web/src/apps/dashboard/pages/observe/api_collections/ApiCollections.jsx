@@ -210,6 +210,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
         console.error("collectionsArr is not an array:", collectionsArr);
         return { prettify: [], normal: [] };
     }
+    console.log("API_DEBUG: Total collections to process:", collectionsArr.length);
 
     const newData = collectionsArr.map((c) => {
         if(c.deactivated){
@@ -392,12 +393,200 @@ function ApiCollections(props) {
     // as riskScore cron runs every 5 min, we will cache the data and refresh in 5 mins
     // similarly call sensitive and severityInfo
 
-    async function fetchData(isMountedRef = { current: true }) {
+    async function fetchData(isMountedRef = { current: true }, forceRefresh = false) {
         try {
             setLoading(true)
-            
+
+            const CACHE_DURATION = 10 * 60; // 5 minutes
+            const now = func.timeNow();
+
+            // Check if we have fresh cached collections data
+            const hasValidCache = !forceRefresh &&
+                                 allCollections.length > 0 &&
+                                 (now - lastFetchedInfo.lastRiskScoreInfo) < CACHE_DURATION;
+
+            if (hasValidCache) {
+                console.log("API_DEBUG: Using cached collections data, skipping API calls");
+
+                try {
+                    // Use cached data to populate the UI
+                    const sensitiveInfoMap = lastFetchedSensitiveResp?.sensitiveInfoMap || {};
+                    const severityInfoMap = lastFetchedSeverityResp || {};
+                    const coverageMapCached = PersistStore.getState().coverageMap || {};
+                    const riskScoreMap = lastFetchedResp?.riskScoreMap || {};
+                    const trafficInfoMap = {};
+
+                    let finalArr = allCollections;
+                    if(customCollectionDataFilter){
+                        finalArr = finalArr.filter(customCollectionDataFilter)
+                    }
+
+                    console.log("API_DEBUG: ->>>>>>>>>>>>>>>> Total collections from cache:", finalArr.length);
+
+                    // Guard: Prevent state update after unmount
+                    if (!isMountedRef.current) {
+                        console.log("API_DEBUG: Component unmounted, aborting cache render");
+                        return;
+                    }
+
+                    // OPTIMIZATION: Process smartly - enough items per tab for first page, but not all 17k
+                    console.log("API_DEBUG:->>>>> Smart processing - first 100 from each major category");
+
+                    const PAGE_SIZE = 100;
+                    const hostnameItems = [];
+                    const groupItems = [];
+                    const customItems = [];
+                    const deactivatedItems = [];
+                    const envTypeObj = {};
+
+                    // Categorize ALL collections (lightweight, just for counts and selection)
+                    finalArr.forEach((c) => {
+                        envTypeObj[c.id] = c.envType;
+
+                        if (!c.deactivated) {
+                            if (c.hostName !== null && c.hostName !== undefined) {
+                                if (hostnameItems.length < PAGE_SIZE) hostnameItems.push(c);
+                            } else if (c.type === "API_GROUP") {
+                                if (groupItems.length < PAGE_SIZE) groupItems.push(c);
+                            } else {
+                                if (customItems.length < PAGE_SIZE) customItems.push(c);
+                            }
+                        } else {
+                            if (deactivatedItems.length < PAGE_SIZE) deactivatedItems.push(c);
+                        }
+                    });
+
+                    // Combine first page from each category (max ~400 items instead of 17k)
+                    const itemsToProcess = [
+                        ...hostnameItems,
+                        ...groupItems,
+                        ...customItems,
+                        ...deactivatedItems
+                    ];
+
+                    console.log("API_DEBUG: Processing", itemsToProcess.length, "items (",
+                               hostnameItems.length, "hostname,",
+                               groupItems.length, "groups,",
+                               customItems.length, "custom,",
+                               deactivatedItems.length, "deactivated)");
+
+                    const dataObj = convertToNewData(itemsToProcess, sensitiveInfoMap, severityInfoMap, coverageMapCached, trafficInfoMap, riskScoreMap, false);
+
+                    if (!dataObj.prettify) {
+                        console.error("dataObj.prettify is undefined");
+                        setLoading(false);
+                        return;
+                    }
+
+                    // Create lightweight data for remaining items (without React components)
+                    const processedIds = new Set(itemsToProcess.map(c => c.id));
+                    const remainingItems = finalArr.filter(c => !processedIds.has(c.id));
+
+                    console.log("API_DEBUG: Creating lightweight data for", remainingItems.length, "remaining items");
+
+                    const lightweightData = remainingItems.map(c => {
+                        const testedEndpoints = c.urlsCount === 0 ? 0 : (coverageMapCached[c.id] || 0);
+                        const riskScore = c.urlsCount === 0 ? 0 : (riskScoreMap[c.id] || 0);
+
+                        let calcCoverage = '0%';
+                        if(!c.isOutOfTestingScope && c.urlsCount > 0){
+                            if(c.urlsCount < testedEndpoints){
+                                calcCoverage = '100%'
+                            } else {
+                                calcCoverage = Math.ceil((testedEndpoints * 100)/c.urlsCount) + '%'
+                            }
+                        } else if(c.isOutOfTestingScope){
+                            calcCoverage = 'N/A'
+                        }
+
+                        const severityInfo = severityInfoMap[c.id] || {};
+                        const issuesArrVal = `HIGH: ${severityInfo.HIGH || 0}, MEDIUM: ${severityInfo.MEDIUM || 0}, LOW: ${severityInfo.LOW || 0}`;
+                        const sensitiveTypes = sensitiveInfoMap[c.id] || [];
+                        const sensitiveSubTypesVal = sensitiveTypes.join(" ") || "-";
+
+                        return {
+                            id: c.id,
+                            displayName: c.displayName,
+                            hostName: c.hostName,
+                            type: c.type,
+                            deactivated: c.deactivated,
+                            urlsCount: c.urlsCount,
+                            startTs: c.startTs,
+                            tagsList: c.tagsList,
+                            registryStatus: c.registryStatus,
+                            description: c.description,
+                            isOutOfTestingScope: c.isOutOfTestingScope,
+                            envType: c?.envType?.map ? c.envType.map(func.formatCollectionType) : c.envType,
+                            envTypeOriginal: c?.envType,
+                            testedEndpoints,
+                            sensitiveInRespTypes: sensitiveTypes,
+                            severityInfo,
+                            detectedTimestamp: c.urlsCount === 0 ? 0 : 0,
+                            riskScore,
+                            detected: '-',
+                            discovered: func.prettifyEpoch(c.startTs || 0),
+                            coverage: calcCoverage,
+                            nextUrl: '/dashboard/observe/inventory/' + c.id,
+                            lastTraffic: '-',
+                            displayNameComp: c.displayName, // Plain text instead of JSX
+                            descriptionComp: c.description || '',
+                            outOfTestingScopeComp: c.isOutOfTestingScope ? 'Yes' : 'No',
+                            riskScoreComp: riskScore.toString(),
+                            issuesArr: issuesArrVal,
+                            issuesArrVal,
+                            sensitiveSubTypes: sensitiveSubTypesVal,
+                            sensitiveSubTypesVal,
+                            envTypeComp: c?.envType?.join(', ') || '',
+                            icon: CircleTickMajor,
+                            rowStatus: c.deactivated ? 'critical' : undefined,
+                            disableClick: c.deactivated || false,
+                            deactivatedRiskScore: c.deactivated ? (riskScore - 10) : riskScore,
+                            activatedRiskScore: -1 * (c.deactivated ? riskScore : (riskScore - 10)),
+                        };
+                    });
+
+                    // Merge processed items with lightweight data
+                    const fullPrettifyData = [...dataObj.prettify, ...lightweightData];
+                    const { categorized: fullCategorized } = categorizeCollections(fullPrettifyData);
+
+                    // Use full categorized data for display
+                    setNormalData([...dataObj.normal, ...lightweightData]);
+                    setData(fullCategorized);
+                    setEnvTypeMap(envTypeObj);
+                    setCollectionsMap(func.mapCollectionIdToName(finalArr));
+                    setHostNameMap(func.mapCollectionIdToHostName(finalArr));
+                    setTagCollectionsMap(func.mapCollectionIdsToTagName(finalArr));
+                    setCollectionsRegistryStatusMap(func.mapCollectionIdToRegistryStatus(finalArr));
+
+                    // Update summary (calculate from ALL raw data, not processed)
+                    const summaryDataObj = {
+                        totalEndpoints: finalArr.reduce((sum, c) => sum + (c.urlsCount || 0), 0),
+                        totalTestedEndpoints: finalArr.reduce((sum, c) => sum + (coverageMapCached[c.id] || 0), 0),
+                        totalSensitiveEndpoints: lastFetchedSensitiveResp?.sensitiveUrls || 0,
+                        totalCriticalEndpoints: lastFetchedResp?.criticalUrls || 0,
+                        totalAllowedForTesting: finalArr.reduce((sum, c) => sum + (c.isOutOfTestingScope ? 0 : c.urlsCount || 0), 0)
+                    };
+                    setSummaryData(summaryDataObj);
+
+                    setHasUsageEndpoints(true);
+                    setLoading(false);
+
+                    console.log("API_DEBUG: Cache render complete. Total items in table:",
+                               itemsToProcess.length, "with React components,",
+                               remainingItems.length, "with lightweight data");
+
+                    return; // Exit early, no API calls and NO background processing!
+                } catch (error) {
+                    console.error("API_DEBUG: Error processing cached data:", error);
+                    // Fall through to fetch fresh data if cache processing fails
+                    setLoading(true);
+                }
+            }
+
+            console.log("API_DEBUG: Cache miss or expired, fetching fresh data");
+
             // Build all API promises to run in parallel
-            const shouldCallHeavyApis = (func.timeNow() - lastFetchedInfo.lastRiskScoreInfo) >= (5 * 60)
+            const shouldCallHeavyApis = (now - lastFetchedInfo.lastRiskScoreInfo) >= (5 * 60)
             
             let apiPromises = [
                 api.getAllCollectionsBasic(),  // index 0
@@ -795,16 +984,7 @@ function ApiCollections(props) {
         console.log("API_DEBUG:HELLO 1")
         const isMountedRef = { current: true };
 
-        // Clear large persisted data to prevent memory leaks
-        // These will be refetched anyway
-        PersistStore.setState({
-            lastFetchedResp: { criticalUrls: 0, riskScoreMap: {} },
-            lastFetchedSeverityResp: {},
-            coverageMap: {},
-            filtersMap: {}
-        });
-
-        fetchData(isMountedRef);
+        fetchData(isMountedRef, false); // Use cache on mount
         resetFunc();
 
         // Cleanup function to prevent state updates after unmount
@@ -827,7 +1007,7 @@ function ApiCollections(props) {
             func.setToast(true, true, error.message || 'Something went wrong!')
         })
         resetResourcesSelected();
-        fetchData()
+        fetchData({ current: true }, true) // Force refresh after mutations
     }
     async function handleShareCollectionsAction(collectionIdList, userIdList, apiFunction){
         const userCollectionMap = {};
