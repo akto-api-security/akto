@@ -594,6 +594,9 @@ public class DbAction extends ActionSupport {
                                 if(UsageMetricCalculator.getDeactivated().contains(apiCollectionId)){
                                     ignore = true;
                                 }
+                                if(apiCollectionId == 0){
+                                    ignore = true;
+                                }
                             } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._URL)){
                                 url = entry.getValue().toString();
                             } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._RESPONSE_CODE)){
@@ -685,6 +688,10 @@ public class DbAction extends ActionSupport {
                             String valStr = entry.getValue().toString();
                             int val = Integer.valueOf(valStr);
                             if (ignoreHosts.contains(val)) {
+                                ignore = true;
+                                break;
+                            }
+                            if (val == 0) {
                                 ignore = true;
                                 break;
                             }
