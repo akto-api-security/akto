@@ -319,9 +319,6 @@ function ApiCollections(props) {
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
 
-    // console.log("COMPONENT_DEBUG: ApiCollections rendering", Date.now());
-    // console.log("COMPONENT_DEBUG: data.hostname length:", data?.hostname?.length || 0, "loading:", loading);
-
     const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0, totalAllowedForTesting: 0})
     const [hasUsageEndpoints, setHasUsageEndpoints] = useState(true)
     const [envTypeMap, setEnvTypeMap] = useState({})
@@ -427,32 +424,15 @@ function ApiCollections(props) {
                         finalArr = finalArr.filter(customCollectionDataFilter)
                     }
 
-                    // console.log("API_DEBUG: Total collections from cache:", finalArr.length,Date.now(), "tms");
 
                     // Guard: Prevent state update after unmount
                     if (!isMountedRef.current) {
-                        // console.log("API_DEBUG: Component unmounted, aborting cache render");
                         return;
                     }
-
-                    // OPTIMIZATION: When using cache, create lightweight data without JSX (lazy rendering)
-                    // Only create JSX components when they're actually needed by the table
-                    // console.log("API_DEBUG:->>>>> Creating lightweight cached data (no JSX)");
-
                     const envTypeObj = {};
-
-                    // Build envTypeObj for all collections
-                    // console.log("API_DEBUG: Building envTypeObj...");
-                    const envStartTime = performance.now();
                     finalArr.forEach((c) => {
                         envTypeObj[c.id] = c.envType;
                     });
-                    // console.log("API_DEBUG: envTypeObj built in", (performance.now() - envStartTime).toFixed(2), "ms");
-
-                    // Create LIGHTWEIGHT data without JSX components (10x faster!)
-                    // console.log("API_DEBUG: Starting lightweight data creation...",Date.now(), "tms");
-                    const convertStartTime = performance.now();
-
                     const lightweightData = finalArr.map(c => {
                         const testedEndpoints = c.urlsCount === 0 ? 0 : (coverageMapCached[c.id] || 0);
                         const riskScore = c.urlsCount === 0 ? 0 : (riskScoreMap[c.id] || 0);
@@ -515,20 +495,10 @@ function ApiCollections(props) {
                             activatedRiskScore: -1 * (c.deactivated ? riskScore : (riskScore - 10)),
                         };
                     });
-
-                    // console.log("API_DEBUG: Lightweight data created in", (performance.now() - convertStartTime).toFixed(2), "ms", Date.now(),"tms");
-
-                    // Prettify the data to add JSX badges and proper styling
                     const prettifiedData = transform.prettifyCollectionsData(lightweightData, false);
 
-                    // Categorize prettified data
-                    // console.log("API_DEBUG: Starting categorizeCollections...");
-                    const categorizeStartTime = performance.now();
                     const { categorized } = categorizeCollections(prettifiedData);
-                    // console.log("API_DEBUG: categorizeCollections completed in", (performance.now() - categorizeStartTime).toFixed(2), "ms");
-
-                    // console.log("API_DEBUG: Calculating summary data...");
-                    const summaryStartTime = performance.now();
+  
                     const initialSummaryDataObj = {
                         totalEndpoints: finalArr.reduce((sum, c) => sum + (c.urlsCount || 0), 0),
                         totalTestedEndpoints: finalArr.reduce((sum, c) => sum + (coverageMapCached[c.id] || 0), 0),
@@ -536,10 +506,6 @@ function ApiCollections(props) {
                         totalCriticalEndpoints: lastFetchedResp?.criticalUrls || 0,
                         totalAllowedForTesting: finalArr.reduce((sum, c) => sum + (c.isOutOfTestingScope ? 0 : c.urlsCount || 0), 0)
                     };
-                    // console.log("API_DEBUG: Summary data calculated in", (performance.now() - summaryStartTime).toFixed(2), "ms");
-
-                    // console.log("API_DEBUG: Setting ALL state at once...",Date.now(), "tms");
-                    const setStateStartTime = performance.now();
 
                     // Force React to batch all state updates into a single re-render
                     unstable_batchedUpdates(() => {
@@ -549,54 +515,28 @@ function ApiCollections(props) {
                         setSummaryData(initialSummaryDataObj);
                         setHasUsageEndpoints(true);
                         setLoading(false);
-
                         console.log(`📊 [PERF] State updated with ${categorized.hostname?.length || 0} items`);
                     });
 
-                    // console.log("API_DEBUG: Creating maps from", finalArr.length, "collections...",Date.now(), "tms");
-                    const mapStartTime = performance.now();
-
                     // Check if maps are already cached in PersistStore
                     const cachedCollectionsMap = PersistStore.getState().collectionsMap;
-                    const cachedHostNameMap = PersistStore.getState().hostNameMap;
-                    const cachedTagCollectionsMap = PersistStore.getState().tagCollectionsMap;
-                    const cachedRegistryStatusMap = PersistStore.getState().collectionsRegistryStatusMap;
 
                     // Only calculate maps if they're not cached or cache is stale
-                    if (cachedCollectionsMap && Object.keys(cachedCollectionsMap).length > 0) {
-                        // console.log("API_DEBUG: Using cached maps from PersistStore - skipping state updates");
-                        // Maps are already in PersistStore, don't call setters to avoid triggering re-renders
-                    } else {
-                        // // console.log("API_DEBUG: Cache miss - calculating maps (will store async)");
+                    if (!cachedCollectionsMap || Object.keys(cachedCollectionsMap).length === 0) {
                         // Calculate maps but DON'T call setters yet - do it asynchronously after render
                         const collectionsMapNew = func.mapCollectionIdToName(finalArr);
-                        // console.log("API_DEBUG: - mapCollectionIdToName:", (performance.now() - mapStartTime).toFixed(2), "ms");
-
-                        const map2StartTime = performance.now();
                         const hostNameMapNew = func.mapCollectionIdToHostName(finalArr);
-                        // // console.log("API_DEBUG: - mapCollectionIdToHostName:", (performance.now() - map2StartTime).toFixed(2), "ms");
-
-                        const map3StartTime = performance.now();
                         const tagCollectionsMapNew = func.mapCollectionIdsToTagName(finalArr);
-                        // // console.log("API_DEBUG: - mapCollectionIdsToTagName:", (performance.now() - map3StartTime).toFixed(2), "ms");
-
-                        const map4StartTime = performance.now();
                         const registryStatusMapNew = func.mapCollectionIdToRegistryStatus(finalArr);
-                        // // console.log("API_DEBUG: - mapCollectionIdToRegistryStatus:", (performance.now() - map4StartTime).toFixed(2), "ms");
 
                         // Store in PersistStore asynchronously AFTER the UI has rendered
                         setTimeout(() => {
-                            // console.log("API_DEBUG: Storing maps in PersistStore async...",Date.now(), "tms");
-                            const asyncStoreStartTime = performance.now();
                             setCollectionsMap(collectionsMapNew);
                             setHostNameMap(hostNameMapNew);
                             setTagCollectionsMap(tagCollectionsMapNew);
                             setCollectionsRegistryStatusMap(registryStatusMapNew);
-                            // console.log("API_DEBUG: Maps stored in", (performance.now() - asyncStoreStartTime).toFixed(2), "ms");
                         }, 0);
                     }
-
-                    // console.log("API_DEBUG: State and maps set in", (performance.now() - setStateStartTime).toFixed(2), "ms");
 
                     const totalCacheRenderTime = performance.now() - cacheRenderStartTime;
                     console.log(`⏱️ [PERF] Cache data processed in ${totalCacheRenderTime.toFixed(2)}ms (${finalArr.length} items)`);
@@ -616,9 +556,6 @@ function ApiCollections(props) {
                     setLoading(true);
                 }
             }
-
-            // console.log("API_DEBUG: Cache miss or expired, fetching fresh data");
-
             // Build all API promises to run in parallel
             const shouldCallHeavyApis = (now - lastFetchedInfo.lastRiskScoreInfo) >= (5 * 60)
             
@@ -646,7 +583,6 @@ function ApiCollections(props) {
                 ]
             }
 
-            // Execute all APIs in parallel
             let results = await Promise.allSettled(apiPromises);
             
             // Extract collections response (index 0)
