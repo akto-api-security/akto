@@ -8,7 +8,10 @@ const tableFunc = {
             setFilters([]);
             return {value: [], total: 0, fullDataIds: []};
         }
-        
+
+        // Check if data has an override for actual total (used when data is limited for memory optimization)
+        const actualTotal = props.data._actualTotal;
+
         let localFilters = func.prepareFilters(props.data,props.filters);
         
         // Optimize filter generation - cache results if data hasn't changed
@@ -131,19 +134,21 @@ const tableFunc = {
           }
   
           let finalData = props.useModifiedData ? props.modifyData(tempData, filters || {}) : tempData
-          
+
           // Optimize pagination calculations
           const totalLength = finalData.length;
           const page = Math.floor(skip / limit);
           const startIndex = page * limit;
           const endIndex = Math.min(startIndex + limit, totalLength);
-          
+
           // Slice only if necessary
           let final2Data = (totalLength <= limit) ? finalData : finalData.slice(startIndex, endIndex);
           let fullDataIds= finalData.map((x) => ({id: x?.id}));
-          
 
-          return {value: final2Data, total: totalLength, fullDataIds: fullDataIds}
+          // Use actualTotal if provided (for memory-optimized large datasets), otherwise use calculated length
+          const reportedTotal = actualTotal !== undefined ? actualTotal : totalLength;
+
+          return {value: final2Data, total: reportedTotal, fullDataIds: fullDataIds}
     },
     mergeFilters(filterArray1, filterArray2, labelFunc, handleRemoveAppliedFilter){
       const combined = [...filterArray1, ...filterArray2];

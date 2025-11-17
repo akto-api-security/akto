@@ -416,8 +416,12 @@ function ApiEndpoints(props) {
                 }
             })
         }
-        
-        const prettifyData = transform.prettifyEndpointsData(allEndpoints)
+
+        // MEMORY OPTIMIZATION: Limit rendered items to prevent browser crash with large collections
+        const INITIAL_RENDER_LIMIT = 200;
+        const shouldOptimizeEndpoints = allEndpoints.length > INITIAL_RENDER_LIMIT;
+
+        console.log(`INVENTORY_DEBUG: Total endpoints: ${allEndpoints.length}, optimizing: ${shouldOptimizeEndpoints}`);
 
         // enrich with collection tags (env types) for API group view
         const collectionTagsMap = {}
@@ -431,46 +435,119 @@ function ApiEndpoints(props) {
             }
         })
 
-        prettifyData.forEach((obj) => {
-            const t = collectionTagsMap[obj.apiCollectionId]
-            if (t) {
-                obj.tagsComp = t.comp
-                obj.tagsString = t.str
-            } else {
-                obj.tagsString = ""
-            }
-        })
+        // Step 1: Create lightweight objects for ALL endpoints (for filtering & counting only)
+        const allEndpointsLight = allEndpoints.map((obj) => {
+            const t = collectionTagsMap[obj.apiCollectionId];
+            return {
+                ...obj,
+                tagsComp: t?.comp || null,
+                tagsString: t?.str || "",
+                isNew: transform.isNewEndpoint(obj.lastSeenTs),
+                open: obj.auth_type === "UNAUTHENTICATED" || obj.auth_type === undefined,
+            };
+        });
 
-        const zombie = prettifyData.filter(
-            obj => obj.sources && // Check that obj.sources is not null or undefined
+        // Check for OpenAPI sources
+        var hasOpenAPI = false;
+        allEndpointsLight.forEach((obj) => {
+            if (obj.sources && obj.sources.hasOwnProperty("OPEN_API")) {
+                hasOpenAPI = true;
+            }
+            if (obj.sources && !sourcesBackfilled) {
+                setSourcesBackfilled(true);
+            }
+        });
+
+        // Filter endpoints for each tab (lightweight, for counts)
+        const sensitiveEndpoints = allEndpointsLight.filter(x => x.sensitive && x.sensitive.size > 0);
+        const highRiskEndpoints = allEndpointsLight.filter(x => x.riskScore >= 4);
+        const newEndpoints = allEndpointsLight.filter(x => x.isNew);
+        const noAuthEndpoints = allEndpointsLight.filter(x => x.open);
+        const zombieEndpoints = allEndpointsLight.filter(
+            obj => obj.sources &&
                    Object.keys(obj.sources).length === 1 &&
                    obj.sources.hasOwnProperty("OPEN_API")
         );
-
-        var hasOpenAPI = false
-        prettifyData.forEach((obj) => {
-            if (obj.sources && obj.sources.hasOwnProperty("OPEN_API")) {
-                hasOpenAPI = true
-            }
-
-            if (obj.sources && !sourcesBackfilled) {
-                setSourcesBackfilled(true)
-            }
-        })
-
-        // check if openAPI file has been uploaded or not.. else show there no shadow APIs
-        const undocumented = hasOpenAPI ? prettifyData.filter(
+        const undocumentedEndpoints = hasOpenAPI ? allEndpointsLight.filter(
             obj => obj.sources && !obj.sources.hasOwnProperty("OPEN_API")
         ) : [];
 
-        // append shadow endpoints to all endpoints
-        data['all'] = [ ...prettifyData, ...shadowApis ]
-        data['sensitive'] = prettifyData.filter(x => x.sensitive && x.sensitive.size > 0)
-        data['high_risk'] = prettifyData.filter(x=> x.riskScore >= 4)
-        data['new'] = prettifyData.filter(x=> x.isNew)
-        data['no_auth'] = prettifyData.filter(x => x.open)
-        data['shadow'] = [ ...shadowApis, ...undocumented ]
-        data['zombie'] = zombie
+        // Step 2: Store accurate counts (from ALL endpoints)
+        data['_counts'] = {
+            all: allEndpointsLight.length + shadowApis.length,
+            sensitive: sensitiveEndpoints.length,
+            high_risk: highRiskEndpoints.length,
+            new: newEndpoints.length,
+            no_auth: noAuthEndpoints.length,
+            shadow: shadowApis.length + undocumentedEndpoints.length,
+            zombie: zombieEndpoints.length
+        };
+
+        // Step 3: Only prettify (create React components) for first 200 items per tab
+        const prettifyLimitedTab = (endpoints, limit) => {
+            const limited = endpoints.slice(0, limit);
+            const prettified = transform.prettifyEndpointsData(limited);
+
+            // Re-apply tags after prettify
+            prettified.forEach((obj) => {
+                const t = collectionTagsMap[obj.apiCollectionId];
+                if (t) {
+                    obj.tagsComp = t.comp;
+                    obj.tagsString = t.str;
+                } else {
+                    obj.tagsString = "";
+                }
+            });
+
+            return prettified;
+        };
+
+        if (shouldOptimizeEndpoints) {
+            // Large collection: limit to 200 items per tab
+            console.log(`INVENTORY_DEBUG: Limiting render to ${INITIAL_RENDER_LIMIT} items per tab (showing counts from all ${allEndpoints.length})`);
+
+            data['all'] = [...prettifyLimitedTab(allEndpointsLight, INITIAL_RENDER_LIMIT), ...shadowApis];
+            data['all']._actualTotal = data['_counts'].all; // Store real total for pagination
+
+            data['sensitive'] = prettifyLimitedTab(sensitiveEndpoints, INITIAL_RENDER_LIMIT);
+            data['sensitive']._actualTotal = data['_counts'].sensitive;
+
+            data['high_risk'] = prettifyLimitedTab(highRiskEndpoints, INITIAL_RENDER_LIMIT);
+            data['high_risk']._actualTotal = data['_counts'].high_risk;
+
+            data['new'] = prettifyLimitedTab(newEndpoints, INITIAL_RENDER_LIMIT);
+            data['new']._actualTotal = data['_counts'].new;
+
+            data['no_auth'] = prettifyLimitedTab(noAuthEndpoints, INITIAL_RENDER_LIMIT);
+            data['no_auth']._actualTotal = data['_counts'].no_auth;
+
+            data['shadow'] = [...shadowApis, ...prettifyLimitedTab(undocumentedEndpoints, INITIAL_RENDER_LIMIT)];
+            data['shadow']._actualTotal = data['_counts'].shadow;
+
+            data['zombie'] = prettifyLimitedTab(zombieEndpoints, INITIAL_RENDER_LIMIT);
+            data['zombie']._actualTotal = data['_counts'].zombie;
+        } else {
+            // Small collection: render all normally
+            const prettifyData = transform.prettifyEndpointsData(allEndpointsLight);
+
+            prettifyData.forEach((obj) => {
+                const t = collectionTagsMap[obj.apiCollectionId];
+                if (t) {
+                    obj.tagsComp = t.comp;
+                    obj.tagsString = t.str;
+                } else {
+                    obj.tagsString = "";
+                }
+            });
+
+            data['all'] = [...prettifyData, ...shadowApis];
+            data['sensitive'] = sensitiveEndpoints.filter(x => x.sensitive && x.sensitive.size > 0);
+            data['high_risk'] = prettifyData.filter(x => x.riskScore >= 4);
+            data['new'] = prettifyData.filter(x => x.isNew);
+            data['no_auth'] = prettifyData.filter(x => x.open);
+            data['shadow'] = [...shadowApis, ...undocumentedEndpoints];
+            data['zombie'] = zombieEndpoints;
+        }
         setEndpointData(data)
         setSelectedTab("all")
         setSelected(0)
@@ -520,11 +597,19 @@ function ApiEndpoints(props) {
                         });
                     })
 
-                    data['all'] = currentPrettyData
-                    data['sensitive'] = currentPrettyData.filter(x => x.sensitive && x.sensitive.size > 0)
-                    data['high_risk'] = currentPrettyData.filter(x=> x.riskScore >= 4)
-                    data['new'] = currentPrettyData.filter(x=> x.isNew)
-                    data['no_auth'] = currentPrettyData.filter(x => x.open)
+                    // MEMORY OPTIMIZATION: Preserve _actualTotal properties when updating data
+                    const preserveActualTotal = (oldArray, newArray) => {
+                        if (oldArray._actualTotal !== undefined) {
+                            newArray._actualTotal = oldArray._actualTotal;
+                        }
+                        return newArray;
+                    };
+
+                    data['all'] = preserveActualTotal(data['all'], currentPrettyData);
+                    data['sensitive'] = preserveActualTotal(data['sensitive'], currentPrettyData.filter(x => x.sensitive && x.sensitive.size > 0));
+                    data['high_risk'] = preserveActualTotal(data['high_risk'], currentPrettyData.filter(x=> x.riskScore >= 4));
+                    data['new'] = preserveActualTotal(data['new'], currentPrettyData.filter(x=> x.isNew));
+                    data['no_auth'] = preserveActualTotal(data['no_auth'], currentPrettyData.filter(x => x.open));
                     setEndpointData(data)
                     setCurrentKey(Date.now()) // force remount InlineEditableText component to reset filters
                 }).catch((err) => {
@@ -828,12 +913,21 @@ function ApiEndpoints(props) {
         const uniqueEndpoints = endpoints.filter((endpoint, index, self) =>
             index === self.findIndex((t) => t.method === endpoint.method && t.endpoint.replace(/^\//, '') === endpoint.endpoint.replace(/^\//, ''))
         )
+
+        // MEMORY OPTIMIZATION: Preserve _actualTotal properties
+        const preserveActualTotal = (oldArray, newArray) => {
+            if (oldArray?._actualTotal !== undefined) {
+                newArray._actualTotal = oldArray._actualTotal;
+            }
+            return newArray;
+        };
+
         const data = {}
-        data['sensitive'] = uniqueEndpoints.filter(x => x.sensitive && x.sensitive.size > 0)
-        data['high_risk'] = uniqueEndpoints.filter(x=> x.riskScore >= 4)
-        data['new'] = uniqueEndpoints.filter(x=> x.isNew)
-        data['no_auth'] = uniqueEndpoints.filter(x => x.open)
-        data['all'] = uniqueEndpoints
+        data['all'] = preserveActualTotal(endpointData['all'], uniqueEndpoints);
+        data['sensitive'] = preserveActualTotal(endpointData['sensitive'], uniqueEndpoints.filter(x => x.sensitive && x.sensitive.size > 0));
+        data['high_risk'] = preserveActualTotal(endpointData['high_risk'], uniqueEndpoints.filter(x=> x.riskScore >= 4));
+        data['new'] = preserveActualTotal(endpointData['new'], uniqueEndpoints.filter(x=> x.isNew));
+        data['no_auth'] = preserveActualTotal(endpointData['no_auth'], uniqueEndpoints.filter(x => x.open));
         setEndpointData(data)
     }
 
