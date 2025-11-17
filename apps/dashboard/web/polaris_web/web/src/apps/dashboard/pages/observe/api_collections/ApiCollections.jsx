@@ -131,13 +131,13 @@ const headers = [
         boxWidth: '160px'
     },
     {
-        text: 'Collection type',
-        title: 'Collection type',
+        text: 'Collection tags',
+        title: 'Collection tags',
         value: 'envTypeComp',
         filterKey: "envType",
         showFilter: true,
         textValue: 'envType',
-        tooltipContent: (<Text variant="bodySm">Environment type for an API collection, Staging or Production </Text>),
+        tooltipContent: (<Text variant="bodySm">Tags for an API collection to describe collection attributes such as environment type (staging, production) and other custom attributes</Text>),
     },
     {   
         title: <HeadingWithTooltip content={<Text variant="bodySm">The most recent time an endpoint within collection was either discovered for the first time or seen again</Text>} title="Last traffic seen" />, 
@@ -850,7 +850,7 @@ function ApiCollections(props) {
 
         const toggleTypeContent = (
             <Popover
-                activator={<div onClick={() => setPopover(!popover)}>Set ENV type</div>}
+                activator={<div onClick={() => setPopover(!popover)}>Set tags</div>}
                 onClose={() => {
                     setPopover(false)
                 }}
@@ -961,7 +961,7 @@ function ApiCollections(props) {
 
 
         await api.updateEnvTypeOfCollection(tagObj === null ? tagObj : [tagObj], apiCollectionIds, tagObj === null).then((resp) => {
-            func.setToast(true, false, "ENV type updated successfully")
+            func.setToast(true, false, "Tags updated successfully")
             setEnvTypeMap(copyObj)
             updateData(copyObj)
         })
