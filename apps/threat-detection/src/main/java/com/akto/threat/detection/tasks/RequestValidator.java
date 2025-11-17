@@ -201,6 +201,9 @@ public class RequestValidator {
     errorBuilder.setInstancePath(instancePath);
     errorBuilder.setAttribute(attribute);
     errorBuilder.setMessage(message);
+    errorBuilder.setLocation(SchemaConformanceError.Location.LOCATION_BODY);
+    errorBuilder.setStart(-1);
+    errorBuilder.setEnd(-1);
     errors.add(errorBuilder.build());
   }
 
@@ -245,6 +248,10 @@ public class RequestValidator {
       errorBuilder.setInstancePath(message.getInstanceLocation().toString());
       errorBuilder.setAttribute("requestBody");
       errorBuilder.setMessage(message.getMessage());
+      errorBuilder.setLocation(SchemaConformanceError.Location.LOCATION_BODY);
+      errorBuilder.setStart(-1);
+      errorBuilder.setEnd(-1);
+      errorBuilder.setPhrase(message.getMessage());
       errors.add(errorBuilder.build());
     }
 
@@ -272,4 +279,5 @@ public class RequestValidator {
       return errors;
     }
   }
+
 }

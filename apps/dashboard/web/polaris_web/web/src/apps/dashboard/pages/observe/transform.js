@@ -451,16 +451,28 @@ const transform = {
     },
 
     getCollectionTypeList(envType, maxItems, wrap){
-        if(envType == null || envType.length === 0){ 
+        if(envType == null || envType.length === 0){
             return <></>
         }
+
+        // Sort tags to prioritize 'privatecloud.agoda.com/service' first
+        const sortedEnvType = [...envType].sort((a, b) => {
+            const aKey = a.split('=')[0];
+            const bKey = b.split('=')[0];
+
+            if (aKey === 'privatecloud.agoda.com/service') return -1;
+            if (bKey === 'privatecloud.agoda.com/service') return 1;
+            return 0;
+        });
+
         return (
             <ShowListInBadge
-                itemsArr={envType}
+                itemsArr={sortedEnvType}
                 maxItems={maxItems}
                 status={"info"}
                 useTooltip={true}
                 wrap={wrap}
+                allowFullWidth={true}
             />
         )
     },

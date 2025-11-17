@@ -25,6 +25,7 @@ function SampleDataComponent(props) {
 
     useEffect(()=>{
 
+        // Metadata parsing: JSON only
         let parsed;
         try{
           parsed = JSON.parse(sampleData?.message)
@@ -49,9 +50,48 @@ function SampleDataComponent(props) {
         let originalResponseJson = func.responseJson(originalParsed, sampleData?.highlightPaths || [])
         let originalRequestJson = func.requestJson(originalParsed, sampleData?.highlightPaths || [])
 
-        // --- PATCH: propagate vulnerabilitySegments from sampleData to both request and response ---
-        // This ensures SampleData receives the correct segments for highlighting
-        const vulnerabilitySegments = sampleData?.vulnerabilitySegments || [];
+        // --- Parse metadata to extract vulnerabilitySegments for threat highlighting ---
+        const normalizeSegments = (errors = []) => {
+          return errors
+            .filter(err => !isNaN(err.start) && !isNaN(err.end))
+            .map(err => ({
+              ...err,
+              start: err.start,
+              end: err.end,
+              phrase: err.phrase
+            }));
+        };
+
+        const selectMetadataSegments = (rawMetadata) => {
+          if (!rawMetadata) {
+            return { segments: [], fromMetadata: false };
+          }
+
+          if (typeof rawMetadata === 'string') {
+            try {
+              const parsedMeta = JSON.parse(rawMetadata);
+              const segments = normalizeSegments(parsedMeta?.schemaErrors);
+              if (segments.length > 0) {
+                return { segments, fromMetadata: true };
+              }
+            } catch (error) {
+              console.error('Error parsing metadata JSON:', error);
+            }
+          } else {
+            const segments = normalizeSegments(rawMetadata?.schemaErrors);
+            if (segments.length > 0) {
+              return { segments, fromMetadata: true };
+            }
+          }
+
+          return { segments: [], fromMetadata: false };
+        };
+
+        const effectiveMetadata = metadata ?? sampleData?.metadata;
+        const { segments: metadataSegments, fromMetadata } = selectMetadataSegments(effectiveMetadata);
+        const baseSegments = sampleData?.vulnerabilitySegments || [];
+        const vulnerabilitySegments = metadataSegments.length > 0 ? metadataSegments : baseSegments;
+        const segmentsFromMetadata = fromMetadata;
 
         if(isNewDiff){
             let lineReqObj = transform.getFirstLine(originalRequestJson?.firstLine,requestJson?.firstLine)
@@ -72,8 +112,9 @@ function SampleDataComponent(props) {
             })
         }else{
             setSampleJsonData({ 
-                request: { message: transform.formatData(requestJson,"http"), original: transform.formatData(originalRequestJson,"http"), highlightPaths:requestJson?.highlightPaths }, 
-                response: showResponse ? { message: transform.formatData(responseJson,"http"), original: transform.formatData(originalResponseJson,"http"), highlightPaths:responseJson?.highlightPaths, vulnerabilitySegments } : {},
+                // If segments came from threat metadata, highlight in request; if they were provided by caller (e.g., LLM analysis), pass to both panes
+                request: { message: transform.formatData(requestJson,"http"), original: transform.formatData(originalRequestJson,"http"), highlightPaths:requestJson?.highlightPaths, vulnerabilitySegments }, 
+                response: showResponse ? { message: transform.formatData(responseJson,"http"), original: transform.formatData(originalResponseJson,"http"), highlightPaths:responseJson?.highlightPaths, ...(segmentsFromMetadata ? {} : {vulnerabilitySegments}) } : {},
             })
         }
       }, [sampleData, metadata])

@@ -318,7 +318,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     if (this.apiCountWindowBasedThresholdNotifier != null) {
         this.apiCountWindowBasedThresholdNotifier.incrementApiHitcount(apiHitCountKey, responseParam.getTime(), RedisKeyInfo.API_COUNTER_SORTED_SET);
     }
-    
+
     List<SchemaConformanceError> errors = null; 
 
 
@@ -365,6 +365,8 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     for (FilterConfig apiFilter : apiFilters.values()) {
       boolean hasPassedFilter = false;
+       // Create a fresh vulnerable list for each filter
+      List<SchemaConformanceError> vulnerable = null;
 
       if(isDebugRequest(responseParam)){
         logger.debugAndAddToDb("Evaluating filter condition for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
@@ -386,8 +388,8 @@ public class MaliciousTrafficDetectorTask implements Task {
 
         }
 
-        errors = RequestValidator.validate(responseParam, apiSchema, apiInfoKey.toString());
-        hasPassedFilter = errors != null && !errors.isEmpty();
+        vulnerable = RequestValidator.validate(responseParam, apiSchema, apiInfoKey.toString());
+        hasPassedFilter = vulnerable != null && !vulnerable.isEmpty();
 
       }else {
         hasPassedFilter = threatDetector.applyFilter(apiFilter, responseParam, rawApi, apiInfoKey);
@@ -416,9 +418,26 @@ public class MaliciousTrafficDetectorTask implements Task {
       // and so we push it to kafka
       if (hasPassedFilter) {
         logger.debugAndAddToDb("filter condition satisfied for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
-        RedactionType redactionType = getRedactionType(responseParam.getRequestParams().getHeaders());
+        
+        // Capture threat positions for LFI, OS Command Injection, and SSRF filters
+        String filterId = apiFilter.getId();
+        if (filterId.equals(ThreatDetector.LFI_FILTER_ID) || 
+            filterId.equals(ThreatDetector.OS_COMMAND_INJECTION_FILTER_ID) || 
+            filterId.equals(ThreatDetector.SSRF_FILTER_ID)) {
 
-          // Later we will also add aggregation support
+          List<SchemaConformanceError> threatPositions = threatDetector.getThreatPositions(filterId, responseParam);
+
+          if (threatPositions != null && !threatPositions.isEmpty()) {
+            // Initialize vulnerable list if null, or append to existing schema errors
+            if (vulnerable == null) {
+              vulnerable = new ArrayList<>();
+            }
+            vulnerable.addAll(threatPositions);
+          }
+        }
+        
+        // Later we will also add aggregation support
+        RedactionType redactionType = getRedactionType(responseParam.getRequestParams().getHeaders());
         // Eg: 100 4xx requests in last 10 minutes.
         // But regardless of whether request falls in aggregation or not,
         // we still push malicious requests to kafka
@@ -438,7 +457,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
         SampleMaliciousRequest maliciousReq = null;
         if (!isAggFilter || !apiFilter.getInfo().getSubCategory().equalsIgnoreCase("API_LEVEL_RATE_LIMITING")) {
-          maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors, successfulExploit, isIgnoredEvent, redactionType);
+          maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, vulnerable, successfulExploit, isIgnoredEvent, redactionType);
         }
 
         if (!isAggFilter) {
@@ -456,7 +475,7 @@ public class MaliciousTrafficDetectorTask implements Task {
               }
               shouldNotify = this.apiCountWindowBasedThresholdNotifier.calcApiCount(apiHitCountKey, responseParam.getTime(), rule);
               if (shouldNotify) {
-                maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors, successfulExploit, isIgnoredEvent, redactionType);
+                maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, vulnerable, successfulExploit, isIgnoredEvent, redactionType);
               }
           } else {
               shouldNotify = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule);

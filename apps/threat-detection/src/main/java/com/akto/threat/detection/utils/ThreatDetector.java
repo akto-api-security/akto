@@ -3,6 +3,7 @@ package com.akto.threat.detection.utils;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -194,6 +195,81 @@ public class ThreatDetector {
         }
 
         return ssrfTrie.containsMatch(httpResponseParams.getRequestParams().getPayload());
+    }
+
+    /**
+     * Get exact character positions where threats were detected
+     * Returns a list of SchemaConformanceError with location, positions, and matched keyword
+     */
+    public List<com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError> getThreatPositions(String filterId, HttpResponseParams httpResponseParams) {
+        List<com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError> errors = new ArrayList<>();
+        
+        if (httpResponseParams == null || httpResponseParams.getRequestParams() == null) {
+            return errors;
+        }
+
+        Trie trieToUse = null;
+        if (LFI_FILTER_ID.equals(filterId)) {
+            trieToUse = lfiTrie;
+        } else if (OS_COMMAND_INJECTION_FILTER_ID.equals(filterId)) {
+            trieToUse = osCommandInjectionTrie;
+        } else if (SSRF_FILTER_ID.equals(filterId)) {
+            trieToUse = ssrfTrie;
+        }
+
+        if (trieToUse == null) {
+            return errors;
+        }
+
+        addThreatMatches(errors, trieToUse, httpResponseParams.getRequestParams().getURL(),
+                "url",
+                com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError.Location.LOCATION_URL,
+                filterId);
+
+        addThreatMatches(errors, trieToUse, String.valueOf(httpResponseParams.getRequestParams().getHeaders()),
+                "headers",
+                com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError.Location.LOCATION_HEADER,
+                filterId);
+
+        addThreatMatches(errors, trieToUse, httpResponseParams.getRequestParams().getPayload(),
+                "payload",
+                com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError.Location.LOCATION_BODY,
+                filterId);
+
+        return errors;
+    }
+
+    private void addThreatMatches(List<com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError> results,
+            Trie trie,
+            String text,
+            String instancePath,
+            com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError.Location location,
+            String filterId) {
+        if (trie == null || text == null) {
+            return;
+        }
+
+        // Stop after first detection per location to avoid duplicate reports
+        for (org.ahocorasick.trie.Emit emit : trie.parseText(text)) {
+            if (emit == null || emit.getKeyword() == null) {
+                continue;
+            }
+
+            com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError error =
+                com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError.newBuilder()
+                    .setMessage(String.format("%s [chars %d-%d]", emit.getKeyword(), emit.getStart(), emit.getEnd() + 1))
+                    .setSchemaPath(filterId)
+                    .setInstancePath(instancePath)
+                    .setAttribute("threat_detected")
+                    .setLocation(location)
+                    .setStart(emit.getStart())
+                    .setEnd(emit.getEnd() + 1)
+                    .setPhrase(emit.getKeyword())
+                    .build();
+            results.add(error);
+            // Stop after first detection in this location
+            break;
+        }
     }
 
 }
