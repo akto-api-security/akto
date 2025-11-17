@@ -525,6 +525,9 @@ public class DbAction extends ActionSupport {
                 if (UsageMetricCalculator.getDeactivated().contains(id.getApiCollectionId())) {
                     continue;
                 }
+                if (id.getApiCollectionId() == 0) {
+                    continue;
+                }
                 if (URLMethods.Method.OPTIONS.equals(id.getMethod()) || URLMethods.Method.OTHER.equals(id.getMethod())) {
                     continue;
                 }
