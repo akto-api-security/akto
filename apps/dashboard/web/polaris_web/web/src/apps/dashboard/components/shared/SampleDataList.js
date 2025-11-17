@@ -9,32 +9,6 @@ import SampleData from './SampleData';
 import func from '../../../../util/func';
 import { getDashboardCategory, mapLabel } from '../../../main/labelHelper';
 
-// function SchemaValidationError({ sampleData}) {
-//     if (!sampleData || !sampleData?.metadata) {
-//         return null;
-//     }
-//     const schemaErrors = JSON.parse(sampleData?.metadata)?.schemaErrors || [];
-//     if (schemaErrors.length === 0) {
-//         return null;
-//     }
-
-
-//     return (
-//         <VerticalStack gap={"4"}>
-//             <Banner
-//                 title="Schema Validation Errors"
-//                 status="critical"
-//             >
-//                 <List type="bullet">
-//                     {schemaErrors?.map((error, index) => {
-//                         return <List.Item key={index}>{error?.message}</List.Item>
-//                     })}
-//                 </List>
-//             </Banner>
-
-//         </VerticalStack>
-//     )
-// }
 
 function SampleDataList(props) {
 
