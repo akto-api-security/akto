@@ -9,8 +9,9 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.Key;
 import com.akto.log.LoggerMaker;
 import com.akto.util.AccountTask;
-import com.mongodb.client.MongoCursor;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
@@ -168,14 +169,49 @@ public class TagMismatchCron {
             int batchSize = 1000;
             int totalProcessed = 0;
             int mismatchCount = 0;
-            int skip = 0;
+
+            // Cursor pagination state
+            Integer lastApiCollectionId = null;
+            String lastUrl = null;
+            String lastMethod = null;
 
             while (true) {
+                // Build cursor filter
+                Bson cursorFilter;
+                if (lastApiCollectionId == null) {
+                    // First batch - no filter
+                    cursorFilter = new BasicDBObject();
+                } else {
+                    // Subsequent batches - continue from last seen
+                    cursorFilter = Filters.or(
+                        Filters.gt("_id.apiCollectionId", lastApiCollectionId),
+                        Filters.and(
+                            Filters.eq("_id.apiCollectionId", lastApiCollectionId),
+                            Filters.gt("_id.url", lastUrl)
+                        ),
+                        Filters.and(
+                            Filters.eq("_id.apiCollectionId", lastApiCollectionId),
+                            Filters.eq("_id.url", lastUrl),
+                            Filters.gt("_id.method", lastMethod)
+                        )
+                    );
+                }
+
+                // Sort by the 3 key fields
+                Bson sort = Sorts.orderBy(
+                    Sorts.ascending("_id.apiCollectionId"),
+                    Sorts.ascending("_id.url"),
+                    Sorts.ascending("_id.method")
+                );
+
+                // Fetch batch
+                long queryStartTime = System.currentTimeMillis();
                 List<SampleData> batch = SampleDataDao.instance.getMCollection()
-                    .find()
-                    .skip(skip)
+                    .find(cursorFilter)
+                    .sort(sort)
                     .limit(batchSize)
                     .into(new ArrayList<>());
+                long queryTime = System.currentTimeMillis() - queryStartTime;
 
                 if (batch.isEmpty()) {
                     break;
@@ -184,7 +220,8 @@ public class TagMismatchCron {
                 long batchStartTime = System.currentTimeMillis();
 
                 loggerMaker.infoAndAddToDb(
-                    String.format("Processing batch at skip %d with %d documents", skip, batch.size())
+                    String.format("Processing batch with %d documents (query time: %d ms, last seen: apiCollectionId=%s, url=%s, method=%s)",
+                        batch.size(), queryTime, lastApiCollectionId, lastUrl, lastMethod)
                 );
 
                 List<SampleData> mismatchedSamples = new ArrayList<>();
@@ -210,7 +247,13 @@ public class TagMismatchCron {
                 // Handle mismatched samples for this batch
                 handleMismatchedSamples(mismatchedSamples);
 
-                skip += batchSize;
+                // Update cursor position
+                if (!batch.isEmpty()) {
+                    SampleData lastDoc = batch.get(batch.size() - 1);
+                    lastApiCollectionId = lastDoc.getId().getApiCollectionId();
+                    lastUrl = lastDoc.getId().getUrl();
+                    lastMethod = lastDoc.getId().getMethod().toString();
+                }
 
                 long batchDuration = System.currentTimeMillis() - batchStartTime;
                 loggerMaker.infoAndAddToDb(
