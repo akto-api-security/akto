@@ -51,13 +51,9 @@ function SampleDataComponent(props) {
         let originalRequestJson = func.requestJson(originalParsed, sampleData?.highlightPaths || [])
 
         // --- Parse metadata to extract vulnerabilitySegments for threat highlighting ---
-        const normalizeSegments = (errors) => {
-          if (!Array.isArray(errors)) {
-            return undefined;
-          }
-
+        const normalizeSegments = (errors = []) => {
           const normalized = errors
-            .filter(err => Number.isFinite(err.start) && Number.isFinite(err.end))
+            .filter(err => !isNaN(err.start) && !isNaN(err.end))
             .map(err => ({
               start: err.start,
               end: err.end,
@@ -66,19 +62,19 @@ function SampleDataComponent(props) {
               message: err.message
             }));
 
-          return normalized.length > 0 ? normalized : undefined;
+          return normalized;
         };
 
         const selectMetadataSegments = (rawMetadata) => {
           if (!rawMetadata) {
-            return { segments: undefined, fromMetadata: false };
+            return { segments: [], fromMetadata: false };
           }
 
           if (typeof rawMetadata === 'string') {
             try {
               const parsedMeta = JSON.parse(rawMetadata);
               const segments = normalizeSegments(parsedMeta?.schemaErrors);
-              if (segments) {
+              if (segments.length > 0) {
                 return { segments, fromMetadata: true };
               }
             } catch (error) {
@@ -86,18 +82,18 @@ function SampleDataComponent(props) {
             }
           } else {
             const segments = normalizeSegments(rawMetadata?.schemaErrors);
-            if (segments) {
+            if (segments.length > 0) {
               return { segments, fromMetadata: true };
             }
           }
 
-          return { segments: undefined, fromMetadata: false };
+          return { segments: [], fromMetadata: false };
         };
 
         const effectiveMetadata = metadata ?? sampleData?.metadata;
         const { segments: metadataSegments, fromMetadata } = selectMetadataSegments(effectiveMetadata);
-        const baseSegments = Array.isArray(sampleData?.vulnerabilitySegments) ? sampleData.vulnerabilitySegments : [];
-        const vulnerabilitySegments = metadataSegments || baseSegments;
+        const baseSegments = sampleData?.vulnerabilitySegments || [];
+        const vulnerabilitySegments = metadataSegments.length > 0 ? metadataSegments : baseSegments;
         const segmentsFromMetadata = fromMetadata;
 
         if(isNewDiff){
