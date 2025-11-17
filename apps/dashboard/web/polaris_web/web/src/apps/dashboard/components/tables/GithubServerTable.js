@@ -69,11 +69,12 @@ function GithubServerTable(props) {
     })
     setAppliedFilters(temp);
 
-    tempFilters[currentPageKey] = {
+    let updatedFilters = {...filtersMap}
+    updatedFilters[currentPageKey] = {
       'filters': temp,
       'sort': pageFiltersMap?.sort || []
     }
-    setFiltersMap(tempFilters)
+    setFiltersMap(updatedFilters)
   }
   
 
@@ -230,7 +231,7 @@ function GithubServerTable(props) {
     }
     setPage(0);
     if(!key.includes("dateRange")){
-      let tempFilters = filtersMap
+      let tempFilters = {...filtersMap}
       tempFilters[currentPageKey]= {
         filters: temp,
         sort: pageFiltersMap?.sort || []
@@ -367,7 +368,7 @@ function GithubServerTable(props) {
       }
     })
     setAppliedFilters([])
-  }, []);
+  }, [filtersMap, currentPageKey, setFiltersMap]);
 
   const resourceIDResolver = (data) => {
     return data.id;

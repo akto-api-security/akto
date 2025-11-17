@@ -377,6 +377,7 @@ function ApiCollections(props) {
     const setTagCollectionsMap = PersistStore(state => state.setTagCollectionsMap)
     const setHostNameMap = PersistStore(state => state.setHostNameMap)
     const setCoverageMap = PersistStore(state => state.setCoverageMap)
+    const setTrafficMap = PersistStore(state => state.setTrafficMap)
 
     // const lastFetchedResp = dummyData.lastFetchedResp
     // const lastFetchedSeverityResp = dummyData.lastFetchedSeverityResp
@@ -419,7 +420,7 @@ function ApiCollections(props) {
                     const severityInfoMap = lastFetchedSeverityResp || {};
                     const coverageMapCached = PersistStore.getState().coverageMap || {};
                     const riskScoreMap = lastFetchedResp?.riskScoreMap || {};
-                    const trafficInfoMap = {};
+                    const trafficInfoMap = PersistStore.getState().trafficMap || {};
 
                     let finalArr = allCollections;
                     if(customCollectionDataFilter){
@@ -455,7 +456,7 @@ function ApiCollections(props) {
                     const lightweightData = finalArr.map(c => {
                         const testedEndpoints = c.urlsCount === 0 ? 0 : (coverageMapCached[c.id] || 0);
                         const riskScore = c.urlsCount === 0 ? 0 : (riskScoreMap[c.id] || 0);
-                        const envType = c?.envType?.map ? c.envType.map(func.formatCollectionType) : c.envType;
+                        const envType = Array.isArray(c?.envType) ? c.envType.map(func.formatCollectionType) : [];
 
                         let calcCoverage = '0%';
                         if(!c.isOutOfTestingScope && c.urlsCount > 0){
@@ -517,10 +518,13 @@ function ApiCollections(props) {
 
                     // console.log("API_DEBUG: Lightweight data created in", (performance.now() - convertStartTime).toFixed(2), "ms", Date.now(),"tms");
 
-                    // Categorize lightweight data
+                    // Prettify the data to add JSX badges and proper styling
+                    const prettifiedData = transform.prettifyCollectionsData(lightweightData, false);
+
+                    // Categorize prettified data
                     // console.log("API_DEBUG: Starting categorizeCollections...");
                     const categorizeStartTime = performance.now();
-                    const { categorized } = categorizeCollections(lightweightData);
+                    const { categorized } = categorizeCollections(prettifiedData);
                     // console.log("API_DEBUG: categorizeCollections completed in", (performance.now() - categorizeStartTime).toFixed(2), "ms");
 
                     // console.log("API_DEBUG: Calculating summary data...");
@@ -684,6 +688,7 @@ function ApiCollections(props) {
 
         }
         setCoverageMap(coverageInfo)
+        setTrafficMap(trafficInfo)
 
         let usersCollectionList = []
         let userList = []
@@ -824,6 +829,7 @@ function ApiCollections(props) {
                     const discovered = func.prettifyEpoch(c.startTs || 0);
                     const testedEndpoints = c.urlsCount === 0 ? 0 : (coverageMap[c.id] || 0);
                     const riskScore = c.urlsCount === 0 ? 0 : (riskScoreMap[c.id] || 0);
+                    const envType = Array.isArray(c?.envType) ? c.envType.map(func.formatCollectionType) : [];
 
                     let calcCoverage = '0%';
                     if(!c.isOutOfTestingScope && c.urlsCount > 0){
@@ -853,7 +859,7 @@ function ApiCollections(props) {
                         registryStatus: c.registryStatus,
                         description: c.description,
                         isOutOfTestingScope: c.isOutOfTestingScope,
-                        envType: c?.envType?.map ? c.envType.map(func.formatCollectionType) : c.envType,
+                        envType: envType,
                         envTypeOriginal: c?.envType,
                         testedEndpoints,
                         sensitiveInRespTypes: sensitiveTypes,
@@ -873,7 +879,7 @@ function ApiCollections(props) {
                         issuesArrVal,
                         sensitiveSubTypes: sensitiveSubTypesVal,
                         sensitiveSubTypesVal,
-                        envTypeComp: c?.envType?.join(', ') || '',
+                        envTypeComp: envType?.join(', ') || '',
                         icon: CircleTickMajor,
                         rowStatus: c.deactivated ? 'critical' : undefined,
                         disableClick: c.deactivated || false,

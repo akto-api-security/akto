@@ -1887,7 +1887,8 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     tableTabs.forEach((tab,ind) => {
       const tabId = this.getKeyFromName(tab)
       const tabKey = baseUrl + tabId
-      const count = currentState[tabKey] || data[tabId]?.length || initialCountArr[ind] || 0
+      // Check _counts first (for accurate counts with memory optimization), then fall back to array length
+      const count = currentState[tabKey] || data._counts?.[tabId] || data[tabId]?.length || initialCountArr[ind] || 0
       finalCountObj[tabId] = count
     })
 
