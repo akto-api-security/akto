@@ -52,17 +52,14 @@ function SampleDataComponent(props) {
 
         // --- Parse metadata to extract vulnerabilitySegments for threat highlighting ---
         const normalizeSegments = (errors = []) => {
-          const normalized = errors
+          return errors
             .filter(err => !isNaN(err.start) && !isNaN(err.end))
             .map(err => ({
+              ...err,
               start: err.start,
               end: err.end,
-              phrase: err.phrase,
-              location: err.location,
-              message: err.message
+              phrase: err.phrase
             }));
-
-          return normalized;
         };
 
         const selectMetadataSegments = (rawMetadata) => {
