@@ -146,8 +146,6 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, sub
                                 updatedFiltersMap[filterUrl]['sort'] = [];
                                 setFiltersMap(updatedFiltersMap)
                                 navigate(`${navUrl}`);
-                            } else if (navUrl && navUrl === '/dashboard/observe/inventory') {
-                                window.open(navUrl, '_blank', 'noopener,noreferrer')
                             }
                         }
                     }
