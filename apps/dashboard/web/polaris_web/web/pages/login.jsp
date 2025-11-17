@@ -83,18 +83,9 @@
 
                 </script>
                 <script>
-                    var isOnPrem = window.DASHBOARD_MODE === 'ON_PREM';
-                    var isAgentic = window.DASHBOARD_CATEGORY === 'Agentic Security';
-
-                    var productId = isAgentic
-                        ? (isOnPrem ? 'shUignSe80215' : 'ijUqfdSQ80078')
-                        : (isOnPrem ? 'rggteHBr72897' : 'cJtNevEq80216');
-
-                    var filterTag = isOnPrem ? 'onprem' : 'saas';
-
-                    var beamer_config = {
-                        product_id: productId,
-                        filter: filterTag,
+                   var beamer_config = {
+                        product_id: 'cJtNevEq80216',
+                        filter: 'filterTag',
                         selector: '#beamer-btn',
                         top: 0,
                         left: 0,
