@@ -130,13 +130,23 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, sub
                                 }
                                 navigate(`${navUrl}${point.name}`);
                             }
-                            else if( navUrl && navUrl==='/dashboard/issues/'){
-                                const filterUrl = '/dashboard/issues'
+                            else if( navUrl && navUrl ==='/dashboard/issues'){
+                                const filterUrl = '/dashboard/issues/#open'
+                                const filterUrl1 = '/dashboard/issues//#open'
                                 let updatedFiltersMap = { ...filtersMap };
                                 updatedFiltersMap[filterUrl] = {}
-                                  
+                                updatedFiltersMap[filterUrl1] = {}
+                                let key = "issueCategory"
+                                if(point.filterKey.toUpperCase() === "CRITICAL")
+                                  key = "severity"
+                                else if(point.filterKey.toUpperCase() === "HIGH")
+                                  key = "severity"
+                                else if(point.filterKey.toUpperCase() === "MEDIUM")
+                                  key = "severity"
+                                else if(point.filterKey.toUpperCase() === "LOW")
+                                  key = "severity"
                                 const filterObj = [{
-                                    key: "issueCategory",
+                                    key: key,
                                     label: point.filterKey,
                                     value: [point.filterKey]
                                 }
@@ -144,6 +154,8 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, sub
 
                                 updatedFiltersMap[filterUrl]['filters'] = filterObj;
                                 updatedFiltersMap[filterUrl]['sort'] = [];
+                                updatedFiltersMap[filterUrl1]['filters'] = filterObj;
+                                updatedFiltersMap[filterUrl1]['sort'] = [];
                                 setFiltersMap(updatedFiltersMap)
                                 navigate(`${navUrl}`);
                             }

@@ -860,22 +860,22 @@ function HomeDashboard() {
             "Critical": {
                 "text": countMap.CRITICAL || 0,
                 "color": func.getHexColorForSeverity("CRITICAL"),
-                "filterKey": "Critical"
+                "filterKey": "CRITICAL"
             },
             "High": {
                 "text": countMap.HIGH || 0,
                 "color": func.getHexColorForSeverity("HIGH"),
-                "filterKey": "High"
+                "filterKey": "HIGH"
             },
             "Medium": {
                 "text": countMap.MEDIUM || 0,
                 "color": func.getHexColorForSeverity("MEDIUM"),
-                "filterKey": "Medium"
+                "filterKey": "MEDIUM"
             },
             "Low": {
                 "text": countMap.LOW || 0,
                 "color": func.getHexColorForSeverity("LOW"),
-                "filterKey": "Low"
+                "filterKey": "LOW"
             }
         };
 
@@ -914,7 +914,7 @@ function HomeDashboard() {
             <div style={{ marginTop: "20px" }}>
                 <ChartypeComponent
                     data={severityMap}
-                    navUrl={"/dashboard/issues/"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0}
+                    navUrl={"/dashboard/issues"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0}
                     pieInnerSize="50%"
                 />
             </div>

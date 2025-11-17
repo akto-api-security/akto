@@ -6,37 +6,16 @@ import observeFunc from "../../observe/transform"
 import TooltipText from '../../../components/shared/TooltipText'
 
 function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNormal, boxHeight, navUrl, isRequest, chartOnLeft, dataTableWidth, boxPadding, pieInnerSize, chartSize, spaceBetween, navUrlBuilder}) {
-    const handleNavigation = React.useCallback((filterValue) => {
-        if (!navUrl && !navUrlBuilder) return
-        const destination = navUrlBuilder ? navUrlBuilder(navUrl, filterValue) : navUrl
-        if (!destination) return
-        window.open(destination, '_blank', 'noopener,noreferrer')
-    }, [navUrl, navUrlBuilder])
     let tableRows = []
     if(data && Object.keys(data).length > 0)
     {
         Object.keys(data).forEach((key,index)=>{
-            const filterValue = data[key]?.filterValue
-            const hasNavigation = Boolean(navUrl || navUrlBuilder)
-            const isClickable = hasNavigation && (navUrlBuilder ? Boolean(filterValue) : Boolean(navUrl))
-            const interactionProps = isClickable ? {
-                onClick: () => handleNavigation(filterValue),
-                onKeyDown: (event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault()
-                        handleNavigation(filterValue)
-                    }
-                },
-                role: 'button',
-                tabIndex: 0
-            } : {}
             let comp = [
                 (
-                    <Box >
+                    <Box>
                         <div
-                            style={{display: "flex", gap: "8px", alignItems: "center", maxWidth: '200px', cursor: isClickable ? 'pointer' : 'auto'}}
+                            style={{display: "flex", gap: "8px", alignItems: "center", maxWidth: '200px'}}
                             key={index}
-                            {...interactionProps}
                         >
                             <span style={{background: data[key]?.color, borderRadius: "50%", width: "8px", height: "8px"}} />
                             <Box width='150px'>
@@ -48,8 +27,6 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
                 <HorizontalStack gap={1} wrap={false}>
                     <Box
                         width='30px'
-                        {...interactionProps}
-                        style={{cursor: isClickable ? 'pointer' : 'auto'}}
                     >
                         <Text>{observeFunc.formatNumberWithCommas(data[key]?.text)}</Text>
                     </Box>
@@ -64,6 +41,8 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
         acc[key] = data[key];
         return acc;
       }, {}) : data
+
+      console.log("chartData", chartData, title);
 
     const chartComponent = (
 
