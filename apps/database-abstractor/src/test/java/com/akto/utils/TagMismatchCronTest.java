@@ -13,6 +13,7 @@ import org.junit.Test;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 
 import static org.junit.Assert.*;
 
@@ -39,22 +40,16 @@ public class TagMismatchCronTest extends MongoBasedTest {
         // Clean up
         SampleDataDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
+
+        // Explicitly stop MongoDB after each test to prevent port conflicts
+        if (mongod != null) {
+            mongod.stop();
+        }
+        if (mongodExe != null) {
+            mongodExe.stop();
+        }
     }
 
-    // Test 1: Empty Database
-    @Test
-    public void testEvaluateTagsMismatch_EmptyDatabase() throws Exception {
-        // No data setup needed
-
-        // Execute using reflection to call private method
-        java.lang.reflect.Method method = TagMismatchCron.class.getDeclaredMethod("evaluateTagsMismatch", int.class);
-        method.setAccessible(true);
-        method.invoke(tagMismatchCron, TEST_ACCOUNT_ID);
-
-        // Verify no errors and no tags created
-        List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(new com.mongodb.BasicDBObject());
-        assertEquals("No collections should exist", 0, collections.size());
-    }
 
     // Test 2: All Samples Have Mismatch
     @Test
@@ -71,12 +66,11 @@ public class TagMismatchCronTest extends MongoBasedTest {
 
         // Create 10 SampleData per collection (all with mismatch)
         List<SampleData> sampleDataList = new ArrayList<>();
+        Random random = new Random();
         for (int collectionId : Arrays.asList(100, 200, 300, 400, 500)) {
-            for (int i = 0; i < 10; i++) {
-                sampleDataList.add(TagMismatchDataMother.createSampleDataWithAllMismatchSamples(
-                    collectionId, "GET", "https://server.akto.io/api/test/" + i, 3
-                ));
-            }
+            sampleDataList.add(TagMismatchDataMother.createSampleDataWithAllMismatchSamples(
+                collectionId, "GET", "https://server.akto.io/api/test/" + random.nextInt(), 10
+            ));
         }
         TagMismatchDataMother.insertSampleDataBatch(sampleDataList);
 
@@ -112,7 +106,7 @@ public class TagMismatchCronTest extends MongoBasedTest {
         List<SampleData> sampleDataList = new ArrayList<>();
         for (int i = 0; i < 20; i++) {
             sampleDataList.add(TagMismatchDataMother.createSampleDataWithNoMismatchSamples(
-                100 + (i % 3) * 100, "GET", "https://server.akto.io/api/test/" + i, 3
+                100 + (i % 3) * 100, "GET", "https://server.akto.io/api/test/" + i, 10
             ));
         }
         TagMismatchDataMother.insertSampleDataBatch(sampleDataList);

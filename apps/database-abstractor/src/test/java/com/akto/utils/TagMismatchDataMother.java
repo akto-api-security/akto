@@ -36,7 +36,7 @@ public class TagMismatchDataMother {
     }
 
     public static String createSampleJsonWithoutMismatch(String method, String url, int time) {
-        return createSampleJson(null, null, method, url, time);
+        return createSampleJson("5.6.7.7", "1", method, url, time);
     }
 
     public static String createSampleJsonWithPartialMismatch(String method, String url, int time, boolean hasDestIp) {

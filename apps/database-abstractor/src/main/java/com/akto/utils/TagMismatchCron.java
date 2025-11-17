@@ -46,7 +46,7 @@ public class TagMismatchCron {
                     }
                 }, "evaluateTagsMismatch");
             }
-        }, 10000, 100000, TimeUnit.MINUTES);
+        }, 0, 1, TimeUnit.HOURS);
 
     }
 
@@ -113,33 +113,36 @@ public class TagMismatchCron {
                 CollectionTags.TagSource.USER
             );
 
-            // Build bulk write operations
-            List<WriteModel<com.akto.dto.ApiCollection>> bulkOperations = new ArrayList<>();
-
+            // Step 1: Build bulk operations to REMOVE existing tags
+            List<WriteModel<com.akto.dto.ApiCollection>> pullOperations = new ArrayList<>();
             for (Integer collectionId : uniqueCollectionIds) {
                 Bson filter = Filters.eq("_id", collectionId);
-
-                // First remove any existing tag with keyName="tags-mismatch"
                 Bson pullUpdate = Updates.pull(
                     com.akto.dto.ApiCollection.TAGS_STRING,
                     Filters.eq(CollectionTags.KEY_NAME, "tags-mismatch")
                 );
+                pullOperations.add(new UpdateOneModel<>(filter, pullUpdate));
+            }
 
-                // Then push the new tag
+            // Execute first bulk write to remove existing tags
+            if (!pullOperations.isEmpty()) {
+                ApiCollectionsDao.instance.getMCollection().bulkWrite(pullOperations);
+            }
+
+            // Step 2: Build bulk operations to ADD new tags
+            List<WriteModel<com.akto.dto.ApiCollection>> pushOperations = new ArrayList<>();
+            for (Integer collectionId : uniqueCollectionIds) {
+                Bson filter = Filters.eq("_id", collectionId);
                 Bson pushUpdate = Updates.push(
                     com.akto.dto.ApiCollection.TAGS_STRING,
                     tagsMismatchTag
                 );
-
-                // Combine both operations
-                Bson combinedUpdate = Updates.combine(pullUpdate, pushUpdate);
-
-                bulkOperations.add(new UpdateOneModel<>(filter, combinedUpdate));
+                pushOperations.add(new UpdateOneModel<>(filter, pushUpdate));
             }
 
-            // Execute bulk write
-            if (!bulkOperations.isEmpty()) {
-                ApiCollectionsDao.instance.getMCollection().bulkWrite(bulkOperations);
+            // Execute second bulk write to add new tags
+            if (!pushOperations.isEmpty()) {
+                ApiCollectionsDao.instance.getMCollection().bulkWrite(pushOperations);
                 loggerMaker.infoAndAddToDb(
                     String.format("Updated tags-mismatch tag for %d API collections", uniqueCollectionIds.size())
                 );
@@ -177,6 +180,8 @@ public class TagMismatchCron {
                     break;
                 }
 
+                long batchStartTime = System.currentTimeMillis();
+
                 loggerMaker.infoAndAddToDb(
                     String.format("Processing batch at skip %d with %d documents", skip, batch.size())
                 );
@@ -206,9 +211,10 @@ public class TagMismatchCron {
 
                 skip += batchSize;
 
+                long batchDuration = System.currentTimeMillis() - batchStartTime;
                 loggerMaker.infoAndAddToDb(
-                    String.format("Completed batch, total processed so far: %d, mismatches so far: %d",
-                        totalProcessed, mismatchCount)
+                    String.format("Completed batch, total processed so far: %d, mismatches so far: %d, batch processing time: %d ms",
+                        totalProcessed, mismatchCount, batchDuration)
                 );
             }
 
