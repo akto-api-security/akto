@@ -18,7 +18,7 @@ import java.util.List;
  */
 public class TagMismatchDataMother {
 
-    private static final String SAMPLE_TEMPLATE = "{\"destIp\":\"%s\",\"method\":\"%s\",\"requestPayload\":\"{}\",\"responsePayload\":\"<!DOCTYPE html> <html> <head> </head> <body> <h1>Hello, API user!</h1> <p>Test response</p> </body> </html>\",\"ip\":\"null\",\"source\":\"HAR\",\"type\":\"HTTP/1.1\",\"akto_vxlan_id\":1111111111,\"path\":\"%s\",\"requestHeaders\":\"{\\\"authorization\\\":\\\"JWT eyJhbGciOiJSUzI1NiJ9\\\",\\\"host\\\":\\\"vulnerableapi.com\\\",\\\"content-type\\\":\\\"application/json\\\"}\",\"responseHeaders\":\"{}\",\"time\":\"%d\",\"statusCode\":\"200\",\"status\":\"OK\",\"akto_account_id\":\"1758179941\",\"direction\":\"%s\",\"is_pending\":\"false\"}";
+    private static final String SAMPLE_TEMPLATE = "{\"destIp\":\"%s\",\"method\":\"%s\",\"requestPayload\":\"{}\",\"responsePayload\":\"<!DOCTYPE html> <html> <head> </head> <body> <h1>Hello, API user!</h1> <p>Test response</p> </body> </html>\",\"ip\":\"null\",\"source\":\"HAR\",\"type\":\"HTTP/1.1\",\"akto_vxlan_id\":1111111111,\"path\":\"%s\",\"requestHeaders\":\"{\\\"authorization\\\":\\\"test this\\\",\\\"host\\\":\\\"vulnerableapi.com\\\",\\\"content-type\\\":\\\"application/json\\\"}\",\"responseHeaders\":\"{}\",\"time\":\"%d\",\"statusCode\":\"200\",\"status\":\"OK\",\"akto_account_id\":\"1758179941\",\"direction\":\"%s\",\"is_pending\":\"false\"}";
 
     // Sample JSON Builders
 

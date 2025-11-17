@@ -163,6 +163,7 @@ public class TagMismatchCron {
         try {
             Context.accountId.set(accountId);
             loggerMaker.infoAndAddToDb("Starting tags mismatch evaluation for account: " + accountId);
+            long cronStartTime = System.currentTimeMillis();
 
             int batchSize = 1000;
             int totalProcessed = 0;
@@ -218,9 +219,10 @@ public class TagMismatchCron {
                 );
             }
 
+            long cronDuration = System.currentTimeMillis() - cronStartTime;
             loggerMaker.infoAndAddToDb(
-                String.format("Completed tags mismatch evaluation for account: %d, total processed: %d, mismatches found: %d",
-                    accountId, totalProcessed, mismatchCount)
+                String.format("Completed tags mismatch evaluation for account: %d, total processed: %d, mismatches found: %d, time: %d ms",
+                    accountId, totalProcessed, mismatchCount, cronDuration)
             );
 
         } catch (Exception e) {

@@ -23,7 +23,7 @@ import static org.junit.Assert.*;
 public class TagMismatchCronTest extends MongoBasedTest {
 
     private TagMismatchCron tagMismatchCron;
-    private static final int TEST_ACCOUNT_ID = 1736798101;
+    private static final int TEST_ACCOUNT_ID = 1000000;
 
     @Before
     public void setup() {
@@ -41,13 +41,6 @@ public class TagMismatchCronTest extends MongoBasedTest {
         SampleDataDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
 
-        // Explicitly stop MongoDB after each test to prevent port conflicts
-        if (mongod != null) {
-            mongod.stop();
-        }
-        if (mongodExe != null) {
-            mongodExe.stop();
-        }
     }
 
 
