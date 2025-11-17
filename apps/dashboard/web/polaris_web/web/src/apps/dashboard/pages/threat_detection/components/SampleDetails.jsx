@@ -310,26 +310,40 @@ Reference URL: ${window.location.href}`.trim();
         }
 
         try {
-            // Extract host and endpoint from URL
-            const url = moreInfoData?.url || "";
+            // Extract host from request data and endpoint from moreInfoData
             let hostStr = "";
-            let endPointStr = "";
-
-            try {
-                if (url.startsWith("http")) {
-                    const urlObj = new URL(url);
-                    hostStr = urlObj.host;
-                    endPointStr = urlObj.pathname;
-                } else {
-                    hostStr = url;
-                    endPointStr = url;
+            const endPointStr = moreInfoData?.url || "";
+            
+            // Try to extract host from request headers in the data
+            if (data && data.length > 0 && data[0]?.orig) {
+                try {
+                    const requestData = typeof data[0].orig === 'string' ? JSON.parse(data[0].orig) : data[0].orig;
+                    
+                    // Check if requestHeaders exists and parse it
+                    if (requestData?.requestHeaders) {
+                        const requestHeaders = typeof requestData.requestHeaders === 'string' 
+                            ? JSON.parse(requestData.requestHeaders) 
+                            : requestData.requestHeaders;
+                        
+                        // Extract host from headers (case-insensitive)
+                        if (requestHeaders) {
+                            hostStr = requestHeaders.host || requestHeaders.Host || requestHeaders.HOST || "";
+                        }
+                    }
+                } catch (err) {
+                    // If parsing fails, continue with empty host
+                    console.error("Error extracting host from request data:", err);
                 }
-            } catch (err) {
-                hostStr = url;
-                endPointStr = url;
+            }
+            
+            // Fallback: if host not found, use endpoint as fallback
+            if (!hostStr) {
+                hostStr = endPointStr || "Unknown";
             }
 
             // Build work item title and description
+            // Note: Description, Details, and Impact will be added by backend from threat policy template
+            // Title will be formatted as "Policy Name - Endpoint" by backend
             const workItemTitle = currentTemplateObj?.testName || currentTemplateObj?.name || moreInfoData?.templateId;
             const attackCount = data?.length || 0;
             const workItemDescription = `Threat Detection Alert
@@ -339,15 +353,6 @@ Severity: ${severity}
 Attack Count: ${attackCount}
 Host: ${hostStr}
 Endpoint: ${endPointStr}
-
-Description:
-${currentTemplateObj?.description || "No description available"}
-
-Details:
-${currentTemplateObj?.details || "N/A"}
-
-Impact:
-${currentTemplateObj?.impact || "N/A"}
 
 Reference URL: ${window.location.href}`.trim();
 
@@ -369,6 +374,8 @@ Reference URL: ${window.location.href}`.trim();
                 projectName,
                 workItemType,
                 threatEventId: threatEventId,
+                templateId: moreInfoData?.templateId,  // Pass templateId (filterId) from threat policy
+                endpoint: endPointStr,  // Pass endpoint for title formatting
                 aktoDashboardHostName: window.location.origin,
                 customABWorkItemFieldsPayload
             });

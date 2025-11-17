@@ -2,10 +2,13 @@ package com.akto.action;
 
 import com.akto.dao.AzureBoardsIntegrationDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.monitoring.FilterConfigYamlParser;
+import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.azure_boards_integration.AzureBoardsIntegration;
+import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.test_editor.Info;
@@ -165,8 +168,10 @@ public class AzureBoardsIntegrationAction extends UserAction {
     
     // Fields for general work item creation (for threat events)
     private String threatEventId;
+    private String templateId;  // filterId from threat policy
     private String title;
     private String description;
+    private String endpoint;  // endpoint path for title formatting
     private String azureBoardsWorkItemUrl;
 
     public String createWorkItem() {
@@ -457,15 +462,83 @@ public class AzureBoardsIntegrationAction extends UserAction {
         try {
             BasicDBList reqPayload = new BasicDBList();
             
+            String workItemTitle = this.title;
+            String workItemDescription = this.description;
+            
+            // If templateId is provided, fetch threat policy info and use it
+            if (this.templateId != null && !this.templateId.isEmpty()) {
+                try {
+                    YamlTemplate threatPolicyTemplate = FilterYamlTemplateDao.instance.findOne(
+                        Filters.eq(Constants.ID, this.templateId)
+                    );
+                    
+                    if (threatPolicyTemplate != null && threatPolicyTemplate.getContent() != null) {
+                        FilterConfig filterConfig = FilterConfigYamlParser.parseTemplate(
+                            threatPolicyTemplate.getContent(), false
+                        );
+                        
+                        if (filterConfig != null && filterConfig.getInfo() != null) {
+                            Info policyInfo = filterConfig.getInfo();
+                            
+                            // Format title as "Policy Name - Endpoint"
+                            if (policyInfo.getName() != null && !policyInfo.getName().isEmpty()) {
+                                if (this.endpoint != null && !this.endpoint.isEmpty()) {
+                                    workItemTitle = policyInfo.getName() + " - " + this.endpoint;
+                                } else {
+                                    workItemTitle = policyInfo.getName();
+                                }
+                            }
+                            
+                            // Build description: keep original description and append Description, Details, Impact from threat policy
+                            StringBuilder descriptionBuilder = new StringBuilder();
+                            
+                            // Keep the original description (Template ID, Severity, Attack Count, Host, Endpoint, Reference URL)
+                            if (workItemDescription != null && !workItemDescription.isEmpty()) {
+                                descriptionBuilder.append(workItemDescription);
+                                descriptionBuilder.append("\n\n");
+                            }
+                            
+                            // Append Description, Details, and Impact from threat policy
+                            if (policyInfo.getDescription() != null && !policyInfo.getDescription().isEmpty()) {
+                                descriptionBuilder.append("Description:\n");
+                                descriptionBuilder.append(policyInfo.getDescription());
+                                descriptionBuilder.append("\n\n");
+                            }
+                            
+                            if (policyInfo.getDetails() != null && !policyInfo.getDetails().isEmpty()) {
+                                descriptionBuilder.append("Details:\n");
+                                descriptionBuilder.append(policyInfo.getDetails());
+                                descriptionBuilder.append("\n\n");
+                            }
+                            
+                            if (policyInfo.getImpact() != null && !policyInfo.getImpact().isEmpty()) {
+                                descriptionBuilder.append("Impact:\n");
+                                descriptionBuilder.append(policyInfo.getImpact());
+                            }
+                            
+                            // Update description with combined content
+                            if (descriptionBuilder.length() > 0) {
+                                workItemDescription = descriptionBuilder.toString();
+                            }
+                            
+                            logger.infoAndAddToDb("Using threat policy info for work item: " + this.templateId, LoggerMaker.LogDb.DASHBOARD);
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.errorAndAddToDb("Error fetching threat policy template: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+                    // Continue with original title and description if template fetch fails
+                }
+            }
+            
             // Add title
             BasicDBObject titleDBObject = new BasicDBObject();
             titleDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
             titleDBObject.put("path", "/fields/System.Title");
-            titleDBObject.put("value", this.title);
+            titleDBObject.put("value", workItemTitle);
             reqPayload.add(titleDBObject);
 
             // Add description with HTML formatting
-            String formattedDescription = this.description.replace("\n", "<br>");
+            String formattedDescription = workItemDescription.replace("\n", "<br>");
             BasicDBObject descriptionDBObject = new BasicDBObject();
             descriptionDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
             descriptionDBObject.put("path", "/fields/System.Description");
@@ -695,5 +768,21 @@ public class AzureBoardsIntegrationAction extends UserAction {
 
     public void setAzureBoardsWorkItemUrl(String azureBoardsWorkItemUrl) {
         this.azureBoardsWorkItemUrl = azureBoardsWorkItemUrl;
+    }
+
+    public String getTemplateId() {
+        return templateId;
+    }
+
+    public void setTemplateId(String templateId) {
+        this.templateId = templateId;
+    }
+
+    public String getEndpoint() {
+        return endpoint;
+    }
+
+    public void setEndpoint(String endpoint) {
+        this.endpoint = endpoint;
     }
 }
