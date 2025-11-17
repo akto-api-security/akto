@@ -13,6 +13,7 @@ import ActivityTracker from "../../dashboard/components/ActivityTracker";
 import settingFunctions from "../../settings/module";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal";
 import transform from "../../testing/transform";
+import issuesFunctions from "../../issues/module";
 
 function SampleDetails(props) {
     const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate } = props
@@ -32,6 +33,13 @@ function SampleDetails(props) {
     const [jiraProjectMaps, setJiraProjectMaps] = useState({});
     const [projId, setProjId] = useState("");
     const [issueType, setIssueType] = useState("");
+
+    // Azure Boards work item states
+    const [azureBoardsWorkItemUrl, setAzureBoardsWorkItemUrl] = useState(props.azureBoardsWorkItemUrl || "");
+    const [boardsModalActive, setBoardsModalActive] = useState(false);
+    const [projectToWorkItemsMap, setProjectToWorkItemsMap] = useState({});
+    const [projectId, setProjectId] = useState("");
+    const [workItemType, setWorkItemType] = useState("");
 
     const fetchRemediationInfo = async() => {
         if(moreInfoData?.templateId !== undefined){
@@ -127,6 +135,17 @@ function SampleDetails(props) {
     useEffect(() => {
         setJiraTicketUrl(props.jiraTicketUrl || "")
     }, [props.jiraTicketUrl])
+
+    useEffect(() => {
+        setAzureBoardsWorkItemUrl(props.azureBoardsWorkItemUrl || "")
+    }, [props.azureBoardsWorkItemUrl])
+
+    // Initialize Azure Boards metadata if integrated
+    useEffect(() => {
+        if (window.AZURE_BOARDS_INTEGRATED === 'true') {
+            issuesFunctions.fetchCreateABWorkItemFieldMetaData()
+        }
+    }, [])
 
     const openTest = (id) => {
         const navigateUrl = window.location.origin + "/dashboard/protection/threat-policy?policy=" + id
@@ -263,6 +282,123 @@ Reference URL: ${window.location.href}`.trim();
         setModalActive(false);
     }
 
+    const handleAzureBoardClick = async () => {
+        if (!boardsModalActive) {
+            try {
+                const azureBoardsIntegration = await settingFunctions.fetchAzureBoardsIntegration();
+                if (azureBoardsIntegration.projectToWorkItemsMap != null && Object.keys(azureBoardsIntegration.projectToWorkItemsMap).length > 0) {
+                    setProjectToWorkItemsMap(azureBoardsIntegration.projectToWorkItemsMap);
+                    if (Object.keys(azureBoardsIntegration.projectToWorkItemsMap).length > 0) {
+                        setProjectId(Object.keys(azureBoardsIntegration.projectToWorkItemsMap)[0]);
+                        setWorkItemType(Object.values(azureBoardsIntegration.projectToWorkItemsMap)[0]?.[0]);
+                    }
+                } else {
+                    setProjectId(azureBoardsIntegration?.projectId || '');
+                    setWorkItemType(azureBoardsIntegration?.workItemType || '');
+                }
+            } catch (error) {
+                func.setToast(true, true, "Failed to fetch Azure Boards integration settings");
+            }
+        }
+        setBoardsModalActive(!boardsModalActive);
+    }
+
+    const createAzureBoardsWorkItem = async (threatEventId, projectName, workItemType) => {
+        if (!threatEventId || !projectName || !workItemType) {
+            func.setToast(true, true, "Missing required parameters");
+            return;
+        }
+
+        try {
+            // Extract host and endpoint from URL
+            const url = moreInfoData?.url || "";
+            let hostStr = "";
+            let endPointStr = "";
+
+            try {
+                if (url.startsWith("http")) {
+                    const urlObj = new URL(url);
+                    hostStr = urlObj.host;
+                    endPointStr = urlObj.pathname;
+                } else {
+                    hostStr = url;
+                    endPointStr = url;
+                }
+            } catch (err) {
+                hostStr = url;
+                endPointStr = url;
+            }
+
+            // Build work item title and description
+            const workItemTitle = currentTemplateObj?.testName || currentTemplateObj?.name || moreInfoData?.templateId;
+            const attackCount = data?.length || 0;
+            const workItemDescription = `Threat Detection Alert
+
+Template ID: ${moreInfoData?.templateId}
+Severity: ${severity}
+Attack Count: ${attackCount}
+Host: ${hostStr}
+Endpoint: ${endPointStr}
+
+Description:
+${currentTemplateObj?.description || "No description available"}
+
+Details:
+${currentTemplateObj?.details || "N/A"}
+
+Impact:
+${currentTemplateObj?.impact || "N/A"}
+
+Reference URL: ${window.location.href}`.trim();
+
+            // Prepare custom fields payload
+            let customABWorkItemFieldsPayload = [];
+            try {
+                customABWorkItemFieldsPayload = issuesFunctions.prepareCustomABWorkItemFieldsPayload(projectName, workItemType);
+            } catch (error) {
+                func.setToast(true, true, "Please fill all required fields before creating an Azure Boards work item.");
+                return;
+            }
+
+            func.setToast(true, false, "Creating Azure Boards Work Item");
+
+            // Call createGeneralAzureBoardsWorkItem API
+            const response = await issuesApi.createGeneralAzureBoardsWorkItem({
+                title: workItemTitle,
+                description: workItemDescription,
+                projectName,
+                workItemType,
+                threatEventId: threatEventId,
+                aktoDashboardHostName: window.location.origin,
+                customABWorkItemFieldsPayload
+            });
+
+            if (response?.errorMessage) {
+                func.setToast(true, true, response?.errorMessage);
+                return;
+            }
+
+            // Update local state with the work item URL
+            if (response?.azureBoardsWorkItemUrl) {
+                setAzureBoardsWorkItemUrl(response.azureBoardsWorkItemUrl);
+                func.setToast(true, false, "Azure Boards Work Item Created Successfully");
+            }
+
+        } catch (error) {
+            func.setToast(true, true, "Failed to create Azure Boards work item");
+        }
+    }
+
+    const handleAzureBoardSaveAction = async () => {
+        if (!projectId || !workItemType) {
+            func.setToast(true, true, "Please select a project and work item type");
+            return;
+        }
+
+        await createAzureBoardsWorkItem(eventId, projectId, workItemType);
+        setBoardsModalActive(false);
+    }
+
     function TitleComponent () {
         return(
             <Box padding={"4"} paddingBlockStart={"0"} maxWidth="100%">
@@ -365,6 +501,38 @@ Reference URL: ${window.location.href}`.trim();
                                 issueType={issueType}
                                 setIssueType={setIssueType}
                                 issueId={eventId}
+                            />
+                        )}
+                        {azureBoardsWorkItemUrl ? (
+                            <Box>
+                                <Button
+                                    size="slim"
+                                    onClick={() => window.open(azureBoardsWorkItemUrl, '_blank')}
+                                >
+                                    View Work Item
+                                </Button>
+                            </Box>
+                        ) : (
+                            <JiraTicketCreationModal
+                                activator={
+                                    <Button
+                                        size="slim"
+                                        onClick={handleAzureBoardClick}
+                                        disabled={window.AZURE_BOARDS_INTEGRATED !== "true"}
+                                    >
+                                        Create Work Item
+                                    </Button>
+                                }
+                                modalActive={boardsModalActive}
+                                setModalActive={setBoardsModalActive}
+                                handleSaveAction={handleAzureBoardSaveAction}
+                                jiraProjectMaps={projectToWorkItemsMap}
+                                projId={projectId}
+                                setProjId={setProjectId}
+                                issueType={workItemType}
+                                setIssueType={setWorkItemType}
+                                issueId={eventId}
+                                isAzureModal={true}
                             />
                         )}
                     </HorizontalStack>

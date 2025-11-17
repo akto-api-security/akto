@@ -162,6 +162,12 @@ public class AzureBoardsIntegrationAction extends UserAction {
     private TestingIssuesId testingIssuesId;
     private String aktoDashboardHostName;
     public List<BasicDBObject> customABWorkItemFieldsPayload;
+    
+    // Fields for general work item creation (for threat events)
+    private String threatEventId;
+    private String title;
+    private String description;
+    private String azureBoardsWorkItemUrl;
 
     public String createWorkItem() {
         AzureBoardsIntegration azureBoardsIntegration = AzureBoardsIntegrationDao.instance.findOne(new BasicDBObject());
@@ -436,6 +442,129 @@ public class AzureBoardsIntegrationAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    /**
+     * Creates a general Azure Boards work item (for threat events or other general use cases)
+     * Similar to createGeneralJiraTicket
+     */
+    public String createGeneralAzureBoardsWorkItem() {
+        AzureBoardsIntegration azureBoardsIntegration = AzureBoardsIntegrationDao.instance.findOne(new BasicDBObject());
+        if(azureBoardsIntegration == null) {
+            logger.errorAndAddToDb("Azure Boards Integration not found for account: " + Context.accountId.get(), LoggerMaker.LogDb.DASHBOARD);
+            addActionError("Azure Boards Integration is not integrated.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        try {
+            BasicDBList reqPayload = new BasicDBList();
+            
+            // Add title
+            BasicDBObject titleDBObject = new BasicDBObject();
+            titleDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
+            titleDBObject.put("path", "/fields/System.Title");
+            titleDBObject.put("value", this.title);
+            reqPayload.add(titleDBObject);
+
+            // Add description with HTML formatting
+            String formattedDescription = this.description.replace("\n", "<br>");
+            BasicDBObject descriptionDBObject = new BasicDBObject();
+            descriptionDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
+            descriptionDBObject.put("path", "/fields/System.Description");
+            descriptionDBObject.put("value", formattedDescription);
+            reqPayload.add(descriptionDBObject);
+
+            // Add custom fields if provided
+            if (customABWorkItemFieldsPayload != null) {
+                for (BasicDBObject field: customABWorkItemFieldsPayload) {
+                    try {
+                        String fieldReferenceName = field.getString("referenceName");
+                        String fieldValue = field.getString("value");
+                        String fieldType = field.getString("type");
+
+                        BasicDBObject customFieldDBObject = new BasicDBObject();
+                        customFieldDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
+                        customFieldDBObject.put("path", "/fields/" + fieldReferenceName);
+
+                        switch (fieldType) {
+                            case "integer":
+                                int intValue = Integer.parseInt(fieldValue);
+                                customFieldDBObject.put("value", intValue);
+                                break;
+                            case "double":
+                                double doubleValue = Double.parseDouble(fieldValue);
+                                customFieldDBObject.put("value", doubleValue);
+                                break;
+                            case "boolean":
+                                boolean booleanValue = Boolean.parseBoolean(fieldValue);
+                                customFieldDBObject.put("value", booleanValue);
+                                break;
+                            default:
+                                customFieldDBObject.put("value", fieldValue);
+                        }
+
+                        reqPayload.add(customFieldDBObject);
+                    } catch (Exception e) {
+                        logger.errorAndAddToDb("Error processing custom field: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+                        continue;
+                    }
+                }
+            }
+
+            String url = azureBoardsIntegration.getBaseUrl() + "/" + azureBoardsIntegration.getOrganization() + "/" + projectName + "/_apis/wit/workitems/$" + workItemType + "?api-version=" + version;
+            logger.infoAndAddToDb("Azure board final url: " + url, LoggerMaker.LogDb.DASHBOARD);
+
+            Map<String, List<String>> headers = new HashMap<>();
+            headers.put("Authorization", Collections.singletonList("Basic " + azureBoardsIntegration.getPersonalAuthToken()));
+            headers.put("content-type", Collections.singletonList("application/json-patch+json"));
+            
+            OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", reqPayload.toString(), headers, "");
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+            logger.infoAndAddToDb("Status and Response from the createGeneralAzureBoardsWorkItem API: " + response.getStatusCode() + " | " + response.getBody());
+            
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() > 201 || responsePayload == null) {
+                addActionError("Error while creating Azure Boards work item");
+                return Action.ERROR.toUpperCase();
+            }
+
+            BasicDBObject respPayloadObj = BasicDBObject.parse(responsePayload);
+
+            String workItemUrl;
+            try {
+                Object linksObj = respPayloadObj.get("_links");
+                BasicDBObject links = BasicDBObject.parse(linksObj.toString());
+                Object htmlObj = links.get("html");
+                BasicDBObject html = BasicDBObject.parse(htmlObj.toString());
+                Object href = html.get("href");
+                workItemUrl = href.toString();
+            } catch (Exception e) {
+                workItemUrl = respPayloadObj.get("url").toString();
+            }
+
+            if(workItemUrl == null) {
+                addActionError("Failed to extract work item URL from response");
+                return Action.ERROR.toUpperCase();
+            }
+
+            this.azureBoardsWorkItemUrl = workItemUrl;
+
+            // Update malicious event with Azure Boards work item URL if threatEventId is provided
+            if(threatEventId != null && !threatEventId.isEmpty()) {
+                // TODO: Add support for updating malicious event with Azure Boards work item URL
+                // For now, we'll need to add this functionality similar to updateMaliciousEventJiraUrl
+                // This requires backend changes to support azureBoardsWorkItemUrl in the threat detection service
+                logger.infoAndAddToDb("Threat event ID provided: " + threatEventId + ", but Azure Boards URL update not yet implemented", LoggerMaker.LogDb.DASHBOARD);
+            }
+
+            return Action.SUCCESS.toUpperCase();
+
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Error creating general Azure Boards work item: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            e.printStackTrace();
+            addActionError("Error creating Azure Boards work item: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
     public String getAzureBoardsBaseUrl() {
         return azureBoardsBaseUrl;
     }
@@ -534,5 +663,37 @@ public class AzureBoardsIntegrationAction extends UserAction {
 
     public void setCustomABWorkItemFieldsPayload(List<BasicDBObject> customABWorkItemFieldsPayload) {
         this.customABWorkItemFieldsPayload = customABWorkItemFieldsPayload;
+    }
+
+    public String getThreatEventId() {
+        return threatEventId;
+    }
+
+    public void setThreatEventId(String threatEventId) {
+        this.threatEventId = threatEventId;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public String getAzureBoardsWorkItemUrl() {
+        return azureBoardsWorkItemUrl;
+    }
+
+    public void setAzureBoardsWorkItemUrl(String azureBoardsWorkItemUrl) {
+        this.azureBoardsWorkItemUrl = azureBoardsWorkItemUrl;
     }
 }
