@@ -153,6 +153,7 @@ function GithubRow(props) {
                         dataPrimaryLink
                         monochrome
                         removeUnderline
+                        {...(data?.nextUrl !== undefined ? { url: data.nextUrl } : {})}
                     >
                         {cellData}
                     </Link>
