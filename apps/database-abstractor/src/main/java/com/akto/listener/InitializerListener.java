@@ -14,8 +14,8 @@ import com.akto.dao.AccountsDao;
 import com.akto.dao.context.Context;
 import com.akto.merging.Cron;
 import com.akto.utils.KafkaUtils;
+import com.akto.utils.TagMismatchCron;
 import com.mongodb.ConnectionString;
-import com.mongodb.ReadPreference;
 
 
 public class InitializerListener implements ServletContextListener {
@@ -48,6 +48,9 @@ public class InitializerListener implements ServletContextListener {
                             Cron cron = new Cron();
                             logger.info("triggering merging cron for db abstractor " + Context.now());
                             cron.cron(true);
+                            TagMismatchCron tagsMismatchCron = new TagMismatchCron();
+                            logger.info("triggering tags mismatch cron for db abstractor " + Context.now());
+                            tagsMismatchCron.runCron();
                         }
 
                     } catch (Exception e) {
