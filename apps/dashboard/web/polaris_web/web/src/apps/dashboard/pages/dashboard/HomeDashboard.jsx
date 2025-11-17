@@ -29,7 +29,7 @@ import CriticalFindingsGraph from '../issues/IssuesPage/CriticalFindingsGraph';
 import values from "@/util/values";
 import { ActionItemsContent } from './components/ActionItemsContent';
 import { fetchActionItemsData } from './components/actionItemsTransform';
-import { getDashboardCategory, isAgenticSecurityCategory, isMCPSecurityCategory, mapLabel } from '../../../main/labelHelper';
+import { getDashboardCategory, isMCPSecurityCategory, mapLabel } from '../../../main/labelHelper';
 import GraphMetric from '../../components/GraphMetric';
 import Dropdown from '../../components/layouts/Dropdown';
 
@@ -133,21 +133,25 @@ function HomeDashboard() {
             "text": 0,
             "color": "#147CF6",
             "filterKey": "Partner",
+            "filterValue": "Partner"
         },
         "Internal": {
             "text": 0,
             "color": "#FDB33D",
-            "filterKey": "Internal"
+            "filterKey": "Internal",
+            "filterValue": "Private"
         },
         "External": {
             "text": 0,
             "color": "#658EE2",
-            "filterKey": "External"
+            "filterKey": "External",
+            "filterValue": "Public"
         },
         "Third Party": {
             "text": 0,
             "color": "#68B3D0",
-            "filterKey": "Third Party"
+            "filterKey": "Third Party",
+            "filterValue": "Third Party"
         },
         "Need more data": {
             "text": 0,
@@ -670,14 +674,14 @@ function HomeDashboard() {
     }
 
 
-    const buildAuthFiltersUrl = useCallback((baseUrl, filterValue) => {
+    const buildAuthFiltersUrl = useCallback((baseUrl, filterValue, baseFilter) => {
+        console.log("filterValue", filterValue);
         if (!baseUrl) return undefined
-        const hashFragment = '#all'
         if (!filterValue) {
-            return `${baseUrl}${hashFragment}`
+            return baseUrl
         }
         const separator = baseUrl.includes('?') ? '&' : '?'
-        return `${baseUrl}${separator}filters=auth_type__${encodeURIComponent(filterValue)}${hashFragment}`
+        return `${baseUrl}${separator}filters=${baseFilter}__${encodeURIComponent(filterValue)}`
     }, [])
 
     function buildAPITypesData(apiStats, missingCount, redundantCount, apiTypeMissing) {
@@ -937,23 +941,25 @@ function HomeDashboard() {
         linkUrl="/dashboard/observe/inventory"
     />
 
+    const inventoryAllCollectionBaseUrl = `/dashboard/observe/inventory/${ALL_COLLECTION_INVENTORY_ID}`
+
     const apisByAccessTypeComponent = <InfoCard
         component={
-            <ChartypeComponent data={accessTypeMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0} pieInnerSize="50%" />
+            <ChartypeComponent data={accessTypeMap} navUrl={inventoryAllCollectionBaseUrl}  navUrlBuilder={(baseUrl, filterValue) => buildAuthFiltersUrl(baseUrl, filterValue, "access_type")} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0} pieInnerSize="50%" />
         }
         title={`${mapLabel("APIs", getDashboardCategory())} by Access type`}
         titleToolTip={`Categorization of ${mapLabel("APIs", getDashboardCategory())} based on their access permissions and intended usage (Partner, Internal, External, etc.).`}
         linkText="Check out"
-        linkUrl="/dashboard/observe/inventory"
+        linkUrl={inventoryAllCollectionBaseUrl}
     />
 
-    const inventoryAllCollectionBaseUrl = `/dashboard/observe/inventory/${ALL_COLLECTION_INVENTORY_ID}`
+    
 
     const apisByAuthTypeComponent =
         <InfoCard
             component={
                 <div style={{ marginTop: showTestingComponents ? '0px' : '20px' }}>
-                    <ChartypeComponent data={authMap} navUrl={inventoryAllCollectionBaseUrl} navUrlBuilder={buildAuthFiltersUrl} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0} pieInnerSize="50%"/>
+                    <ChartypeComponent data={authMap} navUrl={inventoryAllCollectionBaseUrl} navUrlBuilder={(baseUrl, filterValue) => buildAuthFiltersUrl(baseUrl, filterValue, "auth_type")} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0} pieInnerSize="50%"/>
                 </div>
             }
             title={`${mapLabel("APIs", getDashboardCategory())} by Authentication`}
