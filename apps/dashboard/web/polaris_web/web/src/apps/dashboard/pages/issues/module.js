@@ -1,12 +1,26 @@
 import issuesApi from "@/apps/dashboard/pages/issues/api"
 import IssuesStore from '@/apps/dashboard/pages/issues/issuesStore';
-import { TextField } from "@shopify/polaris";
+import { Checkbox, TextField } from "@shopify/polaris";
 import DropdownSearch from "@/apps/dashboard/components/shared/DropdownSearch";
+import Dropdown from "@/apps/dashboard/components/layouts/Dropdown";
+import SingleDate from "../../components/layouts/SingleDate";
 
 const setCreateJiraIssueFieldMetaData = IssuesStore.getState().setCreateJiraIssueFieldMetaData;
 const updateDisplayJiraIssueFieldValues = IssuesStore.getState().updateDisplayJiraIssueFieldValues;
 
+const setCreateABWorkItemFieldMetaData = IssuesStore.getState().setCreateABWorkItemFieldMetaData;
+const updateDisplayABWorkItemFieldValues = IssuesStore.getState().updateDisplayABWorkItemFieldValues;
+
 const issuesFunctions = {
+    fetchIntegrationCustomFieldsMetadata: () => {
+        if (window.JIRA_INTEGRATED === 'true') {
+            issuesFunctions.fetchCreateIssueFieldMetaData()
+        }
+            
+        if (window.AZURE_BOARDS_INTEGRATED === 'true') {
+            issuesFunctions.fetchCreateABWorkItemFieldMetaData()
+        }
+    },
     getJiraFieldConfigurations: (field) => {
         const customFieldURI = field?.schema?.custom || "";
         const allowedValues = field?.allowedValues || [];
@@ -146,7 +160,245 @@ const issuesFunctions = {
         const additionalIssueFields = { customIssueFields: customIssueFields };
         const jiraMetaData = { additionalIssueFields: additionalIssueFields };
         return jiraMetaData;
-    }
+    },
+    fetchCreateABWorkItemFieldMetaData: async () => {
+        try {
+            if (IssuesStore.getState().createABWorkItemFieldMetaData && Object.keys(IssuesStore.getState().createABWorkItemFieldMetaData).length === 0) {
+                const response = await issuesApi.fetchCreateABWorkItemFieldMetaData()
+
+                if (response && Object.keys(response).length > 0) {
+                    setCreateABWorkItemFieldMetaData(response);
+                }
+            } else {
+                return IssuesStore.getState().createABWorkItemFieldMetaData;
+            }
+        } catch (error) {
+        }
+    },
+    getABFieldConfigurations: (field) => {
+        const { organizationFieldDetails, workItemTypeFieldDetails } = field;
+
+        const fieldReferenceName = organizationFieldDetails?.referenceName || "";
+        const fieldName = organizationFieldDetails?.name || "";
+        const fieldType = organizationFieldDetails?.type || "";
+        const isFieldPicklist = organizationFieldDetails?.isPicklist || false;
+        
+        const fieldDefaultValue = workItemTypeFieldDetails?.defaultValue || null;
+        const fieldAllowedValues = workItemTypeFieldDetails?.allowedValues || [];
+        const isFieldRequired = workItemTypeFieldDetails?.alwaysRequired || false;
+
+        const handleFieldChange = (fieldReferenceName, value) => {
+            updateDisplayABWorkItemFieldValues(fieldReferenceName, value)
+        } 
+
+        const getPicklistFieldConfiguration = (fieldType, fieldDefaultValue, fieldAllowedValues) => {
+            const fallbackInitialValue = fieldType === "string" ? "" : 0;
+            const firstAllowedValue = fieldAllowedValues.length > 0 ? fieldAllowedValues[0] : fallbackInitialValue;
+            const initialValue = fieldDefaultValue !== null ? fieldDefaultValue : firstAllowedValue;
+            const menuItems = fieldAllowedValues.map((option) => ({   
+                label: option,
+                value: option
+            }));
+
+            return {
+                initialValue: initialValue,
+                menuItems: menuItems
+            }
+        }
+
+        /* 
+         * Field types documentation: https://learn.microsoft.com/en-us/azure/devops/boards/queries/query-index-quick-ref?view=azure-devops#operators-and-macros-supported-for-each-data-type 
+         */
+        switch (fieldType) {
+            case "string":
+            case "html":
+                if (isFieldPicklist) {
+                    const { initialValue, menuItems } = getPicklistFieldConfiguration(fieldType, fieldDefaultValue, fieldAllowedValues);
+
+                    return {
+                        initialValue: initialValue,
+                        getComponent: () => { 
+                            return (
+                                <Dropdown
+                                    id={`${fieldReferenceName}-dropdown`}
+                                    label={fieldName}
+                                    menuItems={menuItems}
+                                    initial={initialValue}
+                                    selected={(value) => handleFieldChange(fieldReferenceName, value)}/>
+                            ) 
+                        }
+                    }
+                } else {
+                    return {
+                        initialValue: fieldDefaultValue !== null ? fieldDefaultValue : "",
+                        getComponent: () => {
+                            const displayABWorkItemFieldValues = IssuesStore(state => state.displayABWorkItemFieldValues);
+                            
+                            return (
+                                <TextField
+                                    key={fieldReferenceName}
+                                    label={fieldName}
+                                    value={displayABWorkItemFieldValues[fieldReferenceName] || ""}
+                                    onChange={(value) => handleFieldChange(fieldReferenceName, value)}
+                                    maxLength={fieldType === "string" ? 255 : 1000}
+                                    type="text"
+                                    showCharacterCount
+                                    requiredIndicator={isFieldRequired}
+                                />)
+                        }
+                    }
+                }
+            case "integer":
+            case "double":  
+                if (isFieldPicklist) {
+                    const { initialValue, menuItems } = getPicklistFieldConfiguration(fieldType, fieldDefaultValue, fieldAllowedValues);
+
+                    return {
+                        initialValue: initialValue,
+                        getComponent: () => { 
+                            return (
+                                <Dropdown
+                                    id={`${fieldReferenceName}-dropdown`}
+                                    label={fieldName}
+                                    menuItems={menuItems}
+                                    initial={initialValue}
+                                    selected={(value) => handleFieldChange(fieldReferenceName, value)}/>
+                            ) 
+                        }
+                    }
+                } else {
+                    return {
+                        initialValue: fieldDefaultValue !== null ? fieldDefaultValue : 0,
+                        getComponent: () => {
+                            const displayABWorkItemFieldValues = IssuesStore(state => state.displayABWorkItemFieldValues);
+                            
+                            return (
+                                <TextField
+                                    key={fieldReferenceName}
+                                    label={fieldName}
+                                    value={displayABWorkItemFieldValues[fieldReferenceName] || 0}
+                                    onChange={(value) => handleFieldChange(fieldReferenceName, value)}
+                                    type={fieldType === "integer" ? "integer" : "number"}
+                                    requiredIndicator={isFieldRequired}
+                                />)
+                        }
+                    }
+                }
+            case "boolean":
+                return {
+                    initialValue: fieldDefaultValue !== null ? fieldDefaultValue : false,
+                    getComponent: () => { 
+                        const displayABWorkItemFieldValues = IssuesStore(state => state.displayABWorkItemFieldValues);
+
+                        return (
+                            <Checkbox
+                                label={fieldName}
+                                checked={displayABWorkItemFieldValues[fieldReferenceName] || false}
+                                onChange={(newChecked) => handleFieldChange(fieldReferenceName, newChecked)}
+                            />
+                        ) 
+                    }
+                }
+            case "dateTime":
+                const formatABDate = (d) => {
+                    if (d instanceof Date && !isNaN(d)) {
+                        return d.toLocaleDateString(undefined, {
+                            month: 'numeric',
+                            day: 'numeric',
+                            year: 'numeric'
+                        });
+                    }
+                    return '';
+                }
+
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                const initialValue = formatABDate(tomorrow);
+
+                 return {
+                    initialValue: initialValue,
+                    getComponent: () => { 
+                        const displayABWorkItemFieldValues = IssuesStore(state => state.displayABWorkItemFieldValues);
+                        const currentValue = displayABWorkItemFieldValues[fieldReferenceName] || initialValue;
+                        let currentValueDate = new Date();
+                        try {
+                            const [mm, dd, yyyy] = currentValue.split("/");
+                            currentValueDate = new Date(yyyy, mm - 1, dd)
+                        } catch (error) {
+                            // do nothing
+                        }
+                        
+                        return (
+                            <SingleDate
+                                dispatch={(action) => {
+                                    const selectedDate = action?.obj?.selectedDate;
+
+                                    if (selectedDate instanceof Date && !isNaN(selectedDate)) {
+                                        const selectedDateString = formatABDate(selectedDate);
+                                        handleFieldChange(fieldReferenceName, selectedDateString);
+                                    }
+                                }}
+                                data={currentValueDate}
+                                dataKey="selectedDate"
+                                preferredPosition="above"
+                                disableDatesBefore={new Date(new Date().setDate(new Date().getDate()))}
+                                label="Select date"
+                                allowRange={false}
+                                readOnly={true}
+                            />
+                        )
+                    }
+                }
+            default: 
+                return {
+                    initialValue: null,
+                    getComponent: () => { return null }
+                }
+        }
+    },
+    prepareCustomABWorkItemFieldsPayload: (project, workItemType) => {
+        const displayABWorkItemFieldValues = IssuesStore.getState().displayABWorkItemFieldValues;
+        const createABWorkItemFieldMetaData = IssuesStore.getState().createABWorkItemFieldMetaData;
+        const workItemTypeFieldMetaDataList = createABWorkItemFieldMetaData?.[project]?.[workItemType] || [];
+
+        // Convert to map for easier lookup
+        const workItemTypeFieldMetaDataMap = workItemTypeFieldMetaDataList.reduce((acc, field) => {
+            const fieldReferenceName = field?.organizationFieldDetails?.referenceName;
+            const fieldType = field?.organizationFieldDetails?.type || "string";
+
+            const isFieldRequired = field?.workItemTypeFieldDetails?.alwaysRequired || false;
+            if (fieldReferenceName) {
+                acc[fieldReferenceName] = {
+                    fieldType: fieldType,
+                    isFieldRequired: isFieldRequired,
+                    ...field
+                };
+            }
+            return acc;
+        }, {});
+
+        const customABWorkItemFieldsPayload = [];
+        for (const [fieldReferenceName, fieldValue] of Object.entries(displayABWorkItemFieldValues)) {
+            const fieldMetaData = workItemTypeFieldMetaDataMap[fieldReferenceName];
+
+            // Fail validation if the field is required but has no value
+            if (fieldMetaData !== undefined) {
+                const isFieldRequired = fieldMetaData?.isFieldRequired || false;
+                if (isFieldRequired && fieldValue === null) {
+                    throw new Error();
+                }
+            }
+
+            const fieldType = fieldMetaData?.fieldType || "string";
+            customABWorkItemFieldsPayload.push({
+                referenceName: fieldReferenceName,
+                value: fieldType !== "dateTime" ? fieldValue : `${fieldValue} 16:00`, // Add default time for dateTime fields
+                type: fieldType
+            })
+        }
+
+        return customABWorkItemFieldsPayload;
+    },
 }
 
 export default issuesFunctions

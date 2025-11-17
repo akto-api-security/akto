@@ -11,7 +11,8 @@ import {
   ChoiceList,
   Tabs,
   Text,
-  Link} from '@shopify/polaris';
+  Link,
+  TextField} from '@shopify/polaris';
 import { GithubRow} from './rows/GithubRow';
 import { useState, useCallback, useEffect, useMemo, useRef, useReducer } from 'react';
 import "./style.css"
@@ -275,11 +276,38 @@ function GithubServerTable(props) {
   function formatFilters(filters) {
     let formattedFilters = filters
       .map((filter) => {
+        const existingFilter = appliedFilters.find((localFilter) => localFilter.key === filter.key);
+
+        if (filter.type === 'text') {
+          const textValue = existingFilter
+            ? (Array.isArray(existingFilter.value) ? (existingFilter.value[0] || '') : existingFilter.value || '')
+            : '';
+
+          return {
+            key: filter.key,
+            label: filter.label,
+            filter: (
+              <TextField
+                label={filter.title}
+                labelHidden
+                placeholder={filter.placeholder || ''}
+                value={textValue}
+                autoComplete="off"
+                onChange={(value) => {
+                  const newValue = value ? [value] : [];
+                  handleFilterStatusChange(filter.key, newValue);
+                }}
+              />
+            ),
+            pinned: true
+          }
+        }
+
         return {
           key: filter.key,
           label: filter.label,
           filter: (
-              filter.choices.length < 10 ?       
+              filter.choices.length < 10 ?
               <ChoiceList
                 title={filter.title}
                 titleHidden
@@ -292,8 +320,8 @@ function GithubServerTable(props) {
                 {...(filter.singleSelect ? {} : { allowMultiple: true })}
               />
               :
-              <DropdownSearch 
-                placeHoder={"Apply filters"} 
+              <DropdownSearch
+                placeHoder={"Apply filters"}
                 optionsList={getSortedChoices(filter.choices)}
                 setSelected={(value) => handleFilterStatusChange(filter.key,value)}
                 {...(filter.singleSelect ? {} : { allowMultiple: true })}

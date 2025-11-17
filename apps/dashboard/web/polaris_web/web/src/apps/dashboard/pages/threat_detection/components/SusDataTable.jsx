@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import api from "../api";
 import { CellType } from "../../../components/tables/rows/GithubRow";
@@ -10,7 +11,6 @@ import dayjs from "dayjs";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
 import { formatActorId } from "../utils/formatUtils";
-import useTable from "../../../components/tables/TableContext";
 import threatDetectionRequests from "../api";
 import { LABELS } from "../constants";
 
@@ -88,6 +88,7 @@ const sortOptions = [
 let filters = [];
 
 function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABELS.THREAT }) {
+  const location = useLocation();
   const getTimeEpoch = (key) => {
     return Math.floor(Date.parse(currDateRange.period[key]) / 1000);
   };
@@ -146,7 +147,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     // Check if any other filters are applied (only URL and attack category are allowed)
     const hasOtherFilters = (currentFilters.actor && currentFilters.actor.length > 0) ||
                            (currentFilters.type && currentFilters.type.length > 0) ||
-                           (currentFilters.apiCollectionId && currentFilters.apiCollectionId.length > 0);
+                           (currentFilters.apiCollectionId && currentFilters.apiCollectionId.length > 0) ||
+                           (currentFilters.latestApiOrigRegex && currentFilters.latestApiOrigRegex !== '');
     
     if (hasOtherFilters) {
       const message = 'Only URL and Attack Category filters are allowed for bulk operations. Please remove other filters (Actor, Type, Collection) and try again.';
@@ -396,8 +398,13 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       typeFilter = [],
       latestAttack = [],
       hostFilter = [];
+    let latestApiOrigRegex;
     if (filters?.actor) {
       sourceIpsFilter = filters?.actor;
+    }
+    if (filters?.latestApiOrigRegex) {
+      const regexFilter = filters?.latestApiOrigRegex;
+      latestApiOrigRegex = Array.isArray(regexFilter) ? regexFilter[0] : regexFilter;
     }
     if (filters?.apiCollectionId) {
       apiCollectionIdsFilter = filters?.apiCollectionId;
@@ -423,6 +430,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       type: typeFilter,
       latestAttack: latestAttack,
       host: hostFilter,
+      latestApiOrigRegex: latestApiOrigRegex || '',
       sortKey: sortKey,
       sortOrder: sortOrder
     });
@@ -446,7 +454,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       currentTab.toUpperCase(),
       successfulBool,
       label, // Use the label prop (THREAT or GUARDRAIL)
-      hostFilter
+      hostFilter,
+      latestApiOrigRegex
     );
 
     // Store the total count for filtered results
@@ -455,6 +464,21 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     let total = res.total;
     let ret = res?.maliciousEvents.map((x) => {
       const severity = threatFiltersMap[x?.filterId]?.severity || "HIGH"
+      
+      // Build nextUrl for table navigation (similar to prepareTestRunResult)
+      let nextUrl = null;
+      if (x.refId && x.eventType && x.actor && x.filterId) {
+        const params = new URLSearchParams();
+        params.set("refId", x.refId);
+        params.set("eventType", x.eventType);
+        params.set("actor", x.actor);
+        params.set("filterId", x.filterId);
+        if (x.status) {
+          params.set("eventStatus", x.status.toUpperCase());
+        }
+        nextUrl = `${location.pathname}?${params.toString()}`;
+      }
+      
       return {
         ...x,
         id: x.id,
@@ -478,7 +502,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         severityComp: (<div className={`badge-wrapper-${severity}`}>
                           <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                       </div>
-        )
+        ),
+        nextUrl: nextUrl
       };
     });
     setLoading(false);
@@ -511,6 +536,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       }
     })
 
+    const isRegexFilterEnabled = typeof window !== 'undefined' && Number(window.ACTIVE_ACCOUNT) === 1758858035;
+
     filters = [
       {
         key: "actor",
@@ -530,6 +557,14 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         title: "Host",
         choices: hostChoices,
       },
+      ...(isRegexFilterEnabled ? [{
+        key: 'latestApiOrigRegex',
+        label: "API regex",
+        title: "API regex",
+        type: 'text',
+        placeholder: 'Enter regex',
+        choices: []
+      }] : []),
       {
         key: 'type',
         label: "Type",

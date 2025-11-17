@@ -1,0 +1,8 @@
+llm-guard==0.3.16
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+numpy<2
+torch>=2.4.0
+optimum[onnxruntime]>=1.16.0
+

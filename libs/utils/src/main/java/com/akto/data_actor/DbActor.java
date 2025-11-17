@@ -246,4 +246,10 @@ public class DbActor extends DataActor {
     public void insertDataIngestionLog(Log log) {
         DbLayer.insertDataIngestionLog(log);
     }
+
+    public List<ApiCollection> fetchAllApiCollections() {
+        return DbLayer.fetchAllApiCollections();
+    }
+
+
 }

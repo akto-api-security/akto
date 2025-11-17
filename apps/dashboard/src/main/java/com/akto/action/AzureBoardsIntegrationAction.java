@@ -40,6 +40,8 @@ import java.util.*;
 import static com.akto.utils.Utils.createRequestFile;
 import static com.akto.utils.Utils.getTestResultFromTestingRunResult;
 
+import static com.akto.utils.AzureBoardsUtils.getAccountAzureBoardFields;
+
 public class AzureBoardsIntegrationAction extends UserAction {
 
     private String azureBoardsBaseUrl;
@@ -159,6 +161,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
     private String projectName;
     private TestingIssuesId testingIssuesId;
     private String aktoDashboardHostName;
+    public List<BasicDBObject> customABWorkItemFieldsPayload;
 
     public String createWorkItem() {
         AzureBoardsIntegration azureBoardsIntegration = AzureBoardsIntegrationDao.instance.findOne(new BasicDBObject());
@@ -198,7 +201,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
         logger.infoAndAddToDb("Attachment URL: " + attachmentUrl, LoggerMaker.LogDb.DASHBOARD);
 
         BasicDBList reqPayload = new BasicDBList();
-        azureBoardsPayloadCreator(testingRunResult, testName, testDescription, attachmentUrl, reqPayload);
+        azureBoardsPayloadCreator(testingRunResult, testName, testDescription, attachmentUrl, customABWorkItemFieldsPayload, reqPayload);
         logger.infoAndAddToDb("Azure board payload: " + reqPayload.toString(), LoggerMaker.LogDb.DASHBOARD);
 
         String url = azureBoardsIntegration.getBaseUrl() + "/" + azureBoardsIntegration.getOrganization() + "/" + projectName + "/_apis/wit/workitems/$" + workItemType + "?api-version=" + version;
@@ -248,7 +251,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    private void azureBoardsPayloadCreator(TestingRunResult testingRunResult, String testName, String testDescription, String attachmentUrl, BasicDBList reqPayload) {
+    private void azureBoardsPayloadCreator(TestingRunResult testingRunResult, String testName, String testDescription, String attachmentUrl, List<BasicDBObject> customABWorkItemFieldsPayload, BasicDBList reqPayload) {
         String method = testingRunResult.getApiInfoKey().getMethod().name();
         String fullUrl = testingRunResult.getApiInfoKey().getUrl();
         String endpointPath = getEndpointPath(fullUrl);
@@ -289,6 +292,43 @@ public class AzureBoardsIntegrationAction extends UserAction {
             attachmentsDBObject.put("value", valueDBObject);
             reqPayload.add(attachmentsDBObject);
         }
+
+        // Adding custom fields data
+        if (customABWorkItemFieldsPayload != null) {
+            for (BasicDBObject field: customABWorkItemFieldsPayload) {
+                try {
+                    String fieldReferenceName = field.getString("referenceName");
+                    String fieldValue = field.getString("value");
+                    String fieldType = field.getString("type");
+
+                    BasicDBObject customFieldDBObject = new BasicDBObject();
+                    customFieldDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
+                    customFieldDBObject.put("path", "/fields/" + fieldReferenceName);
+
+                    switch (fieldType) {
+                        case "integer":
+                            int intValue = Integer.parseInt(fieldValue);
+                            customFieldDBObject.put("value", intValue);
+                            break;
+                        case "double":
+                            double doubleValue = Double.parseDouble(fieldValue);
+                            customFieldDBObject.put("value", doubleValue);
+                            break;
+                        case "boolean":
+                            boolean booleanValue = Boolean.parseBoolean(fieldValue);
+                            customFieldDBObject.put("value", booleanValue);
+                            break;
+                        default:
+                            customFieldDBObject.put("value", fieldValue);
+                    }
+
+                    reqPayload.add(customFieldDBObject);
+                } catch (Exception e) {
+                    continue;
+                }
+            }
+        }
+
     }
 
     private String getAttachmentUrl(String originalMessage, String message, AzureBoardsIntegration azureBoardsIntegration) {
@@ -370,10 +410,23 @@ public class AzureBoardsIntegrationAction extends UserAction {
         }
 
         if(existingIssues == testingIssuesIdList.size()) {
-            errorMessage = "All selected issues already have existing Jira tickets. No new tickets were created.";
+            errorMessage = "All selected issues already have existing work items. No new work items were created.";
         } else if(existingIssues > 0) {
-            errorMessage = "Jira tickets created for all selected issues, except for " + existingIssues + " issues that already have tickets.";
+            errorMessage = "Azure board work items created for all selected issues, except for " + existingIssues + " issues that already have work items.";
         }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    Map<String, Map<String, BasicDBList>> createWorkItemFieldMetaData;
+    public String fetchCreateWorkItemFieldMetaData() {
+        AzureBoardsIntegration azureBoardsIntegration = AzureBoardsIntegrationDao.instance.findOne(new BasicDBObject());
+        if(azureBoardsIntegration == null) {
+            addActionError("Azure Boards is not integrated.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        createWorkItemFieldMetaData = getAccountAzureBoardFields();
 
         return Action.SUCCESS.toUpperCase();
     }
@@ -465,5 +518,21 @@ public class AzureBoardsIntegrationAction extends UserAction {
 
     public void setErrorMessage(String errorMessage) {
         this.errorMessage = errorMessage;
+    }
+
+    public Map<String, Map<String, BasicDBList>> getCreateWorkItemFieldMetaData() {
+        return createWorkItemFieldMetaData;
+    }
+
+    public void setCreateWorkItemFieldMetaData(Map<String, Map<String, BasicDBList>> createWorkItemFieldMetaData) {
+        this.createWorkItemFieldMetaData = createWorkItemFieldMetaData;
+    }
+
+    public List<BasicDBObject> getCustomABWorkItemFieldsPayload() {
+        return customABWorkItemFieldsPayload;
+    }
+
+    public void setCustomABWorkItemFieldsPayload(List<BasicDBObject> customABWorkItemFieldsPayload) {
+        this.customABWorkItemFieldsPayload = customABWorkItemFieldsPayload;
     }
 }

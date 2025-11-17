@@ -6,7 +6,7 @@ import ApiCollectionCoverageGraph from './ApiCollectionCoverageGraph';
 import ApisTestedOverTimeGraph from './ApisTestedOverTimeGraph';
 import TestRunOverTimeGraph from './TestRunOverTimeGraph';
 import CategoryWiseScoreGraph from './CategoryWiseScoreGraph';
-import { isApiSecurityCategory } from '../../../../main/labelHelper';
+import { isApiSecurityCategory, isDastCategory } from '../../../../main/labelHelper';
 import func from '@/util/func';
 
 // Memoize only the child components that make API calls to prevent unnecessary re-renders
@@ -52,7 +52,7 @@ const SummaryCardComponent = ({
                     chartSize={190}
                 />
               </HorizontalGrid>
-              {func.isDemoAccount() && !isApiSecurityCategory() ? (
+              {func.isDemoAccount() && !(isApiSecurityCategory() || isDastCategory()) ? (
                 <MemoizedCategoryWiseScoreGraph 
                   key={"category-score-graph"} 
                   startTimestamp={startTimestamp} 
@@ -61,8 +61,8 @@ const SummaryCardComponent = ({
                 />
               ) : null}
                 {
-                  func.isDemoAccount() && !isApiSecurityCategory() ? <></> :
-                    <VerticalStack>
+                  func.isDemoAccount() && !(isApiSecurityCategory() || isDastCategory()) ? <></> :
+                    <VerticalStack gap={4}>
                       <HorizontalGrid columns={2} gap={4}>
                         <MemoizedApiCollectionCoverageGraph />
                         <MemoizedTestRunOverTimeGraph />

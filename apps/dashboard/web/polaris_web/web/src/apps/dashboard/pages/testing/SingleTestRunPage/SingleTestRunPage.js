@@ -519,10 +519,7 @@ function SingleTestRunPage() {
       }
     }
 
-    // Fetch jira integration field metadata
-    if (window.JIRA_INTEGRATED === 'true') {
-      issuesFunctions.fetchCreateIssueFieldMetaData()
-    }
+    issuesFunctions.fetchIntegrationCustomFieldsMetadata();
   }, []);
 
   const promotedBulkActions = () => {

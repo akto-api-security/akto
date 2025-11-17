@@ -429,6 +429,7 @@ public class TestExecutor {
                                     break;
                                 }
                                 if(Context.now() - prevCalcTime > relaxingTime){
+                                    Main.sendSlackAlertForFailedTest(accountId, "Relaxing time reached in case of old testing => " + relaxingTime + " minutes, stopping tests with count left: " + totalTestsToBeExecuted.get());
                                     loggerMaker.infoAndAddToDb("Relaxing time reached => " + relaxingTime + " minutes, stopping tests with count left: " + totalTestsToBeExecuted.get());
                                     break;
                                 }                               
@@ -1147,6 +1148,12 @@ public class TestExecutor {
             return false;
         }
 
+        // Remove extensions from payload for specific account
+        Integer currentAccountId = Context.accountId.get();
+        if (currentAccountId != null && currentAccountId == 1758787662) {
+            removeExtensionsFromGraphQL(rawApi);
+        }
+
         String queryName;
 
         try {
@@ -1208,6 +1215,47 @@ public class TestExecutor {
             return true;
         } catch (Exception e) {
             throw new Exception("Error while modifying graphQL payload");
+        }
+    }
+
+    private void removeExtensionsFromGraphQL(RawApi rawApi) {
+        try {
+            // Remove extensions from request body
+            String body = rawApi.getRequest().getBody();
+            if (body != null && !body.trim().isEmpty()) {
+                try {
+                    Object bodyObj = JSON.parse(body);
+                    if (bodyObj instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> bodyMap = (Map<String, Object>) bodyObj;
+                        if (bodyMap.containsKey("extensions")) {
+                            bodyMap.remove("extensions");
+                            rawApi.getRequest().setBody(gson.toJson(bodyMap));
+                        }
+                    } else if (bodyObj instanceof Object[]) {
+                        // Handle array of GraphQL requests
+                        Object[] bodyArray = (Object[]) bodyObj;
+                        boolean modified = false;
+                        for (Object item : bodyArray) {
+                            if (item instanceof Map) {
+                                @SuppressWarnings("unchecked")
+                                Map<String, Object> itemMap = (Map<String, Object>) item;
+                                if (itemMap.containsKey("extensions")) {
+                                    itemMap.remove("extensions");
+                                    modified = true;
+                                }
+                            }
+                        }
+                        if (modified) {
+                            rawApi.getRequest().setBody(gson.toJson(bodyArray));
+                        }
+                    }
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error removing extensions from GraphQL body: " + e.getMessage(), LogDb.TESTING);
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in removeExtensionsFromGraphQL: " + e.getMessage(), LogDb.TESTING);
         }
     }
 
