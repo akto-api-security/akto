@@ -229,7 +229,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
                 iconComp: (<Box><Icon source={tagsList.includes("AI Agent") ? AutomationMajor : MagicMajor} color={"base"}/></Box>)
             } : {}),
             displayNameComp: (
-                <HorizontalStack gap="2" align="center">
+                <HorizontalStack gap="2" align="start">
                     <Box maxWidth="30vw"><Text truncate fontWeight="medium">{c.displayName}</Text></Box>
                     {c.registryStatus === "available" && <RegistryBadge />}
                 </HorizontalStack>
