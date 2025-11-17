@@ -42,8 +42,6 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
         return acc;
       }, {}) : data
 
-      console.log("chartData", chartData, title);
-
     const chartComponent = (
 
         isNormal ? <DonutChart navUrl={navUrl} navUrlBuilder={navUrlBuilder} data={chartData}  title={charTitle}  subtitle={chartSubtitle} type={title} size={chartSize || 210} isRequest={isRequest} pieInnerSize={pieInnerSize}/> : <ConcentricCirclesChart data={chartData} title={charTitle} size={210} subtitle={chartSubtitle} />
