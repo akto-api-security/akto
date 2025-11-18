@@ -1361,13 +1361,21 @@ function ApiCollections(props) {
     // Use titleWithTooltip for Groups tab (selected === 2)
     const dynamicHeaders = selected === 2 ? headers.map(h => h.titleWithTooltip ? {...h, title: h.titleWithTooltip} : h) : headers;
 
+    // Ensure all headers have unique IDs for IndexTable headings to avoid duplicate key warnings
+    const headingsWithIds = dynamicHeaders.map((header, index) => ({
+        ...header,
+        id: header.id || header.value || header.text || `header-${index}`,
+        // Replace empty titles with a space to avoid empty string keys
+        title: (typeof header.title === 'string' && header.title.trim() === '') ? ' ' : header.title
+    }));
+
     const tableComponent = (
         centerView === CenterViewType.Tree ?
         <TreeViewTable
             collectionsArr={filterTreeViewData(normalData)}
             sortOptions={sortOptions}
             resourceName={resourceName}
-            tableHeaders={dynamicHeaders.filter((x) => x.shouldMerge !== undefined)}
+            tableHeaders={headingsWithIds.filter((x) => x.shouldMerge !== undefined)}
             promotedBulkActions={promotedBulkActions}
         />:
         (centerView === CenterViewType.Table ?
@@ -1379,11 +1387,11 @@ function ApiCollections(props) {
             resourceName={resourceName}
             filters={[]}
             disambiguateLabel={disambiguateLabel}
-            headers={dynamicHeaders}
+            headers={headingsWithIds}
             selectable={true}
             promotedBulkActions={promotedBulkActions}
             mode={IndexFiltersMode.Default}
-            headings={dynamicHeaders}
+            headings={headingsWithIds}
             useNewRow={true}
             condensedHeight={true}
             tableTabs={tableTabs}
