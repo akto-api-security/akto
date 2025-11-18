@@ -89,21 +89,25 @@ public class Main {
     public static void checkForPlaygroundTest(AccountSettings accountSettings){
         scheduler.scheduleWithFixedDelay(new Runnable() {
             public void run() {
-                Context.accountId.set(accountSettings.getId());
-                int timestamp = Context.now()-5*60;
-                TestingRunPlayground testingRunPlayground =  dataActor.getCurrentTestingRunDetailsFromEditor(timestamp); // fetch from Db
-                
-                if (testingRunPlayground == null) {
-                    return;
-                }
+                try {
+                    Context.accountId.set(accountSettings.getId());
+                    int timestamp = Context.now()-5*60;
+                    TestingRunPlayground testingRunPlayground =  dataActor.getCurrentTestingRunDetailsFromEditor(timestamp); // fetch from Db
+                    
+                    if (testingRunPlayground == null) {
+                        return;
+                    }
 
-                switch (testingRunPlayground.getTestingRunPlaygroundType()) {
-                    case TEST_EDITOR_PLAYGROUND:
-                        handleTestEditorPlayground(testingRunPlayground);
-                        break;
-                    case POSTMAN_IMPORTS:
-                        handlePostmanImports(testingRunPlayground);
-                        break;
+                    switch (testingRunPlayground.getTestingRunPlaygroundType()) {
+                        case TEST_EDITOR_PLAYGROUND:
+                            handleTestEditorPlayground(testingRunPlayground);
+                            break;
+                        case POSTMAN_IMPORTS:
+                            handlePostmanImports(testingRunPlayground);
+                            break;
+                    }
+                } catch (Exception e) {
+                    loggerMaker.error("Error in running playground tests: " + e.getMessage());
                 }
             }
         }, 0, 2, TimeUnit.SECONDS);
