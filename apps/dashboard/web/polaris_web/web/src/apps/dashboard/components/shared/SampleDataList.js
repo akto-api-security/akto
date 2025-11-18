@@ -74,6 +74,7 @@ function SampleDataList(props) {
                       showDiff={showDiff}
                       isNewDiff={isNewDiff}
                       metadata={metadata}
+                      readOnly={true}
                     />
                   </LegacyCard>
                 </Box>
