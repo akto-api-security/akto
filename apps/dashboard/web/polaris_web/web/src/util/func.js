@@ -526,6 +526,11 @@ prettifyEpoch(epoch) {
   timeNow: () => {
     return parseInt(new Date().getTime() / 1000)
   },
+  // Check if API collections data caching is enabled for current account
+  isApiCollectionsCachingEnabled: () => {
+    const allowedAccounts = [1736798101];
+    return allowedAccounts.includes(window.ACTIVE_ACCOUNT);
+  },
   convertKeysToLowercase: function (obj){
     return Object.keys(obj).reduce((acc, k) => {
       acc[k.toLowerCase()] = obj[k];

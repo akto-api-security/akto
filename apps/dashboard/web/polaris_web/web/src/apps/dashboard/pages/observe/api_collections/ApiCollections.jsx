@@ -396,13 +396,14 @@ function ApiCollections(props) {
         
             setLoading(true)
 
-            const CACHE_DURATION = 5 * 60; // 5 minutes
+            const CACHE_DURATION = 1 * 60; // 5 minutes
             const now = func.timeNow();
 
             // Check if we have fresh cached collections data
             const hasValidCache = !forceRefresh &&
                                  allCollections.length > 0 &&
-                                 (now - lastFetchedInfo.lastRiskScoreInfo) < CACHE_DURATION;
+                                 (now - lastFetchedInfo.lastRiskScoreInfo) < CACHE_DURATION &&
+                                 func.isApiCollectionsCachingEnabled();
 
             if (hasValidCache) {
                 try {
