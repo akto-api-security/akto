@@ -502,7 +502,7 @@ function ApiCollections(props) {
                     const { categorized } = categorizeCollections(lightweightData);
   
                     const initialSummaryDataObj = {
-                        totalEndpoints: finalArr.reduce((sum, c) => sum + (c.urlsCount || 0), 0),
+                        totalEndpoints: finalArr.filter(c => !c.deactivated && c.type !== "API_GROUP" && c.displayName !== "juice_shop_demo" && c.displayName !== "vulnerable_apis" ).reduce((sum, c) => sum + (c.urlsCount || 0), 0),
                         totalTestedEndpoints: finalArr.reduce((sum, c) => sum + (coverageMapCached[c.id] || 0), 0),
                         totalSensitiveEndpoints: lastFetchedSensitiveResp?.sensitiveUrls || 0,
                         totalCriticalEndpoints: lastFetchedResp?.criticalUrls || 0,
@@ -733,7 +733,7 @@ function ApiCollections(props) {
 
         // Calculate initial summary data to avoid showing zeros
         const initialSummaryDataObj = {
-            totalEndpoints: finalArr.reduce((sum, c) => sum + (c.urlsCount || 0), 0),
+            totalEndpoints: finalArr.filter(c => !c.deactivated && c.type !== "API_GROUP" && c.displayName !== "juice_shop_demo" && c.displayName !== "vulnerable_apis" ).reduce((sum, c) => sum + (c.urlsCount || 0), 0),
             totalTestedEndpoints: finalArr.reduce((sum, c) => sum + (coverageMap[c.id] || 0), 0),
             totalSensitiveEndpoints: sensitiveInfo?.sensitiveUrls || 0,
             totalCriticalEndpoints: riskScoreObj?.criticalUrls || 0,
@@ -790,7 +790,7 @@ function ApiCollections(props) {
 
         // Fetch endpoints count and sensitive info asynchronously
         Promise.all([
-            dashboardApi.fetchEndpointsCount(0, 0),
+            dashboardApi.fetchEndpointsCount(0, func.timeNow()),
             shouldCallHeavyApis ? api.getSensitiveInfoForCollections() : Promise.resolve(null)
         ]).then(([endpointsResponse, sensitiveResponse]) => {
             // Guard: Prevent state updates if component is unmounted
@@ -802,6 +802,8 @@ function ApiCollections(props) {
             if (endpointsResponse) {
                 setTotalAPIs(endpointsResponse.newCount);
             }
+            let apisCount = endpointsResponse.newCount;
+            let newSummaryDataObj = {...summaryData};
 
             // Update sensitive info if available
             if(sensitiveResponse == null || sensitiveResponse === undefined){
@@ -860,7 +862,11 @@ function ApiCollections(props) {
                     const updatedSummary = transform.getSummaryData(updatedNormalData);
                     updatedSummary.totalCriticalEndpoints = riskScoreObj.criticalUrls;
                     updatedSummary.totalSensitiveEndpoints = newSensitiveInfo.sensitiveUrls;
+                    updatedSummary.totalEndpoints = apisCount;
                     setSummaryData(updatedSummary);
+                }else{
+                    newSummaryDataObj.totalEndpoints = apisCount;
+                    setSummaryData(newSummaryDataObj);
                 }
             }
         }).catch(error => {
