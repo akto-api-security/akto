@@ -498,7 +498,6 @@ function ApiCollections(props) {
                         sensitiveInfoMap
                     };
                     const lightweightData = finalArr.map(c => transformRawCollectionData(c, cacheMaps));
-                    console.log("API_DEBUG::: Using cached collections data with", lightweightData.length, "items");
 
                     const { categorized } = categorizeCollections(lightweightData);
   

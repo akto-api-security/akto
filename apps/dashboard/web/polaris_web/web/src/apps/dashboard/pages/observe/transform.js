@@ -524,7 +524,7 @@ const transform = {
 
             // Create displayNameComp if it doesn't exist (for lazy-loaded items)
             const displayNameComp = c.displayNameComp || (
-                <HorizontalStack gap="2" align="center">
+                <HorizontalStack gap="2" align="start">
                     <Box maxWidth="30vw"><Text truncate fontWeight="medium">{c.displayName}</Text></Box>
                     {c.registryStatus === "available" && <Badge>Registry</Badge>}
                 </HorizontalStack>
