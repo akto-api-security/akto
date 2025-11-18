@@ -104,8 +104,6 @@ let persistStore = (set, get) => ({
                 envType,
                 isOutOfTestingScope,
                 urls,
-                tagsList,
-                registryStatus,
             }));
             set({ allCollections: optimizedCollections });
         } catch (error) {

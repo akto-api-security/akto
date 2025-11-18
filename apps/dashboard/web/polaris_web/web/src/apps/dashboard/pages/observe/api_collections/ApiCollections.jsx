@@ -8,7 +8,6 @@ import api from "../api"
 import dashboardApi from "../../dashboard/api"
 import settingRequests from "../../settings/api"
 import { useEffect,useState, useRef } from "react"
-import { unstable_batchedUpdates } from "react-dom"
 import func from "@/util/func"
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
 import { CircleTickMajor } from '@shopify/polaris-icons';
@@ -45,6 +44,8 @@ const CenterViewType = {
     Graph: 2
   }
 
+const API_COLLECTIONS_CACHE_DURATION_SECONDS = 5 * 60; // 5 minutes
+const COLLECTIONS_LAZY_RENDER_THRESHOLD = 100; // Collections count above which we use lazy rendering optimization
 
 const headers = [
     ...((isMCPSecurityCategory() || isAgenticSecurityCategory()) && func.isDemoAccount() ? [{
@@ -262,6 +263,68 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
     return { prettify: prettifyData, normal: newData }
 }
 
+// Transform raw collection data to plain data (without JSX) for filtering/sorting
+// This function is passed to the table component for lazy transformation
+const transformRawCollectionData = (rawCollection, transformMaps) => {
+    const trafficInfoMap = transformMaps?.trafficInfoMap || {};
+    const coverageMap = transformMaps?.coverageMap || {};
+    const riskScoreMap = transformMaps?.riskScoreMap || {};
+    const severityInfoMap = transformMaps?.severityInfoMap || {};
+    const sensitiveInfoMap = transformMaps?.sensitiveInfoMap || {};
+
+    const detected = func.prettifyEpoch(trafficInfoMap[rawCollection.id] || 0);
+    const discovered = func.prettifyEpoch(rawCollection.startTs || 0);
+    const testedEndpoints = rawCollection.urlsCount === 0 ? 0 : (coverageMap[rawCollection.id] || 0);
+    const riskScore = rawCollection.urlsCount === 0 ? 0 : (riskScoreMap[rawCollection.id] || 0);
+    const envType = Array.isArray(rawCollection?.envType) ? rawCollection.envType.map(func.formatCollectionType) : [];
+
+    let calcCoverage = '0%';
+    if(!rawCollection.isOutOfTestingScope && rawCollection.urlsCount > 0){
+        if(rawCollection.urlsCount < testedEndpoints){
+            calcCoverage = '100%'
+        } else {
+            calcCoverage = Math.ceil((testedEndpoints * 100)/rawCollection.urlsCount) + '%'
+        }
+    } else if(rawCollection.isOutOfTestingScope){
+        calcCoverage = 'N/A'
+    }
+
+    const severityInfo = severityInfoMap[rawCollection.id] || {};
+    const sensitiveTypes = sensitiveInfoMap[rawCollection.id] || [];
+
+    // Return minimal object - only fields needed for filtering, sorting, and categorization
+    // JSX components will be created on-demand by prettifyPageData
+    return {
+        id: rawCollection.id,
+        displayName: rawCollection.displayName,
+        hostName: rawCollection.hostName,
+        type: rawCollection.type,
+        deactivated: rawCollection.deactivated,
+        urlsCount: rawCollection.urlsCount,
+        startTs: rawCollection.startTs,
+        tagsList: rawCollection.tagsList,
+        registryStatus: rawCollection.registryStatus,
+        description: rawCollection.description,
+        isOutOfTestingScope: rawCollection.isOutOfTestingScope,
+        envType,
+        envTypeOriginal: rawCollection?.envType,
+        testedEndpoints,
+        sensitiveInRespTypes: sensitiveTypes,
+        severityInfo,
+        detectedTimestamp: rawCollection.urlsCount === 0 ? 0 : (trafficInfoMap[rawCollection.id] || 0),
+        riskScore,
+        detected,
+        discovered,
+        coverage: calcCoverage,
+        nextUrl: '/dashboard/observe/inventory/' + rawCollection.id,
+        lastTraffic: detected,
+        rowStatus: rawCollection.deactivated ? 'critical' : undefined,
+        disableClick: rawCollection.deactivated || false,
+        deactivatedRiskScore: rawCollection.deactivated ? (riskScore - 10) : riskScore,
+        activatedRiskScore: -1 * (rawCollection.deactivated ? riskScore : (riskScore - 10)),
+    };
+};
+
 const categorizeCollections = (prettifyArray) => {
     const envTypeObj = {};
     const hostnameCollections = [];
@@ -270,12 +333,12 @@ const categorizeCollections = (prettifyArray) => {
     const activeCollections = [];
     const deactivatedCollectionsData = [];
     const collectionMap = new Map();
-    
+
     prettifyArray.forEach((c) => {
         // Build environment map
         envTypeObj[c.id] = c.envTypeOriginal;
         collectionMap.set(c.id, c);
-        
+
         // Categorize collections in single pass
         if (!c.deactivated) {
             activeCollections.push(c);
@@ -290,7 +353,7 @@ const categorizeCollections = (prettifyArray) => {
             deactivatedCollectionsData.push(c);
         }
     });
-    
+
     return {
         envTypeObj,
         collectionMap,
@@ -393,20 +456,19 @@ function ApiCollections(props) {
 
     async function fetchData(isMountedRef = { current: true }, forceRefresh = false) {
         try {
-        
             setLoading(true)
-
-            const CACHE_DURATION = 1 * 60; // 5 minutes
             const now = func.timeNow();
-
             // Check if we have fresh cached collections data
+            // Cache is valid if: not forcing refresh, have collections, timestamp exists, within duration, and caching enabled
             const hasValidCache = !forceRefresh &&
                                  allCollections.length > 0 &&
-                                 (now - lastFetchedInfo.lastRiskScoreInfo) < CACHE_DURATION &&
+                                 lastFetchedInfo.lastRiskScoreInfo > 0 && // Must have been fetched at least once
+                                 (now - lastFetchedInfo.lastRiskScoreInfo) < API_COLLECTIONS_CACHE_DURATION_SECONDS &&
                                  func.isApiCollectionsCachingEnabled();
 
             if (hasValidCache) {
                 try {
+                    console.log("API_DEBUG::: Using cached collections data");
                     // Use cached data to populate the UI
                     const sensitiveInfoMap = lastFetchedSensitiveResp?.sensitiveInfoMap || {};
                     const severityInfoMap = lastFetchedSeverityResp || {};
@@ -428,71 +490,18 @@ function ApiCollections(props) {
                     finalArr.forEach((c) => {
                         envTypeObj[c.id] = c.envType;
                     });
-                    const lightweightData = finalArr.map(c => {
-                        const testedEndpoints = c.urlsCount === 0 ? 0 : (coverageMapCached[c.id] || 0);
-                        const riskScore = c.urlsCount === 0 ? 0 : (riskScoreMap[c.id] || 0);
-                        const envType = Array.isArray(c?.envType) ? c.envType.map(func.formatCollectionType) : [];
+                    // Use the centralized transformation function with cache-specific maps
+                    const cacheMaps = {
+                        trafficInfoMap,
+                        coverageMap: coverageMapCached,
+                        riskScoreMap,
+                        severityInfoMap,
+                        sensitiveInfoMap
+                    };
+                    const lightweightData = finalArr.map(c => transformRawCollectionData(c, cacheMaps));
+                    console.log("API_DEBUG::: Using cached collections data with", lightweightData.length, "items");
 
-                        let calcCoverage = '0%';
-                        if(!c.isOutOfTestingScope && c.urlsCount > 0){
-                            if(c.urlsCount < testedEndpoints){
-                                calcCoverage = '100%'
-                            } else {
-                                calcCoverage = Math.ceil((testedEndpoints * 100)/c.urlsCount) + '%'
-                            }
-                        } else if(c.isOutOfTestingScope){
-                            calcCoverage = 'N/A'
-                        }
-
-                        const severityInfo = severityInfoMap[c.id] || {};
-                        const issuesArrVal = `HIGH: ${severityInfo.HIGH || 0}, MEDIUM: ${severityInfo.MEDIUM || 0}, LOW: ${severityInfo.LOW || 0}`;
-                        const sensitiveTypes = sensitiveInfoMap[c.id] || [];
-                        const sensitiveSubTypesVal = sensitiveTypes.join(" ") || "-";
-
-                        return {
-                            id: c.id,
-                            displayName: c.displayName,
-                            hostName: c.hostName,
-                            type: c.type,
-                            deactivated: c.deactivated,
-                            urlsCount: c.urlsCount,
-                            startTs: c.startTs,
-                            tagsList: c.tagsList,
-                            registryStatus: c.registryStatus,
-                            description: c.description,
-                            isOutOfTestingScope: c.isOutOfTestingScope,
-                            envType: envType,
-                            envTypeOriginal: c?.envType,
-                            testedEndpoints,
-                            sensitiveInRespTypes: sensitiveTypes,
-                            severityInfo,
-                            detectedTimestamp: c.urlsCount === 0 ? 0 : (trafficInfoMap[c.id] || 0),
-                            riskScore,
-                            detected: func.prettifyEpoch(trafficInfoMap[c.id] || 0),
-                            discovered: func.prettifyEpoch(c.startTs || 0),
-                            coverage: calcCoverage,
-                            nextUrl: '/dashboard/observe/inventory/' + c.id,
-                            lastTraffic: func.prettifyEpoch(trafficInfoMap[c.id] || 0),
-                            // Plain text values for CSV/filtering
-                            displayNameComp: c.displayName,
-                            descriptionComp: c.description || '',
-                            outOfTestingScopeComp: c.isOutOfTestingScope ? 'Yes' : 'No',
-                            riskScoreComp: riskScore.toString(),
-                            issuesArr: issuesArrVal,
-                            issuesArrVal,
-                            sensitiveSubTypes: sensitiveSubTypesVal,
-                            sensitiveSubTypesVal,
-                            envTypeComp: envType?.join(', ') || '',
-                            icon: CircleTickMajor,
-                            rowStatus: c.deactivated ? 'critical' : undefined,
-                            disableClick: c.deactivated || false,
-                            deactivatedRiskScore: c.deactivated ? (riskScore - 10) : riskScore,
-                            activatedRiskScore: -1 * (c.deactivated ? riskScore : (riskScore - 10)),
-                        };
-                    });
-                    const prettifiedData = transform.prettifyCollectionsData(lightweightData, false);
-
-                    const { categorized } = categorizeCollections(prettifiedData);
+                    const { categorized } = categorizeCollections(lightweightData);
   
                     const initialSummaryDataObj = {
                         totalEndpoints: finalArr.reduce((sum, c) => sum + (c.urlsCount || 0), 0),
@@ -502,15 +511,16 @@ function ApiCollections(props) {
                         totalAllowedForTesting: finalArr.reduce((sum, c) => sum + (c.isOutOfTestingScope ? 0 : c.urlsCount || 0), 0)
                     };
 
-                    // Force React to batch all state updates into a single re-render
-                    unstable_batchedUpdates(() => {
-                        setData(categorized);
-                        setNormalData(lightweightData);
-                        setEnvTypeMap(envTypeObj);
-                        setSummaryData(initialSummaryDataObj);
-                        setHasUsageEndpoints(true);
-                        setLoading(false);
-                    });
+                    // React 18+ automatically batches these state updates into a single re-render
+                    // IMPORTANT: Set data and summary BEFORE setting loading=false to avoid showing zeros
+                    setData(categorized);
+                    setNormalData(lightweightData);
+                    setEnvTypeMap(envTypeObj);
+                    setSummaryData(initialSummaryDataObj);
+                    setHasUsageEndpoints(true);
+
+                    // Set loading to false AFTER all data is set
+                    setLoading(false);
 
                     // Check if maps are already cached in PersistStore
                     const cachedCollectionsMap = PersistStore.getState().collectionsMap;
@@ -654,9 +664,9 @@ function ApiCollections(props) {
             finalArr = finalArr.filter(customCollectionDataFilter)
         }
 
-        // Process data - OPTIMIZATION: For large datasets (>500 items), store RAW data + transform function
+        // Process data - OPTIMIZATION: For large datasets (>COLLECTIONS_LAZY_RENDER_THRESHOLD items), store RAW data + transform function
         // Transformation happens on-demand in the table for each page (100 items at a time)
-        const shouldOptimize = finalArr.length > 500;
+        const shouldOptimize = finalArr.length > COLLECTIONS_LAZY_RENDER_THRESHOLD;
 
         let dataObj;
         if (shouldOptimize) {
@@ -692,63 +702,8 @@ function ApiCollections(props) {
         if (dataObj.prettify._lazyTransform) {
             const maps = dataObj.prettify._transformMaps || {};
 
-            dataForCategorization = dataObj.prettify.map(c => {
-                const trafficInfoMap = maps.trafficInfoMap || {};
-                const coverageMap = maps.coverageMap || {};
-                const riskScoreMap = maps.riskScoreMap || {};
-                const severityInfoMap = maps.severityInfoMap || {};
-                const sensitiveInfoMap = maps.sensitiveInfoMap || {};
-
-                const detected = func.prettifyEpoch(trafficInfoMap[c.id] || 0);
-                const discovered = func.prettifyEpoch(c.startTs || 0);
-                const testedEndpoints = c.urlsCount === 0 ? 0 : (coverageMap[c.id] || 0);
-                const riskScore = c.urlsCount === 0 ? 0 : (riskScoreMap[c.id] || 0);
-                const envType = Array.isArray(c?.envType) ? c.envType.map(func.formatCollectionType) : [];
-
-                let calcCoverage = '0%';
-                if(!c.isOutOfTestingScope && c.urlsCount > 0){
-                    if(c.urlsCount < testedEndpoints){
-                        calcCoverage = '100%'
-                    } else {
-                        calcCoverage = Math.ceil((testedEndpoints * 100)/c.urlsCount) + '%'
-                    }
-                } else if(c.isOutOfTestingScope){
-                    calcCoverage = 'N/A'
-                }
-
-                const severityInfo = severityInfoMap[c.id] || {};
-                const sensitiveTypes = sensitiveInfoMap[c.id] || [];
-
-                return {
-                    id: c.id,
-                    displayName: c.displayName,
-                    hostName: c.hostName,
-                    type: c.type,
-                    deactivated: c.deactivated,
-                    urlsCount: c.urlsCount,
-                    startTs: c.startTs,
-                    tagsList: c.tagsList,
-                    registryStatus: c.registryStatus,
-                    description: c.description,
-                    isOutOfTestingScope: c.isOutOfTestingScope,
-                    envType,
-                    envTypeOriginal: c?.envType,
-                    testedEndpoints,
-                    sensitiveInRespTypes: sensitiveTypes,
-                    severityInfo,
-                    detectedTimestamp: c.urlsCount === 0 ? 0 : (trafficInfoMap[c.id] || 0),
-                    riskScore,
-                    detected,
-                    discovered,
-                    coverage: calcCoverage,
-                    nextUrl: '/dashboard/observe/inventory/' + c.id,
-                    lastTraffic: detected,
-                    rowStatus: c.deactivated ? 'critical' : undefined,
-                    disableClick: c.deactivated || false,
-                    deactivatedRiskScore: c.deactivated ? (riskScore - 10) : riskScore,
-                    activatedRiskScore: -1 * (c.deactivated ? riskScore : (riskScore - 10)),
-                };
-            });
+            // Use the centralized transformation function
+            dataForCategorization = dataObj.prettify.map(c => transformRawCollectionData(c, maps));
 
             // Store transformed data back for table to use
             dataForCategorization._lazyTransform = true;
@@ -778,10 +733,20 @@ function ApiCollections(props) {
         res['untracked'] = [];
         setHasUsageEndpoints(hasUserEndpoints);
 
+        // Calculate initial summary data to avoid showing zeros
+        const initialSummaryDataObj = {
+            totalEndpoints: finalArr.reduce((sum, c) => sum + (c.urlsCount || 0), 0),
+            totalTestedEndpoints: finalArr.reduce((sum, c) => sum + (coverageMap[c.id] || 0), 0),
+            totalSensitiveEndpoints: sensitiveInfo?.sensitiveUrls || 0,
+            totalCriticalEndpoints: riskScoreObj?.criticalUrls || 0,
+            totalAllowedForTesting: finalArr.reduce((sum, c) => sum + (c.isOutOfTestingScope ? 0 : c.urlsCount || 0), 0)
+        };
+
         // Render first batch immediately WITHOUT untracked processing to show UI fast
         setData(res);
         setEnvTypeMap(envTypeObj);
         setAllCollections(apiCollectionsResp.apiCollections || []);
+        setSummaryData(initialSummaryDataObj);
 
         // Store untracked collections for use in async callbacks
         let untrackedCollectionsCache = [];
@@ -1400,6 +1365,7 @@ function ApiCollections(props) {
             selected={selected}
             csvFileName={"Inventory"}
             prettifyPageData={(pageData) => transform.prettifyCollectionsData(pageData, false)}
+            transformRawData={transformRawCollectionData}
         />:    <div style={{height: "800px"}}>
 
         <ReactFlow

@@ -41,71 +41,21 @@ const tableFunc = {
             if (props.data._transformedCache) {
                 tempData = props.data._transformedCache;
             } else {
+                // Use the transformation function provided by the caller (e.g., ApiCollections)
+                // This keeps transform.js generic and allows different tables to provide their own logic
+                const transformFunc = props.transformRawData;
                 const maps = props.data._transformMaps || {};
 
-                // Transform raw data to plain data (without JSX)
-                tempData = props.data.map(c => {
-                    const trafficInfoMap = maps.trafficInfoMap || {};
-                    const coverageMap = maps.coverageMap || {};
-                    const riskScoreMap = maps.riskScoreMap || {};
-                    const severityInfoMap = maps.severityInfoMap || {};
-                    const sensitiveInfoMap = maps.sensitiveInfoMap || {};
+                if (!transformFunc || typeof transformFunc !== 'function') {
+                    console.error('transformRawData function is required when using lazy transformation');
+                    tempData = props.data;
+                } else {
+                    // Transform raw data to plain data (without JSX) using the provided function
+                    tempData = props.data.map(item => transformFunc(item, maps));
 
-                    const detected = func.prettifyEpoch(trafficInfoMap[c.id] || 0);
-                    const discovered = func.prettifyEpoch(c.startTs || 0);
-                    const testedEndpoints = c.urlsCount === 0 ? 0 : (coverageMap[c.id] || 0);
-                    const riskScore = c.urlsCount === 0 ? 0 : (riskScoreMap[c.id] || 0);
-                    const envType = Array.isArray(c?.envType) ? c.envType.map(func.formatCollectionType) : [];
-
-                    let calcCoverage = '0%';
-                    if(!c.isOutOfTestingScope && c.urlsCount > 0){
-                        if(c.urlsCount < testedEndpoints){
-                            calcCoverage = '100%'
-                        } else {
-                            calcCoverage = Math.ceil((testedEndpoints * 100)/c.urlsCount) + '%'
-                        }
-                    } else if(c.isOutOfTestingScope){
-                        calcCoverage = 'N/A'
-                    }
-
-                    const severityInfo = severityInfoMap[c.id] || {};
-                    const sensitiveTypes = sensitiveInfoMap[c.id] || [];
-
-                    // Return minimal object - only fields needed for filtering, sorting, and categorization
-                    // JSX components will be created on-demand by prettifyPageData
-                    return {
-                        id: c.id,
-                        displayName: c.displayName,
-                        hostName: c.hostName,
-                        type: c.type,
-                        deactivated: c.deactivated,
-                        urlsCount: c.urlsCount,
-                        startTs: c.startTs,
-                        tagsList: c.tagsList,
-                        registryStatus: c.registryStatus,
-                        description: c.description,
-                        isOutOfTestingScope: c.isOutOfTestingScope,
-                        envType,
-                        envTypeOriginal: c?.envType,
-                        testedEndpoints,
-                        sensitiveInRespTypes: sensitiveTypes,
-                        severityInfo,
-                        detectedTimestamp: c.urlsCount === 0 ? 0 : (trafficInfoMap[c.id] || 0),
-                        riskScore,
-                        detected,
-                        discovered,
-                        coverage: calcCoverage,
-                        nextUrl: '/dashboard/observe/inventory/' + c.id,
-                        lastTraffic: detected,
-                        rowStatus: c.deactivated ? 'critical' : undefined,
-                        disableClick: c.deactivated || false,
-                        deactivatedRiskScore: c.deactivated ? (riskScore - 10) : riskScore,
-                        activatedRiskScore: -1 * (c.deactivated ? riskScore : (riskScore - 10)),
-                    };
-                });
-
-                // Cache the transformed data for future page navigations
-                props.data._transformedCache = tempData;
+                    // Cache the transformed data for future page navigations
+                    props.data._transformedCache = tempData;
+                }
             }
         }
 

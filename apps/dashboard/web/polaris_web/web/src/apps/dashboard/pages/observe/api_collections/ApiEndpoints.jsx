@@ -418,7 +418,7 @@ function ApiEndpoints(props) {
         }
 
         // MEMORY OPTIMIZATION: Limit rendered items to prevent browser crash with large collections
-        const INITIAL_RENDER_LIMIT = 200;
+        const INITIAL_RENDER_LIMIT = 50;
         const shouldOptimizeEndpoints = allEndpoints.length > INITIAL_RENDER_LIMIT;
 
         // enrich with collection tags (env types) for API group view
@@ -445,30 +445,66 @@ function ApiEndpoints(props) {
             };
         });
 
-        // Check for OpenAPI sources
-        var hasOpenAPI = false;
-        allEndpointsLight.forEach((obj) => {
-            if (obj.sources && obj.sources.hasOwnProperty("OPEN_API")) {
-                hasOpenAPI = true;
+        // Single pass through endpoints for all filtering and checks
+        const result = allEndpointsLight.reduce((acc, obj) => {
+            // Check for OpenAPI sources
+            if (obj.sources) {
+                const hasOpenAPISource = obj.sources.hasOwnProperty("OPEN_API");
+                if (hasOpenAPISource) {
+                    acc.hasOpenAPI = true;
+                }
+                if (!sourcesBackfilled) {
+                    acc.needsBackfill = true;
+                }
+
+                // Zombie endpoints: only OPEN_API source
+                if (Object.keys(obj.sources).length === 1 && hasOpenAPISource) {
+                    acc.zombieEndpoints.push(obj);
+                }
+
+                // Undocumented endpoints: has sources but no OPEN_API
+                if (!hasOpenAPISource) {
+                    acc.undocumentedEndpoints.push(obj);
+                }
             }
-            if (obj.sources && !sourcesBackfilled) {
-                setSourcesBackfilled(true);
+
+            // Filter for other tabs
+            if (obj.sensitive && obj.sensitive.size > 0) {
+                acc.sensitiveEndpoints.push(obj);
             }
+            if (obj.riskScore >= 4) {
+                acc.highRiskEndpoints.push(obj);
+            }
+            if (obj.isNew) {
+                acc.newEndpoints.push(obj);
+            }
+            if (obj.open) {
+                acc.noAuthEndpoints.push(obj);
+            }
+
+            return acc;
+        }, {
+            hasOpenAPI: false,
+            needsBackfill: false,
+            sensitiveEndpoints: [],
+            highRiskEndpoints: [],
+            newEndpoints: [],
+            noAuthEndpoints: [],
+            zombieEndpoints: [],
+            undocumentedEndpoints: []
         });
 
-        // Filter endpoints for each tab (lightweight, for counts)
-        const sensitiveEndpoints = allEndpointsLight.filter(x => x.sensitive && x.sensitive.size > 0);
-        const highRiskEndpoints = allEndpointsLight.filter(x => x.riskScore >= 4);
-        const newEndpoints = allEndpointsLight.filter(x => x.isNew);
-        const noAuthEndpoints = allEndpointsLight.filter(x => x.open);
-        const zombieEndpoints = allEndpointsLight.filter(
-            obj => obj.sources &&
-                   Object.keys(obj.sources).length === 1 &&
-                   obj.sources.hasOwnProperty("OPEN_API")
-        );
-        const undocumentedEndpoints = hasOpenAPI ? allEndpointsLight.filter(
-            obj => obj.sources && !obj.sources.hasOwnProperty("OPEN_API")
-        ) : [];
+        // Set state if backfill is needed
+        if (result.needsBackfill) {
+            setSourcesBackfilled(true);
+        }
+
+        const sensitiveEndpoints = result.sensitiveEndpoints;
+        const highRiskEndpoints = result.highRiskEndpoints;
+        const newEndpoints = result.newEndpoints;
+        const noAuthEndpoints = result.noAuthEndpoints;
+        const zombieEndpoints = result.zombieEndpoints;
+        const undocumentedEndpoints = result.hasOpenAPI ? result.undocumentedEndpoints : [];
 
         // Step 2: Store accurate counts (from ALL endpoints)
         data['_counts'] = {
@@ -481,10 +517,9 @@ function ApiEndpoints(props) {
             zombie: zombieEndpoints.length
         };
 
-        // Step 3: Only prettify (create React components) for first 200 items per tab
-        const prettifyLimitedTab = (endpoints, limit) => {
-            const limited = endpoints.slice(0, limit);
-            const prettified = transform.prettifyEndpointsData(limited);
+        // Step 3: Helper function to prettify a page of data with tags applied
+        const prettifyPageWithTags = (pageData) => {
+            const prettified = transform.prettifyEndpointsData(pageData);
 
             // Re-apply tags after prettify
             prettified.forEach((obj) => {
@@ -501,27 +536,46 @@ function ApiEndpoints(props) {
         };
 
         if (shouldOptimizeEndpoints) {
-            // Large collection: limit to 200 items per tab
-            data['all'] = [...prettifyLimitedTab(allEndpointsLight, INITIAL_RENDER_LIMIT), ...shadowApis];
-            data['all']._actualTotal = data['_counts'].all; // Store real total for pagination
+            // Large collection: use lazy prettification - pass raw data and prettify on demand per page
 
-            data['sensitive'] = prettifyLimitedTab(sensitiveEndpoints, INITIAL_RENDER_LIMIT);
-            data['sensitive']._actualTotal = data['_counts'].sensitive;
+            // For 'all' tab: mix raw allEndpointsLight + already prettified shadowApis
+            data['all'] = [...allEndpointsLight, ...shadowApis];
+            data['all']._prettifyPageData = (pageData) => {
+                // Determine which items are shadowApis (already prettified) vs raw data
+                return pageData.map((item) => {
+                    // Check if this item is a shadowApi by checking for codeAnalysisEndpoint flag
+                    if (item.codeAnalysisEndpoint === true) {
+                        // Already prettified, return as-is
+                        return item;
+                    } else {
+                        // Raw data, needs prettification
+                        return prettifyPageWithTags([item])[0];
+                    }
+                });
+            };
 
-            data['high_risk'] = prettifyLimitedTab(highRiskEndpoints, INITIAL_RENDER_LIMIT);
-            data['high_risk']._actualTotal = data['_counts'].high_risk;
+            data['sensitive'] = sensitiveEndpoints;
+            data['sensitive']._prettifyPageData = prettifyPageWithTags;
 
-            data['new'] = prettifyLimitedTab(newEndpoints, INITIAL_RENDER_LIMIT);
-            data['new']._actualTotal = data['_counts'].new;
+            data['high_risk'] = highRiskEndpoints;
+            data['high_risk']._prettifyPageData = prettifyPageWithTags;
 
-            data['no_auth'] = prettifyLimitedTab(noAuthEndpoints, INITIAL_RENDER_LIMIT);
-            data['no_auth']._actualTotal = data['_counts'].no_auth;
+            data['new'] = newEndpoints;
+            data['new']._prettifyPageData = prettifyPageWithTags;
 
-            data['shadow'] = [...shadowApis, ...prettifyLimitedTab(undocumentedEndpoints, INITIAL_RENDER_LIMIT)];
-            data['shadow']._actualTotal = data['_counts'].shadow;
+            data['no_auth'] = noAuthEndpoints;
+            data['no_auth']._prettifyPageData = prettifyPageWithTags;
 
-            data['zombie'] = prettifyLimitedTab(zombieEndpoints, INITIAL_RENDER_LIMIT);
-            data['zombie']._actualTotal = data['_counts'].zombie;
+            // For 'shadow' tab: mix shadowApis (prettified) + undocumentedEndpoints (raw)
+            data['shadow'] = [...shadowApis, ...undocumentedEndpoints];
+            data['shadow']._prettifyPageData = (pageData) => {
+                return pageData.map(item =>
+                    item.codeAnalysisEndpoint === true ? item : prettifyPageWithTags([item])[0]
+                );
+            };
+
+            data['zombie'] = zombieEndpoints;
+            data['zombie']._prettifyPageData = prettifyPageWithTags;
         } else {
             // Small collection: render all normally
             const prettifyData = transform.prettifyEndpointsData(allEndpointsLight);
@@ -1279,6 +1333,7 @@ function ApiEndpoints(props) {
         key={currentKey}
         pageLimit={50}
         data={endpointData[selectedTab]}
+        prettifyPageData={endpointData[selectedTab]?._prettifyPageData}
         sortOptions={sortOptions}
         resourceName={resourceName}
         filters={[]}
