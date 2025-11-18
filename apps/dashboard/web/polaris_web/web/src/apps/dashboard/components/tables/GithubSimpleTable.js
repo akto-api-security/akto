@@ -11,10 +11,18 @@ function GithubSimpleTable(props) {
     const tableKey = props.hardCodedKey ? "hardCodedKey" : `table_${props.data?.length || 0}`;
     // console.log("SIMPLE_TABLE_DEBUG: Rendering with key:", tableKey, "data length:", props.data?.length);
 
+    // Use lazy prettification if prettifyPageData function is provided
+    // This allows creating JSX components only for visible page (100 items) instead of all data (17k items)
+    const fetchFunction = props.prettifyPageData
+        ? (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) =>
+            tableFunc.fetchDataSyncWithLazyPrettify(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue, setFilters, props)
+        : (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) =>
+            tableFunc.fetchDataSync(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue, setFilters, props);
+
     return <GithubServerTable
         key={tableKey}
         pageLimit={props.pageLimit}
-        fetchData={(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => tableFunc.fetchDataSync(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue, setFilters, props)}
+        fetchData={fetchFunction}
         sortOptions={props.sortOptions} 
         resourceName={props.resourceName} 
         filters={filters}

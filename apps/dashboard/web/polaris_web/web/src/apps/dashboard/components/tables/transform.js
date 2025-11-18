@@ -6,47 +6,133 @@ import { times } from "lodash";
 const filterChoicesCache = new Map();
 
 const tableFunc = {
-    fetchDataSync: function (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue, setFilters, props){
-        const fetchStartTime = performance.now();
-        console.log(`🔍 [FETCH_PERF] fetchDataSync called with ${props.data?.length} items, skip: ${skip}, limit: ${limit}`);
-
+    // NEW: Enhanced version with lazy prettification support
+    fetchDataSyncWithLazyPrettify: function (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue, setFilters, props){
         // Early return for empty data
         if (!props.data || props.data.length === 0) {
             setFilters([]);
             return {value: [], total: 0, fullDataIds: []};
         }
 
+        // First call the original fetchDataSync to get the paginated data
+        const result = this.fetchDataSync(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue, setFilters, props);
+
+        // LAZY PRETTIFICATION: If data has a prettifyPageData function, call it on the current page only
+        // This allows tables to prettify (create JSX components) only for visible items
+        if (props.prettifyPageData && typeof props.prettifyPageData === 'function' && result.value.length > 0) {
+            result.value = props.prettifyPageData(result.value);
+        }
+
+        return result;
+    },
+
+    fetchDataSync: function (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue, setFilters, props){
+        // Early return for empty data
+        if (!props.data || props.data.length === 0) {
+            setFilters([]);
+            return {value: [], total: 0, fullDataIds: []};
+        }
+
+        // Check if data needs lazy transformation (raw data -> plain data)
+        const needsLazyTransform = props.data._lazyTransform === true;
+        let tempData = props.data;
+
+        if (needsLazyTransform) {
+            // Check if already cached (transformed during categorization)
+            if (props.data._transformedCache) {
+                tempData = props.data._transformedCache;
+            } else {
+                const maps = props.data._transformMaps || {};
+
+                // Transform raw data to plain data (without JSX)
+                tempData = props.data.map(c => {
+                    const trafficInfoMap = maps.trafficInfoMap || {};
+                    const coverageMap = maps.coverageMap || {};
+                    const riskScoreMap = maps.riskScoreMap || {};
+                    const severityInfoMap = maps.severityInfoMap || {};
+                    const sensitiveInfoMap = maps.sensitiveInfoMap || {};
+
+                    const detected = func.prettifyEpoch(trafficInfoMap[c.id] || 0);
+                    const discovered = func.prettifyEpoch(c.startTs || 0);
+                    const testedEndpoints = c.urlsCount === 0 ? 0 : (coverageMap[c.id] || 0);
+                    const riskScore = c.urlsCount === 0 ? 0 : (riskScoreMap[c.id] || 0);
+                    const envType = Array.isArray(c?.envType) ? c.envType.map(func.formatCollectionType) : [];
+
+                    let calcCoverage = '0%';
+                    if(!c.isOutOfTestingScope && c.urlsCount > 0){
+                        if(c.urlsCount < testedEndpoints){
+                            calcCoverage = '100%'
+                        } else {
+                            calcCoverage = Math.ceil((testedEndpoints * 100)/c.urlsCount) + '%'
+                        }
+                    } else if(c.isOutOfTestingScope){
+                        calcCoverage = 'N/A'
+                    }
+
+                    const severityInfo = severityInfoMap[c.id] || {};
+                    const sensitiveTypes = sensitiveInfoMap[c.id] || [];
+
+                    // Return minimal object - only fields needed for filtering, sorting, and categorization
+                    // JSX components will be created on-demand by prettifyPageData
+                    return {
+                        id: c.id,
+                        displayName: c.displayName,
+                        hostName: c.hostName,
+                        type: c.type,
+                        deactivated: c.deactivated,
+                        urlsCount: c.urlsCount,
+                        startTs: c.startTs,
+                        tagsList: c.tagsList,
+                        registryStatus: c.registryStatus,
+                        description: c.description,
+                        isOutOfTestingScope: c.isOutOfTestingScope,
+                        envType,
+                        envTypeOriginal: c?.envType,
+                        testedEndpoints,
+                        sensitiveInRespTypes: sensitiveTypes,
+                        severityInfo,
+                        detectedTimestamp: c.urlsCount === 0 ? 0 : (trafficInfoMap[c.id] || 0),
+                        riskScore,
+                        detected,
+                        discovered,
+                        coverage: calcCoverage,
+                        nextUrl: '/dashboard/observe/inventory/' + c.id,
+                        lastTraffic: detected,
+                        rowStatus: c.deactivated ? 'critical' : undefined,
+                        disableClick: c.deactivated || false,
+                        deactivatedRiskScore: c.deactivated ? (riskScore - 10) : riskScore,
+                        activatedRiskScore: -1 * (c.deactivated ? riskScore : (riskScore - 10)),
+                    };
+                });
+
+                // Cache the transformed data for future page navigations
+                props.data._transformedCache = tempData;
+            }
+        }
+
         // Check if data has an override for actual total (used when data is limited for memory optimization)
         const actualTotal = props.data._actualTotal;
 
-        let localFilters = func.prepareFilters(props.data,props.filters);
+        let localFilters = func.prepareFilters(tempData,props.filters);
 
         // Create cache key based on data length and headers
         const cacheKey = `${props.data.length}_${props.headers.map(h => h.value).join('_')}`;
 
-        // console.log("TABLE_DEBUG: Building filtersFromHeaders...");
-        const filtersStartTime = performance.now();
-
         let filtersFromHeaders;
         if (filterChoicesCache.has(cacheKey)) {
-          console.log(`✅ [FETCH_PERF] Using cached filters`);
           filtersFromHeaders = filterChoicesCache.get(cacheKey);
         } else {
-          console.log(`🔨 [FETCH_PERF] Building filters from ${props.data.length} items...`);
-          const filterBuildStart = performance.now();
-
           filtersFromHeaders = props.headers.filter((header) => {
             return header.showFilter
           }).map((header) => {
-            const headerStartTime = performance.now();
             let key = header.filterKey || header.value
             let label = header.filterLabel || header.text
 
             // Use Set for better performance with large datasets
             let uniqueValues = new Set();
 
-            for (let i = 0; i < props.data.length; i++) {
-              let value = props.data[i][key];
+            for (let i = 0; i < tempData.length; i++) {
+              let value = tempData[i][key];
               if (value instanceof Set) {
                 value.forEach(v => uniqueValues.add(v));
               } else if (value instanceof Array) {
@@ -62,8 +148,6 @@ const tableFunc = {
 
             let choices = distinctItems.map((item) => ({label: item, value: item}));
 
-            console.log(`   Filter "${key}" took ${(performance.now() - headerStartTime).toFixed(2)}ms`);
-
             return {
               key: key,
               label: label,
@@ -74,15 +158,11 @@ const tableFunc = {
 
           // Cache the result for future calls
           filterChoicesCache.set(cacheKey, filtersFromHeaders);
-          console.log(`🔨 [FETCH_PERF] All filters built in ${(performance.now() - filterBuildStart).toFixed(2)}ms`);
         }
-
-        // console.log("TABLE_DEBUG: All filters built in", (performance.now() - filtersStartTime).toFixed(2), "ms");
 
         localFilters = localFilters.concat(filtersFromHeaders)
         localFilters = localFilters.filter((filter) => filter.choices.length > 0)
         setFilters(localFilters);
-          let tempData = props.data;
 
         let dataSortKey = props?.sortOptions?.filter(value => {
           return (value.value.startsWith(sortKey))
@@ -99,7 +179,6 @@ const tableFunc = {
           let pageLimit = limit;
           let final2Data = tempData && tempData.length <= pageLimit ? tempData :
           tempData.slice(page * pageLimit, Math.min((page + 1) * pageLimit, tempData.length))
-          // console.log("TABLE_DEBUG: ✅ fetchDataSync completed in", (Date.now()), "ms");
 
           return {value:final2Data,total:tempData.length, fullDataIds: tempData.map((x) => {return {id: x?.id}})}
         }
@@ -154,11 +233,8 @@ const tableFunc = {
         }
 
           // Sort only if we have data and a sort key
-          const sortStart = performance.now();
           if (tempData.length > 0 && dataSortKey) {
-            console.log(`🔄 [FETCH_PERF] Sorting ${tempData.length} items...`);
             tempData = func.sortFunc(tempData, dataSortKey, sortOrder, props?.treeView !== undefined ? true : false)
-            console.log(`🔄 [FETCH_PERF] Sorting took ${(performance.now() - sortStart).toFixed(2)}ms`);
           }
 
           if(props.getFilteredItems){
@@ -179,9 +255,6 @@ const tableFunc = {
 
           // Use actualTotal if provided (for memory-optimized large datasets), otherwise use calculated length
           const reportedTotal = actualTotal !== undefined ? actualTotal : totalLength;
-
-          const fetchTotalTime = performance.now() - fetchStartTime;
-          console.log(`✅ [FETCH_PERF] fetchDataSync completed in ${fetchTotalTime.toFixed(2)}ms - returning ${final2Data.length} items`);
 
           return {value: final2Data, total: reportedTotal, fullDataIds: fullDataIds}
     },

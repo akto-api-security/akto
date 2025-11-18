@@ -421,8 +421,6 @@ function ApiEndpoints(props) {
         const INITIAL_RENDER_LIMIT = 200;
         const shouldOptimizeEndpoints = allEndpoints.length > INITIAL_RENDER_LIMIT;
 
-        console.log(`INVENTORY_DEBUG: Total endpoints: ${allEndpoints.length}, optimizing: ${shouldOptimizeEndpoints}`);
-
         // enrich with collection tags (env types) for API group view
         const collectionTagsMap = {}
         ;(allCollections || []).forEach((c) => {
@@ -504,8 +502,6 @@ function ApiEndpoints(props) {
 
         if (shouldOptimizeEndpoints) {
             // Large collection: limit to 200 items per tab
-            console.log(`INVENTORY_DEBUG: Limiting render to ${INITIAL_RENDER_LIMIT} items per tab (showing counts from all ${allEndpoints.length})`);
-
             data['all'] = [...prettifyLimitedTab(allEndpointsLight, INITIAL_RENDER_LIMIT), ...shadowApis];
             data['all']._actualTotal = data['_counts'].all; // Store real total for pagination
 

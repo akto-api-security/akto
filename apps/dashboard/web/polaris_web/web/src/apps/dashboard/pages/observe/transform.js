@@ -509,12 +509,29 @@ const transform = {
                 calcCoverage = 'N/A'
             }
             const loadingComp = <Text color="subdued" variant="bodyMd">...</Text>
+
+            // Create displayNameComp if it doesn't exist (for lazy-loaded items)
+            const displayNameComp = c.displayNameComp || (
+                <HorizontalStack gap="2" align="center">
+                    <Box maxWidth="30vw"><Text truncate fontWeight="medium">{c.displayName}</Text></Box>
+                    {c.registryStatus === "available" && <Badge>Registry</Badge>}
+                </HorizontalStack>
+            );
+
+            // Create descriptionComp if it doesn't exist
+            const descriptionComp = c.descriptionComp || (<Box maxWidth="350px"><Text>{c.description}</Text></Box>);
+
+            // Create outOfTestingScopeComp if it doesn't exist
+            const outOfTestingScopeComp = c.outOfTestingScopeComp || (c.isOutOfTestingScope ? (<Text>Yes</Text>) : (<Text>No</Text>));
+
             return{
                 ...c,
                 id: c.id,
                 nextUrl: '/dashboard/observe/inventory/' + c.id,
                 displayName: c.displayName,
-                displayNameComp: c.displayNameComp,
+                displayNameComp: displayNameComp,
+                descriptionComp: descriptionComp,
+                outOfTestingScopeComp: outOfTestingScopeComp,
                 riskScoreComp: isLoading ? loadingComp : <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
                 coverage: isLoading ? '...' : calcCoverage,
                 issuesArr: isLoading ? loadingComp : this.getIssuesList(c.severityInfo),
