@@ -29,6 +29,7 @@ import com.akto.jsonrpc.JsonRpcUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mcp.McpRequestResponseUtils;
+import com.akto.rest.RestMethodUtils;
 import com.akto.runtime.RuntimeUtil;
 import com.akto.runtime.parser.SampleParser;
 import com.akto.runtime.utils.Utils;
@@ -884,9 +885,22 @@ public class HttpCallParser {
 
             List<HttpResponseParams> responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
             if (responseParamsList.isEmpty()) {
-                HttpResponseParams jsonRpcResponse = JsonRpcUtils.parseJsonRpcResponse(httpResponseParam);
-                List<HttpResponseParams> mcpResponseParamsList = McpRequestResponseUtils.parseMcpResponseParams(jsonRpcResponse);
-                filteredResponseParams.addAll(mcpResponseParamsList);
+                // Check for REST method payload structure (only for account 1758525547)
+                if (DataActor.actualAccountId == 1758525547 || DataActor.actualAccountId == 1667235738) {
+                    List<HttpResponseParams> restMethodResponseParams = RestMethodUtils.getUtils().parseRestMethodResponseParam(httpResponseParam);
+                    if (!restMethodResponseParams.isEmpty()) {
+                        filteredResponseParams.addAll(restMethodResponseParams);
+                        loggerMaker.infoAndAddToDb("Adding " + restMethodResponseParams.size() + " new REST method endpoints in inventory");
+                    } else {
+                        HttpResponseParams jsonRpcResponse = JsonRpcUtils.parseJsonRpcResponse(httpResponseParam);
+                        List<HttpResponseParams> mcpResponseParamsList = McpRequestResponseUtils.parseMcpResponseParams(jsonRpcResponse);
+                        filteredResponseParams.addAll(mcpResponseParamsList);
+                    }
+                } else {
+                    HttpResponseParams jsonRpcResponse = JsonRpcUtils.parseJsonRpcResponse(httpResponseParam);
+                    List<HttpResponseParams> mcpResponseParamsList = McpRequestResponseUtils.parseMcpResponseParams(jsonRpcResponse);
+                    filteredResponseParams.addAll(mcpResponseParamsList);
+                }
             } else {
                 filteredResponseParams.addAll(responseParamsList);
                 loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + "new graphql endpoints in inventory");
