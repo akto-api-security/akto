@@ -24,7 +24,7 @@ function ThreatPolicyPage() {
     return <PageWithMultipleCards
         title={
             <TitleWithInfo
-                titleText={"Threat Policy"}
+                titleText={"Threat Policies"}
                 tooltipContent={"Identify malicious requests with Akto's powerful threat detection capabilities"}
             />
         }

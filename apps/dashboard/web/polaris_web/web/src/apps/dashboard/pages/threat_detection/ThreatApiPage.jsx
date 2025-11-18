@@ -57,7 +57,7 @@ function ThreatApiPage() {
 
   return (
     <PageWithMultipleCards
-      title={<TitleWithInfo titleText={`${mapLabel("APIs", getDashboardCategory())} under Threat`} />}
+      title={<TitleWithInfo titleText={`${mapLabel("APIs", getDashboardCategory())} under ${mapLabel("Threat", getDashboardCategory())}`}/>}
       isFirstPage={true}
       primaryAction={
         <DateRangeFilter
