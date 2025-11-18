@@ -284,7 +284,7 @@ export const labelMap = {
     "API Collection Coverage": "Agentic Collection Coverage",
     "API collection name": "Agentic Collection Name",
     "API Testing": "Agentic Red Teaming",
-    "Threat Detection": "Agentic Protection",
+    "Threat Detection": "Agentic Guardrails",
     "Total APIs": "Total Agentic Components",
     "Critical APIs": "Critical Agentic Components",
     "Tested APIs (Coverage)": "Tested Agentic Components (Coverage)",
