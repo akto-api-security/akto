@@ -626,6 +626,11 @@ function ApiEndpoints(props) {
                         
                         sensitiveParamsMap[key].add({ name: p.subType, position: position});
                     });
+
+                    // Get current state to check if optimization is enabled
+                    const currentEndpointData = endpointData;
+                    const hasLazyPrettification = currentEndpointData['all']?._prettifyPageData !== undefined;
+
                     let currentPrettyData = [...data['all']];
                     currentPrettyData.forEach(apiEndpoint => {
                         const key = apiEndpoint.method + " " + apiEndpoint.endpoint + " " + apiEndpoint.apiCollectionId;
@@ -643,23 +648,27 @@ function ApiEndpoints(props) {
                             sensitiveTags,
                             sensitiveInReq: [...func.convertSensitiveTags(sensitiveInReq)],
                             sensitiveInResp: [...func.convertSensitiveTags(sensitiveInResp)],
-                            sensitiveTagsComp: transform.prettifySubtypes(sensitiveTags)
+                            // Only create prettified component if NOT using lazy prettification
+                            sensitiveTagsComp: hasLazyPrettification ? undefined : transform.prettifySubtypes(sensitiveTags)
                         });
                     })
 
-                    // MEMORY OPTIMIZATION: Preserve _actualTotal properties when updating data
-                    const preserveActualTotal = (oldArray, newArray) => {
+                    // MEMORY OPTIMIZATION: Preserve _actualTotal and _prettifyPageData properties when updating data
+                    const preserveArrayProperties = (oldArray, newArray) => {
                         if (oldArray._actualTotal !== undefined) {
                             newArray._actualTotal = oldArray._actualTotal;
+                        }
+                        if (oldArray._prettifyPageData !== undefined) {
+                            newArray._prettifyPageData = oldArray._prettifyPageData;
                         }
                         return newArray;
                     };
 
-                    data['all'] = preserveActualTotal(data['all'], currentPrettyData);
-                    data['sensitive'] = preserveActualTotal(data['sensitive'], currentPrettyData.filter(x => x.sensitive && x.sensitive.size > 0));
-                    data['high_risk'] = preserveActualTotal(data['high_risk'], currentPrettyData.filter(x=> x.riskScore >= 4));
-                    data['new'] = preserveActualTotal(data['new'], currentPrettyData.filter(x=> x.isNew));
-                    data['no_auth'] = preserveActualTotal(data['no_auth'], currentPrettyData.filter(x => x.open));
+                    data['all'] = preserveArrayProperties(data['all'], currentPrettyData);
+                    data['sensitive'] = preserveArrayProperties(data['sensitive'], currentPrettyData.filter(x => x.sensitive && x.sensitive.size > 0));
+                    data['high_risk'] = preserveArrayProperties(data['high_risk'], currentPrettyData.filter(x=> x.riskScore >= 4));
+                    data['new'] = preserveArrayProperties(data['new'], currentPrettyData.filter(x=> x.isNew));
+                    data['no_auth'] = preserveArrayProperties(data['no_auth'], currentPrettyData.filter(x => x.open));
                     setEndpointData(data)
                     setCurrentKey(Date.now()) // force remount InlineEditableText component to reset filters
                 }).catch((err) => {
