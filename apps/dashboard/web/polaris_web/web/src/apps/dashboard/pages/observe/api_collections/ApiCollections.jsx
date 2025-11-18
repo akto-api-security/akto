@@ -468,7 +468,6 @@ function ApiCollections(props) {
 
             if (hasValidCache) {
                 try {
-                    console.log("API_DEBUG::: Using cached collections data");
                     // Use cached data to populate the UI
                     const sensitiveInfoMap = lastFetchedSensitiveResp?.sensitiveInfoMap || {};
                     const severityInfoMap = lastFetchedSeverityResp || {};
