@@ -207,7 +207,6 @@ const resourceName = {
 const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, isLoading) => {
     // Ensure collectionsArr is an array
     if (!Array.isArray(collectionsArr)) {
-        console.error("collectionsArr is not an array:", collectionsArr);
         return { prettify: [], normal: [] };
     }
 
@@ -237,7 +236,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             envTypeOriginal: c?.envType,
             envType: c?.envType?.map(func.formatCollectionType),
             displayNameComp: (
-                <HorizontalStack gap="2" align="center">
+                <HorizontalStack gap="2" align="start">
                     <Box maxWidth="30vw"><Text truncate fontWeight="medium">{c.displayName}</Text></Box>
                     {c.registryStatus === "available" && <RegistryBadge />}
                 </HorizontalStack>
@@ -498,7 +497,6 @@ function ApiCollections(props) {
                         sensitiveInfoMap
                     };
                     const lightweightData = finalArr.map(c => transformRawCollectionData(c, cacheMaps));
-                    console.log("API_DEBUG::: Using cached collections data with", lightweightData.length, "items");
 
                     const { categorized } = categorizeCollections(lightweightData);
   
@@ -543,7 +541,6 @@ function ApiCollections(props) {
 
                     return; // Exit early, no API calls!
                 } catch (error) {
-                    console.error("Error processing cached data:", error);
                     // Fall through to fetch fresh data if cache processing fails
                     setLoading(true);
                 }
@@ -691,7 +688,6 @@ function ApiCollections(props) {
 
         // Ensure dataObj.prettify exists
         if (!dataObj.prettify) {
-            console.error("dataObj.prettify is undefined");
             return;
         }
 
@@ -865,7 +861,6 @@ function ApiCollections(props) {
                 }
             }
         }).catch(error => {
-            console.error("Error fetching endpoints count or sensitive info:", error);
         });
 
         if (res.hostname.length === 0 && (tableSelectedTab === undefined || tableSelectedTab.length === 0)) {
@@ -879,7 +874,6 @@ function ApiCollections(props) {
         setTagCollectionsMap(func.mapCollectionIdsToTagName(activeCollections))
         setCollectionsRegistryStatusMap(func.mapCollectionIdToRegistryStatus(activeCollections))
         } catch (error) {
-            console.error("Error in fetchData:", error);
             setLoading(false);
         }
     }
