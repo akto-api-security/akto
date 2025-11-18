@@ -144,12 +144,10 @@ function GithubRow(props) {
         )
     }
 
-    function LinkCell(cellData, header, cellWidth, customKey) {
+    function LinkCell(cellData, header, cellWidth) {
         const boxWidth = cellWidth !== undefined ? cellWidth: ''
-        // Use customKey if provided, otherwise use text property as key fallback if title is an object (JSX element)
-        const cellKey = customKey || (typeof header.title === 'string' ? header.title : (header.text || header.value || 'cell'));
         return (
-            <IndexTable.Cell key={cellKey}>
+            <IndexTable.Cell key={header.title}>
                 <div className={`linkClass ${data.deactivated ? "text-subdued" : ""}`} style={{width: boxWidth}}>
                     <Link
                         dataPrimaryLink
@@ -172,9 +170,9 @@ function GithubRow(props) {
         )
     }
 
-    function ActionCell(customKey) {
+    function ActionCell() {
         return (
-            <IndexTable.Cell key={customKey || "actions"}>
+            <IndexTable.Cell key={"actions"}>
                 <HorizontalStack align='end'>
                     {
                         <Popover
@@ -194,51 +192,48 @@ function GithubRow(props) {
         )
     }
 
-    function CollapsibleCell(treeView, value, customKey) {
+    function CollapsibleCell(treeView, value) {
         let iconSource = ChevronRightMinor
         if(collapsibleActive === data?.name){
             iconSource = ChevronDownMinor
         }
         return (
-            <IndexTable.Cell key={customKey || "collapsible"}>
+            <IndexTable.Cell key={"collapsible"}>
                 <Box maxWidth={treeView ? "180px": ''} >
                     <HorizontalStack align={treeView ? "start" : "end"} wrap={false} gap={"2"}>
                         <Box><Icon source={iconSource} /></Box>
-                        {treeView ? value : null}
+                        {treeView ? value : null} 
                     </HorizontalStack>
                 </Box>
             </IndexTable.Cell>
         )
     }
 
-    function getHeader(header, index){
+    function getHeader(header){
         let type = header?.type;
-        // Create a unique key for this cell using index and header properties
-        const cellKey = `${header.text || header.value || 'header'}-${index}`;
-
         switch(type){
 
-            case CellType.ACTION :
-                return hasRowActions ? ActionCell(cellKey) : null;
+            case CellType.ACTION : 
+                return hasRowActions ? ActionCell() : null;
             case CellType.COLLAPSIBLE :
                 if(props?.treeView){
                     if(data?.isTerminal === true){
-                        return header.value ? LinkCell(data[header.value], header, undefined, cellKey) : null
+                        return header.value ? LinkCell(data[header.value], header, undefined) : null
                     }
                 }
-                return CollapsibleCell(props?.treeView, data[header?.value], cellKey);
+                return CollapsibleCell(props?.treeView, data[header?.value]);
             case CellType.TEXT :
-                return header.value ? LinkCell(TextCell(header), header, header?.boxWidth, cellKey) : null;
+                return header.value ? LinkCell(TextCell(header), header, header?.boxWidth) : null;
             default :
-                return header.value ? LinkCell(data[header.value], header, header?.boxWidth, cellKey) : null;
+                return header.value ? LinkCell(data[header.value], header, header?.boxWidth) : null;
         }
     }
 
     function NewCell(){
         return(
             <>
-                {headings.map((header, index) =>{
-                    return getHeader(header, index);
+                {headings.map((header) =>{
+                    return getHeader(header);
                 })}
             </>
         )

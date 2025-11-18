@@ -5,20 +5,10 @@ import tableFunc from "./transform";
 function GithubSimpleTable(props) {
 
     const [filters, setFilters] = useState([])
-
-
-    const tableKey = props.hardCodedKey ? "hardCodedKey" : `table_${props.data?.length || 0}`;
-    
-    const fetchFunction = props.prettifyPageData
-        ? (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) =>
-            tableFunc.fetchDataSyncWithLazyPrettify(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue, setFilters, props)
-        : (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) =>
-            tableFunc.fetchDataSync(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue, setFilters, props);
-
     return <GithubServerTable
-        key={tableKey}
+        key={props.hardCodedKey ? "hardCodedKey" : JSON.stringify(props.data ? props.data : "{}")} // passing any value as a "key" re-renders the component when the value is changed.
         pageLimit={props.pageLimit}
-        fetchData={fetchFunction}
+        fetchData={(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => tableFunc.fetchDataSync(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue, setFilters, props)}
         sortOptions={props.sortOptions} 
         resourceName={props.resourceName} 
         filters={filters}

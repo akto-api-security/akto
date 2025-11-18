@@ -416,10 +416,8 @@ function ApiEndpoints(props) {
                 }
             })
         }
-
-        // MEMORY OPTIMIZATION: Limit rendered items to prevent browser crash with large collections
-        const INITIAL_RENDER_LIMIT = 50;
-        const shouldOptimizeEndpoints = allEndpoints.length > INITIAL_RENDER_LIMIT;
+        
+        const prettifyData = transform.prettifyEndpointsData(allEndpoints)
 
         // enrich with collection tags (env types) for API group view
         const collectionTagsMap = {}
@@ -433,171 +431,46 @@ function ApiEndpoints(props) {
             }
         })
 
-        // Step 1: Create lightweight objects for ALL endpoints (for filtering & counting only)
-        const allEndpointsLight = allEndpoints.map((obj) => {
-            const t = collectionTagsMap[obj.apiCollectionId];
-            return {
-                ...obj,
-                tagsComp: t?.comp || null,
-                tagsString: t?.str || "",
-                isNew: transform.isNewEndpoint(obj.lastSeenTs),
-                open: obj.auth_type === "UNAUTHENTICATED" || obj.auth_type === undefined,
-            };
-        });
+        prettifyData.forEach((obj) => {
+            const t = collectionTagsMap[obj.apiCollectionId]
+            if (t) {
+                obj.tagsComp = t.comp
+                obj.tagsString = t.str
+            } else {
+                obj.tagsString = ""
+            }
+        })
 
-        // Single pass through endpoints for all filtering and checks
-        const result = allEndpointsLight.reduce((acc, obj) => {
-            // Check for OpenAPI sources
-            if (obj.sources) {
-                const hasOpenAPISource = obj.sources.hasOwnProperty("OPEN_API");
-                if (hasOpenAPISource) {
-                    acc.hasOpenAPI = true;
-                }
-                if (!sourcesBackfilled) {
-                    acc.needsBackfill = true;
-                }
+        const zombie = prettifyData.filter(
+            obj => obj.sources && // Check that obj.sources is not null or undefined
+                   Object.keys(obj.sources).length === 1 &&
+                   obj.sources.hasOwnProperty("OPEN_API")
+        );
 
-                // Zombie endpoints: only OPEN_API source
-                if (Object.keys(obj.sources).length === 1 && hasOpenAPISource) {
-                    acc.zombieEndpoints.push(obj);
-                }
-
-                // Undocumented endpoints: has sources but no OPEN_API
-                if (!hasOpenAPISource) {
-                    acc.undocumentedEndpoints.push(obj);
-                }
+        var hasOpenAPI = false
+        prettifyData.forEach((obj) => {
+            if (obj.sources && obj.sources.hasOwnProperty("OPEN_API")) {
+                hasOpenAPI = true
             }
 
-            // Filter for other tabs
-            if (obj.sensitive && obj.sensitive.size > 0) {
-                acc.sensitiveEndpoints.push(obj);
+            if (obj.sources && !sourcesBackfilled) {
+                setSourcesBackfilled(true)
             }
-            if (obj.riskScore >= 4) {
-                acc.highRiskEndpoints.push(obj);
-            }
-            if (obj.isNew) {
-                acc.newEndpoints.push(obj);
-            }
-            if (obj.open) {
-                acc.noAuthEndpoints.push(obj);
-            }
+        })
 
-            return acc;
-        }, {
-            hasOpenAPI: false,
-            needsBackfill: false,
-            sensitiveEndpoints: [],
-            highRiskEndpoints: [],
-            newEndpoints: [],
-            noAuthEndpoints: [],
-            zombieEndpoints: [],
-            undocumentedEndpoints: []
-        });
+        // check if openAPI file has been uploaded or not.. else show there no shadow APIs
+        const undocumented = hasOpenAPI ? prettifyData.filter(
+            obj => obj.sources && !obj.sources.hasOwnProperty("OPEN_API")
+        ) : [];
 
-        // Set state if backfill is needed
-        if (result.needsBackfill) {
-            setSourcesBackfilled(true);
-        }
-
-        const sensitiveEndpoints = result.sensitiveEndpoints;
-        const highRiskEndpoints = result.highRiskEndpoints;
-        const newEndpoints = result.newEndpoints;
-        const noAuthEndpoints = result.noAuthEndpoints;
-        const zombieEndpoints = result.zombieEndpoints;
-        const undocumentedEndpoints = result.hasOpenAPI ? result.undocumentedEndpoints : [];
-
-        // Step 2: Store accurate counts (from ALL endpoints)
-        data['_counts'] = {
-            all: allEndpointsLight.length + shadowApis.length,
-            sensitive: sensitiveEndpoints.length,
-            high_risk: highRiskEndpoints.length,
-            new: newEndpoints.length,
-            no_auth: noAuthEndpoints.length,
-            shadow: shadowApis.length + undocumentedEndpoints.length,
-            zombie: zombieEndpoints.length
-        };
-
-        // Step 3: Helper function to prettify a page of data with tags applied
-        const prettifyPageWithTags = (pageData) => {
-            const prettified = transform.prettifyEndpointsData(pageData);
-
-            // Re-apply tags after prettify
-            prettified.forEach((obj) => {
-                const t = collectionTagsMap[obj.apiCollectionId];
-                if (t) {
-                    obj.tagsComp = t.comp;
-                    obj.tagsString = t.str;
-                } else {
-                    obj.tagsString = "";
-                }
-            });
-
-            return prettified;
-        };
-
-        if (shouldOptimizeEndpoints) {
-            // Large collection: use lazy prettification - pass raw data and prettify on demand per page
-
-            // For 'all' tab: mix raw allEndpointsLight + already prettified shadowApis
-            data['all'] = [...allEndpointsLight, ...shadowApis];
-            data['all']._prettifyPageData = (pageData) => {
-                // Determine which items are shadowApis (already prettified) vs raw data
-                return pageData.map((item) => {
-                    // Check if this item is a shadowApi by checking for codeAnalysisEndpoint flag
-                    if (item.codeAnalysisEndpoint === true) {
-                        // Already prettified, return as-is
-                        return item;
-                    } else {
-                        // Raw data, needs prettification
-                        return prettifyPageWithTags([item])[0];
-                    }
-                });
-            };
-
-            data['sensitive'] = sensitiveEndpoints;
-            data['sensitive']._prettifyPageData = prettifyPageWithTags;
-
-            data['high_risk'] = highRiskEndpoints;
-            data['high_risk']._prettifyPageData = prettifyPageWithTags;
-
-            data['new'] = newEndpoints;
-            data['new']._prettifyPageData = prettifyPageWithTags;
-
-            data['no_auth'] = noAuthEndpoints;
-            data['no_auth']._prettifyPageData = prettifyPageWithTags;
-
-            // For 'shadow' tab: mix shadowApis (prettified) + undocumentedEndpoints (raw)
-            data['shadow'] = [...shadowApis, ...undocumentedEndpoints];
-            data['shadow']._prettifyPageData = (pageData) => {
-                return pageData.map(item =>
-                    item.codeAnalysisEndpoint === true ? item : prettifyPageWithTags([item])[0]
-                );
-            };
-
-            data['zombie'] = zombieEndpoints;
-            data['zombie']._prettifyPageData = prettifyPageWithTags;
-        } else {
-            // Small collection: render all normally
-            const prettifyData = transform.prettifyEndpointsData(allEndpointsLight);
-
-            prettifyData.forEach((obj) => {
-                const t = collectionTagsMap[obj.apiCollectionId];
-                if (t) {
-                    obj.tagsComp = t.comp;
-                    obj.tagsString = t.str;
-                } else {
-                    obj.tagsString = "";
-                }
-            });
-
-            data['all'] = [...prettifyData, ...shadowApis];
-            data['sensitive'] = sensitiveEndpoints.filter(x => x.sensitive && x.sensitive.size > 0);
-            data['high_risk'] = prettifyData.filter(x => x.riskScore >= 4);
-            data['new'] = prettifyData.filter(x => x.isNew);
-            data['no_auth'] = prettifyData.filter(x => x.open);
-            data['shadow'] = [...shadowApis, ...undocumentedEndpoints];
-            data['zombie'] = zombieEndpoints;
-        }
+        // append shadow endpoints to all endpoints
+        data['all'] = [ ...prettifyData, ...shadowApis ]
+        data['sensitive'] = prettifyData.filter(x => x.sensitive && x.sensitive.size > 0)
+        data['high_risk'] = prettifyData.filter(x=> x.riskScore >= 4)
+        data['new'] = prettifyData.filter(x=> x.isNew)
+        data['no_auth'] = prettifyData.filter(x => x.open)
+        data['shadow'] = [ ...shadowApis, ...undocumented ]
+        data['zombie'] = zombie
         setEndpointData(data)
         setSelectedTab("all")
         setSelected(0)
@@ -626,11 +499,6 @@ function ApiEndpoints(props) {
                         
                         sensitiveParamsMap[key].add({ name: p.subType, position: position});
                     });
-
-                    // Get current state to check if optimization is enabled
-                    const currentEndpointData = endpointData;
-                    const hasLazyPrettification = currentEndpointData['all']?._prettifyPageData !== undefined;
-
                     let currentPrettyData = [...data['all']];
                     currentPrettyData.forEach(apiEndpoint => {
                         const key = apiEndpoint.method + " " + apiEndpoint.endpoint + " " + apiEndpoint.apiCollectionId;
@@ -648,27 +516,15 @@ function ApiEndpoints(props) {
                             sensitiveTags,
                             sensitiveInReq: [...func.convertSensitiveTags(sensitiveInReq)],
                             sensitiveInResp: [...func.convertSensitiveTags(sensitiveInResp)],
-                            // Only create prettified component if NOT using lazy prettification
-                            sensitiveTagsComp: hasLazyPrettification ? undefined : transform.prettifySubtypes(sensitiveTags)
+                            sensitiveTagsComp: transform.prettifySubtypes(sensitiveTags)
                         });
                     })
 
-                    // MEMORY OPTIMIZATION: Preserve _actualTotal and _prettifyPageData properties when updating data
-                    const preserveArrayProperties = (oldArray, newArray) => {
-                        if (oldArray._actualTotal !== undefined) {
-                            newArray._actualTotal = oldArray._actualTotal;
-                        }
-                        if (oldArray._prettifyPageData !== undefined) {
-                            newArray._prettifyPageData = oldArray._prettifyPageData;
-                        }
-                        return newArray;
-                    };
-
-                    data['all'] = preserveArrayProperties(data['all'], currentPrettyData);
-                    data['sensitive'] = preserveArrayProperties(data['sensitive'], currentPrettyData.filter(x => x.sensitive && x.sensitive.size > 0));
-                    data['high_risk'] = preserveArrayProperties(data['high_risk'], currentPrettyData.filter(x=> x.riskScore >= 4));
-                    data['new'] = preserveArrayProperties(data['new'], currentPrettyData.filter(x=> x.isNew));
-                    data['no_auth'] = preserveArrayProperties(data['no_auth'], currentPrettyData.filter(x => x.open));
+                    data['all'] = currentPrettyData
+                    data['sensitive'] = currentPrettyData.filter(x => x.sensitive && x.sensitive.size > 0)
+                    data['high_risk'] = currentPrettyData.filter(x=> x.riskScore >= 4)
+                    data['new'] = currentPrettyData.filter(x=> x.isNew)
+                    data['no_auth'] = currentPrettyData.filter(x => x.open)
                     setEndpointData(data)
                     setCurrentKey(Date.now()) // force remount InlineEditableText component to reset filters
                 }).catch((err) => {
@@ -972,21 +828,12 @@ function ApiEndpoints(props) {
         const uniqueEndpoints = endpoints.filter((endpoint, index, self) =>
             index === self.findIndex((t) => t.method === endpoint.method && t.endpoint.replace(/^\//, '') === endpoint.endpoint.replace(/^\//, ''))
         )
-
-        // MEMORY OPTIMIZATION: Preserve _actualTotal properties
-        const preserveActualTotal = (oldArray, newArray) => {
-            if (oldArray?._actualTotal !== undefined) {
-                newArray._actualTotal = oldArray._actualTotal;
-            }
-            return newArray;
-        };
-
         const data = {}
-        data['all'] = preserveActualTotal(endpointData['all'], uniqueEndpoints);
-        data['sensitive'] = preserveActualTotal(endpointData['sensitive'], uniqueEndpoints.filter(x => x.sensitive && x.sensitive.size > 0));
-        data['high_risk'] = preserveActualTotal(endpointData['high_risk'], uniqueEndpoints.filter(x=> x.riskScore >= 4));
-        data['new'] = preserveActualTotal(endpointData['new'], uniqueEndpoints.filter(x=> x.isNew));
-        data['no_auth'] = preserveActualTotal(endpointData['no_auth'], uniqueEndpoints.filter(x => x.open));
+        data['sensitive'] = uniqueEndpoints.filter(x => x.sensitive && x.sensitive.size > 0)
+        data['high_risk'] = uniqueEndpoints.filter(x=> x.riskScore >= 4)
+        data['new'] = uniqueEndpoints.filter(x=> x.isNew)
+        data['no_auth'] = uniqueEndpoints.filter(x => x.open)
+        data['all'] = uniqueEndpoints
         setEndpointData(data)
     }
 
@@ -1342,7 +1189,6 @@ function ApiEndpoints(props) {
         key={currentKey}
         pageLimit={50}
         data={endpointData[selectedTab]}
-        prettifyPageData={endpointData[selectedTab]?._prettifyPageData}
         sortOptions={sortOptions}
         resourceName={resourceName}
         filters={[]}

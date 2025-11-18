@@ -526,11 +526,6 @@ prettifyEpoch(epoch) {
   timeNow: () => {
     return parseInt(new Date().getTime() / 1000)
   },
-  // Check if API collections data caching is enabled for current account
-  isApiCollectionsCachingEnabled: () => {
-    const allowedAccounts = [1736798101, 1758595089];
-    return allowedAccounts.includes(window.ACTIVE_ACCOUNT);
-  },
   convertKeysToLowercase: function (obj){
     return Object.keys(obj).reduce((acc, k) => {
       acc[k.toLowerCase()] = obj[k];
@@ -1892,8 +1887,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     tableTabs.forEach((tab,ind) => {
       const tabId = this.getKeyFromName(tab)
       const tabKey = baseUrl + tabId
-      // Check _counts first (for accurate counts with memory optimization), then fall back to array length
-      const count = currentState[tabKey] || data._counts?.[tabId] || data[tabId]?.length || initialCountArr[ind] || 0
+      const count = currentState[tabKey] || data[tabId]?.length || initialCountArr[ind] || 0
       finalCountObj[tabId] = count
     })
 

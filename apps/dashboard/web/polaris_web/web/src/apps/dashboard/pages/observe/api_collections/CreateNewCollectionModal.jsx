@@ -51,7 +51,7 @@ function CreateNewCollectionModal(props) {
             await api.createCollection(newCollectionName)
             setNewCollectionName('')
         }
-        fetchData({ current: true }, true) // Force refresh after creating new collection
+        fetchData()
         setActive(false)
         func.setToast(true, false, <div data-testid="collection_creation_message">{"API collection created successfully"}</div>)
 
