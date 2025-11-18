@@ -1,6 +1,5 @@
 import func from "@/util/func";
 import PersistStore from "../../../main/PersistStore";
-import { times } from "lodash";
 
 // Cache for filter choices to avoid recomputing on every render
 const filterChoicesCache = new Map();
