@@ -56,6 +56,7 @@ const initialState = {
     lastFetchedSensitiveResp: [],
     selectedSampleApi: {},
     coverageMap: {},
+    trafficMap: {},
     filtersMap: {},
     tableInitialState: {},
     trafficAlerts: [],
@@ -89,7 +90,7 @@ let persistStore = (set, get) => ({
     },
     setAllCollections: (allCollections) => {
         try {
-            const optimizedCollections = allCollections.map(({ id, displayName, urlsCount, deactivated, type, automated, startTs, hostName, name, description, envType, isOutOfTestingScope, urls }) => ({
+            const optimizedCollections = allCollections.map(({ id, displayName, urlsCount, deactivated, type, automated, startTs, hostName, name, description, envType, isOutOfTestingScope, urls}) => ({
                 id,
                 displayName,
                 urlsCount,
@@ -188,6 +189,13 @@ let persistStore = (set, get) => ({
             console.error("Error setting coverageMap:", error);
         }
     },
+    setTrafficMap: (trafficMap) => {
+        try {
+            set({ trafficMap });
+        } catch (error) {
+            console.error("Error setting trafficMap:", error);
+        }
+    },
     setFiltersMap: (filtersMap) => {
         try {
             set({ filtersMap });
@@ -233,7 +241,7 @@ let persistStore = (set, get) => ({
 });
 
 persistStore = devtools(persistStore);
-persistStore = persist(persistStore, { 
+persistStore = persist(persistStore, {
     name: "Akto-data",
     storage: gzipStorage,
     partialize: (state) => ({
@@ -245,13 +253,14 @@ persistStore = persist(persistStore, {
         lastFetchedSensitiveResp: state.lastFetchedSensitiveResp,
         selectedSampleApi: state.selectedSampleApi,
         coverageMap: state.coverageMap,
+        trafficMap: state.trafficMap,
         filtersMap: state.filtersMap,
         tableInitialState: state.tableInitialState,
         trafficAlerts: state.trafficAlerts,
         sendEventOnLogin: state.sendEventOnLogin,
         tableSelectedTab: state.tableSelectedTab,
         dashboardCategory: state.dashboardCategory
-    }) 
+    })
 });
 
 const PersistStore = create(persistStore);
