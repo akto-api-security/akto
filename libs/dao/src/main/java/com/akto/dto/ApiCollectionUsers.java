@@ -72,10 +72,6 @@ public class ApiCollectionUsers {
         }});
 
     public static List<BasicDBObject> getSingleTypeInfoListFromConditions(List<TestingEndpoints> conditions, int skip, int limit, int deltaPeriodValue, List<Integer> deactivatedCollections) {
-        return getSingleTypeInfoListFromConditions(conditions, skip, limit, deltaPeriodValue, deactivatedCollections, null);
-    }
-
-    public static List<BasicDBObject> getSingleTypeInfoListFromConditions(List<TestingEndpoints> conditions, int skip, int limit, int deltaPeriodValue, List<Integer> deactivatedCollections, List<Integer> mismatchedCollectionIds) {
         if(conditions == null || conditions.isEmpty()){
             return new ArrayList<>();
         }
@@ -85,9 +81,6 @@ public class ApiCollectionUsers {
         singleTypeInfoFilters = Filters.and(filters, singleTypeInfoFilters);
         if (deactivatedCollections != null && !deactivatedCollections.isEmpty()) {
             singleTypeInfoFilters = Filters.and(singleTypeInfoFilters, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
-        }
-        if (mismatchedCollectionIds != null && !mismatchedCollectionIds.isEmpty()) {
-            singleTypeInfoFilters = Filters.and(singleTypeInfoFilters, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, mismatchedCollectionIds));
         }
         return ApiCollectionsDao.fetchEndpointsInCollection(singleTypeInfoFilters, skip, limit, deltaPeriodValue);
     }
