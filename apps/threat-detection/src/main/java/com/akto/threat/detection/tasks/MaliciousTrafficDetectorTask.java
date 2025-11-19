@@ -361,9 +361,6 @@ public class MaliciousTrafficDetectorTask implements Task {
     int apiCollectionId = httpCallParser.createApiCollectionId(responseParam);
     responseParam.requestParams.setApiCollectionId(apiCollectionId);
 
-    // Track and log valid hostnames
-    trackAndLogValidHostname(responseParam);
-
     String url = responseParam.getRequestParams().getURL();
     URLMethods.Method method =
         URLMethods.Method.fromString(responseParam.getRequestParams().getMethod());
