@@ -1069,7 +1069,9 @@
             "200" : {
               "description" : "successful operation"
             }
-          }
+          "security" : [ {
+            "petstore_auth" : [ "write:pets", "read:pets" ]
+          } ],
         }
       },
       "/pet/findByTags" : {
