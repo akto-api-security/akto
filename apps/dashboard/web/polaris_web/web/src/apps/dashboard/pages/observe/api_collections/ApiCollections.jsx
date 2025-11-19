@@ -501,10 +501,7 @@ function ApiCollections(props) {
                     if (!isMountedRef.current) {
                         return;
                     }
-                    const envTypeObj = {};
-                    finalArr.forEach((c) => {
-                        envTypeObj[c.id] = c.envType;
-                    });
+
                     // Use the centralized transformation function with cache-specific maps
                     const cacheMaps = {
                         trafficInfoMap,
@@ -513,9 +510,29 @@ function ApiCollections(props) {
                         severityInfoMap,
                         sensitiveInfoMap
                     };
-                    const lightweightData = finalArr.map(c => transformRawCollectionData(c, cacheMaps));
 
-                    const { categorized } = categorizeCollections(lightweightData);
+                    // OPTIMIZATION: For large datasets (>COLLECTIONS_LAZY_RENDER_THRESHOLD items), store RAW data + transform function
+                    // Transformation happens on-demand in the table for each page (100 items at a time)
+                    const shouldOptimize = finalArr.length > COLLECTIONS_LAZY_RENDER_THRESHOLD;
+
+                    let lightweightData;
+                    if (shouldOptimize) {
+                        // Store ONLY raw data + lookup maps - minimal memory footprint
+                        const rawData = finalArr;
+                        rawData._lazyTransform = true;
+                        rawData._transformMaps = cacheMaps;
+
+                        // Transform for categorization only (no JSX components yet)
+                        lightweightData = finalArr.map(c => transformRawCollectionData(c, cacheMaps));
+                        lightweightData._lazyTransform = true;
+                        lightweightData._transformMaps = cacheMaps;
+                        lightweightData._transformedCache = lightweightData;
+                    } else {
+                        // Small dataset - transform all upfront
+                        lightweightData = finalArr.map(c => transformRawCollectionData(c, cacheMaps));
+                    }
+
+                    const { categorized, envTypeObj } = categorizeCollections(lightweightData);
 
                     // Use transform.getSummaryData to match master behavior (excludes API_GROUP and deactivated)
                     const initialSummaryDataObj = transform.getSummaryData(lightweightData);
@@ -784,7 +801,7 @@ function ApiCollections(props) {
                         displayNameComp: collection.displayNameComp,
                         urlsCount: untrackedCount,
                         rowStatus: 'critical',
-                        disableClick: true,
+                        nextUrl: null,
                         deactivated: false,
                         collapsibleRow: untrackedApiDataMap[collectionId] ?
                             transform.getUntrackedApisCollapsibleRow(untrackedApiDataMap[collectionId]) : null,

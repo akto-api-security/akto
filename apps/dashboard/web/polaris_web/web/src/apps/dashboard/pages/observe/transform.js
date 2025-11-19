@@ -576,7 +576,8 @@ const transform = {
             return{
                 ...c,
                 id: c.id,
-                nextUrl: '/dashboard/observe/inventory/' + c.id,
+                name: c.name,
+                nextUrl: null,
                 displayName: c.displayName,
                 displayNameComp: displayNameComp,
                 descriptionComp: <Text></Text>, // Empty for untracked
@@ -594,6 +595,8 @@ const transform = {
                 activatedRiskScore: 0,
                 envTypeComp: <Text></Text>, // Empty for untracked
                 testedEndpoints: 0,
+                collapsibleRow: c.collapsibleRow,
+                collapsibleRowText: c.collapsibleRowText,
             }
         })
 
