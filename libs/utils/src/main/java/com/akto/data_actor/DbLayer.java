@@ -602,8 +602,7 @@ public class DbLayer {
         ObjectId testingRunObjId = new ObjectId(testingRunId);
         
         Bson filter = Filters.and(
-            Filters.eq(Constants.ID, testingRunObjId),
-            Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING)
+            Filters.eq(Constants.ID, testingRunObjId)
         );
         
         Bson update;
