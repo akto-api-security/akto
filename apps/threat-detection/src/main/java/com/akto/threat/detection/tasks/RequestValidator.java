@@ -125,6 +125,12 @@ public class RequestValidator {
       return null;
     }
 
+    // Skip request body validation for GET/DELETE requests
+    String method = responseParam.getRequestParams().getMethod().toLowerCase();
+    if(method.equals("get") || method.equals("delete")){
+      return null;
+    }
+
     JsonNode requestBodyNode = getRequestBodyNode(methodNode, url, responseParam);
     if (requestBodyNode == null) {
       return null;
