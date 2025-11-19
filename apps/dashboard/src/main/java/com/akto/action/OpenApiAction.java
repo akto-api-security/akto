@@ -9,6 +9,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.file.FilesDao;
 import com.akto.dao.upload.FileUploadLogsDao;
 import com.akto.dao.upload.FileUploadsDao;
+import com.akto.data_actor.DbLayer;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
@@ -509,6 +510,36 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
 
     public void setSource(Source source) {
         this.source = source;
+    }
+
+    private String openApiSchema;
+
+    public String fetchOpenApiSchema() {
+        try {
+            String compressedContent = DbLayer.fetchOpenApiSchema(apiCollectionId);
+            if (compressedContent == null) {
+                addActionError("No OpenAPI schema found for collection ID: " + apiCollectionId);
+                return ERROR.toUpperCase();
+            }
+            
+            // Decompress the content
+            openApiSchema = GzipUtils.unzipString(compressedContent);
+            
+            if (openApiSchema == null || openApiSchema.isEmpty()) {
+                addActionError("Failed to decompress OpenAPI schema");
+                return ERROR.toUpperCase();
+            }
+            
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e,"ERROR while fetching OpenAPI schema " + e);
+            addActionError("Error fetching OpenAPI schema: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String getOpenApiSchema() {
+        return openApiSchema;
     }
 
 }

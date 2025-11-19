@@ -473,6 +473,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         params.set("eventType", x.eventType);
         params.set("actor", x.actor);
         params.set("filterId", x.filterId);
+        if (x.apiCollectionId) {
+          params.set("apiCollectionId", x.apiCollectionId);
+        }
         if (x.status) {
           params.set("eventStatus", x.status.toUpperCase());
         }
