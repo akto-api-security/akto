@@ -992,8 +992,7 @@ public class DbLayer {
 
     public static void updateTestingRun(String testingRunId, TestingRun.State state, int scheduleTimestamp) {
         ObjectId testingRunObjId = new ObjectId(testingRunId);
-       Bson filter = Filters.and(Filters.eq(Constants.ID, testingRunObjId),
-        Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING)
+        Bson filter = Filters.and(Filters.eq(Constants.ID, testingRunObjId)
         );
 
         Bson update;
