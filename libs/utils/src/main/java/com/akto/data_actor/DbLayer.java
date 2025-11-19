@@ -595,10 +595,30 @@ public class DbLayer {
     }
 
     public static void updateTestingRun(String testingRunId) {
+        updateTestingRun(testingRunId, TestingRun.State.FAILED, 0);
+    }
+
+    public static void updateTestingRun(String testingRunId, TestingRun.State state, int scheduleTimestamp) {
         ObjectId testingRunObjId = new ObjectId(testingRunId);
-        TestingRunDao.instance.getMCollection().findOneAndUpdate(
+        
+        Bson filter = Filters.and(
             Filters.eq(Constants.ID, testingRunObjId),
-            Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
+            Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING)
+        );
+        
+        Bson update;
+        if (scheduleTimestamp > 0) {
+            // Update both state and schedule timestamp
+            update = Updates.combine(
+                Updates.set(TestingRun.STATE, state),
+                Updates.set(TestingRun.SCHEDULE_TIMESTAMP, scheduleTimestamp)
+            );
+        } else {
+            // Update only state
+            update = Updates.set(TestingRun.STATE, state);
+        }
+        
+        TestingRunDao.instance.updateOneNoUpsert(filter, update);
     }
 
     public static Map<ObjectId, TestingRunResultSummary> fetchTestingRunResultSummaryMap(String testingRunId) {
@@ -635,6 +655,21 @@ public class DbLayer {
 
     public static void insertTestingRunResultSummary(TestingRunResultSummary trrs) {
         TestingRunResultSummariesDao.instance.insertOne(trrs);
+    }
+
+
+    public static TestingRunResultSummary updateTestingRunResultSummaryWithStateAndTimestamp(String testingRunResultSummaryId, TestingRun.State state, int startTimestamp) {
+        ObjectId summaryObjectId = new ObjectId(testingRunResultSummaryId);
+        return TestingRunResultSummariesDao.instance.updateOneNoUpsert(
+            Filters.and(
+                Filters.eq(TestingRunResultSummary.ID, summaryObjectId),
+                Filters.eq(TestingRunResultSummary.STATE, TestingRun.State.RUNNING)
+            ),
+            Updates.combine(
+                Updates.set(TestingRunResultSummary.STATE, state),
+                Updates.set(TestingRunResultSummary.START_TIMESTAMP, startTimestamp)
+            )
+        );
     }
 
     public static void updateTestingRunAndMarkCompleted(String testingRunId, int scheduleTimestamp) {

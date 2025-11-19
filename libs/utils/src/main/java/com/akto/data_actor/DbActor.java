@@ -520,6 +520,11 @@ public class DbActor extends DataActor {
         DbLayer.updateTestingRun(testingRunId);
     }
 
+    @Override
+    public void updateTestingRun(String testingRunId, TestingRun.State state, int scheduleTimestamp) {
+        DbLayer.updateTestingRun(testingRunId, state, scheduleTimestamp);
+    }
+
     public void updateTestingRunAndMarkCompleted(String testingRunId, int scheduleTs) {
         DbLayer.updateTestingRunAndMarkCompleted(testingRunId, scheduleTs);
     }
@@ -668,5 +673,11 @@ public class DbActor extends DataActor {
     @Override
     public void storeConversationResults(List<AgentConversationResult> conversationResults) {
         DbLayer.storeConversationResults(conversationResults);
+    }
+
+
+    @Override
+    public TestingRunResultSummary updateTestingRunResultSummaryWithStateAndTimestamp(String testingRunResultSummaryId, TestingRun.State state, int startTimestamp) {
+        return DbLayer.updateTestingRunResultSummaryWithStateAndTimestamp(testingRunResultSummaryId, state, startTimestamp);
     }
 }

@@ -1706,9 +1706,16 @@ public class ClientActor extends DataActor {
     }
 
     public void updateTestingRun(String testingRunId) {
+        updateTestingRun(testingRunId, TestingRun.State.FAILED, 0);
+    }
+
+    @Override
+    public void updateTestingRun(String testingRunId, TestingRun.State state, int scheduleTimestamp) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("testingRunId", testingRunId);
+        obj.put("state", state.name());
+        obj.put("scheduleTimestamp", scheduleTimestamp);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateTestingRun", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -4232,6 +4239,41 @@ public class ClientActor extends DataActor {
         }
         catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in storeConversationResults" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
+
+    @Override
+    public TestingRunResultSummary updateTestingRunResultSummaryWithStateAndTimestamp(String testingRunResultSummaryId, TestingRun.State state, int startTimestamp) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("testingRunResultSummaryId", testingRunResultSummaryId);
+        obj.put("state", state.name());
+        obj.put("startTimestamp", startTimestamp);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateTestingRunResultSummaryWithStateAndTimestamp", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateTestingRunResultSummaryWithStateAndTimestamp", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBObject testingRunResultSummary = (BasicDBObject) payloadObj.get("trrs");
+                testingRunResultSummary.remove("id");
+                testingRunResultSummary.remove("testingRunId");
+                TestingRunResultSummary res = objectMapper.readValue(testingRunResultSummary.toJson(), TestingRunResultSummary.class);
+                res.setId(new ObjectId(testingRunResultSummary.getString("hexId")));
+                res.setTestingRunId(new ObjectId(testingRunResultSummary.getString("testingRunHexId")));
+                return res;
+            } catch(Exception e) {
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in updateTestingRunResultSummaryWithStateAndTimestamp" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
         }
     }
 
