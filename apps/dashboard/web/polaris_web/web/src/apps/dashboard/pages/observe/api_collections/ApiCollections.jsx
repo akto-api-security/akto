@@ -774,22 +774,31 @@ function ApiCollections(props) {
                     const collection = collectionMap.get(parseInt(collectionId));
                     return collection ? {
                         id: collection.id,
+                        name: `untracked-${collection.id}`,
                         displayName: collection.displayName,
                         displayNameComp: collection.displayNameComp,
                         urlsCount: untrackedCount,
                         rowStatus: 'critical',
                         disableClick: true,
                         deactivated: false,
-                        collapsibleRow: untrackedApiDataMap[collection.id] ?
-                            transform.getUntrackedApisCollapsibleRow(untrackedApiDataMap[collection.id]) : null,
-                        collapsibleRowText: untrackedApiDataMap[collection.id] ? untrackedApiDataMap[collection.id].map(x => x.url).join(", ") : null
+                        collapsibleRow: untrackedApiDataMap[collectionId] ?
+                            transform.getUntrackedApisCollapsibleRow(untrackedApiDataMap[collectionId]) : null,
+                        collapsibleRowText: untrackedApiDataMap[collectionId] ? untrackedApiDataMap[collectionId].map(x => x.url).join(", ") : null,
+                        severityInfo: {},
+                        sensitiveInRespTypes: [],
+                        detectedTimestamp: 0,
+                        startTs: collection.startTs || 0,
+                        testedEndpoints: 0,
+                        riskScore: 0,
                     } : null;
                 })
                 .filter(Boolean);
 
-            // Update data with untracked collections
-            res['untracked'] = untrackedCollectionsCache;
-            setData({...res});
+            // Update data with untracked collections - Create a new object to ensure React detects the change
+            setData(prevData => ({
+                ...prevData,
+                untracked: untrackedCollectionsCache
+            }));
         }, 0); // Execute immediately but asynchronously
 
         // Fetch endpoints count and sensitive info asynchronously
@@ -856,9 +865,12 @@ function ApiCollections(props) {
                     });
 
                     updatedCategorized.deactivated = updatedDeactivatedCollections;
-                    updatedCategorized['untracked'] = untrackedCollectionsCache;
 
-                    setData(updatedCategorized);
+                    // Preserve existing untracked data or use cached version
+                    setData(prevData => ({
+                        ...updatedCategorized,
+                        untracked: prevData.untracked || untrackedCollectionsCache
+                    }));
 
                     // Update summary with new sensitive endpoints count
                     const updatedSummary = transform.getSummaryData(updatedNormalData);
@@ -1243,7 +1255,7 @@ function ApiCollections(props) {
       const summaryItems = [
         {
             title: mapLabel("Total APIs", getDashboardCategory()),
-            data: transform.formatNumberWithCommas(summaryData.totalEndpoints || 0),
+            data: transform.formatNumberWithCommas(totalAPIs),
         },
         {
             title: mapLabel("Critical APIs", getDashboardCategory()),
@@ -1364,7 +1376,7 @@ function ApiCollections(props) {
             onSelect={handleSelectedTab}
             selected={selected}
             csvFileName={"Inventory"}
-            prettifyPageData={(pageData) => transform.prettifyCollectionsData(pageData, false)}
+            prettifyPageData={(pageData) => selectedTab === 'untracked' ? transform.prettifyUntrackedCollectionsData(pageData) : transform.prettifyCollectionsData(pageData, false, selectedTab)}
             transformRawData={transformRawCollectionData}
         />:    <div style={{height: "800px"}}>
 
