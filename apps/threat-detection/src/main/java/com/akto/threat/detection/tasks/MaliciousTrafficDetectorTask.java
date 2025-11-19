@@ -245,20 +245,13 @@ public class MaliciousTrafficDetectorTask implements Task {
         return false;
       }
 
-      // Check if it's an IPv4 address (contains only digits and dots)
-      if (hostnameWithoutPort.matches("^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$")) {
-        return false;
-      }
-
-      // Check if it's an IPv6 address (check without port, IPv6 doesn't have dots and has colons)
-      // IPv6 addresses contain colons and hex characters but no letters beyond a-f
-      if (hostnameWithoutPort.contains(":") && hostnameWithoutPort.matches("^[0-9a-fA-F:]+$")) {
-        return false;
-      }
-
-      // If it has letters (beyond hex range), it's likely a valid hostname
-      // Valid hostnames contain letters and can have dots, hyphens
-      return hostnameWithoutPort.matches(".*[a-zA-Z].*");
+      // Simple check: if lowercase != uppercase, it has letters (valid hostname)
+      // This elegantly filters out IP addresses (which are case-insensitive)
+      // Examples:
+      //   "192.168.1.1" -> toLowerCase() == toUpperCase() -> false (IP)
+      //   "example.com" -> toLowerCase() != toUpperCase() -> true (valid hostname)
+      //   "::1" -> toLowerCase() == toUpperCase() -> false (IPv6)
+      return !hostnameWithoutPort.toLowerCase().equals(hostnameWithoutPort.toUpperCase());
     } catch (Exception e) {
       return false;
     }
