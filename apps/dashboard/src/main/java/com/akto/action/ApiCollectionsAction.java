@@ -72,6 +72,8 @@ public class ApiCollectionsAction extends UserAction {
     Map<Integer, List<String>> sensitiveSubtypesInCollection = new HashMap<>();
     List<BasicDBObject> sensitiveSubtypesInUrl = new ArrayList<>();
     LastCronRunInfo timerInfo;
+    @Setter
+    boolean skipTagsMismatch = false;
 
     Map<Integer,Map<String,Integer>> severityInfo = new HashMap<>();
     int apiCollectionId;
@@ -524,15 +526,83 @@ public class ApiCollectionsAction extends UserAction {
 
     int apiCount;
 
+    private static final String TAG_KEY_MISMATCH = "tags-mismatch";
+    private static final String TAG_VALUE_TRUE = "true";
+
+    private List<BasicDBObject> removeMismatchedCollections(List<BasicDBObject> list) {
+        if (!skipTagsMismatch || list.isEmpty()) {
+            return list;
+        }
+
+        // Extract unique collection IDs
+        Set<Integer> apiCollectionIds = list.stream()
+                .map(this::extractApiCollectionId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        if (apiCollectionIds.isEmpty()) {
+            return list;
+        }
+
+        // Query for mismatched collections
+        Bson filter = Filters.and(
+                Filters.in(Constants.ID, apiCollectionIds),
+                Filters.elemMatch(ApiCollection.TAGS_STRING,
+                        Filters.and(
+                                Filters.eq("keyName", TAG_KEY_MISMATCH),
+                                Filters.eq("value", TAG_VALUE_TRUE))));
+
+        Set<Integer> mismatchedCollectionIds = ApiCollectionsDao.instance
+                .findAll(filter, Projections.include(Constants.ID))
+                .stream()
+                .map(ApiCollection::getId)
+                .collect(Collectors.toSet());
+
+        if (mismatchedCollectionIds.isEmpty()) {
+            return list;
+        }
+
+        // Filter out mismatched collections
+        return list.stream()
+                .filter(obj -> {
+                    Integer colId = extractApiCollectionId(obj);
+                    return colId == null || !mismatchedCollectionIds.contains(colId);
+                })
+                .collect(Collectors.toList());
+    }
+
+    private Integer extractApiCollectionId(BasicDBObject obj) {
+        Object id = obj.get("_id");
+        if (id instanceof BasicDBObject) {
+            return ((BasicDBObject) id).getInt("apiCollectionId");
+        }
+        return null;
+    }
+
     public String getEndpointsListFromConditions() {
         List<TestingEndpoints> conditions = generateConditions(this.conditions);
         List<BasicDBObject> list = ApiCollectionUsers.getSingleTypeInfoListFromConditions(conditions, 0, 200, Utils.DELTA_PERIOD_VALUE,  new ArrayList<>(deactivatedCollections));
+        
+        int initialCount = list.size();
+        
+        // Get accurate count with the same filter
+        int totalCount = ApiCollectionUsers.getApisCountFromConditionsWithStis(
+            conditions, new ArrayList<>(deactivatedCollections));
+
+        list = removeMismatchedCollections(list);
+        // removes from paginated results only
+        int removedCount = initialCount - list.size();
+
+        totalCount = totalCount - removedCount;
+        
         InventoryAction inventoryAction = new InventoryAction();
         inventoryAction.attachAPIInfoListInResponse(list,-1);
         this.setResponse(inventoryAction.getResponse());
-        response.put("apiCount", ApiCollectionUsers.getApisCountFromConditionsWithStis(conditions, new ArrayList<>(deactivatedCollections)));
+        response.put("apiCount", totalCount);
+        
         return SUCCESS.toUpperCase();
     }
+
     public String getEndpointsFromConditions(){
         List<TestingEndpoints> conditions = generateConditions(this.conditions);
 
