@@ -1052,7 +1052,7 @@
           "tags" : [ "pet" ],
           "summary" : "Test endpoint for POST without requestBody",
           "description" : "Test endpoint for POST without requestBody",
-          "security" : [ { "petstore_auth" : [ "write:pets", "read:pets" ] } ],
+          "operationId" : "findPetsByStatusPost",
           "parameters" : [ {
             "name" : "status",
             "in" : "query",
@@ -1069,9 +1069,7 @@
             "200" : {
               "description" : "successful operation"
             }
-          "security" : [ {
-            "petstore_auth" : [ "write:pets", "read:pets" ]
-          } ],
+          }
         }
       },
       "/pet/findByTags" : {
