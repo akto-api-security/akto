@@ -33,7 +33,9 @@ public class Constants {
     public static final String STATUS_COMPLETED = "Completed";
     public static final String STATUS_FAILED = "Failed";
 
-    // Constants for routing tag filtering
+    // Constants for merging tag filtering
     public static final int ROUTING_SKIP_ACCOUNT_ID = 1736798101;
-    public static final List<String> ROUTING_TAG_SUFFIXES = Arrays.asList("booking-creation", "booking-query", "cashout-api", "ebe-creditcard-service-netcore", "partner-credit-card-api");
+    public static final List<String> MERGING_ALLOWED_TAG_VALUES = Arrays.asList("agoda-routing");
+    public static final List<String> MERGING_ALLOWED_TAG_KEYS = Arrays.asList("tags-mismatch");
+    public static final List<String> MERGING_ALLOWED_TAG_SUBSTRINGS = Arrays.asList("proxy", "gateway");
 }

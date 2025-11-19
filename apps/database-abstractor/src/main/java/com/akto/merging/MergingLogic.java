@@ -240,12 +240,6 @@ public class MergingLogic {
                     LogDb.DB_ABS);
                 return new ApiMergerResult(new HashMap<>());
             }
-            if (ApiCollectionsDao.hasRoutingTags(apiCollection)) {
-                loggerMaker.infoAndAddToDb(
-                    "Skipping merging for API collection " + apiCollectionId + " in account " + Constants.ROUTING_SKIP_ACCOUNT_ID + " as it has a tag ending with one of: " + Constants.ROUTING_TAG_SUFFIXES,
-                    LogDb.DB_ABS);
-                return new ApiMergerResult(new HashMap<>());
-            }
         }
 
         Bson filterQ = null;
@@ -390,7 +384,7 @@ public class MergingLogic {
                 String aEndpoint = aUrl.split(" ")[1];
                 URLStatic aStatic = new URLStatic(aEndpoint, aMethod);
                 URLStatic newStatic = new URLStatic(newEndpoint, newMethod);
-                URLTemplate mergedTemplate = tryMergeUrls(aStatic, newStatic, allowMergingOnVersions);
+                URLTemplate mergedTemplate = tryMergeUrls(aStatic, newStatic, allowMergingOnVersions, apiCollectionId);
                 if (mergedTemplate == null) {
                     continue;
                 }
@@ -529,7 +523,7 @@ public class MergingLogic {
     }
 
 
-    public static URLTemplate tryMergeUrls(URLStatic dbUrl, URLStatic newUrl, boolean allowMergingOnVersions) {
+    public static URLTemplate tryMergeUrls(URLStatic dbUrl, URLStatic newUrl, boolean allowMergingOnVersions, int apiCollectionId) {
         if (dbUrl.getMethod() != newUrl.getMethod()) {
             return null;
         }
@@ -539,6 +533,10 @@ public class MergingLogic {
         if (dbTokens.length != newTokens.length) {
             return null;
         }
+
+        // Check if STRING merging is allowed for this collection
+        ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+        boolean allowStringMerging = !ApiCollectionsDao.shouldSkipMerging(apiCollection);
 
         Pattern pattern = patternToSubType.get(SingleTypeInfo.UUID);
 
@@ -556,6 +554,10 @@ public class MergingLogic {
                 newTypes[i] = SingleTypeInfo.SuperType.INTEGER;
                 newTokens[i] = null;
             } else if(pattern.matcher(tempToken).matches() && pattern.matcher(dbToken).matches()){
+                // Skip STRING merging if not allowed for this collection
+                if (!allowStringMerging) {
+                    return null;
+                }
                 newTypes[i] = SingleTypeInfo.SuperType.STRING;
                 newTokens[i] = null;
             }else if(allowMergingOnVersions && isValidVersionToken(tempToken) && isValidVersionToken(dbToken)) {
@@ -565,6 +567,10 @@ public class MergingLogic {
                 newTypes[i] = SingleTypeInfo.SuperType.LOCALE;
                 newTokens[i] = null;
             }else {
+                // Skip STRING merging if not allowed for this collection
+                if (!allowStringMerging) {
+                    return null;
+                }
                 newTypes[i] = SingleTypeInfo.SuperType.STRING;
                 newTokens[i] = null;
                 templatizedStrTokens++;

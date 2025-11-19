@@ -406,17 +406,20 @@ public class DbLayer {
             // Always update cursor to last item in batch
             currentObjectId = batch.get(batch.size() - 1).getId();
 
-            // Filter out template URLs from routing collections
+            // Filter out STRING template URLs from collections that should skip merging
             if (routingCollectionIds != null) {
                 for (SingleTypeInfo sti : batch) {
                     if (!routingCollectionIds.contains(sti.getApiCollectionId())) {
-                        // Not from routing collection - keep everything
+                        // Not from skip-merging collection - keep everything
                         results.add(sti);
                     } else if (!APICatalog.isTemplateUrl(sti.getUrl())) {
-                        // From routing collection but static URL - keep it
+                        // From skip-merging collection but static URL - keep it
+                        results.add(sti);
+                    } else if (!APICatalog.isStringTemplateUrl(sti.getUrl())) {
+                        // From skip-merging collection but non-STRING template URL (INTEGER, LOCALE, etc.) - keep it
                         results.add(sti);
                     }
-                    // From routing collection AND template URL - discard
+                    // From skip-merging collection AND STRING template URL - discard
                 }
             } else {
                 results.addAll(batch);
@@ -452,7 +455,7 @@ public class DbLayer {
 
             for (Integer collectionId : apiCollectionIds) {
                 ApiCollection collection = ApiCollectionsDao.instance.getMeta(collectionId);
-                if (ApiCollectionsDao.hasRoutingTags(collection)) {
+                if (ApiCollectionsDao.shouldSkipMerging(collection)) {
                     routingCollectionIds.add(collectionId);
                 }
             }

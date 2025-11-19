@@ -96,6 +96,10 @@ public class APICatalog {
                 url.contains(SingleTypeInfo.SuperType.LOCALE.name());
     }
 
+    public static boolean isStringTemplateUrl(String url) {
+        return url.contains(SingleTypeInfo.SuperType.STRING.name());
+    }
+
     @Override
     public String toString() {
         return "{" +

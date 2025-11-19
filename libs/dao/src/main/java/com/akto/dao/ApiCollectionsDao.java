@@ -268,22 +268,49 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
     }
 
     /**
-     * Checks if an API collection has tags ending with routing suffixes for a specific account.
+     * Checks if merging should be skipped for an API collection for a specific account.
+     * Merging is allowed only for collections with:
+     * - No tags, OR
+     * - Tags matching allowed values (agoda-routing, tag_mismatch) or containing allowed substrings (proxy, gateway)
      * @param apiCollection The API collection to check
-     * @return true if collection has routing tags and account matches, false otherwise
+     * @return true if merging should be skipped, false if merging is allowed
      */
-    public static boolean hasRoutingTags(ApiCollection apiCollection) {
-        if (apiCollection == null || apiCollection.getTagsList() == null) {
-            return false;
-        }
-
+    public static boolean shouldSkipMerging(ApiCollection apiCollection) {
         // Only check for specific account
         if (Context.accountId.get() != Constants.ROUTING_SKIP_ACCOUNT_ID) {
-            return false;
+            return false; // Don't skip for other accounts
         }
 
-        return apiCollection.getTagsList().stream()
-            .anyMatch(t -> t.getValue() != null &&
-                Constants.ROUTING_TAG_SUFFIXES.stream().anyMatch(suffix -> t.getValue().endsWith(suffix)));
+        // Allow merging if NO tags
+        if (apiCollection == null || apiCollection.getTagsList() == null || apiCollection.getTagsList().isEmpty()) {
+            return false; // Allow merging
+        }
+
+        // Allow merging if AT LEAST ONE tag matches the allowed list
+        boolean hasAllowedTag = apiCollection.getTagsList().stream()
+            .anyMatch(t -> {
+                String keyName = t.getKeyName();
+                String value = t.getValue();
+
+                // Check exact key matches
+                if (keyName != null && Constants.MERGING_ALLOWED_TAG_KEYS.contains(keyName)) {
+                    return true;
+                }
+
+                // Check exact value matches
+                if (value != null && Constants.MERGING_ALLOWED_TAG_VALUES.contains(value)) {
+                    return true;
+                }
+
+                // Check substring matches (contains) in value
+                if (value != null) {
+                    return Constants.MERGING_ALLOWED_TAG_SUBSTRINGS.stream()
+                        .anyMatch(substring -> value.contains(substring));
+                }
+
+                return false;
+            });
+
+        return !hasAllowedTag; // SKIP if NO tag matches the allowed list
     }
 }
