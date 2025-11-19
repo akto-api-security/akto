@@ -172,6 +172,7 @@ export default {
         return await request({
             url: '/api/getAllCollectionsBasic',
             method: 'post',
+            data: {}
         })
     },
     async createCollection(name) {

@@ -528,11 +528,8 @@ public class ApiCollectionsAction extends UserAction {
 
     public String getEndpointsListFromConditions() {
         List<TestingEndpoints> conditions = generateConditions(this.conditions);
+        List<BasicDBObject> list = ApiCollectionUsers.getSingleTypeInfoListFromConditions(conditions, 0, 200, Utils.DELTA_PERIOD_VALUE,  new ArrayList<>(deactivatedCollections));
         
-        // First, get the list without mismatch filtering
-        List<BasicDBObject> list = ApiCollectionUsers.getSingleTypeInfoListFromConditions(
-            conditions, 0, 200, Utils.DELTA_PERIOD_VALUE, 
-            new ArrayList<>(deactivatedCollections), null);
         
         // Calculate mismatched collection IDs efficiently if filtering is enabled
         final List<Integer> mismatchedCollectionIds;
