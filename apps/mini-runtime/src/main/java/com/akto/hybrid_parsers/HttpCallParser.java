@@ -883,6 +883,7 @@ public class HttpCallParser {
 
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
 
+            //TODO("Parse JSON in one place for all the parser methods like Rest/GraphQL/JsonRpc")
             List<HttpResponseParams> responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
             if (responseParamsList.isEmpty()) {
                 // Check for REST method payload structure (only for account 1758525547)
