@@ -168,11 +168,11 @@ export default {
             data: {}
         })
     },
-    async getAllCollectionsBasic() {
+    async getAllCollectionsBasic(skipTagsMismatch) {
         return await request({
             url: '/api/getAllCollectionsBasic',
             method: 'post',
-            data: {}
+            data: { skipTagsMismatch }
         })
     },
     async createCollection(name) {
@@ -720,12 +720,13 @@ export default {
             }
         })
     },
-    async getEndpointsListFromConditions(conditions) {
+    async getEndpointsListFromConditions(conditions, skipTagsMismatch = false) {
         return await request({
             url: '/api/getEndpointsListFromConditions',
             method: 'post',
             data: {
-                conditions
+                conditions,
+                skipTagsMismatch
             }
         }).then((resp) => {
             return resp

@@ -72,6 +72,8 @@ public class ApiCollectionsAction extends UserAction {
     Map<Integer, List<String>> sensitiveSubtypesInCollection = new HashMap<>();
     List<BasicDBObject> sensitiveSubtypesInUrl = new ArrayList<>();
     LastCronRunInfo timerInfo;
+    @Setter
+    boolean skipTagsMismatch = false;
 
     Map<Integer,Map<String,Integer>> severityInfo = new HashMap<>();
     int apiCollectionId;
@@ -526,13 +528,37 @@ public class ApiCollectionsAction extends UserAction {
 
     public String getEndpointsListFromConditions() {
         List<TestingEndpoints> conditions = generateConditions(this.conditions);
-        List<BasicDBObject> list = ApiCollectionUsers.getSingleTypeInfoListFromConditions(conditions, 0, 200, Utils.DELTA_PERIOD_VALUE,  new ArrayList<>(deactivatedCollections));
+        
+        // Calculate mismatched collection IDs once if filtering is enabled
+        List<Integer> mismatchedCollectionIds = null;
+        if (skipTagsMismatch) {
+            mismatchedCollectionIds = ApiCollectionsDao.instance.findAll(Filters.empty())
+                .stream()
+                .filter(collection -> {
+                    List<CollectionTags> tagsList = collection.getTagsList();
+                    return tagsList != null && tagsList.stream()
+                        .anyMatch(tag -> "tags-mismatch".equals(tag.getKeyName()) && "true".equals(tag.getValue()));
+                })
+                .map(ApiCollection::getId)
+                .collect(Collectors.toList());
+        }
+        
+        // Apply filter at database level in both methods
+        List<BasicDBObject> list = ApiCollectionUsers.getSingleTypeInfoListFromConditions(
+            conditions, 0, 200, Utils.DELTA_PERIOD_VALUE, 
+            new ArrayList<>(deactivatedCollections), mismatchedCollectionIds);
+        
+        int totalCount = ApiCollectionUsers.getApisCountFromConditionsWithStis(
+            conditions, new ArrayList<>(deactivatedCollections), mismatchedCollectionIds);
+        
         InventoryAction inventoryAction = new InventoryAction();
-        inventoryAction.attachAPIInfoListInResponse(list,-1);
+        inventoryAction.attachAPIInfoListInResponse(list, -1);
         this.setResponse(inventoryAction.getResponse());
-        response.put("apiCount", ApiCollectionUsers.getApisCountFromConditionsWithStis(conditions, new ArrayList<>(deactivatedCollections)));
+        response.put("apiCount", totalCount);
+        
         return SUCCESS.toUpperCase();
     }
+
     public String getEndpointsFromConditions(){
         List<TestingEndpoints> conditions = generateConditions(this.conditions);
 

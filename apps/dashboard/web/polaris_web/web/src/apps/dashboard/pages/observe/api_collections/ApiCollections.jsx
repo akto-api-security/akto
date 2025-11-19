@@ -388,7 +388,7 @@ function ApiCollections(props) {
             const shouldCallHeavyApis = (func.timeNow() - lastFetchedInfo.lastRiskScoreInfo) >= (5 * 60)
             
             let apiPromises = [
-                api.getAllCollectionsBasic(),  // index 0
+                api.getAllCollectionsBasic(false),  // index 0 - don't skip tags-mismatch in normal view
                 api.getUserEndpoints(),         // index 1
                 api.getCoverageInfoForCollections(), // index 2
                 api.getLastTrafficSeen(),            // index 3
