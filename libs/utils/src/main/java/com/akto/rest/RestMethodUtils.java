@@ -90,9 +90,20 @@ public class RestMethodUtils {
                 // Handle URL with query parameters
                 if (originalUrl.contains("?")) {
                     String[] urlParts = originalUrl.split("\\?", 2);
-                    modifiedUrl = urlParts[0] + "/" + methodName + "?" + urlParts[1];
+                    String basePath = urlParts[0];
+                    // Check if base path ends with slash
+                    if (basePath.endsWith("/")) {
+                        modifiedUrl = basePath + methodName + "?" + urlParts[1];
+                    } else {
+                        modifiedUrl = basePath + "/" + methodName + "?" + urlParts[1];
+                    }
                 } else {
-                    modifiedUrl = originalUrl + "/" + methodName;
+                    // Check if URL ends with slash
+                    if (originalUrl.endsWith("/")) {
+                        modifiedUrl = originalUrl + methodName;
+                    } else {
+                        modifiedUrl = originalUrl + "/" + methodName;
+                    }
                 }
 
                 httpResponseParamsCopy.requestParams.setUrl(modifiedUrl);
