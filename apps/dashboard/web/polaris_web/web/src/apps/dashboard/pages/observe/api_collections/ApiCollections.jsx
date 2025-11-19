@@ -291,6 +291,16 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
     const severityInfo = severityInfoMap[rawCollection.id] || {};
     const sensitiveTypes = sensitiveInfoMap[rawCollection.id] || [];
 
+    // Build issuesArrVal in same format as transform.getIssuesListText
+    const sortedSeverityInfo = func.sortObjectBySeverity(severityInfo);
+    let issuesArrVal = "-";
+    if(Object.keys(sortedSeverityInfo).length > 0){
+        issuesArrVal = "";
+        Object.keys(sortedSeverityInfo).forEach((key) => {
+            issuesArrVal += (key + ": " + sortedSeverityInfo[key] + " ");
+        });
+    }
+
     // Return minimal object - only fields needed for filtering, sorting, and categorization
     // JSX components will be created on-demand by prettifyPageData
     return {
@@ -309,7 +319,11 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         envTypeOriginal: rawCollection?.envType,
         testedEndpoints,
         sensitiveInRespTypes: sensitiveTypes,
+        sensitiveSubTypesVal: sensitiveTypes.join(' ') || '-',
         severityInfo,
+        issuesArrVal: issuesArrVal,
+        severityInfoCount: Object.keys(severityInfo).reduce((sum, key) => sum + (severityInfo[key] || 0), 0),
+        sensitiveInRespCount: sensitiveTypes.length,
         detectedTimestamp: rawCollection.urlsCount === 0 ? 0 : (trafficInfoMap[rawCollection.id] || 0),
         riskScore,
         detected,
@@ -499,14 +513,11 @@ function ApiCollections(props) {
                     const lightweightData = finalArr.map(c => transformRawCollectionData(c, cacheMaps));
 
                     const { categorized } = categorizeCollections(lightweightData);
-  
-                    const initialSummaryDataObj = {
-                        totalEndpoints: finalArr.reduce((sum, c) => sum + (c.urlsCount || 0), 0),
-                        totalTestedEndpoints: finalArr.reduce((sum, c) => sum + (coverageMapCached[c.id] || 0), 0),
-                        totalSensitiveEndpoints: lastFetchedSensitiveResp?.sensitiveUrls || 0,
-                        totalCriticalEndpoints: lastFetchedResp?.criticalUrls || 0,
-                        totalAllowedForTesting: finalArr.reduce((sum, c) => sum + (c.isOutOfTestingScope ? 0 : c.urlsCount || 0), 0)
-                    };
+
+                    // Use transform.getSummaryData to match master behavior (excludes API_GROUP and deactivated)
+                    const initialSummaryDataObj = transform.getSummaryData(lightweightData);
+                    initialSummaryDataObj.totalSensitiveEndpoints = lastFetchedSensitiveResp?.sensitiveUrls || 0;
+                    initialSummaryDataObj.totalCriticalEndpoints = lastFetchedResp?.criticalUrls || 0;
 
                     // React 18+ automatically batches these state updates into a single re-render
                     // IMPORTANT: Set data and summary BEFORE setting loading=false to avoid showing zeros
@@ -728,14 +739,10 @@ function ApiCollections(props) {
         res['untracked'] = [];
         setHasUsageEndpoints(hasUserEndpoints);
 
-        // Calculate initial summary data to avoid showing zeros
-        const initialSummaryDataObj = {
-            totalEndpoints: finalArr.reduce((sum, c) => sum + (c.urlsCount || 0), 0),
-            totalTestedEndpoints: finalArr.reduce((sum, c) => sum + (coverageMap[c.id] || 0), 0),
-            totalSensitiveEndpoints: sensitiveInfo?.sensitiveUrls || 0,
-            totalCriticalEndpoints: riskScoreObj?.criticalUrls || 0,
-            totalAllowedForTesting: finalArr.reduce((sum, c) => sum + (c.isOutOfTestingScope ? 0 : c.urlsCount || 0), 0)
-        };
+        // Use transform.getSummaryData to match master behavior (excludes API_GROUP and deactivated)
+        const initialSummaryDataObj = transform.getSummaryData(dataObj.normal);
+        initialSummaryDataObj.totalSensitiveEndpoints = sensitiveInfo?.sensitiveUrls || 0;
+        initialSummaryDataObj.totalCriticalEndpoints = riskScoreObj?.criticalUrls || 0;
 
         // Render first batch immediately WITHOUT untracked processing to show UI fast
         setData(res);
@@ -833,8 +840,8 @@ function ApiCollections(props) {
                     const updatedPrettifyData = dataObj.prettify.map(item => ({
                         ...item,
                         sensitiveInRespTypes: newSensitiveInfo.sensitiveInfoMap[item.id] || [],
-                        sensitiveSubTypes: transform.getSensitiveChipArray(newSensitiveInfo.sensitiveInfoMap[item.id] || []),
-                        sensitiveSubTypesVal: (newSensitiveInfo.sensitiveInfoMap[item.id] || []).join(',')
+                        sensitiveSubTypes: transform.prettifySubtypes(newSensitiveInfo.sensitiveInfoMap[item.id] || [], item.deactivated),
+                        sensitiveSubTypesVal: (newSensitiveInfo.sensitiveInfoMap[item.id] || []).join(' ')
                     }));
 
                     // Re-categorize with updated data
