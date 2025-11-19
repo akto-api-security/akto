@@ -1,6 +1,6 @@
 import CollectionComponent from "../../../components/CollectionComponent"
 import OperatorDropdown from "../../../components/layouts/OperatorDropdown";
-import { VerticalStack, Card, Button, HorizontalStack, Collapsible, Text, Box, Icon, Popover, ActionList } from "@shopify/polaris";
+import { VerticalStack, Card, Button, HorizontalStack, Collapsible, Text, Box, Icon, Popover, ActionList, Checkbox } from "@shopify/polaris";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import React, { useState, useReducer, useCallback, useMemo, useEffect } from 'react'
@@ -26,6 +26,7 @@ function APIQuery() {
     const collectionsMap = PersistStore.getState().collectionsMap
     const [isUpdate, setIsUpdate] = useState(false)
     const [moreActions, setMoreActions] = useState(false);
+    const [skipTagsMismatch, setSkipTagsMismatch] = useState(true);
 
     const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
@@ -143,7 +144,7 @@ function APIQuery() {
     const exploreEndpoints = useCallback(async () => {
         let dt = prepareData();
         if (dt.length > 0) {
-            let endpointListFromConditions = await api.getEndpointsListFromConditions(dt);
+            let endpointListFromConditions = await api.getEndpointsListFromConditions(dt, skipTagsMismatch);
             let sensitiveParams = await api.loadSensitiveParameters(-1);
             if (endpointListFromConditions || sensitiveParams) {
                 setEndpointListFromConditions(endpointListFromConditions);
@@ -154,7 +155,7 @@ function APIQuery() {
             setEndpointListFromConditions({});
             setSensitiveParams({});
         }
-    }, [prepareData]);
+    }, [prepareData, skipTagsMismatch]);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const modalComponent =
@@ -216,7 +217,13 @@ function APIQuery() {
                                     conditions.length > 0 ? <Button plain destructive onClick={handleClearFunction}>Clear all</Button> : null
                                 }
                             </HorizontalStack>
-                            <HorizontalStack gap={4} align="end">
+                            <HorizontalStack gap={4} align="space-between">
+                                <Checkbox
+                                    label="Hide mismatched collections"
+                                    checked={skipTagsMismatch}
+                                    onChange={setSkipTagsMismatch}
+                                    helpText="Filter out endpoints from collections with tags-mismatch=true"
+                                />
                                 <Button onClick={exploreEndpoints}>Explore {mapLabel("endpoints", getDashboardCategory())}</Button>
                             </HorizontalStack>
                         </VerticalStack>

@@ -72,6 +72,8 @@ public class ApiCollectionsAction extends UserAction {
     Map<Integer, List<String>> sensitiveSubtypesInCollection = new HashMap<>();
     List<BasicDBObject> sensitiveSubtypesInUrl = new ArrayList<>();
     LastCronRunInfo timerInfo;
+    @Setter
+    boolean skipTagsMismatch = false;
 
     Map<Integer,Map<String,Integer>> severityInfo = new HashMap<>();
     int apiCollectionId;
@@ -526,13 +528,74 @@ public class ApiCollectionsAction extends UserAction {
 
     public String getEndpointsListFromConditions() {
         List<TestingEndpoints> conditions = generateConditions(this.conditions);
-        List<BasicDBObject> list = ApiCollectionUsers.getSingleTypeInfoListFromConditions(conditions, 0, 200, Utils.DELTA_PERIOD_VALUE,  new ArrayList<>(deactivatedCollections));
+        
+        // First, get the list without mismatch filtering
+        List<BasicDBObject> list = ApiCollectionUsers.getSingleTypeInfoListFromConditions(
+            conditions, 0, 200, Utils.DELTA_PERIOD_VALUE, 
+            new ArrayList<>(deactivatedCollections), null);
+        
+        // Calculate mismatched collection IDs efficiently if filtering is enabled
+        final List<Integer> mismatchedCollectionIds;
+        if (skipTagsMismatch && !list.isEmpty()) {
+            // Extract unique collection IDs from the result (_id is a nested object with apiCollectionId)
+            Set<Integer> apiCollectionIds = list.stream()
+                .map(obj -> {
+                    // The aggregation returns _id as a nested object
+                    Object id = obj.get("_id");
+                    if (id instanceof BasicDBObject) {
+                        return ((BasicDBObject) id).getInt("apiCollectionId");
+                    }
+                    return null;
+                })
+                .filter(id -> id != null)
+                .collect(Collectors.toSet());
+            
+            // Query ONLY those specific collections for tags-mismatch
+            Bson filter = Filters.and(
+                Filters.in(Constants.ID, apiCollectionIds),
+                Filters.elemMatch("tagsList", 
+                    Filters.and(
+                        Filters.eq("keyName", "tags-mismatch"),
+                        Filters.eq("value", "true")
+                    )
+                )
+            );
+            
+            mismatchedCollectionIds = ApiCollectionsDao.instance
+                .findAll(filter, Projections.include(Constants.ID))
+                .stream()
+                .map(ApiCollection::getId)
+                .collect(Collectors.toList());
+            
+            // Filter out results where apiCollectionId is in mismatchedCollectionIds
+            if (!mismatchedCollectionIds.isEmpty()) {
+                list = list.stream()
+                    .filter(obj -> {
+                        Object id = obj.get("_id");
+                        if (id instanceof BasicDBObject) {
+                            int colId = ((BasicDBObject) id).getInt("apiCollectionId");
+                            return !mismatchedCollectionIds.contains(colId);
+                        }
+                        return true;
+                    })
+                    .collect(Collectors.toList());
+            }
+        } else {
+            mismatchedCollectionIds = null;
+        }
+        
+        // Get accurate count with the same filter
+        int totalCount = ApiCollectionUsers.getApisCountFromConditionsWithStis(
+            conditions, new ArrayList<>(deactivatedCollections), mismatchedCollectionIds);
+        
         InventoryAction inventoryAction = new InventoryAction();
-        inventoryAction.attachAPIInfoListInResponse(list,-1);
+        inventoryAction.attachAPIInfoListInResponse(list, -1);
         this.setResponse(inventoryAction.getResponse());
-        response.put("apiCount", ApiCollectionUsers.getApisCountFromConditionsWithStis(conditions, new ArrayList<>(deactivatedCollections)));
+        response.put("apiCount", totalCount);
+        
         return SUCCESS.toUpperCase();
     }
+
     public String getEndpointsFromConditions(){
         List<TestingEndpoints> conditions = generateConditions(this.conditions);
 

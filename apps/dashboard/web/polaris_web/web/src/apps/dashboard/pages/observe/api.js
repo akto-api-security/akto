@@ -172,7 +172,6 @@ export default {
         return await request({
             url: '/api/getAllCollectionsBasic',
             method: 'post',
-            data: {}
         })
     },
     async createCollection(name) {
@@ -720,12 +719,13 @@ export default {
             }
         })
     },
-    async getEndpointsListFromConditions(conditions) {
+    async getEndpointsListFromConditions(conditions, skipTagsMismatch = false) {
         return await request({
             url: '/api/getEndpointsListFromConditions',
             method: 'post',
             data: {
-                conditions
+                conditions,
+                skipTagsMismatch
             }
         }).then((resp) => {
             return resp
