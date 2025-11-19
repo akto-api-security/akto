@@ -573,13 +573,20 @@ const transform = {
 
     getTruncatedUrl(url){
         const category = getDashboardCategory();
+        let parsedURL = url;
+        let pathUrl = url;
+        try {
+            parsedURL = new URL(url)
+            pathUrl = parsedURL.pathname.replace(/%7B/g, '{').replace(/%7D/g, '}');
+        } catch (error) {
+            
+        }
         if(category.includes("MCP") || category.includes("Agentic")){
             try {
-                const s = String(url);
-                const [path, tail = ""] = s.split(/(?=[?#])/); // keep ? or # in tail
+                const [path, tail = ""] = pathUrl.split(/(?=[?#])/); // keep ? or # in tail
                 const newPath = path
                   .replace(/^.*?\/calls?(?:\/|$)/i, "/")       // keep only what's after /call or /calls
-                  .replace(/\/{2,}/g, "/");                    // collapse slashes
+                  .replace(/\/{2,}/g, "/");                  // collapse slashes
                 return (newPath.endsWith("/") && newPath !== "/")
                   ? newPath.slice(0, -1) + tail
                   : newPath + tail;
@@ -588,13 +595,7 @@ const transform = {
             }
             
         }
-        try {
-            const parsedURL = new URL(url)
-            const pathUrl = parsedURL.pathname.replace(/%7B/g, '{').replace(/%7D/g, '}');
-            return pathUrl
-        } catch (error) {
-            return url
-        }
+        return pathUrl;
     },
 
     getHostName(url){
