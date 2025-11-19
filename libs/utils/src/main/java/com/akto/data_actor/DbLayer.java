@@ -185,57 +185,6 @@ public class DbLayer {
                         Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
                         Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived())
                 ), updateOptions);
-        if (moduleInfo.getModuleType() == ModuleInfo.ModuleType.MINI_TESTING) {
-            //Only for mini-testing heartbeat mark testing run failed state
-            if (Context.now() - getLastUpdatedTsForAccount(Context.accountId.get()) > 10 * 60) {
-                try {
-                    fetchAndFailOutdatedTests();
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "Error while updating outdated tests: " + e.getMessage());
-                    //Ignore
-                }
-                lastUpdatedTsMap.put(Context.accountId.get(), Context.now());
-            }
-        }
-    }
-
-    public static void fetchAndFailOutdatedTests() {
-        List<TestingRun> testingRunList = TestingRunDao.instance.findAll(
-                Filters.and(
-                        Filters.or(
-                                Filters.eq(TestingRun.STATE, State.SCHEDULED),
-                                Filters.eq(TestingRun.STATE, State.RUNNING)
-                        ),
-                        Filters.exists(ModuleInfo.NAME, true),
-                        Filters.ne(ModuleInfo.NAME, null)
-                )
-        );
-
-        for (TestingRun testingRun : testingRunList) {
-            String miniTestingServiceName = testingRun.getMiniTestingServiceName();
-            if(miniTestingServiceName != null && !miniTestingServiceName.isEmpty()) {
-                List<ModuleInfo> moduleInfos = ModuleInfoDao.instance.
-                        findAll(Filters.eq(ModuleInfo.NAME, miniTestingServiceName), 0, 1,
-                                Sorts.descending(ModuleInfo.LAST_HEARTBEAT_RECEIVED));
-                boolean isValid = true;
-                if (moduleInfos != null && !moduleInfos.isEmpty()) {
-                    isValid = Context.now() - moduleInfos.get(0).getLastHeartbeatReceived() < 20 * 60;
-                }
-
-                if(!isValid) {
-                    Bson filter = Filters.or(
-                            Filters.eq(TestingRun.STATE, State.SCHEDULED),
-                            Filters.eq(TestingRun.STATE, State.RUNNING));
-                    TestingRunDao.instance.updateOne(
-                            Filters.and(filter, Filters.eq(Constants.ID, testingRun.getId())),
-                            Updates.set(TestingRun.STATE, State.FAILED));
-                    TestingRunResultSummariesDao.instance.updateOneNoUpsert(
-                            Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRun.getId()),
-                            Updates.set(TestingRunResultSummary.STATE, State.FAILED)
-                    );
-                }
-            }
-        }
     }
 
 
