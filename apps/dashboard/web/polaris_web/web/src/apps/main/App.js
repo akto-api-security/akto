@@ -488,14 +488,6 @@ const router = createBrowserRouter([
                         element: <AuthTypeDetails/>
                     },
                     {
-                        path: "tags",
-                        element: <Tags/>
-                    },
-                    {
-                        path: "tags/details",
-                        element: <TagDetails/>
-                    },
-                    {
                         path: "test-library",
                         element: <TestLibrary/>
                     },

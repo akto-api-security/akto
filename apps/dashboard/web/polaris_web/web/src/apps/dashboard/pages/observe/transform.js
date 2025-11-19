@@ -451,16 +451,28 @@ const transform = {
     },
 
     getCollectionTypeList(envType, maxItems, wrap){
-        if(envType == null || envType.length === 0){ 
+        if(envType == null || envType.length === 0){
             return <></>
         }
+
+        // Sort tags to prioritize 'privatecloud.agoda.com/service' first
+        const sortedEnvType = [...envType].sort((a, b) => {
+            const aKey = a.split('=')[0];
+            const bKey = b.split('=')[0];
+
+            if (aKey === 'privatecloud.agoda.com/service') return -1;
+            if (bKey === 'privatecloud.agoda.com/service') return 1;
+            return 0;
+        });
+
         return (
             <ShowListInBadge
-                itemsArr={envType}
+                itemsArr={sortedEnvType}
                 maxItems={maxItems}
                 status={"info"}
                 useTooltip={true}
                 wrap={wrap}
+                allowFullWidth={true}
             />
         )
     },
@@ -561,13 +573,20 @@ const transform = {
 
     getTruncatedUrl(url){
         const category = getDashboardCategory();
+        let parsedURL = url;
+        let pathUrl = url;
+        try {
+            parsedURL = new URL(url)
+            pathUrl = parsedURL.pathname.replace(/%7B/g, '{').replace(/%7D/g, '}');
+        } catch (error) {
+            
+        }
         if(category.includes("MCP") || category.includes("Agentic")){
             try {
-                const s = String(url);
-                const [path, tail = ""] = s.split(/(?=[?#])/); // keep ? or # in tail
+                const [path, tail = ""] = pathUrl.split(/(?=[?#])/); // keep ? or # in tail
                 const newPath = path
                   .replace(/^.*?\/calls?(?:\/|$)/i, "/")       // keep only what's after /call or /calls
-                  .replace(/\/{2,}/g, "/");                    // collapse slashes
+                  .replace(/\/{2,}/g, "/");                  // collapse slashes
                 return (newPath.endsWith("/") && newPath !== "/")
                   ? newPath.slice(0, -1) + tail
                   : newPath + tail;
@@ -576,13 +595,7 @@ const transform = {
             }
             
         }
-        try {
-            const parsedURL = new URL(url)
-            const pathUrl = parsedURL.pathname.replace(/%7B/g, '{').replace(/%7D/g, '}');
-            return pathUrl
-        } catch (error) {
-            return url
-        }
+        return pathUrl;
     },
 
     getHostName(url){

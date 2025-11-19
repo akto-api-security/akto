@@ -275,7 +275,7 @@ public class Main {
         mapper.setAnnotationIntrospector(new JacksonAnnotationIntrospector(){
             @Override
             public boolean hasIgnoreMarker(final AnnotatedMember m) {
-                List<String> exclusions = Collections.singletonList("exampleSetFlag");
+                List<String> exclusions = Arrays.asList("exampleSetFlag", "types");
                 return exclusions.contains(m.getName())|| super.hasIgnoreMarker(m);
             }
         });

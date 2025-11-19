@@ -334,7 +334,7 @@ export default function LeftNav() {
                 subNavigationItems: reportsSubNavigationItems,
                 key: "6",
             },
-            ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted && dashboardCategory !== CATEGORY_DAST  ? [{
+            ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted && dashboardCategory !== CATEGORY_DAST  ?  [{
                     label: (
                         <Text variant="bodyMd" fontWeight="medium">
                             {mapLabel("Threat Detection", dashboardCategory)}
@@ -346,7 +346,7 @@ export default function LeftNav() {
                         navigate("/dashboard/protection/threat-actor");
                         setActive("normal");
                     },
-                    selected: leftNavSelected.includes("_threat"),
+                    selected: leftNavSelected.includes("_threat") ||  leftNavSelected.includes("_guardrails"),
                     url: "#",
                     key: "7",
                     subNavigationItems: [
@@ -360,7 +360,7 @@ export default function LeftNav() {
                             selected: leftNavSelected === "dashboard_threat_dashboard",
                         }] : []),
                         {
-                            label: "Threat Actors",
+                            label: `${mapLabel("Threat", dashboardCategory)} Actors`,
                             onClick: () => {
                                 navigate("/dashboard/protection/threat-actor");
                                 handleSelect("dashboard_threat_actor");
@@ -369,7 +369,7 @@ export default function LeftNav() {
                             selected: leftNavSelected === "dashboard_threat_actor",
                         },
                         {
-                            label: "Threat Activity",
+                            label: `${mapLabel("Threat", dashboardCategory)} Activity`,
                             onClick: () => {
                                 navigate("/dashboard/protection/threat-activity");
                                 handleSelect("dashboard_threat_activity");
@@ -379,7 +379,7 @@ export default function LeftNav() {
                                 leftNavSelected === "dashboard_threat_activity",
                         },
                         {
-                            label: `${mapLabel("APIs", dashboardCategory)} Under Threat`,
+                            label: `${mapLabel("APIs", dashboardCategory)} Under ${mapLabel("Threat", dashboardCategory)}`,
                             onClick: () => {
                                 navigate("/dashboard/protection/threat-api");
                                 handleSelect("dashboard_threat_api");
@@ -388,8 +388,17 @@ export default function LeftNav() {
                             selected:
                                 leftNavSelected === "dashboard_threat_api",
                         },
+                        ...(dashboardCategory === "Agentic Security" ? [{
+                            label: "Guardrail Policies",
+                            onClick: () => {
+                                navigate("/dashboard/guardrails/policies");
+                                handleSelect("dashboard_guardrails_policies");
+                                setActive("active");
+                            },
+                            selected: leftNavSelected === "dashboard_guardrails_policies",
+                            }] : []),
                         {
-                            label: "Threat Policy",
+                            label: "Threat Policies",
                             onClick: () => {
                                 navigate("/dashboard/protection/threat-policy");
                                 handleSelect("dashboard_threat_policy");
@@ -397,7 +406,7 @@ export default function LeftNav() {
                             },
                             selected:
                                 leftNavSelected === "dashboard_threat_policy",
-                        },
+                        }
                     ],
                 }] : []),
             // ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AI_AGENTS?.isGranted && dashboardCategory === "API Security" ? [{
@@ -469,43 +478,6 @@ export default function LeftNav() {
                 selected: leftNavSelected.includes("_guardrails"),
                 url: "#",
                 key: "10",
-                subNavigationItems: [
-                    {
-                        label: "Guardrails Activity",
-                        onClick: () => {
-                            navigate("/dashboard/guardrails/activity");
-                            handleSelect("dashboard_guardrails_activity");
-                            setActive("active");
-                        },
-                        selected: leftNavSelected === "dashboard_guardrails_activity",
-                    },
-                    {
-                        label: "Guardrails Policies",
-                        onClick: () => {
-                            navigate("/dashboard/guardrails/policies");
-                            handleSelect("dashboard_guardrails_policies");
-                            setActive("active");
-                        },
-                        selected:
-                            leftNavSelected === "dashboard_guardrails_policies",
-                    }
-                ]
-            }] : []),
-            ...(dashboardCategory === "Agentic Security" ? [{
-                label: (
-                    <Text variant="bodyMd" fontWeight="medium">
-                        Agentic Guardrails
-                    </Text>
-                ),
-                icon: LockMajor,
-                onClick: () => {
-                    handleSelect("dashboard_agentic_guardrails");
-                    navigate("/dashboard/guardrails/activity");
-                    setActive("normal");
-                },
-                selected: leftNavSelected.includes("_guardrails"),
-                url: "#",
-                key: "11",
                 subNavigationItems: [
                     {
                         label: "Guardrails Activity",

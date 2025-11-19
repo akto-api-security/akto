@@ -68,6 +68,7 @@ function GithubServerTable(props) {
       }
     })
     setAppliedFilters(temp);
+    let tempFilters = {}
 
     tempFilters[currentPageKey] = {
       'filters': temp,
