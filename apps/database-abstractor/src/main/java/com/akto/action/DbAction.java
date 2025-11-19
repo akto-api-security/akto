@@ -208,6 +208,7 @@ public class DbAction extends ActionSupport {
     int apiCollectionId;
     int startTimestamp;
     int endTimestamp;
+    int scheduleTimestamp;
     List<ApiInfo.ApiInfoKey> newEps;
     String logicalGroupName;
     BasicDBList issuesIds;
@@ -2253,9 +2254,25 @@ public class DbAction extends ActionSupport {
 
     public String updateTestingRun() {
         try {
-            DbLayer.updateTestingRun(testingRunId);
+            if (state != null && !state.isEmpty()) {
+                TestingRun.State stateEnum = TestingRun.State.valueOf(state);
+                DbLayer.updateTestingRun(testingRunId, stateEnum, scheduleTimestamp);
+            } else {
+                DbLayer.updateTestingRun(testingRunId);
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in updateTestingRun " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateTestingRunResultSummaryWithStateAndTimestamp() {
+        try {
+            TestingRun.State stateEnum = TestingRun.State.valueOf(state);
+            trrs = DbLayer.updateTestingRunResultSummaryWithStateAndTimestamp(testingRunResultSummaryId, stateEnum, startTimestamp);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in updateTestingRunResultSummaryWithStateAndTimestamp " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -4256,6 +4273,14 @@ public class DbAction extends ActionSupport {
 
     public void setRemarksList(List<String> remarksList) {
         this.remarksList = remarksList;
+    }
+
+    public int getScheduleTimestamp() {
+        return scheduleTimestamp;
+    }
+
+    public void setScheduleTimestamp(int scheduleTimestamp) {
+        this.scheduleTimestamp = scheduleTimestamp;
     }
 
     public String fetchMcpAuditInfo() {

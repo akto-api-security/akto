@@ -185,57 +185,6 @@ public class DbLayer {
                         Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
                         Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived())
                 ), updateOptions);
-        if (moduleInfo.getModuleType() == ModuleInfo.ModuleType.MINI_TESTING) {
-            //Only for mini-testing heartbeat mark testing run failed state
-            if (Context.now() - getLastUpdatedTsForAccount(Context.accountId.get()) > 10 * 60) {
-                try {
-                    fetchAndFailOutdatedTests();
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "Error while updating outdated tests: " + e.getMessage());
-                    //Ignore
-                }
-                lastUpdatedTsMap.put(Context.accountId.get(), Context.now());
-            }
-        }
-    }
-
-    public static void fetchAndFailOutdatedTests() {
-        List<TestingRun> testingRunList = TestingRunDao.instance.findAll(
-                Filters.and(
-                        Filters.or(
-                                Filters.eq(TestingRun.STATE, State.SCHEDULED),
-                                Filters.eq(TestingRun.STATE, State.RUNNING)
-                        ),
-                        Filters.exists(ModuleInfo.NAME, true),
-                        Filters.ne(ModuleInfo.NAME, null)
-                )
-        );
-
-        for (TestingRun testingRun : testingRunList) {
-            String miniTestingServiceName = testingRun.getMiniTestingServiceName();
-            if(miniTestingServiceName != null && !miniTestingServiceName.isEmpty()) {
-                List<ModuleInfo> moduleInfos = ModuleInfoDao.instance.
-                        findAll(Filters.eq(ModuleInfo.NAME, miniTestingServiceName), 0, 1,
-                                Sorts.descending(ModuleInfo.LAST_HEARTBEAT_RECEIVED));
-                boolean isValid = true;
-                if (moduleInfos != null && !moduleInfos.isEmpty()) {
-                    isValid = Context.now() - moduleInfos.get(0).getLastHeartbeatReceived() < 20 * 60;
-                }
-
-                if(!isValid) {
-                    Bson filter = Filters.or(
-                            Filters.eq(TestingRun.STATE, State.SCHEDULED),
-                            Filters.eq(TestingRun.STATE, State.RUNNING));
-                    TestingRunDao.instance.updateOne(
-                            Filters.and(filter, Filters.eq(Constants.ID, testingRun.getId())),
-                            Updates.set(TestingRun.STATE, State.FAILED));
-                    TestingRunResultSummariesDao.instance.updateOneNoUpsert(
-                            Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRun.getId()),
-                            Updates.set(TestingRunResultSummary.STATE, State.FAILED)
-                    );
-                }
-            }
-        }
     }
 
 
@@ -1038,10 +987,43 @@ public class DbLayer {
     }
 
     public static void updateTestingRun(String testingRunId) {
+        updateTestingRun(testingRunId, TestingRun.State.FAILED, 0);
+    }
+
+    public static void updateTestingRun(String testingRunId, TestingRun.State state, int scheduleTimestamp) {
         ObjectId testingRunObjId = new ObjectId(testingRunId);
-        TestingRunDao.instance.getMCollection().findOneAndUpdate(
-            Filters.eq(Constants.ID, testingRunObjId),
-            Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
+       Bson filter = Filters.and(Filters.eq(Constants.ID, testingRunObjId),
+        Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING)
+        );
+
+        Bson update;
+        if (scheduleTimestamp > 0) {
+            // Update both state and schedule timestamp
+            update = Updates.combine(
+                    Updates.set(TestingRun.STATE, state),
+                    Updates.set(TestingRun.SCHEDULE_TIMESTAMP, scheduleTimestamp)
+            );
+        } else {
+            // Update only state
+            update = Updates.set(TestingRun.STATE, state);
+        }
+
+        TestingRunDao.instance.updateOneNoUpsert(filter, update);
+    }
+
+
+    public static TestingRunResultSummary updateTestingRunResultSummaryWithStateAndTimestamp(String testingRunResultSummaryId, TestingRun.State state, int startTimestamp) {
+        ObjectId summaryObjectId = new ObjectId(testingRunResultSummaryId);
+        return TestingRunResultSummariesDao.instance.updateOneNoUpsert(
+                Filters.and(
+                        Filters.eq(TestingRunResultSummary.ID, summaryObjectId),
+                        Filters.eq(TestingRunResultSummary.STATE, TestingRun.State.RUNNING)
+                ),
+                Updates.combine(
+                        Updates.set(TestingRunResultSummary.STATE, state),
+                        Updates.set(TestingRunResultSummary.START_TIMESTAMP, startTimestamp)
+                )
+        );
     }
 
     public static Map<ObjectId, TestingRunResultSummary> fetchTestingRunResultSummaryMap(String testingRunId) {

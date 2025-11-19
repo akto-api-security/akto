@@ -128,6 +128,10 @@ public abstract class DataActor {
 
     public abstract void updateTestingRun(String testingRunId);
 
+    public abstract void updateTestingRun(String testingRunId, TestingRun.State state, int scheduleTimestamp);
+
+    public abstract TestingRunResultSummary updateTestingRunResultSummaryWithStateAndTimestamp(String testingRunResultSummaryId, TestingRun.State state, int startTimestamp);
+
     public abstract void updateTestRunResultSummary(String summaryId);
     public abstract void deleteTestRunResultSummary(String summaryId);
     public abstract void deleteTestingRunResults(String testingRunResultId);
