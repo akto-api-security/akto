@@ -168,11 +168,10 @@ export default {
             data: {}
         })
     },
-    async getAllCollectionsBasic(skipTagsMismatch) {
+    async getAllCollectionsBasic() {
         return await request({
             url: '/api/getAllCollectionsBasic',
             method: 'post',
-            data: { skipTagsMismatch }
         })
     },
     async createCollection(name) {

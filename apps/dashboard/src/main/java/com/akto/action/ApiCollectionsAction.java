@@ -529,25 +529,62 @@ public class ApiCollectionsAction extends UserAction {
     public String getEndpointsListFromConditions() {
         List<TestingEndpoints> conditions = generateConditions(this.conditions);
         
-        // Calculate mismatched collection IDs once if filtering is enabled
-        List<Integer> mismatchedCollectionIds = null;
-        if (skipTagsMismatch) {
-            mismatchedCollectionIds = ApiCollectionsDao.instance.findAll(Filters.empty())
-                .stream()
-                .filter(collection -> {
-                    List<CollectionTags> tagsList = collection.getTagsList();
-                    return tagsList != null && tagsList.stream()
-                        .anyMatch(tag -> "tags-mismatch".equals(tag.getKeyName()) && "true".equals(tag.getValue()));
-                })
-                .map(ApiCollection::getId)
-                .collect(Collectors.toList());
-        }
-        
-        // Apply filter at database level in both methods
+        // First, get the list without mismatch filtering
         List<BasicDBObject> list = ApiCollectionUsers.getSingleTypeInfoListFromConditions(
             conditions, 0, 200, Utils.DELTA_PERIOD_VALUE, 
-            new ArrayList<>(deactivatedCollections), mismatchedCollectionIds);
+            new ArrayList<>(deactivatedCollections), null);
         
+        // Calculate mismatched collection IDs efficiently if filtering is enabled
+        final List<Integer> mismatchedCollectionIds;
+        if (skipTagsMismatch && !list.isEmpty()) {
+            // Extract unique collection IDs from the result (_id is a nested object with apiCollectionId)
+            Set<Integer> apiCollectionIds = list.stream()
+                .map(obj -> {
+                    // The aggregation returns _id as a nested object
+                    Object id = obj.get("_id");
+                    if (id instanceof BasicDBObject) {
+                        return ((BasicDBObject) id).getInt("apiCollectionId");
+                    }
+                    return null;
+                })
+                .filter(id -> id != null)
+                .collect(Collectors.toSet());
+            
+            // Query ONLY those specific collections for tags-mismatch
+            Bson filter = Filters.and(
+                Filters.in(Constants.ID, apiCollectionIds),
+                Filters.elemMatch("tagsList", 
+                    Filters.and(
+                        Filters.eq("keyName", "tags-mismatch"),
+                        Filters.eq("value", "true")
+                    )
+                )
+            );
+            
+            mismatchedCollectionIds = ApiCollectionsDao.instance
+                .findAll(filter, Projections.include(Constants.ID))
+                .stream()
+                .map(ApiCollection::getId)
+                .collect(Collectors.toList());
+            
+            // Filter out results where apiCollectionId is in mismatchedCollectionIds
+            if (!mismatchedCollectionIds.isEmpty()) {
+                list = list.stream()
+                    .filter(obj -> {
+                        Object id = obj.get("_id");
+                        if (id instanceof BasicDBObject) {
+                            int colId = ((BasicDBObject) id).getInt("apiCollectionId");
+                            return !mismatchedCollectionIds.contains(colId);
+                        }
+                        return true;
+                    })
+                    .collect(Collectors.toList());
+            }
+        } else {
+            mismatchedCollectionIds = null;
+        }
+        
+        // Get accurate count with the same filter
         int totalCount = ApiCollectionUsers.getApisCountFromConditionsWithStis(
             conditions, new ArrayList<>(deactivatedCollections), mismatchedCollectionIds);
         
