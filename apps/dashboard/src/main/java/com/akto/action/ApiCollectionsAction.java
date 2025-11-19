@@ -583,7 +583,7 @@ public class ApiCollectionsAction extends UserAction {
         
         // Get accurate count with the same filter
         int totalCount = ApiCollectionUsers.getApisCountFromConditionsWithStis(
-            conditions, new ArrayList<>(deactivatedCollections), mismatchedCollectionIds);
+            conditions, new ArrayList<>(deactivatedCollections));
         
         InventoryAction inventoryAction = new InventoryAction();
         inventoryAction.attachAPIInfoListInResponse(list, -1);

@@ -100,10 +100,6 @@ public class ApiCollectionUsers {
     }
 
     public static int getApisCountFromConditionsWithStis(List<TestingEndpoints> conditions, List<Integer> deactivatedCollections){
-        return getApisCountFromConditionsWithStis(conditions, deactivatedCollections, null);
-    }
-
-    public static int getApisCountFromConditionsWithStis(List<TestingEndpoints> conditions, List<Integer> deactivatedCollections, List<Integer> mismatchedCollectionIds){
         if(conditions == null || conditions.isEmpty()){
             return 0;
         }
@@ -112,12 +108,6 @@ public class ApiCollectionUsers {
         Bson filters = Filters.and(filterList);
         Bson stiFiltes = getFilters(conditions, CollectionType.ApiCollectionId);
         stiFiltes = Filters.and(filters, stiFiltes);
-        
-        // Add filter to exclude mismatched collections if provided
-        if (mismatchedCollectionIds != null && !mismatchedCollectionIds.isEmpty()) {
-            stiFiltes = Filters.and(stiFiltes, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, mismatchedCollectionIds));
-        }
-        
         List<Bson> pipeLine = new ArrayList<>();
         pipeLine.add(Aggregates.match(stiFiltes));
 
