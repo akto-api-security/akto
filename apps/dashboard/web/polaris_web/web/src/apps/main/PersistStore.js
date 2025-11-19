@@ -54,6 +54,8 @@ const initialState = {
     lastFetchedSeverityResp: {},
     lastCalledSensitiveInfo: 0,
     lastFetchedSensitiveResp: [],
+    lastFetchedUntrackedResp: [],
+    totalAPIs: 0,
     selectedSampleApi: {},
     coverageMap: {},
     trafficMap: {},
@@ -175,6 +177,20 @@ let persistStore = (set, get) => ({
             console.error("Error setting lastFetchedSensitiveResp:", error);
         }
     },
+    setLastFetchedUntrackedResp: (lastFetchedUntrackedResp) => {
+        try {
+            set({ lastFetchedUntrackedResp });
+        } catch (error) {
+            console.error("Error setting lastFetchedUntrackedResp:", error);
+        }
+    },
+    setTotalAPIs: (totalAPIs) => {
+        try {
+            set({ totalAPIs });
+        } catch (error) {
+            console.error("Error setting totalAPIs:", error);
+        }
+    },
     setSelectedSampleApi: (selectedSampleApi) => {
         try {
             set({ selectedSampleApi });
@@ -251,6 +267,8 @@ persistStore = persist(persistStore, {
         lastFetchedSeverityResp: state.lastFetchedSeverityResp,
         lastCalledSensitiveInfo: state.lastCalledSensitiveInfo,
         lastFetchedSensitiveResp: state.lastFetchedSensitiveResp,
+        lastFetchedUntrackedResp: state.lastFetchedUntrackedResp,
+        totalAPIs: state.totalAPIs,
         selectedSampleApi: state.selectedSampleApi,
         coverageMap: state.coverageMap,
         trafficMap: state.trafficMap,

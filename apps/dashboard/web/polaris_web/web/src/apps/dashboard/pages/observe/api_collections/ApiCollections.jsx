@@ -456,11 +456,14 @@ function ApiCollections(props) {
     const lastFetchedResp = PersistStore.getState().lastFetchedResp
     const lastFetchedSeverityResp = PersistStore.getState().lastFetchedSeverityResp
     const lastFetchedSensitiveResp = PersistStore.getState().lastFetchedSensitiveResp
+    const lastFetchedUntrackedResp = PersistStore.getState().lastFetchedUntrackedResp
     const setLastFetchedInfo = PersistStore.getState().setLastFetchedInfo
     const setLastFetchedResp = PersistStore.getState().setLastFetchedResp
     const setLastFetchedSeverityResp = PersistStore.getState().setLastFetchedSeverityResp
     const setLastFetchedSensitiveResp = PersistStore.getState().setLastFetchedSensitiveResp
-    const [totalAPIs, setTotalAPIs] = useState(0)
+    const setLastFetchedUntrackedResp = PersistStore.getState().setLastFetchedUntrackedResp
+    const totalAPIs = PersistStore(state => state.totalAPIs)
+    const setTotalAPIs = PersistStore(state => state.setTotalAPIs)
     const [allEdges, setAllEdges, onAllEdgesChange] = useEdgesState([])
     const [allNodes, setAllNodes, onAllNodesChange] = useNodesState([])
 
@@ -521,6 +524,8 @@ function ApiCollections(props) {
 
                     // React 18+ automatically batches these state updates into a single re-render
                     // IMPORTANT: Set data and summary BEFORE setting loading=false to avoid showing zeros
+                    // Use cached untracked data
+                    categorized.untracked = lastFetchedUntrackedResp || [];
                     setData(categorized);
                     setNormalData(lightweightData);
                     setEnvTypeMap(envTypeObj);
@@ -799,6 +804,9 @@ function ApiCollections(props) {
                 ...prevData,
                 untracked: untrackedCollectionsCache
             }));
+
+            // Cache the untracked data for future use
+            setLastFetchedUntrackedResp(untrackedCollectionsCache);
         }, 0); // Execute immediately but asynchronously
 
         // Fetch endpoints count and sensitive info asynchronously
