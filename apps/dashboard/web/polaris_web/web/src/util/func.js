@@ -1756,7 +1756,9 @@ joinWordsWithUnderscores(input) {
           return CalendarMinor;
         case "BIRTH":
           return CalendarTimeMinor;
-        default: 
+        case "VIN":
+          return IdentityCardMajor;
+        default:
           return KeyMajor;
     }
   },
