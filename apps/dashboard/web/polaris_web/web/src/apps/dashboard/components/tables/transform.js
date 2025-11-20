@@ -2,17 +2,6 @@ import func from "@/util/func";
 import PersistStore from "../../../main/PersistStore";
 
 const tableFunc = {
-    // Helper function for regex search in object values (similar to findInObjectValue)
-    findInObjectValueRegex(obj, regex, keysToIgnore = []) {
-        if (!regex) return true;
-        let flattenedObject = func.flattenObject(obj);
-        let ret = false;
-        Object.keys(flattenedObject).forEach((key) => {
-            ret |= !keysToIgnore.some(ignore => key.toLowerCase().includes(ignore.toLowerCase())) &&
-                regex.test(flattenedObject[key]?.toString() || '');
-        });
-        return ret;
-    },
     fetchDataSync: function (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue, setFilters, props){
         // Early return for empty data
         if (!props.data || props.data.length === 0) {
@@ -69,31 +58,9 @@ const tableFunc = {
 
         if(props?.customFilters){
           tempData = props?.modifyData(filters, dataSortKey, sortOrder)
-          
-          // Check if query is a regex pattern: ($regex: <pattern>)
-          const regexMatch = queryValue && queryValue.match(/^\(\$regex:\s*(.+)\)$/);
-          
-          if (regexMatch) {
-            // Use regex search
-            try {
-              const regexPattern = regexMatch[1].trim();
-              const regex = new RegExp(regexPattern, 'i'); // case-insensitive
-              tempData = tempData.filter((value) => {
-                return this.findInObjectValueRegex(value, regex, ['id', 'time', 'icon', 'order', 'conditions']);
-              });
-            } catch (e) {
-              // Invalid regex pattern - fall back to string search
-              console.warn('Invalid regex pattern, falling back to string search:', e);
-              tempData = tempData.filter((value) => {
-                return func.findInObjectValue(value, queryValue.toLowerCase(), ['id', 'time', 'icon', 'order', 'conditions']);
-              });
-            }
-          } else {
-            // Use normal string search
-            tempData = tempData.filter((value) => {
-              return func.findInObjectValue(value, queryValue.toLowerCase(), ['id', 'time', 'icon', 'order', 'conditions']);
-            });
-          }
+          tempData = tempData.filter((value) => {
+            return func.findInObjectValue(value, queryValue.toLowerCase(), ['id', 'time', 'icon', 'order', 'conditions']);
+          })
           let page = skip / limit;
           let pageLimit = limit;
           let final2Data = tempData && tempData.length <= pageLimit ? tempData :
@@ -173,32 +140,10 @@ const tableFunc = {
 
         // Optimize search query - skip if no query
         if (queryValue && queryValue.length > 0) {
-          // Check if query is a regex pattern: ($regex: <pattern>)
-          const regexMatch = queryValue.match(/^\(\$regex:\s*(.+)\)$/);
-          
-          if (regexMatch) {
-            // Use regex search
-            try {
-              const regexPattern = regexMatch[1].trim();
-              const regex = new RegExp(regexPattern, 'i'); // case-insensitive
-              tempData = tempData.filter((value) => {
-                return this.findInObjectValueRegex(value, regex, ['id', 'time', 'icon', 'order', 'conditions']);
-              });
-            } catch (e) {
-              // Invalid regex pattern - fall back to string search
-              console.warn('Invalid regex pattern, falling back to string search:', e);
-              const lowerQuery = queryValue.toLowerCase();
-              tempData = tempData.filter((value) => {
-                return func.findInObjectValue(value, lowerQuery, ['id', 'time', 'icon', 'order', 'conditions']);
-              });
-            }
-          } else {
-            // Use normal string search
-            const lowerQuery = queryValue.toLowerCase();
-            tempData = tempData.filter((value) => {
-              return func.findInObjectValue(value, lowerQuery, ['id', 'time', 'icon', 'order', 'conditions']);
-            });
-          }
+          const lowerQuery = queryValue.toLowerCase();
+          tempData = tempData.filter((value) => {
+            return func.findInObjectValue(value, lowerQuery, ['id', 'time', 'icon', 'order', 'conditions']);
+          });
         }
 
           // Sort only if we have data and a sort key
