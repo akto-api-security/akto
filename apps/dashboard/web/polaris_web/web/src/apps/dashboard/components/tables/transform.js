@@ -1,57 +1,117 @@
 import func from "@/util/func";
 import PersistStore from "../../../main/PersistStore";
 
+// Cache for filter choices to avoid recomputing on every render
+const filterChoicesCache = new Map();
+
 const tableFunc = {
+    // NEW: Enhanced version with lazy prettification support
+    fetchDataSyncWithLazyPrettify: function (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue, setFilters, props){
+        // Early return for empty data
+        if (!props.data || props.data.length === 0) {
+            setFilters([]);
+            return {value: [], total: 0, fullDataIds: []};
+        }
+
+        // First call the original fetchDataSync to get the paginated data
+        const result = this.fetchDataSync(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue, setFilters, props);
+
+        // LAZY PRETTIFICATION: If data has a prettifyPageData function, call it on the current page only
+        // This allows tables to prettify (create JSX components) only for visible items
+        if (props.prettifyPageData && typeof props.prettifyPageData === 'function' && result.value.length > 0) {
+            result.value = props.prettifyPageData(result.value);
+        }
+
+        return result;
+    },
+
     fetchDataSync: function (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue, setFilters, props){
         // Early return for empty data
         if (!props.data || props.data.length === 0) {
             setFilters([]);
             return {value: [], total: 0, fullDataIds: []};
         }
-        
-        let localFilters = func.prepareFilters(props.data,props.filters);
-        
-        // Optimize filter generation - cache results if data hasn't changed
-        const dataLength = props.data.length;
-        
-        let filtersFromHeaders = props.headers.filter((header) => {
-          return header.showFilter
-        }).map((header) => {
-          let key = header.filterKey || header.value
-          let label = header.filterLabel || header.text
-          
-          // Use Set for better performance with large datasets
-          let uniqueValues = new Set();
-          
-          for (let i = 0; i < props.data.length; i++) {
-            let value = props.data[i][key];
-            if (value instanceof Set) {
-              value.forEach(v => uniqueValues.add(v));
-            } else if (value instanceof Array) {
-              value.forEach(v => uniqueValues.add(v));
-            } else if (typeof value !== 'undefined') {
-              uniqueValues.add(value);
+
+        // Check if data needs lazy transformation (raw data -> plain data)
+        const needsLazyTransform = props.data._lazyTransform === true;
+        let tempData = props.data;
+
+        if (needsLazyTransform) {
+            // Check if already cached (transformed during categorization)
+            if (props.data._transformedCache) {
+                tempData = props.data._transformedCache;
+            } else {
+                // Use the transformation function provided by the caller (e.g., ApiCollections)
+                // This keeps transform.js generic and allows different tables to provide their own logic
+                const transformFunc = props.transformRawData;
+                const maps = props.data._transformMaps || {};
+
+                if (!transformFunc || typeof transformFunc !== 'function') {
+                    console.error('transformRawData function is required when using lazy transformation');
+                    tempData = props.data;
+                } else {
+                    // Transform raw data to plain data (without JSX) using the provided function
+                    tempData = props.data.map(item => transformFunc(item, maps));
+
+                    // Cache the transformed data for future page navigations
+                    props.data._transformedCache = tempData;
+                }
             }
-          }
-          
-          // Convert to array and sort only once
-          let distinctItems = Array.from(uniqueValues);
-          distinctItems.sort();
-          
-          let choices = distinctItems.map((item) => ({label: item, value: item}));
-          
-          return {
-            key: key,
-            label: label,
-            title: label,
-            choices: choices,
-          };
-        })
-        
+        }
+
+        // Check if data has an override for actual total (used when data is limited for memory optimization)
+        const actualTotal = props.data._actualTotal;
+
+        let localFilters = func.prepareFilters(tempData,props.filters);
+
+        // Create cache key based on data length and headers
+        const cacheKey = `${props.data.length}_${props.headers.map(h => h.value).join('_')}`;
+
+        let filtersFromHeaders;
+        if (filterChoicesCache.has(cacheKey)) {
+          filtersFromHeaders = filterChoicesCache.get(cacheKey);
+        } else {
+          filtersFromHeaders = props.headers.filter((header) => {
+            return header.showFilter
+          }).map((header) => {
+            let key = header.filterKey || header.value
+            let label = header.filterLabel || header.text
+
+            // Use Set for better performance with large datasets
+            let uniqueValues = new Set();
+
+            for (let i = 0; i < tempData.length; i++) {
+              let value = tempData[i][key];
+              if (value instanceof Set) {
+                value.forEach(v => uniqueValues.add(v));
+              } else if (value instanceof Array) {
+                value.forEach(v => uniqueValues.add(v));
+              } else if (typeof value !== 'undefined') {
+                uniqueValues.add(value);
+              }
+            }
+
+            // Convert to array and sort only once
+            let distinctItems = Array.from(uniqueValues);
+            distinctItems.sort();
+
+            let choices = distinctItems.map((item) => ({label: item, value: item}));
+
+            return {
+              key: key,
+              label: label,
+              title: label,
+              choices: choices,
+            };
+          })
+
+          // Cache the result for future calls
+          filterChoicesCache.set(cacheKey, filtersFromHeaders);
+        }
+
         localFilters = localFilters.concat(filtersFromHeaders)
         localFilters = localFilters.filter((filter) => filter.choices.length > 0)
         setFilters(localFilters);
-          let tempData = props.data;
 
         let dataSortKey = props?.sortOptions?.filter(value => {
           return (value.value.startsWith(sortKey))
@@ -125,25 +185,27 @@ const tableFunc = {
           if (tempData.length > 0 && dataSortKey) {
             tempData = func.sortFunc(tempData, dataSortKey, sortOrder, props?.treeView !== undefined ? true : false)
           }
-          
+
           if(props.getFilteredItems){
             props.getFilteredItems(tempData)
           }
-  
+
           let finalData = props.useModifiedData ? props.modifyData(tempData, filters || {}) : tempData
-          
+
           // Optimize pagination calculations
           const totalLength = finalData.length;
           const page = Math.floor(skip / limit);
           const startIndex = page * limit;
           const endIndex = Math.min(startIndex + limit, totalLength);
-          
+
           // Slice only if necessary
           let final2Data = (totalLength <= limit) ? finalData : finalData.slice(startIndex, endIndex);
           let fullDataIds= finalData.map((x) => ({id: x?.id}));
-          
 
-          return {value: final2Data, total: totalLength, fullDataIds: fullDataIds}
+          // Use actualTotal if provided (for memory-optimized large datasets), otherwise use calculated length
+          const reportedTotal = actualTotal !== undefined ? actualTotal : totalLength;
+
+          return {value: final2Data, total: reportedTotal, fullDataIds: fullDataIds}
     },
     mergeFilters(filterArray1, filterArray2, labelFunc, handleRemoveAppliedFilter){
       const combined = [...filterArray1, ...filterArray2];
