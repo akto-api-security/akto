@@ -15,8 +15,8 @@ import threatDetectionRequests from "../api";
 import { LABELS } from "../constants";
 
 const resourceName = {
-  singular: "sample",
-  plural: "samples",
+  singular: "activity",
+  plural: "activities",
 };
 
 const headers = [
@@ -389,7 +389,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     _limit,
     filters,
     _filterOperators,
-    _queryValue
+    queryValue
   ) {
     setLoading(true);
     let sourceIpsFilter = [],
@@ -401,10 +401,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     let latestApiOrigRegex;
     if (filters?.actor) {
       sourceIpsFilter = filters?.actor;
-    }
-    if (filters?.latestApiOrigRegex) {
-      const regexFilter = filters?.latestApiOrigRegex;
-      latestApiOrigRegex = Array.isArray(regexFilter) ? regexFilter[0] : regexFilter;
     }
     if (filters?.apiCollectionId) {
       apiCollectionIdsFilter = filters?.apiCollectionId;
@@ -430,7 +426,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       type: typeFilter,
       latestAttack: latestAttack,
       host: hostFilter,
-      latestApiOrigRegex: latestApiOrigRegex || '',
+      latestApiOrigRegex: queryValue.length > 3 ? queryValue : "",
       sortKey: sortKey,
       sortOrder: sortOrder
     });
@@ -536,8 +532,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       }
     })
 
-    const isRegexFilterEnabled = typeof window !== 'undefined' && Number(window.ACTIVE_ACCOUNT) === 1758858035;
-
     filters = [
       {
         key: "actor",
@@ -557,14 +551,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         title: "Host",
         choices: hostChoices,
       },
-      ...(isRegexFilterEnabled ? [{
-        key: 'latestApiOrigRegex',
-        label: "API regex",
-        title: "API regex",
-        type: 'text',
-        placeholder: 'Enter regex',
-        choices: []
-      }] : []),
       {
         key: 'type',
         label: "Type",
@@ -629,7 +615,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       selected={selected}
       onSelect={handleSelectedTab}
       mode={IndexFiltersMode.Default}
-      hideQueryField={true}
     />
   );
 }

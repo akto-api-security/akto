@@ -11,8 +11,7 @@ import {
   ChoiceList,
   Tabs,
   Text,
-  Link,
-  TextField} from '@shopify/polaris';
+  Link} from '@shopify/polaris';
 import { GithubRow} from './rows/GithubRow';
 import { useState, useCallback, useEffect, useMemo, useRef, useReducer } from 'react';
 import "./style.css"
@@ -277,33 +276,6 @@ function GithubServerTable(props) {
   function formatFilters(filters) {
     let formattedFilters = filters
       .map((filter) => {
-        const existingFilter = appliedFilters.find((localFilter) => localFilter.key === filter.key);
-
-        if (filter.type === 'text') {
-          const textValue = existingFilter
-            ? (Array.isArray(existingFilter.value) ? (existingFilter.value[0] || '') : existingFilter.value || '')
-            : '';
-
-          return {
-            key: filter.key,
-            label: filter.label,
-            filter: (
-              <TextField
-                label={filter.title}
-                labelHidden
-                placeholder={filter.placeholder || ''}
-                value={textValue}
-                autoComplete="off"
-                onChange={(value) => {
-                  const newValue = value ? [value] : [];
-                  handleFilterStatusChange(filter.key, newValue);
-                }}
-              />
-            ),
-            pinned: true
-          }
-        }
-
         return {
           key: filter.key,
           label: filter.label,
@@ -493,7 +465,7 @@ function GithubServerTable(props) {
                 sortOptions={props.sortOptions}
                 sortSelected={sortSelected}
                 queryValue={queryValue}
-                queryPlaceholder={`Search in ${transform.formatNumberWithCommas(total)} ${total == 1 ? props.resourceName.singular : props.resourceName.plural}`}
+                queryPlaceholder={`Search in ${transform.formatNumberWithCommas(total)} ${total === 1 ? props.resourceName.singular : props.resourceName.plural}`}
                 onQueryChange={handleFiltersQueryChange}
                 onQueryClear={handleFiltersQueryClear}
                 {...(props.hideQueryField ? { hideQueryField: props.hideQueryField } : {})}
