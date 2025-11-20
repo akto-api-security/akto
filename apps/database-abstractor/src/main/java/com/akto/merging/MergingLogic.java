@@ -240,13 +240,10 @@ public class MergingLogic {
                     LogDb.DB_ABS);
                 return new ApiMergerResult(new HashMap<>());
             }
-            if (ApiCollectionsDao.hasRoutingTags(apiCollection)) {
-                loggerMaker.infoAndAddToDb(
-                    "Skipping merging for API collection " + apiCollectionId + " in account " + Constants.ROUTING_SKIP_ACCOUNT_ID + " as it has a tag ending with one of: " + Constants.ROUTING_TAG_SUFFIXES,
-                    LogDb.DB_ABS);
-                return new ApiMergerResult(new HashMap<>());
-            }
         }
+
+        // Check once at collection level whether STRING merging is allowed
+        boolean allowStringMerging = !ApiCollectionsDao.shouldSkipMerging(apiCollection);
 
         Bson filterQ = null;
         if (apiCollection != null && apiCollection.getHostName() == null) {
@@ -325,7 +322,7 @@ public class MergingLogic {
 
 
             for(int size: sizeToUrlToSti.keySet()) {
-                ApiMergerResult result = tryMergingWithKnownStrictURLs(sizeToUrlToSti.get(size), !mergeUrlsBasic, allowMergingOnVersions, apiCollectionId);
+                ApiMergerResult result = tryMergingWithKnownStrictURLs(sizeToUrlToSti.get(size), !mergeUrlsBasic, allowMergingOnVersions, allowStringMerging, apiCollectionId);
                 finalResult.templateToStaticURLs.putAll(result.templateToStaticURLs);
             }
 
@@ -356,7 +353,7 @@ public class MergingLogic {
         return sizeToURL;
     }
 
-    private static ApiMergerResult tryMergingWithKnownStrictURLs(Map<String, Set<String>> pendingRequests, boolean doBodyMatch, boolean allowMergingOnVersions, int apiCollectionId) {
+    private static ApiMergerResult tryMergingWithKnownStrictURLs(Map<String, Set<String>> pendingRequests, boolean doBodyMatch, boolean allowMergingOnVersions, boolean allowStringMerging, int apiCollectionId) {
         Map<URLTemplate, Set<String>> templateToStaticURLs = new HashMap<>();
 
         Iterator<Map.Entry<String, Set<String>>> iterator = pendingRequests.entrySet().iterator();
@@ -390,7 +387,7 @@ public class MergingLogic {
                 String aEndpoint = aUrl.split(" ")[1];
                 URLStatic aStatic = new URLStatic(aEndpoint, aMethod);
                 URLStatic newStatic = new URLStatic(newEndpoint, newMethod);
-                URLTemplate mergedTemplate = tryMergeUrls(aStatic, newStatic, allowMergingOnVersions);
+                URLTemplate mergedTemplate = tryMergeUrls(aStatic, newStatic, allowMergingOnVersions, allowStringMerging);
                 if (mergedTemplate == null) {
                     continue;
                 }
@@ -529,7 +526,7 @@ public class MergingLogic {
     }
 
 
-    public static URLTemplate tryMergeUrls(URLStatic dbUrl, URLStatic newUrl, boolean allowMergingOnVersions) {
+    public static URLTemplate tryMergeUrls(URLStatic dbUrl, URLStatic newUrl, boolean allowMergingOnVersions, boolean allowStringMerging) {
         if (dbUrl.getMethod() != newUrl.getMethod()) {
             return null;
         }
@@ -556,6 +553,10 @@ public class MergingLogic {
                 newTypes[i] = SingleTypeInfo.SuperType.INTEGER;
                 newTokens[i] = null;
             } else if(pattern.matcher(tempToken).matches() && pattern.matcher(dbToken).matches()){
+                // Skip STRING merging if not allowed for this collection
+                if (!allowStringMerging) {
+                    return null;
+                }
                 newTypes[i] = SingleTypeInfo.SuperType.STRING;
                 newTokens[i] = null;
             }else if(allowMergingOnVersions && isValidVersionToken(tempToken) && isValidVersionToken(dbToken)) {
@@ -565,6 +566,10 @@ public class MergingLogic {
                 newTypes[i] = SingleTypeInfo.SuperType.LOCALE;
                 newTokens[i] = null;
             }else {
+                // Skip STRING merging if not allowed for this collection
+                if (!allowStringMerging) {
+                    return null;
+                }
                 newTypes[i] = SingleTypeInfo.SuperType.STRING;
                 newTokens[i] = null;
                 templatizedStrTokens++;
