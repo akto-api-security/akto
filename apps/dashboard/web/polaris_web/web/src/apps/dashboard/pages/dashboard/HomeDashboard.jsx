@@ -675,7 +675,9 @@ function HomeDashboard() {
 
 
     const buildAuthFiltersUrl = useCallback((baseUrl, filterValue, baseFilter) => {
-        console.log("filterValue", filterValue);
+        if(!func.checkForFeatureSaas("AKTO_API_GROUP_CRONS")){
+            return undefined;
+        }
         if (!baseUrl) return undefined
         if (!filterValue) {
             return baseUrl
