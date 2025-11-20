@@ -69,11 +69,12 @@ function GithubServerTable(props) {
     setAppliedFilters(temp);
     let tempFilters = {}
 
-    tempFilters[currentPageKey] = {
+    let updatedFilters = {...filtersMap}
+    updatedFilters[currentPageKey] = {
       'filters': temp,
       'sort': pageFiltersMap?.sort || []
     }
-    setFiltersMap(tempFilters)
+    setFiltersMap(updatedFilters)
   }
   
 
@@ -139,14 +140,25 @@ function GithubServerTable(props) {
 
     let [sortKey, sortOrder] = sortSelected.length == 0 ? ["", ""] : sortSelected[0].split(" ");
     let filters = props.headers.reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {})
+    
+    // Optimize: process filters once, reuse logic
+    const processFilter = (filter) => {
+      const value = filter.value;
+      if (value && typeof value === 'object' && value.values !== undefined) {
+        // New format - pass as is for client-side, extract values for server-side
+        filters[filter.key] = props.supportsNegationFilter ? value : value.values;
+      } else if (Array.isArray(value)) {
+        // Legacy format - convert only if negation is supported
+        filters[filter.key] = props.supportsNegationFilter ? { values: value, negated: false } : value;
+      } else {
+        filters[filter.key] = value;
+      }
+    };
+    
     if(tempFilters.length === 0){
-      appliedFilters.forEach((filter) => {
-        filters[filter.key] = filter.value
-      })
+      appliedFilters.forEach(processFilter);
     }else{
-      tempFilters.forEach((filter) => {
-        filters[filter.key] = filter.value
-      })
+      tempFilters.forEach(processFilter);
     }
   
     let tempData = await props.fetchData(sortKey, sortOrder == 'asc' ? -1 : 1, page * pageLimit, pageLimit, filters, filterOperators, searchVal);
@@ -220,17 +232,47 @@ function GithubServerTable(props) {
 
   const changeAppliedFilters = useCallback((key, value) => {
     let temp = appliedFilters.filter(filter => filter.key !== key);
-    if (value.length > 0 || Object.keys(value).length > 0) {
+    
+    // Normalize value to new format {values, negated} - optimize for common cases
+    let normalizedValue;
+    if (value && typeof value === 'object' && value.values !== undefined) {
+      // Already in new format
+      normalizedValue = value;
+    } else if (Array.isArray(value)) {
+      // Legacy array format - most common
+      normalizedValue = { values: value, negated: false };
+    } else if (typeof value === 'object' && value.since === undefined) {
+      // Legacy object format (not dateRange)
+      normalizedValue = { values: Object.values(value).flat(), negated: false };
+    } else {
+      // dateRange or other - keep as is
+      normalizedValue = value;
+    }
+    
+    // Only add filter if it has values (or is a dateRange)
+    if (normalizedValue.values?.length > 0 || normalizedValue.since || key.includes("dateRange")) {
+      // Extract values for disambiguateLabel - it expects an array for non-dateRange filters
+      // For dateRange, pass the object as-is since disambiguateLabel handles it specially
+      const labelValue = key.includes("dateRange") 
+        ? normalizedValue 
+        : (normalizedValue.values || []);
+      let label = props.disambiguateLabel(key, labelValue);
+      
+      // Add negation prefix if negated (only for non-dateRange filters)
+      if (normalizedValue.negated && !key.includes("dateRange")) {
+        label = `Exclude: ${label}`;
+      }
+      
       temp.push({
         key: key,
-        label: props.disambiguateLabel(key, value),
+        label: label,
         onRemove: handleRemoveAppliedFilter,
-        value: value
+        value: normalizedValue
       });
     }
     setPage(0);
     if(!key.includes("dateRange")){
-      let tempFilters = filtersMap
+      let tempFilters = {...filtersMap}
       tempFilters[currentPageKey]= {
         filters: temp,
         sort: pageFiltersMap?.sort || []
@@ -255,8 +297,28 @@ function GithubServerTable(props) {
     [],
   );
 
-  const handleFilterStatusChange = (key,value) => {
-    changeAppliedFilters(key, value);
+  const handleFilterStatusChange = (key, value) => {
+    // Handle negation filter - value can be array or object with {values, negated}
+    let filterValue = value;
+    if (typeof value === 'object' && !Array.isArray(value) && value.values !== undefined) {
+      // Value is already in the new format {values, negated}
+      filterValue = value;
+    } else if (Array.isArray(value)) {
+      // Legacy format - convert to new format with negated: false
+      filterValue = { values: value, negated: false };
+    }
+    changeAppliedFilters(key, filterValue);
+  }
+
+  const handleNegationToggle = (key, negated) => {
+    const currentFilter = appliedFilters.find(f => f.key === key);
+    if (currentFilter) {
+      const currentValue = currentFilter.value;
+      const values = Array.isArray(currentValue) ? currentValue : (currentValue?.values || []);
+      changeAppliedFilters(key, { values, negated });
+    } else {
+      changeAppliedFilters(key, { values: [], negated });
+    }
   }
 
   const getSortedChoices = (choices) => {
@@ -276,34 +338,62 @@ function GithubServerTable(props) {
   function formatFilters(filters) {
     let formattedFilters = filters
       .map((filter) => {
+        const currentFilter = appliedFilters.find((localFilter) => localFilter.key === filter.key);
+        const filterValue = currentFilter?.value || filter.selected || [];
+        // Normalize filter value to new format {values, negated}
+        const normalizedValue = Array.isArray(filterValue) 
+          ? { values: filterValue, negated: false }
+          : (filterValue?.values !== undefined ? filterValue : { values: filterValue || [], negated: false });
+        
+        // Add negation choice only if component-level negation is supported (GithubSimpleTable)
+        // Individual filters can still opt-out via filter.supportsNegation === false
+        const supportsNegation = props.supportsNegationFilter === true && filter.supportsNegation !== false;
+        const negationChoices = supportsNegation ? [
+          { label: 'Include', value: 'include' },
+          { label: 'Exclude', value: 'exclude' }
+        ] : [];
+        
         return {
           key: filter.key,
           label: filter.label,
           filter: (
-              filter.choices.length < 10 ?
-              <ChoiceList
-                title={filter.title}
-                titleHidden
-                choices={getSortedChoices(filter.choices)}
-                selected={
-                  appliedFilters.filter((localFilter) => { return localFilter.key == filter.key }).length == 1 ?
-                    appliedFilters.filter((localFilter) => { return localFilter.key == filter.key })[0].value : filter.selected || []
-                }
-                onChange={(value) => handleFilterStatusChange(filter.key,value)}
-                {...(filter.singleSelect ? {} : { allowMultiple: true })}
-              />
-              :
-              <DropdownSearch
-                placeHoder={"Apply filters"}
-                optionsList={getSortedChoices(filter.choices)}
-                setSelected={(value) => handleFilterStatusChange(filter.key,value)}
-                {...(filter.singleSelect ? {} : { allowMultiple: true })}
-                allowMultiple
-                preSelected={
-                  appliedFilters.filter((localFilter) => { return localFilter.key == filter.key }).length == 1 ?
-                    appliedFilters.filter((localFilter) => { return localFilter.key == filter.key })[0].value : filter.selected || []
-                }
-              />
+            <div>
+              {supportsNegation && (
+                <ChoiceList
+                  title="Filter type"
+                  titleHidden
+                  choices={negationChoices}
+                  selected={normalizedValue.negated ? ['exclude'] : ['include']}
+                  onChange={(value) => handleNegationToggle(filter.key, value[0] === 'exclude')}
+                  allowMultiple={false}
+                />
+              )}
+              {filter.choices.length < 10 ?
+                <ChoiceList
+                  title={filter.title}
+                  titleHidden
+                  choices={getSortedChoices(filter.choices)}
+                  selected={normalizedValue.values || []}
+                  onChange={(value) => {
+                    const newValue = { ...normalizedValue, values: value };
+                    handleFilterStatusChange(filter.key, newValue);
+                  }}
+                  {...(filter.singleSelect ? {} : { allowMultiple: true })}
+                />
+                :
+                <DropdownSearch
+                  placeHoder={"Apply filters"}
+                  optionsList={getSortedChoices(filter.choices)}
+                  setSelected={(value) => {
+                    const newValue = { ...normalizedValue, values: value };
+                    handleFilterStatusChange(filter.key, newValue);
+                  }}
+                  {...(filter.singleSelect ? {} : { allowMultiple: true })}
+                  allowMultiple
+                  preSelected={normalizedValue.values || []}
+                />
+              }
+            </div>
           ),
           // shortcut: true,
           pinned: true
@@ -340,7 +430,7 @@ function GithubServerTable(props) {
       }
     })
     setAppliedFilters([])
-  }, []);
+  }, [filtersMap, currentPageKey, setFiltersMap]);
 
   const resourceIDResolver = (data) => {
     return data.id;
