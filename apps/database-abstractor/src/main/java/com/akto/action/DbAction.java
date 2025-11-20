@@ -2254,7 +2254,8 @@ public class DbAction extends ActionSupport {
     public String updateTestingRun() {
         try {
             DbLayer.updateTestingRun(testingRunId);
-        } catch (Exception e) {
+            }
+         catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in updateTestingRun " + e.toString());
             return Action.ERROR.toUpperCase();
         }
