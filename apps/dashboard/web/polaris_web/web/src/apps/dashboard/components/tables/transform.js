@@ -2,6 +2,17 @@ import func from "@/util/func";
 import PersistStore from "../../../main/PersistStore";
 
 const tableFunc = {
+    // Helper function for regex search in object values (similar to findInObjectValue)
+    findInObjectValueRegex(obj, regex, keysToIgnore = []) {
+        if (!regex) return true;
+        let flattenedObject = func.flattenObject(obj);
+        let ret = false;
+        Object.keys(flattenedObject).forEach((key) => {
+            ret |= !keysToIgnore.some(ignore => key.toLowerCase().includes(ignore.toLowerCase())) &&
+                regex.test(flattenedObject[key]?.toString() || '');
+        });
+        return ret;
+    },
     fetchDataSync: function (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue, setFilters, props){
         // Early return for empty data
         if (!props.data || props.data.length === 0) {
@@ -10,9 +21,6 @@ const tableFunc = {
         }
         
         let localFilters = func.prepareFilters(props.data,props.filters);
-        
-        // Optimize filter generation - cache results if data hasn't changed
-        const dataLength = props.data.length;
         
         let filtersFromHeaders = props.headers.filter((header) => {
           return header.showFilter
@@ -61,9 +69,31 @@ const tableFunc = {
 
         if(props?.customFilters){
           tempData = props?.modifyData(filters, dataSortKey, sortOrder)
-          tempData = tempData.filter((value) => {
-            return func.findInObjectValue(value, queryValue.toLowerCase(), ['id', 'time', 'icon', 'order', 'conditions']);
-          })
+          
+          // Check if query is a regex pattern: ($regex: <pattern>)
+          const regexMatch = queryValue && queryValue.match(/^\(\$regex:\s*(.+)\)$/);
+          
+          if (regexMatch) {
+            // Use regex search
+            try {
+              const regexPattern = regexMatch[1].trim();
+              const regex = new RegExp(regexPattern, 'i'); // case-insensitive
+              tempData = tempData.filter((value) => {
+                return this.findInObjectValueRegex(value, regex, ['id', 'time', 'icon', 'order', 'conditions']);
+              });
+            } catch (e) {
+              // Invalid regex pattern - fall back to string search
+              console.warn('Invalid regex pattern, falling back to string search:', e);
+              tempData = tempData.filter((value) => {
+                return func.findInObjectValue(value, queryValue.toLowerCase(), ['id', 'time', 'icon', 'order', 'conditions']);
+              });
+            }
+          } else {
+            // Use normal string search
+            tempData = tempData.filter((value) => {
+              return func.findInObjectValue(value, queryValue.toLowerCase(), ['id', 'time', 'icon', 'order', 'conditions']);
+            });
+          }
           let page = skip / limit;
           let pageLimit = limit;
           let final2Data = tempData && tempData.length <= pageLimit ? tempData :
@@ -89,21 +119,49 @@ const tableFunc = {
                   return false; // Item doesn't pass this filter
                 }
               } else {
-                let filterSet = new Set(filters[filterKey] || []);
-                if (filterSet.size !== 0) {
+                // Handle both legacy array format and new {values, negated} format
+                let filterValue = filters[filterKey];
+                let filterValues = [];
+                let isNegated = false;
+                
+                if (filterValue && typeof filterValue === 'object' && !Array.isArray(filterValue)) {
+                  if (filterValue.values !== undefined) {
+                    // New format with negation support
+                    filterValues = filterValue.values || [];
+                    isNegated = filterValue.negated || false;
+                  } else if (filterValue.since === undefined) {
+                    // Other object format (not dateRange) - try to extract values
+                    filterValues = Object.values(filterValue).flat().filter(v => v !== null && v !== undefined);
+                    isNegated = false;
+                  }
+                  // If it's a dateRange object (has since), it's already handled above, so skip
+                } else if (Array.isArray(filterValue)) {
+                  // Legacy format
+                  filterValues = filterValue;
+                  isNegated = false;
+                } else if (filterValue !== null && filterValue !== undefined) {
+                  // Single value
+                  filterValues = [filterValue];
+                  isNegated = false;
+                }
+                
+                if (filterValues.length > 0) {
                   const itemValue = item[filterKey];
                   let hasMatch = false;
                   
                   if (itemValue instanceof Array) {
-                    hasMatch = itemValue.some(v => filterSet.has(v));
+                    hasMatch = itemValue.some(v => filterValues.includes(v));
                   } else if (itemValue instanceof Set) {
-                    hasMatch = Array.from(itemValue).some(v => filterSet.has(v));
+                    hasMatch = Array.from(itemValue).some(v => filterValues.includes(v));
                   } else {
-                    hasMatch = filterSet.has(itemValue);
+                    hasMatch = filterValues.includes(itemValue);
                   }
                   
-                  if (!hasMatch) {
-                    return false; // Item doesn't pass this filter
+                  // If negated, exclude items that match; otherwise include items that match
+                  if (isNegated && hasMatch) {
+                    return false; // Negated filter: exclude items that match
+                  } else if (!isNegated && !hasMatch) {
+                    return false; // Normal filter: exclude items that don't match
                   }
                 }
               }
@@ -115,10 +173,32 @@ const tableFunc = {
 
         // Optimize search query - skip if no query
         if (queryValue && queryValue.length > 0) {
-          const lowerQuery = queryValue.toLowerCase();
-          tempData = tempData.filter((value) => {
-            return func.findInObjectValue(value, lowerQuery, ['id', 'time', 'icon', 'order', 'conditions']);
-          });
+          // Check if query is a regex pattern: ($regex: <pattern>)
+          const regexMatch = queryValue.match(/^\(\$regex:\s*(.+)\)$/);
+          
+          if (regexMatch) {
+            // Use regex search
+            try {
+              const regexPattern = regexMatch[1].trim();
+              const regex = new RegExp(regexPattern, 'i'); // case-insensitive
+              tempData = tempData.filter((value) => {
+                return this.findInObjectValueRegex(value, regex, ['id', 'time', 'icon', 'order', 'conditions']);
+              });
+            } catch (e) {
+              // Invalid regex pattern - fall back to string search
+              console.warn('Invalid regex pattern, falling back to string search:', e);
+              const lowerQuery = queryValue.toLowerCase();
+              tempData = tempData.filter((value) => {
+                return func.findInObjectValue(value, lowerQuery, ['id', 'time', 'icon', 'order', 'conditions']);
+              });
+            }
+          } else {
+            // Use normal string search
+            const lowerQuery = queryValue.toLowerCase();
+            tempData = tempData.filter((value) => {
+              return func.findInObjectValue(value, lowerQuery, ['id', 'time', 'icon', 'order', 'conditions']);
+            });
+          }
         }
 
           // Sort only if we have data and a sort key
@@ -148,30 +228,64 @@ const tableFunc = {
     mergeFilters(filterArray1, filterArray2, labelFunc, handleRemoveAppliedFilter){
       const combined = [...filterArray1, ...filterArray2];
       const mergedByKey = combined.reduce((acc, {key, value}) => {
+        // Normalize value to new format {values, negated}
+        let normalizedValue = value;
+        if (Array.isArray(value)) {
+          normalizedValue = { values: value, negated: false };
+        } else if (typeof value === 'object' && value.values === undefined && !value.since) {
+          // Legacy object format
+          normalizedValue = { values: Object.values(value).flat(), negated: false };
+        }
+        
         if (acc[key]) {
           if(key.includes('dateRange')){
             acc[key].value = this.mergeTimeRanges(acc[key].value, value)
           }else{
-            acc[key].value = [...new Set([...value,...acc[key].value ])];
+            // Merge values and preserve negation (use the first non-false negation)
+            const existingValue = acc[key].value;
+            const existingNormalized = Array.isArray(existingValue) 
+              ? { values: existingValue, negated: false }
+              : (existingValue?.values !== undefined ? existingValue : { values: existingValue || [], negated: false });
+            
+            const newNormalized = normalizedValue?.values !== undefined 
+              ? normalizedValue 
+              : { values: normalizedValue || [], negated: false };
+            
+            acc[key].value = {
+              values: [...new Set([...existingNormalized.values, ...newNormalized.values])],
+              negated: existingNormalized.negated || newNormalized.negated
+            };
           }
         } else {
           if(key.includes('dateRange')){
             acc[key] = {key, value}
           }else{
-            acc[key] = { key, value: [...value] };
+            acc[key] = { key, value: normalizedValue?.values !== undefined ? normalizedValue : { values: normalizedValue || [], negated: false } };
           } 
         }
         return acc;
       }, {});
 
       return Object.keys(mergedByKey).map((key) => {
-        const obj = mergedByKey[key]
+        const obj = mergedByKey[key];
+        // Extract values for disambiguateLabel - it expects an array for non-dateRange filters
+        // For dateRange, pass the object as-is since disambiguateLabel handles it specially
+        const labelValue = key.includes("dateRange")
+          ? obj.value
+          : (obj.value.values !== undefined ? obj.value.values : (Array.isArray(obj.value) ? obj.value : []));
+        let label = labelFunc(obj.key, labelValue);
+        
+        // Add negation prefix if negated (only for non-dateRange filters)
+        if (obj.value.negated && !key.includes("dateRange")) {
+          label = `Exclude: ${label}`;
+        }
+        
         return {
           ...obj,
-          label: labelFunc(obj.key, obj.value),
+          label: label,
           onRemove: handleRemoveAppliedFilter
-        }
-      })
+        };
+      });
     },
     mergeTimeRanges(obj1, obj2) {
       const sinceEpoch1 = Date.parse(obj1.since);
@@ -222,7 +336,19 @@ const tableFunc = {
     let filterStr = "";
     filters.forEach((filter) => {
       if(filterStr.length !== 0){filterStr += "&"}
-      filterStr += filter.key + "__" + filter.value
+      // Handle new format with {values, negated} or legacy format
+      let valueStr = "";
+      if (filter.value && typeof filter.value === 'object' && filter.value.values !== undefined) {
+        // New format: encode values and negation
+        const values = filter.value.values || [];
+        const negated = filter.value.negated ? "1" : "0";
+        valueStr = values.join(",") + (negated === "1" ? "|negated" : "");
+      } else if (Array.isArray(filter.value)) {
+        valueStr = filter.value.join(",");
+      } else {
+        valueStr = filter.value;
+      }
+      filterStr += filter.key + "__" + valueStr
     })
     return filterStr
   },
@@ -245,12 +371,31 @@ const tableFunc = {
     const pairs = searchString.split('&');
   
     pairs.forEach(pair => {
-      const [key, values] = pair.split('__');
-      const valueArray = values.split(',').map(this.convertValue);
+      const [key, valuesStr] = pair.split('__');
+      // Check if negation flag is present
+      const isNegated = valuesStr.includes('|negated');
+      const cleanValuesStr = isNegated ? valuesStr.replace('|negated', '') : valuesStr;
+      const valueArray = cleanValuesStr.split(',').map(this.convertValue).filter(v => v !== '');
+      
+      // Use new format with {values, negated}
+      const filterValue = {
+        values: valueArray,
+        negated: isNegated
+      };
+      
+      // Extract values for disambiguateLabel - it expects an array, not {values, negated}
+      const labelValue = filterValue.values || filterValue;
+      let label = labelFunc(key, labelValue);
+      
+      // Add negation prefix if negated
+      if (filterValue.negated) {
+        label = `Exclude: ${label}`;
+      }
+      
       result.push({
         key,
-        value: valueArray,
-        label: labelFunc(key,valueArray),
+        value: filterValue,
+        label: label,
         onRemove: handleRemoveAppliedFilter
       });
     });
