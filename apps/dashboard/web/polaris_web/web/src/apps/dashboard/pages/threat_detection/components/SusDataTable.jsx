@@ -147,8 +147,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     // Check if any other filters are applied (only URL and attack category are allowed)
     const hasOtherFilters = (currentFilters.actor && currentFilters.actor.length > 0) ||
                            (currentFilters.type && currentFilters.type.length > 0) ||
-                           (currentFilters.apiCollectionId && currentFilters.apiCollectionId.length > 0) ||
-                           (currentFilters.latestApiOrigRegex && currentFilters.latestApiOrigRegex !== '');
+                           (currentFilters.apiCollectionId && currentFilters.apiCollectionId.length > 0)
     
     if (hasOtherFilters) {
       const message = 'Only URL and Attack Category filters are allowed for bulk operations. Please remove other filters (Actor, Type, Collection) and try again.';
@@ -398,7 +397,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       typeFilter = [],
       latestAttack = [],
       hostFilter = [];
-    let latestApiOrigRegex;
+    let latestApiOrigRegex = queryValue.length > 3 ? queryValue : "";
     if (filters?.actor) {
       sourceIpsFilter = filters?.actor;
     }
@@ -426,7 +425,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       type: typeFilter,
       latestAttack: latestAttack,
       host: hostFilter,
-      latestApiOrigRegex: queryValue.length > 3 ? queryValue : "",
       sortKey: sortKey,
       sortOrder: sortOrder
     });
