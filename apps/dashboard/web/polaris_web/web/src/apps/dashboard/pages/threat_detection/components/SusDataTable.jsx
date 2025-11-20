@@ -426,7 +426,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       type: typeFilter,
       latestAttack: latestAttack,
       host: hostFilter,
-      latestApiOrigRegex: queryValue,
+      latestApiOrigRegex: queryValue.length > 3 ? queryValue : "",
       sortKey: sortKey,
       sortOrder: sortOrder
     });
