@@ -74,7 +74,9 @@ const headers = [
             return (a || 0) + (b || 0);
         },
         shouldMerge: true,
-        boxWidth: '80px'
+        boxWidth: '80px',
+        filterKey: "urlsCount",
+        showFilter: true,
     },
     {
         title: <HeadingWithTooltip content={<Text variant="bodySm">Risk score of collection is maximum risk score of the endpoints inside this collection</Text>} title="Risk score" />,

@@ -56,6 +56,7 @@ function GithubSimpleTable(props) {
         isMultipleItemsSelected={props?.isMultipleItemsSelected}
         emptyStateMarkup={props?.emptyStateMarkup}
         calendarFilterKeys={props?.calendarFilterKeys}
+        supportsNegationFilter={true}
     />
 
 }
