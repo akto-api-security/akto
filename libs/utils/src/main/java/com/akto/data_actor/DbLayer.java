@@ -1020,21 +1020,6 @@ public class DbLayer {
         TestingRunDao.instance.updateOneNoUpsert(filter, update);
     }
 
-
-    public static TestingRunResultSummary updateTestingRunResultSummaryWithStateAndTimestamp(String testingRunResultSummaryId, TestingRun.State state, int startTimestamp) {
-        ObjectId summaryObjectId = new ObjectId(testingRunResultSummaryId);
-        return TestingRunResultSummariesDao.instance.updateOneNoUpsert(
-                Filters.and(
-                        Filters.eq(TestingRunResultSummary.ID, summaryObjectId),
-                        Filters.eq(TestingRunResultSummary.STATE, TestingRun.State.RUNNING)
-                ),
-                Updates.combine(
-                        Updates.set(TestingRunResultSummary.STATE, state),
-                        Updates.set(TestingRunResultSummary.START_TIMESTAMP, startTimestamp)
-                )
-        );
-    }
-
     public static Map<ObjectId, TestingRunResultSummary> fetchTestingRunResultSummaryMap(String testingRunId) {
         ObjectId testingRunObjId = new ObjectId(testingRunId);
         return TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries(Collections.singletonList(testingRunObjId));
