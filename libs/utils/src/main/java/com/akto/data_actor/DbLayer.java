@@ -992,33 +992,38 @@ public class DbLayer {
         int nextScheduleTimestamp = 0;
         TestingRun testingRun = TestingRunDao.instance.findOne("_id", testingRunId);
         // If it's a one-time test (periodInSeconds = 0), don't reschedule
-        if (testingRun.getPeriodInSeconds() > 0) {
 
-        // Calculate how many periods have passed since original schedule
-        int timeSinceOriginal = Context.now() - testingRun.getScheduleTimestamp();
-        int periodsPassed = (timeSinceOriginal / testingRun.getPeriodInSeconds()) + 1;
+        if(testingRun != null) {
+            if (testingRun.getPeriodInSeconds() > 0) {
 
-        // Next schedule = original + (periods * interval)
-        nextScheduleTimestamp =  testingRun.getScheduleTimestamp() + (periodsPassed * testingRun.getPeriodInSeconds());
-       }
+                // Calculate how many periods have passed since original schedule
+                int timeSinceOriginal = Context.now() - testingRun.getScheduleTimestamp();
+                int periodsPassed = (timeSinceOriginal / testingRun.getPeriodInSeconds()) + 1;
 
-        ObjectId testingRunObjId = new ObjectId(testingRunId);
-        Bson filter = Filters.and(Filters.eq(Constants.ID, testingRunObjId)
-        );
-        Bson update;
-        if (nextScheduleTimestamp > 0) {
+                // Next schedule = original + (periods * interval)
+                nextScheduleTimestamp = testingRun.getScheduleTimestamp() + (periodsPassed * testingRun.getPeriodInSeconds());
+            }
 
-            // Update both state and schedule timestamp
-            update = Updates.combine(
-                    Updates.set(TestingRun.STATE, State.SCHEDULED),
-                    Updates.set(TestingRun.SCHEDULE_TIMESTAMP, testingRun.getScheduleTimestamp())
+            ObjectId testingRunObjId = new ObjectId(testingRunId);
+            Bson filter = Filters.and(Filters.eq(Constants.ID, testingRunObjId)
             );
+            Bson update;
+            if (nextScheduleTimestamp > 0) {
 
-        }else{
-            // Update only state
-            update = Updates.set(TestingRun.STATE, State.FAILED);
+                // Update both state and schedule timestamp
+                update = Updates.combine(
+                        Updates.set(TestingRun.STATE, State.SCHEDULED),
+                        Updates.set(TestingRun.SCHEDULE_TIMESTAMP, nextScheduleTimestamp)
+                );
+
+            } else {
+                // Update only state
+                update = Updates.set(TestingRun.STATE, State.FAILED);
+            }
+            TestingRunDao.instance.updateOneNoUpsert(filter, update);
+        }else {
+            loggerMaker.infoAndAddToDb("Invalid testingRunId " + testingRunId , LogDb.CYBORG);
         }
-        TestingRunDao.instance.updateOneNoUpsert(filter, update);
     }
 
     public static Map<ObjectId, TestingRunResultSummary> fetchTestingRunResultSummaryMap(String testingRunId) {
