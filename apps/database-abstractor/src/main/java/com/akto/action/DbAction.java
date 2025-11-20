@@ -2253,7 +2253,7 @@ public class DbAction extends ActionSupport {
 
     public String updateTestingRun() {
         try {
-                DbLayer.updateTestingRun(testingRunId);
+            DbLayer.updateTestingRun(testingRunId);
             }
          catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in updateTestingRun " + e.toString());
@@ -4258,7 +4258,6 @@ public class DbAction extends ActionSupport {
     public void setRemarksList(List<String> remarksList) {
         this.remarksList = remarksList;
     }
-
 
     public String fetchMcpAuditInfo() {
         try {

@@ -1638,7 +1638,6 @@ public class ClientActor extends DataActor {
         return results;
     }
 
-    @Override
     public void updateTestingRun(String testingRunId) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();

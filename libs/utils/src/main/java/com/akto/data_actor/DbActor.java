@@ -518,7 +518,6 @@ public class DbActor extends DataActor {
         DbLayer.updateTestRunResultSummaryNoUpsert(testingRunResultSummaryId);
     }
 
-    @Override
     public void updateTestingRun(String testingRunId) {
         DbLayer.updateTestingRun(testingRunId);
     }
