@@ -236,7 +236,7 @@ public class KeyTypes {
                 return SingleTypeInfo.IP_ADDRESS;
             }
             
-            if (checkForSubtypes && !isHeader  && matchesSubType(SingleTypeInfo.VIN, key, oString) != null) {
+            if (checkForSubtypes  && matchesSubType(SingleTypeInfo.VIN, key, oString) != null) {
                 return SingleTypeInfo.VIN;
             }
 
