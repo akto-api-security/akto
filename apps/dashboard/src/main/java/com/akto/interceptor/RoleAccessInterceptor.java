@@ -135,6 +135,9 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                 if (this.accessType.equalsIgnoreCase(ReadWriteAccess.READ_WRITE.toString())) {
                     long timestamp = Context.now();
                     String apiEndpoint = invocation.getProxy().getActionName();
+
+                    // Retrieve audit description text from auditLog property of request body json here
+
                     String actionDescription = this.actionDescription == null ? "Error: Description not available" : this.actionDescription;
                     String userEmail = user.getLogin();
                     String userAgent = request.getHeader("User-Agent") == null ? "Unknown User-Agent" : request.getHeader("User-Agent");

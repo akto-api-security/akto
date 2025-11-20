@@ -1,4 +1,5 @@
 import request from "../../../../util/request"
+import { constructAuditLog, resourceEnums, opTypeEnums } from "../../../../util/audit"
 
 
 export default {
@@ -176,10 +177,16 @@ export default {
         })
     },
     async createCollection(name) {
+        const auditLog = constructAuditLog(
+            opTypeEnums.CREATE_SINGLE,
+            resourceEnums.API_COLLECTION,
+            name
+        )
+
         return await request({
             url: '/api/createCollection',
             method: 'post',
-            data: { collectionName: name }
+            data: { collectionName: name, auditLog: auditLog }
         })
     },
 
