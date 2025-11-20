@@ -292,18 +292,22 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
                 String keyName = t.getKeyName();
                 String value = t.getValue();
 
-                // Check exact key matches
+                // Check exact key matches (for generic keys like "tag_mismatch")
                 if (keyName != null && Constants.MERGING_ALLOWED_TAG_KEYS.contains(keyName)) {
                     return true;
                 }
 
-                // Check exact value matches
-                if (value != null && Constants.MERGING_ALLOWED_TAG_VALUES.contains(value)) {
-                    return true;
-                }
+                if (keyName != null && keyName.equals(Constants.MERGING_ALLOWED_TAG_KEY)) {
+                    if (value == null) {
+                        return false;
+                    }
 
-                // Check substring matches (contains) in value
-                if (value != null) {
+                    // Check exact value matches
+                    if (Constants.MERGING_ALLOWED_TAG_VALUES.contains(value)) {
+                        return true;
+                    }
+
+                    // Check substring matches (contains) in value
                     return Constants.MERGING_ALLOWED_TAG_SUBSTRINGS.stream()
                         .anyMatch(substring -> value.contains(substring));
                 }
