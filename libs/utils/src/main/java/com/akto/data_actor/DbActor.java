@@ -519,8 +519,8 @@ public class DbActor extends DataActor {
     }
 
     @Override
-    public void updateTestingRun(String testingRunId, int periodInSeconds, int scheduleTimestamp) {
-        DbLayer.updateTestingRun(testingRunId, periodInSeconds, scheduleTimestamp);
+    public void updateTestingRun(String testingRunId) {
+        DbLayer.updateTestingRun(testingRunId);
     }
 
     public void updateTestingRunAndMarkCompleted(String testingRunId, int scheduleTs) {

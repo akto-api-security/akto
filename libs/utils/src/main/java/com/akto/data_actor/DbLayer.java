@@ -987,18 +987,19 @@ public class DbLayer {
     }
 
 
-    public static void updateTestingRun(String testingRunId, int periodInSeconds, int scheduleTimestamp) {
+    public static void updateTestingRun(String testingRunId) {
 
         int nextScheduleTimestamp = 0;
+        TestingRun testingRun = TestingRunDao.instance.findOne("_id", testingRunId);
         // If it's a one-time test (periodInSeconds = 0), don't reschedule
-        if (periodInSeconds > 0) {
+        if (testingRun.getPeriodInSeconds() > 0) {
 
         // Calculate how many periods have passed since original schedule
-        int timeSinceOriginal = Context.now() - scheduleTimestamp;
-        int periodsPassed = (timeSinceOriginal / periodInSeconds) + 1;
+        int timeSinceOriginal = Context.now() - testingRun.getScheduleTimestamp();
+        int periodsPassed = (timeSinceOriginal / testingRun.getPeriodInSeconds()) + 1;
 
         // Next schedule = original + (periods * interval)
-        nextScheduleTimestamp =  scheduleTimestamp + (periodsPassed * periodInSeconds);
+        nextScheduleTimestamp =  testingRun.getScheduleTimestamp() + (periodsPassed * testingRun.getPeriodInSeconds());
        }
 
         ObjectId testingRunObjId = new ObjectId(testingRunId);
@@ -1010,7 +1011,7 @@ public class DbLayer {
             // Update both state and schedule timestamp
             update = Updates.combine(
                     Updates.set(TestingRun.STATE, State.SCHEDULED),
-                    Updates.set(TestingRun.SCHEDULE_TIMESTAMP, scheduleTimestamp)
+                    Updates.set(TestingRun.SCHEDULE_TIMESTAMP, testingRun.getScheduleTimestamp())
             );
 
         }else{

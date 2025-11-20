@@ -194,7 +194,7 @@ public class Main {
                     loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId
                             + " . Failing test run : " + start, LogDb.TESTING);
                 }
-                dataActor.updateTestingRun(testingRun.getId().toHexString(), testingRun.getPeriodInSeconds(),testingRun.getScheduleTimestamp());
+                dataActor.updateTestingRun(testingRun.getId().toHexString());
                 dataActor.updateTestRunResultSummary(summaryId.toHexString());
                 return;
             }

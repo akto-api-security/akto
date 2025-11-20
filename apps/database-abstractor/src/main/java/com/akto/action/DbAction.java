@@ -208,8 +208,6 @@ public class DbAction extends ActionSupport {
     int apiCollectionId;
     int startTimestamp;
     int endTimestamp;
-    int scheduleTimestamp;
-    int periodInSeconds;
     List<ApiInfo.ApiInfoKey> newEps;
     String logicalGroupName;
     BasicDBList issuesIds;
@@ -2255,7 +2253,7 @@ public class DbAction extends ActionSupport {
 
     public String updateTestingRun() {
         try {
-                DbLayer.updateTestingRun(testingRunId, periodInSeconds, scheduleTimestamp);
+                DbLayer.updateTestingRun(testingRunId);
             }
          catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in updateTestingRun " + e.toString());
@@ -4261,21 +4259,6 @@ public class DbAction extends ActionSupport {
         this.remarksList = remarksList;
     }
 
-    public int getScheduleTimestamp() {
-        return scheduleTimestamp;
-    }
-
-    public void setScheduleTimestamp(int scheduleTimestamp) {
-        this.scheduleTimestamp = scheduleTimestamp;
-    }
-
-    public int getPeriodInSeconds() {
-        return periodInSeconds;
-    }
-
-    public void setPeriodInSeconds(int periodInSeconds) {
-        this.periodInSeconds = periodInSeconds;
-    }
 
     public String fetchMcpAuditInfo() {
         try {

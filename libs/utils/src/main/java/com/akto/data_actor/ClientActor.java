@@ -1639,12 +1639,10 @@ public class ClientActor extends DataActor {
     }
 
     @Override
-    public void updateTestingRun(String testingRunId, int periodInSeconds, int scheduleTimestamp) {
+    public void updateTestingRun(String testingRunId) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("testingRunId", testingRunId);
-        obj.put("periodInSeconds", periodInSeconds);
-        obj.put("scheduleTimestamp", scheduleTimestamp);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateTestingRun", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
