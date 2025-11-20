@@ -594,29 +594,36 @@ public class DbLayer {
             Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
     }
 
-    public static void updateTestingRun(String testingRunId) {
-        updateTestingRun(testingRunId, TestingRun.State.FAILED, 0);
-    }
+    public static void updateTestingRun(String testingRunId, int periodInSeconds, int scheduleTimestamp) {
 
-    public static void updateTestingRun(String testingRunId, TestingRun.State state, int scheduleTimestamp) {
+        int nextScheduleTimestamp = 0;
+        // If it's a one-time test (periodInSeconds = 0), don't reschedule
+        if (periodInSeconds > 0) {
+
+            // Calculate how many periods have passed since original schedule
+            int timeSinceOriginal = Context.now() - scheduleTimestamp;
+            int periodsPassed = (timeSinceOriginal / periodInSeconds) + 1;
+
+            // Next schedule = original + (periods * interval)
+            nextScheduleTimestamp =  scheduleTimestamp + (periodsPassed * periodInSeconds);
+        }
+
         ObjectId testingRunObjId = new ObjectId(testingRunId);
-        
-        Bson filter = Filters.and(
-            Filters.eq(Constants.ID, testingRunObjId)
+        Bson filter = Filters.and(Filters.eq(Constants.ID, testingRunObjId)
         );
-        
         Bson update;
-        if (scheduleTimestamp > 0) {
+        if (nextScheduleTimestamp > 0) {
+
             // Update both state and schedule timestamp
             update = Updates.combine(
-                Updates.set(TestingRun.STATE, state),
-                Updates.set(TestingRun.SCHEDULE_TIMESTAMP, scheduleTimestamp)
+                    Updates.set(TestingRun.STATE, State.SCHEDULED),
+                    Updates.set(TestingRun.SCHEDULE_TIMESTAMP, scheduleTimestamp)
             );
-        } else {
+
+        }else{
             // Update only state
-            update = Updates.set(TestingRun.STATE, state);
+            update = Updates.set(TestingRun.STATE, State.FAILED);
         }
-        
         TestingRunDao.instance.updateOneNoUpsert(filter, update);
     }
 
@@ -656,20 +663,6 @@ public class DbLayer {
         TestingRunResultSummariesDao.instance.insertOne(trrs);
     }
 
-
-    public static TestingRunResultSummary updateTestingRunResultSummaryWithStateAndTimestamp(String testingRunResultSummaryId, TestingRun.State state, int startTimestamp) {
-        ObjectId summaryObjectId = new ObjectId(testingRunResultSummaryId);
-        return TestingRunResultSummariesDao.instance.updateOneNoUpsert(
-            Filters.and(
-                Filters.eq(TestingRunResultSummary.ID, summaryObjectId),
-                Filters.eq(TestingRunResultSummary.STATE, TestingRun.State.RUNNING)
-            ),
-            Updates.combine(
-                Updates.set(TestingRunResultSummary.STATE, state),
-                Updates.set(TestingRunResultSummary.START_TIMESTAMP, startTimestamp)
-            )
-        );
-    }
 
     public static void updateTestingRunAndMarkCompleted(String testingRunId, int scheduleTimestamp) {
         Bson completedUpdate = Updates.combine(

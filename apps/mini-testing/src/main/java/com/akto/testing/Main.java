@@ -192,34 +192,6 @@ public class Main {
     private static final int LAST_TEST_RUN_EXECUTION_DELTA = 5 * 60;
     private static final int MAX_RETRIES_FOR_FAILED_SUMMARIES = 3;
 
-    private static int calculateNextScheduleTimestamp(TestingRun testingRun, int currentTimestamp) {
-        int periodInSeconds = testingRun.getPeriodInSeconds();
-        
-        // If it's a one-time test (periodInSeconds = 0), don't reschedule
-        if (periodInSeconds <= 0) {
-            return 0;
-        }
-        
-        int originalScheduleTime = testingRun.getScheduleTimestamp();
-        
-        // Calculate how many periods have passed since original schedule
-        int timeSinceOriginal = currentTimestamp - originalScheduleTime;
-        int periodsPassed = (timeSinceOriginal / periodInSeconds) + 1;
-        
-        // Next schedule = original + (periods * interval)
-        return originalScheduleTime + (periodsPassed * periodInSeconds);
-    }
-
-
-    private static void rescheduleTestingRun(TestingRun testingRun, int nextScheduleTimestamp) {
-        dataActor.updateTestingRun(testingRun.getHexId(), State.SCHEDULED, nextScheduleTimestamp);
-        loggerMaker.infoAndAddToDb("Rescheduling TestingRun instead of marking failed. Next run at: " + nextScheduleTimestamp + " for TR_ID: " + testingRun.getHexId(), LogDb.TESTING);
-    }
-
-    private static TestingRunResultSummary rescheduleTestRunResultSummary(TestingRunResultSummary testingRunResultSummary, int nextScheduleTimestamp) {
-        return dataActor.updateTestingRunResultSummaryWithStateAndTimestamp(testingRunResultSummary.getHexId(), State.SCHEDULED, nextScheduleTimestamp);
-    }
-
     private static BasicDBObject checkIfAlreadyTestIsRunningOnMachine(){
         // this will return true if consumer is running and this the latest summary of the testing run
         // and also the summary should be in running state
@@ -555,21 +527,10 @@ public class Main {
                     if (start - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
                         logSentMap.put(accountId, start);
                     }
-                    
-                    // Check if this is a recurring test that should be rescheduled
-                    int nextScheduleTimestamp = calculateNextScheduleTimestamp(testingRun, Context.now());
-                    if (nextScheduleTimestamp > 0) {
-                        rescheduleTestingRun(testingRun, nextScheduleTimestamp);
-                        TestingRunResultSummary summary = rescheduleTestRunResultSummary(trrs, nextScheduleTimestamp);
-                        loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId 
-                                + ". Rescheduling recurring test for " + nextScheduleTimestamp, LogDb.TESTING);
-                    } else {
-                        // One-time test - mark as failed
-                        dataActor.updateTestingRun(testingRun.getId().toHexString());
-                        dataActor.updateTestRunResultSummary(summaryId.toHexString());
-                        loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId
-                                + " . Failing one-time test run : " + start, LogDb.TESTING);
-                    }
+                    dataActor.updateTestingRun(testingRun.getId().toHexString(), testingRun.getPeriodInSeconds(),testingRun.getScheduleTimestamp());
+                    dataActor.updateTestRunResultSummary(summaryId.toHexString());
+                    loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId
+                                + " . Updating status of one-time test as failed and recurring test as scheduled : " + start, LogDb.TESTING);
                 }
                 continue;
             }
@@ -634,13 +595,7 @@ public class Main {
                                     loggerMaker.infoAndAddToDb("Max retries level reached for TRR_ID: " + testingRun.getHexId(), LogDb.TESTING);
                                     maxRetriesReached = true;
                                 }else{
-                                    // Check if this is a recurring test that should be rescheduled
-                                    int nextScheduleTimestamp = calculateNextScheduleTimestamp(testingRun, Context.now());
-                                    if (nextScheduleTimestamp > 0) {
-                                        summary = rescheduleTestRunResultSummary(testingRunResultSummary, nextScheduleTimestamp);
-                                    } else {
                                         summary = dataActor.markTestRunResultSummaryFailed(testingRunResultSummary.getId().toHexString());
-                                    }
                                 }
     
                                 runResultSummary = dataActor.fetchTestingRunResultSummary(testingRunResultSummary.getId().toHexString());
@@ -664,14 +619,8 @@ public class Main {
                                 loggerMaker.infoAndAddToDb("Deleted for TestingRunResult rerun case for failed testrun TRRS: " + testingRunResultSummary.getId(), LogDb.TESTING);
                                 continue;
                             }
-                            // Check if this is a recurring test that should be rescheduled
-                            int nextScheduleTimestamp = calculateNextScheduleTimestamp(testingRun, Context.now());
                             TestingRunResultSummary summary;
-                            if (nextScheduleTimestamp > 0) {
-                                summary = rescheduleTestRunResultSummary(testingRunResultSummary, nextScheduleTimestamp);
-                            } else {
-                                summary = dataActor.markTestRunResultSummaryFailed(testingRunResultSummary.getId().toHexString());
-                            }
+                            summary = dataActor.markTestRunResultSummaryFailed(testingRunResultSummary.getId().toHexString());
                             if (summary == null) {
                                 loggerMaker.infoAndAddToDb("Skipping because some other thread picked it up, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
                                 continue;

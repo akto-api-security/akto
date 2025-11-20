@@ -141,6 +141,7 @@ public class DbAction extends ActionSupport {
     int startTimestamp;
     int endTimestamp;
     int scheduleTimestamp;
+    int periodInSeconds;
     List<ApiInfo.ApiInfoKey> newEps;
     String logicalGroupName;
     BasicDBList issuesIds;
@@ -1633,12 +1634,8 @@ public class DbAction extends ActionSupport {
 
     public String updateTestingRun() {
         try {
-            if (state != null && !state.isEmpty()) {
-                TestingRun.State stateEnum = TestingRun.State.valueOf(state);
-                DbLayer.updateTestingRun(testingRunId, stateEnum, scheduleTimestamp);
-            } else {
-                DbLayer.updateTestingRun(testingRunId);
-            }
+             DbLayer.updateTestingRun(testingRunId, periodInSeconds, scheduleTimestamp);
+
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }
@@ -1832,18 +1829,6 @@ public class DbAction extends ActionSupport {
         } catch (Exception e) {
             e.printStackTrace();
             loggerMaker.errorAndAddToDb(e, "Error insertMCPAuditDataLog " + e.toString());
-            return Action.ERROR.toUpperCase();
-        }
-        return Action.SUCCESS.toUpperCase();
-    }
-
-
-    public String updateTestingRunResultSummaryWithStateAndTimestamp() {
-        try {
-            TestingRun.State stateEnum = TestingRun.State.valueOf(state);
-            trrs = DbLayer.updateTestingRunResultSummaryWithStateAndTimestamp(testingRunResultSummaryId, stateEnum, startTimestamp);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in updateTestingRunResultSummaryWithStateAndTimestamp " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -2793,6 +2778,14 @@ public class DbAction extends ActionSupport {
 
     public TestingRunPlayground getTestingRunPlayground() {
         return testingRunPlayground;
+    }
+
+    public int getPeriodInSeconds() {
+        return periodInSeconds;
+    }
+
+    public void setPeriodInSeconds(int periodInSeconds) {
+        this.periodInSeconds = periodInSeconds;
     }
 
     public void setTestingRunPlayground(TestingRunPlayground testingRunPlayground) {

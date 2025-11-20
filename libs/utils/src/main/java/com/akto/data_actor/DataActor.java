@@ -130,9 +130,7 @@ public abstract class DataActor {
 
     public abstract void updateTestRunResultSummaryNoUpsert(String testingRunResultSummaryId);
 
-    public abstract void updateTestingRun(String testingRunId);
-
-    public abstract void updateTestingRun(String testingRunId, TestingRun.State state, int scheduleTimestamp);
+    public abstract void updateTestingRun(String testingRunId, int periodInSeconds, int scheduleTimestamp);
 
     public abstract void updateTestRunResultSummary(String summaryId);
     public abstract void deleteTestRunResultSummary(String summaryId);
@@ -321,5 +319,4 @@ public abstract class DataActor {
 
     public abstract void storeConversationResults(List<AgentConversationResult> conversationResults);
 
-    public abstract TestingRunResultSummary updateTestingRunResultSummaryWithStateAndTimestamp(String testingRunResultSummaryId, TestingRun.State state, int startTimestamp);
 }
