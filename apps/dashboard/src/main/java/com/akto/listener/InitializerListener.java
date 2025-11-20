@@ -2011,6 +2011,7 @@ public class InitializerListener implements ServletContextListener {
             aktoDataTypes.add(new AktoDataType("JWT", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER), now, ignoreData, false, true, Arrays.asList("AUTHENTICATION","TOKEN"), Severity.HIGH));
             aktoDataTypes.add(new AktoDataType("EMAIL", true, Collections.emptyList(), now, ignoreData, false, true,  Arrays.asList("PII"), Severity.MEDIUM));
             aktoDataTypes.add(new AktoDataType("CREDIT_CARD", true, Collections.emptyList(), now, ignoreData, false, true, Arrays.asList("FINANCIAL","PII"), Severity.MEDIUM));
+            aktoDataTypes.add(new AktoDataType("VIN", true, Collections.emptyList(), now, ignoreData, false, true, Arrays.asList("PII"), Severity.MEDIUM));
             aktoDataTypes.add(new AktoDataType("SSN", true, Collections.emptyList(), now, ignoreData, false, true,  Arrays.asList("PII"), Severity.HIGH ));
             aktoDataTypes.add(new AktoDataType("ADDRESS", true, Collections.emptyList(), now, ignoreData, false, true,  Arrays.asList("PII"), Severity.LOW));
             aktoDataTypes.add(new AktoDataType("IP_ADDRESS", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER), now, ignoreData, false, true, Arrays.asList("DEVICE IDENTIFIER"), Severity.HIGH));

@@ -12,7 +12,7 @@ import homeFunctions from '../apps/dashboard/pages/home/module';
 import { tokens } from "@shopify/polaris-tokens" 
 import PersistStore from '../apps/main/PersistStore';
 
-import { circle_cancel, circle_tick_minor } from "@/apps/dashboard/components/icons";
+import { circle_cancel, circle_tick_minor, car_icon } from "@/apps/dashboard/components/icons";
 import quickStartFunc from '../apps/dashboard/pages/quick_start/transform';
 import { Box } from '@shopify/polaris';
 import TooltipText from '../apps/dashboard/components/shared/TooltipText';
@@ -1761,7 +1761,9 @@ joinWordsWithUnderscores(input) {
           return CalendarMinor;
         case "BIRTH":
           return CalendarTimeMinor;
-        default: 
+        case "VIN":
+          return car_icon;
+        default:
           return KeyMajor;
     }
   },
