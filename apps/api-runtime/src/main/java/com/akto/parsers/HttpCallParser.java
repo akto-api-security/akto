@@ -28,6 +28,7 @@ import com.akto.jsonrpc.JsonRpcUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mcp.McpRequestResponseUtils;
+import com.akto.rest.RestMethodUtils;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.Main;
 import com.akto.runtime.RuntimeUtil;
@@ -675,24 +676,50 @@ public class HttpCallParser {
 
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
 
+            //TODO("Parse JSON in one place for all the parser methods like Rest/GraphQL/JsonRpc")
             List<HttpResponseParams> responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
-            if (!responseParamsList.isEmpty()) {
-                filteredResponseParams.addAll(responseParamsList);
-                loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + "new graphql endpoints in inventory",LogDb.RUNTIME);
-            } else if (JsonRpcUtils.isJsonRpcRequest(httpResponseParam)) {
-                HttpResponseParams jsonRpcResponse = JsonRpcUtils.parseJsonRpcResponse(httpResponseParam);
-                HttpResponseParams mcpResponseParams = McpRequestResponseUtils.parseMcpResponseParams(jsonRpcResponse);
-                if (mcpResponseParams != null) {
-                    filteredResponseParams.add(mcpResponseParams);
+            if (responseParamsList.isEmpty()) {
+                // Check for REST method payload structure (only for account 1758525547)
+                if (Context.accountId.get() == 1758525547 || Context.accountId.get() == 1667235738) {
+                    List<HttpResponseParams> restMethodResponseParams = RestMethodUtils.getUtils().parseRestMethodResponseParam(httpResponseParam);
+                    if (!restMethodResponseParams.isEmpty()) {
+                        filteredResponseParams.addAll(restMethodResponseParams);
+                        loggerMaker.infoAndAddToDb("Adding " + restMethodResponseParams.size() + " new REST method endpoints in inventory", LogDb.RUNTIME);
+                    } else {
+                        HttpResponseParams jsonRpcResponse = JsonRpcUtils.parseJsonRpcResponse(httpResponseParam);
+                        HttpResponseParams mcpResponseParams = McpRequestResponseUtils.parseMcpResponseParams(jsonRpcResponse);
+                        if (mcpResponseParams != null) {
+                            filteredResponseParams.add(mcpResponseParams);
+                        } else {
+                            List<HttpResponseParams> impervaResponseParamsList = ImpervaUtils.parseImpervaResponse(httpResponseParam);
+                            if (impervaResponseParamsList.isEmpty()) {
+                                filteredResponseParams.add(httpResponseParam);
+                            } else {
+                                filteredResponseParams.addAll(impervaResponseParamsList);
+                                loggerMaker.infoAndAddToDb("Added " + impervaResponseParamsList.size() + " new imperva endpoints in inventory", LogDb.RUNTIME);
+                            }
+                        }
+                    }
+                } else {
+                    if (JsonRpcUtils.isJsonRpcRequest(httpResponseParam)) {
+                        HttpResponseParams jsonRpcResponse = JsonRpcUtils.parseJsonRpcResponse(httpResponseParam);
+                        HttpResponseParams mcpResponseParams = McpRequestResponseUtils.parseMcpResponseParams(jsonRpcResponse);
+                        if (mcpResponseParams != null) {
+                            filteredResponseParams.add(mcpResponseParams);
+                        }
+                    } else {
+                        List<HttpResponseParams> impervaResponseParamsList = ImpervaUtils.parseImpervaResponse(httpResponseParam);
+                        if (impervaResponseParamsList.isEmpty()) {
+                            filteredResponseParams.add(httpResponseParam);
+                        } else {
+                            filteredResponseParams.addAll(impervaResponseParamsList);
+                            loggerMaker.infoAndAddToDb("Added " + impervaResponseParamsList.size() + " new imperva endpoints in inventory", LogDb.RUNTIME);
+                        }
+                    }
                 }
             } else {
-                List<HttpResponseParams> impervaResponseParamsList = ImpervaUtils.parseImpervaResponse(httpResponseParam);
-                if (impervaResponseParamsList.isEmpty()) {
-                    filteredResponseParams.add(httpResponseParam);
-                } else {
-                    filteredResponseParams.addAll(impervaResponseParamsList);
-                    loggerMaker.infoAndAddToDb("Added " + impervaResponseParamsList.size() + "new imperva endpoints in inventory");
-                }
+                filteredResponseParams.addAll(responseParamsList);
+                loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + " new graphql endpoints in inventory", LogDb.RUNTIME);
             }
 
             if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
