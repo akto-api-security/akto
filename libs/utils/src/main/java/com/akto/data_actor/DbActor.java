@@ -518,20 +518,10 @@ public class DbActor extends DataActor {
         DbLayer.updateTestRunResultSummaryNoUpsert(testingRunResultSummaryId);
     }
 
-    public void updateTestingRun(String testingRunId) {
-        DbLayer.updateTestingRun(testingRunId);
-    }
-
     @Override
-    public void updateTestingRun(String testingRunId, TestingRun.State state, int scheduleTimestamp) {
-        DbLayer.updateTestingRun(testingRunId, state, scheduleTimestamp);
+    public void updateTestingRun(String testingRunId, int periodInSeconds, int scheduleTimestamp) {
+        DbLayer.updateTestingRun(testingRunId, periodInSeconds, scheduleTimestamp);
     }
-
-    @Override
-    public TestingRunResultSummary updateTestingRunResultSummaryWithStateAndTimestamp(String testingRunResultSummaryId, TestingRun.State state, int startTimestamp) {
-        return DbLayer.updateTestingRunResultSummaryWithStateAndTimestamp(testingRunResultSummaryId, state, startTimestamp);
-    }
-
 
     public void updateTestingRunAndMarkCompleted(String testingRunId, int scheduleTs) {
         DbLayer.updateTestingRunAndMarkCompleted(testingRunId, scheduleTs);
