@@ -13,7 +13,7 @@ COPY src/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY src/scanner_service.py src/warmup.py ./
+COPY src/scanner_service.py src/warmup.py src/intent_analyzer.py ./
 
 # Pre-download ONNX models - required for Cloudflare containers (no persistent volumes)
 # Note: Commented out due to torch/optimum version conflicts. Models will download on first request.

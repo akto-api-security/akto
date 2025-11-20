@@ -127,6 +127,11 @@ def get_scanner(scanner_type: str, scanner_name: str, config: Dict[str, Any]):
         elif scanner_name in onnx_scanners:
             config["use_onnx"] = True
         
+        # Filter scanner-specific parameters
+        # IntentAnalysis accepts use_zero_shot and use_sentiment, others don't
+        if scanner_name != "IntentAnalysis":
+            config = {k: v for k, v in config.items() if k not in ["use_zero_shot", "use_sentiment"]}
+        
         scanner = scanner_class(**config)
         scanner_cache[cache_key] = scanner
         
