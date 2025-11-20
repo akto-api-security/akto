@@ -18,7 +18,7 @@ public class MergingLogicTest {
         URLStatic url1 = new URLStatic("/api/en/products", URLMethods.Method.GET);
         URLStatic url2 = new URLStatic("/api/ja/products", URLMethods.Method.GET);
 
-        URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false);
+        URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false, true);
 
         assertNotNull("Should merge locale URLs", result);
         assertEquals("Should create LOCALE template", "/api/LOCALE/products", result.getTemplateString());
@@ -35,7 +35,7 @@ public class MergingLogicTest {
         URLStatic url1 = new URLStatic("/api/en-US/users", URLMethods.Method.POST);
         URLStatic url2 = new URLStatic("/api/ja-JP/users", URLMethods.Method.POST);
 
-        URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false);
+        URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false, true);
 
         assertNotNull("Should merge locale URLs with country codes", result);
         assertEquals("Should create LOCALE template", "/api/LOCALE/users", result.getTemplateString());
@@ -48,7 +48,7 @@ public class MergingLogicTest {
         URLStatic url1 = new URLStatic("/shop/en/items", URLMethods.Method.GET);
         URLStatic url2 = new URLStatic("/shop/pt-BR/items", URLMethods.Method.GET);
 
-        URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false);
+        URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false, true);
 
         assertNotNull("Should merge mixed locale formats", result);
         assertEquals("Should create LOCALE template", "/shop/LOCALE/items", result.getTemplateString());
@@ -61,7 +61,7 @@ public class MergingLogicTest {
         URLStatic url1 = new URLStatic("/api/en/products", URLMethods.Method.GET);
         URLStatic url2 = new URLStatic("/api/foo/products", URLMethods.Method.GET);
 
-        URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false);
+        URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false, true);
 
         // Should merge as STRING, not LOCALE (since one is invalid locale)
         if (result != null) {
@@ -76,7 +76,7 @@ public class MergingLogicTest {
         URLStatic url1 = new URLStatic("/api/123/items", URLMethods.Method.GET);
         URLStatic url2 = new URLStatic("/api/456/items", URLMethods.Method.GET);
 
-        URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false);
+        URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false, true);
 
         assertNotNull("Should merge integer URLs", result);
         assertEquals("Should create INTEGER template", "/api/INTEGER/items", result.getTemplateString());
@@ -89,7 +89,7 @@ public class MergingLogicTest {
         URLStatic url1 = new URLStatic("/api/en/products", URLMethods.Method.GET);
         URLStatic url2 = new URLStatic("/api/ja/products", URLMethods.Method.POST);
 
-        URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false);
+        URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false, true);
 
         assertNull("Should not merge different HTTP methods", result);
     }
@@ -100,7 +100,7 @@ public class MergingLogicTest {
         URLStatic url1 = new URLStatic("/api/en/products", URLMethods.Method.GET);
         URLStatic url2 = new URLStatic("/api/en/products/details", URLMethods.Method.GET);
 
-        URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false);
+        URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false, true);
 
         assertNull("Should not merge different URL lengths", result);
     }
@@ -111,7 +111,7 @@ public class MergingLogicTest {
         URLStatic url1 = new URLStatic("/en/api/products", URLMethods.Method.GET);
         URLStatic url2 = new URLStatic("/ja/api/products", URLMethods.Method.GET);
 
-        URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false);
+        URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false, true);
 
         assertNotNull("Should merge URLs with locale at start", result);
         // Check that LOCALE type is set at position 0
@@ -128,7 +128,7 @@ public class MergingLogicTest {
         URLStatic url1 = new URLStatic("/api/en/products", URLMethods.Method.GET);
         URLStatic url2 = new URLStatic("/api/ja/products", URLMethods.Method.GET);
 
-        URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false);
+        URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false, true);
 
         assertNotNull("Should merge valid locale URLs", result);
         assertEquals("Should have LOCALE type", SingleTypeInfo.SuperType.LOCALE, result.getTypes()[1]);
@@ -140,7 +140,7 @@ public class MergingLogicTest {
         URLStatic url1 = new URLStatic("/api/en/products", URLMethods.Method.GET);
         URLStatic url2 = new URLStatic("/api/foo/products", URLMethods.Method.GET);
 
-        URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false);
+        URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false, true);
 
         // Should merge as STRING, not LOCALE (since one is invalid locale)
         if (result != null) {
@@ -155,7 +155,7 @@ public class MergingLogicTest {
         URLStatic url1 = new URLStatic("/api/en-US/users", URLMethods.Method.POST);
         URLStatic url2 = new URLStatic("/api/pt-BR/users", URLMethods.Method.POST);
 
-        URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false);
+        URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false, true);
 
         assertNotNull("Should merge locale URLs with country codes", result);
         assertEquals("Should have LOCALE type", SingleTypeInfo.SuperType.LOCALE, result.getTypes()[1]);
@@ -217,7 +217,7 @@ public class MergingLogicTest {
         URLStatic url1 = new URLStatic("/api/en-us/products", URLMethods.Method.GET);
         URLStatic url2 = new URLStatic("/api/fr-FR/products", URLMethods.Method.GET);
 
-        URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false);
+        URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false, true);
 
         assertNotNull("Should merge different locale codes regardless of case", result);
         assertEquals("Should create LOCALE template", "/api/LOCALE/products", result.getTemplateString());
@@ -238,7 +238,7 @@ public class MergingLogicTest {
             URLStatic url1 = new URLStatic(pair[0], URLMethods.Method.GET);
             URLStatic url2 = new URLStatic(pair[1], URLMethods.Method.GET);
 
-            URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false);
+            URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false, true);
 
             assertNotNull("Should merge locale pair: " + pair[0] + " and " + pair[1], result);
             assertEquals("Should create LOCALE template", "/api/LOCALE/data", result.getTemplateString());
