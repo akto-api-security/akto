@@ -139,9 +139,24 @@ public class Main {
         if (schema.getProperties() == null) return parameters;
         for(String param:schema.getProperties().keySet()){
             Parameter parameter = new Parameter();
-            parameter.setName(param);
+            // Strip the _queryParam suffix if present to get clean parameter name
+            String cleanParamName = param;
+            if (param.endsWith("_queryParam")) {
+                cleanParamName = param.substring(0, param.length() - "_queryParam".length());
+            }
+            parameter.setName(cleanParamName);
             parameter.setIn(location.name().toLowerCase());
-            parameter.setSchema(schema.getProperties().get(param));
+            
+            Schema<?> paramSchema = schema.getProperties().get(param);
+            parameter.setSchema(paramSchema);
+            
+            // Set example on parameter if available in schema
+            if (paramSchema != null && paramSchema.getExample() != null) {
+                parameter.setExample(paramSchema.getExample());
+            }            
+            // Set required to false by default for query and header parameters
+            // Path parameters should be required, but they're handled separately in parameterizePath
+            parameter.setRequired(location == ParamLocation.PATH);
             parameters.add(parameter);
         }
         return parameters;
