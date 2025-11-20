@@ -755,7 +755,8 @@ public class Executor {
                 // conversations list will be the variable of wordlists, hence it will come in key after being resolved
                 // we need to use them in AgentClient so just add those in any request headers of raw-api
                 List<String> conversationsList = (List<String>) value;
-                return Operations.addHeader(rawApi, "x-agent-conversations", String.join(",", conversationsList));
+                rawApi.setConversationsList(conversationsList);
+                return Operations.addHeader(rawApi, Constants.AKTO_AGENT_CONVERSATIONS , "0");
                 
             case "attach_file":
                 if (isMcpRequest) {
