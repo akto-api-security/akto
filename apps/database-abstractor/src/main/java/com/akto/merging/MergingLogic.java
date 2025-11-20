@@ -242,6 +242,9 @@ public class MergingLogic {
             }
         }
 
+        // Check once at collection level whether STRING merging is allowed
+        boolean allowStringMerging = !ApiCollectionsDao.shouldSkipMerging(apiCollection);
+
         Bson filterQ = null;
         if (apiCollection != null && apiCollection.getHostName() == null) {
             filterQ = Filters.eq("apiCollectionId", apiCollectionId);
@@ -319,7 +322,7 @@ public class MergingLogic {
 
 
             for(int size: sizeToUrlToSti.keySet()) {
-                ApiMergerResult result = tryMergingWithKnownStrictURLs(sizeToUrlToSti.get(size), !mergeUrlsBasic, allowMergingOnVersions, apiCollectionId);
+                ApiMergerResult result = tryMergingWithKnownStrictURLs(sizeToUrlToSti.get(size), !mergeUrlsBasic, allowMergingOnVersions, allowStringMerging, apiCollectionId);
                 finalResult.templateToStaticURLs.putAll(result.templateToStaticURLs);
             }
 
@@ -350,7 +353,7 @@ public class MergingLogic {
         return sizeToURL;
     }
 
-    private static ApiMergerResult tryMergingWithKnownStrictURLs(Map<String, Set<String>> pendingRequests, boolean doBodyMatch, boolean allowMergingOnVersions, int apiCollectionId) {
+    private static ApiMergerResult tryMergingWithKnownStrictURLs(Map<String, Set<String>> pendingRequests, boolean doBodyMatch, boolean allowMergingOnVersions, boolean allowStringMerging, int apiCollectionId) {
         Map<URLTemplate, Set<String>> templateToStaticURLs = new HashMap<>();
 
         Iterator<Map.Entry<String, Set<String>>> iterator = pendingRequests.entrySet().iterator();
@@ -384,7 +387,7 @@ public class MergingLogic {
                 String aEndpoint = aUrl.split(" ")[1];
                 URLStatic aStatic = new URLStatic(aEndpoint, aMethod);
                 URLStatic newStatic = new URLStatic(newEndpoint, newMethod);
-                URLTemplate mergedTemplate = tryMergeUrls(aStatic, newStatic, allowMergingOnVersions, apiCollectionId);
+                URLTemplate mergedTemplate = tryMergeUrls(aStatic, newStatic, allowMergingOnVersions, allowStringMerging);
                 if (mergedTemplate == null) {
                     continue;
                 }
@@ -523,7 +526,7 @@ public class MergingLogic {
     }
 
 
-    public static URLTemplate tryMergeUrls(URLStatic dbUrl, URLStatic newUrl, boolean allowMergingOnVersions, int apiCollectionId) {
+    public static URLTemplate tryMergeUrls(URLStatic dbUrl, URLStatic newUrl, boolean allowMergingOnVersions, boolean allowStringMerging) {
         if (dbUrl.getMethod() != newUrl.getMethod()) {
             return null;
         }
@@ -533,10 +536,6 @@ public class MergingLogic {
         if (dbTokens.length != newTokens.length) {
             return null;
         }
-
-        // Check if STRING merging is allowed for this collection
-        ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
-        boolean allowStringMerging = !ApiCollectionsDao.shouldSkipMerging(apiCollection);
 
         Pattern pattern = patternToSubType.get(SingleTypeInfo.UUID);
 
