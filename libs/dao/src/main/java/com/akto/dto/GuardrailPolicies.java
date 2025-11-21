@@ -50,6 +50,9 @@ public class GuardrailPolicies {
 
     private LLMRule llmRule;
 
+    // Step 6.5: Base Prompt Rule - for checking intent of user input in agent base prompts with placeholders
+    private BasePromptRule basePromptRule;
+
     // Step 7: Server and application settings (old format - backward compatibility)
     private List<String> selectedMcpServers;
     private List<String> selectedAgentServers;
@@ -118,7 +121,7 @@ public class GuardrailPolicies {
                            int updatedTimestamp, String createdBy, String updatedBy, String selectedCollection,
                            String selectedModel, List<DeniedTopic> deniedTopics, List<PiiType> piiTypes,
                            List<String> regexPatterns, List<RegexPattern> regexPatternsV2, Map<String, Object> contentFiltering,
-                           LLMRule llmRule,
+                           LLMRule llmRule, BasePromptRule basePromptRule,
                            List<String> selectedMcpServers, List<String> selectedAgentServers,
                            List<SelectedServer> selectedMcpServersV2, List<SelectedServer> selectedAgentServersV2,
                            boolean applyOnResponse, boolean applyOnRequest, String url, double confidenceScore, boolean active) {
@@ -138,6 +141,7 @@ public class GuardrailPolicies {
         this.regexPatternsV2 = regexPatternsV2;
         this.contentFiltering = contentFiltering;
         this.llmRule = llmRule;
+        this.basePromptRule = basePromptRule;
         this.selectedMcpServers = selectedMcpServers;
         this.selectedAgentServers = selectedAgentServers;
         this.selectedMcpServersV2 = selectedMcpServersV2;
@@ -214,6 +218,23 @@ public class GuardrailPolicies {
         public LLMRule(boolean enabled, String userPrompt, double confidenceScore) {
             this.enabled = enabled;
             this.userPrompt = userPrompt;
+            this.confidenceScore = confidenceScore;
+        }
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class BasePromptRule {
+        private boolean enabled;
+        private String basePrompt; // Base prompt with placeholders like {var} or {}
+        private boolean autoDetect; // Whether to auto-detect base_prompt from traffic
+        private double confidenceScore;
+
+        public BasePromptRule(boolean enabled, String basePrompt, boolean autoDetect, double confidenceScore) {
+            this.enabled = enabled;
+            this.basePrompt = basePrompt;
+            this.autoDetect = autoDetect;
             this.confidenceScore = confidenceScore;
         }
     }

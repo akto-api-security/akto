@@ -430,6 +430,8 @@ function GuardrailPolicies() {
                 contentFiltering: guardrailData.contentFilters || {},
                 // Add LLM policy if present
                 ...(guardrailData.llmRule ? { llmRule: guardrailData.llmRule } : {}),
+                // Add Base Prompt Rule if present
+                ...(guardrailData.basePromptRule ? { basePromptRule: guardrailData.basePromptRule } : {}),
                 applyOnResponse: guardrailData.applyOnResponse || false,
                 applyOnRequest: guardrailData.applyOnRequest || false,
                 url: guardrailData.url || '',

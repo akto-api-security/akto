@@ -76,6 +76,12 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [enableLlmRule, setEnableLlmRule] = useState(false);
     const [llmConfidenceScore, setLlmConfidenceScore] = useState(0.5);
 
+    // Step 6.5: Base Prompt Rule
+    const [enableBasePromptRule, setEnableBasePromptRule] = useState(false);
+    const [basePrompt, setBasePrompt] = useState("");
+    const [basePromptAutoDetect, setBasePromptAutoDetect] = useState(true);
+    const [basePromptConfidenceScore, setBasePromptConfidenceScore] = useState(0.5);
+
     // Step 7: URL and Confidence Score
     const [url, setUrl] = useState("");
     const [confidenceScore, setConfidenceScore] = useState(25); // Start with 25 (first checkpoint)
@@ -162,12 +168,18 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         },
         {
             number: 7,
+            title: "Base Prompt Rule",
+            optional: true,
+            summary: enableBasePromptRule ? `Enabled${basePromptAutoDetect ? ' (Auto-detect)' : ''}${basePrompt ? ` - ${basePrompt.substring(0, 30)}${basePrompt.length > 30 ? '...' : ''}` : ''}, Confidence: ${basePromptConfidenceScore.toFixed(2)}` : null
+        },
+        {
+            number: 8,
             title: "URL and Confidence Score",
             optional: true,
             summary: url ? `URL: ${url.substring(0, 30)}${url.length > 30 ? '...' : ''}, Confidence: ${confidenceScore}` : null
         },
         {
-            number: 8,
+            number: 9,
             title: "Server and application settings",
             optional: false,
             summary: (selectedMcpServers.length > 0 || selectedAgentServers.length > 0)
@@ -289,6 +301,10 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setLlmRule("");
         setEnableLlmRule(false);
         setLlmConfidenceScore(0.5);
+        setEnableBasePromptRule(false);
+        setBasePrompt("");
+        setBasePromptAutoDetect(true);
+        setBasePromptConfidenceScore(0.5);
         setUrl("");
         setConfidenceScore(25);
         setUrlError("");
@@ -359,6 +375,19 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             setLlmConfidenceScore(0.5);
         }
 
+        // Base Prompt Rule
+        if (policy.basePromptRule) {
+            setEnableBasePromptRule(policy.basePromptRule.enabled || false);
+            setBasePrompt(policy.basePromptRule.basePrompt || "");
+            setBasePromptAutoDetect(policy.basePromptRule.autoDetect !== undefined ? policy.basePromptRule.autoDetect : true);
+            setBasePromptConfidenceScore(policy.basePromptRule.confidenceScore !== undefined ? policy.basePromptRule.confidenceScore : 0.5);
+        } else {
+            setEnableBasePromptRule(false);
+            setBasePrompt("");
+            setBasePromptAutoDetect(true);
+            setBasePromptConfidenceScore(0.5);
+        }
+
         // URL and Confidence Score
         setUrl(policy.url || "");
         // Map existing confidence score to nearest checkpoint
@@ -406,7 +435,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     };
 
     const handleSkipToServers = () => {
-        setCurrentStep(8);
+        setCurrentStep(9);
     };
 
     const handleSave = async () => {
@@ -463,6 +492,14 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         enabled: true,
                         userPrompt: llmRule.trim(),
                         confidenceScore: llmConfidenceScore
+                    }
+                } : {}),
+                ...(enableBasePromptRule ? {
+                    basePromptRule: {
+                        enabled: true,
+                        basePrompt: basePromptAutoDetect ? null : basePrompt.trim(), // Only save manual prompt, auto-detect will fetch on read
+                        autoDetect: basePromptAutoDetect,
+                        confidenceScore: basePromptConfidenceScore
                     }
                 } : {}),
                 url: url || null,
@@ -960,6 +997,62 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const renderStep7 = () => (
         <LegacyCard sectioned>
             <VerticalStack gap="4">
+                <Text variant="headingMd">Base Prompt Rule</Text>
+                <Text variant="bodyMd" tone="subdued">
+                    Configure a base prompt rule to check the intent of user input in agent prompts with placeholders like {`{var}`} or {`{}`}.
+                </Text>
+
+                <Checkbox
+                    label="Enable base prompt rule"
+                    checked={enableBasePromptRule}
+                    onChange={setEnableBasePromptRule}
+                    helpText="When enabled, the guardrail will analyze user inputs that fill placeholders in the base prompt."
+                />
+
+                {enableBasePromptRule && (
+                    <>
+                        <Checkbox
+                            label="Auto-detect base prompt from traffic"
+                            checked={basePromptAutoDetect}
+                            onChange={setBasePromptAutoDetect}
+                            helpText="Automatically detect the base prompt pattern from agent traffic. If disabled, you must provide the base prompt manually."
+                        />
+
+                        {!basePromptAutoDetect && (
+                            <TextField
+                                label="Base Prompt Template"
+                                value={basePrompt}
+                                onChange={setBasePrompt}
+                                multiline={5}
+                                placeholder="You are a helpful assistant. Answer the following question: {}"
+                                helpText="Provide the base prompt template with placeholders using {} or {var_name} syntax."
+                            />
+                        )}
+
+                        <Box>
+                            <Text variant="bodyMd" fontWeight="medium">Confidence Score: {basePromptConfidenceScore.toFixed(2)}</Text>
+                            <Box paddingBlockStart="2">
+                                <RangeSlider
+                                    label=""
+                                    value={basePromptConfidenceScore}
+                                    min={0}
+                                    max={1}
+                                    step={0.01}
+                                    output
+                                    onChange={setBasePromptConfidenceScore}
+                                    helpText="Set the confidence threshold (0-1). Higher values require more confidence to block content."
+                                />
+                            </Box>
+                        </Box>
+                    </>
+                )}
+            </VerticalStack>
+        </LegacyCard>
+    );
+
+    const renderStep8 = () => (
+        <LegacyCard sectioned>
+            <VerticalStack gap="4">
                 <Text variant="headingMd">URL and Confidence Score</Text>
                 <Text variant="bodyMd" tone="subdued">
                     Configure the URL and confidence score for this guardrail policy.
@@ -1001,7 +1094,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         </LegacyCard>
     );
 
-    const renderStep8 = () => (
+    const renderStep9 = () => (
         <LegacyCard sectioned>
             <VerticalStack gap="4">
                 <Text variant="headingMd">Server and application settings</Text>
@@ -1069,6 +1162,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             case 6: return renderStep6();
             case 7: return renderStep7();
             case 8: return renderStep8();
+            case 9: return renderStep9();
             default: return renderStep1();
         }
     };
@@ -1083,7 +1177,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             });
         }
 
-        if (currentStep > 1 && currentStep < 8) {
+        if (currentStep > 1 && currentStep < 9) {
             actions.push({
                 content: "Skip to Server settings",
                 onAction: handleSkipToServers
@@ -1094,14 +1188,14 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     };
 
     const getPrimaryAction = () => {
-        if (currentStep === 8) {
+        if (currentStep === 9) {
             return {
                 content: isEditMode ? "Update Guardrail" : "Create Guardrail",
                 onAction: handleSave,
                 loading: loading,
                 disabled: !name.trim() || !blockedMessage.trim() || urlError
             };
-        } else if (currentStep < 8) {
+        } else if (currentStep < 9) {
             return {
                 content: "Next",
                 onAction: handleNext,
