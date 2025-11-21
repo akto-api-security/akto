@@ -1977,14 +1977,64 @@ public class DbLayer {
 
     public static List<GuardrailPolicies> fetchGuardrailPolicies(Integer updatedAfter) {
         try {
+            List<GuardrailPolicies> policies;
             if (updatedAfter != null && updatedAfter > 0) {
-                return GuardrailPoliciesDao.instance.findAll(Filters.gt("updatedTimestamp", updatedAfter));
+                policies = GuardrailPoliciesDao.instance.findAll(Filters.gt("updatedTimestamp", updatedAfter));
             } else {
-                return GuardrailPoliciesDao.instance.findAll();
+                policies = GuardrailPoliciesDao.instance.findAll();
             }
+            
+            // Populate base prompt from detected base prompt if auto-detect is enabled
+            for (GuardrailPolicies policy : policies) {
+                populateBasePromptIfNeeded(policy);
+            }
+            
+            return policies;
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchGuardrailPolicies: " + e.getMessage());
             return new ArrayList<>();
+        }
+    }
+
+    private static void populateBasePromptIfNeeded(GuardrailPolicies policy) {
+        try {
+            if (policy == null || policy.getBasePromptRule() == null) {
+                return;
+            }
+            
+            GuardrailPolicies.BasePromptRule basePromptRule = policy.getBasePromptRule();
+            
+            // Only populate if:
+            // 1. Rule is enabled
+            // 2. Auto-detect is true
+            // 3. Base prompt is not already set
+            if (!basePromptRule.isEnabled() || !basePromptRule.isAutoDetect()) {
+                return;
+            }
+            
+            if (basePromptRule.getBasePrompt() != null && !basePromptRule.getBasePrompt().isEmpty()) {
+                return; // Base prompt already set
+            }
+            
+            // Fetch from selected collection's detectedBasePrompt
+            String selectedCollectionId = policy.getSelectedCollection();
+            if (selectedCollectionId == null || selectedCollectionId.isEmpty()) {
+                return;
+            }
+            
+            try {
+                int collectionId = Integer.parseInt(selectedCollectionId);
+                ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(collectionId);
+                
+                if (apiCollection != null && apiCollection.getDetectedBasePrompt() != null 
+                    && !apiCollection.getDetectedBasePrompt().isEmpty()) {
+                    basePromptRule.setBasePrompt(apiCollection.getDetectedBasePrompt());
+                }
+            } catch (NumberFormatException e) {
+                loggerMaker.errorAndAddToDb("Invalid collection ID format: " + selectedCollectionId, LoggerMaker.LogDb.DASHBOARD);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in populateBasePromptIfNeeded: " + e.getMessage());
         }
     }
 

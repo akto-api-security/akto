@@ -50,6 +50,9 @@ public class GuardrailPolicies {
 
     private LLMRule llmRule;
 
+    // Step 7: Base Prompt Rule
+    private BasePromptRule basePromptRule;
+
     // Step 7: Server and application settings (old format - backward compatibility)
     private List<String> selectedMcpServers;
     private List<String> selectedAgentServers;
@@ -214,6 +217,23 @@ public class GuardrailPolicies {
         public LLMRule(boolean enabled, String userPrompt, double confidenceScore) {
             this.enabled = enabled;
             this.userPrompt = userPrompt;
+            this.confidenceScore = confidenceScore;
+        }
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class BasePromptRule {
+        private boolean enabled;
+        private String basePrompt; // base prompt template with placeholders (like {var} or {})
+        private boolean autoDetect; // whether to auto-detect from traffic
+        private double confidenceScore;
+
+        public BasePromptRule(boolean enabled, String basePrompt, boolean autoDetect, double confidenceScore) {
+            this.enabled = enabled;
+            this.basePrompt = basePrompt;
+            this.autoDetect = autoDetect;
             this.confidenceScore = confidenceScore;
         }
     }
