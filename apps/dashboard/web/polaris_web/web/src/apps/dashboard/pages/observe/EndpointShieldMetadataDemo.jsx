@@ -2,7 +2,7 @@ import { Text, HorizontalStack, VerticalStack, Box, Badge, Button, Icon, Tooltip
 import { useEffect, useReducer, useState, useRef, useMemo, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from 'framer-motion'
-import { CaretDownMinor, CodeMinor, DynamicSourceMinor, EmailMajor, ClockMinor, CalendarMinor } from '@shopify/polaris-icons'
+import { CaretDownMinor, CodeMinor, DynamicSourceMinor, ClockMinor, CalendarMinor } from '@shopify/polaris-icons'
 import InlineEditableText from "../../components/shared/InlineEditableText"
 import values from "@/util/values";
 import {produce} from "immer"
@@ -32,7 +32,6 @@ const headings = [
     createHeading("Agent ID", "agentId"),
     createHeading("Device ID", "deviceId"),
     createHeading("Username", "username"),
-    createHeading("Email", "email"),
     createHeading("Last Heartbeat", "lastHeartbeatComp", "lastHeartbeat"),
     createHeading("Last Deployed", "lastDeployedComp", "lastDeployed")
 ]
@@ -51,9 +50,8 @@ const sortOptions = [
     ...createSortOptions('Agent ID', 'agentId', 1),
     ...createSortOptions('Device ID', 'deviceId', 2),
     ...createSortOptions('Username', 'username', 3),
-    ...createSortOptions('Email', 'email', 4),
-    ...createSortOptions('Last Heartbeat', 'lastHeartbeat', 5, true),
-    ...createSortOptions('Last Deployed', 'lastDeployed', 6, true)
+    ...createSortOptions('Last Heartbeat', 'lastHeartbeat', 4, true),
+    ...createSortOptions('Last Deployed', 'lastDeployed', 5, true)
 ];
 
 // Helper function to create filter configuration
@@ -63,11 +61,6 @@ const createFilter = (key, label) => ({
     title: label,
     choices: []
 });
-
-const filters = [
-    createFilter('username', 'Username'),
-    createFilter('email', 'Email')
-]
 
 const resourceName = {
     singular: 'agent',
@@ -115,7 +108,6 @@ const MetadataField = ({ icon, tooltip, value }) => (
 const getMetadataFields = (agent) => [
     { icon: CodeMinor, tooltip: "Agent ID", value: agent.agentId },
     { icon: DynamicSourceMinor, tooltip: "Device ID", value: agent.deviceId },
-    { icon: EmailMajor, tooltip: "Email", value: agent.email },
     { icon: ClockMinor, tooltip: "Last Heartbeat", value: func.prettifyEpoch(agent.lastHeartbeat) },
     { icon: CalendarMinor, tooltip: "Last Deployed", value: func.prettifyEpoch(agent.lastDeployed) }
 ];
@@ -135,6 +127,10 @@ function EndpointShieldMetadataDemo() {
     const [description, setDescription] = useState("");
     const [isEditingDescription, setIsEditingDescription] = useState(false);
     const [editableDescription, setEditableDescription] = useState("");
+    const [filters, setFilters] = useState([
+        createFilter('username', 'Username'),
+        createFilter('deviceId', 'Device ID')
+    ]);
     const copyRef = useRef(null);
 
     const getTimeEpoch = (key) => {
@@ -369,8 +365,8 @@ function EndpointShieldMetadataDemo() {
                     return false;
                 }
 
-                // Email filter
-                if (filters.email && filters.email.length > 0 && !filters.email.includes(agent.email)) {
+                // Device ID filter
+                if (filters.deviceId && filters.deviceId.length > 0 && !filters.deviceId.includes(agent.deviceId)) {
                     return false;
                 }
 
@@ -380,8 +376,7 @@ function EndpointShieldMetadataDemo() {
                     const matchesSearch =
                         agent.agentId.toLowerCase().includes(searchLower) ||
                         agent.deviceId.toLowerCase().includes(searchLower) ||
-                        agent.username.toLowerCase().includes(searchLower) ||
-                        agent.email.toLowerCase().includes(searchLower);
+                        agent.username.toLowerCase().includes(searchLower);
                     if (!matchesSearch) return false;
                 }
 
@@ -394,7 +389,12 @@ function EndpointShieldMetadataDemo() {
                     let aVal = a[sortKey];
                     let bVal = b[sortKey];
 
-                    if (typeof aVal === 'string') {
+                    // Handle null/undefined values - push them to the end
+                    if (aVal == null && bVal == null) return 0;
+                    if (aVal == null) return 1;
+                    if (bVal == null) return -1;
+
+                    if (typeof aVal === 'string' && typeof bVal === 'string') {
                         aVal = aVal.toLowerCase();
                         bVal = bVal.toLowerCase();
                     }
@@ -426,10 +426,18 @@ function EndpointShieldMetadataDemo() {
         // Populate filter choices with unique values from dummy data
         const dummyData = generateDummyData();
         const uniqueUsernames = [...new Set(dummyData.map(a => a.username))];
-        const uniqueEmails = [...new Set(dummyData.map(a => a.email))];
+        const uniqueDeviceIds = [...new Set(dummyData.map(a => a.deviceId))];
 
-        filters[0].choices = uniqueUsernames.map(username => ({ label: username, value: username }));
-        filters[1].choices = uniqueEmails.map(email => ({ label: email, value: email }));
+        setFilters([
+            {
+                ...createFilter('username', 'Username'),
+                choices: uniqueUsernames.map(username => ({ label: username, value: username }))
+            },
+            {
+                ...createFilter('deviceId', 'Device ID'),
+                choices: uniqueDeviceIds.map(deviceId => ({ label: deviceId, value: deviceId }))
+            }
+        ]);
     }, [])
 
     const primaryActions = (
@@ -458,7 +466,7 @@ function EndpointShieldMetadataDemo() {
                 primaryAction={primaryActions}
                 components = {[
                     <GithubServerTable
-                        key={startTimestamp + endTimestamp}
+                        key={startTimestamp + endTimestamp + filters[0]?.choices?.length}
                         headers={headings}
                         resourceName={resourceName}
                         appliedFilters={[]}
