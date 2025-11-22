@@ -244,32 +244,35 @@ function GuardrailPolicies() {
             });
         }
 
-        // Word filters and regex patterns
+        // Word filters
         const wordFilters = [];
         if (policy.wordFilters?.profanity) wordFilters.push("Profanity");
         if (policy.wordFilters?.custom?.length > 0) wordFilters.push(`${policy.wordFilters.custom.length} Custom Words`);
-        
-        // Use effective regex patterns - prefer V2 format with behavior, fallback to old format
-        const effectiveRegexPatterns = getEffectiveRegexPatterns(policy);
-        if (effectiveRegexPatterns?.length > 0) {
-            const blockCount = effectiveRegexPatterns.filter(r => r.behavior === 'block').length;
-            const maskCount = effectiveRegexPatterns.filter(r => r.behavior === 'mask').length;
-            const regexSummary = [];
-            if (blockCount > 0) regexSummary.push(`${blockCount} Block`);
-            if (maskCount > 0) regexSummary.push(`${maskCount} Mask`);
-            wordFilters.push(`Regex: ${regexSummary.join(', ')}`);
-        }
         if (wordFilters.length > 0) {
             details.push({ label: "Word Filters", value: wordFilters.join(", ") });
         }
 
-        // PII types details
+        // Sensitive information filters (PII types and regex patterns)
+        const sensitiveInfoFilters = [];
+
+        // PII types
         if (policy.piiTypes?.length > 0) {
             const piiNames = policy.piiTypes.map(pii => pii.type).slice(0, 2);
-            const moreCount = policy.piiTypes.length > 2 ? ` +${policy.piiTypes.length - 2} more` : '';
-            details.push({ 
-                label: "PII Detection", 
-                value: `${piiNames.join(", ")}${moreCount}` 
+            const moreCount = policy.piiTypes.length > 2 ? ` +${policy.piiTypes.length - 2} more PIIs` : '';
+            sensitiveInfoFilters.push(`${piiNames.join(", ")}${moreCount}`);
+        }
+
+        // Regex patterns
+        const effectiveRegexPatterns = getEffectiveRegexPatterns(policy);
+        if (effectiveRegexPatterns?.length > 0) {
+            const patternCount = effectiveRegexPatterns.length;
+            sensitiveInfoFilters.push(`${patternCount} regex pattern${patternCount > 1 ? 's' : ''}`);
+        }
+
+        if (sensitiveInfoFilters.length > 0) {
+            details.push({
+                label: "Sensitive Data Filters",
+                value: sensitiveInfoFilters.join(", ")
             });
         }
 

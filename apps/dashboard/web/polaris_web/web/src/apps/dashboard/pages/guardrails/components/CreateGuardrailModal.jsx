@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
     Modal,
     FormLayout,
@@ -10,7 +10,6 @@ import {
     HorizontalStack,
     VerticalStack,
     Box,
-    Badge,
     Icon,
     Scrollable,
     RangeSlider,
@@ -18,7 +17,8 @@ import {
 } from "@shopify/polaris";
 import {
     ChecklistMajor,
-    DeleteMajor
+    DeleteMajor,
+    AlertMinor
 } from "@shopify/polaris-icons";
 import AddDeniedTopicModal from "./AddDeniedTopicModal";
 import SensitiveInformationFilters from "./SensitiveInformationFilters";
@@ -62,12 +62,12 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [regexPatterns, setRegexPatterns] = useState([]);
     const [newRegexPattern, setNewRegexPattern] = useState("");
 
-    // Step 6: LLM-based Rule
+    // Step 6: LLM prompt based rule
     const [llmRule, setLlmRule] = useState("");
     const [enableLlmRule, setEnableLlmRule] = useState(false);
     const [llmConfidenceScore, setLlmConfidenceScore] = useState(0.5);
 
-    // Step 7: URL and Confidence Score
+    // Step 7: External model based evaluation
     const [url, setUrl] = useState("");
     const [confidenceScore, setConfidenceScore] = useState(25); // Start with 25 (first checkpoint)
 
@@ -108,57 +108,78 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [showAddTopicModal, setShowAddTopicModal] = useState(false);
     const [editingTopic, setEditingTopic] = useState(null);
 
+    const getStepValidation = (stepNumber) => {
+        switch (stepNumber) {
+            case 1:
+                const isStep1Valid = name.trim() && blockedMessage.trim();
+                return {
+                    isValid: isStep1Valid,
+                    errorMessage: !isStep1Valid ? "Required fields missing" : null
+                };
+            case 7:
+                const hasUrl = url && url.trim().length > 0;
+                const isStep7Valid = !(hasUrl && urlError);
+                return {
+                    isValid: isStep7Valid,
+                    errorMessage: !isStep7Valid ? urlError : null
+                };
+            default:
+                return { isValid: true, errorMessage: null };
+        }
+    };
+
     const getStepsWithSummary = () => [
         {
             number: 1,
             title: "Provide guardrail details",
-            optional: false,
-            summary: name ? `${name}${description ? ` - ${description.substring(0, 30)}${description.length > 30 ? '...' : ''}` : ''}` : null
+            summary: name ? `${name}${description ? ` - ${description.substring(0, 30)}${description.length > 30 ? '...' : ''}` : ''}` : null,
+            ...getStepValidation(1)
         },
         {
             number: 2,
             title: "Configure content filters",
-            optional: true,
             summary: (enableHarmfulCategories || enablePromptAttacks)
                 ? `${enableHarmfulCategories ? 'Harmful categories' : ''}${enableHarmfulCategories && enablePromptAttacks ? ', ' : ''}${enablePromptAttacks ? 'Prompt attacks' : ''}`
-                : null
+                : null,
+            ...getStepValidation(2)
         },
         {
             number: 3,
             title: "Add denied topics",
-            optional: true,
-            summary: deniedTopics.length > 0 ? `${deniedTopics.length} topic${deniedTopics.length !== 1 ? 's' : ''}` : null
+            summary: deniedTopics.length > 0 ? `${deniedTopics.length} topic${deniedTopics.length !== 1 ? 's' : ''}` : null,
+            ...getStepValidation(3)
         },
         {
             number: 4,
             title: "Add word filters",
-            optional: true,
-            summary: (filterProfanity || customWords.length > 0 || regexPatterns.length > 0)
-                ? `${filterProfanity ? 'Profanity' : ''}${filterProfanity && customWords.length > 0 ? ', ' : ''}${customWords.length > 0 ? `${customWords.length} custom word${customWords.length !== 1 ? 's' : ''}` : ''}${(filterProfanity || customWords.length > 0) && regexPatterns.length > 0 ? ', ' : ''}${regexPatterns.length > 0 ? `${regexPatterns.length} regex pattern${regexPatterns.length !== 1 ? 's' : ''}` : ''}`
-                : null
+            summary: (filterProfanity || customWords.length > 0)
+                ? `${filterProfanity ? 'Profanity' : ''}${filterProfanity && customWords.length > 0 ? ', ' : ''}${customWords.length > 0 ? `${customWords.length} custom word${customWords.length !== 1 ? 's' : ''}` : ''}`
+                : null,
+            ...getStepValidation(4)
         },
         {
             number: 5,
             title: "Add sensitive information filters",
-            optional: true,
-            summary: piiTypes.length > 0 ? `${piiTypes.length} PII type${piiTypes.length !== 1 ? 's' : ''}` : null
+            summary: (piiTypes.length > 0 || regexPatterns.length > 0)
+                ? `${piiTypes.length > 0 ? `${piiTypes.length} PII type${piiTypes.length !== 1 ? 's' : ''}` : ''}${piiTypes.length > 0 && regexPatterns.length > 0 ? ', ' : ''}${regexPatterns.length > 0 ? `${regexPatterns.length} regex pattern${regexPatterns.length !== 1 ? 's' : ''}` : ''}`
+                : null,
+            ...getStepValidation(5)
         },
         {
             number: 6,
-            title: "LLM-based Rule",
-            optional: true,
-            summary: enableLlmRule ? `Enabled${llmRule ? ` - ${llmRule.substring(0, 30)}${llmRule.length > 30 ? '...,' : ','}` : ','} Confidence: ${llmConfidenceScore.toFixed(2)}` : null
+            title: "LLM prompt based rule",
+            summary: enableLlmRule ? `Enabled${llmRule ? ` - ${llmRule.substring(0, 30)}${llmRule.length > 30 ? '...,' : ','}` : ','} Confidence: ${llmConfidenceScore.toFixed(2)}` : null,
+            ...getStepValidation(6)
         },
         {
             number: 7,
-            title: "URL and Confidence Score",
-            optional: true,
-            summary: url ? `URL: ${url.substring(0, 30)}${url.length > 30 ? '...' : ''}, Confidence: ${confidenceScore}` : null
+            title: "External model based evaluation",
+            summary: url ? `URL: ${url.substring(0, 30)}${url.length > 30 ? '...' : ''}, Confidence: ${confidenceScore}` : null,
+            ...getStepValidation(7)
         },
         {
             number: 8,
             title: "Server and application settings",
-            optional: false,
             summary: (selectedMcpServers.length > 0 || selectedAgentServers.length > 0)
                 ? (() => {
                     const serverSummary = [];
@@ -186,7 +207,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         ` - ${applyOnRequest ? 'Req' : ''}${applyOnRequest && applyOnResponse ? '/' : ''}${applyOnResponse ? 'Res' : ''}` : '';
                     return `${serverSummary.join(", ")}${appSettings}`;
                 })()
-                : null
+                : null,
+            ...getStepValidation(8)
         }
     ];
 
@@ -348,7 +370,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             setLlmConfidenceScore(0.5);
         }
 
-        // URL and Confidence Score
+        // External model based evaluation
         setUrl(policy.url || "");
         // Map existing confidence score to nearest checkpoint
         const existingScore = policy.confidenceScore || policy.riskScore || 25;
@@ -392,10 +414,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         if (currentStep > 1) {
             setCurrentStep(currentStep - 1);
         }
-    };
-
-    const handleSkipToServers = () => {
-        setCurrentStep(8);
     };
 
     const handleSave = async () => {
@@ -520,102 +538,175 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setShowAddTopicModal(false);
     };
 
+    const stepRefs = useRef({});
+
+    // Auto-scroll to current step when it changes
+    useEffect(() => {
+        if (currentStep && stepRefs.current[currentStep]) {
+            stepRefs.current[currentStep].scrollIntoView({
+                behavior: 'smooth',
+                block: 'nearest'
+            });
+        }
+    }, [currentStep]);
+
+    const handleStepClick = (stepNumber) => {
+        // Toggle collapse if clicking on already open step
+        if (stepNumber === currentStep) {
+            setCurrentStep(null);
+        } else {
+            setCurrentStep(stepNumber);
+        }
+    };
+
     const renderStepIndicator = () => (
-        <Box paddingBlockEnd="4">
-            <VerticalStack gap="2">
-                {steps.map((step) => (
-                    <VerticalStack key={step.number} gap="1">
-                        <HorizontalStack gap="2" blockAlign="center">
-                            <Box style={{
-                                width: "24px",
-                                height: "24px",
-                                borderRadius: "50%",
-                                backgroundColor: step.number === currentStep ? "#0070f3" :
-                                                step.number < currentStep ? "#008060" : "#e1e3e5",
-                                color: step.number <= currentStep ? "white" : "#6d7175",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                fontSize: "12px",
-                                fontWeight: "bold"
-                            }}>
-                                {step.number < currentStep ? <Icon source={ChecklistMajor} /> : step.number}
-                            </Box>
-                            <Text
-                                variant="bodyMd"
-                                color={step.number === currentStep ? "critical" : "subdued"}
-                                fontWeight={step.number === currentStep ? "bold" : "regular"}
-                            >
-                                {step.title}
-                            </Text>
-                            {step.optional && (
-                                <Badge size="small" tone="info">optional</Badge>
-                            )}
-                        </HorizontalStack>
-                        {step.summary && (
-                            <Box paddingInlineStart="6">
-                                <Text variant="bodySm" color="subdued" fontWeight="medium">
-                                    {step.summary}
-                                </Text>
-                            </Box>
-                        )}
-                    </VerticalStack>
-                ))}
-            </VerticalStack>
-        </Box>
+        <VerticalStack gap="2">
+            {steps.map((step) => (
+                <Box
+                    key={step.number}
+                    ref={(el) => stepRefs.current[step.number] = el}
+                >
+                    <LegacyCard sectioned>
+                        <Box
+                            style={{
+                                backgroundColor: step.number === currentStep ? "#f6f6f7" : "transparent",
+                                margin: "-16px",
+                                padding: "16px",
+                                borderRadius: "8px"
+                            }}
+                        >
+                            <VerticalStack gap="3">
+                                <Box
+                                    style={{ cursor: "pointer" }}
+                                    onClick={() => handleStepClick(step.number)}
+                                >
+                                    <HorizontalStack gap="3" blockAlign="center">
+                                        <Box style={{
+                                            width: "24px",
+                                            height: "24px",
+                                            borderRadius: "50%",
+                                            backgroundColor: step.number === currentStep ? "#0070f3" :
+                                                            (!step.isValid && step.number < currentStep) ? "#d72c0d" :
+                                                            step.number < currentStep ? "#008060" : "#e1e3e5",
+                                            color: step.number <= currentStep || !step.isValid ? "white" : "#6d7175",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            fontSize: "12px",
+                                            fontWeight: "bold",
+                                            flexShrink: 0
+                                        }}>
+                                            {(!step.isValid && step.number < currentStep) ? <Icon source={AlertMinor} /> :
+                                             step.number < currentStep ? <Icon source={ChecklistMajor} /> : step.number}
+                                        </Box>
+                                        <Box style={{ flexGrow: 1 }}>
+                                            <VerticalStack gap="1">
+                                                <HorizontalStack gap="2" blockAlign="center">
+                                                    <Text
+                                                        variant="bodyMd"
+                                                        color={step.number === currentStep ? "success" : "subdued"}
+                                                        fontWeight={step.number === currentStep ? "bold" : "regular"}
+                                                    >
+                                                        {step.title}
+                                                    </Text>
+                                                    {!step.isValid && step.number !== currentStep && (
+                                                        <Icon source={AlertMinor} color="critical" />
+                                                    )}
+                                                </HorizontalStack>
+                                                {step.number !== currentStep && (
+                                                    <>
+                                                        {step.summary && (
+                                                            <Text variant="bodySm" color="subdued" fontWeight="medium">
+                                                                {step.summary}
+                                                            </Text>
+                                                        )}
+                                                        {!step.isValid && step.errorMessage && (
+                                                            <Text variant="bodySm" color="critical" fontWeight="medium">
+                                                                {step.errorMessage}
+                                                            </Text>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </VerticalStack>
+                                        </Box>
+                                    </HorizontalStack>
+                                </Box>
+
+                                {step.number === currentStep && (
+                                    <Box paddingBlockStart="2">
+                                        {renderStepContent(step.number)}
+                                    </Box>
+                                )}
+                            </VerticalStack>
+                        </Box>
+                    </LegacyCard>
+                </Box>
+            ))}
+        </VerticalStack>
     );
 
-    const renderStep1 = () => (
-        <LegacyCard sectioned>
-            <VerticalStack gap="4">
-                <Text variant="headingMd">Guardrail details</Text>
-                <FormLayout>
-                    <TextField
-                        label="Name"
-                        value={name}
-                        onChange={setName}
-                        placeholder="chatbot-guardrail"
-                        helpText="Valid characters are a-z, A-Z, 0-9, _ (underscore) and - (hyphen). The name can have up to 50 characters."
-                        requiredIndicator
-                    />
-                    <TextField
-                        label="Description"
-                        value={description}
-                        onChange={setDescription}
-                        multiline={3}
-                        placeholder="This guardrail blocks toxic content, assistance related to - investment, insurance, medical and programming."
-                        helpText="The description can have up to 200 characters."
-                    />
-                    <TextField
-                        label="Messaging for blocked prompts"
-                        value={blockedMessage}
-                        onChange={setBlockedMessage}
-                        multiline={3}
-                        placeholder="Sorry, the model cannot answer this question. This has been blocked by chatbot-guardrail."
-                        helpText="Enter a message to display if your guardrail blocks the user prompt."
-                        requiredIndicator
-                    />
-                    <Checkbox
-                        label="Apply the same blocked message for responses"
-                        checked={applyToResponses}
-                        onChange={setApplyToResponses}
-                    />
-                </FormLayout>
-            </VerticalStack>
-        </LegacyCard>
+    const renderStepContent = (stepNumber) => {
+        switch (stepNumber) {
+            case 1: return renderStep1Content();
+            case 2: return renderStep2Content();
+            case 3: return renderStep3Content();
+            case 4: return renderStep4Content();
+            case 5: return renderStep5Content();
+            case 6: return renderStep6Content();
+            case 7: return renderStep7Content();
+            case 8: return renderStep8Content();
+            default: return null;
+        }
+    };
+
+    const renderStep1Content = () => (
+        <VerticalStack gap="4">
+            <Text variant="headingMd">Guardrail details</Text>
+            <FormLayout>
+                <TextField
+                    label="Name"
+                    value={name}
+                    onChange={setName}
+                    placeholder="chatbot-guardrail"
+                    helpText="Valid characters are a-z, A-Z, 0-9, _ (underscore) and - (hyphen). The name can have up to 50 characters."
+                    requiredIndicator
+                />
+                <TextField
+                    label="Description"
+                    value={description}
+                    onChange={setDescription}
+                    multiline={3}
+                    placeholder="This guardrail blocks toxic content, assistance related to - investment, insurance, medical and programming."
+                    helpText="The description can have up to 200 characters."
+                />
+                <TextField
+                    label="Messaging for blocked prompts"
+                    value={blockedMessage}
+                    onChange={setBlockedMessage}
+                    multiline={3}
+                    placeholder="Sorry, the model cannot answer this question. This has been blocked by chatbot-guardrail."
+                    helpText="Enter a message to display if your guardrail blocks the user prompt."
+                    requiredIndicator
+                />
+                <Checkbox
+                    label="Apply the same blocked message for responses"
+                    checked={applyToResponses}
+                    onChange={setApplyToResponses}
+                />
+            </FormLayout>
+        </VerticalStack>
     );
 
-    const renderStep2 = () => (
-        <LegacyCard sectioned>
-            <VerticalStack gap="4">
-                <Text variant="headingMd">Configure content filters</Text>
+    const renderStep2Content = () => (
+        <VerticalStack gap="4">
+            <Text variant="headingMd">Configure content filters</Text>
                 <Text variant="bodyMd" tone="subdued">
                     Configure content filters by adjusting the degree of filtering to detect and block harmful user inputs and model responses that violate your usage policies.
                 </Text>
                 
                 <Box padding="4" borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
                     <VerticalStack gap="4">
-                        <Text variant="headingMd">Harmful categories</Text>
+                        <Text variant="headingSm">Harmful categories</Text>
                         <Text variant="bodyMd" tone="subdued">
                             Enable to detect and block harmful user inputs and model responses. Use a higher filter strength to increase the likelihood of filtering harmful content in a given category.
                         </Text>
@@ -627,7 +718,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         {enableHarmfulCategories && (
                             <VerticalStack gap="3">
                                 <HorizontalStack align="space-between">
-                                    <Text variant="headingMd">Filters for prompts</Text>
+                                    <Text variant="headingSm">Filters for prompts</Text>
                                     <Button variant="plain" onClick={() => {
                                         const resetSettings = { ...harmfulCategoriesSettings };
                                         Object.keys(resetSettings).forEach(key => {
@@ -680,7 +771,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
 
                 <Box padding="4" borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
                     <VerticalStack gap="4">
-                        <Text variant="headingMd">Prompt attacks</Text>
+                        <Text variant="headingSm">Prompt attacks</Text>
                         <Text variant="bodyMd" tone="subdued">
                             Enable to detect and block user inputs attempting to override system instructions. To avoid misclassifying system prompts as a prompt attack and ensure that the filters are selectively applied to user inputs, use input tagging.
                         </Text>
@@ -711,19 +802,17 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                     </VerticalStack>
                 </Box>
             </VerticalStack>
-        </LegacyCard>
     );
 
-    const renderStep3 = () => (
-        <LegacyCard sectioned>
-            <VerticalStack gap="4">
+    const renderStep3Content = () => (
+        <VerticalStack gap="4">
                 <Text variant="headingMd">Add denied topics</Text>
                 <Text variant="bodyMd" tone="subdued">
                     Add up to 30 denied topics to block user inputs or model responses associated with the topic.
                 </Text>
 
                 <HorizontalStack align="space-between">
-                    <Text variant="headingMd">Denied topics ({deniedTopics.length})</Text>
+                    <Text variant="headingSm">Denied topics ({deniedTopics.length})</Text>
                     <HorizontalStack gap="2">
                         <Button onClick={() => {}}>Edit</Button>
                         <Button onClick={() => setDeniedTopics([])}>Delete</Button>
@@ -745,12 +834,10 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                     </Box>
                 )}
             </VerticalStack>
-        </LegacyCard>
     );
 
-    const renderStep4 = () => (
-        <LegacyCard sectioned>
-            <VerticalStack gap="4">
+    const renderStep4Content = () => (
+        <VerticalStack gap="4">
                 <Text variant="headingMd">Add word filters</Text>
                 <Text variant="bodyMd" tone="subdued">
                     Use these filters to block certain words and phrases in user inputs and model responses.
@@ -758,7 +845,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
 
                 <Box padding="4" borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
                     <VerticalStack gap="3">
-                        <Text variant="headingMd">Profanity filter</Text>
+                        <Text variant="headingSm">Profanity filter</Text>
                         <Checkbox
                             label="Filter profanity"
                             checked={filterProfanity}
@@ -770,7 +857,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
 
                 <Box padding="4" borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
                     <VerticalStack gap="3">
-                        <Text variant="headingMd">Add custom words and phrases</Text>
+                        <Text variant="headingSm">Add custom words and phrases</Text>
                         <Text variant="bodyMd" tone="subdued">
                             Specify up to 10,000 words or phrases (max 3 words) to be blocked by the guardrail. A blocked message will show if user input or model responses contain these words or phrases.
                         </Text>
@@ -790,7 +877,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
 
                         {customWords.length > 0 && (
                             <Box>
-                                <Text variant="headingMd">View and edit words and phrases ({customWords.length})</Text>
+                                <Text variant="headingSm">View and edit words and phrases ({customWords.length})</Text>
                                 <Box paddingBlockStart="2">
                                     <VerticalStack gap="2">
                                         {customWords.map((word, index) => (
@@ -810,10 +897,9 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                     </VerticalStack>
                 </Box>
             </VerticalStack>
-        </LegacyCard>
     );
 
-    const renderStep5 = () => (
+    const renderStep5Content = () => (
         <SensitiveInformationFilters
             piiTypes={piiTypes}
             setPiiTypes={setPiiTypes}
@@ -824,10 +910,9 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         />
     );
 
-    const renderStep6 = () => (
-        <LegacyCard sectioned>
-            <VerticalStack gap="4">
-                <Text variant="headingMd">LLM-based Rule</Text>
+    const renderStep6Content = () => (
+        <VerticalStack gap="4">
+                <Text variant="headingMd">LLM prompt based rule</Text>
                 <Text variant="bodyMd" tone="subdued">
                     Configure an LLM-based rule to evaluate and filter content using natural language instructions.
                 </Text>
@@ -868,13 +953,11 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                     </>
                 )}
             </VerticalStack>
-        </LegacyCard>
     );
 
-    const renderStep7 = () => (
-        <LegacyCard sectioned>
-            <VerticalStack gap="4">
-                <Text variant="headingMd">URL and Confidence Score</Text>
+    const renderStep7Content = () => (
+        <VerticalStack gap="4">
+                <Text variant="headingMd">External model based evaluation</Text>
                 <Text variant="bodyMd" tone="subdued">
                     Configure the URL and confidence score for this guardrail policy.
                 </Text>
@@ -912,12 +995,10 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                     </VerticalStack>
                 </FormLayout>
             </VerticalStack>
-        </LegacyCard>
     );
 
-    const renderStep8 = () => (
-        <LegacyCard sectioned>
-            <VerticalStack gap="4">
+    const renderStep8Content = () => (
+        <VerticalStack gap="4">
                 <Text variant="headingMd">Server and application settings</Text>
                 <Text variant="bodyMd" tone="subdued">
                     Configure which servers the guardrail should be applied to and specify whether it applies to requests, responses, or both.
@@ -946,7 +1027,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
 
                     <Box padding="4" borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
                         <VerticalStack gap="3">
-                            <Text variant="headingMd">Application Settings</Text>
+                            <Text variant="headingSm">Application Settings</Text>
                             <Text variant="bodyMd" tone="subdued">
                                 Specify whether the guardrail should be applied to responses and/or requests.
                             </Text>
@@ -970,22 +1051,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                     </Box>
                 </FormLayout>
             </VerticalStack>
-        </LegacyCard>
     );
-
-    const renderCurrentStep = () => {
-        switch (currentStep) {
-            case 1: return renderStep1();
-            case 2: return renderStep2();
-            case 3: return renderStep3();
-            case 4: return renderStep4();
-            case 5: return renderStep5();
-            case 6: return renderStep6();
-            case 7: return renderStep7();
-            case 8: return renderStep8();
-            default: return renderStep1();
-        }
-    };
 
     const getModalActions = () => {
         const actions = [];
@@ -997,10 +1063,10 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             });
         }
 
-        if (currentStep > 1 && currentStep < 8) {
+        if (currentStep < 8) {
             actions.push({
-                content: "Skip to Server settings",
-                onAction: handleSkipToServers
+                content: "Next",
+                onAction: handleNext
             });
         }
 
@@ -1008,21 +1074,12 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     };
 
     const getPrimaryAction = () => {
-        if (currentStep === 8) {
-            return {
-                content: isEditMode ? "Update Guardrail" : "Create Guardrail",
-                onAction: handleSave,
-                loading: loading,
-                disabled: !name.trim() || !blockedMessage.trim() || urlError
-            };
-        } else if (currentStep < 8) {
-            return {
-                content: "Next",
-                onAction: handleNext,
-                disabled: (currentStep === 1 && (!name.trim() || !blockedMessage.trim()))
-            };
-        }
-        return null;
+        return {
+            content: isEditMode ? "Update Guardrail" : "Create Guardrail",
+            onAction: handleSave,
+            loading: loading,
+            disabled: !name.trim() || !blockedMessage.trim() || urlError
+        };
     };
 
     return (
@@ -1030,7 +1087,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             <Modal
                 open={isOpen}
                 onClose={handleClose}
-                title={`${isEditMode ? 'Edit' : 'Create'} guardrail - Step ${currentStep}`}
+                title={`${isEditMode ? 'Edit' : 'Create'} guardrail`}
                 primaryAction={getPrimaryAction()}
                 secondaryActions={[
                     {
@@ -1042,16 +1099,9 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 large
             >
                 <Modal.Section>
-                    <HorizontalStack gap="6" align="start">
-                        <Box minWidth="200px">
-                            {renderStepIndicator()}
-                        </Box>
-                        <Box width="100%">
-                            <Scrollable style={{ height: "500px" }}>
-                                {renderCurrentStep()}
-                            </Scrollable>
-                        </Box>
-                    </HorizontalStack>
+                    <Scrollable style={{ height: "600px" }}>
+                        {renderStepIndicator()}
+                    </Scrollable>
                 </Modal.Section>
             </Modal>
 

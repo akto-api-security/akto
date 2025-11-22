@@ -1,5 +1,4 @@
 import {
-    LegacyCard,
     VerticalStack,
     Text,
     Box,
@@ -40,12 +39,11 @@ const SensitiveInformationFilters = ({
     ];
 
     return (
-        <LegacyCard sectioned>
-            <VerticalStack gap="4">
-                <Text variant="headingMd">Add sensitive information filters</Text>
-                <Text variant="bodyMd" tone="subdued">
-                    Use these filters to handle any data related to privacy.
-                </Text>
+        <VerticalStack gap="4">
+            <Text variant="headingMd">Add sensitive information filters</Text>
+            <Text variant="bodyMd" tone="subdued">
+                Use these filters to handle any data related to privacy.
+            </Text>
 
                 <Box padding="4" borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
                     <VerticalStack gap="3">
@@ -162,7 +160,6 @@ const SensitiveInformationFilters = ({
                     </VerticalStack>
                 </Box>
             </VerticalStack>
-        </LegacyCard>
     );
 };
 
