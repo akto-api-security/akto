@@ -699,9 +699,13 @@ function EndpointShieldMetadata() {
         }
     }, [endpointShieldData])
 
+    const allowBulkActions = window.USER_NAME && window.USER_NAME.endsWith("@akto.io");
+
     const promotedBulkActions = (selectedAgents) => {
-        return [
-            {
+        const actions = [];
+
+        if (allowBulkActions) {
+            actions.push({
                 content: `Delete ${selectedAgents.length} agent info entr${selectedAgents.length > 1 ? "ies" : "y"}`,
                 onAction: async () => {
                     const deleteConfirmationMessage = `Are you sure you want to delete ${selectedAgents.length} agent info entr${selectedAgents.length > 1 ? "ies" : "y"}?`;
@@ -716,8 +720,10 @@ function EndpointShieldMetadata() {
                         }
                     });
                 },
-            },
-        ];
+            });
+        }
+
+        return actions;
     };
 
     const primaryActions = (
@@ -762,7 +768,7 @@ function EndpointShieldMetadata() {
                         headings={headings}
                         onRowClick={handleRowClick}
                         rowClickable={true}
-                        selectable={true}
+                        selectable={allowBulkActions}
                         promotedBulkActions={promotedBulkActions}
                     />
                 ]}
