@@ -1,38 +1,28 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
     Modal,
     FormLayout,
     TextField,
     Checkbox,
     Button,
-    LegacyStack,
     Text,
     LegacyCard,
     HorizontalStack,
-    RadioButton,
     VerticalStack,
     Box,
-    Divider,
     Badge,
     Icon,
     Scrollable,
     RangeSlider,
-    List,
-    ButtonGroup,
     DataTable
 } from "@shopify/polaris";
 import {
     ChecklistMajor,
-    CircleInformationMajor,
-    DeleteMajor,
-    PlusMinor,
-    EditMajor
+    DeleteMajor
 } from "@shopify/polaris-icons";
 import AddDeniedTopicModal from "./AddDeniedTopicModal";
-import AddPiiTypeModal from "./AddPiiTypeModal";
-import AddRegexPatternModal from "./AddRegexPatternModal";
+import SensitiveInformationFilters from "./SensitiveInformationFilters";
 import DropdownSearch from "../../../components/shared/DropdownSearch";
-import api from "../api";
 import PersistStore from '../../../../main/PersistStore';
 
 const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, isEditMode = false }) => {
@@ -70,6 +60,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     // Step 5: Sensitive information filters
     const [piiTypes, setPiiTypes] = useState([]);
     const [regexPatterns, setRegexPatterns] = useState([]);
+    const [newRegexPattern, setNewRegexPattern] = useState("");
 
     // Step 6: LLM-based Rule
     const [llmRule, setLlmRule] = useState("");
@@ -115,8 +106,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
 
     // Sub-modal states
     const [showAddTopicModal, setShowAddTopicModal] = useState(false);
-    const [showAddPiiModal, setShowAddPiiModal] = useState(false);
-    const [showAddRegexModal, setShowAddRegexModal] = useState(false);
     const [editingTopic, setEditingTopic] = useState(null);
 
     const getStepsWithSummary = () => [
@@ -517,10 +506,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setRegexPatterns([...regexPatterns, regexData]);
     };
 
-    const removeRegexPattern = (index) => {
-        setRegexPatterns(regexPatterns.filter((_, i) => i !== index));
-    };
-
     const handleSaveTopic = (topicData) => {
         if (editingTopic !== null) {
             // Update existing topic
@@ -535,27 +520,17 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setShowAddTopicModal(false);
     };
 
-    const handleSavePii = (piiData) => {
-        setPiiTypes([...piiTypes, piiData]);
-        setShowAddPiiModal(false);
-    };
-
-    const handleSaveRegex = (regexData) => {
-        setRegexPatterns([...regexPatterns, regexData]);
-        setShowAddRegexModal(false);
-    };
-
     const renderStepIndicator = () => (
         <Box paddingBlockEnd="4">
             <VerticalStack gap="2">
                 {steps.map((step) => (
                     <VerticalStack key={step.number} gap="1">
                         <HorizontalStack gap="2" blockAlign="center">
-                            <div style={{
+                            <Box style={{
                                 width: "24px",
                                 height: "24px",
                                 borderRadius: "50%",
-                                backgroundColor: step.number === currentStep ? "#0070f3" : 
+                                backgroundColor: step.number === currentStep ? "#0070f3" :
                                                 step.number < currentStep ? "#008060" : "#e1e3e5",
                                 color: step.number <= currentStep ? "white" : "#6d7175",
                                 display: "flex",
@@ -565,9 +540,9 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                                 fontWeight: "bold"
                             }}>
                                 {step.number < currentStep ? <Icon source={ChecklistMajor} /> : step.number}
-                            </div>
-                            <Text 
-                                variant="bodyMd" 
+                            </Box>
+                            <Text
+                                variant="bodyMd"
                                 color={step.number === currentStep ? "critical" : "subdued"}
                                 fontWeight={step.number === currentStep ? "bold" : "regular"}
                             >
@@ -638,7 +613,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                     Configure content filters by adjusting the degree of filtering to detect and block harmful user inputs and model responses that violate your usage policies.
                 </Text>
                 
-                <div style={{ padding: "16px", border: "1px solid #d1d5db", borderRadius: "8px", backgroundColor: "#FFFFFF" }}>
+                <Box padding="4" borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
                     <VerticalStack gap="4">
                         <Text variant="headingMd">Harmful categories</Text>
                         <Text variant="bodyMd" tone="subdued">
@@ -701,9 +676,9 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                             </VerticalStack>
                         )}
                     </VerticalStack>
-                </div>
+                </Box>
 
-                <div style={{ padding: "16px", border: "1px solid #d1d5db", borderRadius: "8px", backgroundColor: "#FFFFFF" }}>
+                <Box padding="4" borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
                     <VerticalStack gap="4">
                         <Text variant="headingMd">Prompt attacks</Text>
                         <Text variant="bodyMd" tone="subdued">
@@ -734,18 +709,19 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                             </Box>
                         )}
                     </VerticalStack>
-                </div>
+                </Box>
             </VerticalStack>
         </LegacyCard>
     );
 
     const renderStep3 = () => (
+        <LegacyCard sectioned>
             <VerticalStack gap="4">
                 <Text variant="headingMd">Add denied topics</Text>
                 <Text variant="bodyMd" tone="subdued">
                     Add up to 30 denied topics to block user inputs or model responses associated with the topic.
                 </Text>
-                
+
                 <HorizontalStack align="space-between">
                     <Text variant="headingMd">Denied topics ({deniedTopics.length})</Text>
                     <HorizontalStack gap="2">
@@ -756,7 +732,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 </HorizontalStack>
 
                 {deniedTopics.length > 0 && (
-                    <div style={{ border: "1px solid #d1d5db", borderRadius: "8px", overflow: "hidden" }}>
+                    <Box style={{ border: "1px solid #d1d5db", borderRadius: "8px", overflow: "hidden" }}>
                         <DataTable
                             columnContentTypes={['text', 'text', 'text']}
                             headings={['Name', 'Definition', 'Sample phrases']}
@@ -766,20 +742,21 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                                 `${topic.samplePhrases.length} phrase${topic.samplePhrases.length !== 1 ? 's' : ''}`
                             ])}
                         />
-                    </div>
+                    </Box>
                 )}
             </VerticalStack>
-
+        </LegacyCard>
     );
 
     const renderStep4 = () => (
+        <LegacyCard sectioned>
             <VerticalStack gap="4">
                 <Text variant="headingMd">Add word filters</Text>
                 <Text variant="bodyMd" tone="subdued">
                     Use these filters to block certain words and phrases in user inputs and model responses.
                 </Text>
-                
-                <div style={{ padding: "16px", border: "1px solid #d1d5db", borderRadius: "8px", backgroundColor: "#FFFFFF" }}>
+
+                <Box padding="4" borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
                     <VerticalStack gap="3">
                         <Text variant="headingMd">Profanity filter</Text>
                         <Checkbox
@@ -789,23 +766,23 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                             helpText="Enable this feature to block profane words in user inputs and model responses. The list of words is based on the global definition of profanity and is subject to change."
                         />
                     </VerticalStack>
-                </div>
+                </Box>
 
-                <div style={{ padding: "16px", border: "1px solid #d1d5db", borderRadius: "8px", backgroundColor: "#FFFFFF" }}>
+                <Box padding="4" borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
                     <VerticalStack gap="3">
                         <Text variant="headingMd">Add custom words and phrases</Text>
                         <Text variant="bodyMd" tone="subdued">
                             Specify up to 10,000 words or phrases (max 3 words) to be blocked by the guardrail. A blocked message will show if user input or model responses contain these words or phrases.
                         </Text>
-                        
+
                         <HorizontalStack gap="2">
-                            <div style={{ flexGrow: 1 }}>
+                            <Box style={{ flexGrow: 1 }}>
                                 <TextField
                                     value={newWord}
                                     onChange={setNewWord}
                                     placeholder="Example - Where should I invest my money?"
                                 />
-                            </div>
+                            </Box>
                             <Button onClick={addCustomWord} disabled={!newWord.trim()}>
                                 Add word or phrase
                             </Button>
@@ -831,83 +808,20 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                             </Box>
                         )}
                     </VerticalStack>
-                </div>
-            </VerticalStack>
-    );
-
-    const renderStep5 = () => (
-        <LegacyCard sectioned>
-            <VerticalStack gap="4">
-                <Text variant="headingMd">Add sensitive information filters</Text>
-                <Text variant="bodyMd" tone="subdued">
-                    Use these filters to handle any data related to privacy.
-                </Text>
-                
-                <Text variant="headingMd">Personally Identifiable Information (PII) types</Text>
-                <Text variant="bodyMd" tone="subdued">
-                    Specify the types of PII to be filtered and the desired guardrail behavior.
-                </Text>
-
-                <HorizontalStack align="space-between">
-                    <Text variant="headingMd">PII types ({piiTypes.length})</Text>
-                    <HorizontalStack gap="2">
-                        <Button onClick={() => setPiiTypes([])}>Delete all</Button>
-                        <Button primary onClick={() => {}}>Add all PII types</Button>
-                    </HorizontalStack>
-                </HorizontalStack>
-
-                {piiTypes.length > 0 && (
-                    <div style={{ border: "1px solid #d1d5db", borderRadius: "8px", overflow: "hidden" }}>
-                        <DataTable
-                            columnContentTypes={['text', 'text']}
-                            headings={['Choose PII type', 'Guardrail behavior']}
-                            rows={piiTypes.map(pii => [
-                                pii.type.charAt(0).toUpperCase() + pii.type.slice(1),
-                                pii.behavior.charAt(0).toUpperCase() + pii.behavior.slice(1)
-                            ])}
-                        />
-                    </div>
-                )}
-
-                <Button onClick={() => setShowAddPiiModal(true)}>Add new PII</Button>
-
-                <Box paddingBlockStart="4">
-                    <VerticalStack gap="3">
-                        <Text variant="headingMd">Regex patterns</Text>
-                        <Text variant="bodyMd" tone="subdued">
-                            Add up to 10 regex patterns to filter custom types of sensitive information for your specific use case.
-                        </Text>
-                        
-                        <HorizontalStack align="space-between">
-                            <Text variant="headingMd">Regex patterns ({regexPatterns.length})</Text>
-                            <HorizontalStack gap="2">
-                                <Button onClick={() => setRegexPatterns([])}>Delete all</Button>
-                                <Button primary onClick={() => setShowAddRegexModal(true)}>Add regex pattern</Button>
-                            </HorizontalStack>
-                        </HorizontalStack>
-
-                        {regexPatterns.length > 0 && (
-                            <div style={{ border: "1px solid #d1d5db", borderRadius: "8px", overflow: "hidden" }}>
-                                <DataTable
-                                    columnContentTypes={['text', 'text', 'text']}
-                                    headings={['Regex Pattern', 'Guardrail behavior', 'Actions']}
-                                    rows={regexPatterns.map((regex, index) => [
-                                        regex.pattern || 'Invalid pattern',
-                                        regex.behavior ? regex.behavior.charAt(0).toUpperCase() + regex.behavior.slice(1) : 'Unknown',
-                                        <Button
-                                            key={index}
-                                            icon={DeleteMajor}
-                                            variant="plain"
-                                            onClick={() => removeRegexPattern(index)}
-                                        />
-                                    ])}
-                                />
-                            </div>
-                        )}
-                    </VerticalStack>
                 </Box>
             </VerticalStack>
         </LegacyCard>
+    );
+
+    const renderStep5 = () => (
+        <SensitiveInformationFilters
+            piiTypes={piiTypes}
+            setPiiTypes={setPiiTypes}
+            regexPatterns={regexPatterns}
+            setRegexPatterns={setRegexPatterns}
+            newRegexPattern={newRegexPattern}
+            setNewRegexPattern={setNewRegexPattern}
+        />
     );
 
     const renderStep6 = () => (
@@ -1030,7 +944,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         disabled={collectionsLoading}
                     />
 
-                    <div style={{ padding: "16px", border: "1px solid #d1d5db", borderRadius: "8px", backgroundColor: "#FFFFFF" }}>
+                    <Box padding="4" borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
                         <VerticalStack gap="3">
                             <Text variant="headingMd">Application Settings</Text>
                             <Text variant="bodyMd" tone="subdued">
@@ -1053,7 +967,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                                 />
                             </VerticalStack>
                         </VerticalStack>
-                    </div>
+                    </Box>
                 </FormLayout>
             </VerticalStack>
         </LegacyCard>
@@ -1149,18 +1063,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 }}
                 onSave={handleSaveTopic}
                 existingTopic={editingTopic !== null ? deniedTopics[editingTopic] : null}
-            />
-
-            <AddPiiTypeModal
-                isOpen={showAddPiiModal}
-                onClose={() => setShowAddPiiModal(false)}
-                onSave={handleSavePii}
-            />
-
-            <AddRegexPatternModal
-                isOpen={showAddRegexModal}
-                onClose={() => setShowAddRegexModal(false)}
-                onSave={handleSaveRegex}
             />
         </>
     );
