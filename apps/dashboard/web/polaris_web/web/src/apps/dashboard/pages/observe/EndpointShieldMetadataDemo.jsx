@@ -82,6 +82,7 @@ const LOG_LEVEL_WIDTH = "60px";
 const convertDataIntoTableFormat = (agentData) => {
     return {
         ...agentData,
+        id: agentData?.agentId, // Use agentId as the unique identifier for table selection
         lastHeartbeatComp: func.prettifyEpoch(agentData?.lastHeartbeat),
         lastDeployedComp: func.prettifyEpoch(agentData?.lastDeployed)
     };

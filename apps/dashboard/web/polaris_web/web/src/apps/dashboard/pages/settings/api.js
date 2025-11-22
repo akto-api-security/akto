@@ -652,6 +652,13 @@ const settingRequests = {
             data: { filter }
         })
     },
+    async deleteModuleInfo(moduleIds) {
+        return await request({
+            url: '/api/deleteModuleInfo',
+            method: 'post',
+            data: { moduleIds }
+        })
+    },
     async fetchCloudflareWafIntegration() {
         return await request({
             url: '/api/fetchCloudflareWafIntegration',
