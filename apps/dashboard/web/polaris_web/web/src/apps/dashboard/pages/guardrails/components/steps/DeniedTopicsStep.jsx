@@ -6,7 +6,6 @@ import {
     Box,
     TextField,
     HorizontalStack,
-    Icon,
     Tag
 } from "@shopify/polaris";
 import { PlusMinor, EditMinor, DeleteMinor } from "@shopify/polaris-icons";
@@ -63,13 +62,34 @@ const DeniedTopicsStep = ({
             return;
         }
 
+        // Validation checks using helper functions
+        if (validateTopicName(editFormData.topic)) {
+            return;
+        }
+
+        if (validateDescription(editFormData.description)) {
+            return;
+        }
+
+        // Validate sample phrases
+        const invalidPhrase = editFormData.samplePhrases.find(phrase => validateSamplePhrase(phrase));
+        if (invalidPhrase) {
+            return;
+        }
+
+        const topicData = {
+            topic: editFormData.topic.trim(),
+            description: editFormData.description.trim(),
+            samplePhrases: editFormData.samplePhrases
+        };
+
         const updatedTopics = [...deniedTopics];
         if (editingIndex === deniedTopics.length) {
             // Adding new
-            updatedTopics.push(editFormData);
+            updatedTopics.push(topicData);
         } else {
             // Editing existing
-            updatedTopics[editingIndex] = editFormData;
+            updatedTopics[editingIndex] = topicData;
         }
         setDeniedTopics(updatedTopics);
         cancelEditing();
@@ -81,10 +101,11 @@ const DeniedTopicsStep = ({
     };
 
     const addSamplePhrase = () => {
-        if (newPhraseInput.trim() && editFormData.samplePhrases.length < 5) {
+        const trimmedPhrase = newPhraseInput.trim();
+        if (trimmedPhrase && editFormData.samplePhrases.length < 5 && trimmedPhrase.length <= 100) {
             setEditFormData({
                 ...editFormData,
-                samplePhrases: [...editFormData.samplePhrases, newPhraseInput.trim()]
+                samplePhrases: [...editFormData.samplePhrases, trimmedPhrase]
             });
             setNewPhraseInput("");
         }
@@ -102,6 +123,36 @@ const DeniedTopicsStep = ({
             e.preventDefault();
             addSamplePhrase();
         }
+    };
+
+    // Validation helpers
+    const validateTopicName = (name) => {
+        if (!name) return null;
+        if (name.length > 100) {
+            return "Name must not exceed 100 characters";
+        }
+        // Valid characters: a-z, A-Z, 0-9, _, -, space, !, ?, .
+        const validCharsPattern = /^[a-zA-Z0-9_\-\s!?.]*$/;
+        if (!validCharsPattern.test(name)) {
+            return "Name contains invalid characters. Only a-z, A-Z, 0-9, _, -, space, !, ?, and . are allowed";
+        }
+        return null;
+    };
+
+    const validateDescription = (description) => {
+        if (!description) return null;
+        if (description.length > 200) {
+            return "Definition must not exceed 200 characters";
+        }
+        return null;
+    };
+
+    const validateSamplePhrase = (phrase) => {
+        if (!phrase) return null;
+        if (phrase.length > 100) {
+            return "Phrase must not exceed 100 characters";
+        }
+        return null;
     };
 
     const renderViewRow = (topic, index) => (
@@ -163,6 +214,7 @@ const DeniedTopicsStep = ({
                     onChange={(value) => setEditFormData({ ...editFormData, topic: value })}
                     placeholder="Medical Diagnosis"
                     helpText="Valid characters are a-z, A-Z, 0-9, underscore (_), hyphen (-), space, exclamation point (!), question mark (?), and period (.). Max 100 characters."
+                    error={validateTopicName(editFormData.topic)}
                     requiredIndicator
                     autoComplete="off"
                 />
@@ -174,6 +226,7 @@ const DeniedTopicsStep = ({
                     multiline={3}
                     placeholder="Medical diagnosis refers to providing specific medical condition assessments, disease identification, symptom analysis..."
                     helpText="Provide a clear definition to detect and block user inputs. Max 200 characters."
+                    error={validateDescription(editFormData.description)}
                     requiredIndicator
                     autoComplete="off"
                 />
@@ -208,12 +261,13 @@ const DeniedTopicsStep = ({
                                         onChange={setNewPhraseInput}
                                         onKeyPress={handlePhraseKeyPress}
                                         placeholder="Type phrase and press Enter"
+                                        error={validateSamplePhrase(newPhraseInput)}
                                         autoComplete="off"
                                     />
                                 </Box>
                                 <Button
                                     onClick={addSamplePhrase}
-                                    disabled={!newPhraseInput.trim()}
+                                    disabled={!newPhraseInput.trim() || !!validateSamplePhrase(newPhraseInput)}
                                     icon={PlusMinor}
                                 >
                                     Add
@@ -230,7 +284,12 @@ const DeniedTopicsStep = ({
                     <Button
                         primary
                         onClick={saveRow}
-                        disabled={!editFormData.topic.trim() || !editFormData.description.trim()}
+                        disabled={
+                            !editFormData.topic.trim() ||
+                            !editFormData.description.trim() ||
+                            !!validateTopicName(editFormData.topic) ||
+                            !!validateDescription(editFormData.description)
+                        }
                     >
                         {isNew ? "Save topic" : "Update topic"}
                     </Button>
