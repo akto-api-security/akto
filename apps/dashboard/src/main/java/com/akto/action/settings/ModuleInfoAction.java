@@ -11,6 +11,7 @@ import java.util.Map;
 public class ModuleInfoAction extends UserAction {
     private List<ModuleInfo> moduleInfos;
     private Map<String, Object> filter;
+    private List<String> moduleIds;
 
     @Override
     public String execute() {
@@ -32,6 +33,19 @@ public class ModuleInfoAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String deleteModuleInfo() {
+        if (moduleIds == null || moduleIds.isEmpty()) {
+            return ERROR.toUpperCase();
+        }
+
+        // Delete modules by their IDs
+        BasicDBObject query = new BasicDBObject();
+        query.put(ModuleInfoDao.ID, new BasicDBObject("$in", moduleIds));
+        ModuleInfoDao.instance.deleteAll(query);
+
+        return SUCCESS.toUpperCase();
+    }
+
     public List<ModuleInfo> getModuleInfos() {
         return moduleInfos;
     }
@@ -46,5 +60,13 @@ public class ModuleInfoAction extends UserAction {
 
     public void setFilter(Map<String, Object> filter) {
         this.filter = filter;
+    }
+
+    public List<String> getModuleIds() {
+        return moduleIds;
+    }
+
+    public void setModuleIds(List<String> moduleIds) {
+        this.moduleIds = moduleIds;
     }
 }

@@ -101,6 +101,7 @@ const LOG_LIMITS = {
 const convertDataIntoTableFormat = (agentData) => {
     return {
         ...agentData,
+        id: agentData?.agentId, // Use agentId as the unique identifier for table selection
         lastHeartbeatComp: func.prettifyEpoch(agentData?.lastHeartbeat),
         lastDeployedComp: func.prettifyEpoch(agentData?.lastDeployed)
     };
@@ -698,6 +699,27 @@ function EndpointShieldMetadata() {
         }
     }, [endpointShieldData])
 
+    const promotedBulkActions = (selectedAgents) => {
+        return [
+            {
+                content: `Delete ${selectedAgents.length} agent info entr${selectedAgents.length > 1 ? "ies" : "y"}`,
+                onAction: async () => {
+                    const deleteConfirmationMessage = `Are you sure you want to delete ${selectedAgents.length} agent info entr${selectedAgents.length > 1 ? "ies" : "y"}?`;
+                    func.showConfirmationModal(deleteConfirmationMessage, "Delete", async () => {
+                        try {
+                            await settingRequests.deleteModuleInfo(selectedAgents);
+                            func.setToast(true, false, `${selectedAgents.length} agent info entr${selectedAgents.length > 1 ? "ies" : "y"} deleted successfully`);
+                            window.location.reload();
+                        } catch (error) {
+                            console.error("Error deleting agent info:", error);
+                            func.setToast(true, true, "Failed to delete agent info");
+                        }
+                    });
+                },
+            },
+        ];
+    };
+
     const primaryActions = (
         <HorizontalStack gap={"2"}>
             <DateRangeFilter
@@ -740,6 +762,8 @@ function EndpointShieldMetadata() {
                         headings={headings}
                         onRowClick={handleRowClick}
                         rowClickable={true}
+                        selectable={true}
+                        promotedBulkActions={promotedBulkActions}
                     />
                 ]}
             />
