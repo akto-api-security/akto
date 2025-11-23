@@ -2151,6 +2151,39 @@ public class ClientActor extends DataActor {
         }
     }
 
+
+    @Override
+    public void bulkUpdateLastTestedField(List<ApiInfo.ApiInfoKey> apiInfoKeys, int timestamp) {
+        if (apiInfoKeys == null || apiInfoKeys.isEmpty()) {
+            return;
+        }
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        List<Map<String, Object>> apiInfoKeysList = new ArrayList<>();
+        for (ApiInfo.ApiInfoKey apiInfoKey : apiInfoKeys) {
+            Map<String, Object> keyMap = new HashMap<>();
+            keyMap.put("apiCollectionId", apiInfoKey.getApiCollectionId());
+            keyMap.put("url", apiInfoKey.getUrl());
+            keyMap.put("method", apiInfoKey.getMethod().name());
+            apiInfoKeysList.add(keyMap);
+        }
+        obj.put("apiInfoKeysList", apiInfoKeysList);
+        obj.put("timestamp", timestamp);
+        String objString = gson.toJson(obj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/bulkUpdateLastTestedField", "", "POST", objString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in bulkUpdateLastTestedField", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in bulkUpdateLastTestedField: " + e, LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+    }
+
     public void insertTestingRunResults(TestingRunResult testingRunResult) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();

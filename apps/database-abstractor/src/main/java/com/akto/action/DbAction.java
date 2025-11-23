@@ -2207,6 +2207,36 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+
+    List<Map<String, Object>> apiInfoKeysList;
+    int timestamp;
+
+    public String bulkUpdateLastTestedField() {
+        try {
+            if (apiInfoKeysList == null || apiInfoKeysList.isEmpty()) {
+                return Action.ERROR.toUpperCase();
+            }
+            List<ApiInfo.ApiInfoKey> apiInfoKeys = new ArrayList<>();
+            for (Map<String, Object> keyMap : apiInfoKeysList) {
+                int apiCollectionIdVal = 0;
+                try {
+                    apiCollectionIdVal = (int)(long) keyMap.get("apiCollectionId");
+                } catch (Exception e) {
+                    apiCollectionIdVal = (int) keyMap.get("apiCollectionId");
+                }
+                String urlVal = (String) keyMap.get("url");
+                String methodStr = (String) keyMap.get("method");
+                URLMethods.Method methodEnum = URLMethods.Method.fromString(methodStr);
+                ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionIdVal, urlVal, methodEnum);
+                apiInfoKeys.add(apiInfoKey);
+            }
+            DbLayer.bulkUpdateLastTestedField(apiInfoKeys, timestamp);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String updateTestInitiatedCountInTestSummary() {
         try {
             DbLayer.updateTestInitiatedCountInTestSummary(summaryId, testInitiatedCount);
@@ -4268,5 +4298,21 @@ public class DbAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
+    }
+
+    public int getTimestamp() {
+        return timestamp;
+    }
+
+    public void setTimestamp(int timestamp) {
+        this.timestamp = timestamp;
+    }
+
+    public List<Map<String, Object>> getApiInfoKeysList() {
+        return apiInfoKeysList;
+    }
+
+    public void setApiInfoKeysList(List<Map<String, Object>> apiInfoKeysList) {
+        this.apiInfoKeysList = apiInfoKeysList;
     }
 }
