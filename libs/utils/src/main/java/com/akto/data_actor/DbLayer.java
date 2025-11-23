@@ -741,6 +741,10 @@ public class DbLayer {
         ApiInfoDao.instance.updateLastTestedField(apiInfoKey);
     }
 
+    public static void bulkUpdateLastTestedField(List<ApiInfo.ApiInfoKey> apiInfoKeys, int timestamp) {
+        ApiInfoDao.instance.bulkUpdateLastTestedField(apiInfoKeys, timestamp);
+    }
+
     public static void insertTestingRunResults(TestingRunResult testingRunResult) {
         TestingRunResultDao.instance.insertOne(testingRunResult);
     }

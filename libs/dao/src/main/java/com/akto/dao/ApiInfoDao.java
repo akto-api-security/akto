@@ -86,6 +86,21 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         );
     }
 
+    public void bulkUpdateLastTestedField(List<ApiInfoKey> apiInfoKeys, int timestamp){
+        if(apiInfoKeys == null || apiInfoKeys.isEmpty()){
+            return;
+        }
+        List<Bson> filters = new ArrayList<>();
+        for(ApiInfoKey apiInfoKey : apiInfoKeys){
+            filters.add(getFilter(apiInfoKey));
+        }
+        Bson combinedFilter = Filters.or(filters);
+        instance.getMCollection().updateMany(
+            combinedFilter,
+            Updates.set(ApiInfo.LAST_TESTED, timestamp)
+        );
+    }
+
     public Map<Integer,Integer> getCoverageCount(){
         Map<Integer,Integer> result = new HashMap<>();
         List<Bson> pipeline = new ArrayList<>();

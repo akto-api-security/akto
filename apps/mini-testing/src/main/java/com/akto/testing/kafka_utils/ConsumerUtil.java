@@ -7,6 +7,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -45,11 +46,13 @@ public class ConsumerUtil {
     static{
         properties.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, 10000); 
     }
-    private static Consumer<String, String> consumer = Constants.IS_NEW_TESTING_ENABLED ? new KafkaConsumer<>(properties) : null; 
+    private static Consumer<String, String> consumer = Constants.IS_NEW_TESTING_ENABLED ? new KafkaConsumer<>(properties) : null;
     private static final LoggerMaker loggerMaker = new LoggerMaker(ConsumerUtil.class);
     public static ExecutorService executor = Executors.newFixedThreadPool(150);
     private static final int maxRunTimeForTests = 5 * 60;
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
+
+    private static final ConcurrentHashMap<ApiInfoKey, Integer> testedApisMap = new ConcurrentHashMap<>();
 
     public static SingleTestPayload parseTestMessage(String message) {
         JSONObject jsonObject = JSON.parseObject(message);
@@ -80,7 +83,9 @@ public class ConsumerUtil {
             loggerMaker.info("Running test for: " + apiInfoKey + " with subcategory: " + subCategory);
             TestingRunResult runResult = executor.runTestNew(apiInfoKey, singleTestPayload.getTestingRunId(), instance.getTestingUtil(), singleTestPayload.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), singleTestPayload.getTestLogs(), sample);
             executor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
-            dataActor.updateLastTestedField(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().toString());
+
+            testedApisMap.put(apiInfoKey, Context.now());
+
             loggerMaker.insertImportantTestingLog("Test completed for: " + apiInfoKey + " with subcategory: " + subCategory + " in " + (Context.now() - timeNow) + " seconds");
         }
     }
@@ -99,6 +104,32 @@ public class ConsumerUtil {
 
         TestingRunResult runResult = Utils.generateFailedRunResultForMessage(singleTestPayload.getTestingRunId(), singleTestPayload.getApiInfoKey(), testSuperType, testSubType, singleTestPayload.getTestingRunResultSummaryId(), new ArrayList<>(),  TestError.TEST_TIMED_OUT.getMessage());
         testExecutor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
+    }
+
+    /**
+     * Performs bulk update of lastTested field for all APIs that were tested
+     */
+    private void flushLastTestedUpdates() {
+        if (testedApisMap.isEmpty()) {
+            loggerMaker.info("No APIs to update for lastTested field");
+            return;
+        }
+
+        try {
+            int maxTimestamp = testedApisMap.values().stream().max(Integer::compareTo).orElse(Context.now());
+
+            List<ApiInfoKey> apiInfoKeys = new ArrayList<>(testedApisMap.keySet());
+
+            loggerMaker.info("Performing bulk update of lastTested field for " + apiInfoKeys.size() + " APIs");
+
+            dataActor.bulkUpdateLastTestedField(apiInfoKeys, maxTimestamp);
+
+            loggerMaker.info("Successfully updated lastTested field for " + apiInfoKeys.size() + " APIs");
+
+            testedApisMap.clear();
+        } catch (Exception e) {
+            loggerMaker.error("Error during bulk update of lastTested field: " + e.getMessage(), e);
+        }
     }
     
     public void init(int maxRunTimeInSeconds) {
@@ -186,6 +217,9 @@ public class ConsumerUtil {
             loggerMaker.info("Error in polling records");
         }finally{
             loggerMaker.info("Closing consumer as all results have been executed.");
+
+            flushLastTestedUpdates();
+
             parallelConsumer.closeDrainFirst();
             parallelConsumer = null;
             consumer.close();
