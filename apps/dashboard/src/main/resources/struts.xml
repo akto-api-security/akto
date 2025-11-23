@@ -531,7 +531,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">LOGS</param>
-                <param name="accessType">WRITE</param>
+                <param name="accessType">READ_WRITE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
