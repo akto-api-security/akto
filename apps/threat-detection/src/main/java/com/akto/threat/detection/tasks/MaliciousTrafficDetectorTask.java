@@ -3,13 +3,14 @@ package com.akto.threat.detection.tasks;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
@@ -36,6 +37,9 @@ import com.akto.dto.api_protection_parse_layer.Rule;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLTemplate;
+import com.akto.dto.type.APICatalog;
+import com.akto.runtime.RuntimeUtil;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
@@ -84,6 +88,7 @@ public class MaliciousTrafficDetectorTask implements Task {
   private final RawApiMetadataFactory rawApiFactory;
 
   private Map<String, FilterConfig> apiFilters;
+  private List<ApiInfo> apiInfos;
   private int filterLastUpdatedAt = 0;
   private int filterUpdateIntervalSec = 900;
 
@@ -104,6 +109,8 @@ public class MaliciousTrafficDetectorTask implements Task {
   private static List<FilterConfig> ignoredEventFilters = new ArrayList<>();
   private final AtomicInteger applyFilterLogCount = new AtomicInteger(0);
   private static final int MAX_APPLY_FILTER_LOGS = 1000;
+  private static Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates = new HashMap<>();
+  private static HashSet<String> apiInfoKeys = new HashSet<>();
 
   // Kafka records per minute tracking
   private int recordsReadCount = 0;
@@ -313,6 +320,38 @@ public class MaliciousTrafficDetectorTask implements Task {
     return apiFilters;
   }
 
+  private List<ApiInfo> getApiInfos() {
+    int now = (int) (System.currentTimeMillis() / 1000);
+    if (now - filterLastUpdatedAt < filterUpdateIntervalSec) {
+      return apiInfos;
+    }
+
+    apiInfos = dataActor.fetchApiInfos();
+    logger.debugAndAddToDb("total api infos fetched  " + apiInfos.size());
+
+    for(ApiInfo apiInfo: apiInfos){
+      String url = apiInfo.getId().getUrl();
+
+      apiInfoKeys.add(apiInfo.getId().toString());
+
+      if(APICatalog.isTemplateUrl(url)){
+        URLTemplate urlTemplate = RuntimeUtil.createUrlTemplate(url, apiInfo.getId().getMethod());
+        int apiCollectionId = apiInfo.getId().getApiCollectionId();
+
+        if(!apiCollectionUrlTemplates.containsKey(apiCollectionId)){
+          apiCollectionUrlTemplates.put(apiCollectionId, new ArrayList<>());
+        }
+
+        apiCollectionUrlTemplates.get(apiCollectionId).add(urlTemplate);
+      }
+    }
+
+    this.filterLastUpdatedAt = now;
+    
+    return apiInfos;
+
+  }
+
   private String getApiSchema(int apiCollectionId) {
     String apiSchema = null;
     try {
@@ -339,6 +378,38 @@ public class MaliciousTrafficDetectorTask implements Task {
     }
     return apiSchema;
   }
+
+  
+  private List<SchemaConformanceError> handleSchemaConformFilter(HttpResponseParams responseParam, ApiInfo.ApiInfoKey apiInfoKey, List<SchemaConformanceError> errors){
+    int apiCollectionId = apiInfoKey.getApiCollectionId();
+
+    // Api info was found
+    if(apiInfoKeys.contains(apiInfoKey.toString())){
+      return errors;
+    }
+
+    // If not found check in template urls
+    List<URLTemplate> urlTemplates = apiCollectionUrlTemplates.get(apiCollectionId);
+    if(urlTemplates == null || urlTemplates.isEmpty()){
+      // No templates for this collection - URL not found
+      logger.debugAndAddToDb("Schema conformance error: URL not found in discovered traffic - " +
+                             apiInfoKey.getUrl() + " " + apiInfoKey.getMethod());
+      
+      RequestValidator.addError("#/paths", apiInfoKey.getUrl(), "url",
+        "URL not found in discovered traffic: " + apiInfoKey.getUrl() + " " + apiInfoKey.getMethod());
+      return errors;
+    }
+
+    for(URLTemplate urlTemplate: urlTemplates){
+      if(urlTemplate.match(apiInfoKey.getUrl(), apiInfoKey.getMethod())){
+        return errors;
+      }
+    }
+    RequestValidator.addError("#/paths", apiInfoKey.getUrl(), "url",
+        "URL not found in discovered traffic: " + apiInfoKey.getUrl() + " " + apiInfoKey.getMethod());
+    return RequestValidator.getErrors();
+  }
+
 
   private void processRecord(HttpResponseParam record) throws Exception {
     HttpResponseParams responseParam = buildHttpResponseParam(record);
@@ -431,17 +502,19 @@ public class MaliciousTrafficDetectorTask implements Task {
 
       // Evaluate filter first (ignore and filter are independent conditions)
       // SchemaConform check is disabled
-      if(false && apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
+      if(Context.accountId.get() == 1758179941 && apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
         logger.debug("SchemaConform filter found for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
-        String apiSchema = getApiSchema(apiCollectionId);
+        vulnerable = handleSchemaConformFilter(responseParam, apiInfoKey, vulnerable); 
+        
+        // String apiSchema = getApiSchema(apiCollectionId);
 
-        if (apiSchema == null || apiSchema.isEmpty()) {
+        // if (apiSchema == null || apiSchema.isEmpty()) {
 
-          continue;
+        //   continue;
 
-        }
+        // }
 
-        vulnerable = RequestValidator.validate(responseParam, apiSchema, apiInfoKey.toString());
+        // vulnerable = RequestValidator.validate(responseParam, apiSchema, apiInfoKey.toString());
         hasPassedFilter = vulnerable != null && !vulnerable.isEmpty();
 
       }else {
