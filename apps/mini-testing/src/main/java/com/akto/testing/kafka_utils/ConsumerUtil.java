@@ -15,6 +15,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import org.apache.kafka.clients.consumer.*;
 import org.bson.types.ObjectId;
 
@@ -47,6 +49,7 @@ public class ConsumerUtil {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ConsumerUtil.class);
     public static ExecutorService executor = Executors.newFixedThreadPool(150);
     private static final int maxRunTimeForTests = 5 * 60;
+    private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     public static SingleTestPayload parseTestMessage(String message) {
         JSONObject jsonObject = JSON.parseObject(message);
@@ -77,7 +80,8 @@ public class ConsumerUtil {
             loggerMaker.info("Running test for: " + apiInfoKey + " with subcategory: " + subCategory);
             TestingRunResult runResult = executor.runTestNew(apiInfoKey, singleTestPayload.getTestingRunId(), instance.getTestingUtil(), singleTestPayload.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), singleTestPayload.getTestLogs(), sample);
             executor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
-            loggerMaker.insertImportantTestingLog("Test completed for: " + apiInfoKey + " with subcategory: " + subCategory + " in " + (Context.now() - timeNow) + " seconds"); 
+            dataActor.updateLastTestedField(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().toString());
+            loggerMaker.insertImportantTestingLog("Test completed for: " + apiInfoKey + " with subcategory: " + subCategory + " in " + (Context.now() - timeNow) + " seconds");
         }
     }
 
