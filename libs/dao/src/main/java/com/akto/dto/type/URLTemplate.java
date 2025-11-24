@@ -46,7 +46,13 @@ public class URLTemplate {
         this.method = method;
     }
 
-    public boolean match(String url, Method urlMethod) {
+    /**
+     * Helper to check exact string match between URL and template (optimization).
+     * @param url The URL to check
+     * @param urlMethod The HTTP method
+     * @return true if exact match, false otherwise
+     */
+    private boolean exactStringMatch(String url, Method urlMethod) {
         if (url.startsWith("/")) url = url.substring(1, url.length());
         if (url.endsWith("/")) url = url.substring(0, url.length()-1);
 
@@ -55,13 +61,19 @@ public class URLTemplate {
         if (tempUrl.endsWith("/")) tempUrl = tempUrl.substring(0, tempUrl.length()-1);
 
         String a = url + " " + urlMethod.name();
-        String b = tempUrl + " " + this.getMethod().name();
-        if (a.equals(b)) {
+        String b = tempUrl + " " + this.method.name();
+
+        return a.equals(b);
+    }
+
+    public boolean match(String url, Method urlMethod) {
+        // Optimization: Try exact string match first
+        if (exactStringMatch(url, urlMethod)) {
             return true;
         }
 
+        // Fall back to token-based matching
         String[] thatTokens = url.split("/");
-
         return match(thatTokens, urlMethod);
     }
 
@@ -92,12 +104,19 @@ public class URLTemplate {
     /**
      * Match URL against this template and return detailed result.
      * Checks URL pattern first, then method - enables single-pass matching.
+     * Includes exact string match optimization before token-based matching.
      *
      * @param url The URL to match
      * @param urlMethod The HTTP method to match
      * @return MatchResult indicating the match status
      */
     public MatchResult matchTemplate(String url, Method urlMethod) {
+        // Optimization: Try exact string match first (faster than token matching)
+        if (exactStringMatch(url, urlMethod)) {
+            return MatchResult.FULL_MATCH;
+        }
+
+        // Fall back to token-based matching for parameterized URLs
         // Step 1: Check if URL pattern matches
         if (!matchTokens(url)) {
             return MatchResult.NO_MATCH;
