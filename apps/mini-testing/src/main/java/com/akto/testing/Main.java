@@ -107,7 +107,7 @@ public class Main {
                             break;
                     }
                 } catch (Exception e) {
-                    loggerMaker.error("Error in running playground tests: " + e.getMessage());
+                    loggerMaker.errorAndAddToDb(e, "Error in running playground tests: " + e.getMessage());
                 }
             }
         }, 0, 2, TimeUnit.SECONDS);
@@ -119,6 +119,7 @@ public class Main {
         try {
             testConfig = TestConfigYamlParser.parseTemplate(testingRunPlayground.getTestTemplate());
         } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in parsing template for handleTestEditorPlayground");
             return;
         }
         ApiInfo.ApiInfoKey infoKey = testingRunPlayground.getApiInfoKey();
@@ -221,7 +222,7 @@ public class Main {
                 return null;
             }
         } catch (Exception e) {
-            loggerMaker.error("Error in reading the testing state file: " + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "Error in reading the testing state file: " + e.getMessage());
             return null;
         }
     }
@@ -244,7 +245,7 @@ public class Main {
             loggerMaker.infoAndAddToDb("evaluating second trrs condition");
             int maxRetries = 5;
             for (int i = 0; i < maxRetries; i++) {
-                loggerMaker.infoAndAddToDb("fetching baseconfig in second trrs condition");
+                loggerMaker.infoAndAddToDb("fetching base config in second trrs condition");
                 baseConfig = dataActor.findTestingRunConfig(testingRun.getTestIdConfig());
                 if (baseConfig != null) {
                     break;
@@ -252,6 +253,7 @@ public class Main {
                 try {
                     Thread.sleep(1000);
                 } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error in fetching base config in second trrs condition");
                 }
             }
 
@@ -382,16 +384,16 @@ public class Main {
                     matrixAnalyzerRunning = true;
                     matrixAnalyzer.run();
                 } catch (Exception e) {
-                    loggerMaker.infoAndAddToDb("could not run matrixAnalyzer: " + e.getMessage(), LogDb.TESTING);
+                    loggerMaker.errorAndAddToDb(e, "could not run matrixAnalyzer: " + e.getMessage());
                 } finally {
                     matrixAnalyzerRunning = false;
                 }
             }
         }, 0, 1, TimeUnit.MINUTES);
 
-        loggerMaker.infoAndAddToDb("sun.arch.data.model: " +  System.getProperty("sun.arch.data.model"), LogDb.TESTING);
-        loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);
-        loggerMaker.infoAndAddToDb("os.version: " + System.getProperty("os.version"), LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("sun.arch.data.model: " +  System.getProperty("sun.arch.data.model"));
+        loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"));
+        loggerMaker.infoAndAddToDb("os.version: " + System.getProperty("os.version"));
         
         Map<Integer, Integer> logSentMap = new HashMap<>();
 
@@ -449,7 +451,7 @@ public class Main {
                     // });
                 }
             } catch (Exception e) {
-                loggerMaker.error("Error in running failed tests from file.", e);
+                loggerMaker.errorAndAddToDb(e, "Error in running failed tests from file.");
             }
         }
 

@@ -285,7 +285,7 @@ public class TestExecutor {
                     Producer.createTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
                 } catch (Exception e) {
                     e.printStackTrace();
-                    loggerMaker.error("Error in creating topic", e);
+                    loggerMaker.errorAndAddToDb(e, "Error in creating topic");
                 }
             }
 
