@@ -88,6 +88,24 @@ public class RequestValidator {
     // TODO: handle cases like
     // /pets/{petId} and /pets/mine both are present in schema
 
+    // Strip query parameters and fragments from URL
+    int queryIndex = url.indexOf('?');
+    if (queryIndex != -1) {
+      url = url.substring(0, queryIndex);
+    }
+    int fragmentIndex = url.indexOf('#');
+    if (fragmentIndex != -1) {
+      url = url.substring(0, fragmentIndex);
+    }
+
+    // Remove trailing slash for consistent matching
+    if (url.endsWith("/") && url.length() > 1) {
+      url = url.substring(0, url.length() - 1);
+    }
+    if (pathKey.endsWith("/") && pathKey.length() > 1) {
+      pathKey = pathKey.substring(0, pathKey.length() - 1);
+    }
+
     String[] pathSegments = pathKey.split("/");
     String[] urlSegments = url.split("/");
 
@@ -126,17 +144,18 @@ public class RequestValidator {
     }
 
     // Skip request body validation for GET/DELETE requests
-    String method = responseParam.getRequestParams().getMethod().toLowerCase();
-    if(method.equals("get") || method.equals("delete")){
-      return null;
-    }
+    // String method = responseParam.getRequestParams().getMethod().toLowerCase();
+    // if(method.equals("get") || method.equals("delete")){
+    //   return null;
+    // }
 
-    JsonNode requestBodyNode = getRequestBodyNode(methodNode, url, responseParam);
-    if (requestBodyNode == null) {
-      return null;
-    }
+    // JsonNode requestBodyNode = getRequestBodyNode(methodNode, url, responseParam);
+    // if (requestBodyNode == null) {
+    //   return null;
+    // }
 
-    return getContentSchemaNode(requestBodyNode, responseParam);
+    // return getContentSchemaNode(requestBodyNode, responseParam);
+    return methodNode;
   }
 
   private static JsonNode getPathNode(JsonNode rootSchemaNode, String url, HttpResponseParams responseParam) {
@@ -233,33 +252,33 @@ public class RequestValidator {
       return errors;
     }
 
-    JsonNode dataNode = objectMapper.readTree(httpResponseParams.getRequestParams().getPayload());
+    // JsonNode dataNode = objectMapper.readTree(httpResponseParams.getRequestParams().getPayload());
 
-    JsonSchema schema = factory.getSchema(schemaNode);
+    // JsonSchema schema = factory.getSchema(schemaNode);
 
-    Set<ValidationMessage> validationMessages = schema.validate(dataNode);
+    // Set<ValidationMessage> validationMessages = schema.validate(dataNode);
 
-    if (validationMessages.isEmpty()) {
+    // if (validationMessages.isEmpty()) {
 
-      return errors;
-    }
+    //   return errors;
+    // }
 
-    logger.debug("Request not conforming to schema for api collection id {}",
-        httpResponseParams.getRequestParams().getApiCollectionId());
+    // logger.debug("Request not conforming to schema for api collection id {}",
+    //     httpResponseParams.getRequestParams().getApiCollectionId());
 
-    errors.clear();
-    for (ValidationMessage message : validationMessages) {
-      errorBuilder.clear();
-      errorBuilder.setSchemaPath(message.getSchemaLocation().toString());
-      errorBuilder.setInstancePath(message.getInstanceLocation().toString());
-      errorBuilder.setAttribute("requestBody");
-      errorBuilder.setMessage(message.getMessage());
-      errorBuilder.setLocation(SchemaConformanceError.Location.LOCATION_BODY);
-      errorBuilder.setStart(-1);
-      errorBuilder.setEnd(-1);
-      errorBuilder.setPhrase(message.getMessage());
-      errors.add(errorBuilder.build());
-    }
+    // errors.clear();
+    // for (ValidationMessage message : validationMessages) {
+    //   errorBuilder.clear();
+    //   errorBuilder.setSchemaPath(message.getSchemaLocation().toString());
+    //   errorBuilder.setInstancePath(message.getInstanceLocation().toString());
+    //   errorBuilder.setAttribute("requestBody");
+    //   errorBuilder.setMessage(message.getMessage());
+    //   errorBuilder.setLocation(SchemaConformanceError.Location.LOCATION_BODY);
+    //   errorBuilder.setStart(-1);
+    //   errorBuilder.setEnd(-1);
+    //   errorBuilder.setPhrase(message.getMessage());
+    //   errors.add(errorBuilder.build());
+    // }
 
     return errors;
   }

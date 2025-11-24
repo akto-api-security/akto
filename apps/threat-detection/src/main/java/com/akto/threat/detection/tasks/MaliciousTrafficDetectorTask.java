@@ -431,7 +431,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
       // Evaluate filter first (ignore and filter are independent conditions)
       // SchemaConform check is disabled
-      if(false && apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
+      if(apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
         logger.debug("SchemaConform filter found for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
         String apiSchema = getApiSchema(apiCollectionId);
 
