@@ -61,7 +61,9 @@ public class MetricData {
         // Cyborg metrics
         CYBORG_CALL_LATENCY("Cyborg Call Latency", "Time taken for Cyborg API calls"),
         CYBORG_CALL_COUNT("Cyborg Call Count", "Number of calls made to Cyborg"),
-        CYBORG_DATA_SIZE("Cyborg Data Size", "Total size of data processed by Cyborg");
+        CYBORG_DATA_SIZE("Cyborg Data Size", "Total size of data processed by Cyborg"),
+
+        DATA_INGESTION_API_COUNT("APIs Ingested", "Number of APIs ingested by data ingestion service");
 
         private final String descriptionName;
         private final String description;
