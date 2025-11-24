@@ -366,6 +366,17 @@ public class MaliciousTrafficDetectorTask implements Task {
     String url = apiInfoKey.getUrl();
     URLMethods.Method method = apiInfoKey.getMethod();
 
+    // Normalize URL: remove query parameters, fragments, and trailing slashes
+    if (url.contains("?")) {
+      url = url.substring(0, url.indexOf("?"));
+    }
+    if (url.contains("#")) {
+      url = url.substring(0, url.indexOf("#"));
+    }
+    if (url.endsWith("/")) {
+      url = url.substring(0, url.length() - 1);
+    }
+
     // Check if exact URL + method combination exists
     String urlKey = apiCollectionId + ":" + url;
     Set<URLMethods.Method> methods = apiInfoUrlToMethods.get(urlKey);

@@ -197,9 +197,12 @@ class HandleSchemaConformFilterTest {
 
     @Test
     void testTemplateUrl_fullMatch_returnsNoErrors() {
-        // Given
+        // Given - template pattern in BOTH apiInfoUrlToMethods and apiCollectionUrlTemplates
         URLTemplate template = RuntimeUtil.createUrlTemplate("/api/users/INTEGER", URLMethods.Method.GET);
-        setupTestConfig(Collections.emptyMap(), createTemplateMap(123, template));
+        Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods = createApiUrlMap("123:/api/users/INTEGER", URLMethods.Method.GET);
+        setupTestConfig(apiInfoUrlToMethods, createTemplateMap(123, template));
+
+        // Actual static URL from incoming request
         HttpResponseParams responseParam = createResponseParam(200, "/api/users/123", "GET");
         ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "/api/users/123", URLMethods.Method.GET);
         List<SchemaConformanceError> errors = new ArrayList<>();
@@ -215,7 +218,10 @@ class HandleSchemaConformFilterTest {
     void testTemplateUrl_urlMatchMethodMismatch_returnsMethodError() {
         // Given - template exists for POST but request is GET
         URLTemplate template = RuntimeUtil.createUrlTemplate("/api/users/INTEGER", URLMethods.Method.POST);
-        setupTestConfig(Collections.emptyMap(), createTemplateMap(123, template));
+        Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods = createApiUrlMap("123:/api/users/INTEGER", URLMethods.Method.POST);
+        setupTestConfig(apiInfoUrlToMethods, createTemplateMap(123, template));
+
+        // Actual static URL from incoming request
         HttpResponseParams responseParam = createResponseParam(200, "/api/users/456", "GET");
         ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "/api/users/456", URLMethods.Method.GET);
         List<SchemaConformanceError> errors = new ArrayList<>();
@@ -234,7 +240,10 @@ class HandleSchemaConformFilterTest {
     void testTemplateUrl_noMatch_returnsUrlError() {
         // Given - template for different URL pattern
         URLTemplate template = RuntimeUtil.createUrlTemplate("/api/users/INTEGER", URLMethods.Method.GET);
-        setupTestConfig(Collections.emptyMap(), createTemplateMap(123, template));
+        Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods = createApiUrlMap("123:/api/users/INTEGER", URLMethods.Method.GET);
+        setupTestConfig(apiInfoUrlToMethods, createTemplateMap(123, template));
+
+        // Actual static URL from incoming request - different pattern
         HttpResponseParams responseParam = createResponseParam(200, "/api/products/123", "GET");
         ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "/api/products/123", URLMethods.Method.GET);
         List<SchemaConformanceError> errors = new ArrayList<>();
@@ -254,7 +263,15 @@ class HandleSchemaConformFilterTest {
         URLTemplate template1 = RuntimeUtil.createUrlTemplate("/api/users/INTEGER", URLMethods.Method.GET);
         URLTemplate template2 = RuntimeUtil.createUrlTemplate("/api/products/INTEGER", URLMethods.Method.GET);
         URLTemplate template3 = RuntimeUtil.createUrlTemplate("/api/orders/INTEGER/items/INTEGER", URLMethods.Method.POST);
-        setupTestConfig(Collections.emptyMap(), createTemplateMap(123, template1, template2, template3));
+
+        Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods = new HashMap<>();
+        apiInfoUrlToMethods.put("123:/api/users/INTEGER", Collections.singleton(URLMethods.Method.GET));
+        apiInfoUrlToMethods.put("123:/api/products/INTEGER", Collections.singleton(URLMethods.Method.GET));
+        apiInfoUrlToMethods.put("123:/api/orders/INTEGER/items/INTEGER", Collections.singleton(URLMethods.Method.POST));
+
+        setupTestConfig(apiInfoUrlToMethods, createTemplateMap(123, template1, template2, template3));
+
+        // Actual static URL from incoming request
         HttpResponseParams responseParam = createResponseParam(200, "/api/products/789", "GET");
         ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "/api/products/789", URLMethods.Method.GET);
         List<SchemaConformanceError> errors = new ArrayList<>();
@@ -268,9 +285,12 @@ class HandleSchemaConformFilterTest {
 
     @Test
     void testTemplateUrl_emptyCollection_returnsUrlError() {
-        // Given - no templates for the collection
+        // Given - no templates for collection 123, only for 456
         URLTemplate template = RuntimeUtil.createUrlTemplate("/api/other/INTEGER", URLMethods.Method.GET);
-        setupTestConfig(Collections.emptyMap(), createTemplateMap(456, template));
+        Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods = createApiUrlMap("456:/api/other/INTEGER", URLMethods.Method.GET);
+        setupTestConfig(apiInfoUrlToMethods, createTemplateMap(456, template));
+
+        // Actual static URL from incoming request for collection 123
         HttpResponseParams responseParam = createResponseParam(200, "/api/users/123", "GET");
         ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "/api/users/123", URLMethods.Method.GET);
         List<SchemaConformanceError> errors = new ArrayList<>();
@@ -289,7 +309,8 @@ class HandleSchemaConformFilterTest {
     void testTemplateParameter_integerType_validValue() {
         // Given
         URLTemplate template = RuntimeUtil.createUrlTemplate("/api/users/INTEGER", URLMethods.Method.GET);
-        setupTestConfig(Collections.emptyMap(), createTemplateMap(123, template));
+        Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods = createApiUrlMap("123:/api/users/INTEGER", URLMethods.Method.GET);
+        setupTestConfig(apiInfoUrlToMethods, createTemplateMap(123, template));
         HttpResponseParams responseParam = createResponseParam(200, "/api/users/12345", "GET");
         ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "/api/users/12345", URLMethods.Method.GET);
         List<SchemaConformanceError> errors = new ArrayList<>();
@@ -305,7 +326,8 @@ class HandleSchemaConformFilterTest {
     void testTemplateParameter_integerType_invalidValue() {
         // Given
         URLTemplate template = RuntimeUtil.createUrlTemplate("/api/users/INTEGER", URLMethods.Method.GET);
-        setupTestConfig(Collections.emptyMap(), createTemplateMap(123, template));
+        Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods = createApiUrlMap("123:/api/users/INTEGER", URLMethods.Method.GET);
+        setupTestConfig(apiInfoUrlToMethods, createTemplateMap(123, template));
         HttpResponseParams responseParam = createResponseParam(200, "/api/users/abc", "GET");
         ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "/api/users/abc", URLMethods.Method.GET);
         List<SchemaConformanceError> errors = new ArrayList<>();
@@ -322,7 +344,8 @@ class HandleSchemaConformFilterTest {
     void testTemplateParameter_floatType_validValue() {
         // Given
         URLTemplate template = RuntimeUtil.createUrlTemplate("/api/prices/FLOAT", URLMethods.Method.GET);
-        setupTestConfig(Collections.emptyMap(), createTemplateMap(123, template));
+        Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods = createApiUrlMap("123:/api/prices/FLOAT", URLMethods.Method.GET);
+        setupTestConfig(apiInfoUrlToMethods, createTemplateMap(123, template));
         HttpResponseParams responseParam = createResponseParam(200, "/api/prices/19.99", "GET");
         ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "/api/prices/19.99", URLMethods.Method.GET);
         List<SchemaConformanceError> errors = new ArrayList<>();
@@ -339,7 +362,8 @@ class HandleSchemaConformFilterTest {
     void testTemplateParameter_objectIdType_validValue() {
         // Given
         URLTemplate template = RuntimeUtil.createUrlTemplate("/api/items/OBJECT_ID", URLMethods.Method.GET);
-        setupTestConfig(Collections.emptyMap(), createTemplateMap(123, template));
+        Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods = createApiUrlMap("123:/api/items/OBJECT_ID", URLMethods.Method.GET);
+        setupTestConfig(apiInfoUrlToMethods, createTemplateMap(123, template));
         HttpResponseParams responseParam = createResponseParam(200, "/api/items/507f1f77bcf86cd799439011", "GET");
         ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "/api/items/507f1f77bcf86cd799439011", URLMethods.Method.GET);
         List<SchemaConformanceError> errors = new ArrayList<>();
@@ -355,7 +379,8 @@ class HandleSchemaConformFilterTest {
     void testTemplateParameter_stringType_matchesAnyValue() {
         // Given
         URLTemplate template = RuntimeUtil.createUrlTemplate("/api/categories/STRING", URLMethods.Method.GET);
-        setupTestConfig(Collections.emptyMap(), createTemplateMap(123, template));
+        Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods = createApiUrlMap("123:/api/categories/STRING", URLMethods.Method.GET);
+        setupTestConfig(apiInfoUrlToMethods, createTemplateMap(123, template));
         HttpResponseParams responseParam = createResponseParam(200, "/api/categories/electronics", "GET");
         ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "/api/categories/electronics", URLMethods.Method.GET);
         List<SchemaConformanceError> errors = new ArrayList<>();
@@ -371,7 +396,8 @@ class HandleSchemaConformFilterTest {
     void testTemplateParameter_multipleParameters_allValid() {
         // Given
         URLTemplate template = RuntimeUtil.createUrlTemplate("/api/users/INTEGER/posts/INTEGER", URLMethods.Method.GET);
-        setupTestConfig(Collections.emptyMap(), createTemplateMap(123, template));
+        Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods = createApiUrlMap("123:/api/users/INTEGER/posts/INTEGER", URLMethods.Method.GET);
+        setupTestConfig(apiInfoUrlToMethods, createTemplateMap(123, template));
         HttpResponseParams responseParam = createResponseParam(200, "/api/users/42/posts/999", "GET");
         ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "/api/users/42/posts/999", URLMethods.Method.GET);
         List<SchemaConformanceError> errors = new ArrayList<>();
@@ -387,7 +413,8 @@ class HandleSchemaConformFilterTest {
     void testTemplateParameter_multipleParameters_oneInvalid() {
         // Given
         URLTemplate template = RuntimeUtil.createUrlTemplate("/api/users/INTEGER/posts/INTEGER", URLMethods.Method.GET);
-        setupTestConfig(Collections.emptyMap(), createTemplateMap(123, template));
+        Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods = createApiUrlMap("123:/api/users/INTEGER/posts/INTEGER", URLMethods.Method.GET);
+        setupTestConfig(apiInfoUrlToMethods, createTemplateMap(123, template));
         HttpResponseParams responseParam = createResponseParam(200, "/api/users/abc/posts/999", "GET");
         ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "/api/users/abc/posts/999", URLMethods.Method.GET);
         List<SchemaConformanceError> errors = new ArrayList<>();
@@ -404,7 +431,8 @@ class HandleSchemaConformFilterTest {
     void testTemplateParameter_mixedTypes_correctMatching() {
         // Given - template with INTEGER, STRING parameters
         URLTemplate template = RuntimeUtil.createUrlTemplate("/api/users/INTEGER/profile/STRING/active", URLMethods.Method.GET);
-        setupTestConfig(Collections.emptyMap(), createTemplateMap(123, template));
+        Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods = createApiUrlMap("123:/api/users/INTEGER/profile/STRING/active", URLMethods.Method.GET);
+        setupTestConfig(apiInfoUrlToMethods, createTemplateMap(123, template));
         HttpResponseParams responseParam = createResponseParam(200, "/api/users/123/profile/public/active", "GET");
         ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "/api/users/123/profile/public/active", URLMethods.Method.GET);
         List<SchemaConformanceError> errors = new ArrayList<>();
@@ -420,7 +448,8 @@ class HandleSchemaConformFilterTest {
     void testTemplateParameter_differentSegmentCount_noMatch() {
         // Given
         URLTemplate template = RuntimeUtil.createUrlTemplate("/api/users/INTEGER", URLMethods.Method.GET);
-        setupTestConfig(Collections.emptyMap(), createTemplateMap(123, template));
+        Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods = createApiUrlMap("123:/api/users/INTEGER", URLMethods.Method.GET);
+        setupTestConfig(apiInfoUrlToMethods, createTemplateMap(123, template));
         HttpResponseParams responseParam = createResponseParam(200, "/api/users/123/posts", "GET");
         ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "/api/users/123/posts", URLMethods.Method.GET);
         List<SchemaConformanceError> errors = new ArrayList<>();
@@ -437,61 +466,73 @@ class HandleSchemaConformFilterTest {
 
     @Test
     void testUrlNormalization_queryParameters_removedBeforeMatching() {
-        // Given
+        // Given - apiInfoUrlToMethods contains normalized URL
         setupTestConfig(createApiUrlMap("123:/api/users", URLMethods.Method.GET), Collections.emptyMap());
+
+        // Actual request URL with query parameters (non-normalized)
         HttpResponseParams responseParam = createResponseParam(200, "/api/users?page=1&limit=10", "GET");
-        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "/api/users", URLMethods.Method.GET);
+        // ApiInfoKey also has the non-normalized URL (same as responseParam)
+        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "/api/users?page=1&limit=10", URLMethods.Method.GET);
         List<SchemaConformanceError> errors = new ArrayList<>();
 
         // When
         List<SchemaConformanceError> result = MaliciousTrafficDetectorTask.handleSchemaConformFilter(responseParam, apiInfoKey, errors);
 
-        // Then
+        // Then - should match after normalization removes query params
         assertThat(result).isEmpty();
     }
 
     @Test
     void testUrlNormalization_fragments_removedBeforeMatching() {
-        // Given
+        // Given - apiInfoUrlToMethods contains normalized URL
         setupTestConfig(createApiUrlMap("123:/api/users", URLMethods.Method.GET), Collections.emptyMap());
+
+        // Actual request URL with fragment (non-normalized)
         HttpResponseParams responseParam = createResponseParam(200, "/api/users#section1", "GET");
-        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "/api/users", URLMethods.Method.GET);
+        // ApiInfoKey also has the non-normalized URL (same as responseParam)
+        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "/api/users#section1", URLMethods.Method.GET);
         List<SchemaConformanceError> errors = new ArrayList<>();
 
         // When
         List<SchemaConformanceError> result = MaliciousTrafficDetectorTask.handleSchemaConformFilter(responseParam, apiInfoKey, errors);
 
-        // Then
+        // Then - should match after normalization removes fragment
         assertThat(result).isEmpty();
     }
 
     @Test
     void testUrlNormalization_trailingSlash_normalizedBeforeMatching() {
-        // Given
+        // Given - apiInfoUrlToMethods contains normalized URL (no trailing slash)
         setupTestConfig(createApiUrlMap("123:/api/users", URLMethods.Method.GET), Collections.emptyMap());
+
+        // Actual request URL with trailing slash (non-normalized)
         HttpResponseParams responseParam = createResponseParam(200, "/api/users/", "GET");
-        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "/api/users", URLMethods.Method.GET);
+        // ApiInfoKey also has the non-normalized URL (same as responseParam)
+        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "/api/users/", URLMethods.Method.GET);
         List<SchemaConformanceError> errors = new ArrayList<>();
 
         // When
         List<SchemaConformanceError> result = MaliciousTrafficDetectorTask.handleSchemaConformFilter(responseParam, apiInfoKey, errors);
 
-        // Then
+        // Then - should match after normalization removes trailing slash
         assertThat(result).isEmpty();
     }
 
     @Test
     void testUrlNormalization_combinedQueryAndFragment_bothRemoved() {
-        // Given
+        // Given - apiInfoUrlToMethods contains normalized URL
         setupTestConfig(createApiUrlMap("123:/api/users", URLMethods.Method.GET), Collections.emptyMap());
+
+        // Actual request URL with both query params and fragment (non-normalized)
         HttpResponseParams responseParam = createResponseParam(200, "/api/users?page=1#top", "GET");
-        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "/api/users", URLMethods.Method.GET);
+        // ApiInfoKey also has the non-normalized URL (same as responseParam)
+        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "/api/users?page=1#top", URLMethods.Method.GET);
         List<SchemaConformanceError> errors = new ArrayList<>();
 
         // When
         List<SchemaConformanceError> result = MaliciousTrafficDetectorTask.handleSchemaConformFilter(responseParam, apiInfoKey, errors);
 
-        // Then
+        // Then - should match after normalization removes both query params and fragment
         assertThat(result).isEmpty();
     }
 
