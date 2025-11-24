@@ -54,6 +54,9 @@ public class TestingRun {
     public static final String SEND_SLACK_ALERT = "sendSlackAlert";
     private boolean sendSlackAlert = false;
 
+    public static final String DO_NOT_MARK_ISSUES_AS_FIXED = "doNotMarkIssuesAsFixed";
+    private boolean doNotMarkIssuesAsFixed = false;
+
     public TestingRun() { }
 
     public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, String triggeredBy, boolean sendSlackAlert) {
@@ -227,6 +230,15 @@ public class TestingRun {
     public void setMiniTestingServiceName(String miniTestingServiceName) {
         this.miniTestingServiceName = miniTestingServiceName;
     }
+
+    public boolean getDoNotMarkIssuesAsFixed() {
+        return doNotMarkIssuesAsFixed;
+    }
+
+    public void setDoNotMarkIssuesAsFixed(boolean doNotMarkIssuesAsFixed) {
+        this.doNotMarkIssuesAsFixed = doNotMarkIssuesAsFixed;
+    }
+
 
     @Override
     public String toString() {
