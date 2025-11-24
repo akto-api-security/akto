@@ -7,6 +7,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -15,6 +16,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import org.apache.kafka.clients.consumer.*;
 import org.bson.types.ObjectId;
 
@@ -27,6 +30,7 @@ import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.info.SingleTestPayload;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.TestExecutor;
 import com.akto.testing.Utils;
 import com.akto.util.Constants;
@@ -43,10 +47,13 @@ public class ConsumerUtil {
     static{
         properties.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, 10000); 
     }
-    private static Consumer<String, String> consumer = Constants.IS_NEW_TESTING_ENABLED ? new KafkaConsumer<>(properties) : null; 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ConsumerUtil.class);
+    private static Consumer<String, String> consumer = Constants.IS_NEW_TESTING_ENABLED ? new KafkaConsumer<>(properties) : null;
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ConsumerUtil.class, LogDb.TESTING);
     public static ExecutorService executor = Executors.newFixedThreadPool(150);
     private static final int maxRunTimeForTests = 5 * 60;
+    private static final DataActor dataActor = DataActorFactory.fetchInstance();
+
+    private static final ConcurrentHashMap<ApiInfoKey, Integer> testedApisMap = new ConcurrentHashMap<>();
 
     public static SingleTestPayload parseTestMessage(String message) {
         JSONObject jsonObject = JSON.parseObject(message);
@@ -74,10 +81,13 @@ public class ConsumerUtil {
         if(messagesList == null || messagesList.isEmpty()){}
         else{
             String sample = messagesList.get(messagesList.size() - 1);
-            loggerMaker.info("Running test for: " + apiInfoKey + " with subcategory: " + subCategory);
+            loggerMaker.infoAndAddToDb("Running test for: " + apiInfoKey + " with subcategory: " + subCategory);
             TestingRunResult runResult = executor.runTestNew(apiInfoKey, singleTestPayload.getTestingRunId(), instance.getTestingUtil(), singleTestPayload.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), singleTestPayload.getTestLogs(), sample);
             executor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
-            loggerMaker.insertImportantTestingLog("Test completed for: " + apiInfoKey + " with subcategory: " + subCategory + " in " + (Context.now() - timeNow) + " seconds"); 
+
+            testedApisMap.put(apiInfoKey, Context.now());
+
+            loggerMaker.insertImportantTestingLog("Test completed for: " + apiInfoKey + " with subcategory: " + subCategory + " in " + (Context.now() - timeNow) + " seconds");
         }
     }
 
@@ -95,6 +105,23 @@ public class ConsumerUtil {
 
         TestingRunResult runResult = Utils.generateFailedRunResultForMessage(singleTestPayload.getTestingRunId(), singleTestPayload.getApiInfoKey(), testSuperType, testSubType, singleTestPayload.getTestingRunResultSummaryId(), new ArrayList<>(),  TestError.TEST_TIMED_OUT.getMessage());
         testExecutor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
+    }
+
+    /**
+     * Performs bulk update of lastTested field for all APIs that were tested
+     */
+    private void flushLastTestedUpdates() {
+        if (testedApisMap.isEmpty()) {
+            loggerMaker.infoAndAddToDb("No APIs to update for lastTested field");
+            return;
+        }
+
+        try {
+            dataActor.bulkUpdateLastTestedField(testedApisMap);
+            testedApisMap.clear();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error during bulk update of lastTested field: " + e.getMessage());
+        }
     }
     
     public void init(int maxRunTimeInSeconds) {
@@ -134,7 +161,7 @@ public class ConsumerUtil {
             parallelConsumer.poll(record -> {
                 String threadName = Thread.currentThread().getName();
                 String message = record.value();
-                loggerMaker.info("Thread [" + threadName + "] picked up record: " + message);
+                loggerMaker.infoAndAddToDb("Thread [" + threadName + "] picked up record: " + message);
                 try {
                     if(!executor.isShutdown()){
                         Future<?> future = executor.submit(() -> runTestFromMessage(message));
@@ -142,35 +169,35 @@ public class ConsumerUtil {
                         try {
                             future.get(maxRunTimeForTests, TimeUnit.SECONDS); 
                         } catch (InterruptedException | TimeoutException e) {
-                            loggerMaker.error("Task timed out");
+                            loggerMaker.errorAndAddToDb("Task timed out");
                             future.cancel(true);
                             createTimedOutResultFromMessage(message);
                         } catch(RejectedExecutionException e){
                             future.cancel(true);
                         } catch (Exception e) {
                             future.cancel(true);
-                            loggerMaker.error("Error in task execution: " + message, e);
+                            loggerMaker.errorAndAddToDb(e, "Error in task execution: " + message);
                         }
                     }
                     
                 } finally {
-                    loggerMaker.info("Thread [" + threadName + "] finished processing record: " + message);
+                    loggerMaker.infoAndAddToDb("Thread [" + threadName + "] finished processing record: " + message);
                 }
             });
 
             while (parallelConsumer != null) {
                 if(!GetRunningTestsStatus.getRunningTests().isTestRunning(summaryObjectId)){
-                    loggerMaker.info("Tests have been marked stopped.");
+                    loggerMaker.infoAndAddToDb("Tests have been marked stopped.");
                     executor.shutdownNow();
                     break;
                 }
                 else if ((Context.now() - startTime > maxRunTimeInSeconds)) {
-                    loggerMaker.info("Max run time reached. Stopping consumer.");
+                    loggerMaker.infoAndAddToDb("Max run time reached. Stopping consumer.");
                     executor.shutdownNow();
                     break;
                 }else if(firstRecordRead.get() && parallelConsumer.workRemaining() == 0){
                     int remainingTime = Math.min( Math.max(0,maxRunTimeInSeconds - (Context.now() - startTime)), maxRunTimeForTests);
-                    loggerMaker.info("Records are empty now, thus executing final tests");
+                    loggerMaker.infoAndAddToDb("Records are empty now, thus executing final tests");
                     executor.shutdown();
                     executor.awaitTermination(remainingTime, TimeUnit.SECONDS);
                     break;
@@ -179,9 +206,12 @@ public class ConsumerUtil {
             }
 
         } catch (Exception e) {
-            loggerMaker.info("Error in polling records");
+            loggerMaker.errorAndAddToDb(e, "Error in polling records");
         }finally{
-            loggerMaker.info("Closing consumer as all results have been executed.");
+            loggerMaker.infoAndAddToDb("Closing consumer as all results have been executed.");
+
+            flushLastTestedUpdates();
+
             parallelConsumer.closeDrainFirst();
             parallelConsumer = null;
             consumer.close();

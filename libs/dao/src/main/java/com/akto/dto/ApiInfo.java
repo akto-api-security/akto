@@ -124,6 +124,14 @@ public class ApiInfo {
             return apiCollectionId + " " + url + " " + method;
         }
 
+        public static ApiInfoKey fromString(String apiInfoKeyString) {
+            String[] split = apiInfoKeyString.split(" ");
+            ApiInfoKey apiInfoKey = new ApiInfoKey();
+            apiInfoKey.setApiCollectionId(Integer.parseInt(split[0]));
+            apiInfoKey.setUrl(split[1]);
+            apiInfoKey.setMethod(URLMethods.Method.valueOf(split[2]));
+            return apiInfoKey;
+        }
     }
 
 
