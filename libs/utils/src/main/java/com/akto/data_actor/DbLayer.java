@@ -209,13 +209,18 @@ public class DbLayer {
     }
 
     public static List<ApiInfo> fetchApiRateLimits(ApiInfo.ApiInfoKey lastApiInfoKey) {
+
+        Bson existsFilter = Filters.empty();
+        Bson filters = Filters.empty();
+        if(Context.accountId.get() == 1758179941){
+            loggerMaker.info("Fetch all api infos for Dil");
+        }else {
+            existsFilter = Filters.and(
+                Filters.ne("rateLimits", null),
+                Filters.ne("rateLimitConfidence", null)
+            );
+        }
         // Filter for documents that have both rateLimits and rateLimitConfidence fields
-        Bson existsFilter = Filters.and(
-            Filters.ne("rateLimits", null),
-            Filters.ne("rateLimitConfidence", null)
-        );
-        
-        Bson filters = existsFilter;
         
         // Add pagination filter if lastApiInfoKey is provided
         if (lastApiInfoKey != null) {
