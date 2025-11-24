@@ -500,7 +500,11 @@ const transform = {
                         return (index < 4 ? <Tooltip dismissOnMouseOut content={item} key={index + item}><Box>
                             <div className={deactivated ? "icon-deactivated" : ""}>
                                 {isSvgString ? (
-                                    <div dangerouslySetInnerHTML={{__html: iconSource}} style={{display: 'flex', alignItems: 'center', width: '20px', height: '20px'}} />
+                                    <img
+                                        src={`data:image/svg+xml;base64,${btoa(iconSource)}`}
+                                        alt={item}
+                                        style={{display: 'flex', alignItems: 'center', width: '20px', height: '20px'}}
+                                    />
                                 ) : (
                                     <Icon color={deactivated ? "" : "subdued"} source={iconSource} />
                                 )}
