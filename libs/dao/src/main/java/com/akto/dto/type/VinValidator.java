@@ -1,4 +1,4 @@
-package com.akto.dto.type.standard;
+package com.akto.dto.type;
 
 import java.util.regex.Pattern;
 
