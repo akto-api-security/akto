@@ -90,6 +90,7 @@ public class MaliciousTrafficDetectorTask implements Task {
   private Map<String, FilterConfig> apiFilters;
   private List<ApiInfo> apiInfos;
   private int filterLastUpdatedAt = 0;
+  private int apiInfoLastUpdatedAt = 0;
   private int filterUpdateIntervalSec = 900;
 
   private final KafkaProtoProducer internalKafka;
@@ -322,7 +323,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
   private List<ApiInfo> getApiInfos() {
     int now = (int) (System.currentTimeMillis() / 1000);
-    if (now - filterLastUpdatedAt < filterUpdateIntervalSec) {
+    if (now - apiInfoLastUpdatedAt < filterUpdateIntervalSec) {
       return apiInfos;
     }
 
@@ -346,7 +347,7 @@ public class MaliciousTrafficDetectorTask implements Task {
       }
     }
 
-    this.filterLastUpdatedAt = now;
+    this.apiInfoLastUpdatedAt = now;
     
     return apiInfos;
 
@@ -381,6 +382,13 @@ public class MaliciousTrafficDetectorTask implements Task {
 
   
   private List<SchemaConformanceError> handleSchemaConformFilter(HttpResponseParams responseParam, ApiInfo.ApiInfoKey apiInfoKey, List<SchemaConformanceError> errors){
+    // Early return if status code not in 200-300
+    if(responseParam.getStatusCode() < 200 && responseParam.getStatusCode() >= 300){
+      return errors;
+    }
+
+    apiInfos = getApiInfos();
+
     int apiCollectionId = apiInfoKey.getApiCollectionId();
 
     // Api info was found
@@ -396,8 +404,8 @@ public class MaliciousTrafficDetectorTask implements Task {
                              apiInfoKey.getUrl() + " " + apiInfoKey.getMethod());
       
       RequestValidator.addError("#/paths", apiInfoKey.getUrl(), "url",
-        "URL not found in discovered traffic: " + apiInfoKey.getUrl() + " " + apiInfoKey.getMethod());
-      return errors;
+        "API not found in discovered traffic: " + apiInfoKey.getMethod() + " " + apiInfoKey.getUrl());
+      return RequestValidator.getErrors();
     }
 
     for(URLTemplate urlTemplate: urlTemplates){
@@ -406,7 +414,7 @@ public class MaliciousTrafficDetectorTask implements Task {
       }
     }
     RequestValidator.addError("#/paths", apiInfoKey.getUrl(), "url",
-        "URL not found in discovered traffic: " + apiInfoKey.getUrl() + " " + apiInfoKey.getMethod());
+        "Api not found in discovered traffic: " + apiInfoKey.getMethod() + " " + apiInfoKey.getUrl());
     return RequestValidator.getErrors();
   }
 
