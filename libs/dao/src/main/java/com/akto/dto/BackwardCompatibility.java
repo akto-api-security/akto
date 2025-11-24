@@ -117,6 +117,9 @@ public class BackwardCompatibility {
 
     public static final String FILL_LAST_TESTED_FIELD = "fillLastTestedField";
 
+    public static final String CREATE_VIN_SUPPORT_DATA_TYPE = "createVinSupportDataType";
+    private int createVinSupportDataType;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -127,7 +130,7 @@ public class BackwardCompatibility {
                                  int deactivateCollections, int disableAwsSecretPii, int apiCollectionAutomatedField, 
                                  int automatedApiGroups, int addAdminRoleIfAbsent, int dropSpecialCharacterApiCollections, int fixApiAccessType,
                                  int addDefaultFilters, int moveAzureSamlToNormalSaml, int deleteOptionsAPIs, int moveOktaOidcSSO, int markSummariesVulnerable,
-                                 int changeOperatorConditionInCDT, int cleanupRbacEntries, int fillLastTestedField, int fillQueryParams) {
+                                 int changeOperatorConditionInCDT, int cleanupRbacEntries, int fillLastTestedField, int fillQueryParams, int createVinSupportDataType) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -165,6 +168,7 @@ public class BackwardCompatibility {
         this.cleanupRbacEntries = cleanupRbacEntries;
         this.fillLastTestedField = fillLastTestedField; 
         this.fillQueryParams = fillQueryParams;
+        this.createVinSupportDataType = createVinSupportDataType;
     }
 
     public BackwardCompatibility() {
@@ -496,5 +500,13 @@ public class BackwardCompatibility {
 
     public void setFillQueryParams(int fillQueryParams) {
         this.fillQueryParams = fillQueryParams;
+    }
+
+    public int getCreateVinSupportDataType() {
+        return createVinSupportDataType;
+    }
+
+    public void setCreateVinSupportDataType(int createVinSupportDataType) {
+        this.createVinSupportDataType = createVinSupportDataType;
     }
 }

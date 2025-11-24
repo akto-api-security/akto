@@ -2434,6 +2434,12 @@ public class InitializerListener implements ServletContextListener {
                         public void accept(Account account) {
                             logger.info("Starting createIndices for " + account.getId() + " at " + now);
                             DaoInit.createIndices();
+                            BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(Filters.empty());
+                            if (backwardCompatibility == null) {
+                                backwardCompatibility = new BackwardCompatibility();
+                                BackwardCompatibilityDao.instance.insertOne(backwardCompatibility);
+                            }
+                            newSetBackwardCompatibilities(backwardCompatibility);
                         }
                     }, "context-initializer-secondary");
                     logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
@@ -3327,6 +3333,22 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public static void createVinSupportDataType(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getCreateVinSupportDataType() == 0){
+            int now = Context.now();
+            IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
+            AktoDataType dataType = new AktoDataType("VIN", true, Collections.emptyList(), now, ignoreData, false, true, Arrays.asList("PII"), Severity.MEDIUM);
+            AktoDataTypeDao.instance.insertOne(dataType);
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.CREATE_VIN_SUPPORT_DATA_TYPE, Context.now())
+            );
+        }
+    }
+
+    public static void newSetBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
+        createVinSupportDataType(backwardCompatibility);
+    }
 
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         if (DashboardMode.isMetered()) {
