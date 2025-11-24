@@ -486,8 +486,8 @@ public class DbActor extends DataActor {
     }
 
     @Override
-    public void bulkUpdateLastTestedField(List<ApiInfo.ApiInfoKey> apiInfoKeys, int timestamp) {
-        DbLayer.bulkUpdateLastTestedField(apiInfoKeys, timestamp);
+    public void bulkUpdateLastTestedField(Map<ApiInfo.ApiInfoKey, Integer> testedApisMap) {
+        DbLayer.bulkUpdateLastTestedField(testedApisMap);
     }
 
     public void updateTestInitiatedCountInTestSummary(String summaryId, int testInitiatedCount) {

@@ -2219,22 +2219,14 @@ public class ClientActor extends DataActor {
     }
 
     @Override
-    public void bulkUpdateLastTestedField(List<ApiInfo.ApiInfoKey> apiInfoKeys, int timestamp) {
-        if (apiInfoKeys == null || apiInfoKeys.isEmpty()) {
-            return;
-        }
+    public void bulkUpdateLastTestedField(Map<ApiInfo.ApiInfoKey, Integer> testedApisMap) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
-        List<Map<String, Object>> apiInfoKeysList = new ArrayList<>();
-        for (ApiInfo.ApiInfoKey apiInfoKey : apiInfoKeys) {
-            Map<String, Object> keyMap = new HashMap<>();
-            keyMap.put("apiCollectionId", apiInfoKey.getApiCollectionId());
-            keyMap.put("url", apiInfoKey.getUrl());
-            keyMap.put("method", apiInfoKey.getMethod().name());
-            apiInfoKeysList.add(keyMap);
+        Map<String, Integer> testedApisMapObj = new HashMap<>();
+        for (Map.Entry<ApiInfo.ApiInfoKey, Integer> entry : testedApisMap.entrySet()) {
+            testedApisMapObj.put(entry.getKey().toString(), entry.getValue());
         }
-        obj.put("apiInfoKeysList", apiInfoKeysList);
-        obj.put("timestamp", timestamp);
+        obj.put("testedApisMap", testedApisMapObj);
         String objString = gson.toJson(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/bulkUpdateLastTestedField", "", "POST", objString, headers, "");
         try {

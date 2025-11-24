@@ -185,7 +185,7 @@ public abstract class DataActor {
 
     public abstract void updateLastTestedField(int apiCollectionId, String url, String method);
 
-    public abstract void bulkUpdateLastTestedField(List<ApiInfo.ApiInfoKey> apiInfoKeys, int timestamp);
+    public abstract void bulkUpdateLastTestedField(Map<ApiInfo.ApiInfoKey, Integer> testedApisMap);
 
     public abstract void insertTestingRunResults(TestingRunResult testingRunResults);
 
