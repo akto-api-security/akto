@@ -1594,6 +1594,27 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    Map<String, Integer> testedApisMap;
+
+    public String bulkUpdateLastTestedField() {
+        try {
+            if (testedApisMap == null || testedApisMap.isEmpty()) {
+                return Action.ERROR.toUpperCase();
+            }
+
+            Map<ApiInfoKey, Integer> apiInfoKeyIntegerMap = new HashMap<>();
+            for(Map.Entry<String, Integer> entry : testedApisMap.entrySet()) {
+                apiInfoKeyIntegerMap.put(ApiInfoKey.fromString(entry.getKey()), entry.getValue());
+            }
+
+            DbLayer.bulkUpdateLastTestedField(apiInfoKeyIntegerMap);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in bulkUpdateLastTestedField " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String updateTestInitiatedCountInTestSummary() {
         try {
             DbLayer.updateTestInitiatedCountInTestSummary(summaryId, testInitiatedCount);
@@ -2771,6 +2792,15 @@ public class DbAction extends ActionSupport {
 
     public void setTestingRunPlayground(TestingRunPlayground testingRunPlayground) {
         this.testingRunPlayground = testingRunPlayground;
+    }
+
+
+    public Map<String, Integer> getTestedApisMap() {
+        return testedApisMap;
+    }
+
+    public void setTestedApisMap(Map<String, Integer> testedApisMap) {
+        this.testedApisMap = testedApisMap;
     }
 
 }
