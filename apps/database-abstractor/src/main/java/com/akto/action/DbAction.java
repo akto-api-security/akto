@@ -2207,31 +2207,22 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-
-    List<Map<String, Object>> apiInfoKeysList;
-    int timestamp;
+    Map<String, Integer> testedApisMap;
 
     public String bulkUpdateLastTestedField() {
         try {
-            if (apiInfoKeysList == null || apiInfoKeysList.isEmpty()) {
+            if (testedApisMap == null || testedApisMap.isEmpty()) {
                 return Action.ERROR.toUpperCase();
             }
-            List<ApiInfo.ApiInfoKey> apiInfoKeys = new ArrayList<>();
-            for (Map<String, Object> keyMap : apiInfoKeysList) {
-                int apiCollectionIdVal = 0;
-                try {
-                    apiCollectionIdVal = (int)(long) keyMap.get("apiCollectionId");
-                } catch (Exception e) {
-                    apiCollectionIdVal = (int) keyMap.get("apiCollectionId");
-                }
-                String urlVal = (String) keyMap.get("url");
-                String methodStr = (String) keyMap.get("method");
-                URLMethods.Method methodEnum = URLMethods.Method.fromString(methodStr);
-                ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionIdVal, urlVal, methodEnum);
-                apiInfoKeys.add(apiInfoKey);
+
+            Map<ApiInfoKey, Integer> apiInfoKeyIntegerMap = new HashMap<>();
+            for(Map.Entry<String, Integer> entry : testedApisMap.entrySet()) {
+                apiInfoKeyIntegerMap.put(ApiInfoKey.fromString(entry.getKey()), entry.getValue());
             }
-            DbLayer.bulkUpdateLastTestedField(apiInfoKeys, timestamp);
+
+            DbLayer.bulkUpdateLastTestedField(apiInfoKeyIntegerMap);
         } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in bulkUpdateLastTestedField " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -4300,19 +4291,11 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public int getTimestamp() {
-        return timestamp;
+    public Map<String, Integer> getTestedApisMap() {
+        return testedApisMap;
     }
 
-    public void setTimestamp(int timestamp) {
-        this.timestamp = timestamp;
-    }
-
-    public List<Map<String, Object>> getApiInfoKeysList() {
-        return apiInfoKeysList;
-    }
-
-    public void setApiInfoKeysList(List<Map<String, Object>> apiInfoKeysList) {
-        this.apiInfoKeysList = apiInfoKeysList;
+    public void setTestedApisMap(Map<String, Integer> testedApisMap) {
+        this.testedApisMap = testedApisMap;
     }
 }
