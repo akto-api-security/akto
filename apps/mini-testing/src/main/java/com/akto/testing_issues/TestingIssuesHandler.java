@@ -7,8 +7,6 @@ import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
-import com.akto.dto.testing.GenericTestResult;
-import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
@@ -83,49 +81,6 @@ public class TestingIssuesHandler {
 
     public static final String SET_OPERATION = "set";
 
-    /**
-     * Checks if a test has failed (has errors).
-     * A test is considered failed if:
-     * 1. The errorsList is not null and not empty, OR
-     * 2. ALL test results have errors (if there are test results)
-     */
-    private boolean hasTestFailed(TestingRunResult runResult) {
-        if (runResult == null) {
-            return false;
-        }
-
-        // Check errorsList
-        List<String> errorsList = runResult.getErrorsList();
-        if (errorsList != null && !errorsList.isEmpty()) {
-            return true;
-        }
-
-        // Check test results for errors - only mark as failed if ALL test results have errors
-        List<GenericTestResult> testResults = runResult.getTestResults();
-        if (testResults != null && !testResults.isEmpty()) {
-            int testResultCount = 0;
-            int testResultsWithErrors = 0;
-
-            for (GenericTestResult testResult : testResults) {
-                if (testResult instanceof TestResult) {
-                    testResultCount++;
-                    TestResult tr = (TestResult) testResult;
-                    List<String> errors = tr.getErrors();
-                    if (errors != null && !errors.isEmpty()) {
-                        testResultsWithErrors++;
-                    }
-                }
-            }
-
-            // Only mark as failed if ALL test results have errors
-            if (testResultCount > 0 && testResultsWithErrors == testResultCount) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     private void writeUpdateQueryIntoWriteModel(List<Object> writeModelList,
                                                 Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap,
                                                 List<TestingRunIssues> testingRunIssuesList) {
@@ -149,8 +104,7 @@ public class TestingIssuesHandler {
                     updatePayload = new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name(), SET_OPERATION);
                     updates.add(updatePayload.toString());
                 }
-            } else if (!hasTestFailed(runResult)){
-                // Don't mark as FIXED if test failed (e.g., 401, API call failed, etc.)
+            } else {
                 updatePayload = new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED.name(), SET_OPERATION);
                 updates.add(updatePayload.toString());
             }
