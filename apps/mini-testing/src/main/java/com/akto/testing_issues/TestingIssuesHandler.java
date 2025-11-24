@@ -7,6 +7,7 @@ import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
@@ -83,7 +84,8 @@ public class TestingIssuesHandler {
 
     private void writeUpdateQueryIntoWriteModel(List<Object> writeModelList,
                                                 Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap,
-                                                List<TestingRunIssues> testingRunIssuesList) {
+                                                List<TestingRunIssues> testingRunIssuesList,
+                                                boolean doNotMarkIssuesAsFixed) {
         int lastSeen = Context.now();
 
         testingRunIssuesList.forEach(testingRunIssues -> {
@@ -104,10 +106,11 @@ public class TestingIssuesHandler {
                     updatePayload = new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name(), SET_OPERATION);
                     updates.add(updatePayload.toString());
                 }
-            } else {
+            } else if (!doNotMarkIssuesAsFixed) {
                 updatePayload = new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED.name(), SET_OPERATION);
                 updates.add(updatePayload.toString());
             }
+            // When flag is true we intentionally avoid touching the status for non-vulnerable results
 
             String severity = TestExecutor.getSeverityFromTestingRunResult(runResult).toString();
             updatePayload = new UpdatePayload(TestingRunIssues.KEY_SEVERITY, severity, SET_OPERATION);
@@ -215,7 +218,18 @@ public class TestingIssuesHandler {
 
         loggerMaker.infoAndAddToDb(String.format("Total list of issues from db : %s", testingRunIssuesList.size()), LogDb.TESTING);
         List<Object> writeModelList = new ArrayList<>();
-        writeUpdateQueryIntoWriteModel(writeModelList, testingIssuesIdsMap, testingRunIssuesList);
+        boolean doNotMarkIssuesAsFixedFlag = false;
+        if (testingRunResultList != null && !testingRunResultList.isEmpty()) {
+            TestingRunResult firstResult = testingRunResultList.get(0);
+            if (firstResult != null && firstResult.getTestRunId() != null) {
+                TestingRun testingRun = dataActor.findTestingRun(firstResult.getTestRunId().toHexString());
+                if (testingRun != null) {
+                    doNotMarkIssuesAsFixedFlag = testingRun.getDoNotMarkIssuesAsFixed();
+                }
+            }
+        }
+
+        writeUpdateQueryIntoWriteModel(writeModelList, testingIssuesIdsMap, testingRunIssuesList, doNotMarkIssuesAsFixedFlag);
         loggerMaker.infoAndAddToDb(String.format("Total write queries after the update iterations: %s", writeModelList.size()), LogDb.TESTING);
         insertVulnerableTestsIntoIssuesCollection(writeModelList, testingIssuesIdsMap, testingRunIssuesList);
         loggerMaker.infoAndAddToDb(String.format("Total write queries after the insertion iterations: %s", writeModelList.size()), LogDb.TESTING);
