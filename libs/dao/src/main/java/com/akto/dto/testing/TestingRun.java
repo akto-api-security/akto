@@ -219,10 +219,6 @@ public class TestingRun {
         this.miniTestingServiceName = miniTestingServiceName;
     }
 
-    public boolean isDoNotMarkIssuesAsFixed() {
-        return doNotMarkIssuesAsFixed;
-    }
-
     public boolean getDoNotMarkIssuesAsFixed() {
         return doNotMarkIssuesAsFixed;
     }
