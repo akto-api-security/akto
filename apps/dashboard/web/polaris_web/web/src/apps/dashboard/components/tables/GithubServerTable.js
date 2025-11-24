@@ -10,6 +10,7 @@ import {
   Key,
   ChoiceList,
   Tabs,
+  LegacyTabs,
   Text,
   Link} from '@shopify/polaris';
 import { GithubRow} from './rows/GithubRow';
@@ -92,6 +93,7 @@ function GithubServerTable(props) {
 
   const [sortableColumns, setSortableColumns] = useState([])
   const [activeColumnSort, setActiveColumnSort] = useState({columnIndex: -1, sortDirection: 'descending'})
+  const [filterNegationState, setFilterNegationState] = useState({})
 
   let filterOperators = props.headers.reduce((map, e) => { map[e.sortKey || e.filterKey || e.value] = 'OR'; return map }, {})
 
@@ -130,6 +132,17 @@ function GithubServerTable(props) {
     const tempFilters = appliedFilters.filter((filter) => !filter?.key?.includes("dateRange"))
     updateQueryParams("filters",tableFunc.getPrettifiedFilter(tempFilters))
   },[appliedFilters])
+
+  // Initialize negation state from appliedFilters
+  useEffect(() => {
+    const negationMap = {};
+    appliedFilters.forEach(filter => {
+      if (filter.value && typeof filter.value === 'object' && filter.value.negated !== undefined) {
+        negationMap[filter.key] = filter.value.negated;
+      }
+    });
+    setFilterNegationState(negationMap);
+  }, [appliedFilters])
 
   async function fetchData(searchVal, tempFilters = []) {
     if (abortControllerRef.current) {
@@ -249,20 +262,21 @@ function GithubServerTable(props) {
       normalizedValue = value;
     }
     
-    // Only add filter if it has values (or is a dateRange)
-    if (normalizedValue.values?.length > 0 || normalizedValue.since || key.includes("dateRange")) {
+    // Only add filter if it has values, is a dateRange, or has explicit negation state
+    const hasExplicitNegation = normalizedValue.negated !== undefined && normalizedValue.negated !== false;
+    if (normalizedValue.values?.length > 0 || normalizedValue.since || key.includes("dateRange") || hasExplicitNegation) {
       // Extract values for disambiguateLabel - it expects an array for non-dateRange filters
       // For dateRange, pass the object as-is since disambiguateLabel handles it specially
-      const labelValue = key.includes("dateRange") 
-        ? normalizedValue 
+      const labelValue = key.includes("dateRange")
+        ? normalizedValue
         : (normalizedValue.values || []);
       let label = props.disambiguateLabel(key, labelValue);
-      
+
       // Add negation prefix if negated (only for non-dateRange filters)
       if (normalizedValue.negated && !key.includes("dateRange")) {
         label = `Exclude: ${label}`;
       }
-      
+
       temp.push({
         key: key,
         label: label,
@@ -311,12 +325,19 @@ function GithubServerTable(props) {
   }
 
   const handleNegationToggle = (key, negated) => {
+    // Always update the negation state for this filter
+    setFilterNegationState(prev => ({
+      ...prev,
+      [key]: negated
+    }));
+
     const currentFilter = appliedFilters.find(f => f.key === key);
     if (currentFilter) {
       const currentValue = currentFilter.value;
       const values = Array.isArray(currentValue) ? currentValue : (currentValue?.values || []);
       changeAppliedFilters(key, { values, negated });
     } else {
+      // Even with no values, we still update the filter with the negation state
       changeAppliedFilters(key, { values: [], negated });
     }
   }
@@ -327,7 +348,7 @@ function GithubServerTable(props) {
 
   const filters = useMemo(() => {
     return formatFilters(props.filters);
-  }, [props.filters, appliedFilters]);
+  }, [props.filters, appliedFilters, filterNegationState]);
 
   const handleDateChange = (dateObj, filterKey) => {
     dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})
@@ -340,33 +361,44 @@ function GithubServerTable(props) {
       .map((filter) => {
         const currentFilter = appliedFilters.find((localFilter) => localFilter.key === filter.key);
         const filterValue = currentFilter?.value || filter.selected || [];
+        // Check if we have a stored negation state for this filter
+        const storedNegation = filterNegationState[filter.key];
         // Normalize filter value to new format {values, negated}
-        const normalizedValue = Array.isArray(filterValue) 
-          ? { values: filterValue, negated: false }
-          : (filterValue?.values !== undefined ? filterValue : { values: filterValue || [], negated: false });
+        const normalizedValue = Array.isArray(filterValue)
+          ? { values: filterValue, negated: storedNegation !== undefined ? storedNegation : false }
+          : (filterValue?.values !== undefined ? { ...filterValue, negated: storedNegation !== undefined ? storedNegation : filterValue.negated } : { values: filterValue || [], negated: storedNegation !== undefined ? storedNegation : false });
         
         // Add negation choice only if component-level negation is supported (GithubSimpleTable)
         // Individual filters can still opt-out via filter.supportsNegation === false
         const supportsNegation = props.supportsNegationFilter === true && filter.supportsNegation !== false;
-        const negationChoices = supportsNegation ? [
-          { label: 'Include', value: 'include' },
-          { label: 'Exclude', value: 'exclude' }
-        ] : [];
-        
+
         return {
           key: filter.key,
           label: filter.label,
           filter: (
             <div>
               {supportsNegation && (
-                <ChoiceList
-                  title="Filter type"
-                  titleHidden
-                  choices={negationChoices}
-                  selected={normalizedValue.negated ? ['exclude'] : ['include']}
-                  onChange={(value) => handleNegationToggle(filter.key, value[0] === 'exclude')}
-                  allowMultiple={false}
-                />
+                <div style={{ marginBottom: '6px' }}>
+                  <LegacyTabs
+                    tabs={[
+                      {
+                        id: 'include',
+                        content: 'Include',
+                        panelID: 'include-panel'
+                      },
+                      {
+                        id: 'exclude',
+                        content: 'Exclude',
+                        panelID: 'exclude-panel'
+                      }
+                    ]}
+                    selected={normalizedValue.negated ? 1 : 0}
+                    onSelect={(selectedTabIndex) => {
+                      handleNegationToggle(filter.key, selectedTabIndex === 1);
+                    }}
+                    fitted
+                  />
+                </div>
               )}
               {filter.choices.length < 10 ?
                 <ChoiceList
