@@ -9,6 +9,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -88,9 +89,7 @@ public class MaliciousTrafficDetectorTask implements Task {
   private final RawApiMetadataFactory rawApiFactory;
 
   private Map<String, FilterConfig> apiFilters;
-  private List<ApiInfo> apiInfos;
   private int filterLastUpdatedAt = 0;
-  private int apiInfoLastUpdatedAt = 0;
   private int filterUpdateIntervalSec = 900;
 
   private final KafkaProtoProducer internalKafka;
@@ -110,8 +109,6 @@ public class MaliciousTrafficDetectorTask implements Task {
   private static List<FilterConfig> ignoredEventFilters = new ArrayList<>();
   private final AtomicInteger applyFilterLogCount = new AtomicInteger(0);
   private static final int MAX_APPLY_FILTER_LOGS = 1000;
-  private static Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates = new HashMap<>();
-  private static HashSet<String> apiInfoKeys = new HashSet<>();
 
   // Kafka records per minute tracking
   private int recordsReadCount = 0;
@@ -321,37 +318,6 @@ public class MaliciousTrafficDetectorTask implements Task {
     return apiFilters;
   }
 
-  private List<ApiInfo> getApiInfos() {
-    int now = (int) (System.currentTimeMillis() / 1000);
-    if (now - apiInfoLastUpdatedAt < filterUpdateIntervalSec) {
-      return apiInfos;
-    }
-
-    apiInfos = dataActor.fetchApiInfos();
-    logger.debugAndAddToDb("total api infos fetched  " + apiInfos.size());
-
-    for(ApiInfo apiInfo: apiInfos){
-      String url = apiInfo.getId().getUrl();
-
-      apiInfoKeys.add(apiInfo.getId().toString());
-
-      if(APICatalog.isTemplateUrl(url)){
-        URLTemplate urlTemplate = RuntimeUtil.createUrlTemplate(url, apiInfo.getId().getMethod());
-        int apiCollectionId = apiInfo.getId().getApiCollectionId();
-
-        if(!apiCollectionUrlTemplates.containsKey(apiCollectionId)){
-          apiCollectionUrlTemplates.put(apiCollectionId, new ArrayList<>());
-        }
-
-        apiCollectionUrlTemplates.get(apiCollectionId).add(urlTemplate);
-      }
-    }
-
-    this.apiInfoLastUpdatedAt = now;
-    
-    return apiInfos;
-
-  }
 
   private String getApiSchema(int apiCollectionId) {
     String apiSchema = null;
@@ -380,41 +346,75 @@ public class MaliciousTrafficDetectorTask implements Task {
     return apiSchema;
   }
 
-  
   private List<SchemaConformanceError> handleSchemaConformFilter(HttpResponseParams responseParam, ApiInfo.ApiInfoKey apiInfoKey, List<SchemaConformanceError> errors){
     // Early return if status code not in 200-300
-    if(responseParam.getStatusCode() < 200 && responseParam.getStatusCode() >= 300){
+    if(responseParam.getStatusCode() < 200 || responseParam.getStatusCode() >= 300){
       return errors;
     }
 
-    apiInfos = getApiInfos();
+    // Get API info data from cache (guaranteed non-null)
+    AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
+    Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods = config.getApiInfoUrlToMethods();
+    Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates = config.getApiCollectionUrlTemplates();
+
+    if(apiInfoUrlToMethods.isEmpty() && apiCollectionUrlTemplates.isEmpty()) {
+      logger.infoAndAddToDb("No api infos found for validating schema");
+      return errors;
+    }
 
     int apiCollectionId = apiInfoKey.getApiCollectionId();
+    String url = apiInfoKey.getUrl();
+    URLMethods.Method method = apiInfoKey.getMethod();
 
-    // Api info was found
-    if(apiInfoKeys.contains(apiInfoKey.toString())){
+    // Check if exact URL + method combination exists
+    String urlKey = apiCollectionId + ":" + url;
+    Set<URLMethods.Method> methods = apiInfoUrlToMethods.get(urlKey);
+
+    // Case 1: Both URL and method found - no error
+    if(methods != null && methods.contains(method)){
       return errors;
+
+    }else if(methods != null && !methods.contains(method)){
+      // Case 2: URL found but method not found - new method detected
+      RequestValidator.addError("#/paths" + url, method.name(), "method",
+        String.format("Method %s not available for path %s in discovered traffic",
+          method.name(), responseParam.getRequestParams().getURL()));
+          return RequestValidator.getErrors();
     }
 
-    // If not found check in template urls
+
+    // Case 3: URL not found in static URLs, check in template URLs
     List<URLTemplate> urlTemplates = apiCollectionUrlTemplates.get(apiCollectionId);
     if(urlTemplates == null || urlTemplates.isEmpty()){
       // No templates for this collection - URL not found
       logger.debugAndAddToDb("Schema conformance error: URL not found in discovered traffic - " +
-                             apiInfoKey.getUrl() + " " + apiInfoKey.getMethod());
-      
-      RequestValidator.addError("#/paths", apiInfoKey.getUrl(), "url",
-        "API not found in discovered traffic: " + apiInfoKey.getMethod() + " " + apiInfoKey.getUrl());
+                             url + " " + method);
+
+      RequestValidator.addError("#/paths", url, "url",
+        "API not found in discovered traffic: " + method + " " + url);
       return RequestValidator.getErrors();
     }
 
+    // Single-pass template matching: check URL pattern and method together
     for(URLTemplate urlTemplate: urlTemplates){
-      if(urlTemplate.match(apiInfoKey.getUrl(), apiInfoKey.getMethod())){
-        return errors;
+      URLTemplate.MatchResult result = urlTemplate.matchTemplate(url, method);
+
+      if(result == URLTemplate.MatchResult.FULL_MATCH) {
+        return errors;  // Perfect match - both URL pattern and method
+      }
+
+      if(result == URLTemplate.MatchResult.URL_MATCH_METHOD_MISMATCH) {
+        // URL pattern matched but method doesn't match - new method detected
+        RequestValidator.addError("#/paths" + url, method.name(), "method",
+          String.format("Method %s not available for path %s in discovered traffic",
+            method.name(), responseParam.getRequestParams().getURL()));
+        return RequestValidator.getErrors();
       }
     }
-    RequestValidator.addError("#/paths", apiInfoKey.getUrl(), "url",
-        "Api not found in discovered traffic: " + apiInfoKey.getMethod() + " " + apiInfoKey.getUrl());
+
+    // No template matched at all - URL pattern not found
+    RequestValidator.addError("#/paths", url, "url",
+        "API not found in discovered traffic: " + method + " " + url);
     return RequestValidator.getErrors();
   }
 

@@ -2,8 +2,10 @@ package com.akto.threat.detection.cache;
 
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLTemplate;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,18 +21,19 @@ public class AccountConfig {
     private final Map<Integer, Boolean> apiCollections;
     private final List<ApiInfo> apiInfos;
     private final Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates;
-    private final Set<String> apiInfoKeys;
+    private final Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods;
 
     public AccountConfig(int accountId, boolean isRedacted, List<ApiCollection> apiCollections,
                          List<ApiInfo> apiInfos, Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates,
-                         Set<String> apiInfoKeys) {
+                         Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods) {
         this.accountId = accountId;
         this.isRedacted = isRedacted;
         this.apiCollections  = new HashMap<>();
         initMapApiCollectionsFromList(apiCollections);
-        this.apiInfos = apiInfos;
-        this.apiCollectionUrlTemplates = apiCollectionUrlTemplates;
-        this.apiInfoKeys = apiInfoKeys;
+        // Guarantee non-null collections - use empty collections if null
+        this.apiInfos = apiInfos != null ? apiInfos : Collections.emptyList();
+        this.apiCollectionUrlTemplates = apiCollectionUrlTemplates != null ? apiCollectionUrlTemplates : Collections.emptyMap();
+        this.apiInfoUrlToMethods = apiInfoUrlToMethods != null ? apiInfoUrlToMethods : Collections.emptyMap();
     }
 
     private void initMapApiCollectionsFromList(List<ApiCollection> apiCollections){
@@ -85,10 +88,12 @@ public class AccountConfig {
     }
 
     /**
-     * Get all API info keys
+     * Get API info URL to methods mapping
+     * Key format: "apiCollectionId:url"
+     * Value: Set of HTTP methods for that URL
      */
-    public Set<String> getApiInfoKeys() {
-        return apiInfoKeys;
+    public Map<String, Set<URLMethods.Method>> getApiInfoUrlToMethods() {
+        return apiInfoUrlToMethods;
     }
 
     @Override
@@ -98,7 +103,7 @@ public class AccountConfig {
                 ", isRedacted=" + isRedacted +
                 ", apiCollectionsCount=" + (apiCollections != null ? apiCollections.size() : 0) +
                 ", apiInfosCount=" + (apiInfos != null ? apiInfos.size() : 0) +
-                ", apiInfoKeysCount=" + (apiInfoKeys != null ? apiInfoKeys.size() : 0) +
+                ", apiInfoUrlToMethodsCount=" + (apiInfoUrlToMethods != null ? apiInfoUrlToMethods.size() : 0) +
                 '}';
     }
 }

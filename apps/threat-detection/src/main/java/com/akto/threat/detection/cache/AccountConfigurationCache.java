@@ -79,20 +79,27 @@ public class AccountConfigurationCache {
             logger.infoAndAddToDb("Refreshing account configuration cache");
             AccountSettings accountSettings = dataActor.fetchAccountSettings();
             List <ApiCollection> apiCollections = dataActor.fetchAllApiCollections();
+            // This will fetch paginated apiInfos with _id, rateLimits fields.
             List<ApiInfo> apiInfos = dataActor.fetchApiRateLimits(null);
 
-            // Build API info metadata structures
+            // Build API info metadata structures - always non-null
             Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates = new HashMap<>();
-            Set<String> apiInfoKeys = new HashSet<>();
+            Map<String, Set<com.akto.dto.type.URLMethods.Method>> apiInfoUrlToMethods = new HashMap<>();
 
-            if (apiInfos != null) {
+            // Process API infos only if available
+            if (apiInfos != null && !apiInfos.isEmpty()) {
                 for (ApiInfo apiInfo : apiInfos) {
                     String url = apiInfo.getId().getUrl();
-                    apiInfoKeys.add(apiInfo.getId().toString());
+                    int apiCollectionId = apiInfo.getId().getApiCollectionId();
+                    com.akto.dto.type.URLMethods.Method method = apiInfo.getId().getMethod();
 
+                    // Build URL to methods map with key format: "apiCollectionId:url"
+                    String urlKey = apiCollectionId + ":" + url;
+                    apiInfoUrlToMethods.computeIfAbsent(urlKey, k -> new HashSet<>()).add(method);
+
+                    // Build URL templates for parameterized URLs
                     if (APICatalog.isTemplateUrl(url)) {
-                        URLTemplate urlTemplate = RuntimeUtil.createUrlTemplate(url, apiInfo.getId().getMethod());
-                        int apiCollectionId = apiInfo.getId().getApiCollectionId();
+                        URLTemplate urlTemplate = RuntimeUtil.createUrlTemplate(url, method);
 
                         if (!apiCollectionUrlTemplates.containsKey(apiCollectionId)) {
                             apiCollectionUrlTemplates.put(apiCollectionId, new ArrayList<>());
@@ -102,6 +109,7 @@ public class AccountConfigurationCache {
                     }
                 }
             }
+            // Note: Maps remain empty (not null) if apiInfos is null/empty
 
             this.cachedConfig = new AccountConfig(
                 accountSettings.getId(),
@@ -109,7 +117,7 @@ public class AccountConfigurationCache {
                 apiCollections,
                 apiInfos,
                 apiCollectionUrlTemplates,
-                apiInfoKeys
+                apiInfoUrlToMethods
             );
             this.lastRefreshTime = System.currentTimeMillis();
             logger.infoAndAddToDb("Account configuration cache refreshed successfully. AccountId: " +
