@@ -3,13 +3,15 @@ package com.akto.threat.detection.tasks;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
@@ -36,6 +38,9 @@ import com.akto.dto.api_protection_parse_layer.Rule;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLTemplate;
+import com.akto.dto.type.APICatalog;
+import com.akto.runtime.RuntimeUtil;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
@@ -313,6 +318,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     return apiFilters;
   }
 
+
   private String getApiSchema(int apiCollectionId) {
     String apiSchema = null;
     try {
@@ -339,6 +345,91 @@ public class MaliciousTrafficDetectorTask implements Task {
     }
     return apiSchema;
   }
+
+  public static List<SchemaConformanceError> handleSchemaConformFilter(HttpResponseParams responseParam, ApiInfo.ApiInfoKey apiInfoKey, List<SchemaConformanceError> errors){
+    // Early return if status code not in 200-300
+    if(responseParam.getStatusCode() < 200 || responseParam.getStatusCode() >= 300){
+      return errors;
+    }
+
+    // Get API info data from cache (guaranteed non-null)
+    AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
+    Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods = config.getApiInfoUrlToMethods();
+    Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates = config.getApiCollectionUrlTemplates();
+
+    if(apiInfoUrlToMethods.isEmpty() && apiCollectionUrlTemplates.isEmpty()) {
+      logger.infoAndAddToDb("No api infos found for validating schema");
+      return errors;
+    }
+
+    int apiCollectionId = apiInfoKey.getApiCollectionId();
+    String url = apiInfoKey.getUrl();
+    URLMethods.Method method = apiInfoKey.getMethod();
+
+    // Normalize URL: remove query parameters, fragments, and trailing slashes
+    if (url.contains("?")) {
+      url = url.substring(0, url.indexOf("?"));
+    }
+    if (url.contains("#")) {
+      url = url.substring(0, url.indexOf("#"));
+    }
+    if (url.endsWith("/")) {
+      url = url.substring(0, url.length() - 1);
+    }
+
+    // Check if exact URL + method combination exists
+    String urlKey = apiCollectionId + ":" + url;
+    Set<URLMethods.Method> methods = apiInfoUrlToMethods.get(urlKey);
+
+    // Case 1: Both URL and method found - no error
+    if(methods != null && methods.contains(method)){
+      return errors;
+
+    }else if(methods != null && !methods.contains(method)){
+      // Case 2: URL found but method not found - new method detected
+      RequestValidator.addError("#/paths" + url, method.name(), "method",
+        String.format("Method %s not available for path %s in discovered traffic",
+          method.name(), responseParam.getRequestParams().getURL()));
+          return RequestValidator.getErrors();
+    }
+
+
+    // Case 3: URL not found in static URLs, check in template URLs
+    List<URLTemplate> urlTemplates = apiCollectionUrlTemplates.get(apiCollectionId);
+    if(urlTemplates == null || urlTemplates.isEmpty()){
+      // No templates for this collection - URL not found
+      logger.debugAndAddToDb("Schema conformance error: URL not found in discovered traffic - " +
+                             url + " " + method);
+
+      RequestValidator.addError("#/paths", url, "url",
+        "API not found in discovered traffic: " + method + " " + url);
+      return RequestValidator.getErrors();
+    }
+
+    // Single-pass template matching: check URL pattern and method together
+    for(URLTemplate urlTemplate: urlTemplates){
+      URLTemplate.MatchResult result = urlTemplate.matchTemplate(url, method);
+
+      if(result == URLTemplate.MatchResult.FULL_MATCH) {
+        return errors;  // Perfect match - both URL pattern and method
+      }
+
+      if(result == URLTemplate.MatchResult.URL_MATCH_METHOD_MISMATCH) {
+        // URL pattern matched but method doesn't match - new method detected
+        RequestValidator.addError("#/paths" + url, method.name(), "method",
+          String.format("Method %s not available for path %s template %s in discovered traffic",
+            method.name(), responseParam.getRequestParams().getURL(), urlTemplate.getTemplateString()));
+       
+        return RequestValidator.getErrors();
+      }
+    }
+
+    // No template matched at all - URL pattern not found
+    RequestValidator.addError("#/paths", url, "url",
+        "API not found in discovered traffic: " + method + " " + url);
+    return RequestValidator.getErrors();
+  }
+
 
   private void processRecord(HttpResponseParam record) throws Exception {
     HttpResponseParams responseParam = buildHttpResponseParam(record);
@@ -431,17 +522,19 @@ public class MaliciousTrafficDetectorTask implements Task {
 
       // Evaluate filter first (ignore and filter are independent conditions)
       // SchemaConform check is disabled
-      if(false && apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
+      if(Context.accountId.get() == 1758179941 && apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
         logger.debug("SchemaConform filter found for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
-        String apiSchema = getApiSchema(apiCollectionId);
+        vulnerable = handleSchemaConformFilter(responseParam, apiInfoKey, vulnerable); 
+        
+        // String apiSchema = getApiSchema(apiCollectionId);
 
-        if (apiSchema == null || apiSchema.isEmpty()) {
+        // if (apiSchema == null || apiSchema.isEmpty()) {
 
-          continue;
+        //   continue;
 
-        }
+        // }
 
-        vulnerable = RequestValidator.validate(responseParam, apiSchema, apiInfoKey.toString());
+        // vulnerable = RequestValidator.validate(responseParam, apiSchema, apiInfoKey.toString());
         hasPassedFilter = vulnerable != null && !vulnerable.isEmpty();
 
       }else {

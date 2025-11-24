@@ -3,11 +3,19 @@ package com.akto.threat.detection.cache;
 import com.akto.data_actor.DataActor;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
+import com.akto.dto.type.APICatalog;
+import com.akto.dto.type.URLTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.runtime.RuntimeUtil;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Thread-safe singleton cache for account configuration.
@@ -70,15 +78,52 @@ public class AccountConfigurationCache {
         try {
             logger.infoAndAddToDb("Refreshing account configuration cache");
             AccountSettings accountSettings = dataActor.fetchAccountSettings();
+            logger.infoAndAddToDb("Fetched accountSettings in configuration cache");
             List <ApiCollection> apiCollections = dataActor.fetchAllApiCollections();
+            // This will fetch paginated apiInfos with _id, rateLimits fields.
+            List<ApiInfo> apiInfos = dataActor.fetchApiRateLimits(null);
+
+            // Build API info metadata structures - always non-null
+            Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates = new HashMap<>();
+            Map<String, Set<com.akto.dto.type.URLMethods.Method>> apiInfoUrlToMethods = new HashMap<>();
+
+            // Process API infos only if available
+            if (apiInfos != null && !apiInfos.isEmpty()) {
+                for (ApiInfo apiInfo : apiInfos) {
+                    String url = apiInfo.getId().getUrl();
+                    int apiCollectionId = apiInfo.getId().getApiCollectionId();
+                    com.akto.dto.type.URLMethods.Method method = apiInfo.getId().getMethod();
+
+                    // Build URL to methods map with key format: "apiCollectionId:url"
+                    String urlKey = apiCollectionId + ":" + url;
+                    apiInfoUrlToMethods.computeIfAbsent(urlKey, k -> new HashSet<>()).add(method);
+
+                    // Build URL templates for parameterized URLs
+                    if (APICatalog.isTemplateUrl(url)) {
+                        URLTemplate urlTemplate = RuntimeUtil.createUrlTemplate(url, method);
+
+                        if (!apiCollectionUrlTemplates.containsKey(apiCollectionId)) {
+                            apiCollectionUrlTemplates.put(apiCollectionId, new ArrayList<>());
+                        }
+
+                        apiCollectionUrlTemplates.get(apiCollectionId).add(urlTemplate);
+                    }
+                }
+            }
+            // Note: Maps remain empty (not null) if apiInfos is null/empty
+
             this.cachedConfig = new AccountConfig(
                 accountSettings.getId(),
                 accountSettings.isRedactPayload(),
-                apiCollections
+                apiCollections,
+                apiInfos,
+                apiCollectionUrlTemplates,
+                apiInfoUrlToMethods
             );
             this.lastRefreshTime = System.currentTimeMillis();
             logger.infoAndAddToDb("Account configuration cache refreshed successfully. AccountId: " +
-                                  accountSettings.getId() + ", API Collections: " + apiCollections.size());
+                                  accountSettings.getId() + ", API Collections: " + apiCollections.size() +
+                                  ", API Infos: " + (apiInfos != null ? apiInfos.size() : 0));
         } catch (Exception e) {
             logger.errorAndAddToDb(e, "Error refreshing account configuration cache. Keeping old cache if available.");
         }
@@ -92,6 +137,18 @@ public class AccountConfigurationCache {
             this.cachedConfig = null;
             this.lastRefreshTime = 0;
             logger.infoAndAddToDb("Account configuration cache cleared");
+        }
+    }
+
+    /**
+     * For testing only - directly set cache config without DataActor.
+     * This allows tests to inject test data without mocking DataActor.
+     */
+    public void setConfigForTesting(AccountConfig config) {
+        synchronized (lock) {
+            this.cachedConfig = config;
+            this.lastRefreshTime = System.currentTimeMillis();
+            logger.infoAndAddToDb("Account configuration cache set for testing");
         }
     }
 

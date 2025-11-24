@@ -200,7 +200,7 @@ public class RequestValidator {
     return schemaNode;
   }
 
-  private static void addError(String schemaPath, String instancePath, String attribute, String message) {
+  public static void addError(String schemaPath, String instancePath, String attribute, String message) {
     errors.clear();
     errorBuilder.clear();
     errorBuilder.setSchemaPath(schemaPath);
