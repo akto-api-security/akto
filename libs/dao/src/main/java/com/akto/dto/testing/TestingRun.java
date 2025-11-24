@@ -32,7 +32,7 @@ public class TestingRun {
     @Getter
     @Setter
     private boolean sendSlackAlert = false;
-    
+
     public static final String SELECTED_SLACK_CHANNEL_ID = "selectedSlackChannelId";
     @Getter
     @Setter
@@ -55,6 +55,9 @@ public class TestingRun {
     public enum TestingRunType{
         ONE_TIME, RECURRING, CI_CD, CONTINUOUS_TESTING
     }
+
+    public static final String DO_NOT_MARK_ISSUES_AS_FIXED = "doNotMarkIssuesAsFixed";
+    private boolean doNotMarkIssuesAsFixed = false;
 
     public TestingRun() { }
 
@@ -215,6 +218,15 @@ public class TestingRun {
     public void setMiniTestingServiceName(String miniTestingServiceName) {
         this.miniTestingServiceName = miniTestingServiceName;
     }
+
+    public boolean getDoNotMarkIssuesAsFixed() {
+        return doNotMarkIssuesAsFixed;
+    }
+
+    public void setDoNotMarkIssuesAsFixed(boolean doNotMarkIssuesAsFixed) {
+        this.doNotMarkIssuesAsFixed = doNotMarkIssuesAsFixed;
+    }
+
 
     @Override
     public String toString() {
