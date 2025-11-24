@@ -83,6 +83,12 @@ public class TestingIssuesHandler {
 
     public static final String SET_OPERATION = "set";
 
+    /**
+     * Checks if a test has failed (has errors).
+     * A test is considered failed if:
+     * 1. The errorsList is not null and not empty, OR
+     * 2. ALL test results have errors (if there are test results)
+     */
     private boolean hasTestFailed(TestingRunResult runResult) {
         if (runResult == null) {
             return false;
@@ -94,17 +100,26 @@ public class TestingIssuesHandler {
             return true;
         }
 
-        // Check test results for errors
+        // Check test results for errors - only mark as failed if ALL test results have errors
         List<GenericTestResult> testResults = runResult.getTestResults();
-        if (testResults != null) {
+        if (testResults != null && !testResults.isEmpty()) {
+            int testResultCount = 0;
+            int testResultsWithErrors = 0;
+
             for (GenericTestResult testResult : testResults) {
                 if (testResult instanceof TestResult) {
+                    testResultCount++;
                     TestResult tr = (TestResult) testResult;
                     List<String> errors = tr.getErrors();
                     if (errors != null && !errors.isEmpty()) {
-                        return true;
+                        testResultsWithErrors++;
                     }
                 }
+            }
+
+            // Only mark as failed if ALL test results have errors
+            if (testResultCount > 0 && testResultsWithErrors == testResultCount) {
+                return true;
             }
         }
 
