@@ -494,9 +494,16 @@ const transform = {
             <Box maxWidth="200px">
                 <HorizontalStack gap={1} wrap={false}>
                     {sensitiveTags.map((item,index)=>{
+                        const iconSource = func.getSensitiveIcons(item);
+                        const isSvgString = typeof iconSource === 'string' && iconSource.trim().startsWith('<svg');
+
                         return (index < 4 ? <Tooltip dismissOnMouseOut content={item} key={index + item}><Box>
                             <div className={deactivated ? "icon-deactivated" : ""}>
-                                <Icon color={deactivated ? "" : "subdued"} source={func.getSensitiveIcons(item)} />
+                                {isSvgString ? (
+                                    <div dangerouslySetInnerHTML={{__html: iconSource}} style={{display: 'flex', alignItems: 'center', width: '20px', height: '20px'}} />
+                                ) : (
+                                    <Icon color={deactivated ? "" : "subdued"} source={iconSource} />
+                                )}
                             </div>
                         </Box></Tooltip> : null)
                     })}
