@@ -346,7 +346,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     return apiSchema;
   }
 
-  private List<SchemaConformanceError> handleSchemaConformFilter(HttpResponseParams responseParam, ApiInfo.ApiInfoKey apiInfoKey, List<SchemaConformanceError> errors){
+  public static List<SchemaConformanceError> handleSchemaConformFilter(HttpResponseParams responseParam, ApiInfo.ApiInfoKey apiInfoKey, List<SchemaConformanceError> errors){
     // Early return if status code not in 200-300
     if(responseParam.getStatusCode() < 200 || responseParam.getStatusCode() >= 300){
       return errors;

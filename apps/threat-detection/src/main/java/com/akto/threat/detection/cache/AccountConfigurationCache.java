@@ -140,6 +140,18 @@ public class AccountConfigurationCache {
     }
 
     /**
+     * For testing only - directly set cache config without DataActor.
+     * This allows tests to inject test data without mocking DataActor.
+     */
+    public void setConfigForTesting(AccountConfig config) {
+        synchronized (lock) {
+            this.cachedConfig = config;
+            this.lastRefreshTime = System.currentTimeMillis();
+            logger.infoAndAddToDb("Account configuration cache set for testing");
+        }
+    }
+
+    /**
      * Get time remaining until next auto-refresh (in seconds).
      */
     public long getTimeUntilRefresh() {
