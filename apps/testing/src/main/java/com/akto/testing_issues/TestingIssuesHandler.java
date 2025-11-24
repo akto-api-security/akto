@@ -8,6 +8,8 @@ import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.GenericTestResult;
+import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
@@ -41,6 +43,40 @@ public class TestingIssuesHandler {
      *
      * */
 
+    /**
+     * Checks if a test has failed (has errors).
+     * A test is considered failed if:
+     * 1. The errorsList is not null and not empty, OR
+     * 2. Any test result has errors
+     */
+    private boolean hasTestFailed(TestingRunResult runResult) {
+        if (runResult == null) {
+            return false;
+        }
+
+        // Check errorsList
+        List<String> errorsList = runResult.getErrorsList();
+        if (errorsList != null && !errorsList.isEmpty()) {
+            return true;
+        }
+
+        // Check test results for errors
+        List<GenericTestResult> testResults = runResult.getTestResults();
+        if (testResults != null) {
+            for (GenericTestResult testResult : testResults) {
+                if (testResult instanceof TestResult) {
+                    TestResult tr = (TestResult) testResult;
+                    List<String> errors = tr.getErrors();
+                    if (errors != null && !errors.isEmpty()) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
     private void writeUpdateQueryIntoWriteModel(List<WriteModel<TestingRunIssues>> writeModelList,
                                                 Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap,
                                                 List<TestingRunIssues> testingRunIssuesList) {
@@ -61,6 +97,9 @@ public class TestingIssuesHandler {
                 updateStatusFields = new BsonDocument();
             } else if (runResult.isVulnerable()) {
                 updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN);
+            } else if (hasTestFailed(runResult)) {
+                // Don't mark as FIXED if test failed (e.g., 401, API call failed, etc.)
+                updateStatusFields = new BsonDocument();
             } else {
                 updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED);
             }
