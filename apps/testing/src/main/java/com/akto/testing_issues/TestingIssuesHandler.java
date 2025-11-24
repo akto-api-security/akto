@@ -3,6 +3,7 @@ package com.akto.testing_issues;
 import static com.akto.util.Constants.ID;
 
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
@@ -10,6 +11,7 @@ import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
@@ -43,52 +45,10 @@ public class TestingIssuesHandler {
      *
      * */
 
-    /**
-     * Checks if a test has failed (has errors).
-     * A test is considered failed if:
-     * 1. The errorsList is not null and not empty, OR
-     * 2. ALL test results have errors (if there are test results)
-     */
-    private boolean hasTestFailed(TestingRunResult runResult) {
-        if (runResult == null) {
-            return false;
-        }
-
-        // Check errorsList
-        List<String> errorsList = runResult.getErrorsList();
-        if (errorsList != null && !errorsList.isEmpty()) {
-            return true;
-        }
-
-        // Check test results for errors - only mark as failed if ALL test results have errors
-        List<GenericTestResult> testResults = runResult.getTestResults();
-        if (testResults != null && !testResults.isEmpty()) {
-            int testResultCount = 0;
-            int testResultsWithErrors = 0;
-            
-            for (GenericTestResult testResult : testResults) {
-                if (testResult instanceof TestResult) {
-                    testResultCount++;
-                    TestResult tr = (TestResult) testResult;
-                    List<String> errors = tr.getErrors();
-                    if (errors != null && !errors.isEmpty()) {
-                        testResultsWithErrors++;
-                    }
-                }
-            }
-            
-            // Only mark as failed if ALL test results have errors
-            if (testResultCount > 0 && testResultsWithErrors == testResultCount) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     private void writeUpdateQueryIntoWriteModel(List<WriteModel<TestingRunIssues>> writeModelList,
                                                 Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap,
-                                                List<TestingRunIssues> testingRunIssuesList) {
+                                                List<TestingRunIssues> testingRunIssuesList,
+                                                boolean doNotMarkIssuesAsFixed) {
         int lastSeen = Context.now();
 
         testingRunIssuesList.forEach(testingRunIssues -> {
@@ -106,8 +66,8 @@ public class TestingIssuesHandler {
                 updateStatusFields = new BsonDocument();
             } else if (runResult.isVulnerable()) {
                 updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN);
-            } else if (hasTestFailed(runResult)) {
-                // Don't mark as FIXED if test failed (e.g., 401, API call failed, etc.)
+            } else if (doNotMarkIssuesAsFixed) {
+                // Don't mark as FIXED if the test run has the "do not mark issues as fixed" flag set
                 updateStatusFields = new BsonDocument();
             } else {
                 updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED);
@@ -231,9 +191,21 @@ public class TestingIssuesHandler {
         Bson inQuery = Filters.in(ID, testingIssuesIdsMap.keySet().toArray());
         List<TestingRunIssues> testingRunIssuesList = TestingRunIssuesDao.instance.findAll(inQuery);
 
+        // Fetch TestingRun to check if doNotMarkIssuesAsFixed flag is set
+        boolean doNotMarkIssuesAsFixed = false;
+        if (testingRunResultList != null && !testingRunResultList.isEmpty()) {
+            TestingRunResult firstResult = testingRunResultList.get(0);
+            if (firstResult != null && firstResult.getTestRunId() != null) {
+                TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq(ID, firstResult.getTestRunId()));
+                if (testingRun != null) {
+                    doNotMarkIssuesAsFixed = testingRun.getDoNotMarkIssuesAsFixed();
+                }
+            }
+        }
+
         List<WriteModel<TestingRunIssues>> writeModelList = new ArrayList<>();
         // this will create only the updates {status and summaryId change} for existing issues only
-        writeUpdateQueryIntoWriteModel(writeModelList, testingIssuesIdsMap, testingRunIssuesList);
+        writeUpdateQueryIntoWriteModel(writeModelList, testingIssuesIdsMap, testingRunIssuesList, doNotMarkIssuesAsFixed);
 
 
         insertVulnerableTestsIntoIssuesCollection(writeModelList, testingIssuesIdsMap, testingRunIssuesList);
