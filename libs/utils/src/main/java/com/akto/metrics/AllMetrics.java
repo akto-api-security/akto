@@ -3,14 +3,11 @@ package com.akto.metrics;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.metrics.MetricData;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
-import okhttp3.*;
-
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -28,6 +25,8 @@ public class AllMetrics {
         String prefix = "RT_";
         if(LogDb.THREAT_DETECTION.equals(module)){
             prefix = "TD_";
+        } else if(LogDb.DATA_INGESTION.equals(module)){
+            prefix = "DI_";
         }
         int accountId = Context.accountId.get();
 
@@ -47,6 +46,7 @@ public class AllMetrics {
         kafkaBytesConsumedRate = new SumMetric(prefix+"KAFKA_BYTES_CONSUMED_RATE", 60, accountId, orgId);
         /*
          * TODO: initialize metrics based on the module, to limit avoidable calls.
+         * Note: dataIngestionApiCount is NOT initialized here - use initDataIngestion() instead
          */
 
         metrics = Arrays.asList(runtimeKafkaRecordCount, runtimeKafkaRecordSize, runtimeProcessLatency,
@@ -56,6 +56,7 @@ public class AllMetrics {
                 sampleDataFetchCount, pgDataSizeInMb, kafkaOffset, kafkaRecordsLagMax, kafkaRecordsConsumedRate, kafkaFetchAvgLatency,
                 kafkaBytesConsumedRate, cyborgNewApiCount, cyborgTotalApiCount, deltaCatalogNewCount, deltaCatalogTotalCount,
                 cyborgApiPayloadSize, multipleSampleDataFetchLatency);
+                // Note: dataIngestionApiCount is NOT in this list - added separately by initDataIngestion()
 
         if(executorService == null){
             executorService  = Executors.newScheduledThreadPool(1);
@@ -92,20 +93,60 @@ public class AllMetrics {
         }, 0, 60, TimeUnit.SECONDS);
     }
 
+    /**
+     * Simplified init for data-ingestion-service - only initializes data ingestion metrics
+     * Call this instead of init() to avoid sending zeros for runtime metrics
+     */
+    public void initDataIngestion(int accountId) {
+        String orgId = null;
+        try {
+            Organization organization = DataActorFactory.fetchInstance().fetchOrganization(accountId);
+            orgId = organization.getId();
+        } catch (Exception e) {
+        }
+
+        // Only initialize data ingestion metric
+        dataIngestionApiCount = new SumMetric("DATA_INGESTION_API_COUNT", 60, accountId, orgId);
+
+        // Only include the metric we actually track
+        metrics = Arrays.asList(dataIngestionApiCount);
+
+        if(executorService == null){
+            executorService  = Executors.newScheduledThreadPool(1);
+        }
+
+        executorService.scheduleWithFixedDelay(() -> {
+            try {
+                Context.accountId.set(accountId);
+                BasicDBList list = new BasicDBList();
+                for (Metric m : metrics) {
+                    if (m == null) {
+                        continue;
+                    }
+                    float metric = m.getMetricAndReset();
+
+                    BasicDBObject metricsData = new BasicDBObject();
+                    metricsData.put("metric_id", m.metricId);
+                    metricsData.put("val", metric);
+                    metricsData.put("org_id", m.orgId);
+                    metricsData.put("instance_id", instance_id);
+                    metricsData.put("account_id", m.accountId);
+                    list.add(metricsData);
+                }
+                if(!list.isEmpty()) {
+                    sendDataToAkto(list);
+                }
+            } catch (Exception e){
+                loggerMaker.errorAndAddToDb("Error while sending data ingestion metrics: " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+            }
+        }, 0, 10, TimeUnit.SECONDS);
+    }
+
     private AllMetrics(){}
 
     public static AllMetrics instance = new AllMetrics();
 
-    private static final String URL = "https://logs.akto.io/ingest-metrics";
-
-    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
-            .writeTimeout(1, TimeUnit.SECONDS)
-            .readTimeout(1, TimeUnit.SECONDS)
-            .callTimeout(1, TimeUnit.SECONDS)
-            .build();
-
     private final static LoggerMaker loggerMaker = new LoggerMaker(AllMetrics.class, LogDb.RUNTIME);
-
     private static final String instance_id = UUID.randomUUID().toString();
     private Metric runtimeKafkaRecordCount = null;
     private Metric runtimeKafkaRecordSize = null;
@@ -137,6 +178,7 @@ public class AllMetrics {
     private Metric deltaCatalogTotalCount = null;
     private Metric cyborgApiPayloadSize = null;
     private Metric multipleSampleDataFetchLatency = null;
+    private Metric dataIngestionApiCount = null;
 
     private List<Metric> metrics = null;
 
@@ -290,6 +332,11 @@ public class AllMetrics {
             multipleSampleDataFetchLatency.record(val);
     }
 
+    public void setDataIngestionApiCount(float val){
+        if(dataIngestionApiCount != null)
+            dataIngestionApiCount.record(val);
+    }
+
 
     private static ScheduledExecutorService executorService;
 
@@ -404,27 +451,26 @@ public class AllMetrics {
     }
 
     public static void sendDataToAkto(BasicDBList list){
-        MediaType mediaType = MediaType.parse("application/json");
-        RequestBody body = RequestBody.create(new BasicDBObject("data", list).toJson(), mediaType);
-        Request request = new Request.Builder()
-                .url(URL)
-                .method("POST", body)
-                .addHeader("Content-Type", "application/json")
-                .build();
-        Response response = null;
         try {
-            response =  client.newCall(request).execute();
-        } catch (IOException e) {
-            loggerMaker.errorAndAddToDb(e, "Error while executing request " + request.url() + ": " + e.getMessage());
-        } finally {
-            if (response != null) {
-                response.close();
+            // Convert BasicDBList to List<MetricData>
+            java.util.ArrayList<MetricData> metricDataList = new java.util.ArrayList<>();
+            for (Object obj : list) {
+                BasicDBObject metricsData = (BasicDBObject) obj;
+                String metricId = metricsData.getString("metric_id");
+                Object valObj = metricsData.get("val");
+                float val = valObj instanceof Number ? ((Number) valObj).floatValue() : 0f;
+                String orgId = metricsData.getString("org_id");
+                String instanceId = metricsData.getString("instance_id");
+
+                MetricData metricData = new MetricData(metricId, val, orgId, instanceId, MetricData.MetricType.SUM);
+                metricDataList.add(metricData);
             }
-        }
-        if (response!= null && response.isSuccessful()) {
-            loggerMaker.infoAndAddToDb("Updated traffic_metrics");
-        } else {
-            loggerMaker.infoAndAddToDb("Traffic_metrics not sent");
+
+            // Use DataActor to ingest metrics
+            DataActorFactory.fetchInstance().ingestMetricData(metricDataList);
+            loggerMaker.infoAndAddToDb("Updated traffic_metrics via DataActor");
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error while ingesting metrics: " + e.getMessage());
         }
     }
 }

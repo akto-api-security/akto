@@ -246,4 +246,8 @@ public class DbActor extends DataActor {
     public void insertDataIngestionLog(Log log) {
         DbLayer.insertDataIngestionLog(log);
     }
+
+    public void ingestMetricData(List<com.akto.dto.metrics.MetricData> metricData) {
+        DbLayer.ingestMetricData(metricData);
+    }
 }
