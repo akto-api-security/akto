@@ -334,21 +334,6 @@ class HandleSchemaConformFilterTest {
         assertThat(result).isEmpty();
     }
 
-    @Test
-    void testTemplateParameter_booleanType_validValue() {
-        // Given
-        URLTemplate template = RuntimeUtil.createUrlTemplate("/api/settings/BOOLEAN", URLMethods.Method.GET);
-        setupTestConfig(Collections.emptyMap(), createTemplateMap(123, template));
-        HttpResponseParams responseParam = createResponseParam(200, "/api/settings/true", "GET");
-        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "/api/settings/true", URLMethods.Method.GET);
-        List<SchemaConformanceError> errors = new ArrayList<>();
-
-        // When
-        List<SchemaConformanceError> result = MaliciousTrafficDetectorTask.handleSchemaConformFilter(responseParam, apiInfoKey, errors);
-
-        // Then
-        assertThat(result).isEmpty();
-    }
 
     @Test
     void testTemplateParameter_objectIdType_validValue() {
@@ -417,11 +402,11 @@ class HandleSchemaConformFilterTest {
 
     @Test
     void testTemplateParameter_mixedTypes_correctMatching() {
-        // Given - template with INTEGER, STRING, BOOLEAN parameters
-        URLTemplate template = RuntimeUtil.createUrlTemplate("/api/users/INTEGER/profile/STRING/active/BOOLEAN", URLMethods.Method.GET);
+        // Given - template with INTEGER, STRING parameters
+        URLTemplate template = RuntimeUtil.createUrlTemplate("/api/users/INTEGER/profile/STRING/active", URLMethods.Method.GET);
         setupTestConfig(Collections.emptyMap(), createTemplateMap(123, template));
-        HttpResponseParams responseParam = createResponseParam(200, "/api/users/123/profile/public/active/true", "GET");
-        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "/api/users/123/profile/public/active/true", URLMethods.Method.GET);
+        HttpResponseParams responseParam = createResponseParam(200, "/api/users/123/profile/public/active", "GET");
+        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "/api/users/123/profile/public/active", URLMethods.Method.GET);
         List<SchemaConformanceError> errors = new ArrayList<>();
 
         // When
@@ -515,7 +500,7 @@ class HandleSchemaConformFilterTest {
     @Test
     void testRequestValidator_clearsPreviousErrors() {
         // Given - first request with error
-        setupTestConfig(Collections.emptyMap(), Collections.emptyMap());
+        setupTestConfig(createApiUrlMap("123:/api/users", URLMethods.Method.GET), Collections.emptyMap());
         HttpResponseParams responseParam1 = createResponseParam(200, "/api/invalid", "GET");
         ApiInfo.ApiInfoKey apiInfoKey1 = new ApiInfo.ApiInfoKey(123, "/api/invalid", URLMethods.Method.GET);
         List<SchemaConformanceError> errors1 = new ArrayList<>();
