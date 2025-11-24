@@ -156,7 +156,8 @@ function Metrics() {
         // Cyborg metrics
         'CYBORG_CALL_LATENCY',
         'CYBORG_CALL_COUNT',
-        'CYBORG_DATA_SIZE'
+        'CYBORG_DATA_SIZE',
+        'DATA_INGESTION_API_COUNT'
     ];
 
     const names = [...oldMetrics, ...newMetrics];
@@ -277,7 +278,8 @@ function Metrics() {
     const runtimeMetricsKeys = newMetrics.slice(0, 12);
     const postgresqlMetricsKeys = newMetrics.slice(12, 21);
     const testingMetricsKeys = newMetrics.slice(21, 25);
-    const cyborgMetricsKeys = newMetrics.slice(25);
+    const cyborgMetricsKeys = newMetrics.slice(25, 28);
+    const dataIngestionMetricsKeys = newMetrics.slice(28);
 
     const graphContainer = (
         <>
@@ -312,6 +314,13 @@ function Metrics() {
             <MetricsSection
                 sectionTitle="Cyborg Metrics"
                 metricsToDisplay={cyborgMetricsKeys}
+                orderedResult={orderedResult}
+                nameMap={nameMap}
+                defaultChartOptionsFn={defaultChartOptions}
+            />
+            <MetricsSection
+                sectionTitle="Data Ingestion Metrics"
+                metricsToDisplay={dataIngestionMetricsKeys}
                 orderedResult={orderedResult}
                 nameMap={nameMap}
                 defaultChartOptionsFn={defaultChartOptions}
