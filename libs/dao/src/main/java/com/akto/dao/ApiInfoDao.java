@@ -8,15 +8,7 @@ import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.MongoCursor;
-import com.mongodb.client.model.Accumulators;
-import com.mongodb.client.model.Aggregates;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.IndexOptions;
-import com.mongodb.client.model.Indexes;
-import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.Sorts;
-import com.mongodb.client.model.UnwindOptions;
-import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.*;
 
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -91,6 +83,14 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
             getFilter(apiInfoKey), 
             Updates.set(ApiInfo.LAST_TESTED, Context.now())
         );
+    }
+
+    public void bulkUpdateLastTestedField(Map<ApiInfo.ApiInfoKey, Integer> testedApisMap){
+        ArrayList<WriteModel<ApiInfo>> bulkUpdatesForApiInfo = new ArrayList<>();
+        for(Map.Entry<ApiInfo.ApiInfoKey, Integer> entry : testedApisMap.entrySet()){
+            bulkUpdatesForApiInfo.add(new UpdateManyModel<>(getFilter(entry.getKey()), Updates.set(ApiInfo.LAST_TESTED, entry.getValue()), new UpdateOptions().upsert(false)));
+        }
+        instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo, new BulkWriteOptions().ordered(false));
     }
 
     public Map<Integer,Integer> getCoverageCount(){

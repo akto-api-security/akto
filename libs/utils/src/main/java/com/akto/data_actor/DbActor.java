@@ -487,6 +487,11 @@ public class DbActor extends DataActor {
         DbLayer.updateLastTestedField(apiCollectionId, url, method);
     }
 
+    @Override
+    public void bulkUpdateLastTestedField(Map<ApiInfo.ApiInfoKey, Integer> testedApisMap) {
+        DbLayer.bulkUpdateLastTestedField(testedApisMap);
+    }
+
     public void updateTestInitiatedCountInTestSummary(String summaryId, int testInitiatedCount) {
         DbLayer.updateTestInitiatedCountInTestSummary(summaryId, testInitiatedCount);
     }
