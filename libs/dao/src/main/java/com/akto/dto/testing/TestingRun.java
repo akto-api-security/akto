@@ -270,10 +270,6 @@ public class TestingRun {
         this.sendPendingTestsWebhookTimestamp = sendPendingTestsWebhookTimestamp;
     }
 
-    public boolean isDoNotMarkIssuesAsFixed() {
-        return doNotMarkIssuesAsFixed;
-    }
-
     public boolean getDoNotMarkIssuesAsFixed() {
         return doNotMarkIssuesAsFixed;
     }
