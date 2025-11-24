@@ -417,8 +417,9 @@ public class MaliciousTrafficDetectorTask implements Task {
       if(result == URLTemplate.MatchResult.URL_MATCH_METHOD_MISMATCH) {
         // URL pattern matched but method doesn't match - new method detected
         RequestValidator.addError("#/paths" + url, method.name(), "method",
-          String.format("Method %s not available for path %s in discovered traffic",
-            method.name(), responseParam.getRequestParams().getURL()));
+          String.format("Method %s not available for path %s template %s in discovered traffic",
+            method.name(), responseParam.getRequestParams().getURL(), urlTemplate.getTemplateString()));
+       
         return RequestValidator.getErrors();
       }
     }

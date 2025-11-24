@@ -78,6 +78,7 @@ public class AccountConfigurationCache {
         try {
             logger.infoAndAddToDb("Refreshing account configuration cache");
             AccountSettings accountSettings = dataActor.fetchAccountSettings();
+            logger.infoAndAddToDb("Fetched accountSettings in configuration cache");
             List <ApiCollection> apiCollections = dataActor.fetchAllApiCollections();
             // This will fetch paginated apiInfos with _id, rateLimits fields.
             List<ApiInfo> apiInfos = dataActor.fetchApiRateLimits(null);
