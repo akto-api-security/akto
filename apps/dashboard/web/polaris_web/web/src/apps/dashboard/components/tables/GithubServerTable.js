@@ -378,26 +378,36 @@ function GithubServerTable(props) {
           filter: (
             <div>
               {supportsNegation && (
-                <div style={{ marginBottom: '6px' }}>
-                  <LegacyTabs
-                    tabs={[
-                      {
-                        id: 'include',
-                        content: 'Include',
-                        panelID: 'include-panel'
-                      },
-                      {
-                        id: 'exclude',
-                        content: 'Exclude',
-                        panelID: 'exclude-panel'
-                      }
-                    ]}
-                    selected={normalizedValue.negated ? 1 : 0}
-                    onSelect={(selectedTabIndex) => {
-                      handleNegationToggle(filter.key, selectedTabIndex === 1);
-                    }}
-                    fitted
-                  />
+                <div style={{
+                  marginBottom: '8px',
+                  marginLeft: '-8px',
+                  marginRight: '-8px',
+                  marginTop: '-8px'
+                }}>
+                  <div style={{
+                    fontSize: '12px',
+                    lineHeight: '1.2'
+                  }}>
+                    <LegacyTabs
+                      tabs={[
+                        {
+                          id: 'include',
+                          content: 'Include',
+                          panelID: 'include-panel'
+                        },
+                        {
+                          id: 'exclude',
+                          content: 'Exclude',
+                          panelID: 'exclude-panel'
+                        }
+                      ]}
+                      selected={normalizedValue.negated ? 1 : 0}
+                      onSelect={(selectedTabIndex) => {
+                        handleNegationToggle(filter.key, selectedTabIndex === 1);
+                      }}
+                      fitted
+                    />
+                  </div>
                 </div>
               )}
               {filter.choices.length < 10 ?
