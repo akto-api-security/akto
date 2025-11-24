@@ -7,6 +7,8 @@ import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.GenericTestResult;
+import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
@@ -81,6 +83,34 @@ public class TestingIssuesHandler {
 
     public static final String SET_OPERATION = "set";
 
+    private boolean hasTestFailed(TestingRunResult runResult) {
+        if (runResult == null) {
+            return false;
+        }
+
+        // Check errorsList
+        List<String> errorsList = runResult.getErrorsList();
+        if (errorsList != null && !errorsList.isEmpty()) {
+            return true;
+        }
+
+        // Check test results for errors
+        List<GenericTestResult> testResults = runResult.getTestResults();
+        if (testResults != null) {
+            for (GenericTestResult testResult : testResults) {
+                if (testResult instanceof TestResult) {
+                    TestResult tr = (TestResult) testResult;
+                    List<String> errors = tr.getErrors();
+                    if (errors != null && !errors.isEmpty()) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
     private void writeUpdateQueryIntoWriteModel(List<Object> writeModelList,
                                                 Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap,
                                                 List<TestingRunIssues> testingRunIssuesList) {
@@ -104,7 +134,8 @@ public class TestingIssuesHandler {
                     updatePayload = new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name(), SET_OPERATION);
                     updates.add(updatePayload.toString());
                 }
-            } else {
+            } else if (!hasTestFailed(runResult)){
+                // Don't mark as FIXED if test failed (e.g., 401, API call failed, etc.)
                 updatePayload = new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED.name(), SET_OPERATION);
                 updates.add(updatePayload.toString());
             }
