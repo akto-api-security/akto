@@ -44,6 +44,7 @@ public class Producer {
                 }
             } catch (Exception e) {
                 e.printStackTrace();
+                loggerMaker.errorAndAddToDb(e, "Error in pushMessagesToKafka");
             }
             totalRecords.incrementAndGet();
             throttleNumber.incrementAndGet();
@@ -179,7 +180,7 @@ public class Producer {
             try {
                 deleteTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error deleting topic: " + e.getMessage());
+                loggerMaker.errorAndAddToDb(e, "Error deleting topic: " + e.getMessage());
                 e.printStackTrace();
             }
         }
