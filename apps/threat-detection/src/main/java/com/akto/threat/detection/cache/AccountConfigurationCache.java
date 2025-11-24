@@ -3,11 +3,19 @@ package com.akto.threat.detection.cache;
 import com.akto.data_actor.DataActor;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
+import com.akto.dto.type.APICatalog;
+import com.akto.dto.type.URLTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.runtime.RuntimeUtil;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Thread-safe singleton cache for account configuration.
@@ -71,14 +79,42 @@ public class AccountConfigurationCache {
             logger.infoAndAddToDb("Refreshing account configuration cache");
             AccountSettings accountSettings = dataActor.fetchAccountSettings();
             List <ApiCollection> apiCollections = dataActor.fetchAllApiCollections();
+            List<ApiInfo> apiInfos = dataActor.fetchApiRateLimits(null);
+
+            // Build API info metadata structures
+            Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates = new HashMap<>();
+            Set<String> apiInfoKeys = new HashSet<>();
+
+            if (apiInfos != null) {
+                for (ApiInfo apiInfo : apiInfos) {
+                    String url = apiInfo.getId().getUrl();
+                    apiInfoKeys.add(apiInfo.getId().toString());
+
+                    if (APICatalog.isTemplateUrl(url)) {
+                        URLTemplate urlTemplate = RuntimeUtil.createUrlTemplate(url, apiInfo.getId().getMethod());
+                        int apiCollectionId = apiInfo.getId().getApiCollectionId();
+
+                        if (!apiCollectionUrlTemplates.containsKey(apiCollectionId)) {
+                            apiCollectionUrlTemplates.put(apiCollectionId, new ArrayList<>());
+                        }
+
+                        apiCollectionUrlTemplates.get(apiCollectionId).add(urlTemplate);
+                    }
+                }
+            }
+
             this.cachedConfig = new AccountConfig(
                 accountSettings.getId(),
                 accountSettings.isRedactPayload(),
-                apiCollections
+                apiCollections,
+                apiInfos,
+                apiCollectionUrlTemplates,
+                apiInfoKeys
             );
             this.lastRefreshTime = System.currentTimeMillis();
             logger.infoAndAddToDb("Account configuration cache refreshed successfully. AccountId: " +
-                                  accountSettings.getId() + ", API Collections: " + apiCollections.size());
+                                  accountSettings.getId() + ", API Collections: " + apiCollections.size() +
+                                  ", API Infos: " + (apiInfos != null ? apiInfos.size() : 0));
         } catch (Exception e) {
             logger.errorAndAddToDb(e, "Error refreshing account configuration cache. Keeping old cache if available.");
         }
