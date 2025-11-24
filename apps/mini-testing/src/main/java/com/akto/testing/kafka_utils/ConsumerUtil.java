@@ -116,16 +116,7 @@ public class ConsumerUtil {
         }
 
         try {
-            int maxTimestamp = testedApisMap.values().stream().max(Integer::compareTo).orElse(Context.now());
-
-            List<ApiInfoKey> apiInfoKeys = new ArrayList<>(testedApisMap.keySet());
-
-            loggerMaker.info("Performing bulk update of lastTested field for " + apiInfoKeys.size() + " APIs");
-
-            dataActor.bulkUpdateLastTestedField(apiInfoKeys, maxTimestamp);
-
-            loggerMaker.info("Successfully updated lastTested field for " + apiInfoKeys.size() + " APIs");
-
+            dataActor.bulkUpdateLastTestedField(testedApisMap);
             testedApisMap.clear();
         } catch (Exception e) {
             loggerMaker.error("Error during bulk update of lastTested field: " + e.getMessage(), e);

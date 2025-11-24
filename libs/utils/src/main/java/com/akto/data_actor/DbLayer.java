@@ -741,8 +741,8 @@ public class DbLayer {
         ApiInfoDao.instance.updateLastTestedField(apiInfoKey);
     }
 
-    public static void bulkUpdateLastTestedField(List<ApiInfo.ApiInfoKey> apiInfoKeys, int timestamp) {
-        ApiInfoDao.instance.bulkUpdateLastTestedField(apiInfoKeys, timestamp);
+    public static void bulkUpdateLastTestedField(Map<ApiInfo.ApiInfoKey, Integer> testedApisMap) {
+        ApiInfoDao.instance.bulkUpdateLastTestedField(testedApisMap);
     }
 
     public static void insertTestingRunResults(TestingRunResult testingRunResult) {
