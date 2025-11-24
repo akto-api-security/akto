@@ -307,6 +307,11 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                     </div>
                 }
             </HorizontalGrid>
+            <Checkbox
+                label="Keep issues open"
+                checked={testRun.doNotMarkIssuesAsFixed}
+                onChange={() => setTestRun(prev => ({ ...prev, doNotMarkIssuesAsFixed: !prev.doNotMarkIssuesAsFixed }))}
+            />
         </VerticalStack>
     );
 };
