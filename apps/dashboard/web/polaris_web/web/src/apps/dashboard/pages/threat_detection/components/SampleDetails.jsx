@@ -104,7 +104,7 @@ function SampleDetails(props) {
         component: <ActivityTracker latestActivity={latestActivity} />
     }
 
-    const ValuesTab = {
+    const ValuesTab = data.length > 0 && {
         id: 'values',
         content: "Values",
         component: (
