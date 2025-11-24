@@ -10,7 +10,6 @@ import com.akto.dto.IgnoreData;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.type.SingleTypeInfo.ParamId;
 import com.akto.dto.type.SingleTypeInfo.SubType;
-import com.akto.dto.type.standard.VinValidator;
 
 import com.akto.types.CappedSet;
 import com.google.i18n.phonenumbers.PhoneNumberUtil;
