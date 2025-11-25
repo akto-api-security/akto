@@ -16,11 +16,11 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
 import com.akto.util.RecordedLoginFlowUtil;
-import com.akto.util.enums.LoginFlowEnums;
 import com.akto.utils.Utils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 import org.apache.commons.lang3.StringUtils;
@@ -189,7 +189,12 @@ public class AktoJaxAction extends UserAction {
         loggerMaker.infoAndAddToDb("uploadCrawlerData() - Crawler topic: " + topic);
 
         // fetch collection id
-        ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq("_id", Integer.valueOf(apiCollectionId)));
+        ApiCollection apiCollection = null;
+        MongoCursor<ApiCollection> cursor = ApiCollectionsDao.instance.getMCollection().find(Filters.eq("_id", Integer.valueOf(apiCollectionId))).cursor();
+        while (cursor.hasNext()) {
+            apiCollection = cursor.next();
+            break;
+        }
         if(apiCollection == null) {
             addActionError("API collection not found");
             return Action.ERROR.toUpperCase();
