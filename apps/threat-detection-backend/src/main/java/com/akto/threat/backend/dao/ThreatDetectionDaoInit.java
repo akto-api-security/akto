@@ -18,4 +18,16 @@ public class ThreatDetectionDaoInit {
         // Set the static client that all AccountBasedDao instances will use
         AccountBasedDao.clients[0] = mongoClient;
     }
+
+    public static void createIndices(String accountId) {
+        try {
+            // malicious events indices
+            MaliciousEventDao.instance.createIndexIfAbsent(accountId);
+        } catch (Exception ignored) {}
+
+        try {
+            // api distribution data indices
+            ApiDistributionDataDao.instance.createIndicesIfAbsent(accountId);
+        } catch (Exception ignored) {}
+    }
 }
