@@ -528,7 +528,7 @@ prettifyEpoch(epoch) {
   },
   // Check if API collections data caching is enabled for current account
   isApiCollectionsCachingEnabled: () => {
-    const allowedAccounts = [1736798101, 1758595089];
+    const allowedAccounts = [1736798101, 1758595089, 1718042191];
     return allowedAccounts.includes(window.ACTIVE_ACCOUNT);
   },
   convertKeysToLowercase: function (obj){
