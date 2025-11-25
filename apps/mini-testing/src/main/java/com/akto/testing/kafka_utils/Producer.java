@@ -58,12 +58,10 @@ public class Producer {
             // Check if producer is ready before sending
             if (producer == null) {
                 loggerMaker.insertImportantTestingLog("Kafka producer is null! Cannot send message. ThrottleNumber will remain incremented.");
-                continue;
             }
 
             if (!producer.producerReady) {
                 loggerMaker.insertImportantTestingLog("Kafka producer not ready! Cannot send message. ThrottleNumber will remain incremented.");
-                continue;
             }
 
             producer.sendWithCounter(messageString, Constants.TEST_RESULTS_TOPIC_NAME, throttleNumber);
