@@ -274,6 +274,10 @@ function TestRunResultFlyout(props) {
         window.open(navUrl, "_blank")
     }
 
+    const owaspData = func.categoryMapping[selectedTestRunResult?.testCategory] || {};
+    const owaspMapping = owaspData.label || "";
+    const owaspUrl = owaspData.url || "";
+
     function ActionsComp (){
         const issuesActions = issueDetails?.testRunIssueStatus === "IGNORED" ? [...issues, ...reopen] : issues
         return(
@@ -313,7 +317,6 @@ function TestRunResultFlyout(props) {
                             </Button>
                             {(severity && severity?.length > 0) ? (issueDetails?.testRunIssueStatus === 'IGNORED' ? <Badge size='small'>Ignored</Badge> : <Box className={`badge-wrapper-${severity.toUpperCase()}`}><Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge></Box>) : null}
                         </div>
-
                         {
                             isEditingDescription ? (
                                 <InlineEditableText
@@ -326,11 +329,11 @@ function TestRunResultFlyout(props) {
                                 />
                             ) : (
                                 !description ? (
-                                    <Button plain removeUnderline onClick={() => setIsEditingDescription(true)}>
+                                    <Button plain removeUnderline textAlign="left" onClick={() => setIsEditingDescription(true)}>
                                         Add description
                                     </Button>
                                 ) : (
-                                    <Button plain removeUnderline onClick={() => setIsEditingDescription(true)}>
+                                    <Button plain removeUnderline textAlign="left" onClick={() => setIsEditingDescription(true)}>
                                         <Text as="span" variant="bodyMd" color="subdued" alignment="start">
                                             {description}
                                         </Text>
@@ -339,11 +342,17 @@ function TestRunResultFlyout(props) {
                             )
                         }
                     </Box>
+                    {owaspMapping.length > 0 ? (
+                        <Link onClick={() => owaspUrl && window.open(owaspUrl, '_blank')}>
+                            <Badge size="small">OWASP Top 10 | {owaspMapping}</Badge>
+                        </Link>
+                    ): null}
                     <HorizontalStack gap={"2"}>
                         <Text color="subdued" variant="bodySm">{transform.getTestingRunResultUrl(selectedTestRunResult)}</Text>
                         <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
                         <Text color="subdued" variant="bodySm">{selectedTestRunResult?.testCategory}</Text>
                     </HorizontalStack>
+                        
                     <ApiGroups collectionIds={apiInfo?.collectionIds} />
                 </VerticalStack>
                 <HorizontalStack gap={2} wrap={false}>
