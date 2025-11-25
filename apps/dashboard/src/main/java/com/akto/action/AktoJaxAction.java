@@ -24,6 +24,7 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 import org.apache.commons.lang3.StringUtils;
@@ -94,10 +95,11 @@ public class AktoJaxAction extends UserAction {
 
             loggerMaker.infoAndAddToDb("Crawler collection id: " + collectionId);
             if (apiCollection != null && !apiCollection.isDastCollection()) {
-                ApiCollectionsDao.instance.updateOne(
+                ApiCollectionsDao.instance.getMCollection().updateOne(
                         Filters.eq(Constants.ID, collectionId),
                         Updates.set(ApiCollection.TAGS_STRING, Collections.singletonList(
-                                new CollectionTags(Context.now(), Constants.AKTO_DAST_TAG, "DAST", TagSource.USER))));
+                                new CollectionTags(Context.now(), Constants.AKTO_DAST_TAG, "DAST", TagSource.USER))),
+                            new UpdateOptions().upsert(false));
                 loggerMaker.infoAndAddToDb("Updated Collection with tag: " + collectionId);
             }
 
