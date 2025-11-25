@@ -309,16 +309,26 @@ function TestRunResultFlyout(props) {
             <div style={{display: 'flex', justifyContent: "space-between", alignItems: "flex-start", gap:"24px", padding: "16px", paddingTop: '0px'}}>
                 <VerticalStack gap={"2"}>
                     <Box width="100%">
-                        <div style={{display: 'flex', gap: '4px', marginBottom: '4px'}} className='test-title'>
-                            <Button removeUnderline plain monochrome onClick={() => openTest()}>
-                                <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
-                            </Button>
-                            {(severity && severity?.length > 0) ? (issueDetails?.testRunIssueStatus === 'IGNORED' ? <Badge size='small'>Ignored</Badge> : <Box className={`badge-wrapper-${severity.toUpperCase()}`}><Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge></Box>) : null}
-                        </div>
-                        {owaspMapping.length > 0 ? <HorizontalStack gap={"2"} wrap={false}>
-                                <Badge size="small">OWASP Top 10 | {owaspMapping}</Badge>
-                            </HorizontalStack>: null
-                        }
+                        {owaspMapping.length > 0 ? (
+                            <div style={{marginBottom: '8px'}}>
+                                <div style={{display: 'flex', gap: '4px', marginBottom: '4px'}} className='test-title'>
+                                    <Button removeUnderline plain monochrome onClick={() => openTest()}>
+                                        <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
+                                    </Button>
+                                    {(severity && severity?.length > 0) ? (issueDetails?.testRunIssueStatus === 'IGNORED' ? <Badge size='small'>Ignored</Badge> : <Box className={`badge-wrapper-${severity.toUpperCase()}`}><Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge></Box>) : null}
+                                </div>
+                                <HorizontalStack gap={"2"} wrap={false}>
+                                    <Badge size="small">OWASP Top 10 | {owaspMapping}</Badge>
+                                </HorizontalStack>
+                            </div>
+                        ) : (
+                            <div style={{display: 'flex', gap: '4px', marginBottom: '4px'}} className='test-title'>
+                                <Button removeUnderline plain monochrome onClick={() => openTest()}>
+                                    <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
+                                </Button>
+                                {(severity && severity?.length > 0) ? (issueDetails?.testRunIssueStatus === 'IGNORED' ? <Badge size='small'>Ignored</Badge> : <Box className={`badge-wrapper-${severity.toUpperCase()}`}><Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge></Box>) : null}
+                            </div>
+                        )}
 
                         {
                             isEditingDescription ? (
@@ -332,11 +342,11 @@ function TestRunResultFlyout(props) {
                                 />
                             ) : (
                                 !description ? (
-                                    <Button plain removeUnderline onClick={() => setIsEditingDescription(true)}>
+                                    <Button plain removeUnderline textAlign="left" onClick={() => setIsEditingDescription(true)}>
                                         Add description
                                     </Button>
                                 ) : (
-                                    <Button plain removeUnderline onClick={() => setIsEditingDescription(true)}>
+                                    <Button plain removeUnderline textAlign="left" onClick={() => setIsEditingDescription(true)}>
                                         <Text as="span" variant="bodyMd" color="subdued" alignment="start">
                                             {description}
                                         </Text>
