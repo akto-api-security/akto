@@ -28,8 +28,7 @@ function APIQuery() {
     const [moreActions, setMoreActions] = useState(false);
 
     // Only show checkbox for specific accounts
-    const allowedAccounts = [1718042191, 1736798101];
-    const showSkipTagsMismatch = allowedAccounts.includes(window.ACTIVE_ACCOUNT);
+    const showSkipTagsMismatch = func.isApiCollectionsCachingEnabled();
     const [skipTagsMismatch, setSkipTagsMismatch] = useState(showSkipTagsMismatch);
 
     const [searchParams, setSearchParams] = useSearchParams();
