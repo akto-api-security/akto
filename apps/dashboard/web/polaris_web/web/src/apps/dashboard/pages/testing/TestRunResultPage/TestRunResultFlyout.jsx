@@ -274,22 +274,9 @@ function TestRunResultFlyout(props) {
         window.open(navUrl, "_blank")
     }
 
-    const owaspMapping = func.categoryMapping[selectedTestRunResult?.testCategory] || "";
-
-    const owaspUrlMapping = {
-        "API1:2023 Broken Object Level Authorization": "https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/",
-        "API2:2023 Broken Authentication": "https://owasp.org/API-Security/editions/2023/en/0xa2-broken-authentication/",
-        "API3:2023 Broken Object Property Level Authorization": "https://owasp.org/API-Security/editions/2023/en/0xa3-broken-object-property-level-authorization/",
-        "API4:2023 Unrestricted Resource Consumption": "https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/",
-        "API5:2023 Broken Function Level Authorization": "https://owasp.org/API-Security/editions/2023/en/0xa5-broken-function-level-authorization/",
-        "API6:2023 Unrestricted Access to Sensitive Business Flows": "https://owasp.org/API-Security/editions/2023/en/0xa6-unrestricted-access-to-sensitive-business-flows/",
-        "API7:2023 Server Side Request Forgery": "https://owasp.org/API-Security/editions/2023/en/0xa7-server-side-request-forgery/",
-        "API8:2023 Security Misconfiguration": "https://owasp.org/API-Security/editions/2023/en/0xa8-security-misconfiguration/",
-        "API9:2023 Improper Inventory Management": "https://owasp.org/API-Security/editions/2023/en/0xa9-improper-inventory-management/",
-        "API10:2023 Unsafe Consumption of APIs": "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/"
-    };
-
-    const owaspUrl = owaspUrlMapping[owaspMapping] || "";
+    const owaspData = func.categoryMapping[selectedTestRunResult?.testCategory] || {};
+    const owaspMapping = owaspData.label || "";
+    const owaspUrl = owaspData.url || "";
 
     function ActionsComp (){
         const issuesActions = issueDetails?.testRunIssueStatus === "IGNORED" ? [...issues, ...reopen] : issues
@@ -324,29 +311,12 @@ function TestRunResultFlyout(props) {
             <div style={{display: 'flex', justifyContent: "space-between", alignItems: "flex-start", gap:"24px", padding: "16px", paddingTop: '0px'}}>
                 <VerticalStack gap={"2"}>
                     <Box width="100%">
-                        {owaspMapping.length > 0 ? (
-                            <div style={{marginBottom: '8px'}}>
-                                <div style={{display: 'flex', gap: '4px', marginBottom: '4px'}} className='test-title'>
-                                    <Button removeUnderline plain monochrome onClick={() => openTest()}>
-                                        <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
-                                    </Button>
-                                    {(severity && severity?.length > 0) ? (issueDetails?.testRunIssueStatus === 'IGNORED' ? <Badge size='small'>Ignored</Badge> : <Box className={`badge-wrapper-${severity.toUpperCase()}`}><Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge></Box>) : null}
-                                </div>
-                                <HorizontalStack gap={"2"} wrap={false}>
-                                    <div style={{cursor: 'pointer'}} onClick={() => owaspUrl && window.open(owaspUrl, '_blank')}>
-                                        <Badge size="small">OWASP Top 10 | {owaspMapping}</Badge>
-                                    </div>
-                                </HorizontalStack>
-                            </div>
-                        ) : (
-                            <div style={{display: 'flex', gap: '4px', marginBottom: '4px'}} className='test-title'>
-                                <Button removeUnderline plain monochrome onClick={() => openTest()}>
-                                    <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
-                                </Button>
-                                {(severity && severity?.length > 0) ? (issueDetails?.testRunIssueStatus === 'IGNORED' ? <Badge size='small'>Ignored</Badge> : <Box className={`badge-wrapper-${severity.toUpperCase()}`}><Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge></Box>) : null}
-                            </div>
-                        )}
-
+                        <div style={{display: 'flex', gap: '4px', marginBottom: '4px'}} className='test-title'>
+                            <Button removeUnderline plain monochrome onClick={() => openTest()}>
+                                <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
+                            </Button>
+                            {(severity && severity?.length > 0) ? (issueDetails?.testRunIssueStatus === 'IGNORED' ? <Badge size='small'>Ignored</Badge> : <Box className={`badge-wrapper-${severity.toUpperCase()}`}><Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge></Box>) : null}
+                        </div>
                         {
                             isEditingDescription ? (
                                 <InlineEditableText
@@ -372,6 +342,11 @@ function TestRunResultFlyout(props) {
                             )
                         }
                     </Box>
+                    {owaspMapping.length > 0 ? (
+                        <Link onClick={() => owaspUrl && window.open(owaspUrl, '_blank')}>
+                            <Badge size="small">OWASP Top 10 | {owaspMapping}</Badge>
+                        </Link>
+                    ): null}
                     <HorizontalStack gap={"2"}>
                         <Text color="subdued" variant="bodySm">{transform.getTestingRunResultUrl(selectedTestRunResult)}</Text>
                         <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
