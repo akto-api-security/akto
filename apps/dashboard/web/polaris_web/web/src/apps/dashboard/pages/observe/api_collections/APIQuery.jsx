@@ -26,7 +26,10 @@ function APIQuery() {
     const collectionsMap = PersistStore.getState().collectionsMap
     const [isUpdate, setIsUpdate] = useState(false)
     const [moreActions, setMoreActions] = useState(false);
-    const [skipTagsMismatch, setSkipTagsMismatch] = useState(true);
+
+    // Only show checkbox for specific accounts
+    const showSkipTagsMismatch = func.isApiCollectionsCachingEnabled();
+    const [skipTagsMismatch, setSkipTagsMismatch] = useState(showSkipTagsMismatch);
 
     const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
@@ -218,12 +221,14 @@ function APIQuery() {
                                 }
                             </HorizontalStack>
                             <HorizontalStack gap={4} align="space-between">
-                                <Checkbox
-                                    label="Hide mismatched collections"
-                                    checked={skipTagsMismatch}
-                                    onChange={setSkipTagsMismatch}
-                                    helpText="Filter out endpoints from collections with tags-mismatch=true"
-                                />
+                                {showSkipTagsMismatch && (
+                                    <Checkbox
+                                        label="Hide mismatched collections"
+                                        checked={skipTagsMismatch}
+                                        onChange={setSkipTagsMismatch}
+                                        helpText="Filter out endpoints from collections with tags-mismatch=true"
+                                    />
+                                )}
                                 <Button onClick={exploreEndpoints}>Explore {mapLabel("endpoints", getDashboardCategory())}</Button>
                             </HorizontalStack>
                         </VerticalStack>
