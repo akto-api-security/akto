@@ -86,9 +86,9 @@ public class AccountConfigurationCache {
             // This will fetch paginated apiInfos with _id, rateLimits fields.
             List<ApiInfo> apiInfos = new ArrayList<>();
 
-            if (accountSettings.getId() != 1758179941) {
-                apiInfos = dataActor.fetchApiRateLimits(null);
-            }
+            // if (accountSettings.getId() != 1758179941) {
+            //     apiInfos = dataActor.fetchApiRateLimits(null);
+            // }
 
             // Build API info metadata structures - always non-null
             Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates = new HashMap<>();
