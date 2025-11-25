@@ -312,10 +312,19 @@ function TestRunResultFlyout(props) {
                 <VerticalStack gap={"2"}>
                     <Box width="100%">
                         <div style={{display: 'flex', gap: '4px', marginBottom: '4px'}} className='test-title'>
-                            <Button removeUnderline plain monochrome onClick={() => openTest()}>
-                                <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
-                            </Button>
-                            {(severity && severity?.length > 0) ? (issueDetails?.testRunIssueStatus === 'IGNORED' ? <Badge size='small'>Ignored</Badge> : <Box className={`badge-wrapper-${severity.toUpperCase()}`}><Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge></Box>) : null}
+                        <VerticalStack gap={1}>
+                            <HorizontalStack gap={1}>
+                                <Button removeUnderline plain monochrome onClick={() => openTest()}>
+                                    <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
+                                </Button>
+                                {(severity && severity?.length > 0) ? (issueDetails?.testRunIssueStatus === 'IGNORED' ? <Badge size='small'>Ignored</Badge> : <Box className={`badge-wrapper-${severity.toUpperCase()}`}><Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge></Box>) : null}
+                            </HorizontalStack>      
+                                {owaspMapping.length > 0 ? (
+                                    <Link onClick={() => owaspUrl && window.open(owaspUrl, '_blank')}>
+                                        <Badge size="small">OWASP Top 10 | {owaspMapping}</Badge>
+                                    </Link>
+                                ): null}  
+                        </VerticalStack> 
                         </div>
                         {
                             isEditingDescription ? (
@@ -342,11 +351,6 @@ function TestRunResultFlyout(props) {
                             )
                         }
                     </Box>
-                    {owaspMapping.length > 0 ? (
-                        <Link onClick={() => owaspUrl && window.open(owaspUrl, '_blank')}>
-                            <Badge size="small">OWASP Top 10 | {owaspMapping}</Badge>
-                        </Link>
-                    ): null}
                     <HorizontalStack gap={"2"}>
                         <Text color="subdued" variant="bodySm">{transform.getTestingRunResultUrl(selectedTestRunResult)}</Text>
                         <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
