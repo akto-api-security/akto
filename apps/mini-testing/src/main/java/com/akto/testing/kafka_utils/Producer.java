@@ -39,14 +39,33 @@ public class Producer {
             String messageString = singleTestPayload.toString();
             try {
                 int waitStart = Context.now();
+                if (throttleNumber.get() > 10000) {
+                    loggerMaker.insertImportantTestingLog("Throttling: Waiting due to high throttleNumber: " + throttleNumber.get());
+                }
                 while (throttleNumber.get() > 10000 && (Context.now() - waitStart) < Constants.MAX_WAIT_FOR_SLEEP) {
                     Thread.sleep(1000);
                 }
+                if (throttleNumber.get() > 10000) {
+                    loggerMaker.insertImportantTestingLog("Throttling timeout reached. Still have high throttleNumber: " + throttleNumber.get() + ". Proceeding anyway.");
+                }
             } catch (Exception e) {
+                loggerMaker.insertImportantTestingLog("Error during throttling wait: " + e.getMessage());
                 e.printStackTrace();
             }
             totalRecords.incrementAndGet();
             throttleNumber.incrementAndGet();
+            
+            // Check if producer is ready before sending
+            if (producer == null) {
+                loggerMaker.insertImportantTestingLog("Kafka producer is null! Cannot send message. ThrottleNumber will remain incremented.");
+                continue;
+            }
+            
+            if (!producer.producerReady) {
+                loggerMaker.insertImportantTestingLog("Kafka producer not ready! Cannot send message. ThrottleNumber will remain incremented.");
+                continue;
+            }
+
             producer.sendWithCounter(messageString, Constants.TEST_RESULTS_TOPIC_NAME, throttleNumber);
         }
         return null;
@@ -75,6 +94,7 @@ public class Producer {
             }
         }
     
+        loggerMaker.insertImportantTestingLog("CRITICAL: Failed to delete topic '" + topicName + "' after " + maxRetries + " retries.");
         throw new RuntimeException("Failed to delete topic '" + topicName + "' after " + maxRetries + " retries.");
     }
 
@@ -90,7 +110,7 @@ public class Producer {
             } catch (Exception e) {
                 retries++;
                 long backoff = (long) (baseBackoff * Math.pow(2, retries));
-                loggerMaker.infoAndAddToDb("Attempt " +retries + " to create topic failed: " + e.getMessage());
+                loggerMaker.insertImportantTestingLog("Attempt " + retries + " to create topic failed: " + e.getMessage());
     
                 try {
                     Thread.sleep(backoff);
@@ -100,7 +120,8 @@ public class Producer {
                 }
             }
         }
-    
+
+        loggerMaker.insertImportantTestingLog("CRITICAL: Failed to create topic '" + topicName + "' after " + maxRetries + " retries.");
         throw new RuntimeException("Failed to create topic '" + topicName + "' after " + maxRetries + " retries.");
     }
 
@@ -173,13 +194,20 @@ public class Producer {
             throw new RuntimeException("Topic creation not confirmed after retries.");
         }
     }    
+    public static String getProducerStatus() {
+        if (producer == null) {
+            return "Producer is null (new testing not enabled)";
+        }
+        return "Producer ready: " + producer.producerReady;
+    }
+    
     public void initProducer(TestingRun testingRun, ObjectId summaryId, boolean doInitOnly, SyncLimit syncLimit){
         TestExecutor executor = new TestExecutor();
         if(!doInitOnly){
             try {
                 deleteTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error deleting topic: " + e.getMessage());
+                loggerMaker.insertImportantTestingLog("Error deleting topic: " + e.getMessage());
                 e.printStackTrace();
             }
         }
