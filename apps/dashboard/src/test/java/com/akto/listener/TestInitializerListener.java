@@ -147,7 +147,7 @@ public class TestInitializerListener extends MongoBasedTest {
                 + "&actor=" + URLEncoder.encode("14.143.179.162", StandardCharsets.UTF_8.toString())
                 + "&filterId=" + URLEncoder.encode("XSS", StandardCharsets.UTF_8.toString());
 
-        assertTrue(result.contains("Threat Activity URL"));
+        assertTrue(result.contains("View Threat Activity"));
         assertTrue(result.contains(expectedUrl));
     }
 
