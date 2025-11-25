@@ -11,6 +11,8 @@ import com.akto.dto.CrawlerRun;
 import com.akto.dto.CrawlerUrl;
 import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.testing.*;
+import com.akto.dto.traffic.CollectionTags;
+import com.akto.dto.traffic.CollectionTags.TagSource;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.TestExecutor;
@@ -22,6 +24,7 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
@@ -70,25 +73,33 @@ public class AktoJaxAction extends UserAction {
             collectionsAction.setCollectionName(host);
             String collectionStatus = collectionsAction.createCollection();
             int collectionId = 0;
-
+            ApiCollection apiCollection = null;
             if(collectionStatus.equalsIgnoreCase(Action.SUCCESS)) {
                 List<ApiCollection> apiCollections = collectionsAction.getApiCollections();
                 if (apiCollections != null && !apiCollections.isEmpty()) {
-                    collectionId = apiCollections.get(0).getId();
+                    apiCollection = apiCollections.get(0);
+                    collectionId = apiCollection.getId();
                 } else {
-                    ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.NAME, host));
+                    apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.NAME, host));
                     if (apiCollection != null) {
                         collectionId = apiCollection.getId();
                     }
                 }
             } else {
-                ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.NAME, host));
+                apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.NAME, host));
                 if (apiCollection != null) {
                     collectionId = apiCollection.getId();
                 }
             }
 
             loggerMaker.infoAndAddToDb("Crawler collection id: " + collectionId);
+            if (apiCollection != null && !apiCollection.isDastCollection()) {
+                ApiCollectionsDao.instance.updateOne(
+                        Filters.eq(Constants.ID, collectionId),
+                        Updates.set(ApiCollection.TAGS_STRING, Collections.singletonList(
+                                new CollectionTags(Context.now(), Constants.AKTO_DAST_TAG, "DAST", TagSource.USER))));
+                loggerMaker.infoAndAddToDb("Updated Collection with tag: " + collectionId);
+            }
 
             String crawlId = UUID.randomUUID().toString();
 
