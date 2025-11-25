@@ -1481,4 +1481,23 @@ public class ClientActor extends DataActor {
             return;
         }
     }
+
+    @Override
+    public void ingestMetricData(List<com.akto.dto.metrics.MetricData> metricData){
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("metricData", metricData);
+        String objString = gson.toJson(obj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/ingestMetricsData", "", "POST", objString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("invalid response in ingestMetricData", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in ingestMetricData" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+        return;
+    }
 }

@@ -156,7 +156,10 @@ function Metrics() {
         // Cyborg metrics
         'CYBORG_CALL_LATENCY',
         'CYBORG_CALL_COUNT',
-        'CYBORG_DATA_SIZE'
+        'CYBORG_DATA_SIZE',
+
+        // Data ingestion metrics
+        'DATA_INGESTION_API_COUNT'
     ];
 
     const names = [...oldMetrics, ...newMetrics];

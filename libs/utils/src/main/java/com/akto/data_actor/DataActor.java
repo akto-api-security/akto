@@ -104,4 +104,6 @@ public abstract class DataActor {
     public abstract String fetchOpenApiSchema(int apiCollectionId);
 
     public abstract void insertDataIngestionLog(Log log);
+
+    public abstract void ingestMetricData(List<com.akto.dto.metrics.MetricData> metricData);
 }

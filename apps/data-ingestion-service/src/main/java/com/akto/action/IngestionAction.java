@@ -11,6 +11,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import com.akto.dto.IngestDataBatch;
 import com.akto.utils.KafkaUtils;
+import com.akto.metrics.AllMetrics;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 
@@ -27,8 +28,9 @@ public class IngestionAction extends ActionSupport {
 
     public String ingestData() {
         try {
-
             printLogs("ingestData batch size " + batchData.size());
+
+            int apiCount = 0;
             for (IngestDataBatch payload: batchData) {
                 printLogs("Inserting data to kafka...");
 
@@ -42,7 +44,12 @@ public class IngestionAction extends ActionSupport {
                 }
 
                 KafkaUtils.insertData(payload);
+                apiCount++;
             }
+
+            // Record metrics using AllMetrics
+            AllMetrics.instance.setDataIngestionApiCount((float) apiCount);
+
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while inserting data to Kafka: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
             return Action.ERROR.toUpperCase();
@@ -88,5 +95,5 @@ public class IngestionAction extends ActionSupport {
         success = true;
         return Action.SUCCESS.toUpperCase();
     }
-    
+
 }
