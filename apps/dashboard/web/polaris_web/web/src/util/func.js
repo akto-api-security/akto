@@ -46,7 +46,30 @@ const searchResultSections = {
   },
 }
 
+const categoryMapping = {
+  "BOLA": "API1:2023 Broken Object Level Authorization",
+  "Broken Authentication": "API2:2023 Broken Authentication",
+  "Broken User Authentication": "API2:2023 Broken Authentication",
+  "BFLA": "API5:2023 Broken Function Level Authorization",
+  "IAM": "API9:2023 Improper Inventory Management",
+  "EDE": "API6:2023 Unrestricted Access to Sensitive Business Flows",
+  "Lack of Resources & Rate Limiting": "API4:2023 Unrestricted Resource Consumption",
+  "Mass Assignment": "API3:2023 Broken Object Property Level Authorization",
+  "Injection": "API10:2023 Unsafe Consumption of APIs",
+  "Security Misconfiguration": "API8:2023 Security Misconfiguration",
+  "Misconfiguration": "API8:2023 Security Misconfiguration",
+  "Server Side Request Forgery": "API7:2023 Server Side Request Forgery",
+  "CORS Misconfiguration": "API8:2023 Security Misconfiguration",
+  "Command Injection": "API10:2023 Unsafe Consumption of APIs",
+  "CRLF Injection": "API10:2023 Unsafe Consumption of APIs",
+  "Server Side Template Injection": "API10:2023 Unsafe Consumption of APIs",
+  "Local File Inclusion": "API10:2023 Unsafe Consumption of APIs",
+  "XXS": "API10:2023 Unsafe Consumption of APIs",
+  "Improper Inventory Management": "API9:2023 Improper Inventory Management"
+}
+
 const func = {
+  categoryMapping: categoryMapping,
   setToast (isActive, isError, message) {
     Store.getState().setToastConfig({
           isActive: isActive,

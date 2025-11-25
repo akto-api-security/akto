@@ -274,6 +274,8 @@ function TestRunResultFlyout(props) {
         window.open(navUrl, "_blank")
     }
 
+    const owaspMapping = func.categoryMapping[selectedTestRunResult?.testCategory] || "";
+
     function ActionsComp (){
         const issuesActions = issueDetails?.testRunIssueStatus === "IGNORED" ? [...issues, ...reopen] : issues
         return(
@@ -313,6 +315,10 @@ function TestRunResultFlyout(props) {
                             </Button>
                             {(severity && severity?.length > 0) ? (issueDetails?.testRunIssueStatus === 'IGNORED' ? <Badge size='small'>Ignored</Badge> : <Box className={`badge-wrapper-${severity.toUpperCase()}`}><Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge></Box>) : null}
                         </div>
+                        {owaspMapping.length > 0 ? <HorizontalStack gap={"2"} wrap={false}>
+                                <Badge size="small">OWASP Top 10 | {owaspMapping}</Badge>
+                            </HorizontalStack>: null
+                        }
 
                         {
                             isEditingDescription ? (
@@ -344,6 +350,7 @@ function TestRunResultFlyout(props) {
                         <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
                         <Text color="subdued" variant="bodySm">{selectedTestRunResult?.testCategory}</Text>
                     </HorizontalStack>
+                        
                     <ApiGroups collectionIds={apiInfo?.collectionIds} />
                 </VerticalStack>
                 <HorizontalStack gap={2} wrap={false}>
