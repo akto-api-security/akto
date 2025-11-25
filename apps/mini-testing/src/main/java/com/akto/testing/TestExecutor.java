@@ -288,7 +288,7 @@ public class TestExecutor {
                     loggerMaker.error("Error in creating topic", e);
 
                     //TODO
-                    //Add logic to mark test summary and test failed
+                    //Add logic to mark test summary and test failed or move to logic of !IS_NEW_TESTING_ENABLED
                 }
             }
 
@@ -369,7 +369,7 @@ public class TestExecutor {
                         loggerMaker.insertImportantTestingLog("CRITICAL: Failed to send records to Kafka ");
 
                        //TODO
-                        // //Add logic to mark test summary and test failed
+                        // //Add logic to mark test summary and test failed or move to logic of !IS_NEW_TESTING_ENABLED
                     } else {
                         loggerMaker.insertImportantTestingLog("All records sent successfully to Kafka");
                     }
