@@ -77,11 +77,18 @@ public class AccountConfigurationCache {
     private void refreshConfig(DataActor dataActor) {
         try {
             logger.infoAndAddToDb("Refreshing account configuration cache");
-            AccountSettings accountSettings = new AccountSettings(); //dataActor.fetchAccountSettings();
+            AccountSettings accountSettings = dataActor.fetchAccountSettings();
             logger.infoAndAddToDb("Fetched accountSettings in configuration cache");
-            List <ApiCollection> apiCollections = new ArrayList<>(); //dataActor.fetchAllApiCollections();
+            List <ApiCollection> apiCollections = new ArrayList<>();
+            if (accountSettings.getId() != 1758179941) {
+                apiCollections = dataActor.fetchAllApiCollections();
+            }
             // This will fetch paginated apiInfos with _id, rateLimits fields.
-            List<ApiInfo> apiInfos = new ArrayList<>(); //dataActor.fetchApiRateLimits(null);
+            List<ApiInfo> apiInfos = new ArrayList<>();
+
+            if (accountSettings.getId() != 1758179941) {
+                apiInfos = dataActor.fetchApiRateLimits(null);
+            }
 
             // Build API info metadata structures - always non-null
             Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates = new HashMap<>();
