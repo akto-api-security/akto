@@ -50,6 +50,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         sendSlackAlert: false,
         sendMsTeamsAlert: false,
         cleanUpTestingResources: false,
+        doNotMarkIssuesAsFixed: false,
         autoTicketingDetails: initialAutoTicketingDetails,
         miniTestingServiceName: "",
         slackChannel: ""
