@@ -1548,7 +1548,7 @@ public class InitializerListener implements ServletContextListener {
                     }
                 }, "webhook-sender");
             }
-        }, 0, 1, TimeUnit.MINUTES);
+        }, 0, 1, TimeUnit.HOURS);
     }
 
     static class ChangesInfo {
@@ -2649,9 +2649,9 @@ public class InitializerListener implements ServletContextListener {
                         setUpFillCollectionIdArrayJob();
                                                
 
-                        // CleanInventory.cleanInventoryJobRunner();
+                        CleanInventory.cleanInventoryJobRunner();
 
-                        // MatchingJob.MatchingJobRunner();
+                        MatchingJob.MatchingJobRunner();
                     }
 
                     int now2 = Context.now();
