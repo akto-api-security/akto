@@ -1231,6 +1231,31 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static String buildThreatActivityUrl(String baseUrl, Map<String, Object> data) {
+        String refId = data.get("refId") != null ? data.get("refId").toString() : "";
+        String eventType = data.get("eventType") != null ? data.get("eventType").toString() : "";
+        String actor = data.get("actor") != null ? data.get("actor").toString() : "";
+        String filterId = data.get("filterId") != null ? data.get("filterId").toString() : "";
+
+        if (StringUtils.isBlank(refId) || StringUtils.isBlank(eventType)
+                || StringUtils.isBlank(actor) || StringUtils.isBlank(filterId)) {
+            return null;
+        }
+
+        StringBuilder urlBuilder = new StringBuilder();
+        urlBuilder.append(baseUrl)
+                .append(THREAT_ACTIVITY_PATH)
+                .append("?refId=")
+                .append(encodeParam(refId))
+                .append("&eventType=")
+                .append(encodeParam(eventType))
+                .append("&actor=")
+                .append(encodeParam(actor))
+                .append("&filterId=")
+                .append(encodeParam(filterId));
+        return urlBuilder.toString();
+    }
+
     private static String TEAMS_WEBHOOK_OPENING_BODY = "{\n" +
                 "    \"type\": \"message\",\n" +
                 "    \"attachments\": [\n" +
@@ -1251,6 +1276,17 @@ public class InitializerListener implements ServletContextListener {
                 "";
 
     private static final String THREAT_ACTIVITY_PATH = "/dashboard/protection/threat-activity";
+
+    private static final String TEAMS_ACTION_SET_TEMPLATE = "        {\n" +
+            "            \"type\": \"ActionSet\",\n" +
+            "            \"actions\": [\n" +
+            "                {\n" +
+            "                    \"type\": \"Action.OpenUrl\",\n" +
+            "                    \"title\": \"%s\",\n" +
+            "                    \"url\": \"%s\"\n" +
+            "                }\n" +
+            "            ]\n" +
+            "        },\n";
 
     private static String createMicrosoftTeamsWorkflowWebhookPayload(CustomWebhook webhook, Map<String, Object> valueMap){
         StringBuilder body = new StringBuilder();
@@ -1415,39 +1451,16 @@ public class InitializerListener implements ServletContextListener {
                     firstFact = false;
                 }
                 
-                String refIdVal = data.get("refId") != null ? data.get("refId").toString() : "";
-                String eventTypeVal = data.get("eventType") != null ? data.get("eventType").toString() : "";
-                String actorVal = data.get("actor") != null ? data.get("actor").toString() : "";
-                String filterIdVal = data.get("filterId") != null ? data.get("filterId").toString() : "";
-
-                if (StringUtils.isNotBlank(refIdVal) && StringUtils.isNotBlank(eventTypeVal)
-                        && StringUtils.isNotBlank(actorVal) && StringUtils.isNotBlank(filterIdVal)) {
-                    StringBuilder threatUrlBuilder = new StringBuilder();
-                    threatUrlBuilder.append(dashboardBaseUrl)
-                            .append(THREAT_ACTIVITY_PATH)
-                            .append("?refId=")
-                            .append(encodeParam(refIdVal))
-                            .append("&eventType=")
-                            .append(encodeParam(eventTypeVal))
-                            .append("&actor=")
-                            .append(encodeParam(actorVal))
-                            .append("&filterId=")
-                            .append(encodeParam(filterIdVal));
-
-                    String threatUrl = threatUrlBuilder.toString();
-
-                    if (!firstFact) {
-                        body.append(",\n");
-                    }
-                    body.append("                {\n" +
-                            "                    \"title\": \"Threat Activity URL:\",\n" +
-                            "                    \"value\": \"" + escapeJsonString(threatUrl) + "\"\n" +
-                            "                }");
-                    firstFact = false;
-                }
-                
                 body.append("\n            ]\n" +
                         "        },\n");
+
+                // Add clickable button if we have all required URL parameters
+                String threatUrl = buildThreatActivityUrl(dashboardBaseUrl, data);
+                if (threatUrl != null) {
+                    body.append(String.format(TEAMS_ACTION_SET_TEMPLATE,
+                            escapeJsonString("View Threat Activity"),
+                            escapeJsonString(threatUrl)));
+                }
                 isFirstItem = false;
             }
             
