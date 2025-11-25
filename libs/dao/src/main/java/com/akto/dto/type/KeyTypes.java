@@ -123,7 +123,7 @@ public class KeyTypes {
         return aktoDataType != null && aktoDataType.validate(value, key);
     }
 
-    private static SubType matchesSubType(SingleTypeInfo.SubType subType, Object key, Object val) {
+    public static SubType matchesSubType(SingleTypeInfo.SubType subType, Object key, Object val) {
         String name = subType.getName();
         // check if user has overriden the default behaviour of the subtype
         if (aktoDataTypeChanged(name)) {
