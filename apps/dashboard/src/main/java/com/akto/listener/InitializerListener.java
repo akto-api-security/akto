@@ -2440,6 +2440,7 @@ public class InitializerListener implements ServletContextListener {
                                 BackwardCompatibilityDao.instance.insertOne(backwardCompatibility);
                             }
                             newSetBackwardCompatibilities(backwardCompatibility);
+                            insertPiiSources();
                         }
                     }, "context-initializer-secondary");
                     logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
