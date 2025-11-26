@@ -286,6 +286,9 @@ public class TestExecutor {
                 } catch (Exception e) {
                     e.printStackTrace();
                     loggerMaker.errorAndAddToDb(e, "Error in creating topic");
+
+                    //TODO
+                    //Add logic to mark test summary and test failed
                 }
             }
 
@@ -355,7 +358,22 @@ public class TestExecutor {
                     loggerMaker.infoAndAddToDb("Canceled all running future tasks due to timeout.", LogDb.TESTING);
                 }else{
                     Thread.sleep(20000); // wait for 20 seconds to ensure all messages are sent
-                    loggerMaker.insertImportantTestingLog("Finished inserting records in kafka, Total records: " + totalRecords.get() + " Unsent records: " + throttleNumber.get());
+
+                    int unsentRecords = throttleNumber.get();
+                    loggerMaker.insertImportantTestingLog("Finished inserting records in kafka, Total records: " + totalRecords.get() + " Unsent records: " + unsentRecords);
+
+                    // Add detailed logging for unsent records analysis
+                    if (unsentRecords > 0) {
+                        // Check producer status
+                        loggerMaker.insertImportantTestingLog("Producer status: " + Producer.getProducerStatus());
+                        loggerMaker.insertImportantTestingLog("CRITICAL: Failed to send records to Kafka ");
+
+                        //TODO
+                        // //Add logic to mark test summary and test failed
+                    } else {
+                        loggerMaker.insertImportantTestingLog("All records sent successfully to Kafka");
+                    }
+
                     dbObject.put("PRODUCER_RUNNING", false);
                     dbObject.put("CONSUMER_RUNNING", true);
                     writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
