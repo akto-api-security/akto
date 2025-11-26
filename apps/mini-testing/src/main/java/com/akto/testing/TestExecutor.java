@@ -84,6 +84,9 @@ public class TestExecutor {
     private static final AtomicInteger totalTestsCount = new AtomicInteger(0);
     private static final boolean shouldCallClientLayerForSampleData = System.getenv("TESTING_DB_LAYER_SERVICE_URL") != null && !System.getenv("TESTING_DB_LAYER_SERVICE_URL").isEmpty();
     private static RSAPrivateKey privateKey = PayloadEncodeUtil.getPrivateKey();
+    
+    // Fallback mechanism: when Kafka fails, switch to legacy testing approach
+    private static volatile boolean kafkaFallbackMode = false;
 
     public void init(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit, boolean shouldInitOnly) {
         totalTestsCount.set(0);
@@ -284,11 +287,11 @@ public class TestExecutor {
                 try {
                     Producer.createTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
                 } catch (Exception e) {
-                    e.printStackTrace();
-                    loggerMaker.errorAndAddToDb(e, "Error in creating topic");
-
-                    //TODO
-                    //Add logic to mark test summary and test failed
+                    loggerMaker.insertImportantTestingLog("Kafka topic creation failed. Switching to fallback mode (non-Kafka testing). Error: " + e.getMessage());
+                    kafkaFallbackMode = true;
+                    
+                    // Log fallback switch
+                    loggerMaker.insertImportantTestingLog("FALLBACK MODE ENABLED: Will use legacy testing approach without Kafka");
                 }
             }
 
@@ -317,7 +320,7 @@ public class TestExecutor {
                 if(rawApi != null){
                     TestingConfigurations.getInstance().getRawApiMap().put(apiInfoKey, rawApi);
                 }
-                if(Constants.IS_NEW_TESTING_ENABLED){
+                if(Constants.IS_NEW_TESTING_ENABLED && !kafkaFallbackMode){
                     for (String testSubCategory: testingRunSubCategories) {
                         if (apiInfoKeySubcategoryMap == null || apiInfoKeySubcategoryMap.get(apiInfoKey).contains(testSubCategory)) {
                             insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, new AtomicBoolean(false), totalRecords, throttleNumber);
@@ -330,7 +333,7 @@ public class TestExecutor {
                 }
             }
             try {
-                if(!Constants.IS_NEW_TESTING_ENABLED){
+                if(!Constants.IS_NEW_TESTING_ENABLED || kafkaFallbackMode){
                     int waitTs = Context.now();
                     int prevCalcTime = Context.now();
                     int lastCheckedCount = 0;
@@ -357,6 +360,8 @@ public class TestExecutor {
                     }
                     loggerMaker.infoAndAddToDb("Canceled all running future tasks due to timeout.", LogDb.TESTING);
                 }else{
+                    // This else block only executes when IS_NEW_TESTING_ENABLED is true AND kafkaFallbackMode is false
+                    // So we can directly proceed with Kafka completion logic
                     Thread.sleep(20000); // wait for 20 seconds to ensure all messages are sent
 
                     int unsentRecords = throttleNumber.get();
@@ -366,17 +371,23 @@ public class TestExecutor {
                     if (unsentRecords > 0) {
                         // Check producer status
                         loggerMaker.insertImportantTestingLog("Producer status: " + Producer.getProducerStatus());
-                        loggerMaker.insertImportantTestingLog("CRITICAL: Failed to send records to Kafka ");
-
-                        //TODO
-                        // //Add logic to mark test summary and test failed
+                        loggerMaker.insertImportantTestingLog("CRITICAL: " + unsentRecords + " records remain unsent in Kafka. Switching to fallback mode for future test runs.");
+                        
+                        // Enable fallback mode for future test runs
+                        kafkaFallbackMode = true;
+                        
+                        // Log the fallback switch
+                        loggerMaker.insertImportantTestingLog("FALLBACK MODE ENABLED: Future test runs will use legacy testing approach due to Kafka send failures during execution");
+                        
+                        loggerMaker.insertImportantTestingLog("Consumer will NOT be started due to incomplete Kafka data. " + unsentRecords + " test results may be missing.");
                     } else {
                         loggerMaker.insertImportantTestingLog("All records sent successfully to Kafka");
+                        
+                        // Normal Kafka completion - start consumer
+                        dbObject.put("PRODUCER_RUNNING", false);
+                        dbObject.put("CONSUMER_RUNNING", true);
+                        writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
                     }
-
-                    dbObject.put("PRODUCER_RUNNING", false);
-                    dbObject.put("CONSUMER_RUNNING", true);
-                    writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
                 }
                 
 
@@ -768,7 +779,7 @@ public class TestExecutor {
                 loggerMaker.infoAndAddToDb("Skipping test from producers because: " + failMessage + " apiinfo: " + apiInfoKey.toString(), LogDb.TESTING);
             }
             totalTestsCount.decrementAndGet();
-        }else if (Constants.IS_NEW_TESTING_ENABLED){
+        }else if (Constants.IS_NEW_TESTING_ENABLED && !kafkaFallbackMode){
             // push data to kafka here and inside that call run test new function
             // create an object of TestMessage
             SingleTestPayload singleTestPayload = new SingleTestPayload(
@@ -780,24 +791,43 @@ public class TestExecutor {
             try {
                 Producer.pushMessagesToKafka(Arrays.asList(singleTestPayload), totalRecords, throttleNumber);
             } catch (Exception e) {
-                e.printStackTrace();
+                loggerMaker.insertImportantTestingLog("Kafka push failed. Switching to fallback mode for this test. Error: " + e.getMessage());
+                kafkaFallbackMode = true;
+                
+                // Fall through to legacy testing approach
+                testingRunResult = executeLegacyTesting(apiInfoKey, summaryId, messages, testConfig, testLogs, isApiInfoTested);
+                totalTestsCount.decrementAndGet();
                 return null;
             }
 
-        }else{
-            if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId)){
-                TestingConfigurations instance = TestingConfigurations.getInstance();
-                String sampleMessage = messages.get(messages.size() - 1);
-                testingRunResult = runTestNew(apiInfoKey, summaryId, instance.getTestingUtil(), summaryId, testConfig, instance.getTestingRunConfig(), instance.isDebug(), testLogs, sampleMessage);
-                if (testingRunResult != null) {
-                    List<String> errorList = testingRunResult.getErrorsList();
-                    if (errorList == null || !errorList.contains(TestResult.API_CALL_FAILED_ERROR_STRING)) {
-                        isApiInfoTested.set(true);
-                    }
-                }
-                insertResultsAndMakeIssues(Collections.singletonList(testingRunResult), summaryId);
-            }
+        }else{ 
+            // Use legacy testing approach (either IS_NEW_TESTING_ENABLED is false OR kafkaFallbackMode is true)
+            testingRunResult = executeLegacyTesting(apiInfoKey, summaryId, messages, testConfig, testLogs, isApiInfoTested);
             totalTestsCount.decrementAndGet();
+        }
+        return null;
+    }
+
+    /**
+     * Executes legacy testing approach (fallback mode)
+     * @return TestingRunResult if test executed, null otherwise
+     */
+    private TestingRunResult executeLegacyTesting(ApiInfo.ApiInfoKey apiInfoKey, ObjectId summaryId, 
+            List<String> messages, TestConfig testConfig, List<TestingRunResult.TestLog> testLogs, 
+            AtomicBoolean isApiInfoTested) {
+        
+        if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId)){
+            TestingConfigurations instance = TestingConfigurations.getInstance();
+            String sampleMessage = messages.get(messages.size() - 1);
+            TestingRunResult testingRunResult = runTestNew(apiInfoKey, summaryId, instance.getTestingUtil(), summaryId, testConfig, instance.getTestingRunConfig(), instance.isDebug(), testLogs, sampleMessage);
+            if (testingRunResult != null) {
+                List<String> errorList = testingRunResult.getErrorsList();
+                if (errorList == null || !errorList.contains(TestResult.API_CALL_FAILED_ERROR_STRING)) {
+                    isApiInfoTested.set(true);
+                }
+            }
+            insertResultsAndMakeIssues(Collections.singletonList(testingRunResult), summaryId);
+            return testingRunResult;
         }
         return null;
     }
