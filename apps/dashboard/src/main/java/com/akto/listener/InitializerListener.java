@@ -2649,9 +2649,9 @@ public class InitializerListener implements ServletContextListener {
                         setUpFillCollectionIdArrayJob();
                                                
 
-                        CleanInventory.cleanInventoryJobRunner();
+                        // CleanInventory.cleanInventoryJobRunner();
 
-                        MatchingJob.MatchingJobRunner();
+                        // MatchingJob.MatchingJobRunner();
                     }
 
                     int now2 = Context.now();
