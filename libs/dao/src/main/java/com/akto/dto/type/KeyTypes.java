@@ -11,6 +11,7 @@ import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.type.SingleTypeInfo.ParamId;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.standard.VinValidator;
+import com.akto.dto.type.standard.VrnValidator;
 import com.akto.types.CappedSet;
 import com.google.i18n.phonenumbers.PhoneNumberUtil;
 import com.google.i18n.phonenumbers.Phonenumber;
@@ -145,7 +146,10 @@ public class KeyTypes {
                     if (isPhoneNumber(val.toString())) return subType;
                     break;
                 case "VIN":
-                    if (VinValidator.isValid(val.toString())) return subType;    
+                    if (VinValidator.isValid(val.toString())) return subType;
+                    break;
+                case "VRN":
+                    if (VrnValidator.isValid(val.toString())) return subType;
                     break;
                 default:
                     return null;
@@ -180,6 +184,10 @@ public class KeyTypes {
 
         if (checkForSubtypes && !isHeader  && matchesSubType(SingleTypeInfo.VIN, key, oString) != null) {
             return SingleTypeInfo.VIN;
+        }
+
+        if (checkForSubtypes && !isHeader  && matchesSubType(SingleTypeInfo.VRN, key, oString) != null) {
+            return SingleTypeInfo.VRN;
         }
 
         if (NumberUtils.isDigits(o.toString())) {

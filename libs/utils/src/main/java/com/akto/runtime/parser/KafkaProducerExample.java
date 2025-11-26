@@ -101,7 +101,7 @@ public class KafkaProducerExample {
     public static List<ProducerRecord<String, String>> demoRecordGenerator() {
         List<String> hosts = new ArrayList<>();
         for (int i = 1; i <= 10; i++) {
-            hosts.add("host-" + i + "-auth-type.enigma");
+            hosts.add("vrn-host-" + i + "-auth-type.enigma");
         }
         List<String> paths = java.util.Arrays.asList("json-one", "/json-two", "/json/-three", "/json-four", "/json/5/test");
         // List<String> paths = java.util.Arrays.asList("json-one", "/json-two");
@@ -128,7 +128,7 @@ public class KafkaProducerExample {
                     requestHeaders,
                     requestHeaders,
                     "POST",
-                    "{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"companyId\":{\"type\":\"string\"},\"companyName\":{\"type\":\"string\"}}}}",
+                    "{\"vehicleRegistration\":\"AB12 XYZ\",\"registrationNumber\":\"CD34 EFG\",\"vrn\":\"GH56 JKL\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"companyId\":{\"type\":\"string\"},\"companyName\":{\"type\":\"string\"}}}}",
                     "{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"companyId\":{\"type\":\"string\"},\"companyName\":{\"type\":\"string\"}}}}",
                     "0.0.0.0",
                     "0",
