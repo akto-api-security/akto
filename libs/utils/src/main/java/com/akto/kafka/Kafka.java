@@ -1,16 +1,19 @@
 package com.akto.kafka;
 
+import com.akto.log.LoggerMaker;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.producer.*;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.akto.log.LoggerMaker.LogDb;
 
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Kafka {
     private static final Logger logger = LoggerFactory.getLogger(Kafka.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Kafka.class, LogDb.TESTING);
     private KafkaProducer<String, String> producer;
     public boolean producerReady;
 
@@ -43,19 +46,23 @@ public class Kafka {
 
     public void sendWithCounter(String message, String topic, AtomicInteger counter) {
         if (!this.producerReady) {
-          logger.error("Producer not ready. Cannot send message.");
-          return;
+            loggerMaker.insertImportantTestingLog("Producer not ready. Cannot send message. Counter will remain incremented. Current counter: " + counter.get());
+            return;
         };
-    
+
         ProducerRecord<String, String> record = new ProducerRecord<>(topic, message);
-        producer.send(record, (recordMetadata, e) -> {
-            if (e != null) {
-                logger.error("onCompletion error: " + e.getMessage() + " for message: " + message);
-            } else {
-                logger.info(message + " sent to topic " + topic + " with offset " + recordMetadata.offset());
-                counter.decrementAndGet();
-            }
-        });
+        try {
+            producer.send(record, (recordMetadata, e) -> {
+                if (e != null) {
+                    loggerMaker.insertImportantTestingLog("Failed to send message to Kafka. Error: " + e.getMessage()+ " for message " +message+ ". Counter will remain incremented. Current counter: " + counter.get());
+                } else {
+                    logger.info(message + " sent to topic " + topic + " with offset " + recordMetadata.offset());
+                    counter.decrementAndGet();
+                }
+            });
+        } catch (Exception sendException) {
+            loggerMaker.insertImportantTestingLog("Exception occurred while sending message to Kafka: " + sendException.getMessage() + ". Counter will remain incremented. Current counter: " + counter.get());
+        }
     }
 
     public void send(String message,String topic) {
