@@ -249,6 +249,8 @@ public class SingleTypeInfo {
             Collections.emptyList());
     public static SubType VIN = new SubType("VIN", true, SuperType.STRING, StringSchema.class,
             Collections.emptyList());
+    public static SubType VRN = new SubType("VRN", true, SuperType.STRING, StringSchema.class,
+            Collections.emptyList());
     public static SubType PHONE_NUMBER = new SubType("PHONE_NUMBER", true, SuperType.STRING, StringSchema.class,
             Collections.emptyList());
     public static SubType UUID = new SubType("UUID", false, SuperType.STRING, StringSchema.class,
@@ -610,6 +612,7 @@ public class SingleTypeInfo {
         subTypeMap.put("SSN", SSN);
         subTypeMap.put("CREDIT_CARD", CREDIT_CARD);
         subTypeMap.put("VIN", VIN);
+        subTypeMap.put("VRN", VRN);
         subTypeMap.put("PHONE_NUMBER", PHONE_NUMBER);
         subTypeMap.put("UUID", UUID);
         subTypeMap.put("GENERIC", GENERIC);

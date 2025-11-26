@@ -145,8 +145,11 @@ public class KeyTypes {
                     if (isPhoneNumber(val.toString())) return subType;
                     break;
                 case "VIN":
-                    if (VinValidator.isValid(val.toString())) return subType;    
-                    break; 
+                    if (VinValidator.isValid(val.toString())) return subType;
+                    break;
+                case "VRN":
+                    if (VrnValidator.isValid(val.toString())) return subType;
+                    break;
                 default:
                     return null;
             }
@@ -237,6 +240,10 @@ public class KeyTypes {
             
             if (checkForSubtypes  && matchesSubType(SingleTypeInfo.VIN, key, oString) != null) {
                 return SingleTypeInfo.VIN;
+            }
+
+            if (checkForSubtypes && matchesSubType(SingleTypeInfo.VRN, key, oString) != null) {
+                return SingleTypeInfo.VRN;
             }
 
             return SingleTypeInfo.GENERIC;
