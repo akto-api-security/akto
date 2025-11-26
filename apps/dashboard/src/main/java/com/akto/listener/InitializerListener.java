@@ -18,6 +18,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.attribute.FileTime;
@@ -257,6 +258,8 @@ import com.slack.api.webhook.WebhookResponse;
 
 import io.intercom.api.Intercom;
 import okhttp3.OkHttpClient;
+
+import java.io.UnsupportedEncodingException;
 
 public class InitializerListener implements ServletContextListener {
 
@@ -1217,6 +1220,42 @@ public class InitializerListener implements ServletContextListener {
                 .replace("\t", "\\t");
     }
 
+    private static String encodeParam(String value) {
+        if (value == null) {
+            return "";
+        }
+        try {
+            return URLEncoder.encode(value, StandardCharsets.UTF_8.toString());
+        } catch (UnsupportedEncodingException e) {
+            return value;
+        }
+    }
+
+    private static String buildThreatActivityUrl(String baseUrl, Map<String, Object> data) {
+        String refId = data.get("refId") != null ? data.get("refId").toString() : "";
+        String eventType = data.get("eventType") != null ? data.get("eventType").toString() : "";
+        String actor = data.get("actor") != null ? data.get("actor").toString() : "";
+        String filterId = data.get("filterId") != null ? data.get("filterId").toString() : "";
+
+        if (StringUtils.isBlank(refId) || StringUtils.isBlank(eventType)
+                || StringUtils.isBlank(actor) || StringUtils.isBlank(filterId)) {
+            return null;
+        }
+
+        StringBuilder urlBuilder = new StringBuilder();
+        urlBuilder.append(baseUrl)
+                .append(THREAT_ACTIVITY_PATH)
+                .append("?refId=")
+                .append(encodeParam(refId))
+                .append("&eventType=")
+                .append(encodeParam(eventType))
+                .append("&actor=")
+                .append(encodeParam(actor))
+                .append("&filterId=")
+                .append(encodeParam(filterId));
+        return urlBuilder.toString();
+    }
+
     private static String TEAMS_WEBHOOK_OPENING_BODY = "{\n" +
                 "    \"type\": \"message\",\n" +
                 "    \"attachments\": [\n" +
@@ -1235,6 +1274,19 @@ public class InitializerListener implements ServletContextListener {
                 "    ]\n" +
                 "}\n" +
                 "";
+
+    private static final String THREAT_ACTIVITY_PATH = "/dashboard/protection/threat-activity";
+
+    private static final String TEAMS_ACTION_SET_TEMPLATE = "        {\n" +
+            "            \"type\": \"ActionSet\",\n" +
+            "            \"actions\": [\n" +
+            "                {\n" +
+            "                    \"type\": \"Action.OpenUrl\",\n" +
+            "                    \"title\": \"%s\",\n" +
+            "                    \"url\": \"%s\"\n" +
+            "                }\n" +
+            "            ]\n" +
+            "        },\n";
 
     private static String createMicrosoftTeamsWorkflowWebhookPayload(CustomWebhook webhook, Map<String, Object> valueMap){
         StringBuilder body = new StringBuilder();
@@ -1357,6 +1409,7 @@ public class InitializerListener implements ServletContextListener {
     
 
     private static void buildApiThreatsTeamsWebhookBody(StringBuilder body, String name, Object value) {
+        final String dashboardBaseUrl = getDashboardBaseUrl();
         if (value instanceof List) {
             body.append("        {\n" +
                     "            \"type\": \"TextBlock\",\n" +
@@ -1400,6 +1453,14 @@ public class InitializerListener implements ServletContextListener {
                 
                 body.append("\n            ]\n" +
                         "        },\n");
+
+                // Add clickable button if we have all required URL parameters
+                String threatUrl = buildThreatActivityUrl(dashboardBaseUrl, data);
+                if (threatUrl != null) {
+                    body.append(String.format(TEAMS_ACTION_SET_TEMPLATE,
+                            escapeJsonString("View Threat Activity"),
+                            escapeJsonString(threatUrl)));
+                }
                 isFirstItem = false;
             }
             
@@ -1487,7 +1548,7 @@ public class InitializerListener implements ServletContextListener {
                     }
                 }, "webhook-sender");
             }
-        }, 0, 1, TimeUnit.MINUTES);
+        }, 0, 1, TimeUnit.HOURS);
     }
 
     static class ChangesInfo {
@@ -4419,6 +4480,28 @@ public class InitializerListener implements ServletContextListener {
                 }, "automated-api-groups-scheduler");
             }
         }, 0, 4, TimeUnit.HOURS);
+    }
+
+    private static String getDashboardBaseUrl() {
+        String dashboardUrl = Constants.DEFAULT_AKTO_DASHBOARD_URL;
+        if (DashboardMode.isOnPremDeployment()) {
+            com.akto.dto.Config.AktoHostUrlConfig aktoUrlConfig = (com.akto.dto.Config.AktoHostUrlConfig) ConfigsDao.instance.findOne(
+                Filters.eq(Constants.ID, ConfigType.AKTO_DASHBOARD_HOST_URL.name())
+            );
+            if (aktoUrlConfig != null && StringUtils.isNotBlank(aktoUrlConfig.getHostUrl())) {
+                dashboardUrl = aktoUrlConfig.getHostUrl();
+            }
+        }
+
+        if (StringUtils.isBlank(dashboardUrl)) {
+            dashboardUrl = Constants.DEFAULT_AKTO_DASHBOARD_URL;
+        }
+
+        if (dashboardUrl.endsWith("/")) {
+            dashboardUrl = dashboardUrl.substring(0, dashboardUrl.length() - 1);
+        }
+
+        return dashboardUrl;
     }
 }
 
