@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Run the memory calculation script to set JAVA_OPTIONS
-source /var/lib/jetty/set_xmx.sh
+source /opt/jetty/set_xmx.sh
 
-# Start Jetty normally
-exec /docker-entrypoint.sh "$@"
+# Start Jetty
+exec java $JAVA_OPTIONS -jar /opt/jetty/start.jar
