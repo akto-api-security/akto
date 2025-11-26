@@ -59,9 +59,9 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: akto-api-security
           REGISTRY_ALIAS: p7q3h0z2
-          IMAGE_TAG: kafkalatest
-          IMAGE_TAG2: latest
-          IMAGE_TAG3: 1.42.1_local
+          IMAGE_TAG: kafkalatest-no-root
+          IMAGE_TAG2: latest-no-root
+          IMAGE_TAG3: 1.42.1_local-no-root
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
@@ -81,8 +81,8 @@ jobs:
         env:
           ECR_REGISTRY: aktosecurity
           ECR_REPOSITORY: akto-api-security
-          IMAGE_TAG: kafkalatest
-          IMAGE_TAG2: latest
+          IMAGE_TAG: kafkalatest-no-root
+          IMAGE_TAG2: latest-no-root
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
