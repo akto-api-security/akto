@@ -67,8 +67,8 @@ jobs:
         env:
           ECR_REGISTRY: aktosecurity
           ECR_REPOSITORY: akto-api-security
-          IMAGE_TAG_DATA_INGESTION: latest
-          IMAGE_TAG_DATA_INGESTION_2: ${{github.event.inputs.release_version_data_ingestion}}
+          IMAGE_TAG_DATA_INGESTION: latest-no-root
+          IMAGE_TAG_DATA_INGESTION_2: ${{github.event.inputs.release_version_data_ingestion}}-no-root
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub
@@ -97,7 +97,7 @@ jobs:
         uses: mathieudutour/github-tag-action@v6.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          custom_tag: data-ingestion-${{ github.event.inputs.release_version_data_ingestion}}
+          custom_tag: data-ingestion-${{ github.event.inputs.release_version_data_ingestion}}-no-root
       - name: Create a GitHub release
         uses: ncipollo/release-action@v1.12.0
         with:
