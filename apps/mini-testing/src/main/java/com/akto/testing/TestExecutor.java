@@ -464,7 +464,7 @@ public class TestExecutor {
                     if (unsentRecords == totalRecords.get()) {
                         // Check producer status
                         loggerMaker.infoAndAddToDb("Producer status: " + Producer.getProducerStatus());
-                        loggerMaker.insertImportantTestingLog("KAFKA FAILURE DETECTED: All " + totalRecords.get() + " records failed to send. Switching to legacy mode immediately to run all tests.");
+                        loggerMaker.infoAndAddToDb("KAFKA FAILURE DETECTED: All " + totalRecords.get() + " records failed to send. Switching to legacy mode immediately to run all tests.");
                         
                         // Set fallback mode for current execution
                         currentExecutionFallback = true;
