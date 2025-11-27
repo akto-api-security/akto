@@ -88,6 +88,22 @@ public class TestExecutor {
     // Fallback mechanism: when Kafka fails, switch to legacy testing approach
     private static volatile boolean kafkaFallbackMode = false;
 
+    /**
+     * Centralized function to determine if Kafka mode should be enabled.
+     * Returns true if new testing is enabled AND Kafka fallback mode is not active.
+     */
+    public static boolean enableKafkaMode() {
+        return Constants.IS_NEW_TESTING_ENABLED && !kafkaFallbackMode;
+    }
+
+    /**
+     * Resets the Kafka fallback mode to false for new test runs.
+     * This should be called at the beginning of each testing cycle to give Kafka another chance.
+     */
+    public static void resetKafkaFallbackMode() {
+        kafkaFallbackMode = false;
+    }
+
     public void init(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit, boolean shouldInitOnly) {
         totalTestsCount.set(0);
         PrometheusMetricsHandler.markModuleBusy();
@@ -271,7 +287,7 @@ public class TestExecutor {
                 return;
             }
 
-            if(!Constants.IS_NEW_TESTING_ENABLED){
+            if(!enableKafkaMode()){
                 maxThreads = Math.min(100, Math.max(10, testingRun.getMaxConcurrentRequests()));
             }
 
@@ -281,7 +297,7 @@ public class TestExecutor {
             // create count down latch to know when inserting kafka records are completed.
             CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
             int tempRunTime = 10 * 60;
-            if(!Constants.IS_NEW_TESTING_ENABLED){
+            if(!enableKafkaMode()){
                 tempRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
             }else{
                 try {
@@ -320,7 +336,7 @@ public class TestExecutor {
                 if(rawApi != null){
                     TestingConfigurations.getInstance().getRawApiMap().put(apiInfoKey, rawApi);
                 }
-                if(Constants.IS_NEW_TESTING_ENABLED && !kafkaFallbackMode){
+                if(enableKafkaMode()){
                     for (String testSubCategory: testingRunSubCategories) {
                         if (apiInfoKeySubcategoryMap == null || apiInfoKeySubcategoryMap.get(apiInfoKey).contains(testSubCategory)) {
                             insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, new AtomicBoolean(false), totalRecords, throttleNumber);
@@ -333,7 +349,7 @@ public class TestExecutor {
                 }
             }
             try {
-                if(!Constants.IS_NEW_TESTING_ENABLED || kafkaFallbackMode){
+                if(!enableKafkaMode()){
                     int waitTs = Context.now();
                     int prevCalcTime = Context.now();
                     int lastCheckedCount = 0;
@@ -356,7 +372,7 @@ public class TestExecutor {
                     }
     
                     for (Future<Void> future : testingRecords) {
-                        future.cancel(!Constants.IS_NEW_TESTING_ENABLED);
+                        future.cancel(!enableKafkaMode());
                     }
                     loggerMaker.infoAndAddToDb("Canceled all running future tasks due to timeout.", LogDb.TESTING);
                 }else{
@@ -365,23 +381,23 @@ public class TestExecutor {
                     Thread.sleep(20000); // wait for 20 seconds to ensure all messages are sent
 
                     int unsentRecords = throttleNumber.get();
-                    loggerMaker.insertImportantTestingLog("Finished inserting records in kafka, Total records: " + totalRecords.get() + " Unsent records: " + unsentRecords);
+                    loggerMaker.infoAndAddToDb("Finished inserting records in kafka, Total records: " + totalRecords.get() + " Unsent records: " + unsentRecords);
 
                     // Add detailed logging for unsent records analysis
                     if (unsentRecords > 0) {
                         // Check producer status
-                        loggerMaker.insertImportantTestingLog("Producer status: " + Producer.getProducerStatus());
-                        loggerMaker.insertImportantTestingLog("CRITICAL: " + unsentRecords + " records remain unsent in Kafka. Switching to fallback mode for future test runs.");
+                        loggerMaker.infoAndAddToDb("Producer status: " + Producer.getProducerStatus());
+                        loggerMaker.infoAndAddToDb("CRITICAL: " + unsentRecords + " records remain unsent in Kafka. Switching to fallback mode for future test runs.");
                         
                         // Enable fallback mode for future test runs
                         kafkaFallbackMode = true;
                         
                         // Log the fallback switch
-                        loggerMaker.insertImportantTestingLog("FALLBACK MODE ENABLED: Future test runs will use legacy testing approach due to Kafka send failures during execution");
+                        loggerMaker.infoAndAddToDb("FALLBACK MODE ENABLED: Future test runs will use legacy testing approach due to Kafka send failures during execution");
                         
-                        loggerMaker.insertImportantTestingLog("Consumer will NOT be started due to incomplete Kafka data. " + unsentRecords + " test results may be missing.");
+                        loggerMaker.infoAndAddToDb("Consumer will NOT be started due to incomplete Kafka data. " + unsentRecords + " test results may be missing.");
                     } else {
-                        loggerMaker.insertImportantTestingLog("All records sent successfully to Kafka");
+                        loggerMaker.infoAndAddToDb("All records sent successfully to Kafka");
                         
                         // Normal Kafka completion - start consumer
                         dbObject.put("PRODUCER_RUNNING", false);
@@ -779,7 +795,7 @@ public class TestExecutor {
                 loggerMaker.infoAndAddToDb("Skipping test from producers because: " + failMessage + " apiinfo: " + apiInfoKey.toString(), LogDb.TESTING);
             }
             totalTestsCount.decrementAndGet();
-        }else if (Constants.IS_NEW_TESTING_ENABLED && !kafkaFallbackMode){
+        }else if (enableKafkaMode()){
             // push data to kafka here and inside that call run test new function
             // create an object of TestMessage
             SingleTestPayload singleTestPayload = new SingleTestPayload(

@@ -43,16 +43,16 @@ public class Producer {
             try {
                 int waitStart = Context.now();
                 if (throttleNumber.get() > 10000) {
-                    loggerMaker.insertImportantTestingLog("Throttling: Waiting due to high throttleNumber: " + throttleNumber.get());
+                    loggerMaker.infoAndAddToDb("Throttling: Waiting due to high throttleNumber: " + throttleNumber.get());
                 }
                 while (throttleNumber.get() > 10000 && (Context.now() - waitStart) < Constants.MAX_WAIT_FOR_SLEEP) {
                     Thread.sleep(1000);
                 }
                 if (throttleNumber.get() > 10000) {
-                    loggerMaker.insertImportantTestingLog("Throttling timeout reached. Still have high throttleNumber: " + throttleNumber.get() + ". Proceeding anyway.");
+                    loggerMaker.infoAndAddToDb("Throttling timeout reached. Still have high throttleNumber: " + throttleNumber.get() + ". Proceeding anyway.");
                 }
             } catch (Exception e) {
-                loggerMaker.insertImportantTestingLog("Error during throttling wait: " + e.getMessage());
+                loggerMaker.infoAndAddToDb("Error during throttling wait: " + e.getMessage());
                 e.printStackTrace();
             }
             totalRecords.incrementAndGet();
@@ -60,12 +60,12 @@ public class Producer {
 
             // Check if producer is ready before sending
             if (producer == null) {
-                loggerMaker.insertImportantTestingLog("Kafka producer is null! Cannot send message. Triggering fallback mode.");
+                loggerMaker.infoAndAddToDb("Kafka producer is null! Cannot send message. Triggering fallback mode.");
                 throw new Exception("Kafka producer is null - fallback to legacy testing required");
             }
 
             if (!producer.producerReady) {
-                loggerMaker.insertImportantTestingLog("Kafka producer not ready! Cannot send message. Triggering fallback mode.");
+                loggerMaker.infoAndAddToDb("Kafka producer not ready! Cannot send message. Triggering fallback mode.");
                 throw new Exception("Kafka producer not ready - fallback to legacy testing required");
             }
 
@@ -97,8 +97,8 @@ public class Producer {
             }
         }
 
-        loggerMaker.insertImportantTestingLog("CRITICAL: Failed to delete topic '" + topicName + "' after " + maxRetries + " retries.");
-        loggerMaker.insertImportantTestingLog("This failure will be handled gracefully - tests can continue without topic deletion");
+        loggerMaker.infoAndAddToDb("CRITICAL: Failed to delete topic '" + topicName + "' after " + maxRetries + " retries.");
+        loggerMaker.infoAndAddToDb("This failure will be handled gracefully - tests can continue without topic deletion");
         throw new RuntimeException("Failed to delete topic '" + topicName + "' after " + maxRetries + " retries.");
     }
 
@@ -125,7 +125,7 @@ public class Producer {
             }
         }
 
-        loggerMaker.insertImportantTestingLog("CRITICAL: Failed to create topic '" + topicName + "' after " + maxRetries + " retries.");
+        loggerMaker.infoAndAddToDb("CRITICAL: Failed to create topic '" + topicName + "' after " + maxRetries + " retries.");
         throw new RuntimeException("Failed to create topic '" + topicName + "' after " + maxRetries + " retries.");
     }
 
