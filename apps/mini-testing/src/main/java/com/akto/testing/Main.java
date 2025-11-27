@@ -458,6 +458,7 @@ public class Main {
         singleTypeInfoInit(accountId);
 
         while (true) {
+            TestExecutor.resetKafkaFallbackMode();
             PrometheusMetricsHandler.markModuleIdle();
             int start = Context.now();
             long startDetailed = System.currentTimeMillis();
@@ -668,7 +669,7 @@ public class Main {
                 Executor.clearRoleCache();
 
                 if(!maxRetriesReached){
-                    if(Constants.IS_NEW_TESTING_ENABLED){
+                    if(TestExecutor.enableKafkaMode()){
                         int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
                         testingProducer.initProducer(testingRun, summaryId, false, syncLimit);
                         testingConsumer.init(maxRunTime);
