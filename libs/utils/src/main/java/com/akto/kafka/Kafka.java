@@ -46,7 +46,7 @@ public class Kafka {
 
     public void sendWithCounter(String message, String topic, AtomicInteger counter) {
         if (!this.producerReady) {
-            loggerMaker.insertImportantTestingLog("Producer not ready. Cannot send message. Counter will remain incremented. Current counter: " + counter.get());
+            loggerMaker.errorAndAddToDb("Producer not ready. Cannot send message. Counter will remain incremented. Current counter: " + counter.get());
             return;
         };
 
@@ -54,14 +54,14 @@ public class Kafka {
         try {
             producer.send(record, (recordMetadata, e) -> {
                 if (e != null) {
-                    loggerMaker.insertImportantTestingLog("Failed to send message to Kafka. Error: " + e.getMessage()+ " for message " +message+ ". Counter will remain incremented. Current counter: " + counter.get());
+                    loggerMaker.infoAndAddToDb("Failed to send message to Kafka. Error: " + e.getMessage()+ " for message " +message+ ". Counter will remain incremented. Current counter: " + counter.get());
                 } else {
                     logger.info(message + " sent to topic " + topic + " with offset " + recordMetadata.offset());
                     counter.decrementAndGet();
                 }
             });
         } catch (Exception sendException) {
-            loggerMaker.insertImportantTestingLog("Exception occurred while sending message to Kafka: " + sendException.getMessage() + ". Counter will remain incremented. Current counter: " + counter.get());
+            loggerMaker.errorAndAddToDb(sendException, "Exception occurred while sending message to Kafka: " + sendException.getMessage() + ". Counter will remain incremented. Current counter: " + counter.get());
         }
     }
 
@@ -122,8 +122,9 @@ public class Kafka {
         try {
             producer.send(record).get();
             producerReady = true;
-        } catch (Exception ignored) {
+        } catch (Exception e) {
             close();
+            loggerMaker.errorAndAddToDb(e, "Kafka producer initialization failed with unexpected error: ");
         }
     }
 
