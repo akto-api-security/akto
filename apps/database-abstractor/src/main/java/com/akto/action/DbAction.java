@@ -81,7 +81,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
-
 public class DbAction extends ActionSupport {
     static final ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
     private static final Set<String> IGNORED_SUB_TYPES = new HashSet<>(Arrays.asList(
