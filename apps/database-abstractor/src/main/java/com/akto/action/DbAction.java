@@ -1491,12 +1491,24 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    // Added to stop ingestion of unwanted logs
+    private static String ignoreDaemonLog = "Kafka write successful";
+    private static String ignoreMiniRuntimeLog = "lastExecutedBatch sample";
+
     public String insertRuntimeLog() {
         try {
             int accId = Context.accountId.get();
             if (accId == 1733164172) {
                 return Action.SUCCESS.toUpperCase();
             }
+            
+            if (HIGHER_STI_LIMIT_ACCOUNT_IDS.contains(accId)) {
+                String message = log.getString("log") != null ? log.getString("log") : "";
+                if (message.contains(ignoreDaemonLog) || message.contains(ignoreMiniRuntimeLog)) {
+                    return Action.SUCCESS.toUpperCase();
+                }
+            }
+
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
             DbLayer.insertRuntimeLog(dbLog);
 
