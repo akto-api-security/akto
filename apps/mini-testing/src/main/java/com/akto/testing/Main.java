@@ -114,13 +114,20 @@ public class Main {
     private static void handleTestEditorPlayground(TestingRunPlayground testingRunPlayground) {
         ApiInfo.ApiInfoKey infoKey = testingRunPlayground.getApiInfoKey();
         TestingRunResult testingRunResult = new TestingRunResult(
-                null, infoKey, "", "", new ArrayList<>(),
+                null, infoKey, "", "", null,
                 false, new ArrayList<>(), 100,
-                Context.now(), Context.now(), testingRunPlayground.getId(), null, new ArrayList<>());
+                Context.now(), Context.now(), null, null, new ArrayList<>());
+        List<TestResult> testResults = new ArrayList<>();
+        testResults.add(new TestResult("", "", Collections.emptyList(), 0, false, TestResult.Confidence.HIGH, null));
+        testingRunResult.setSingleTestResults(testResults);
         try {
-            testingRunResult = createTestEditorPlayground(testingRunPlayground);
+            testingRunResult = createTestEditorPlayground(testingRunPlayground, testingRunResult);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in handling test editor playground: " + e.getMessage());
+            String errorMessage = "Error in handling test editor playground: " + e.getMessage();
+            loggerMaker.errorAndAddToDb(e, errorMessage);
+            testResults.clear();
+            testResults.add(new TestResult("","", Arrays.asList(errorMessage), 0, false, TestResult.Confidence.HIGH, null));
+            testingRunResult.setSingleTestResults(testResults);
         }
         if (testingRunResult != null) {
             testingRunResult.setId(testingRunPlayground.getId());
@@ -134,7 +141,7 @@ public class Main {
         }
     }
 
-    private static TestingRunResult createTestEditorPlayground(TestingRunPlayground testingRunPlayground) {
+    private static TestingRunResult createTestEditorPlayground(TestingRunPlayground testingRunPlayground, TestingRunResult testingRunResult) {
         TestExecutor executor = new TestExecutor();
         TestConfig testConfig = null;
         try {
@@ -156,7 +163,7 @@ public class Main {
 
         TestingUtil testingUtil = new TestingUtil(messageStore, null, null, customAuthTypes);
         String message = messageStore.getSampleDataMap().get(infoKey).get(messageStore.getSampleDataMap().get(infoKey).size() - 1);
-        TestingRunResult testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null, true, testLogs, message);
+        testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null, true, testLogs, message);
 
         GenericTestResult testRes = testingRunResult.getTestResults().get(0);
         if (testRes instanceof TestResult) {
