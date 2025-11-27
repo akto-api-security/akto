@@ -36,8 +36,7 @@ public class Producer {
 
     public static Void pushMessagesToKafka(List<SingleTestPayload> messages, AtomicInteger totalRecords, AtomicInteger throttleNumber) throws Exception{
         // logging to show exactly what Kafka URL is being used
-        String envKafkaUrl = System.getenv("LOCAL_KAFKA_BROKER_URL");
-        loggerMaker.infoAndAddToDb("Environment LOCAL_KAFKA_BROKER_URL = " + (envKafkaUrl != null ? envKafkaUrl : "NOT SET"));
+        loggerMaker.infoAndAddToDb("Environment LOCAL_KAFKA_BROKER_URL = " + (Constants.LOCAL_KAFKA_BROKER_URL != null ? Constants.LOCAL_KAFKA_BROKER_URL : "NOT SET"));
         for(SingleTestPayload singleTestPayload: messages){
             String messageString = singleTestPayload.toString();
             try {
