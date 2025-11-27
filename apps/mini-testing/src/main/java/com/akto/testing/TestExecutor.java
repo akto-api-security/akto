@@ -383,7 +383,8 @@ public class TestExecutor {
                 try {
                     Producer.createTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
                 } catch (Exception e) {
-                    loggerMaker.insertImportantTestingLog("Kafka topic creation failed. " + e.getMessage());
+                    e.printStackTrace();
+                    loggerMaker.errorAndAddToDb(e, "Error in creating topic");
                 }
             }
 

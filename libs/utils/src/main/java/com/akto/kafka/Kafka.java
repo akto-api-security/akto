@@ -124,7 +124,7 @@ public class Kafka {
             producerReady = true;
         } catch (Exception e) {
             close();
-            loggerMaker.insertImportantTestingLog("Kafka producer initialization failed with unexpected error: " + e.getClass().getSimpleName() + " - " + e.getMessage() + ". Fallback mode will be used.");
+            loggerMaker.errorAndAddToDb(e, "Kafka producer initialization failed with unexpected error: ");
         }
     }
 
