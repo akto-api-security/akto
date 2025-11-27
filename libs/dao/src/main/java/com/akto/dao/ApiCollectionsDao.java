@@ -4,6 +4,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.rbac.UsersCollectionsList;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
 import com.akto.util.Pair;
@@ -76,9 +77,26 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
     public void updateTransportType(ApiCollection apiCollection, String transportType) {
         try {
             Bson filter = Filters.eq(ApiCollection.ID, apiCollection.getId());
+            
+            // Update the transport type field
             Bson update = Updates.set(ApiCollection.MCP_TRANSPORT_TYPE, transportType);
             ApiCollectionsDao.instance.updateOne(filter, update);
             apiCollection.setMcpTransportType(transportType);
+            
+            // Update the mcp-server-type tag
+            // Remove any existing tag with the same keyName and add the new tag
+            BasicDBObject pullQuery = new BasicDBObject(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TYPE_TAG);
+            CollectionTags serverTypeTag = new CollectionTags(
+                Context.now(), 
+                Constants.AKTO_MCP_SERVER_TYPE_TAG, 
+                transportType, 
+                CollectionTags.TagSource.KUBERNETES
+            );
+            Bson tagUpdate = Updates.combine(
+                Updates.pull(ApiCollection.TAGS_STRING, pullQuery),
+                Updates.addToSet(ApiCollection.TAGS_STRING, serverTypeTag)
+            );
+            ApiCollectionsDao.instance.updateOne(filter, tagUpdate);
         } catch (Exception e) {
         }
     }
