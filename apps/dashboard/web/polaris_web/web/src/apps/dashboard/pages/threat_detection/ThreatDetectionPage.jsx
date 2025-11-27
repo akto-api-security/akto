@@ -220,11 +220,13 @@ function ThreatDetectionPage() {
         // Support legacy 'filters' param for backward compatibility
         const legacyFilters = searchParams.get("filters");
         const statusValue = eventStatusFromQuery || (legacyFilters ? legacyFilters.replace(/#/g, "").toUpperCase() : "");
+        const apiCollectionIdParam = searchParams.get("apiCollectionId");
         return {
             refId: searchParams.get("refId"),
             eventType: searchParams.get("eventType"),
             actor: searchParams.get("actor"),
             filterId: searchParams.get("filterId"),
+            apiCollectionId: apiCollectionIdParam ? parseInt(apiCollectionIdParam, 10) : undefined,
             status: statusValue,
             hasQueryEvent: Boolean(
                 searchParams.get("refId") && 
@@ -465,7 +467,7 @@ function ThreatDetectionPage() {
             moreInfoData: {
               url: rowContext?.url || '',
               method: rowContext?.method || '',
-              apiCollectionId: rowContext?.apiCollectionId,
+              apiCollectionId: rowContext?.apiCollectionId || queryParams.apiCollectionId,
               templateId: queryParams.filterId,
             },
             currentEventId: rowContext?.eventId || '',
