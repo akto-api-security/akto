@@ -98,7 +98,6 @@ public class Producer {
         }
 
         loggerMaker.infoAndAddToDb("CRITICAL: Failed to delete topic '" + topicName + "' after " + maxRetries + " retries.");
-        loggerMaker.infoAndAddToDb("This failure will be handled gracefully - tests can continue without topic deletion");
         throw new RuntimeException("Failed to delete topic '" + topicName + "' after " + maxRetries + " retries.");
     }
 
