@@ -458,7 +458,9 @@ public class Main {
         singleTypeInfoInit(accountId);
 
         while (true) {
-            TestExecutor.resetKafkaFallbackMode();
+            TestExecutor testExecutor = new TestExecutor();
+            // Reset current execution fallback flag for new test cycle
+            testExecutor.resetCurrentExecutionFallback();
             PrometheusMetricsHandler.markModuleIdle();
             int start = Context.now();
             long startDetailed = System.currentTimeMillis();
@@ -654,7 +656,7 @@ public class Main {
                     summaryId = trrs.getId();
                 }
 
-                TestExecutor testExecutor = new TestExecutor();
+
                 if (trrs.getState() == State.SCHEDULED) {
                     if (trrs.getMetadata()!= null && trrs.getMetadata().containsKey("pull_request_id") && trrs.getMetadata().containsKey("commit_sha_head") ) {
                         //case of github status push
@@ -669,7 +671,7 @@ public class Main {
                 Executor.clearRoleCache();
 
                 if(!maxRetriesReached){
-                    if(TestExecutor.enableKafkaMode()){
+                    if(Constants.IS_NEW_TESTING_ENABLED){
                         int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
                         testingProducer.initProducer(testingRun, summaryId, false, syncLimit);
                         testingConsumer.init(maxRunTime);
