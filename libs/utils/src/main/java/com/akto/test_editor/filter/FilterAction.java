@@ -11,7 +11,6 @@ import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
-import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.BodyOperator;
 import com.akto.dao.test_editor.TestEditorEnums.CollectionOperands;
@@ -30,7 +29,6 @@ import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLTemplate;
-import com.akto.mcp.McpRequestResponseUtils;
 import com.akto.test_editor.Utils;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.*;
@@ -377,12 +375,20 @@ public final class FilterAction {
                 double percentageMatch = Utils.structureMatch(filterActionRequest.getRawApi(), filterActionRequest.fetchRawApiBasedOnContext());
                 val = (int) percentageMatch;
             }
+
+            if (filterActionRequest.getOperand().equalsIgnoreCase(TestEditorEnums.DataOperands.REGEX_EXTRACT.toString())) {
+                List<String> querySet = Utils.convertObjectToListOfString(filterActionRequest.getQuerySet());
+                List<String> matches = new ArrayList<>();
+                for (String query : querySet) {
+                    matches.addAll(Utils.extractRegex(payload, query));
+                }
+                if (matches.size() > 0) {
+                    return new DataOperandsFilterResponse(true, matches, null, null);
+                }
+                return new DataOperandsFilterResponse(false, null, null, null);
+            }
             
             DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(val, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
-            res = invokeFilter(dataOperandFilterRequest);
-            return new DataOperandsFilterResponse(res, null, null, null);
-        } else if (filterActionRequest.getConcernedSubProperty() == null) {
-            DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(payload, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
             res = invokeFilter(dataOperandFilterRequest);
             return new DataOperandsFilterResponse(res, null, null, null);
         }
@@ -451,6 +457,19 @@ public final class FilterAction {
                 }
                 double percentageMatch = compareWithOriginalResponse(payload, sampleRawApi.getResponse().getBody(), new HashMap<>());
                 val = (int) percentageMatch;
+            }
+            /*
+             * no concerned sub property means that
+             * the operation was directly applied on the payload
+             * so we need to extract the matching key set, if any
+             */
+        } else if (filterActionRequest.getConcernedSubProperty() == null &&
+                filterActionRequest.getMatchingKeySet() != null &&
+                filterActionRequest.getMatchingKeySet().size() > 0) {
+            if (extractMultiple) {
+                val = filterActionRequest.getMatchingKeySet();
+            } else {
+                val = filterActionRequest.getMatchingKeySet().get(0);
             }
         } else {
             val = payload;
