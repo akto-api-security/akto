@@ -3,18 +3,12 @@ package com.akto.testing;
 import com.akto.MongoBasedTest;
 import com.akto.dao.OtpTestDataDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.testing.LoginFlowStepsDao;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.api_workflow.Node;
 import com.akto.dto.testing.LoginFlowParams;
-import com.akto.dto.testing.LoginFlowStepsData;
 import com.akto.dto.testing.WorkflowNodeDetails;
 import com.akto.dto.testing.WorkflowUpdatedSampleData;
 import com.akto.dto.testing.WorkflowTestResult.NodeResult;
-import com.akto.dto.type.RequestTemplate;
-import com.akto.log.LoggerMaker.LogDb;
-import com.akto.runtime.URLAggregator;
-import com.akto.types.BasicDBListL;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -82,7 +76,7 @@ public class ApiWorkflowExecutorTest extends MongoBasedTest {
         String nodeId = "x1";
         Map<String, List<String>> headers = new HashMap<>();
         String queryParams = "status=online";
-        com.akto.testing.workflow_node_executor.Utils.populateValuesMap(valuesMap, payload, nodeId, headers, true, queryParams);
+        Utils.populateValuesMap(valuesMap, payload, nodeId, headers, true, queryParams);
 
         assertEquals(8, valuesMap.size()); // 7 normal values + entire body string
         assertEquals("online", valuesMap.get("x1.request.query.status"));
@@ -95,7 +89,7 @@ public class ApiWorkflowExecutorTest extends MongoBasedTest {
 
         payload = "{\"company\": \"Akto\"}";
         headers.put("x-forwarded-for", Arrays.asList("ip1", "ip2"));
-        com.akto.testing.workflow_node_executor.Utils.populateValuesMap(valuesMap, payload, nodeId, headers, false, null);
+        Utils.populateValuesMap(valuesMap, payload, nodeId, headers, false, null);
 
         assertEquals(11, valuesMap.size()); // 8 from earlier + 2 values + 1 body string (this time for isRequest false)
         assertEquals("Akto", valuesMap.get("x1.response.body.company"));
@@ -103,7 +97,7 @@ public class ApiWorkflowExecutorTest extends MongoBasedTest {
 
 
         payload = "mobNo=999999999&Vehicle=Car";
-        com.akto.testing.workflow_node_executor.Utils.populateValuesMap(valuesMap, payload, nodeId, new HashMap<>(),true, null);
+        Utils.populateValuesMap(valuesMap, payload, nodeId, new HashMap<>(),true, null);
         assertEquals(13, valuesMap.size()); // 11 + 2 new (no request.body because already filled)
         assertEquals("999999999", valuesMap.get("x1.request.body.mobNo"));
         assertEquals("Car", valuesMap.get("x1.request.body.Vehicle"));
