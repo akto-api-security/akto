@@ -8,6 +8,7 @@ public class TestEditorEnums {
         NOT_CONTAINS,
         NOT_CONTAINS_EITHER,
         REGEX,
+        REGEX_EXTRACT,
         EQ,
         EQ_OBJ,
         GTE,
