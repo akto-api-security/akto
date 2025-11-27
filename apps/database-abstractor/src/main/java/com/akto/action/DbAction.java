@@ -1567,7 +1567,6 @@ public class DbAction extends ActionSupport {
         return false;
     }
 
-
     public String insertAnalyserLog() {
         try {
             int accId = Context.accountId.get();
