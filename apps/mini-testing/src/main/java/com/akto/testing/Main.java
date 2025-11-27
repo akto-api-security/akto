@@ -1,8 +1,6 @@
 package com.akto.testing;
 
 import com.akto.RuntimeMode;
-import com.akto.agent.AgentClient;
-import com.akto.agent.AgenticUtils;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
@@ -114,13 +112,36 @@ public class Main {
     }
 
     private static void handleTestEditorPlayground(TestingRunPlayground testingRunPlayground) {
+        ApiInfo.ApiInfoKey infoKey = testingRunPlayground.getApiInfoKey();
+        TestingRunResult testingRunResult = new TestingRunResult(
+                null, infoKey, "", "", new ArrayList<>(),
+                false, new ArrayList<>(), 100,
+                Context.now(), Context.now(), testingRunPlayground.getId(), null, new ArrayList<>());
+        try {
+            testingRunResult = createTestEditorPlayground(testingRunPlayground);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in handling test editor playground: " + e.getMessage());
+        }
+        if (testingRunResult != null) {
+            testingRunResult.setId(testingRunPlayground.getId());
+            testingRunResult.setTestRunId(testingRunPlayground.getId());
+            testingRunResult.setTestRunResultSummaryId(testingRunPlayground.getId());
+            testingRunResult.setTestResults(null);
+            testingRunResult.setTestLogs(null);
+            testingRunPlayground.setTestingRunResult(testingRunResult);
+            // update testingRunPlayground in DB
+            dataActor.updateTestingRunPlayground(testingRunPlayground);
+        }
+    }
+
+    private static TestingRunResult createTestEditorPlayground(TestingRunPlayground testingRunPlayground) {
         TestExecutor executor = new TestExecutor();
         TestConfig testConfig = null;
         try {
             testConfig = TestConfigYamlParser.parseTemplate(testingRunPlayground.getTestTemplate());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in parsing template for handleTestEditorPlayground");
-            return;
+            return null;
         }
         ApiInfo.ApiInfoKey infoKey = testingRunPlayground.getApiInfoKey();
 
@@ -136,9 +157,6 @@ public class Main {
         TestingUtil testingUtil = new TestingUtil(messageStore, null, null, customAuthTypes);
         String message = messageStore.getSampleDataMap().get(infoKey).get(messageStore.getSampleDataMap().get(infoKey).size() - 1);
         TestingRunResult testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null, true, testLogs, message);
-        testingRunResult.setId(testingRunPlayground.getId());
-        testingRunResult.setTestRunId(testingRunPlayground.getId());
-        testingRunResult.setTestRunResultSummaryId(testingRunPlayground.getId());
 
         GenericTestResult testRes = testingRunResult.getTestResults().get(0);
         if (testRes instanceof TestResult) {
@@ -154,11 +172,7 @@ public class Main {
             }
             testingRunResult.setMultiExecTestResults(list);
         }
-        testingRunResult.setTestResults(null);
-        testingRunResult.setTestLogs(null);
-        testingRunPlayground.setTestingRunResult(testingRunResult);
-        // update testingRunPlayground in DB
-        dataActor.updateTestingRunPlayground(testingRunPlayground);
+        return testingRunResult;
     }
 
     private static void handlePostmanImports(TestingRunPlayground testingRunPlayground) {
