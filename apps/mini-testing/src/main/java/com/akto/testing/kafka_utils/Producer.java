@@ -86,7 +86,7 @@ public class Producer {
             } catch (Exception e) {
                 retries++;
                 long backoff = (long) (baseBackoff * Math.pow(2, retries));
-                loggerMaker.insertImportantTestingLog("Attempt " + retries + " to delete topic failed: " + e.getMessage());
+                loggerMaker.infoAndAddToDb("Attempt " + retries + " to delete topic failed: " + e.getMessage());
     
                 try {
                     Thread.sleep(backoff);
@@ -113,7 +113,7 @@ public class Producer {
             } catch (Exception e) {
                 retries++;
                 long backoff = (long) (baseBackoff * Math.pow(2, retries));
-                loggerMaker.insertImportantTestingLog("Attempt " + retries + " to create topic failed: " + e.getMessage());
+                loggerMaker.errorAndAddToDb(e, "Attempt " + retries + " to create topic failed: " + e.getMessage());
 
                 try {
                     Thread.sleep(backoff);
@@ -142,26 +142,26 @@ public class Producer {
                 }
             } catch (Exception e) {
                 // Handle any other unexpected exceptions during topic listing
-                loggerMaker.insertImportantTestingLog("Unexpected error during topic listing: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+                loggerMaker.infoAndAddToDb("Unexpected error during topic listing: " + e.getClass().getSimpleName() + " - " + e.getMessage());
                 throw new ExecutionException("Unexpected error during topic listing", e);
             }
             
             try {
                 DeleteTopicsResult deleteTopicsResult = adminClient.deleteTopics(Collections.singletonList(topicName));
                 deleteTopicsResult.all().get(10, java.util.concurrent.TimeUnit.SECONDS);
-                loggerMaker.insertImportantTestingLog("Topic \"" + topicName + "\" deletion initiated.");
+                loggerMaker.infoAndAddToDb("Topic \"" + topicName + "\" deletion initiated.");
             } catch (java.util.concurrent.TimeoutException e) {
-                loggerMaker.insertImportantTestingLog("Topic deletion timed out: Kafka broker may be down or overloaded");
+                loggerMaker.errorAndAddToDb(e, "Topic deletion timed out: Kafka broker may be down or overloaded");
                 throw new ExecutionException("Topic deletion timeout", e);
             } catch (ExecutionException e) {
                 if (e.getCause() instanceof java.net.SocketException) {
-                    loggerMaker.insertImportantTestingLog("Topic deletion failed: Socket error - Kafka broker host is down");
+                    loggerMaker.errorAndAddToDb(e,"Topic deletion failed: Socket error - Kafka broker host is down");
                     throw e;
                 }
                 throw e;
             } catch (Exception e) {
                 // Handle any other unexpected exceptions during topic deletion
-                loggerMaker.insertImportantTestingLog("Unexpected error during topic deletion: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+                loggerMaker.infoAndAddToDb("Unexpected error during topic deletion: " + e.getClass().getSimpleName() + " - " + e.getMessage());
                 throw new ExecutionException("Unexpected error during topic deletion", e);
             }
 
@@ -175,11 +175,11 @@ public class Producer {
 
                 Set<String> topics = adminClient.listTopics().names().get();
                 if (!topics.contains(topicName)) {
-                    loggerMaker.insertImportantTestingLog("Confirmed topic \"" + topicName + "\" is deleted on retry attempt: " + retries);
+                    loggerMaker.infoAndAddToDb("Confirmed topic \"" + topicName + "\" is deleted on retry attempt: " + retries);
                     return;
                 }
 
-                loggerMaker.insertImportantTestingLog("Waiting for topic \"" + topicName + "\" to be fully deleted... retry attempt: " + retries);
+                loggerMaker.infoAndAddToDb("Waiting for topic \"" + topicName + "\" to be fully deleted... retry attempt: " + retries);
             }
 
             throw new RuntimeException("Topic deletion not confirmed after retries.");
@@ -189,7 +189,7 @@ public class Producer {
                 // Re-throw these as they're already handled above or declared in method signature
                 throw e;
             }
-            loggerMaker.insertImportantTestingLog("Unexpected error in deleteTopic operation: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "Unexpected error in deleteTopic operation: " + e.getClass().getSimpleName() + " - " + e.getMessage());
             throw new ExecutionException("Unexpected error in topic deletion operation", e);
         }
     }
@@ -204,12 +204,12 @@ public class Producer {
             
             try {
                 adminClient.createTopics(Collections.singletonList(newTopic)).all().get(10, java.util.concurrent.TimeUnit.SECONDS);
-                loggerMaker.insertImportantTestingLog("Topic \"" + topicName + "\" creation initiated.");
+                loggerMaker.infoAndAddToDb("Topic \"" + topicName + "\" creation initiated.");
             } catch (java.util.concurrent.TimeoutException e) {
-                loggerMaker.insertImportantTestingLog("Topic creation timed out: Kafka broker may be down or overloaded");
+                loggerMaker.errorAndAddToDb(e,"Topic creation timed out: Kafka broker may be down or overloaded");
                 throw e;
             } catch (ExecutionException e) {
-                loggerMaker.insertImportantTestingLog("Topic creation failed with execution error: " + e.getCause().getClass().getSimpleName());
+                loggerMaker.errorAndAddToDb(e,"Topic creation failed with execution error: " + e.getCause().getClass().getSimpleName());
                 throw e;
             }
 
