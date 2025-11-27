@@ -885,7 +885,6 @@ public class TestExecutor {
                 Producer.pushMessagesToKafka(Arrays.asList(singleTestPayload), totalRecords, throttleNumber);
             } catch (Exception e) {
                 loggerMaker.insertImportantTestingLog("Kafka push failed. Error: " + e.getMessage());
-                totalTestsCount.decrementAndGet();
                 return null;
             }
 

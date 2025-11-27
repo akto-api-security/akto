@@ -36,8 +36,8 @@ public class Producer {
 
     public static Void pushMessagesToKafka(List<SingleTestPayload> messages, AtomicInteger totalRecords, AtomicInteger throttleNumber) throws Exception{
         // logging to show exactly what Kafka URL is being used
-        String envKafkaUrl = System.getenv("KAFKA_BROKER_URL");
-        loggerMaker.insertImportantTestingLog("Environment KAFKA_BROKER_URL = " + (envKafkaUrl != null ? envKafkaUrl : "NOT SET (using default localhost:29092)"));
+        String envKafkaUrl = System.getenv("LOCAL_KAFKA_BROKER_URL");
+        loggerMaker.infoAndAddToDb("Environment LOCAL_KAFKA_BROKER_URL = " + (envKafkaUrl != null ? envKafkaUrl : "NOT SET"));
         for(SingleTestPayload singleTestPayload: messages){
             String messageString = singleTestPayload.toString();
             try {
