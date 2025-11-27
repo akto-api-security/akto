@@ -479,6 +479,9 @@ public class Main {
         singleTypeInfoInit(accountId);
 
         while (true) {
+            TestExecutor testExecutor = new TestExecutor();
+            // Reset current execution fallback flag for new test cycle
+            testExecutor.resetCurrentExecutionFallback();
             PrometheusMetricsHandler.markModuleIdle();
             int start = Context.now();
             long startDetailed = System.currentTimeMillis();
@@ -674,7 +677,7 @@ public class Main {
                     summaryId = trrs.getId();
                 }
 
-                TestExecutor testExecutor = new TestExecutor();
+
                 if (trrs.getState() == State.SCHEDULED) {
                     if (trrs.getMetadata()!= null && trrs.getMetadata().containsKey("pull_request_id") && trrs.getMetadata().containsKey("commit_sha_head") ) {
                         //case of github status push
