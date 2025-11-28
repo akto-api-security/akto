@@ -12,19 +12,19 @@ on:
         required: true
       mini-runtime:
         type: boolean
-        default: true
+        default: false
         description: Mini-Runtime
       mini-testing:
         type: boolean
-        default: true
+        default: false
         description: Mini-Testing
       testing-db-layer:
         type: boolean
-        default: true
+        default: false
         description: Testing-Db-Layer
       mini-runtime-service:
         type: boolean
-        default: true
+        default: false
         description: Mini-Runtime-Service
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
