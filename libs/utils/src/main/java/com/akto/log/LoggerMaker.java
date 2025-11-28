@@ -164,29 +164,38 @@ public class LoggerMaker  {
         sendToSlack(slackCyborgWebhookUrl, err);
     }
 
+    private String formatWithAccountId(String msg) {
+        Integer accountId = Context.accountId.get();
+        if (accountId != null) {
+            return "accountId: " + accountId + " " + msg;
+        }
+        return msg;
+    }
+
     public void debug(String msg, Object... vars){
-        logger.debug(msg, vars);
+        String formattedMsg = formatWithAccountId(msg);
+        logger.debug(formattedMsg, vars);
     }
 
     public void info(String msg, Object... vars){
-        logger.info(msg, vars);
+        String formattedMsg = formatWithAccountId(msg);
+        logger.info(formattedMsg, vars);
     }
 
     public void warn(String msg, Object... vars){
-        logger.warn(msg, vars);
+        String formattedMsg = formatWithAccountId(msg);
+        logger.warn(formattedMsg, vars);
     }
 
     protected String basicError(String err, LogDb db) {
-        if(Context.accountId.get() != null){
-            err = String.format("%s\nAccount id: %d", err, Context.accountId.get());
-        }
-        logger.error(err);
+        String formattedErr = formatWithAccountId(err);
+        logger.error(formattedErr);
         try{
-            insert(err, "error", db);
+            insert(formattedErr, "error", db);
         } catch (Exception e){
 
         }
-        return err;
+        return formattedErr;
     }
 
     public void errorAndAddToDb(String err, LogDb db) {
@@ -234,8 +243,7 @@ public class LoggerMaker  {
     }
 
     public void infoAndAddToDb(String info, LogDb db) {
-        String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
-        String infoMessage = "acc: " + accountId + ", " + info;
+        String infoMessage = formatWithAccountId(info);
         logger.info(infoMessage);
         try{
             insert(infoMessage, "info",db);
@@ -340,6 +348,7 @@ public class LoggerMaker  {
     }
 
     public void error(String message, Object... vars) {
-        logger.error(message, vars);
+        String formattedMsg = formatWithAccountId(message);
+        logger.error(formattedMsg, vars);
     }
 }
