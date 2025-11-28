@@ -292,10 +292,6 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
                 String keyName = t.getKeyName();
                 String value = t.getValue();
 
-                // Check exact key matches (for generic keys like "tag_mismatch")
-                if (keyName != null && Constants.MERGING_ALLOWED_TAG_KEYS.contains(keyName)) {
-                    return true;
-                }
 
                 if (keyName != null && keyName.equals(Constants.MERGING_ALLOWED_TAG_KEY)) {
                     if (value == null) {

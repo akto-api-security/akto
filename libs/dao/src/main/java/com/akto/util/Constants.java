@@ -37,6 +37,5 @@ public class Constants {
     public static final int ROUTING_SKIP_ACCOUNT_ID = 1736798101;
     public static final String MERGING_ALLOWED_TAG_KEY = "privatecloud.agoda.com/service";
     public static final List<String> MERGING_ALLOWED_TAG_VALUES = Arrays.asList("agoda-routing");
-    public static final List<String> MERGING_ALLOWED_TAG_KEYS = Arrays.asList("tags-mismatch");
     public static final List<String> MERGING_ALLOWED_TAG_SUBSTRINGS = Arrays.asList("proxy", "gateway");
 }
