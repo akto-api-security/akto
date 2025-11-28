@@ -4268,20 +4268,20 @@ public class ClientActor extends DataActor {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in fetchYamlTemplates", LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchCommonWordList", LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
             BasicDBObject payloadObj;
             
             try {
                 payloadObj =  BasicDBObject.parse(responsePayload);
-                BasicDBObject yamlTemplateObj = (BasicDBObject) payloadObj.get("yamlTemplates");
-                objectMapper.readValue(yamlTemplateObj.toJson(), YamlTemplate.class);
+                BasicDBObject yamlTemplateObj = (BasicDBObject) payloadObj.get("commonTemplate");
+                yamlTemplate = objectMapper.readValue(yamlTemplateObj.toJson(), YamlTemplate.class);
             } catch(Exception e) {
-                loggerMaker.errorAndAddToDb("error extracting response in fetchYamlTemplates" + e, LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("error extracting response in fetchCommonWordList" + e, LoggerMaker.LogDb.RUNTIME);
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in fetchYamlTemplates" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("error in fetchCommonWordList" + e, LoggerMaker.LogDb.RUNTIME);
             return null;
         }
         return yamlTemplate;
