@@ -313,7 +313,9 @@ public class TestExecutor {
             }
         }
 
-        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false, yamlTemplates);
+        YamlTemplate commonTemplate = dataActor.fetchCommonWordList();
+
+        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false, yamlTemplates, commonTemplate);
 
         List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
         TestingUtil testingUtil = new TestingUtil(sampleMessageStore, testRoles, testingRun.getUserEmail(), customAuthTypes);
