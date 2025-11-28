@@ -119,12 +119,12 @@ public class TestExecutor {
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
             List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
             if (messages == null || messages.isEmpty()) {
-                latch.countDown(); // Reduce latch count for skipped endpoints
+                countDownLatch(latch);
                 continue;
             }
             String sample = messages.get(messages.size() - 1);
             if(sample == null || sample.isEmpty()){
-                latch.countDown(); // Reduce latch count for skipped endpoints
+                countDownLatch(latch);
                 continue;
             }
             if(sample.contains("originalRequestPayload")){
@@ -147,6 +147,7 @@ public class TestExecutor {
                 testingRecords.add(future);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error in starting with latch for API " + apiInfoKey + " : " + e.getMessage());
+                countDownLatch(latch);
             }
         }
         
@@ -399,10 +400,12 @@ public class TestExecutor {
             for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
                 List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
                 if (messages == null || messages.isEmpty()) {
+                    countDownLatch(latch);
                     continue;
                 }
                 String sample = messages.get(messages.size() - 1);
                 if(sample == null || sample.isEmpty()){
+                    countDownLatch(latch);
                     continue;
                 }
                 if(sample.contains("originalRequestPayload")){
@@ -432,6 +435,7 @@ public class TestExecutor {
                         testingRecords.add(future);
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e, "Error in starting with latch for API " + apiInfoKey + " : " + e.getMessage());
+                        countDownLatch(latch);
                     }
                 }
             }
@@ -763,9 +767,13 @@ public class TestExecutor {
             loggerMaker.warnAndAddToDb("API: " + apiInfoKey.toString() + " has been successfully tested");
             dataActor.updateLastTestedField(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().toString());
         }
-        latch.countDown();
-        loggerMaker.warnAndAddToDb("DONE FINAL: " + latch.getCount());
+        countDownLatch(latch);
         return null;
+    }
+
+    public void countDownLatch(CountDownLatch latch) {
+        latch.countDown();
+        loggerMaker.warnAndAddToDb("DONE FINAL: " + latch.getCount() + " totalTestsCount: " + totalTestsCount.get());
     }
 
     public static void trim(TestingRunResult testingRunResult) {
@@ -881,14 +889,12 @@ public class TestExecutor {
         String testSuperType = testConfig.getInfo().getCategory().getName();
         String testSubType = testConfig.getInfo().getSubCategory();
 
-
         String failMessage = null;
         TestingRunResult testingRunResult = com.akto.testing.Utils.generateFailedRunResultForMessage(testingRun.getId(), apiInfoKey, testSuperType, testSubType, summaryId, messages, failMessage); 
         if(testingRunResult != null){
             if(Constants.KAFKA_DEBUG_MODE){
                 loggerMaker.infoAndAddToDb("Skipping test from producers because: " + failMessage + " apiInfo: " + apiInfoKey.toString());
             }
-            totalTestsCount.decrementAndGet();
         }else if (Constants.IS_NEW_TESTING_ENABLED && !currentExecutionFallback){
             // push data to kafka here and inside that call run test new function
             // create an object of TestMessage
@@ -902,14 +908,12 @@ public class TestExecutor {
                 Producer.pushMessagesToKafka(Arrays.asList(singleTestPayload), totalRecords, throttleNumber);
             } catch (Exception e) {
                 loggerMaker.insertImportantTestingLog("Kafka push failed. Error: " + e.getMessage());
-                return null;
             }
-
         }else{ 
             // Use legacy testing approach (either IS_NEW_TESTING_ENABLED is false OR kafkaFallbackMode is true)
             executeLegacyTesting(apiInfoKey, summaryId, messages, testConfig, testLogs, isApiInfoTested);
-            totalTestsCount.decrementAndGet();
         }
+        totalTestsCount.decrementAndGet();
         return null;
     }
 
