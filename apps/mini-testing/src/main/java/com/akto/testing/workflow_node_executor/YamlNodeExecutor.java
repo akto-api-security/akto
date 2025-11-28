@@ -282,7 +282,8 @@ public class YamlNodeExecutor extends NodeExecutor {
         for (int i = 0; i < 10; i++) {
             yamlTemplates.addAll(dataActor.fetchYamlTemplates(true, i*50));
         }
-        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false, yamlTemplates);
+        YamlTemplate commonTemplate = dataActor.fetchCommonWordList();
+        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false, yamlTemplates, commonTemplate);
         TestConfig testConfig = testConfigMap.get(testSubCategory);
 
         ExecutorNode executorNode = yamlNodeDetails.getExecutorNode();

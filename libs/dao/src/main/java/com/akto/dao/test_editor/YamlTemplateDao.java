@@ -19,6 +19,17 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
 
     public static final YamlTemplateDao instance = new YamlTemplateDao();
 
+    public Map<String, List<String>> fetchCommonWordListMap(YamlTemplate commonTemplate) {
+        Map<String, List<String>> commonWordListMap = new HashMap<>();
+        if (commonTemplate != null) {
+            String content = commonTemplate.getContent();
+            if (content != null && !content.isEmpty()) {
+                commonWordListMap = TestConfigYamlParser.parseWordLists(content);
+            }
+        }
+        return commonWordListMap;
+    }
+
     public Map<String, TestConfig> fetchTestConfigMap(boolean includeYamlContent, boolean fetchOnlyActive) {
         Map<String, TestConfig> testConfigMap = new HashMap<>();
         List<Bson> filters = new ArrayList<>();
@@ -47,9 +58,13 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
 
         return testConfigMap;
     }
-
     public Map<String, TestConfig> fetchTestConfigMap(boolean includeYamlContent, boolean fetchOnlyActive, List<YamlTemplate> yamlTemplates) {
+        return fetchTestConfigMap(includeYamlContent, fetchOnlyActive, yamlTemplates, null);
+    }
+
+    public Map<String, TestConfig> fetchTestConfigMap(boolean includeYamlContent, boolean fetchOnlyActive, List<YamlTemplate> yamlTemplates, YamlTemplate commonTemplate) {
         Map<String, TestConfig> testConfigMap = new HashMap<>();
+        Map<String, List<String>> commonWordListMap = fetchCommonWordListMap(commonTemplate);
         for (YamlTemplate yamlTemplate: yamlTemplates) {
             try {
                 TestConfig testConfig = TestConfigYamlParser.parseTemplate(yamlTemplate.getContent());
@@ -60,6 +75,11 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
                 }
                 testConfig.setInactive(yamlTemplate.getInactive());
                 testConfig.setAuthor(yamlTemplate.getAuthor());
+                if (testConfig.getWordlists() != null) {
+                    testConfig.getWordlists().putAll(commonWordListMap);
+                } else {
+                    testConfig.setWordlists(commonWordListMap);
+                }
                 testConfigMap.put(testConfig.getId(), testConfig);
             } catch (Exception e) {
                 e.printStackTrace();

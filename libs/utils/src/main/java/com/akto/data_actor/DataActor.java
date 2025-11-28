@@ -320,4 +320,6 @@ public abstract class DataActor {
     public abstract void storeMcpReconResultsBatch(List<McpReconResult> serverDataList);
 
     public abstract void storeConversationResults(List<AgentConversationResult> conversationResults);
+
+    public abstract YamlTemplate fetchCommonWordList();
 }
