@@ -12,7 +12,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 public class ModuleInfoWorker {
-    private static LoggerMaker loggerMaker = new LoggerMaker(ModuleInfoWorker.class, LoggerMaker.LogDb.RUNTIME);
+    private final static LoggerMaker loggerMaker = new LoggerMaker(ModuleInfoWorker.class, LoggerMaker.LogDb.RUNTIME);
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private final ModuleInfo.ModuleType moduleType;
     private final int startedTs = Context.now();
@@ -59,10 +59,10 @@ public class ModuleInfoWorker {
                 throw new Exception("Input stream null");
             }
         } catch (Exception e) {
-            loggerMaker.error("Error getting local version, skipping heartbeat check");
+            loggerMaker.errorAndAddToDb("Error getting local version, skipping heartbeat check");
             return;
         }
-        loggerMaker.infoAndAddToDb("Starting heartbeat update for module: " + moduleType.name() + " with version: " + version + " and name: " + name);
+        loggerMaker.warnAndAddToDb("Starting heartbeat update for module: " + moduleType.name() + " with version: " + version + " and name: " + name);
         ModuleInfoWorker infoWorker = new ModuleInfoWorker(moduleType, version, dataActor, name);
         infoWorker.scheduleHeartBeatUpdate();
     }

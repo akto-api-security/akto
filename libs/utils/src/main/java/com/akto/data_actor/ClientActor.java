@@ -3360,6 +3360,7 @@ public class ClientActor extends DataActor {
             String token = getAuthToken();
             DecodedJWT jwt = JWT.decode(token);
             String payload = jwt.getPayload();
+            loggerMaker.warn("Token expires at " + (jwt.getExpiresAt()!=null ? jwt.getExpiresAt().getTime() : "never"));
             byte[] decodedBytes = Base64.getUrlDecoder().decode(payload);
             String decodedPayload = new String(decodedBytes);
             BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
@@ -3367,7 +3368,7 @@ public class ClientActor extends DataActor {
             loggerMaker.warn("checkAccount accountId log " + accId);
             return accId == 1000000 || accId == 1752722331;
         } catch (Exception e) {
-            loggerMaker.error("checkaccount error" + e.getStackTrace());
+            loggerMaker.error("checkAccount error" + e.getStackTrace());
         }
         return false;
     }
