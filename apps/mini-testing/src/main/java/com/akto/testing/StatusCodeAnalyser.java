@@ -74,7 +74,7 @@ public class StatusCodeAnalyser {
                 if(hostAndContentType.containsKey(host)) continue;
                 contentType = TestExecutor.findContentTypeFromOriginalHttpRequest(request);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while finding host in status code analyser: " + e, LogDb.TESTING);
+                loggerMaker.errorAndAddToDb(e, "Error while finding host in status code analyser: " + e);
                 continue;
             }
             if(host != null ){
