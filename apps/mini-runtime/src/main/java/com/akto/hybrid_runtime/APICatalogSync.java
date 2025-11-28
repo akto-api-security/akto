@@ -1704,11 +1704,6 @@ public class APICatalogSync {
             } catch (Exception e) {
                 // print lastExecutedBatch for debugging
                 loggerMaker.errorAndAddToDb(e, "Batch processing timed out or failed apiCollectionId: " + apiCollectionId + " batch size: " + batch.size());
-                for (SampleData sd : lastExecutedBatch) {
-                    for (String sample : sd.getSamples()) {
-                        loggerMaker.infoAndAddToDb("lastExecutedBatch sample: " + sample);
-                    }
-                }
             }
         }
     }
