@@ -14,6 +14,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import PersistStore from "../../../../main/PersistStore";
 import collectionsApi from "./api"
 import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
+import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 
 function APIQuery() {
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), []);
@@ -26,6 +27,7 @@ function APIQuery() {
     const collectionsMap = PersistStore.getState().collectionsMap
     const [isUpdate, setIsUpdate] = useState(false)
     const [moreActions, setMoreActions] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
 
     // Only show checkbox for specific accounts
     const showSkipTagsMismatch = func.isApiCollectionsCachingEnabled();
@@ -138,13 +140,16 @@ function APIQuery() {
     }
 
     const handleClearFunction = useCallback(() => {
+        setIsLoading(true);
         dispatchConditions({ type: "clear" });
         setEndpointListFromConditions({});
         setSensitiveParams({});
+        setIsLoading(false);
     }, []);
 
 
     const exploreEndpoints = useCallback(async () => {
+        setIsLoading(true);
         let dt = prepareData();
         if (dt.length > 0) {
             let endpointListFromConditions = await api.getEndpointsListFromConditions(dt, skipTagsMismatch);
@@ -158,6 +163,7 @@ function APIQuery() {
             setEndpointListFromConditions({});
             setSensitiveParams({});
         }
+        setIsLoading(false);
     }, [prepareData, skipTagsMismatch]);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -240,13 +246,13 @@ function APIQuery() {
     const components = useMemo(() => [
         modalComponent,
         collapsibleComponent,
-        <ApiEndpoints
+        isLoading ? <SpinnerCentered/> : <ApiEndpoints
             key="endpoint-table"
             endpointListFromConditions={endpointListFromConditions}
             sensitiveParamsForQuery={sensitiveParams}
             isQueryPage={true}
         />
-    ], [modalComponent, collapsibleComponent, endpointListFromConditions, sensitiveParams]);
+    ], [modalComponent, collapsibleComponent, endpointListFromConditions, sensitiveParams, isLoading]);
 
     const handleClick = () => {
         if(isUpdate){
