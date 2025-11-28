@@ -89,7 +89,7 @@ public class Main {
             public void run() {
                 try {
                     Context.accountId.set(accountSettings.getId());
-                    int timestamp = Context.now()-5*60;
+                    int timestamp = Context.now() - 5 * 60;
                     TestingRunPlayground testingRunPlayground =  dataActor.getCurrentTestingRunDetailsFromEditor(timestamp); // fetch from Db
                     
                     if (testingRunPlayground == null) {
