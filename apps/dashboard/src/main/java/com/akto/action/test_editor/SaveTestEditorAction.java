@@ -686,6 +686,7 @@ public class SaveTestEditorAction extends UserAction {
             CommonTemplateDao.instance.updateOne(
                     Filters.eq(Constants.ID, COMMON_TEST_TEMPLATE),
                     Updates.combine(updates));
+            YamlTemplateDao.instance.clearCommonWordListMapForAccount();
 
         } catch (Exception e) {
             e.printStackTrace();

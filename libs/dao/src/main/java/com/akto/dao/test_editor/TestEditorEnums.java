@@ -11,6 +11,7 @@ public class TestEditorEnums {
         NOT_CONTAINS_CIDR,
         CONFORM_SCHEMA,
         REGEX,
+        REGEX_EXTRACT,
         EQ,
         EQ_OBJ,
         GTE,
