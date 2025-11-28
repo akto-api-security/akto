@@ -341,7 +341,7 @@ public class ClientActor extends DataActor {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("invalid response in overageExists", LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("invalid response in overageApisExists", LoggerMaker.LogDb.RUNTIME);
                 return false;
             }
             BasicDBObject payloadObj;
@@ -349,11 +349,11 @@ public class ClientActor extends DataActor {
                 payloadObj = BasicDBObject.parse(responsePayload);
                 return payloadObj.getBoolean("exists", false);
             } catch(Exception e) {
-                loggerMaker.errorAndAddToDb("error extracting response in overageExists" + e, LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("error extracting response in overageApisExists" + e, LoggerMaker.LogDb.RUNTIME);
                 return false;
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in overageExists" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("error in overageApisExists" + e, LoggerMaker.LogDb.RUNTIME);
             return false;
         }
     }
@@ -510,7 +510,7 @@ public class ClientActor extends DataActor {
                 OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
                 String responsePayload = response.getBody();
                 if (response.getStatusCode() != 200 || responsePayload == null) {
-                    loggerMaker.errorAndAddToDb("invalid response in getUnsavedSensitiveParamInfos", LoggerMaker.LogDb.RUNTIME);
+                    loggerMaker.errorAndAddToDb("invalid response in fetchAllStis", LoggerMaker.LogDb.RUNTIME);
                     return allStis;
                 }
                 BasicDBObject payloadObj;
@@ -530,10 +530,10 @@ public class ClientActor extends DataActor {
                         lastStiId = s.getId().toHexString();
                     }
                 } catch(Exception e) {
-                    loggerMaker.errorAndAddToDb("error extracting response in getUnsavedSensitiveParamInfos" + e, LoggerMaker.LogDb.RUNTIME);
+                    loggerMaker.errorAndAddToDb("error extracting response in fetchAllStis" + e, LoggerMaker.LogDb.RUNTIME);
                 }
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("error in getUnsavedSensitiveParamInfos" + e, LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("error in fetchAllStis" + e, LoggerMaker.LogDb.RUNTIME);
             }
         }
 
@@ -1004,7 +1004,7 @@ public class ClientActor extends DataActor {
                 loggerMaker.errorAndAddToDb("error extracting response in fetchRuntimeFilters" + e, LoggerMaker.LogDb.RUNTIME);
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in fetchCustomAuthTypes" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("error in fetchRuntimeFilters" + e, LoggerMaker.LogDb.RUNTIME);
         }
         return runtimeFilters;
     }
@@ -1018,7 +1018,7 @@ public class ClientActor extends DataActor {
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             if (response.getStatusCode() != 200) {
-                loggerMaker.errorAndAddToDb("non 2xx response in updateCidrList", LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("non 2xx response in updateRuntimeVersion", LoggerMaker.LogDb.RUNTIME);
                 return;
             }
         } catch (Exception e) {
@@ -1034,7 +1034,7 @@ public class ClientActor extends DataActor {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in updateCidrList", LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchActiveAccount", LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
             BasicDBObject payloadObj;
@@ -1043,10 +1043,10 @@ public class ClientActor extends DataActor {
                 BasicDBObject accountObj = (BasicDBObject) payloadObj.get("account");
                 account = objectMapper.readValue(accountObj.toJson(), Account.class);
             } catch(Exception e) {
-                loggerMaker.errorAndAddToDb("error extracting response in fetchRuntimeFilters" + e, LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("error extracting response in fetchActiveAccount" + e, LoggerMaker.LogDb.RUNTIME);
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in updateRuntimeVersion" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("error in fetchActiveAccount" + e, LoggerMaker.LogDb.RUNTIME);
         }
         return account;
     }
@@ -1104,7 +1104,7 @@ public class ClientActor extends DataActor {
     public List<ApiCollection> fetchApiCollections() {
         Map<String, List<String>> headers = buildHeaders();
         List<ApiCollection> apiCollections = new ArrayList<>();
-        loggerMaker.infoAndAddToDb("fetchEndpointsInCollection api called ", LoggerMaker.LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("fetchApiCollections api called ", LoggerMaker.LogDb.RUNTIME);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchApiCollections", "", "POST", null, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -1132,7 +1132,7 @@ public class ClientActor extends DataActor {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in fetchApiCollections" + e, LoggerMaker.LogDb.RUNTIME);
         }
-        loggerMaker.infoAndAddToDb("fetchEndpointsInCollection api called size " + apiCollections.size(), LoggerMaker.LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("fetchApiCollections api called size " + apiCollections.size(), LoggerMaker.LogDb.RUNTIME);
         return apiCollections;
     }
 
@@ -1162,10 +1162,10 @@ public class ClientActor extends DataActor {
                     apiCollections.add(col);
                 }
             } catch(Exception e) {
-                loggerMaker.errorAndAddToDb("error extracting response in fetchApiCollections" + e, LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("error extracting response in fetchAllApiCollections" + e, LoggerMaker.LogDb.RUNTIME);
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in fetchApiCollections" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("error in fetchAllApiCollections" + e, LoggerMaker.LogDb.RUNTIME);
         }
         loggerMaker.infoAndAddToDb("fetchAllApiCollections api called size " + apiCollections.size(), LoggerMaker.LogDb.RUNTIME);
         return apiCollections;
@@ -1318,10 +1318,10 @@ public class ClientActor extends DataActor {
                 responsePayload = response.getBody();
             } catch (Exception e) {
                 responsePayload = "";
-                loggerMaker.errorAndAddToDb(e, "error getting response payload in fetchSetupObject " + e, LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e, "error getting response payload in fetchSetup " + e, LoggerMaker.LogDb.RUNTIME);
             }
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in updateCidrList", LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchSetup", LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
             BasicDBObject payloadObj;
@@ -1330,10 +1330,10 @@ public class ClientActor extends DataActor {
                 BasicDBObject accountObj = (BasicDBObject) payloadObj.get("setup");
                 setup = objectMapper.readValue(accountObj.toJson(), Setup.class);
             } catch(Exception e) {
-                loggerMaker.errorAndAddToDb(e, "error extracting response in fetchSetupObject " + e, LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e, "error extracting response in fetchSetup " + e, LoggerMaker.LogDb.RUNTIME);
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "error in fetchSetupObject" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb(e, "error in fetchSetup" + e, LoggerMaker.LogDb.RUNTIME);
         }
         return setup;
     }
@@ -1374,7 +1374,7 @@ public class ClientActor extends DataActor {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in fetchEstimatedDocCount", LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchAccountSettingsForAccount", LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
             BasicDBObject payloadObj;
@@ -1386,7 +1386,7 @@ public class ClientActor extends DataActor {
                 return null;
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in fetchEstimatedDocCount" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("error in fetchAccountSettingsForAccount" + e, LoggerMaker.LogDb.RUNTIME);
             return null;
         }
     }
@@ -1538,7 +1538,9 @@ public class ClientActor extends DataActor {
                 testingRunConfig.remove("authMechanismId");
                 TestingRunConfig res = decode(apiInfoKeyCodec, testingRunConfig);
                 try {
-                    res.setAuthMechanismId(new ObjectId(testingRunConfig.getString("strAuthMechanismId")));
+                    if (testingRunConfig.getString("strAuthMechanismId") != null) {
+                        res.setAuthMechanismId(new ObjectId());
+                    }
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Unable to set auth in testingRunConfig", LoggerMaker.LogDb.TESTING);
                 }
@@ -1772,7 +1774,7 @@ public class ClientActor extends DataActor {
                     results.add(s);
                 }
             } catch(Exception e) {
-                loggerMaker.errorAndAddToDb("error extracting response in fetchLatestTestingRunResult" + e, LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e, "error extracting response in fetchLatestTestingRunResult " + e, LoggerMaker.LogDb.RUNTIME);
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in fetchLatestTestingRunResult" + e, LoggerMaker.LogDb.RUNTIME);
@@ -1821,7 +1823,7 @@ public class ClientActor extends DataActor {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in fetchTestingRunResultSummary", LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchRerunTestingRunResultSummary", LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
             BasicDBObject payloadObj;
@@ -1838,7 +1840,7 @@ public class ClientActor extends DataActor {
                 return null;
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in fetchTestingRunResultSummary" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("error in fetchRerunTestingRunResultSummary" + e, LoggerMaker.LogDb.RUNTIME);
             return null;
         }
     }
@@ -1935,7 +1937,7 @@ public class ClientActor extends DataActor {
                     issueList.add(objectMapper.readValue(obj2.toJson(), TestingRunIssues.class));
                 }
             } catch(Exception e) {
-                loggerMaker.errorAndAddToDb("error extracting response in getUnsavedSensitiveParamInfos" + e, LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("error extracting response in fetchOpenIssues" + e, LoggerMaker.LogDb.RUNTIME);
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in fetchOpenIssues" + e, LoggerMaker.LogDb.RUNTIME);
@@ -2080,16 +2082,16 @@ public class ClientActor extends DataActor {
         BasicDBObject obj = new BasicDBObject();
         obj.put("summaryId", summaryId);
         obj.put("totalCountIssues", totalCountIssues);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchTestingRunResultSummary", "", "POST", obj.toString(), headers, "");
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateIssueCountInTestSummary", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in fetchTestingRunResultSummary", LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("non 2xx response in updateIssueCountInTestSummary", LoggerMaker.LogDb.RUNTIME);
                 return;
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in fetchTestingRunResultSummary" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("error in updateIssueCountInTestSummary" + e, LoggerMaker.LogDb.RUNTIME);
             return;
         }
     }
@@ -2293,7 +2295,7 @@ public class ClientActor extends DataActor {
                 return;
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in insertTestingRunResults" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("error in insertActivity" + e, LoggerMaker.LogDb.RUNTIME);
             return;
         }
     }
@@ -2399,10 +2401,10 @@ public class ClientActor extends DataActor {
                     testingRunResultList.add(objectMapper.readValue(obj2.toJson(), TestingRunResult.class));
                 }
             } catch(Exception e) {
-                loggerMaker.errorAndAddToDb("error extracting response in fetchLatestTestingRunResult" + e, LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e, "error extracting response in fetchLatestTestingRunResultBySummaryId " + e, LoggerMaker.LogDb.RUNTIME);
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in fetchLatestTestingRunResult" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb(e, "error in fetchLatestTestingRunResultBySummaryId" + e, LoggerMaker.LogDb.RUNTIME);
             return testingRunResultList;
         }
         return testingRunResultList;
@@ -2458,7 +2460,7 @@ public class ClientActor extends DataActor {
                     sampleDataList.add(objectMapper.readValue(obj2.toJson(), SampleData.class));
                 }
             } catch(Exception e) {
-                loggerMaker.errorAndAddToDb("error extracting response in fetchLatestTestingRunResult" + e, LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("error extracting response in fetchSampleData " + e, LoggerMaker.LogDb.RUNTIME);
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in fetchSampleData" + e, LoggerMaker.LogDb.RUNTIME);

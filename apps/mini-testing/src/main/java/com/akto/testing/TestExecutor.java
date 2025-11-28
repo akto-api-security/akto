@@ -142,8 +142,12 @@ public class TestExecutor {
             }
             
             // Execute legacy testing
-            Future<Void> future = threadPool.submit(() -> startWithLatch(testingRunSubCategories, accountId, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, latch, finalApiInfoKeySubcategoryMap));
-            testingRecords.add(future);
+            try {
+                Future<Void> future = threadPool.submit(() -> startWithLatch(testingRunSubCategories, accountId, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, latch, finalApiInfoKeySubcategoryMap));
+                testingRecords.add(future);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error in starting with latch for API " + apiInfoKey + " : " + e.getMessage());
+            }
         }
         
         try {
@@ -420,10 +424,15 @@ public class TestExecutor {
                             insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, new AtomicBoolean(false), totalRecords, throttleNumber);
                         }
                     }
-                }
-                else{
-                    Future<Void> future = threadPool.submit(() -> startWithLatch(testingRunSubCategories, accountId, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, latch, finalApiInfoKeySubcategoryMap));
-                    testingRecords.add(future);
+                } else {
+                    try {
+                        Future<Void> future = threadPool.submit(() -> startWithLatch(testingRunSubCategories, accountId,
+                                apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap,
+                                testConfigMap, testLogs, testingRun, latch, finalApiInfoKeySubcategoryMap));
+                        testingRecords.add(future);
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e, "Error in starting with latch for API " + apiInfoKey + " : " + e.getMessage());
+                    }
                 }
             }
             try {
@@ -530,8 +539,13 @@ public class TestExecutor {
     }
 
     public static OriginalHttpRequest findOriginalHttpRequest(ApiInfo.ApiInfoKey apiInfoKey, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessagesMap, SampleMessageStore sampleMessageStore){
+        if (sampleMessagesMap==null || sampleMessagesMap.isEmpty()) {
+            return null;
+        }
         List<String> sampleMessages = sampleMessagesMap.get(apiInfoKey);
-        if (sampleMessages == null || sampleMessagesMap.isEmpty()) return null;
+        if (sampleMessages == null || sampleMessages.isEmpty()) {
+            return null;
+        }
         String message = sampleMessages.get(sampleMessages.size() - 1);
         if(shouldCallClientLayerForSampleData){
             try {
@@ -555,6 +569,9 @@ public class TestExecutor {
 
     public static String findHostFromOriginalHttpRequest(OriginalHttpRequest originalHttpRequest)
             throws URISyntaxException {
+        if(originalHttpRequest == null){
+            return null;
+        }
         String baseUrl = originalHttpRequest.getUrl();
         if (baseUrl.startsWith("http")) {
             URI uri = new URI(baseUrl);
@@ -726,7 +743,7 @@ public class TestExecutor {
         List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, CountDownLatch latch, Map<ApiInfoKey, List<String>> apiInfoKeySubcategoryMap) {
 
         Context.accountId.set(accountId);
-        loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey);
+        loggerMaker.warnAndAddToDb("Starting test for " + apiInfoKey);
         AtomicBoolean isApiInfoTested = new AtomicBoolean(false);
         try {
             for (String testSubCategory: testingRunSubCategories) {
@@ -734,7 +751,7 @@ public class TestExecutor {
                     if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId)){
                         insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, isApiInfoTested, new AtomicInteger(0), new AtomicInteger(0));
                     }else{
-                        loggerMaker.info("Test stopped for id: " + testingRun.getHexId());
+                        loggerMaker.warnAndAddToDb("Test stopped for id: " + testingRun.getHexId());
                         break;
                     }
                 }
@@ -743,11 +760,11 @@ public class TestExecutor {
             loggerMaker.errorAndAddToDb(e, "error while running tests: " + e);
         }
         if(isApiInfoTested.get()){
-            loggerMaker.info("Api: " + apiInfoKey.toString() + " has been successfully tested");
+            loggerMaker.warnAndAddToDb("API: " + apiInfoKey.toString() + " has been successfully tested");
             dataActor.updateLastTestedField(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().toString());
         }
         latch.countDown();
-        loggerMaker.infoAndAddToDb("DONE FINAL: " + latch.getCount());
+        loggerMaker.warnAndAddToDb("DONE FINAL: " + latch.getCount());
         return null;
     }
 
@@ -869,7 +886,7 @@ public class TestExecutor {
         TestingRunResult testingRunResult = com.akto.testing.Utils.generateFailedRunResultForMessage(testingRun.getId(), apiInfoKey, testSuperType, testSubType, summaryId, messages, failMessage); 
         if(testingRunResult != null){
             if(Constants.KAFKA_DEBUG_MODE){
-                loggerMaker.infoAndAddToDb("Skipping test from producers because: " + failMessage + " apiinfo: " + apiInfoKey.toString());
+                loggerMaker.infoAndAddToDb("Skipping test from producers because: " + failMessage + " apiInfo: " + apiInfoKey.toString());
             }
             totalTestsCount.decrementAndGet();
         }else if (Constants.IS_NEW_TESTING_ENABLED && !currentExecutionFallback){
