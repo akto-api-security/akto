@@ -71,6 +71,7 @@ public class Constants {
     public static final String AKTO_DISCOVERED_APIS_COLLECTION = "shadow_apis";
     public static final String AKTO_MCP_SERVER_TAG = "mcp-server";
     public static final String AKTO_MCP_SERVER_TYPE_TAG = "mcp-server-type";
+    public static final String AKTO_MALICIOUS_MCP_SERVER_TAG = "malicious-mcp-server";
     public static final String AKTO_DAST_TAG = "dast";
     public static final String AKTO_GEN_AI_TAG = "gen-ai";
     public static final String AKTO_GUARD_RAIL_TAG = "guard-rail";
