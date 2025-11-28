@@ -2,6 +2,7 @@ package com.akto.action;
 
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dao.test_editor.CommonTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.traffic_collector.TrafficCollectorInfoDao;
 import com.akto.dao.traffic_collector.TrafficCollectorMetricsDao;
@@ -280,6 +281,8 @@ public class DbAction extends ActionSupport {
     Tokens token;
     WorkflowTest workflowTest;
     List<YamlTemplate> yamlTemplates;
+    @Getter @Setter
+    YamlTemplate commonTemplate;
     SingleTypeInfo sti;
     int scheduleTs;
     TestingRunPlayground testingRunPlayground;
@@ -1976,6 +1979,16 @@ public class DbAction extends ActionSupport {
             yamlTemplates = DbLayer.fetchYamlTemplatesWithIds(ids, fetchOnlyActive);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchYamlTemplatesWithIds " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchCommonWordList() {
+        try {
+            commonTemplate = CommonTemplateDao.instance.findOne(Filters.empty());
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchCommonWordList " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
