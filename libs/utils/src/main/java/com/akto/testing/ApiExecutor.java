@@ -261,11 +261,39 @@ public class ApiExecutor {
         String url = request.getUrl();
         url = url.trim();
 
+        boolean usedOverrideUrl = false;
+
         if (!url.startsWith("http")) {
-            url = OriginalHttpRequest.makeUrlAbsolute(url, request.findHostFromHeader(), request.findProtocolFromHeader());
+            String hostFromHeader = request.findHostFromHeader();
+            String protocolFromHeader = request.findProtocolFromHeader();
+
+            // If we don't have original host/protocol but have override host in config, use override directly
+            if ((StringUtils.isEmpty(hostFromHeader) || StringUtils.isEmpty(protocolFromHeader))
+                && testingRunConfig != null
+                && !StringUtils.isEmpty(testingRunConfig.getOverriddenTestAppUrl())) {
+
+                String overrideUrl = testingRunConfig.getOverriddenTestAppUrl();
+
+                // Combine the override URL with the request path
+                if (!overrideUrl.endsWith("/") && !url.startsWith("/")) {
+                    url = overrideUrl + "/" + url;
+                } else if (overrideUrl.endsWith("/") && url.startsWith("/")) {
+                    url = overrideUrl.substring(0, overrideUrl.length()-1) + url;
+                } else {
+                    url = overrideUrl + url;
+                }
+                usedOverrideUrl = true;
+            } else {
+                url = OriginalHttpRequest.makeUrlAbsolute(url, hostFromHeader, protocolFromHeader);
+            }
         }
 
-        return replaceHostFromConfig(url, testingRunConfig);
+        // Only replace host from config if we didn't already use the override URL
+        if (!usedOverrideUrl) {
+            return replaceHostFromConfig(url, testingRunConfig);
+        }
+
+        return url;
     }
 
     public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects,
