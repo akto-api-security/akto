@@ -4260,4 +4260,31 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public YamlTemplate fetchCommonWordList() {
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchCommonWordList", "", "POST", null, headers, "");
+        YamlTemplate yamlTemplate = null;
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchYamlTemplates", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBObject yamlTemplateObj = (BasicDBObject) payloadObj.get("yamlTemplates");
+                objectMapper.readValue(yamlTemplateObj.toJson(), YamlTemplate.class);
+            } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchYamlTemplates" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchYamlTemplates" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+        return yamlTemplate;
+    }
+
 }
