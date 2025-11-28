@@ -206,21 +206,32 @@ public class LoggerMaker {
         }
     }
 
+    private String formatMessageWithAccountId(String info) {
+        String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
+        return "acc: " + accountId + ", " + info;
+    }
+
     @Deprecated
     public void infoAndAddToDb(String info, LogDb db) {
-        String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
-        String infoMessage = "acc: " + accountId + ", " + info;
+        String infoMessage = formatMessageWithAccountId(info);
         logger.info(infoMessage);
-        try{
-            insert(infoMessage, "info",db);
-        } catch (Exception e){
+        try {
+            insert(infoMessage, "info", db);
+        } catch (Exception e) {
+        }
+    }
 
+    private void warnAndAddToDb(String info, LogDb db) {
+        String infoMessage = formatMessageWithAccountId(info);
+        logger.warn(infoMessage);
+        try {
+            insert(infoMessage, "warn", db);
+        } catch (Exception e) {
         }
     }
 
     public void insertImportantTestingLog(String info) {
-        String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
-        String infoMessage = "acc: " + accountId + ", " + info;
+        String infoMessage = formatMessageWithAccountId(info);
         logger.info(infoMessage);
         if(checkUpdate()){
             String text = aClass + " : " + " [" + moduleId + " ] " + info;
@@ -236,6 +247,10 @@ public class LoggerMaker {
 
     public void infoAndAddToDb(String info) {
         infoAndAddToDb(info, this.db);
+    }
+
+    public void warnAndAddToDb(String info) {
+        warnAndAddToDb(info, this.db);
     }
 
     private Boolean checkUpdate(){
