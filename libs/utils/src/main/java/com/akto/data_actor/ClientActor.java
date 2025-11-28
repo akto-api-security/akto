@@ -338,7 +338,7 @@ public class ClientActor extends DataActor {
         obj.put("url", url);
         OriginalHttpRequest request = new OriginalHttpRequest(ClientActor.url + "/overageApisExists", "", "GET", obj.toString(), headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("invalid response in overageExists", LoggerMaker.LogDb.RUNTIME);
@@ -364,7 +364,7 @@ public class ClientActor extends DataActor {
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchDeactivatedCollections", "", "GET", null, headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("invalid response in fetchDeactivatedCollections", LoggerMaker.LogDb.RUNTIME);
@@ -394,7 +394,7 @@ public class ClientActor extends DataActor {
         obj.put("deltaUsage", deltaUsage);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateUsage", "", "POST", obj.toString(), headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("invalid response in updateUsage", LoggerMaker.LogDb.RUNTIME);
@@ -413,7 +413,7 @@ public class ClientActor extends DataActor {
         String objString = gson.toJson(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/ingestMetricsData", "", "POST", objString, headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("invalid response in updateUsage", LoggerMaker.LogDb.RUNTIME);
@@ -3742,7 +3742,7 @@ public class ClientActor extends DataActor {
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/countTestingRunResultSummaries", "", "POST",  obj.toString(), headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in countTestingRunResultSummaries", LoggerMaker.LogDb.TESTING);
@@ -3768,7 +3768,7 @@ public class ClientActor extends DataActor {
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchTestScript", "", "GET", null, headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("invalid response in fetchTestScript", LoggerMaker.LogDb.RUNTIME);
@@ -3798,7 +3798,7 @@ public class ClientActor extends DataActor {
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/findDependencyNodes", "", "POST",  obj.toString(), headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in findDependencyNodes", LoggerMaker.LogDb.TESTING);
@@ -3829,7 +3829,7 @@ public class ClientActor extends DataActor {
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/findLatestTestingRunResultSummary", "", "POST",  obj.toString(), headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in findLatestTestingRunResultSummary", LoggerMaker.LogDb.TESTING);
@@ -3888,7 +3888,7 @@ public class ClientActor extends DataActor {
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/findTestSubCategoriesByTestSuiteId", "", "POST", obj.toString(), headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in findTestSubCategoriesByTestSuiteId", LogDb.RUNTIME);
@@ -3918,7 +3918,7 @@ public class ClientActor extends DataActor {
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchEditorTest", "", "POST",  obj.toString(), headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in fetchEditorTest", LoggerMaker.LogDb.TESTING);
@@ -3957,7 +3957,7 @@ public class ClientActor extends DataActor {
         String jsonString = gson.toJson(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateTestingRunPlaygroundStateAndResult", "", "POST",  jsonString, headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in updateTestingRunPlaygroundStateAndResult", LoggerMaker.LogDb.TESTING);
@@ -3986,7 +3986,7 @@ public class ClientActor extends DataActor {
 
             loggerMaker.debug("Sending request to LLM server: {}", requestJson);
 
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
 
             if (response == null) {
                 loggerMaker.errorAndAddToDb("Response object is null from LLM server", LoggerMaker.LogDb.TESTING);
@@ -4031,7 +4031,7 @@ public class ClientActor extends DataActor {
 
             loggerMaker.debug("Sending request to LLM server: {}", requestJson);
 
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
 
             if (response == null) {
                 loggerMaker.errorAndAddToDb("Response object is null from LLM server", LoggerMaker.LogDb.TESTING);
@@ -4063,7 +4063,7 @@ public class ClientActor extends DataActor {
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/getSlackWebhooks", "", "POST",  "", headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in fetchSlackWebhooks", LoggerMaker.LogDb.TESTING);
@@ -4106,7 +4106,7 @@ public class ClientActor extends DataActor {
         String jsonBody = wrapper.toJson();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertMCPAuditDataLog", "", "POST", jsonBody, headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in insertMCPAuditDataLog", LogDb.RUNTIME);
@@ -4164,7 +4164,7 @@ public class ClientActor extends DataActor {
         
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateMcpReconRequestStatus", "", "POST", obj.toString(), headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in updateMcpReconRequestStatus", LoggerMaker.LogDb.RUNTIME);
@@ -4214,7 +4214,7 @@ public class ClientActor extends DataActor {
         
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeMcpReconResultsBatch", "", "POST", jsonBody, headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in storeMcpReconResultsBatch", LoggerMaker.LogDb.RUNTIME);
@@ -4248,7 +4248,7 @@ public class ClientActor extends DataActor {
         
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeConversationResults", "", "POST", jsonBody, headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in storeConversationResults", LoggerMaker.LogDb.RUNTIME);
