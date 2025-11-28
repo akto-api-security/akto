@@ -1,7 +1,6 @@
 package com.akto.testing;
 
 import com.akto.PayloadEncodeUtil;
-import com.akto.agent.AgenticUtils;
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
@@ -154,15 +153,15 @@ public class TestExecutor {
             int lastCheckedCount = 0;
             while(latch.getCount() > 0 && GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) 
                 && (Context.now() - waitTs < tempRunTime)) {
-                    loggerMaker.infoAndAddToDb("waiting for tests to finish, count left: " + totalTestsCount.get(), LogDb.TESTING);
+                    loggerMaker.infoAndAddToDb("waiting for tests to finish, count left: " + totalTestsCount.get());
 
                     if(lastCheckedCount != totalTestsCount.get()){
                         lastCheckedCount = totalTestsCount.get();
-                        loggerMaker.debugInfoAddToDb("Total tests left to be executed :" + totalTestsCount.get(), LogDb.TESTING);
+                        loggerMaker.debugInfoAddToDb("Total tests left to be executed :" + totalTestsCount.get());
                         prevCalcTime = Context.now();
                     }else{
                         if((Context.now() - prevCalcTime) > 20 * 60){
-                            loggerMaker.debugInfoAddToDb("No new tests are being executed in the last 20 minutes, stopping the test run", LogDb.TESTING);
+                            loggerMaker.debugInfoAddToDb("No new tests are being executed in the last 20 minutes, stopping the test run");
                             break;
                         }
                     }
@@ -197,7 +196,7 @@ public class TestExecutor {
     public void workflowInit (TestingRun testingRun, ObjectId summaryId, boolean debug, List<TestingRunResult.TestLog> testLogs) {
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
         if (!testingEndpoints.getType().equals(TestingEndpoints.Type.WORKFLOW)) {
-            loggerMaker.errorAndAddToDb("Invalid workflow type", LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Invalid workflow type");
             return;
         }
 
@@ -207,7 +206,7 @@ public class TestExecutor {
         WorkflowTest workflowTest = dataActor.fetchWorkflowTest(workflowTestOld.getId());
 
         if (workflowTest == null) {
-            loggerMaker.errorAndAddToDb("Workflow test has been deleted", LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Workflow test has been deleted");
             return ;
         }
 
@@ -220,7 +219,7 @@ public class TestExecutor {
             GraphExecutorResult graphExecutorResult = apiWorkflowExecutor.init(graphExecutorRequest, debug, testLogs, null);
             dataActor.insertWorkflowTestResult(graphExecutorResult.getWorkflowTestResult());
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while executing workflow test " + e, LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Error while executing workflow test " + e);
         }
 
         Map<String, Integer> totalCountIssues = new HashMap<>();
@@ -287,7 +286,7 @@ public class TestExecutor {
 
 
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
-        loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size());
         boolean collectionWise = testingEndpoints.getType().equals(TestingEndpoints.Type.COLLECTION_WISE);
 
         SampleMessageStore sampleMessageStore = SampleMessageStore.create();
@@ -332,21 +331,21 @@ public class TestExecutor {
         int currentTime = Context.now();
         Map<String, String> hostAndContentType = new HashMap<>();
         try {
-            loggerMaker.infoAndAddToDb("Starting findAllHosts at: " + currentTime, LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("Starting findAllHosts at: " + currentTime);
             hostAndContentType = StatusCodeAnalyser.findAllHosts(sampleMessageStore, sampleDataMapForStatusCodeAnalyser);
-            loggerMaker.infoAndAddToDb("Completing findAllHosts in: " + (Context.now() -  currentTime) + " at: " + Context.now(), LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("Completing findAllHosts in: " + (Context.now() -  currentTime) + " at: " + Context.now());
         } catch (Exception e){
-            loggerMaker.errorAndAddToDb("Error while running findAllHosts " + e.getMessage(), LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Error while running findAllHosts " + e.getMessage());
         }
         currentTime = Context.now();
-        loggerMaker.infoAndAddToDb("Starting status code analyser", LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("Starting status code analyser");
         try {
             StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore ,  attackerTestRole.findMatchingAuthMechanism(null), testingRun.getTestingRunConfig(), hostAndContentType);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while running status code analyser " + e.getMessage(), LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Error while running status code analyser " + e.getMessage());
         }
 
-        loggerMaker.infoAndAddToDb("StatusCodeAnalyser result = " + StatusCodeAnalyser.result + " defaultPayloadMap: " + StatusCodeAnalyser.defaultPayloadsMap + " calculated in: " + (Context.now() - currentTime), LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("StatusCodeAnalyser result = " + StatusCodeAnalyser.result + " defaultPayloadMap: " + StatusCodeAnalyser.defaultPayloadsMap + " calculated in: " + (Context.now() - currentTime));
 
         dataActor.updateTotalApiCountInTestSummary(summaryId.toHexString(), apiInfoKeyList.size());
 
@@ -434,15 +433,15 @@ public class TestExecutor {
                     int lastCheckedCount = 0;
                     while(latch.getCount() > 0 && GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) 
                         && (Context.now() - waitTs < maxRunTime)) {
-                            loggerMaker.infoAndAddToDb("waiting for tests to finish, count left: " + totalTestsCount.get(), LogDb.TESTING);
+                            loggerMaker.infoAndAddToDb("waiting for tests to finish, count left: " + totalTestsCount.get());
 
                             if(lastCheckedCount != totalTestsCount.get()){
                                 lastCheckedCount = totalTestsCount.get();
-                                loggerMaker.debugInfoAddToDb("Total tests left to be executed :" + totalTestsCount.get(), LogDb.TESTING);
+                                loggerMaker.debugInfoAddToDb("Total tests left to be executed :" + totalTestsCount.get());
                                 prevCalcTime = Context.now();
                             }else{
                                 if((Context.now() - prevCalcTime) > 20 * 60){
-                                    loggerMaker.debugInfoAddToDb("No new tests are being executed in the last 20 minutes, stopping the test run", LogDb.TESTING);
+                                    loggerMaker.debugInfoAddToDb("No new tests are being executed in the last 20 minutes, stopping the test run");
                                     break;
                                 }
                             }
@@ -453,7 +452,7 @@ public class TestExecutor {
                     for (Future<Void> future : testingRecords) {
                         future.cancel(!Constants.IS_NEW_TESTING_ENABLED);
                     }
-                    loggerMaker.infoAndAddToDb("Canceled all running future tasks due to timeout.", LogDb.TESTING);
+                    loggerMaker.infoAndAddToDb("Canceled all running future tasks due to timeout.");
                 }else{
                     // This else block only executes when IS_NEW_TESTING_ENABLED is true AND kafkaFallbackMode is false
                     // So we can directly proceed with Kafka completion logic
@@ -493,7 +492,7 @@ public class TestExecutor {
     }
 
     public static void updateTestSummary(ObjectId summaryId){
-        loggerMaker.infoAndAddToDb("Finished updating results count", LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("Finished updating results count");
 
         State updatedState = GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) ? State.COMPLETED : GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId);
 
@@ -503,8 +502,7 @@ public class TestExecutor {
         do {
             fetchMore = false;
             List<TestingRunResult> testingRunResults = dataActor.fetchLatestTestingRunResultBySummaryId(summaryId.toHexString(), limit, skip);
-            loggerMaker.infoAndAddToDb("Reading " + testingRunResults.size() + " vulnerable testingRunResults",
-                    LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("Reading " + testingRunResults.size() + " vulnerable testingRunResults");
             if (testingRunResults.size() == limit) {
                 skip += limit;
                 fetchMore = true;
@@ -515,7 +513,7 @@ public class TestExecutor {
         TestingRunResultSummary testingRunResultSummary = dataActor.updateIssueCountAndStateInSummary(summaryId.toHexString(), new HashMap<>(), updatedState.toString());
         if (TestingConfigurations.getInstance().getRerunTestingRunResultSummary() != null) {
             dataActor.deleteTestRunResultSummary(TestingConfigurations.getInstance().getRerunTestingRunResultSummary().getId().toHexString());
-            loggerMaker.infoAndAddToDb("Deleting rerun testing result summary after completion of test: TRRS_ID:" + TestingConfigurations.getInstance().getRerunTestingRunResultSummary().getHexId(), LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("Deleting rerun testing result summary after completion of test: TRRS_ID:" + TestingConfigurations.getInstance().getRerunTestingRunResultSummary().getHexId());
             TestingConfigurations.getInstance().setRerunTestingRunResultSummary(null);
         }
         // GithubUtils.publishGithubComments(testingRunResultSummary);
@@ -542,7 +540,7 @@ public class TestExecutor {
                     message = PayloadEncodeUtil.decryptPacked(message, privateKey);
                 }
             } catch (JWTVerificationException e) {
-                loggerMaker.errorAndAddToDb(e, "Error while decoding encoded payload in findOriginalHttpRequest: " + e.getMessage(), LogDb.TESTING);
+                loggerMaker.errorAndAddToDb(e, "Error while decoding encoded payload in findOriginalHttpRequest: " + e.getMessage());
             } catch (Exception e) {
                 return null;
             }
@@ -590,11 +588,11 @@ public class TestExecutor {
             try {
                 loginFlowResponse = executeLoginFlow(authMechanism, null);
                 if (loginFlowResponse.getSuccess()) {
-                    loggerMaker.infoAndAddToDb("login flow success", LogDb.TESTING);
+                    loggerMaker.infoAndAddToDb("login flow success");
                     break;
                 }
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e.getMessage(), LogDb.TESTING);
+                loggerMaker.errorAndAddToDb(e.getMessage());
             }
         }
         return loginFlowResponse;
@@ -603,16 +601,16 @@ public class TestExecutor {
     public static LoginFlowResponse executeLoginFlow(AuthMechanism authMechanism, LoginFlowParams loginFlowParams) throws Exception {
 
         if (authMechanism.getType() == null) {
-            loggerMaker.infoAndAddToDb("auth type value is null", LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("auth type value is null");
             return new LoginFlowResponse(null, null, true);
         }
 
         if (!authMechanism.getType().equals(LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString())) {
-            loggerMaker.infoAndAddToDb("invalid auth type for login flow execution", LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("invalid auth type for login flow execution");
             return new LoginFlowResponse(null, null, true);
         }
 
-        loggerMaker.infoAndAddToDb("login flow execution started", LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("login flow execution started");
 
         WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData());
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
@@ -728,7 +726,7 @@ public class TestExecutor {
         List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, CountDownLatch latch, Map<ApiInfoKey, List<String>> apiInfoKeySubcategoryMap) {
 
         Context.accountId.set(accountId);
-        loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);   
+        loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey);
         AtomicBoolean isApiInfoTested = new AtomicBoolean(false);
         try {
             for (String testSubCategory: testingRunSubCategories) {
@@ -749,7 +747,7 @@ public class TestExecutor {
             dataActor.updateLastTestedField(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().toString());
         }
         latch.countDown();
-        loggerMaker.infoAndAddToDb("DONE FINAL: " + latch.getCount(), LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("DONE FINAL: " + latch.getCount());
         return null;
     }
 
@@ -794,7 +792,7 @@ public class TestExecutor {
     public void insertResultsAndMakeIssues(List<TestingRunResult> testingRunResults, ObjectId testRunResultSummaryId) {
         int resultSize = testingRunResults.size();
         if (resultSize > 0) {
-            loggerMaker.infoAndAddToDb("testingRunResults size: " + resultSize, LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("testingRunResults size: " + resultSize);
             trim(testingRunResults);
             TestingRunResult originalTestingRunResultForRerun = TestingConfigurations.getInstance().getTestingRunResultForApiKeyInfo(testingRunResults.get(0).getApiInfoKey(), testingRunResults.get(0).getTestSubType());
             if (originalTestingRunResultForRerun != null) {
@@ -827,9 +825,9 @@ public class TestExecutor {
             trr.setTestResults(null);
             trr.setTestLogs(null);
             dataActor.insertTestingRunResults(trr);
-            loggerMaker.infoAndAddToDb("Inserted testing results", LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("Inserted testing results");
             dataActor.updateTestResultsCountInTestSummary(testRunResultSummaryId.toHexString(), resultSize);
-            loggerMaker.infoAndAddToDb("Updated count in summary", LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("Updated count in summary");
 
             TestingIssuesHandler handler = new TestingIssuesHandler();
             boolean triggeredByTestEditor = false;
@@ -839,7 +837,7 @@ public class TestExecutor {
                 trr.setTestResults(list);
                 handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor);
             } catch (Exception e){
-                loggerMaker.errorAndAddToDb(e, "Unable to create issues", LogDb.TESTING);
+                loggerMaker.errorAndAddToDb(e, "Unable to create issues");
             }
         }
     }
@@ -871,7 +869,7 @@ public class TestExecutor {
         TestingRunResult testingRunResult = com.akto.testing.Utils.generateFailedRunResultForMessage(testingRun.getId(), apiInfoKey, testSuperType, testSubType, summaryId, messages, failMessage); 
         if(testingRunResult != null){
             if(Constants.KAFKA_DEBUG_MODE){
-                loggerMaker.infoAndAddToDb("Skipping test from producers because: " + failMessage + " apiinfo: " + apiInfoKey.toString(), LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("Skipping test from producers because: " + failMessage + " apiinfo: " + apiInfoKey.toString());
             }
             totalTestsCount.decrementAndGet();
         }else if (Constants.IS_NEW_TESTING_ENABLED && !currentExecutionFallback){
@@ -948,7 +946,7 @@ public class TestExecutor {
             TestRoles attackerTestRole = Executor.fetchOrFindAttackerRole();
             AuthMechanism attackerAuthMechanism = null;
             if (attackerTestRole == null) {
-                loggerMaker.infoAndAddToDb("ATTACKER_TOKEN_ALL test role not found", LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("ATTACKER_TOKEN_ALL test role not found");
             } else {
                 attackerAuthMechanism = attackerTestRole.findMatchingAuthMechanism(rawApi);
             }
@@ -970,7 +968,7 @@ public class TestExecutor {
                         msg = PayloadEncodeUtil.decryptPacked(msg, privateKey);
                     }
                 } catch (JWTVerificationException e) {
-                    loggerMaker.errorAndAddToDb(e, "Error while decoding encoded payload in runTestNew: " + e.getMessage(), LogDb.TESTING);
+                    loggerMaker.errorAndAddToDb(e, "Error while decoding encoded payload in runTestNew: " + e.getMessage());
                 } catch (Exception e) {
                 }
                 if (msg != null) {
@@ -1010,7 +1008,7 @@ public class TestExecutor {
         String testExecutionLogId = UUID.randomUUID().toString();
         
         loggerMaker.infoAndAddToDb("triggering test run for apiInfoKey " + apiInfoKey + "test " + 
-            testSubType + " logId " + testExecutionLogId, LogDb.TESTING);
+            testSubType + " logId " + testExecutionLogId);
 
         com.akto.test_editor.execution.Executor executor = new Executor();
         executor.overrideTestUrl(rawApi, testingRunConfig);
@@ -1053,7 +1051,7 @@ public class TestExecutor {
             try {
                 cleanUpTestArtifacts(Collections.singletonList(ret), apiInfoKey, sampleMessageStore, testingRunConfig);
             } catch(Exception e){
-                loggerMaker.errorAndAddToDb(e, "Error while cleaning up test artifacts: " + e.getMessage(), LogDb.TESTING);
+                loggerMaker.errorAndAddToDb(e, "Error while cleaning up test artifacts: " + e.getMessage());
             }
         }
 
@@ -1073,14 +1071,14 @@ public class TestExecutor {
                         try {
                             formattedMessage = com.akto.runtime.utils.Utils.convertToSampleMessage(message);
                         } catch (Exception e) {
-                            loggerMaker.errorAndAddToDb("cleanUpTestArtifacts: Error while formatting message: " + e.getMessage(), LogDb.TESTING);
+                            loggerMaker.errorAndAddToDb("cleanUpTestArtifacts: Error while formatting message: " + e.getMessage());
                         }
                         if (formattedMessage == null) {
                             continue;
                         }
                         RawApi rawApiToBeReplayed = RawApi.buildFromMessage(formattedMessage, true);
                         if (rawApiToBeReplayed.getResponse().getStatusCode() >= 300) {
-                            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts rawApiToBeReplayed status code invalid: " + rawApiToBeReplayed.getResponse().getStatusCode(), LogDb.TESTING);
+                            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts rawApiToBeReplayed status code invalid: " + rawApiToBeReplayed.getResponse().getStatusCode());
                             continue;
                         }
                         switch (apiInfoKey.getMethod()) {
@@ -1131,16 +1129,16 @@ public class TestExecutor {
                                                     EndpointLogicalGroup endpointLogicalGroup = role.fetchEndpointLogicalGroup();
                                                     if (endpointLogicalGroup != null && endpointLogicalGroup.getTestingEndpoints() != null  && endpointLogicalGroup.getTestingEndpoints().containsApi(apiInfoKey)) {
 
-                                                        loggerMaker.infoAndAddToDb("attempting to override auth ", LogDb.TESTING);
+                                                        loggerMaker.infoAndAddToDb("attempting to override auth ");
                                                         if (Executor.modifyAuthTokenInRawApi(role, nextApi) == null) {
-                                                            loggerMaker.infoAndAddToDb("Default auth mechanism absent", LogDb.TESTING);
+                                                            loggerMaker.infoAndAddToDb("Default auth mechanism absent");
                                                         }
                                                     } else {
-                                                        loggerMaker.infoAndAddToDb("Endpoint didn't satisfy endpoint condition for testRole", LogDb.TESTING);
+                                                        loggerMaker.infoAndAddToDb("Endpoint didn't satisfy endpoint condition for testRole");
                                                     }
                                                 } else {
                                                     String reason = "Test role has been deleted";
-                                                    loggerMaker.infoAndAddToDb(reason + ", going ahead with sample auth", LogDb.TESTING);
+                                                    loggerMaker.infoAndAddToDb(reason + ", going ahead with sample auth");
                                                 }
                                             }
 
