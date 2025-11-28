@@ -178,12 +178,12 @@ function Dashboard() {
     }
 
     const refreshFunc = () => {
-        if(document.visibilityState === 'hidden'){
-            PersistStore.getState().resetAll();
-            LocalStore.getState().resetStore();
-            navigate("/dashboard/observe/inventory")
-            window.location.reload();
-        }
+        // if(document.visibilityState === 'hidden'){
+        //     PersistStore.getState().resetAll();
+        //     LocalStore.getState().resetStore();
+        //     navigate("/dashboard/observe/inventory")
+        //     window.location.reload();
+        // }
     }
 
     const initializeTimer = () => {
