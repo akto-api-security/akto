@@ -387,7 +387,7 @@ public class Main {
         TestCompletion testCompletion = new TestCompletion();
         ModuleInfoWorker.init(ModuleInfo.ModuleType.MINI_TESTING, dataActor, customMiniTestingServiceName);
         LoggerMaker.setModuleId(customMiniTestingServiceName);
-        loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
+        loggerMaker.warnAndAddToDb("Starting.......");
 
         if(Constants.IS_NEW_TESTING_ENABLED){
             boolean val = Utils.createFolder(Constants.TESTING_STATE_FOLDER_PATH);
