@@ -481,8 +481,10 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 } : {}),
                 url: url || null,
                 confidenceScore: confidenceScore,
-                selectedMcpServers: transformedMcpServers,
-                selectedAgentServers: transformedAgentServers,
+                selectedMcpServers: selectedMcpServers, // Old format (just IDs)
+                selectedAgentServers: selectedAgentServers, // Old format (just IDs)
+                selectedMcpServersV2: transformedMcpServers, // New format (with names)
+                selectedAgentServersV2: transformedAgentServers, // New format (with names)
                 applyOnResponse,
                 applyOnRequest,
                 // Add edit mode information
