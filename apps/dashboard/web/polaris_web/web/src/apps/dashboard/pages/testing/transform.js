@@ -1352,12 +1352,14 @@ getMissingConfigs(testResults){
         conversationsListCopy.push({
             ...commonObj,
             _id: "user_" + conversation.prompt,
-            message: conversation.prompt,
+            message: conversation?.finalSentPrompt || conversation.prompt,
             role: "user"
         })
         
         // Check if response contains "## ROOT CAUSE ANALYSIS"
         let systemMessage = conversation.response
+        extractedRemediationText = conversation.remediationMessage || "";
+        
         if (systemMessage && typeof systemMessage === 'string') {
             const rootCauseIndex = systemMessage.indexOf('ROOT CAUSE ANALYSIS')
             if (rootCauseIndex !== -1) {
@@ -1380,7 +1382,7 @@ getMissingConfigs(testResults){
     
     return {
         conversations: conversationsListCopy,
-        remediationText: extractedRemediationText || null
+        remediationText: extractedRemediationText
     }
   }
 }
