@@ -4240,8 +4240,10 @@ public class ClientActor extends DataActor {
                     .append("response", r.getResponse())
                     .append("conversation", r.getConversation())
                     .append("timestamp", r.getTimestamp())
-                    .append("validation", r.isValidation());
-
+                    .append("validation", r.isValidation())
+                    .append("finalSentPrompt", r.getFinalSentPrompt())
+                    .append("remediationMessage", r.getRemediationMessage())
+                    .append("validationMessage", r.getValidationMessage());
             docs.add(d);
         }
 
