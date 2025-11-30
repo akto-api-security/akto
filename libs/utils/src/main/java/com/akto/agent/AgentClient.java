@@ -172,8 +172,8 @@ public class AgentClient {
             String validationMessage = null;
             String remediationMessage = null;
             if(validation) {
-                validationMessage = jsonNode.get("validationMessage").asText();
-                remediationMessage = jsonNode.get("remediationMessage").asText();
+                validationMessage = jsonNode.has("validationMessage") ? jsonNode.get("validationMessage").asText() : null;
+                remediationMessage = jsonNode.has("remediationMessage") ? jsonNode.get("remediationMessage").asText() : null;
             }
 
             String finalSentPrompt = null;
