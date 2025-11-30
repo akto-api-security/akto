@@ -47,4 +47,3 @@ scanner.scan(warmup_text, warmup_text)
 
 print("\n✓ All models cached successfully!")
 print("First scan will now be fast (~500ms instead of 30s)")
-

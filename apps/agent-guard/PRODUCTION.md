@@ -362,4 +362,4 @@ docker-compose up -d
 
 ---
 
-Built with [LLM Guard](https://github.com/protectai/llm-guard) • Part of [Akto](https://github.com/akto-api-security/akto)
+Built with [LLM Guard](https://github.com/akto-api-security/llm-guard) • Part of [Akto](https://github.com/akto-api-security/akto)
