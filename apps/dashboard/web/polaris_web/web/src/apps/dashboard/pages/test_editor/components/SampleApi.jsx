@@ -299,8 +299,8 @@ const SampleApi = () => {
             }
             else setTestResult(resp)
             if(resp?.agentConversationResults?.length > 0){
-                let conversationsListCopy = testingFunc.prepareConversationsList(resp?.agentConversationResults)
-                setConversationsList(conversationsListCopy)
+                let result = testingFunc.prepareConversationsList(resp?.agentConversationResults)
+                setConversationsList(result.conversations)
             }
         } catch (err){
         }
