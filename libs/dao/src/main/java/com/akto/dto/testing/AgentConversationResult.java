@@ -21,4 +21,7 @@ public class AgentConversationResult {
     private List<String> conversation;
     private int timestamp;
     private boolean validation;
+    private String validationMessage;
+    private String finalSentPrompt;
+    private String remediationMessage;
 }
