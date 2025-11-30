@@ -1,23 +1,14 @@
-import { useReducer, useState, useEffect } from "react";
-import { Box, EmptySearchResult, HorizontalStack, VerticalStack, Popover, ActionList, Button, Icon, Badge, Text} from '@shopify/polaris';
-import {CancelMinor, EditMinor, FileMinor, HideMinor, ViewMinor, ChecklistMajor} from '@shopify/polaris-icons';
+import { useState, useEffect } from "react";
+import { EmptySearchResult, VerticalStack, Button, Badge, Text } from '@shopify/polaris';
+import { CancelMinor, ViewMinor, ChecklistMajor } from '@shopify/polaris-icons';
 import CreateGuardrailModal from "./components/CreateGuardrailModal";
-import DateRangeFilter from "../../components/layouts/DateRangeFilter";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func";
-import values from "@/util/values";
-import { produce } from "immer"
 import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
-import SessionStore from "../../../main/SessionStore";
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
-import { labelMap } from '../../../main/labelHelperMap';
-import PersistStore from '@/apps/main/PersistStore';
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
-import guardRailData from "./dummyData";
 import api from "./api";
-import GetPrettifyEndpoint from "@/apps/dashboard/pages/observe/GetPrettifyEndpoint";
-import dayjs from "dayjs";
 
 const resourceName = {
   singular: "policy",
@@ -46,15 +37,15 @@ const headings = [
     title: "Status",
   },
   {
-    text: "Created on",
-    title: "Created on",
+    text: "Created",
+    title: "Created",
     value: "createdTs",
     type: CellType.TEXT,
     sortActive: true,
   },
   {
-    text: "Updated on",
-    title: "Updated on",
+    text: "Updated",
+    title: "Updated",
     value: "updatedTs",
     type: CellType.TEXT,
   },
@@ -78,28 +69,28 @@ const headings = [
 
 const sortOptions = [
   {
-    label: "Created on",
+    label: "Created",
     value: "createdTs asc",
     directionLabel: "Newest",
     sortKey: "createdTs",
     columnIndex: 4,
   },
   {
-    label: "Created on",
+    label: "Created",
     value: "createdTs desc",
     directionLabel: "Oldest",
     sortKey: "createdTs",
     columnIndex: 4,
   },
   {
-    label: "Updated on",
+    label: "Updated",
     value: "updatedTs asc",
     directionLabel: "Newest",
     sortKey: "updatedTs",
     columnIndex: 5,
   },
   {
-    label: "Updated on",
+    label: "Updated",
     value: "updatedTs desc",
     directionLabel: "Oldest",
     sortKey: "updatedTs",
@@ -161,13 +152,14 @@ function GuardrailPolicies() {
                         ),
                         createdTs: func.prettifyEpoch(policy.createdTimestamp),
                         updatedTs: func.prettifyEpoch(policy.updatedTimestamp),
-                        createdBy: policy.createdBy || "N/A",
-                        updatedBy: policy.updatedBy || "N/A",
+                        createdBy: policy.createdBy || "-",
+                        updatedBy: policy.updatedBy || "-",
                         originalData: policy
                     }));
                 setPolicyData(formattedPolicies);
             }
         } catch (error) {
+            console.error("Error fetching guardrail policies:", error);
             func.setToast(true, true, "Failed to load guardrail policies");
         } finally {
             setLoading(false);
@@ -252,32 +244,35 @@ function GuardrailPolicies() {
             });
         }
 
-        // Word filters and regex patterns
+        // Word filters
         const wordFilters = [];
         if (policy.wordFilters?.profanity) wordFilters.push("Profanity");
         if (policy.wordFilters?.custom?.length > 0) wordFilters.push(`${policy.wordFilters.custom.length} Custom Words`);
-        
-        // Use effective regex patterns - prefer V2 format with behavior, fallback to old format
-        const effectiveRegexPatterns = getEffectiveRegexPatterns(policy);
-        if (effectiveRegexPatterns?.length > 0) {
-            const blockCount = effectiveRegexPatterns.filter(r => r.behavior === 'block').length;
-            const maskCount = effectiveRegexPatterns.filter(r => r.behavior === 'mask').length;
-            const regexSummary = [];
-            if (blockCount > 0) regexSummary.push(`${blockCount} Block`);
-            if (maskCount > 0) regexSummary.push(`${maskCount} Mask`);
-            wordFilters.push(`Regex: ${regexSummary.join(', ')}`);
-        }
         if (wordFilters.length > 0) {
             details.push({ label: "Word Filters", value: wordFilters.join(", ") });
         }
 
-        // PII types details
+        // Sensitive information filters (PII types and regex patterns)
+        const sensitiveInfoFilters = [];
+
+        // PII types
         if (policy.piiTypes?.length > 0) {
             const piiNames = policy.piiTypes.map(pii => pii.type).slice(0, 2);
-            const moreCount = policy.piiTypes.length > 2 ? ` +${policy.piiTypes.length - 2} more` : '';
-            details.push({ 
-                label: "PII Detection", 
-                value: `${piiNames.join(", ")}${moreCount}` 
+            const moreCount = policy.piiTypes.length > 2 ? ` +${policy.piiTypes.length - 2} more PIIs` : '';
+            sensitiveInfoFilters.push(`${piiNames.join(", ")}${moreCount}`);
+        }
+
+        // Regex patterns
+        const effectiveRegexPatterns = getEffectiveRegexPatterns(policy);
+        if (effectiveRegexPatterns?.length > 0) {
+            const patternCount = effectiveRegexPatterns.length;
+            sensitiveInfoFilters.push(`${patternCount} regex pattern${patternCount > 1 ? 's' : ''}`);
+        }
+
+        if (sensitiveInfoFilters.length > 0) {
+            details.push({
+                label: "Sensitive Data Filters",
+                value: sensitiveInfoFilters.join(", ")
             });
         }
 
@@ -352,6 +347,7 @@ function GuardrailPolicies() {
             // Refresh the page to ensure data gets updated on screen
             window.location.reload();
         } catch (error) {
+            console.error("Error toggling guardrail status:", error);
             func.setToast(true, true, "Failed to update guardrail status");
             setLoading(false);
         }
@@ -374,6 +370,26 @@ function GuardrailPolicies() {
         handleEditPolicy(data)
     }
 
+    const promotedBulkActions = (selectedPolicies) => {
+        return [
+            {
+                content: `Delete ${selectedPolicies.length} polic${selectedPolicies.length > 1 ? "ies" : "y"}`,
+                onAction: async () => {
+                    const deleteConfirmationMessage = `Are you sure you want to delete ${selectedPolicies.length} polic${selectedPolicies.length > 1 ? "ies" : "y"}?`;
+                    func.showConfirmationModal(deleteConfirmationMessage, "Delete", async () => {
+                        try {
+                            await api.deleteGuardrailPolicies(selectedPolicies);
+                            func.setToast(true, false, `${selectedPolicies.length} polic${selectedPolicies.length > 1 ? "ies" : "y"} deleted successfully`);
+                            window.location.reload();
+                        } catch (error) {
+                            console.error("Error deleting policies:", error);
+                            func.setToast(true, true, "Failed to delete policies");
+                        }
+                    });
+                },
+            },
+        ];
+    };
 
     const getActionsList = (item) => {
         const isActive = item.originalData?.active;
@@ -381,8 +397,8 @@ function GuardrailPolicies() {
             title: 'Actions',
             items: [
                 {
-                    content: isActive ? 
-                        <span style={{ color: '#D72C0D' }}>Disable policy</span> : 
+                    content: isActive ?
+                        <span style={{ color: '#D72C0D' }}>Disable policy</span> :
                         <span style={{ color: '#008060' }}>Enable policy</span>,
                     icon: isActive ? CancelMinor : ChecklistMajor,
                     onAction: () => handleToggleStatus(item),
@@ -473,6 +489,7 @@ function GuardrailPolicies() {
                 }
             }
         } catch (error) {
+            console.error("Error saving guardrail policy:", error);
             func.setToast(true, true, isEditMode ? "Failed to update guardrail" : "Failed to create guardrail");
         } finally {
             setLoading(false);
@@ -499,6 +516,8 @@ function GuardrailPolicies() {
             hasRowActions={true}
             hardCodedKey={true}
             loading={loading}
+            selectable={true}
+            promotedBulkActions={promotedBulkActions}
 
         />,   
         <CreateGuardrailModal

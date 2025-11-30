@@ -63,8 +63,9 @@ public class Main {
            continue;
          }
          HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
-         if(featureWiseAllowed == null) {
-             featureWiseAllowed = new HashMap<>();
+         if(featureWiseAllowed == null || featureWiseAllowed.isEmpty()) {
+            // case for on-prem customers without internet access
+            break;
          }
 
          FeatureAccess allowed = featureWiseAllowed.getOrDefault("THREAT_DETECTION", FeatureAccess.noAccess);

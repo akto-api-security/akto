@@ -162,6 +162,10 @@ public class HttpResponseParams {
         return this.statusCode;
     }
 
+    public void setStatusCode(int statusCode) {
+        this.statusCode = statusCode;
+    }
+
     public Map<String, List<String>> getHeaders() {
         return this.headers;
     }

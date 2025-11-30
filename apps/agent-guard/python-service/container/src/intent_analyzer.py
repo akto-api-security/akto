@@ -220,7 +220,7 @@ class IntentAnalyzer:
 
                 _sentiment_analyzer = pipeline(
                     "sentiment-analysis",
-                    model="distilbert-base-uncased-finetuned-sst-2-english",
+                    model="TangoBeeAkto/distilbert-base-uncased-finetuned-sst-2-english",
                     device=-1,  # CPU
                     model_kwargs={'cache_dir': cache_dir}
                 )
@@ -245,7 +245,7 @@ class IntentAnalyzer:
                 # Accuracy: 89-90% vs 91.7% (acceptable trade-off for latency)
                 _zero_shot_classifier = pipeline(
                     "zero-shot-classification",
-                    model="MoritzLaurer/deberta-v3-base-zeroshot-v1.1-all-33",
+                    model="TangoBeeAkto/deberta-v3-base-zeroshot-v1.1-all-33",
                     device=-1,  # CPU
                     model_kwargs={'cache_dir': cache_dir}
                 )

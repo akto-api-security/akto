@@ -78,6 +78,7 @@ function TestRunResultPage(props) {
   const hostNameMap = PersistStore(state => state.hostNameMap)
 
   const [conversations, setConversations] = useState([])
+  const [conversationRemediationText, setConversationRemediationText] = useState(null)
   const [showForbidden, setShowForbidden] = useState(false)
 
   const useFlyout = location.pathname.includes("test-editor") ? false : true
@@ -164,8 +165,10 @@ function TestRunResultPage(props) {
         if(conversationId){
           let res = await api.fetchConversationsFromConversationId(conversationId);
           if(res && res.length > 0){
-            const conversationsList = transform.prepareConversationsList(res)
-            setConversations(conversationsList);
+            const result = transform.prepareConversationsList(res)
+            setConversations(result.conversations);
+            // Store remediation text from conversations if available
+            setConversationRemediationText(result.remediationText || null)
           }
         }
       }
@@ -292,6 +295,7 @@ function TestRunResultPage(props) {
       azureBoardsWorkItemUrl={azureBoardsWorkItemUrl}
       serviceNowTicketUrl={serviceNowTicketUrl}
       conversations={conversations}
+      conversationRemediationText={conversationRemediationText}
       showForbidden={showForbidden}
     />
     </>

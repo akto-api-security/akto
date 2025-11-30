@@ -29,7 +29,7 @@ import LegendLabel from './LegendLabel.jsx'
 function TestRunResultFlyout(props) {
 
 
-    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, conversations, showForbidden} = props
+    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, conversations, conversationRemediationText, showForbidden} = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
@@ -127,12 +127,17 @@ function TestRunResultFlyout(props) {
     }
 
     useEffect(() => {
-        if (!remediationSrc) {
-            fetchRemediationInfo("tests-library-master/remediation/"+selectedTestRunResult.testCategoryId+".md")
-        } else {
+        if (remediationSrc) {
+            // Priority 1: Use remediation from backend/subCategoryMap
             setRemediationText(remediationSrc)
+        } else if (conversationRemediationText) {
+            // Priority 2: Use remediation text extracted from conversations
+            setRemediationText(conversationRemediationText)
+        } else {
+            // Priority 3: Fall back to fetching from file
+            fetchRemediationInfo("tests-library-master/remediation/"+selectedTestRunResult.testCategoryId+".md")
         }
-    }, [selectedTestRunResult.testCategoryId, remediationSrc])
+    }, [selectedTestRunResult.testCategoryId, remediationSrc, conversationRemediationText, fetchRemediationInfo])
 
 
     function ignoreAction(ignoreReason){
@@ -202,7 +207,7 @@ function TestRunResultFlyout(props) {
             try {
                 customABWorkItemFieldsPayload = issuesFunctions.prepareCustomABWorkItemFieldsPayload(projectId, workItemType);
             } catch (error) {
-                setToast(true, true, "Please fill all required fields before creating a Azure boards work item.");
+                func.setToast(true, true, "Please fill all required fields before creating a Azure boards work item.");
                 return;
             }
             
@@ -274,6 +279,10 @@ function TestRunResultFlyout(props) {
         window.open(navUrl, "_blank")
     }
 
+    const owaspData = func.categoryMapping[selectedTestRunResult?.testCategory] || {};
+    const owaspMapping = owaspData.label || "";
+    const owaspUrl = owaspData.url || "";
+
     function ActionsComp (){
         const issuesActions = issueDetails?.testRunIssueStatus === "IGNORED" ? [...issues, ...reopen] : issues
         return(
@@ -308,12 +317,20 @@ function TestRunResultFlyout(props) {
                 <VerticalStack gap={"2"}>
                     <Box width="100%">
                         <div style={{display: 'flex', gap: '4px', marginBottom: '4px'}} className='test-title'>
-                            <Button removeUnderline plain monochrome onClick={() => openTest()}>
-                                <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
-                            </Button>
-                            {(severity && severity?.length > 0) ? (issueDetails?.testRunIssueStatus === 'IGNORED' ? <Badge size='small'>Ignored</Badge> : <Box className={`badge-wrapper-${severity.toUpperCase()}`}><Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge></Box>) : null}
+                        <VerticalStack gap={1}>
+                            <HorizontalStack gap={1}>
+                                <Button removeUnderline plain monochrome onClick={() => openTest()}>
+                                    <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
+                                </Button>
+                                {(severity && severity?.length > 0) ? (issueDetails?.testRunIssueStatus === 'IGNORED' ? <Badge size='small'>Ignored</Badge> : <Box className={`badge-wrapper-${severity.toUpperCase()}`}><Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge></Box>) : null}
+                            </HorizontalStack>      
+                                {owaspMapping.length > 0 ? (
+                                    <Link onClick={() => owaspUrl && window.open(owaspUrl, '_blank')}>
+                                        <Badge size="small">OWASP Top 10 | {owaspMapping}</Badge>
+                                    </Link>
+                                ): null}  
+                        </VerticalStack> 
                         </div>
-
                         {
                             isEditingDescription ? (
                                 <InlineEditableText
@@ -326,11 +343,11 @@ function TestRunResultFlyout(props) {
                                 />
                             ) : (
                                 !description ? (
-                                    <Button plain removeUnderline onClick={() => setIsEditingDescription(true)}>
+                                    <Button plain removeUnderline textAlign="left" onClick={() => setIsEditingDescription(true)}>
                                         Add description
                                     </Button>
                                 ) : (
-                                    <Button plain removeUnderline onClick={() => setIsEditingDescription(true)}>
+                                    <Button plain removeUnderline textAlign="left" onClick={() => setIsEditingDescription(true)}>
                                         <Text as="span" variant="bodyMd" color="subdued" alignment="start">
                                             {description}
                                         </Text>
@@ -344,6 +361,7 @@ function TestRunResultFlyout(props) {
                         <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
                         <Text color="subdued" variant="bodySm">{selectedTestRunResult?.testCategory}</Text>
                     </HorizontalStack>
+                        
                     <ApiGroups collectionIds={apiInfo?.collectionIds} />
                 </VerticalStack>
                 <HorizontalStack gap={2} wrap={false}>
