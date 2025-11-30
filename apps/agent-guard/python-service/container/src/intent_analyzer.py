@@ -408,22 +408,23 @@ class IntentAnalyzer:
         """
         risk_score = 0.0
 
-        # 1. Pattern matching signals (0-0.3 points)
-        pattern_risk = min(len(fast_signals["matched_patterns"]) * 0.05, 0.3)
+        # 1. Pattern matching signals (0-0.4 points) - INCREASED from 0.3
+        # Each pattern is a strong signal, weight more heavily
+        pattern_risk = min(len(fast_signals["matched_patterns"]) * 0.1, 0.4)
         risk_score += pattern_risk
 
-        # 2. Urgency signals (0-0.1 point)
-        urgency_risk = fast_signals["urgency_score"] * 0.1
+        # 2. Urgency signals (0-0.15 points) - INCREASED from 0.1
+        urgency_risk = fast_signals["urgency_score"] * 0.15
         risk_score += urgency_risk
 
-        # 3. Sentiment signals (0-0.2 points)
+        # 3. Sentiment signals (0-0.25 points) - INCREASED from 0.2
         # Negative sentiment can indicate hostile intent
         if sentiment_score < -0.5:
-            risk_score += 0.2
+            risk_score += 0.25
         elif sentiment_score < -0.2:
-            risk_score += 0.1
+            risk_score += 0.15
 
-        # 4. Semantic intent signals (0-0.4 points)
+        # 4. Semantic intent signals (0-0.5 points) - INCREASED from 0.4
         high_risk_intents = [
             IntentCategory.EXECUTE_COMMAND.value,
             IntentCategory.PRIVILEGE_ESCALATION.value,
@@ -435,19 +436,24 @@ class IntentAnalyzer:
 
         if intent in high_risk_intents:
             # High risk intent weighted by confidence
-            risk_score += 0.4 * intent_confidence
+            risk_score += 0.5 * intent_confidence
         elif intent == IntentCategory.BULK_OPERATION.value:
-            risk_score += 0.2 * intent_confidence
+            risk_score += 0.25 * intent_confidence
         elif intent == IntentCategory.LEGITIMATE_QUERY.value:
             # Reduce risk for legitimate queries
             risk_score -= 0.1 * intent_confidence
+        
+        # 5. Pattern + High-Risk Intent Combination Bonus (0-0.1 points)
+        # If we have both pattern matches AND high-risk intent, add bonus
+        if len(fast_signals["matched_patterns"]) >= 1 and intent in high_risk_intents:
+            risk_score += 0.1
 
-        # 5. Legitimacy mitigation (0 to -0.2 points)
+        # 6. Legitimacy mitigation (0 to -0.2 points)
         # Legitimate business language reduces risk
         legitimacy_mitigation = fast_signals["legitimacy_score"] * 0.2
         risk_score -= legitimacy_mitigation
 
-        # 6. User context adjustments (optional)
+        # 7. User context adjustments (optional)
         if user_context:
             # If user has elevated role, slightly reduce risk
             if user_context.get("role") in ["admin", "manager"]:
@@ -535,7 +541,7 @@ class IntentAnalyzer:
             elif "data_exfiltration" in categories:
                 intent = IntentCategory.DATA_EXFILTRATION.value
             else:
-                intent = IntentCategory.CODE_INJECTION.value
+                intent = IntentCategory.EXECUTE_COMMAND.value
 
             # Calculate high risk score based on pattern count
             risk_score = 0.85 + (len(fast_signals["matched_patterns"]) * 0.03)
@@ -573,7 +579,7 @@ class IntentAnalyzer:
             elif "data_exfiltration" in categories:
                 intent = IntentCategory.DATA_EXFILTRATION.value
             else:
-                intent = IntentCategory.CODE_INJECTION.value
+                intent = IntentCategory.EXECUTE_COMMAND.value
 
             # High risk score (patterns + sentiment + urgency)
             risk_score = 0.6  # Base for 2+ patterns + negative sentiment
