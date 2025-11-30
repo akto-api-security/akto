@@ -1342,6 +1342,8 @@ getMissingConfigs(testResults){
   },
   prepareConversationsList(agentConversationResults){
     let conversationsListCopy = []
+    let extractedRemediationText = ''
+    
     agentConversationResults.forEach(conversation => {
         let commonObj = {
             creationTimestamp: conversation.timestamp,
@@ -1350,17 +1352,38 @@ getMissingConfigs(testResults){
         conversationsListCopy.push({
             ...commonObj,
             _id: "user_" + conversation.prompt,
-            message: conversation.prompt,
+            message: conversation?.finalSentPrompt || conversation.prompt,
             role: "user"
         })
+        
+        // Check if response contains "## ROOT CAUSE ANALYSIS"
+        let systemMessage = conversation.response
+        extractedRemediationText = conversation.remediationMessage || "";
+        
+        if (systemMessage && typeof systemMessage === 'string') {
+            const rootCauseIndex = systemMessage.indexOf('ROOT CAUSE ANALYSIS')
+            if (rootCauseIndex !== -1) {
+                // Extract remediation text (from "## ROOT CAUSE ANALYSIS" to the end)
+                if (!extractedRemediationText) {
+                    extractedRemediationText = systemMessage.substring(rootCauseIndex)
+                }
+                // Keep only the part before "## ROOT CAUSE ANALYSIS" for the conversation
+                systemMessage = systemMessage.substring(0, rootCauseIndex).trim()
+            }
+        }
+        
         conversationsListCopy.push({
             ...commonObj,
             _id: "system_" + conversation.response,
-            message: conversation.response,
+            message: systemMessage,
             role: "system"
         })
     })
-    return conversationsListCopy;
+    
+    return {
+        conversations: conversationsListCopy,
+        remediationText: extractedRemediationText
+    }
   }
 }
 
