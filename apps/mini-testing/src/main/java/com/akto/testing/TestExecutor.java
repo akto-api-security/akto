@@ -56,6 +56,7 @@ import static com.akto.testing.Utils.writeJsonContentInFile;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
+import static com.akto.testing.Utils.generateFailedRunResultForMessage;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -120,11 +121,13 @@ public class TestExecutor {
             List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
             if (messages == null || messages.isEmpty()) {
                 countDownLatch(latch);
+                createAndSaveSampleNotFoundResultForOneTestSubcategory(apiInfoKey, testingRun.getId(), summaryId, testingRunSubCategories, null, testConfigMap);
                 continue;
             }
             String sample = messages.get(messages.size() - 1);
             if(sample == null || sample.isEmpty()){
                 countDownLatch(latch);
+                createAndSaveSampleNotFoundResultForOneTestSubcategory(apiInfoKey, testingRun.getId(), summaryId, testingRunSubCategories, null, testConfigMap);
                 continue;
             }
             if(sample.contains("originalRequestPayload")){
@@ -401,11 +404,13 @@ public class TestExecutor {
                 List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
                 if (messages == null || messages.isEmpty()) {
                     countDownLatch(latch);
+                    createAndSaveSampleNotFoundResultForOneTestSubcategory(apiInfoKey, testingRun.getId(), summaryId, testingRunSubCategories, apiInfoKeySubcategoryMap, testConfigMap);
                     continue;
                 }
                 String sample = messages.get(messages.size() - 1);
                 if(sample == null || sample.isEmpty()){
                     countDownLatch(latch);
+                    createAndSaveSampleNotFoundResultForOneTestSubcategory(apiInfoKey, testingRun.getId(), summaryId, testingRunSubCategories, apiInfoKeySubcategoryMap, testConfigMap);
                     continue;
                 }
                 if(sample.contains("originalRequestPayload")){
@@ -504,6 +509,35 @@ public class TestExecutor {
         }
     }
 
+    private void createAndSaveSampleNotFoundResultForOneTestSubcategory(ApiInfoKey apiInfoKey, ObjectId testingRunId,
+            ObjectId testingRunResultSummaryId, List<String> testingRunSubCategories,
+            Map<ApiInfoKey, List<String>> apiInfoKeySubcategoryMap, Map<String, TestConfig> testConfigMap) {
+        try {
+            for (String testSubCategory : testingRunSubCategories) {
+                if (apiInfoKeySubcategoryMap == null
+                        || apiInfoKeySubcategoryMap.get(apiInfoKey).contains(testSubCategory)) {
+                    TestConfig testConfig = testConfigMap.get(testSubCategory);
+                    if (testConfig != null) {
+                        // save for one test subcategory if no sample is found
+                        // since the same result will be saved for all test subcategories
+                        String testSuperType = testConfig.getInfo().getCategory().getName();
+                        String testSubType = testConfig.getInfo().getSubCategory();
+                        TestingRunResult runResult = generateFailedRunResultForMessage(
+                                testingRunId, apiInfoKey, testSuperType, testSubType,
+                                testingRunResultSummaryId, new ArrayList<>(), TestError.NO_PATH.getMessage());
+                        this.insertResultsAndMakeIssues(Collections.singletonList(runResult),
+                                testingRunResultSummaryId);
+                        break;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e,
+                    "Error while creating and saving sample not found result for one test subcategory: "
+                            + e.getMessage());
+        }
+    }
+
     public static void updateTestSummary(ObjectId summaryId){
         loggerMaker.infoAndAddToDb("Finished updating results count");
 
@@ -554,13 +588,15 @@ public class TestExecutor {
         if(shouldCallClientLayerForSampleData){
             try {
                 message = clientLayer.fetchLatestSample(apiInfoKey);
-                if (!message.contains("requestPayload") && privateKey != null) {
+                if(message == null){
+                    loggerMaker.infoAndAddToDb("No fetchLatestSample response found for " + apiInfoKey.toString() + " from testing db layer in findOriginalHttpRequest");
+                }else if (!message.contains("requestPayload") && privateKey != null) {
                     message = PayloadEncodeUtil.decryptPacked(message, privateKey);
                 }
             } catch (JWTVerificationException e) {
                 loggerMaker.errorAndAddToDb(e, "Error while decoding encoded payload in findOriginalHttpRequest: " + e.getMessage());
             } catch (Exception e) {
-                return null;
+                loggerMaker.errorAndAddToDb(e, "Error while fetching sample from testing db layer in findOriginalHttpRequest: " + e.getMessage());
             }
             if (message == null) {
                 return null;
@@ -985,12 +1021,15 @@ public class TestExecutor {
                 
                 try {
                     msg = clientLayer.fetchLatestSample(apiInfoKey);
-                    if (!msg.contains("requestPayload") && privateKey != null) {
-                        msg = PayloadEncodeUtil.decryptPacked(msg, privateKey);
+                    if(msg == null){
+                        loggerMaker.infoAndAddToDb("No fetchLatestSample response found for " + apiInfoKey.toString() + " from testing db layer in runTestNew");
+                    }else if (!msg.contains("requestPayload") && privateKey != null) {
+                            msg = PayloadEncodeUtil.decryptPacked(msg, privateKey);
                     }
                 } catch (JWTVerificationException e) {
                     loggerMaker.errorAndAddToDb(e, "Error while decoding encoded payload in runTestNew: " + e.getMessage());
                 } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error while fetching sample from testing db layer in runTestNew: " + e.getMessage());
                 }
                 if (msg != null) {
                     rawApi = RawApi.buildFromMessage(msg, true);
@@ -998,6 +1037,7 @@ public class TestExecutor {
                 AllMetrics.instance.setSampleDataFetchLatency(System.currentTimeMillis() - start);
             } catch (Exception e) {
                 e.printStackTrace();
+                loggerMaker.errorAndAddToDb(e, "Error while fetchLatestSample in runTestNew: " + e.getMessage());
             }
         }
         int startTime = Context.now();
