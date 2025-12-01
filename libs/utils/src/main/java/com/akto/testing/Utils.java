@@ -581,6 +581,9 @@ public class Utils {
         if(shouldCallClientLayerForSampleData){
             try {
                 msg = clientLayer.fetchLatestSample(apiInfoKey);
+                if(msg == null){
+                    loggerMaker.infoAndAddToDb("No fetchLatestSample response found for " + apiInfoKey.toString() + " from testing db layer in generateFailedRunResultForMessage");
+                }
             } catch (Exception e) {
             }   
         }

@@ -22,7 +22,7 @@ import java.util.*;
 public class SampleMessageStore {
 
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(SampleMessageStore.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(SampleMessageStore.class, LogDb.TESTING);
     private Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
     private Map<String, SingleTypeInfo> singleTypeInfos = new HashMap<>();
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
@@ -96,20 +96,24 @@ public class SampleMessageStore {
             if(System.getenv("TESTING_DB_LAYER_SERVICE_URL") != null && !System.getenv("TESTING_DB_LAYER_SERVICE_URL").isEmpty()){
                 try {
                     encodedSamples = clientLayer.fetchSamples(apiInfoKey);
-                    for (String sample: encodedSamples) {
-                        if (!sample.contains("requestPayload") && privateKey != null) {
-                            try {
-                                samples.add(PayloadEncodeUtil.decryptPacked(sample, privateKey));
-                            } catch (Exception e) {
-                                loggerMaker.errorAndAddToDb("error while decoding payload " + e.getMessage());
+                    if(encodedSamples == null || encodedSamples.isEmpty()){
+                        loggerMaker.infoAndAddToDb("No samples found for " + apiInfoKey.toString() + " from testing db layer in fetchAllOriginalMessages");
+                    } else {
+                        for (String sample: encodedSamples) {
+                            if (!sample.contains("requestPayload") && privateKey != null) {
+                                try {
+                                    samples.add(PayloadEncodeUtil.decryptPacked(sample, privateKey));
+                                } catch (Exception e) {
+                                    loggerMaker.errorAndAddToDb("error while decoding payload " + e.getMessage());
+                                }
+                            } else {
+                                samples.add(sample);
                             }
-                        } else {
-                            samples.add(sample);
                         }
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
-                    System.out.println("error in fetchAllOriginalMessages " + e.getMessage());
+                    loggerMaker.errorAndAddToDb(e, "error in fetchAllOriginalMessages " + e.getMessage());
                 }
             }
             
@@ -130,8 +134,7 @@ public class SampleMessageStore {
                     try {
                         messages.add(RawApi.buildFromMessage(message, true));
                     } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb("Error while building RawAPI for " + apiInfoKey + " : " + e,
-                                LogDb.TESTING);
+                        loggerMaker.errorAndAddToDb(e, "Error while building RawAPI for " + apiInfoKey.toString() + " : " + e.getMessage());
                     }
                 }
             }
