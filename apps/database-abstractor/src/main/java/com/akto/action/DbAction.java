@@ -2961,6 +2961,29 @@ public class DbAction extends ActionSupport {
         }
         return Action.SUCCESS.toUpperCase();
     }
+
+    List<AgentTrafficLog> writesForAgentTrafficLogs;
+
+    public List<AgentTrafficLog> getWritesForAgentTrafficLogs() {
+        return writesForAgentTrafficLogs;
+    }
+
+    public void setWritesForAgentTrafficLogs(List<AgentTrafficLog> writesForAgentTrafficLogs) {
+        this.writesForAgentTrafficLogs = writesForAgentTrafficLogs;
+    }
+
+    public String bulkWriteAgentTrafficLogs() {
+        try {
+            if (writesForAgentTrafficLogs != null && !writesForAgentTrafficLogs.isEmpty()) {
+                loggerMaker.infoAndAddToDb("bulkWriteAgentTrafficLogs called with " + writesForAgentTrafficLogs.size() + " logs");
+                DbLayer.bulkWriteAgentTrafficLogs(writesForAgentTrafficLogs);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in bulkWriteAgentTrafficLogs " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
     
     public String storeMcpReconResultsBatch() {
         try {
