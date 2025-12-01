@@ -171,8 +171,19 @@ public class AgentClient {
             if (jsonNode.has("validation")) {
                 validation = jsonNode.get("validation").asBoolean() || false;
             }
+            String validationMessage = null;
+            String remediationMessage = null;
+            if(validation) {
+                validationMessage = jsonNode.get("validationMessage").asText();
+                remediationMessage = jsonNode.get("remediationMessage").asText();
+            }
+
+            String finalSentPrompt = null;
+            if(jsonNode.has("finalSentPrompt")) {
+                finalSentPrompt = jsonNode.get("finalSentPrompt").asText();
+            }
             
-            return new AgentConversationResult(conversationId, originalPrompt, response, conversation, timestamp, validation);
+            return new AgentConversationResult(conversationId, originalPrompt, response, conversation, timestamp, validation, validationMessage, finalSentPrompt, remediationMessage);
             
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error parsing agent response: " + e.getMessage() + ", response body: " + responseBody, LogDb.TESTING);

@@ -29,7 +29,7 @@ import LegendLabel from './LegendLabel.jsx'
 function TestRunResultFlyout(props) {
 
 
-    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, conversations, showForbidden} = props
+    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, conversations, conversationRemediationText, showForbidden} = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
@@ -127,12 +127,17 @@ function TestRunResultFlyout(props) {
     }
 
     useEffect(() => {
-        if (!remediationSrc) {
-            fetchRemediationInfo("tests-library-master/remediation/"+selectedTestRunResult.testCategoryId+".md")
-        } else {
+        if (remediationSrc) {
+            // Priority 1: Use remediation from backend/subCategoryMap
             setRemediationText(remediationSrc)
+        } else if (conversationRemediationText) {
+            // Priority 2: Use remediation text extracted from conversations
+            setRemediationText(conversationRemediationText)
+        } else {
+            // Priority 3: Fall back to fetching from file
+            fetchRemediationInfo("tests-library-master/remediation/"+selectedTestRunResult.testCategoryId+".md")
         }
-    }, [selectedTestRunResult.testCategoryId, remediationSrc])
+    }, [selectedTestRunResult.testCategoryId, remediationSrc, conversationRemediationText, fetchRemediationInfo])
 
 
     function ignoreAction(ignoreReason){
@@ -202,7 +207,7 @@ function TestRunResultFlyout(props) {
             try {
                 customABWorkItemFieldsPayload = issuesFunctions.prepareCustomABWorkItemFieldsPayload(projectId, workItemType);
             } catch (error) {
-                setToast(true, true, "Please fill all required fields before creating a Azure boards work item.");
+                func.setToast(true, true, "Please fill all required fields before creating a Azure boards work item.");
                 return;
             }
             
