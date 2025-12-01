@@ -35,16 +35,17 @@ import com.akto.util.LastCronRunInfo;
 import com.akto.utils.RiskScoreOfCollections;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import org.json.JSONObject;
 import org.json.JSONArray;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.akto.task.Cluster.callDibs;
 
@@ -159,29 +160,30 @@ public class SyncCron {
 
     private void updateMaliciousMcpServerTags() {
         try {
-            // Get all MCP collections
+            // Get all MCP collections with only required fields (ID and tagsList)
             List<ApiCollection> allCollections = ApiCollectionsDao.instance.findAll(
                 Filters.elemMatch(ApiCollection.TAGS_STRING, 
-                    Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG))
+                    Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
+                Projections.include(ApiCollection.ID, ApiCollection.TAGS_STRING, ApiCollection.MCP_MALICIOUSNESS_LAST_CHECK)
             );
 
             if (allCollections == null || allCollections.isEmpty()) {
                 return;
             }
 
-            // Get all collection IDs that are MCP collections
-            Set<Integer> mcpCollectionIds = new HashSet<>();
-            Map<Integer, ApiCollection> collectionMap = new HashMap<>();
-            for (ApiCollection collection : allCollections) {
-                if (collection.isMcpCollection()) {
-                    mcpCollectionIds.add(collection.getId());
-                    collectionMap.put(collection.getId(), collection);
-                }
-            }
-
-            if (mcpCollectionIds.isEmpty()) {
-                return;
-            }
+            // Get all collection IDs and create collection map using streams
+            Set<Integer> mcpCollectionIds = allCollections.stream()
+                .filter(ApiCollection::isMcpCollection)
+                .map(ApiCollection::getId)
+                .collect(Collectors.toSet());
+            
+            Map<Integer, ApiCollection> collectionMap = allCollections.stream()
+                .filter(ApiCollection::isMcpCollection)
+                .collect(Collectors.toMap(
+                    ApiCollection::getId,
+                    collection -> collection,
+                    (existing, replacement) -> existing
+                ));
 
             // Analyze tools for each MCP collection (only if tools have changed)
             Set<Integer> maliciousCollections = new HashSet<>();
