@@ -402,8 +402,6 @@ public class InventoryAction extends UserAction {
         }
         response = new BasicDBObject();
         response.put("apiInfoList", apiInfos);
-
-
         if(apiCollectionId != -1){
             ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId));
             if (apiCollection != null) {
