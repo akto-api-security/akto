@@ -402,6 +402,29 @@ public class InventoryAction extends UserAction {
         }
         response = new BasicDBObject();
         response.put("apiInfoList", apiInfos);
+
+        // Add auth type enums to response
+        List<Map<String, String>> authTypeEnums = new ArrayList<>();
+        Map<String, String> labelMap = new HashMap<>();
+        labelMap.put("UNAUTHENTICATED", "Unauthenticated");
+        labelMap.put("BASIC", "Basic");
+        labelMap.put("AUTHORIZATION_HEADER", "Authorization Header");
+        labelMap.put("JWT", "JWT");
+        labelMap.put("API_TOKEN", "API Token");
+        labelMap.put("BEARER", "Bearer");
+        labelMap.put("CUSTOM", "Custom");
+        labelMap.put("API_KEY", "API Key");
+        labelMap.put("MTLS", "MTLS");
+        labelMap.put("SESSION_TOKEN", "Session Token");
+
+        for (ApiInfo.AuthType authType : ApiInfo.AuthType.values()) {
+            Map<String, String> authTypeMap = new HashMap<>();
+            authTypeMap.put("value", authType.name());
+            authTypeMap.put("label", labelMap.getOrDefault(authType.name(), authType.name()));
+            authTypeEnums.add(authTypeMap);
+        }
+        response.put("authTypeEnums", authTypeEnums);
+
         if(apiCollectionId != -1){
             ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId));
             if (apiCollection != null) {
