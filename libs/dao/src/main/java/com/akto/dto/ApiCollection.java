@@ -72,6 +72,9 @@ public class ApiCollection {
     String registryStatus;
     public static final String REGISTRY_STATUS = "registryStatus";
 
+    int mcpMaliciousnessLastCheck;
+    public static final String MCP_MALICIOUSNESS_LAST_CHECK = "mcpMaliciousnessLastCheck";
+
     private static final List<String> ENV_KEYWORDS_WITH_DOT = Arrays.asList(
         "staging", "preprod", "qa", "demo", "dev", "test", "svc", 
         "localhost", "local", "intranet", "lan", "example", "invalid", 
@@ -466,5 +469,13 @@ public class ApiCollection {
 
     public void setRegistryStatus(String registryStatus) {
         this.registryStatus = registryStatus;
+    }
+
+    public int getMcpMaliciousnessLastCheck() {
+        return mcpMaliciousnessLastCheck;
+    }
+
+    public void setMcpMaliciousnessLastCheck(int mcpMaliciousnessLastCheck) {
+        this.mcpMaliciousnessLastCheck = mcpMaliciousnessLastCheck;
     }
 }

@@ -39,8 +39,11 @@ import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import org.json.JSONObject;
 import org.json.JSONArray;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static com.akto.task.Cluster.callDibs;
@@ -168,9 +171,11 @@ public class SyncCron {
 
             // Get all collection IDs that are MCP collections
             Set<Integer> mcpCollectionIds = new HashSet<>();
+            Map<Integer, ApiCollection> collectionMap = new HashMap<>();
             for (ApiCollection collection : allCollections) {
                 if (collection.isMcpCollection()) {
                     mcpCollectionIds.add(collection.getId());
+                    collectionMap.put(collection.getId(), collection);
                 }
             }
 
@@ -178,48 +183,85 @@ public class SyncCron {
                 return;
             }
 
-            // Analyze tools for each MCP collection
+            // Analyze tools for each MCP collection (only if tools have changed)
             Set<Integer> maliciousCollections = new HashSet<>();
             McpToolMaliciousnessAnalyzer analyzer = new McpToolMaliciousnessAnalyzer();
+            int currentTime = Context.now();
             
             for (Integer collectionId : mcpCollectionIds) {
                 try {
-                    if (analyzeMcpCollectionTools(collectionId, analyzer)) {
+                    ApiCollection collection = collectionMap.get(collectionId);
+                    
+                    // Find the tools/list endpoint once for this collection
+                    ApiInfo toolsListApi = ApiInfoDao.instance.findOne(
+                        Filters.and(
+                            Filters.eq(ApiInfo.ID_API_COLLECTION_ID, collectionId),
+                            Filters.regex(ApiInfo.ID_URL, "tools/list", "i"),
+                            Filters.eq(ApiInfo.ID_METHOD, URLMethods.Method.POST.name())
+                        )
+                    );
+                    
+                    // Check if we need to analyze (tools may have changed)
+                    if (!shouldAnalyzeCollection(collection, toolsListApi)) {
+                        loggerMaker.debugAndAddToDb(String.format("Skipping collection %d - tools haven't changed since last check", collectionId), LogDb.DASHBOARD);
+                        // Keep existing malicious tag status (don't update tags for skipped collections)
+                        continue;
+                    }
+                    
+                    // Analyze tools and update last check timestamp only if analysis completes
+                    boolean isMalicious = analyzeMcpCollectionTools(collectionId, toolsListApi, analyzer);
+                    if (isMalicious) {
                         maliciousCollections.add(collectionId);
                     }
+                    
+                    // Update last check timestamp after successful analysis
+                    updateLastCheckTimestamp(collectionId, currentTime);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(String.format("Error analyzing tools for collection %d: %s", collectionId, e.getMessage()), LogDb.DASHBOARD);
+                    // Don't update timestamp on error - will retry next time
                 }
             }
 
             // Update tags for all MCP collections
             for (Integer collectionId : mcpCollectionIds) {
                 try {
-                    Bson filter = Filters.eq(ApiCollection.ID, collectionId);
-                    BasicDBObject pullQuery = new BasicDBObject(CollectionTags.KEY_NAME, Constants.AKTO_MALICIOUS_MCP_SERVER_TAG);
+                    ApiCollection collection = collectionMap.get(collectionId);
+                    if (collection == null) {
+                        continue;
+                    }
                     
+                    // Get current tags list
+                    List<CollectionTags> currentTags = collection.getTagsList();
+                    if (currentTags == null) {
+                        currentTags = new ArrayList<>();
+                    }
+                    
+                    // Create a new list without the malicious-mcp-server tag
+                    List<CollectionTags> updatedTags = new ArrayList<>();
+                    for (CollectionTags tag : currentTags) {
+                        if (!Constants.AKTO_MALICIOUS_MCP_SERVER_TAG.equals(tag.getKeyName())) {
+                            updatedTags.add(tag);
+                        }
+                    }
+                    
+                    // Add the malicious tag if collection is malicious
                     if (maliciousCollections.contains(collectionId)) {
-                        // Add tag if collection has malicious tools
                         CollectionTags maliciousTag = new CollectionTags(
                             Context.now(),
                             Constants.AKTO_MALICIOUS_MCP_SERVER_TAG,
                             "true",
                             CollectionTags.TagSource.USER
                         );
-                        
-                        Bson tagUpdate = Updates.combine(
-                            Updates.pull(ApiCollection.TAGS_STRING, pullQuery),
-                            Updates.addToSet(ApiCollection.TAGS_STRING, maliciousTag)
-                        );
-                        
-                        ApiCollectionsDao.instance.updateOne(filter, tagUpdate);
+                        updatedTags.add(maliciousTag);
                         loggerMaker.debugAndAddToDb(String.format("Added malicious-mcp-server tag to collection %d", collectionId), LogDb.DASHBOARD);
                     } else {
-                        // Remove tag if collection has no malicious tools
-                        Bson tagUpdate = Updates.pull(ApiCollection.TAGS_STRING, pullQuery);
-                        ApiCollectionsDao.instance.updateOne(filter, tagUpdate);
                         loggerMaker.debugAndAddToDb(String.format("Removed malicious-mcp-server tag from collection %d", collectionId), LogDb.DASHBOARD);
                     }
+                    
+                    // Replace entire tags array with a single update operation
+                    Bson filter = Filters.eq(ApiCollection.ID, collectionId);
+                    Bson update = Updates.set(ApiCollection.TAGS_STRING, updatedTags);
+                    ApiCollectionsDao.instance.updateOne(filter, update);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(String.format("Error updating malicious-mcp-server tag for collection %d: %s", collectionId, e.getMessage()), LogDb.DASHBOARD);
                 }
@@ -229,17 +271,48 @@ public class SyncCron {
         }
     }
 
-    private boolean analyzeMcpCollectionTools(int collectionId, McpToolMaliciousnessAnalyzer analyzer) {
+    private boolean shouldAnalyzeCollection(ApiCollection collection, ApiInfo toolsListApi) {
         try {
-            // Find the tools/list endpoint for this collection
-            ApiInfo toolsListApi = ApiInfoDao.instance.findOne(
-                Filters.and(
-                    Filters.eq(ApiInfo.ID_API_COLLECTION_ID, collectionId),
-                    Filters.regex(ApiInfo.ID_URL, "tools/list", "i"),
-                    Filters.eq(ApiInfo.ID_METHOD, URLMethods.Method.POST.name())
-                )
-            );
+            if (toolsListApi == null) {
+                // If tools/list doesn't exist, we should check (first time)
+                return true;
+            }
 
+            int toolsListLastSeen = toolsListApi.getLastSeen();
+            if (toolsListLastSeen == 0) {
+                // If lastSeen is 0, we should check
+                return true;
+            }
+
+            // Get last check timestamp from ApiCollection field
+            int lastCheckTimestamp = collection.getMcpMaliciousnessLastCheck();
+
+            // If we haven't checked before, or if tools/list has been seen after our last check, analyze
+            if (lastCheckTimestamp == 0 || toolsListLastSeen > lastCheckTimestamp) {
+                return true;
+            }
+
+            return false;
+        } catch (Exception e) {
+            loggerMaker.debugAndAddToDb(String.format("Error checking if collection %d should be analyzed: %s", collection.getId(), e.getMessage()), LogDb.DASHBOARD);
+            // On error, default to checking
+            return true;
+        }
+    }
+
+    private void updateLastCheckTimestamp(int collectionId, int timestamp) {
+        try {
+            Bson filter = Filters.eq(ApiCollection.ID, collectionId);
+            Bson update = Updates.set(ApiCollection.MCP_MALICIOUSNESS_LAST_CHECK, timestamp);
+            
+            ApiCollectionsDao.instance.updateOne(filter, update);
+        } catch (Exception e) {
+            loggerMaker.debugAndAddToDb(String.format("Error updating last check timestamp for collection %d: %s", collectionId, e.getMessage()), LogDb.DASHBOARD);
+        }
+    }
+
+    private boolean analyzeMcpCollectionTools(int collectionId, ApiInfo toolsListApi, McpToolMaliciousnessAnalyzer analyzer) {
+        try {
             if (toolsListApi == null) {
                 loggerMaker.debugAndAddToDb(String.format("tools/list endpoint not found for collection %d", collectionId), LogDb.DASHBOARD);
                 return false;
