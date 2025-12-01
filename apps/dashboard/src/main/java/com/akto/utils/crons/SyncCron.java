@@ -24,7 +24,9 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.gpt.handlers.gpt_prompts.McpToolMaliciousnessAnalyzer;
+import com.akto.dto.HttpResponseParams;
 import com.akto.mcp.McpRequestResponseUtils;
+import com.akto.parsers.HttpCallParser;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -337,45 +339,19 @@ public class SyncCron {
 
             // Parse the first sample to get tools/list response
             String sampleJson = sampleData.getSamples().get(0);
-            JSONObject sampleMessage = new JSONObject(sampleJson);
+            
+            // Use parseKafkaMessage to extract request/response data
+            HttpResponseParams httpResponseParams;
+            try {
+                httpResponseParams = HttpCallParser.parseKafkaMessage(sampleJson);
+            } catch (Exception e) {
+                loggerMaker.debugAndAddToDb(String.format("Error parsing sample data for collection %d: %s", collectionId, e.getMessage()), LogDb.DASHBOARD);
+                return false;
+            }
             
             // Extract response payload and content type
-            String responsePayload = null;
-            String contentType = null;
-            
-            if (sampleMessage.has("responsePayload")) {
-                Object payloadObj = sampleMessage.get("responsePayload");
-                if (payloadObj instanceof String) {
-                    responsePayload = (String) payloadObj;
-                } else if (payloadObj instanceof JSONObject) {
-                    responsePayload = payloadObj.toString();
-                }
-            } else if (sampleMessage.has("response")) {
-                JSONObject responseObj = sampleMessage.getJSONObject("response");
-                if (responseObj.has("body")) {
-                    Object bodyObj = responseObj.get("body");
-                    if (bodyObj instanceof String) {
-                        responsePayload = (String) bodyObj;
-                    } else if (bodyObj instanceof JSONObject) {
-                        responsePayload = bodyObj.toString();
-                    }
-                }
-            }
-
-            // Extract content type from response headers
-            if (sampleMessage.has("responseHeaders")) {
-                Object headersObj = sampleMessage.get("responseHeaders");
-                if (headersObj instanceof String) {
-                    try {
-                        JSONObject headers = new JSONObject((String) headersObj);
-                        contentType = headers.optString(HttpRequestResponseUtils.CONTENT_TYPE.toLowerCase(), null);
-                    } catch (Exception e) {
-                        // Ignore parsing error
-                    }
-                } else if (headersObj instanceof JSONObject) {
-                    contentType = ((JSONObject) headersObj).optString(HttpRequestResponseUtils.CONTENT_TYPE.toLowerCase(), null);
-                }
-            }
+            String responsePayload = httpResponseParams.getPayload();
+            String contentType = HttpRequestResponseUtils.getHeaderValue(httpResponseParams.getHeaders(), HttpRequestResponseUtils.CONTENT_TYPE);
 
             if (responsePayload == null || responsePayload.isEmpty()) {
                 loggerMaker.debugAndAddToDb(String.format("No response payload found in sample data for collection %d", collectionId), LogDb.DASHBOARD);
