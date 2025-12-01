@@ -11,30 +11,32 @@ import com.akto.action.observe.InventoryAction;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ActivitiesDao;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.ApiInfoDao;
+import com.akto.dao.SampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.Account;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.traffic.CollectionTags;
-import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
+import com.akto.gpt.handlers.gpt_prompts.McpToolMaliciousnessAnalyzer;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.task.Cluster;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.LastCronRunInfo;
-import com.akto.util.enums.GlobalEnums.Severity;
-import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.akto.utils.RiskScoreOfCollections;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
-import java.util.ArrayList;
+import org.json.JSONObject;
+import org.json.JSONArray;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -109,7 +111,7 @@ public class SyncCron {
                                 updateRiskScore.updateSeverityScoreInApiInfo(startTsSeverity);
                             }
 
-                            // Update malicious-mcp-server tags based on HIGH severity OPEN issues
+                            // Update malicious-mcp-server tags based on tool analysis (malicious names, descriptions, name-description mismatches)
                             updateMaliciousMcpServerTags();
 
                             AccountSettingsDao.instance.getMCollection().updateOne(
@@ -150,28 +152,19 @@ public class SyncCron {
                 return;
             }
 
-            // Find MCP collections with OPEN HIGH severity issues
-            List<Bson> pipeline = new ArrayList<>();
-            pipeline.add(Aggregates.match(Filters.and(
-                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN),
-                Filters.eq(TestingRunIssues.KEY_SEVERITY, Severity.HIGH),
-                Filters.in(TestingRunIssues.ID_API_COLLECTION_ID, mcpCollectionIds)
-            )));
+            // Analyze tools for each MCP collection
+            Set<Integer> maliciousCollections = new HashSet<>();
+            McpToolMaliciousnessAnalyzer analyzer = new McpToolMaliciousnessAnalyzer();
             
-            // Group by collection ID to get unique collection IDs with HIGH severity issues
-            BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$" + TestingRunIssues.ID_API_COLLECTION_ID);
-            pipeline.add(Aggregates.group(groupedId));
-
-            Set<Integer> collectionsWithHighSeverityIssues = new HashSet<>();
-            TestingRunIssuesDao.instance.getMCollection()
-                .aggregate(pipeline, BasicDBObject.class)
-                .forEach(doc -> {
-                    BasicDBObject id = (BasicDBObject) doc.get("_id");
-                    if (id != null) {
-                        int collectionId = id.getInt("apiCollectionId");
-                        collectionsWithHighSeverityIssues.add(collectionId);
+            for (Integer collectionId : mcpCollectionIds) {
+                try {
+                    if (analyzeMcpCollectionTools(collectionId, analyzer)) {
+                        maliciousCollections.add(collectionId);
                     }
-                });
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(String.format("Error analyzing tools for collection %d: %s", collectionId, e.getMessage()), LogDb.DASHBOARD);
+                }
+            }
 
             // Update tags for all MCP collections
             for (Integer collectionId : mcpCollectionIds) {
@@ -179,8 +172,8 @@ public class SyncCron {
                     Bson filter = Filters.eq(ApiCollection.ID, collectionId);
                     BasicDBObject pullQuery = new BasicDBObject(CollectionTags.KEY_NAME, Constants.AKTO_MALICIOUS_MCP_SERVER_TAG);
                     
-                    if (collectionsWithHighSeverityIssues.contains(collectionId)) {
-                        // Add tag if collection has HIGH severity OPEN issues
+                    if (maliciousCollections.contains(collectionId)) {
+                        // Add tag if collection has malicious tools
                         CollectionTags maliciousTag = new CollectionTags(
                             Context.now(),
                             Constants.AKTO_MALICIOUS_MCP_SERVER_TAG,
@@ -196,7 +189,7 @@ public class SyncCron {
                         ApiCollectionsDao.instance.updateOne(filter, tagUpdate);
                         loggerMaker.debugAndAddToDb(String.format("Added malicious-mcp-server tag to collection %d", collectionId), LogDb.DASHBOARD);
                     } else {
-                        // Remove tag if collection has no HIGH severity OPEN issues
+                        // Remove tag if collection has no malicious tools
                         Bson tagUpdate = Updates.pull(ApiCollection.TAGS_STRING, pullQuery);
                         ApiCollectionsDao.instance.updateOne(filter, tagUpdate);
                         loggerMaker.debugAndAddToDb(String.format("Removed malicious-mcp-server tag from collection %d", collectionId), LogDb.DASHBOARD);
@@ -207,6 +200,109 @@ public class SyncCron {
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error in updateMaliciousMcpServerTags: " + e.getMessage(), LogDb.DASHBOARD);
+        }
+    }
+
+    private boolean analyzeMcpCollectionTools(int collectionId, McpToolMaliciousnessAnalyzer analyzer) {
+        try {
+            // Find the tools/list endpoint for this collection
+            ApiInfo toolsListApi = ApiInfoDao.instance.findOne(
+                Filters.and(
+                    Filters.eq(ApiInfo.ID_API_COLLECTION_ID, collectionId),
+                    Filters.regex(ApiInfo.ID_URL, "tools/list", "i"),
+                    Filters.eq(ApiInfo.ID_METHOD, URLMethods.Method.POST.name())
+                )
+            );
+
+            if (toolsListApi == null) {
+                loggerMaker.debugAndAddToDb(String.format("tools/list endpoint not found for collection %d", collectionId), LogDb.DASHBOARD);
+                return false;
+            }
+
+            // Get sample data for tools/list endpoint
+            SampleData sampleData = SampleDataDao.instance.fetchSampleDataForApi(
+                collectionId,
+                toolsListApi.getId().getUrl(),
+                toolsListApi.getId().getMethod()
+            );
+
+            if (sampleData == null || sampleData.getSamples() == null || sampleData.getSamples().isEmpty()) {
+                loggerMaker.debugAndAddToDb(String.format("No sample data found for tools/list in collection %d", collectionId), LogDb.DASHBOARD);
+                return false;
+            }
+
+            // Parse the first sample to get tools/list response
+            String sampleJson = sampleData.getSamples().get(0);
+            JSONObject sampleMessage = new JSONObject(sampleJson);
+            
+            // Extract response payload
+            String responsePayload = null;
+            if (sampleMessage.has("responsePayload")) {
+                Object payloadObj = sampleMessage.get("responsePayload");
+                if (payloadObj instanceof String) {
+                    responsePayload = (String) payloadObj;
+                } else if (payloadObj instanceof JSONObject) {
+                    responsePayload = payloadObj.toString();
+                }
+            } else if (sampleMessage.has("response") && sampleMessage.getJSONObject("response").has("body")) {
+                Object bodyObj = sampleMessage.getJSONObject("response").get("body");
+                if (bodyObj instanceof String) {
+                    responsePayload = (String) bodyObj;
+                } else if (bodyObj instanceof JSONObject) {
+                    responsePayload = bodyObj.toString();
+                }
+            }
+
+            if (responsePayload == null || responsePayload.isEmpty()) {
+                loggerMaker.debugAndAddToDb(String.format("No response payload found in sample data for collection %d", collectionId), LogDb.DASHBOARD);
+                return false;
+            }
+
+            // Parse JSON-RPC response to get tools
+            JSONObject jsonrpcResponse = new JSONObject(responsePayload);
+            if (!jsonrpcResponse.has("result")) {
+                loggerMaker.debugAndAddToDb(String.format("Invalid JSON-RPC response format for collection %d", collectionId), LogDb.DASHBOARD);
+                return false;
+            }
+
+            JSONObject result = jsonrpcResponse.getJSONObject("result");
+            if (!result.has("tools")) {
+                loggerMaker.debugAndAddToDb(String.format("No tools found in response for collection %d", collectionId), LogDb.DASHBOARD);
+                return false;
+            }
+
+            JSONArray toolsArray = result.getJSONArray("tools");
+            
+            // Analyze each tool
+            for (int i = 0; i < toolsArray.length(); i++) {
+                JSONObject tool = toolsArray.getJSONObject(i);
+                String toolName = tool.optString("name", "");
+                String toolDescription = tool.optString("description", "");
+
+                if (toolName.isEmpty()) {
+                    continue;
+                }
+
+                // Analyze tool for maliciousness using LLM
+                BasicDBObject queryData = new BasicDBObject();
+                queryData.put(McpToolMaliciousnessAnalyzer.TOOL_NAME, toolName);
+                queryData.put(McpToolMaliciousnessAnalyzer.TOOL_DESCRIPTION, toolDescription);
+
+                BasicDBObject analysisResult = analyzer.handle(queryData);
+                
+                if (analysisResult != null && analysisResult.getBoolean("isMalicious", false)) {
+                    loggerMaker.infoAndAddToDb(String.format(
+                        "Found malicious tool in collection %d: %s. Reason: %s", 
+                        collectionId, toolName, analysisResult.getString("reason")
+                    ), LogDb.DASHBOARD);
+                    return true;
+                }
+            }
+
+            return false;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(String.format("Error analyzing MCP tools for collection %d: %s", collectionId, e.getMessage()), LogDb.DASHBOARD);
+            return false;
         }
     }
 }
