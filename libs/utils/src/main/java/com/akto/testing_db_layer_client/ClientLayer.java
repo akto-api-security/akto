@@ -1,21 +1,18 @@
 package com.akto.testing_db_layer_client;
 
-import com.akto.DaoInit;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.sql.SampleDataAlt;
 import com.akto.dto.sql.SampleDataAltCopy;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.ApiExecutor;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
-
-import org.bson.codecs.configuration.CodecRegistry;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,10 +22,9 @@ import java.util.UUID;
 
 public class ClientLayer {
 
-    private static final Logger logger = LoggerFactory.getLogger(ClientLayer.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ClientLayer.class, LogDb.TESTING);
     private static final String url = System.getenv("TESTING_DB_LAYER_SERVICE_URL");
     private static final boolean dbMergingMode = System.getenv().getOrDefault("DB_MERGING_MODE", "false").equals("true");
-    private static final CodecRegistry codecRegistry = DaoInit.createCodecRegistry();
     private static final Gson gson = new Gson();
     ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false).configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
 
@@ -43,7 +39,7 @@ public class ClientLayer {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                logger.error("non 2xx response in fetchSamples");
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchSamples");
                 return null;
             }
             BasicDBObject payloadObj;
@@ -52,11 +48,11 @@ public class ClientLayer {
                 return (List) payloadObj.get("samples");
             } catch(Exception e) {
                 e.printStackTrace();
-                logger.error("error parsing fetchSamples response" + e.getMessage());
+                loggerMaker.errorAndAddToDb(e, "error parsing fetchSamples response" + e.getMessage());
                 return null;
             }
         } catch (Exception e) {
-            logger.error("error in fetchSamples" + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "error in fetchSamples " + e.getMessage());
             return null;
         }
     }
@@ -72,7 +68,7 @@ public class ClientLayer {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                logger.error("non 2xx response in fetchLatestSample");
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchLatestSample");
                 return null;
             }
             BasicDBObject payloadObj;
@@ -81,11 +77,11 @@ public class ClientLayer {
                 return payloadObj.getString("sample");
             } catch(Exception e) {
                 e.printStackTrace();
-                logger.error("error parsing fetchLatestSample response" + e.getMessage());
+                loggerMaker.errorAndAddToDb(e, "error parsing fetchLatestSample response " + e.getMessage());
                 return null;
             }
         } catch (Exception e) {
-            logger.error("error in fetchLatestSample" + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "error in fetchLatestSample " + e.getMessage());
             return null;
         }
     }
@@ -97,7 +93,7 @@ public class ClientLayer {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                logger.error("non 2xx response in fetchTotalRecords");
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchTotalRecords");
                 return 0;
             }
             BasicDBObject payloadObj;
@@ -107,11 +103,11 @@ public class ClientLayer {
                 return cnt;
             } catch(Exception e) {
                 e.printStackTrace();
-                logger.error("error parsing fetchTotalRecords response" + e.getMessage());
+                loggerMaker.errorAndAddToDb(e, "error parsing fetchTotalRecords response " + e.getMessage());
                 return 0;
             }
         } catch (Exception e) {
-            logger.error("error in fetchTotalRecords" + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "error in fetchTotalRecords " + e.getMessage());
             return 0;
         }
     }
@@ -123,7 +119,7 @@ public class ClientLayer {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                logger.error("non 2xx response in fetchTotalSize");
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchTotalSize");
                 return 0;
             }
             BasicDBObject payloadObj;
@@ -133,11 +129,11 @@ public class ClientLayer {
                 return Long.valueOf(cnt);
             } catch(Exception e) {
                 e.printStackTrace();
-                logger.error("error parsing fetchTotalSize response" + e.getMessage());
+                loggerMaker.errorAndAddToDb(e, "error parsing fetchTotalSize response " + e.getMessage());
                 return 0;
             }
         } catch (Exception e) {
-            logger.error("error in fetchTotalSize" + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "error in fetchTotalSize " + e.getMessage());
             return 0;
         }
     }
@@ -151,7 +147,7 @@ public class ClientLayer {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                logger.error("non 2xx response in triggerPostgresCommand");
+                loggerMaker.errorAndAddToDb("non 2xx response in triggerPostgresCommand");
                 return null;
             }
             BasicDBObject payloadObj;
@@ -161,11 +157,11 @@ public class ClientLayer {
                 return respList;
             } catch(Exception e) {
                 e.printStackTrace();
-                logger.error("error parsing triggerPostgresCommand response" + e.getMessage());
+                loggerMaker.errorAndAddToDb(e, "error parsing triggerPostgresCommand response " + e.getMessage());
                 return null;
             }
         } catch (Exception e) {
-            logger.error("error in triggerPostgresCommand" + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "error in triggerPostgresCommand " + e.getMessage());
             return null;
         }
     }
@@ -184,10 +180,10 @@ public class ClientLayer {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                logger.error("non 2xx response in bulkInsertSamples");
+                loggerMaker.errorAndAddToDb("non 2xx response in bulkInsertSamples");
             }
         } catch (Exception e) {
-            logger.error("error in bulkInsertSamples" + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "error in bulkInsertSamples " + e.getMessage());
         }
     }
 
@@ -201,10 +197,10 @@ public class ClientLayer {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                logger.error("non 2xx response in updateUrl");
+                loggerMaker.errorAndAddToDb("non 2xx response in updateUrl");
             }
         } catch (Exception e) {
-            logger.error("error in updateUrl" + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "error in updateUrl " + e.getMessage());
         }
     }
 
@@ -220,7 +216,7 @@ public class ClientLayer {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                logger.error("non 2xx response in fetchSampleData");
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchSampleData");
                 return null;
             }
             BasicDBObject payloadObj;
@@ -238,11 +234,11 @@ public class ClientLayer {
                 return results;
             } catch(Exception e) {
                 e.printStackTrace();
-                logger.error("error parsing fetchSampleData response" + e.getMessage());
+                loggerMaker.errorAndAddToDb(e, "error parsing fetchSampleData response " + e.getMessage());
                 return null;
             }
         } catch (Exception e) {
-            logger.error("error in fetchSampleData" + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "error in fetchSampleData " + e.getMessage());
             return null;
         }
     }
