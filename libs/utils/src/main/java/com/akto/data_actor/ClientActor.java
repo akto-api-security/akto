@@ -4190,4 +4190,29 @@ public class ClientActor extends DataActor {
         }
     }
 
+    @Override
+    public void bulkWriteAgentTrafficLogs(List<Object> writesForAgentTrafficLogs) {
+        // Convert List<Object> to List<AgentTrafficLog>
+        List<AgentTrafficLog> agentTrafficLogs = new ArrayList<>();
+        for (Object obj : writesForAgentTrafficLogs) {
+            agentTrafficLogs.add((AgentTrafficLog) obj);
+        }
+        
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("agentTrafficLogs", agentTrafficLogs);
+        
+        String objString = gson.toJson(obj);
+        
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/bulkWriteAgentTrafficLogs", "", "POST", objString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in bulkWriteAgentTrafficLogs", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in bulkWriteAgentTrafficLogs" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
 }

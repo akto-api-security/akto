@@ -585,6 +585,13 @@ public class Main {
                     }
                 }
 
+                // Save raw agent traffic logs to MongoDB for future training
+                try {
+                    saveAgentTrafficLogs(accWiseResponse);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error saving agent traffic logs: " + e.getMessage());
+                }
+
                 accWiseResponse = filterBasedOnHeaders(accWiseResponse, accountInfo.accountSettings);
                 loggerMaker.infoAndAddToDb("Initiating sync function for account: " + accountId);
                 parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI, accountInfo.accountSettings);
@@ -846,10 +853,42 @@ public class Main {
         }
     }
 
+    /**
+     * Save raw agent traffic logs to MongoDB for future training and analysis.
+     * Stores unprocessed request/response data with collection context.
+     */
+    private static void saveAgentTrafficLogs(List<HttpResponseParams> responseParamsList) {
+        if (responseParamsList == null || responseParamsList.isEmpty()) {
+            return;
+        }
+
+        try {
+            List<AgentTrafficLog> trafficLogs = new ArrayList<>();
+            
+            for (HttpResponseParams params : responseParamsList) {
+                // Convert HttpResponseParams to AgentTrafficLog
+                // Note: isBlocked and threatInfo can be enhanced later when threat detection is integrated
+                AgentTrafficLog log = AgentTrafficLog.fromHttpResponseParams(params, null, null);
+                trafficLogs.add(log);
+            }
+            
+            // Use DataActor to save to MongoDB via cyborg
+            if (!trafficLogs.isEmpty()) {
+                List<Object> writesForAgentTrafficLogs = new ArrayList<>(trafficLogs);
+                dataActor.bulkWriteAgentTrafficLogs(writesForAgentTrafficLogs);
+                loggerMaker.infoAndAddToDb("Saved " + trafficLogs.size() + " agent traffic logs to MongoDB");
+            }
+            
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in saveAgentTrafficLogs: " + e.getMessage());
+        }
+    }
+
     public static void createIndices() {
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
         SensitiveSampleDataDao.instance.createIndicesIfAbsent();
         SampleDataDao.instance.createIndicesIfAbsent();
+        AgentTrafficLogDao.instance.createIndicesIfAbsent();
     }
 
 
