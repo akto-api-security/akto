@@ -185,6 +185,7 @@ public class SyncCron {
 
             // Analyze tools for each MCP collection (only if tools have changed)
             Set<Integer> maliciousCollections = new HashSet<>();
+            Set<Integer> analyzedCollections = new HashSet<>(); // Track which collections were analyzed
             McpToolMaliciousnessAnalyzer analyzer = new McpToolMaliciousnessAnalyzer();
             int currentTime = Context.now();
             
@@ -210,6 +211,8 @@ public class SyncCron {
                     
                     // Analyze tools and update last check timestamp only if analysis completes
                     boolean isMalicious = analyzeMcpCollectionTools(collectionId, toolsListApi, analyzer);
+                    analyzedCollections.add(collectionId); // Mark as analyzed
+                    
                     if (isMalicious) {
                         maliciousCollections.add(collectionId);
                     }
@@ -222,8 +225,8 @@ public class SyncCron {
                 }
             }
 
-            // Update tags for all MCP collections
-            for (Integer collectionId : mcpCollectionIds) {
+            // Update tags only for collections that were analyzed
+            for (Integer collectionId : analyzedCollections) {
                 try {
                     ApiCollection collection = collectionMap.get(collectionId);
                     if (collection == null) {
