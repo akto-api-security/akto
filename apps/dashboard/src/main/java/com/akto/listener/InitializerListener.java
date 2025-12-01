@@ -2627,6 +2627,7 @@ public class InitializerListener implements ServletContextListener {
                     }
                     updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
                     syncCronInfo.setUpUpdateCronScheduler();
+                    syncCronInfo.setUpMcpMaliciousnessCronScheduler();
                     setUpTestEditorTemplatesScheduler();
                     JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
                     updateApiGroupsForAccounts(); 

@@ -48,6 +48,7 @@ import static com.akto.task.Cluster.callDibs;
 public class SyncCron {
     private static final LoggerMaker loggerMaker = new LoggerMaker(SyncCron.class, LogDb.DASHBOARD);
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    ScheduledExecutorService mcpMaliciousnessScheduler = Executors.newScheduledThreadPool(1);
 
     public void setUpUpdateCronScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -90,13 +91,6 @@ public class SyncCron {
                                 ActivitiesDao.instance.insertActivity("Endpoints detected",newEndpoints + " new endpoints detected");
                             }
 
-                            try {
-                                // Update malicious-mcp-server tags based on tool analysis (malicious names, descriptions, name-description mismatches)
-                                updateMaliciousMcpServerTags();
-                            } catch (Exception mcpex) {
-                                loggerMaker.errorAndAddToDb("Error in updateMaliciousMcpServerTags: " + mcpex.getMessage(), LogDb.DASHBOARD);
-                            }
-                            
                             // updated {Severity score field in APIinfo}
                             RiskScoreOfCollections updateRiskScore = new RiskScoreOfCollections();
 
@@ -133,6 +127,31 @@ public class SyncCron {
                 }, "sync-cron-info");
             }
         }, 0, 5, TimeUnit.MINUTES);
+    }
+
+    public void setUpMcpMaliciousnessCronScheduler() {
+        mcpMaliciousnessScheduler.scheduleWithFixedDelay(new Runnable() {
+            public void run() {
+                Context.accountId.set(1000_000);
+                boolean dibs = callDibs(Cluster.MCP_MALICIOUSNESS_CRON_INFO, 300, 60);
+                if(!dibs){
+                    loggerMaker.debugAndAddToDb("Cron for updating malicious MCP server tags dibs not acquired, thus skipping cron", LogDb.DASHBOARD);
+                    return;
+                }
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        loggerMaker.debugAndAddToDb("Cron for updating malicious MCP server tags picked up for account " + t.getId(), LogDb.DASHBOARD);
+                        try {
+                            // Update malicious-mcp-server tags based on tool analysis (malicious names, descriptions, name-description mismatches)
+                            updateMaliciousMcpServerTags();
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb("Error in updateMaliciousMcpServerTags: " + e.getMessage(), LogDb.DASHBOARD);
+                        }
+                    }
+                }, "mcp-maliciousness-cron-info");
+            }
+        }, 0, 30, TimeUnit.MINUTES);
     }
 
     private void updateMaliciousMcpServerTags() {
