@@ -96,9 +96,7 @@ public class SyncCron {
                             } catch (Exception mcpex) {
                                 loggerMaker.errorAndAddToDb("Error in updateMaliciousMcpServerTags: " + mcpex.getMessage(), LogDb.DASHBOARD);
                             }
-                            // Update malicious-mcp-server tags based on tool analysis (malicious names, descriptions, name-description mismatches)
-                            updateMaliciousMcpServerTags();
-
+                            
                             // updated {Severity score field in APIinfo}
                             RiskScoreOfCollections updateRiskScore = new RiskScoreOfCollections();
 
