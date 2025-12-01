@@ -6,12 +6,13 @@ import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.model.Filters;
-import org.apache.commons.lang3.NotImplementedException;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class AuthTypeTestingEndpoints extends TestingEndpoints {
     private List<String> authTypes;
@@ -27,12 +28,51 @@ public class AuthTypeTestingEndpoints extends TestingEndpoints {
 
     @Override
     public List<ApiInfo.ApiInfoKey> returnApis() {
-        throw new NotImplementedException();
+        // Not used in filtering workflow, only for testing/policy contexts
+        return new ArrayList<>();
     }
 
     @Override
     public boolean containsApi(ApiInfo.ApiInfoKey key) {
-        return true;
+        if (authTypes == null || authTypes.isEmpty()) {
+            return false;
+        }
+        
+        ApiInfo apiInfo = ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(key));
+        if (apiInfo == null || apiInfo.getAllAuthTypesFound() == null) {
+            return false;
+        }
+        
+        // Check if any of the selected auth types exist in the API's auth types
+        Set<ApiInfo.AuthType> selectedAuthTypes = new HashSet<>();
+        for (String authTypeStr : authTypes) {
+            try {
+                selectedAuthTypes.add(ApiInfo.AuthType.valueOf(authTypeStr));
+            } catch (IllegalArgumentException e) {
+                // Skip invalid auth types
+            }
+        }
+        
+        // Check if any set in allAuthTypesFound contains any of our selected auth types
+        for (Set<ApiInfo.AuthType> authTypeSet : apiInfo.getAllAuthTypesFound()) {
+            for (ApiInfo.AuthType authType : authTypeSet) {
+                if (selectedAuthTypes.contains(authType)) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
+
+    private static Bson createApiFilters(ApiCollectionUsers.CollectionType type, ApiInfo.ApiInfoKey apiKey) {
+        String prefix = getFilterPrefix(type);
+        
+        return Filters.and(
+            Filters.eq(prefix + SingleTypeInfo._URL, apiKey.getUrl()),
+            Filters.eq(prefix + SingleTypeInfo._METHOD, apiKey.getMethod().toString()),
+            Filters.in(SingleTypeInfo._COLLECTION_IDS, apiKey.getApiCollectionId())
+        );
     }
 
     @Override
@@ -55,21 +95,29 @@ public class AuthTypeTestingEndpoints extends TestingEndpoints {
             return MCollection.noMatchFilter;
         }
 
-        // Create filters for auth types
-        // allAuthTypesFound is Set<Set<AuthType>>, so we need to match against nested arrays
-        // Use Filters.in similar to UnauthenticatedEndpoint pattern
+        // allAuthTypesFound is stored as: [["JWT"], ["BEARER"], ["JWT", "BEARER"]]
+        // We want to match if ANY inner array contains ANY of our selected auth types
+        // Use $in to check if the array contains an array with our auth type
+        // This is the same pattern as UnauthenticatedEndpoint (line 95-98)
         List<Bson> authTypeFilters = new ArrayList<>();
         for (ApiInfo.AuthType authType : authTypeEnums) {
-            // Match if allAuthTypesFound contains a set that contains this auth type
             authTypeFilters.add(
                 Filters.in(ApiInfo.ALL_AUTH_TYPES_FOUND, 
                     Collections.singletonList(Collections.singletonList(authType))
                 )
             );
         }
-
         Bson authFilter = Filters.or(authTypeFilters);
-        List<ApiInfo> matchedApis = ApiInfoDao.instance.findAll(authFilter, null);
+
+        // For ApiInfo-based collections, use the auth filter directly
+        if (type == ApiCollectionUsers.CollectionType.Id_ApiCollectionId) {
+            return authFilter;
+        }
+
+        // For SingleTypeInfo-based collections (ApiCollectionId), 
+        // fetch matching ApiInfos and create filters based on URL/method/collectionId
+        // This is necessary because SingleTypeInfo doesn't have allAuthTypesFound field
+        List<ApiInfo> matchedApis = ApiInfoDao.instance.findAll(authFilter);
         
         if (matchedApis.isEmpty()) {
             return MCollection.noMatchFilter;
@@ -77,17 +125,7 @@ public class AuthTypeTestingEndpoints extends TestingEndpoints {
 
         List<Bson> apiFilters = new ArrayList<>();
         for (ApiInfo apiInfo : matchedApis) {
-            ApiInfo.ApiInfoKey key = apiInfo.getId();
-            Bson filter = Filters.and(
-                Filters.eq(SingleTypeInfo._URL, key.getUrl()),
-                Filters.eq(SingleTypeInfo._METHOD, key.getMethod().toString()),
-                Filters.in(SingleTypeInfo._COLLECTION_IDS, key.getApiCollectionId())
-            );
-            apiFilters.add(filter);
-        }
-
-        if (apiFilters.isEmpty()) {
-            return MCollection.noMatchFilter;
+            apiFilters.add(createApiFilters(type, apiInfo.getId()));
         }
 
         return Filters.or(apiFilters);
