@@ -162,10 +162,15 @@ public class SyncCron {
 
     private void updateMaliciousMcpServerTags() {
         try {
-            // Get all MCP collections with only required fields (ID and tagsList)
+            // Get all MCP collections with only required fields (ID and tagsList), excluding deactivated ones
+            Bson mcpTagFilter = Filters.elemMatch(ApiCollection.TAGS_STRING, 
+                Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG));
+            Bson activeFilter = Filters.or(
+                Filters.exists(ApiCollection._DEACTIVATED, false),
+                Filters.eq(ApiCollection._DEACTIVATED, false)
+            );
             List<ApiCollection> allCollections = ApiCollectionsDao.instance.findAll(
-                Filters.elemMatch(ApiCollection.TAGS_STRING, 
-                    Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
+                Filters.and(mcpTagFilter, activeFilter),
                 Projections.include(ApiCollection.ID, ApiCollection.TAGS_STRING, ApiCollection.MCP_MALICIOUSNESS_LAST_CHECK)
             );
 
