@@ -24,6 +24,8 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.gpt.handlers.gpt_prompts.McpToolMaliciousnessAnalyzer;
+import com.akto.mcp.McpRequestResponseUtils;
+import com.akto.util.HttpRequestResponseUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.task.Cluster;
@@ -235,8 +237,10 @@ public class SyncCron {
             String sampleJson = sampleData.getSamples().get(0);
             JSONObject sampleMessage = new JSONObject(sampleJson);
             
-            // Extract response payload
+            // Extract response payload and content type
             String responsePayload = null;
+            String contentType = null;
+            
             if (sampleMessage.has("responsePayload")) {
                 Object payloadObj = sampleMessage.get("responsePayload");
                 if (payloadObj instanceof String) {
@@ -244,12 +248,30 @@ public class SyncCron {
                 } else if (payloadObj instanceof JSONObject) {
                     responsePayload = payloadObj.toString();
                 }
-            } else if (sampleMessage.has("response") && sampleMessage.getJSONObject("response").has("body")) {
-                Object bodyObj = sampleMessage.getJSONObject("response").get("body");
-                if (bodyObj instanceof String) {
-                    responsePayload = (String) bodyObj;
-                } else if (bodyObj instanceof JSONObject) {
-                    responsePayload = bodyObj.toString();
+            } else if (sampleMessage.has("response")) {
+                JSONObject responseObj = sampleMessage.getJSONObject("response");
+                if (responseObj.has("body")) {
+                    Object bodyObj = responseObj.get("body");
+                    if (bodyObj instanceof String) {
+                        responsePayload = (String) bodyObj;
+                    } else if (bodyObj instanceof JSONObject) {
+                        responsePayload = bodyObj.toString();
+                    }
+                }
+            }
+
+            // Extract content type from response headers
+            if (sampleMessage.has("responseHeaders")) {
+                Object headersObj = sampleMessage.get("responseHeaders");
+                if (headersObj instanceof String) {
+                    try {
+                        JSONObject headers = new JSONObject((String) headersObj);
+                        contentType = headers.optString(HttpRequestResponseUtils.CONTENT_TYPE.toLowerCase(), null);
+                    } catch (Exception e) {
+                        // Ignore parsing error
+                    }
+                } else if (headersObj instanceof JSONObject) {
+                    contentType = ((JSONObject) headersObj).optString(HttpRequestResponseUtils.CONTENT_TYPE.toLowerCase(), null);
                 }
             }
 
@@ -258,8 +280,34 @@ public class SyncCron {
                 return false;
             }
 
+            // Use McpRequestResponseUtils to parse response (handles SSE responses properly)
+            String parsedResponse = McpRequestResponseUtils.parseResponse(contentType, responsePayload);
+            
+            // If it's an SSE response, extract the first event's data
+            String jsonrpcData = parsedResponse;
+            if (contentType != null && contentType.toLowerCase().contains(HttpRequestResponseUtils.TEXT_EVENT_STREAM_CONTENT_TYPE)) {
+                try {
+                    BasicDBObject parsed = BasicDBObject.parse(parsedResponse);
+                    Object eventsObj = parsed.get("events");
+                    if (eventsObj instanceof List) {
+                        @SuppressWarnings("unchecked")
+                        List<BasicDBObject> events = (List<BasicDBObject>) eventsObj;
+                        if (events != null && !events.isEmpty()) {
+                            jsonrpcData = events.get(0).getString("data");
+                            if (jsonrpcData == null || jsonrpcData.isEmpty()) {
+                                loggerMaker.debugAndAddToDb(String.format("No data found in SSE events for collection %d", collectionId), LogDb.DASHBOARD);
+                                return false;
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    loggerMaker.debugAndAddToDb(String.format("Error parsing SSE response for collection %d: %s", collectionId, e.getMessage()), LogDb.DASHBOARD);
+                    return false;
+                }
+            }
+
             // Parse JSON-RPC response to get tools
-            JSONObject jsonrpcResponse = new JSONObject(responsePayload);
+            JSONObject jsonrpcResponse = new JSONObject(jsonrpcData);
             if (!jsonrpcResponse.has("result")) {
                 loggerMaker.debugAndAddToDb(String.format("Invalid JSON-RPC response format for collection %d", collectionId), LogDb.DASHBOARD);
                 return false;
