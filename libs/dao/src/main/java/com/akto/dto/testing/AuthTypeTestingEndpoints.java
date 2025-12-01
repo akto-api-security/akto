@@ -41,9 +41,6 @@ public class AuthTypeTestingEndpoints extends TestingEndpoints {
             return MCollection.noMatchFilter;
         }
 
-        String prefix = getFilterPrefix(type);
-        String fieldForFilter = prefix + SingleTypeInfo._API_COLLECTION_ID;
-
         // Convert string auth types to AuthType enum
         List<ApiInfo.AuthType> authTypeEnums = new ArrayList<>();
         for (String authTypeStr : authTypes) {
@@ -78,14 +75,13 @@ public class AuthTypeTestingEndpoints extends TestingEndpoints {
             return MCollection.noMatchFilter;
         }
 
-        // Create filters based on collection type
         List<Bson> apiFilters = new ArrayList<>();
         for (ApiInfo apiInfo : matchedApis) {
             ApiInfo.ApiInfoKey key = apiInfo.getId();
             Bson filter = Filters.and(
-                Filters.eq(prefix + SingleTypeInfo._URL, key.getUrl()),
-                Filters.eq(prefix + SingleTypeInfo._METHOD, key.getMethod().toString()),
-                Filters.eq(fieldForFilter, key.getApiCollectionId())
+                Filters.eq(SingleTypeInfo._URL, key.getUrl()),
+                Filters.eq(SingleTypeInfo._METHOD, key.getMethod().toString()),
+                Filters.in(SingleTypeInfo._COLLECTION_IDS, key.getApiCollectionId())
             );
             apiFilters.add(filter);
         }
