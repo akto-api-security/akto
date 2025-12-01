@@ -6,10 +6,10 @@ import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.model.Filters;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -95,15 +95,17 @@ public class AuthTypeTestingEndpoints extends TestingEndpoints {
             return MCollection.noMatchFilter;
         }
 
-        // allAuthTypesFound is stored as: [["JWT"], ["BEARER"], ["JWT", "BEARER"]]
-        // We want to match if ANY inner array contains ANY of our selected auth types
-        // Use $in to check if the array contains an array with our auth type
-        // This is the same pattern as UnauthenticatedEndpoint (line 95-98)
         List<Bson> authTypeFilters = new ArrayList<>();
         for (ApiInfo.AuthType authType : authTypeEnums) {
+            // Nested elemMatch: outer for array-of-arrays, inner for elements in sub-array
+            // Java Filters API doesn't support nested elemMatch, so use Document
             authTypeFilters.add(
-                Filters.in(ApiInfo.ALL_AUTH_TYPES_FOUND, 
-                    Collections.singletonList(Collections.singletonList(authType))
+                new Document(ApiInfo.ALL_AUTH_TYPES_FOUND,
+                    new Document("$elemMatch",
+                        new Document("$elemMatch",
+                            new Document("$eq", authType.name())
+                        )
+                    )
                 )
             );
         }
@@ -139,4 +141,3 @@ public class AuthTypeTestingEndpoints extends TestingEndpoints {
         this.authTypes = authTypes;
     }
 }
-
