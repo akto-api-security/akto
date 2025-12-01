@@ -80,6 +80,7 @@ public class DbAction extends ActionSupport {
     List<BulkUpdates> writesForTestingRunIssues;
     List<BulkUpdates> writesForOverageInfo;
     List<DependencyNode> dependencyNodeList;
+    List<AgentTrafficLog> agentTrafficLogs;
     TestScript testScript;
     @Setter @Getter
     McpAuditInfo auditInfo;
@@ -1831,6 +1832,17 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String bulkWriteAgentTrafficLogs() {
+        try {
+            DbLayer.bulkWriteAgentTrafficLogs(agentTrafficLogs);
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb(e, "Error bulkWriteAgentTrafficLogs " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }
@@ -2691,6 +2703,14 @@ public class DbAction extends ActionSupport {
 
     public void setDependencyNodeList(List<DependencyNode> dependencyNodeList) {
         this.dependencyNodeList = dependencyNodeList;
+    }
+
+    public List<AgentTrafficLog> getAgentTrafficLogs() {
+        return agentTrafficLogs;
+    }
+
+    public void setAgentTrafficLogs(List<AgentTrafficLog> agentTrafficLogs) {
+        this.agentTrafficLogs = agentTrafficLogs;
     }
 
     public int getStartTimestamp() {

@@ -36,6 +36,7 @@ import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.AccessMatrixTaskInfosDao;
 import com.akto.dao.testing.AccessMatrixUrlToRolesDao;
+import com.akto.dao.AgentTrafficLogDao;
 import com.akto.dao.testing.AgentConversationResultDao;
 import com.akto.dao.testing.EndpointLogicalGroupDao;
 import com.akto.dao.testing.LoginFlowStepsDao;
@@ -1226,5 +1227,9 @@ public class DbLayer {
 
     public static void storeConversationResults(List<AgentConversationResult> conversationResults) {
         AgentConversationResultDao.instance.insertMany(conversationResults);
+    }
+
+    public static void bulkWriteAgentTrafficLogs(List<AgentTrafficLog> agentTrafficLogs) {
+        AgentTrafficLogDao.instance.insertMany(agentTrafficLogs);
     }
 }
