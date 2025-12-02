@@ -164,6 +164,7 @@ public class AccountConfigurationCache {
                                   ", API Infos: " + (apiInfos != null ? apiInfos.size() : 0));
         } catch (Exception e) {
             logger.errorAndAddToDb(e, "Error refreshing account configuration cache. Keeping old cache if available.");
+            e.printStackTrace();
         }
     }
 
