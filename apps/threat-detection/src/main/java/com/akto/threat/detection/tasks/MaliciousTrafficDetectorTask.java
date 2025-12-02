@@ -189,7 +189,11 @@ public class MaliciousTrafficDetectorTask implements Task {
               }
 
               AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
-              Context.isRedactPayload.set(config.isRedacted());
+              if (config == null) {
+                Context.isRedactPayload.set(false);
+              } else {
+                Context.isRedactPayload.set(config.isRedacted());
+              }
 
               for (ConsumerRecord<String, byte[]> record : records) {
                 HttpResponseParam httpResponseParam = HttpResponseParam.parseFrom(record.value());
