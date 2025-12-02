@@ -15,7 +15,6 @@ import com.akto.dto.HistoricalData;
 import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
 
-import com.akto.task.Cluster;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
