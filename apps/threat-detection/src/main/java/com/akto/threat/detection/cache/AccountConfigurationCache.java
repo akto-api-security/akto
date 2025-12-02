@@ -67,6 +67,10 @@ public class AccountConfigurationCache {
             }
         }
 
+        if (cachedConfig == null) {
+            logger.errorAndAddToDb("getConfig returning null - cache refresh failed. DataActor: " + dataActor);
+        }
+
         return cachedConfig;
     }
 
@@ -78,7 +82,16 @@ public class AccountConfigurationCache {
         try {
             logger.infoAndAddToDb("Refreshing account configuration cache");
             AccountSettings accountSettings = dataActor.fetchAccountSettings();
-            logger.infoAndAddToDb("Fetched accountSettings in configuration cache");
+
+            logger.infoAndAddToDb("Fetched accountSettings in configuration cache. accountSettings is null: " + (accountSettings == null));
+
+            if (accountSettings == null) {
+                logger.errorAndAddToDb("fetchAccountSettings returned null. Cannot refresh cache. DataActor: " + dataActor);
+                return;
+            }
+
+            logger.infoAndAddToDb("AccountSettings ID: " + accountSettings.getId());
+
             List <ApiCollection> apiCollections = new ArrayList<>();
             if (accountSettings.getId() != 1758179941) {
                 apiCollections = dataActor.fetchAllApiCollections();
