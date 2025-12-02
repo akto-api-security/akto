@@ -68,7 +68,7 @@ public class AccountConfigurationCache {
         }
 
         if (cachedConfig == null) {
-            logger.errorAndAddToDb("getConfig returning null - cache refresh failed. DataActor: " + dataActor);
+            logger.errorAndAddToDb("getConfig returning null - cache refresh failed");
         }
 
         return cachedConfig;
@@ -86,7 +86,7 @@ public class AccountConfigurationCache {
             logger.infoAndAddToDb("Fetched accountSettings in configuration cache. accountSettings is null: " + (accountSettings == null));
 
             if (accountSettings == null) {
-                logger.errorAndAddToDb("fetchAccountSettings returned null. Cannot refresh cache. DataActor: " + dataActor);
+                logger.errorAndAddToDb("fetchAccountSettings returned null. Cannot refresh cache");
                 return;
             }
 
