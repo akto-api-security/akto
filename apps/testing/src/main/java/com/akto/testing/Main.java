@@ -1,6 +1,5 @@
 package com.akto.testing;
 
-import static com.akto.testing.Utils.isTestingRunForDemoCollection;
 import static com.akto.testing.Utils.readJsonContentFromFile;
 
 import com.akto.DaoInit;
@@ -203,16 +202,14 @@ public class Main {
         return ret;
     }
     private static final int LAST_TEST_RUN_EXECUTION_DELTA = 10 * 60;
-    private static final int DEFAULT_DELTA_IGNORE_TIME = 2*60*60;
+    private static final int DEFAULT_DELTA_IGNORE_TIME = TestingRunResultSummariesDao.DEFAULT_DELTA_IGNORE_TIME_SECONDS;
     private static final int MAX_RETRIES_FOR_FAILED_SUMMARIES = 3;
 
     private static TestingRun findPendingTestingRun(int userDeltaTime) {
         int deltaPeriod = userDeltaTime == 0 ? DEFAULT_DELTA_IGNORE_TIME : userDeltaTime;
         int delta = Context.now() - deltaPeriod;
 
-        Bson filter1 = Filters.and(Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
-                Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, Context.now())
-        );
+        Bson filter1 = TestingRunDao.instance.createScheduledTestingRunFilter(Context.now());
         Bson filter2 = Filters.and(
                 Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
                 Filters.lte(TestingRun.PICKED_UP_TIMESTAMP, delta)
@@ -240,15 +237,11 @@ public class Main {
         int deltaPeriod = userDeltaTime == 0 ? DEFAULT_DELTA_IGNORE_TIME : userDeltaTime;
         int delta = now - deltaPeriod;
 
-        Bson filter1 = Filters.and(
-            Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
-            Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now),
-            Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)
-        );
+        Bson filter1 = TestingRunResultSummariesDao.instance.createScheduledTestingRunResultSummaryFilter(now, delta);
 
         Bson filter2 = Filters.and(
             Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
-            Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now - 20*60),
+            Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now - TestingRunResultSummariesDao.STUCK_RUNNING_TEST_THRESHOLD_SECONDS),
             Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)
         );
 

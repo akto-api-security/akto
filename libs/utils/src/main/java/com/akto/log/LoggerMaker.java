@@ -365,6 +365,7 @@ public class LoggerMaker  {
         debugAndAddToDb(message, this.db);
     }
 
+    @Deprecated
     public void debugAndAddToDb(String message, LogDb db) {
         String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
         String debugMessage = "acc: " + accountId + ", " + message;

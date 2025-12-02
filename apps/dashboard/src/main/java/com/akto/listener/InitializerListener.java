@@ -174,7 +174,6 @@ import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
-import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
@@ -220,7 +219,6 @@ import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.util.tasks.OrganizationTask;
 import com.akto.utils.Auth0;
 import com.akto.utils.AutomatedApiGroupsUtils;
-import com.akto.utils.RSAKeyPairUtils;
 import com.akto.utils.TestTemplateUtils;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.crons.Crons;
@@ -230,10 +228,10 @@ import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
 import com.akto.utils.jobs.CleanInventory;
 import com.akto.utils.jobs.DeactivateCollections;
 import com.akto.utils.jobs.JobUtils;
-import com.akto.utils.jobs.MatchingJob;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
+import com.akto.utils.crons.TestingAlertsCron;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.ReadPreference;
@@ -286,6 +284,7 @@ public class InitializerListener implements ServletContextListener {
 
     private static Map<String, String> piiFileMap;
     Crons crons = new Crons();
+    TestingAlertsCron testingAlertsCron = new TestingAlertsCron();
 
     public static String getDomain() {
         if (domain == null) {
@@ -2661,6 +2660,11 @@ public class InitializerListener implements ServletContextListener {
                 } else {
                     logger.debug("Skipping init functions and scheduling jobs at " + now);
                 }
+
+                if(isSaas){
+                    alertsForTestingNonFunctional();
+                }
+
                 // setUpAktoMixpanelEndpointsScheduler();
                 //fetchGithubZip();
                 if(isSaas){
@@ -2714,6 +2718,13 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
+    private void alertsForTestingNonFunctional() {
+        // Hourly cron to update organization cache
+        testingAlertsCron.setUpOrganizationFeatureCacheScheduler();
+        
+        // 5-minute cron to check accounts
+        testingAlertsCron.setUpTestingAlertsScheduler();
+    }
 
     private void setUpDependencyFlowScheduler() {
         int minutes = DashboardMode.isOnPremDeployment() ? 60 : 24*60;
@@ -3603,10 +3614,10 @@ public class InitializerListener implements ServletContextListener {
 
     private static void setDashboardVersionForAccount(){
         try {
-            logger.debugAndAddToDb("Updating account version for " + Context.accountId.get(), LogDb.DASHBOARD);
+            logger.debugAndAddToDb("Updating account version for " + Context.accountId.get());
             AccountSettingsDao.instance.updateVersion(AccountSettings.DASHBOARD_VERSION);
         } catch (Exception e) {
-            logger.errorAndAddToDb(e,"error while updating dashboard version: " + e.toString(), LogDb.DASHBOARD);
+            logger.errorAndAddToDb(e,"error while updating dashboard version: " + e.toString());
         }
     }
 
