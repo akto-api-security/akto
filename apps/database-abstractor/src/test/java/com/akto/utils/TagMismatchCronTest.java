@@ -12,8 +12,10 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 
 import static org.junit.Assert.*;
 
@@ -452,5 +454,323 @@ public class TagMismatchCronTest extends MongoBasedTest {
         List<CollectionTags> tags200 = TagMismatchDataMother.getApiCollectionTags(200);
         assertNotNull("Collection 200 should have tag (0.0.0.0:0 pattern)",
             TagMismatchDataMother.findTagByKeyName(tags200, "tags-mismatch"));
+    }
+
+    // ========== Unit Tests for ignoreSameHostNameCollections ==========
+
+    /**
+     * Test 12: Valid service name extraction - should ignore collection
+     * Hostname: "local.ebe-creditcard-service-netcore.svc:5000-ebe-creditcard-service-netcore"
+     * Expected: Service name "ebe-creditcard-service-netcore" is extracted and found in hostname -> ignored
+     */
+    @Test
+    public void testIgnoreSameHostNameCollections_ValidServiceName() throws Exception {
+        // Setup: Create collection with matching service name pattern
+        ApiCollection collection = TagMismatchDataMother.createApiCollection(
+            100,
+            "Credit Card Service",
+            "local.ebe-creditcard-service-netcore.svc:5000-ebe-creditcard-service-netcore"
+        );
+        TagMismatchDataMother.insertApiCollections(Arrays.asList(collection));
+
+        // Reload collections into static map
+        TagMismatchCron.loadApiCollections();
+
+        // Create set with collection ID
+        Set<Integer> collectionIds = new HashSet<>(Arrays.asList(100));
+
+        // Invoke method under test
+        TagMismatchCron.ignoreSameHostNameCollections(collectionIds);
+
+        // Verify collection was removed (ignored)
+        assertTrue("Collection should be ignored (removed from set)", collectionIds.isEmpty());
+    }
+
+    /**
+     * Test 13: Multiple collections with matching service names
+     * All should be ignored
+     */
+    @Test
+    public void testIgnoreSameHostNameCollections_MultipleMatchingCollections() throws Exception {
+        // Setup: Create 3 collections with matching patterns
+        List<ApiCollection> collections = Arrays.asList(
+            TagMismatchDataMother.createApiCollection(
+                100, "Service 1", "local.payment-service.svc:8080-payment-service"
+            ),
+            TagMismatchDataMother.createApiCollection(
+                200, "Service 2", "prod.auth-service.cluster:9090-auth-service"
+            ),
+            TagMismatchDataMother.createApiCollection(
+                300, "Service 3", "test.user-management.internal:3000-user-management"
+            )
+        );
+        TagMismatchDataMother.insertApiCollections(collections);
+
+        // Reload collections into static map
+        TagMismatchCron.loadApiCollections();
+
+        // Create set with all collection IDs
+        Set<Integer> collectionIds = new HashSet<>(Arrays.asList(100, 200, 300));
+
+        // Invoke method under test
+        TagMismatchCron.ignoreSameHostNameCollections(collectionIds);
+
+        // Verify all collections were removed
+        assertTrue("All collections should be ignored", collectionIds.isEmpty());
+    }
+
+    /**
+     * Test 14: Hostname without dash in last segment - should NOT ignore
+     * Hostname: "api.example.com"
+     */
+    @Test
+    public void testIgnoreSameHostNameCollections_NoDashInLastSegment() throws Exception {
+        // Setup: Create collection without dash in last segment
+        ApiCollection collection = TagMismatchDataMother.createApiCollection(
+            100, "Example Service", "api.example.com"
+        );
+        TagMismatchDataMother.insertApiCollections(Arrays.asList(collection));
+
+        // Reload collections
+        TagMismatchCron.loadApiCollections();
+
+        // Create set with collection ID
+        Set<Integer> collectionIds = new HashSet<>(Arrays.asList(100));
+
+        // Invoke method
+        TagMismatchCron.ignoreSameHostNameCollections(collectionIds);
+
+        // Verify collection was NOT removed
+        assertTrue("Collection should NOT be ignored (no dash in last segment)", collectionIds.contains(100));
+        assertEquals("Set should still have 1 element", 1, collectionIds.size());
+    }
+
+    /**
+     * Test 15: Service name not found in hostname - should NOT ignore
+     * Hostname: "api.example.com:8080-different-service"
+     * Extracted service: "different-service" but hostname doesn't contain it in other parts
+     */
+    @Test
+    public void testIgnoreSameHostNameCollections_ServiceNameNotInHostname() throws Exception {
+        // Setup: Service name appears only once (in last segment after dash)
+        ApiCollection collection = TagMismatchDataMother.createApiCollection(
+            100, "Service", "api.example.com:8080-unique-service-name"
+        );
+        TagMismatchDataMother.insertApiCollections(Arrays.asList(collection));
+
+        // Reload collections
+        TagMismatchCron.loadApiCollections();
+
+        // Create set with collection ID
+        Set<Integer> collectionIds = new HashSet<>(Arrays.asList(100));
+
+        // Invoke method
+        TagMismatchCron.ignoreSameHostNameCollections(collectionIds);
+
+        // Verify collection was NOT removed (service name only appears once)
+        assertTrue("Collection should NOT be ignored", collectionIds.contains(100));
+        assertEquals("Set should still have 1 element", 1, collectionIds.size());
+    }
+
+    /**
+     * Test 16: Mixed collections - some match, some don't
+     * Only matching ones should be ignored
+     */
+    @Test
+    public void testIgnoreSameHostNameCollections_MixedCollections() throws Exception {
+        // Setup: 5 collections, 2 match pattern, 3 don't
+        List<ApiCollection> collections = Arrays.asList(
+            // MATCH: service name in hostname
+            TagMismatchDataMother.createApiCollection(
+                100, "Match 1", "local.payment-service.svc:8080-payment-service"
+            ),
+            // NO MATCH: no dash in last segment
+            TagMismatchDataMother.createApiCollection(
+                200, "No Match 1", "api.example.com"
+            ),
+            // MATCH: service name in hostname
+            TagMismatchDataMother.createApiCollection(
+                300, "Match 2", "prod.auth-service.cluster:9090-auth-service"
+            ),
+            // NO MATCH: service name not in hostname
+            TagMismatchDataMother.createApiCollection(
+                400, "No Match 2", "api.server.com:3000-unique-name"
+            ),
+            // NO MATCH: null hostname (should not be in map)
+            TagMismatchDataMother.createApiCollection(
+                500, "No Match 3", null
+            )
+        );
+        TagMismatchDataMother.insertApiCollections(collections);
+
+        // Reload collections
+        TagMismatchCron.loadApiCollections();
+
+        // Create set with all collection IDs
+        Set<Integer> collectionIds = new HashSet<>(Arrays.asList(100, 200, 300, 400, 500));
+
+        // Invoke method
+        TagMismatchCron.ignoreSameHostNameCollections(collectionIds);
+
+        // Verify only 100 and 300 were removed
+        assertFalse("Collection 100 should be ignored (removed)", collectionIds.contains(100));
+        assertTrue("Collection 200 should NOT be ignored", collectionIds.contains(200));
+        assertFalse("Collection 300 should be ignored (removed)", collectionIds.contains(300));
+        assertTrue("Collection 400 should NOT be ignored", collectionIds.contains(400));
+        assertTrue("Collection 500 should NOT be ignored (null hostname)", collectionIds.contains(500));
+        assertEquals("Should have 3 collections remaining", 3, collectionIds.size());
+    }
+
+    /**
+     * Test 17: Empty set - should handle gracefully
+     */
+    @Test
+    public void testIgnoreSameHostNameCollections_EmptySet() throws Exception {
+        // Create empty set
+        Set<Integer> collectionIds = new HashSet<>();
+
+        // Invoke method
+        TagMismatchCron.ignoreSameHostNameCollections(collectionIds);
+
+        // Verify still empty, no errors
+        assertTrue("Set should remain empty", collectionIds.isEmpty());
+    }
+
+    /**
+     * Test 18: Collection not in map - should remain in set
+     */
+    @Test
+    public void testIgnoreSameHostNameCollections_CollectionNotInMap() throws Exception {
+        // Setup: Create one collection but query for different ID
+        ApiCollection collection = TagMismatchDataMother.createApiCollection(
+            100, "Service", "api.service.com:8080-service"
+        );
+        TagMismatchDataMother.insertApiCollections(Arrays.asList(collection));
+
+        // Reload collections
+        TagMismatchCron.loadApiCollections();
+
+        // Create set with non-existent collection ID
+        Set<Integer> collectionIds = new HashSet<>(Arrays.asList(999));
+
+        // Invoke method
+        TagMismatchCron.ignoreSameHostNameCollections(collectionIds);
+
+        // Verify collection stays in set (not removed)
+        assertTrue("Non-existent collection should remain in set", collectionIds.contains(999));
+    }
+
+    /**
+     * Test 19: Edge case - dash at end of last segment
+     * Hostname: "api.service.com:8080-"
+     * Extracted service name would be empty, should NOT ignore
+     */
+    @Test
+    public void testIgnoreSameHostNameCollections_DashAtEnd() throws Exception {
+        // Setup: Dash at end, no service name after it
+        ApiCollection collection = TagMismatchDataMother.createApiCollection(
+            100, "Service", "api.service.com:8080-"
+        );
+        TagMismatchDataMother.insertApiCollections(Arrays.asList(collection));
+
+        // Reload collections
+        TagMismatchCron.loadApiCollections();
+
+        // Create set
+        Set<Integer> collectionIds = new HashSet<>(Arrays.asList(100));
+
+        // Invoke method
+        TagMismatchCron.ignoreSameHostNameCollections(collectionIds);
+
+        // Verify collection was NOT removed (empty service name)
+        assertTrue("Collection should NOT be ignored (empty service name)", collectionIds.contains(100));
+    }
+
+    /**
+     * Test 20: Real-world example from requirements
+     * Hostname: "local.ebe-creditcard-service-netcore.svc:5000-ebe-creditcard-service-netcore"
+     * This should be ignored
+     */
+    @Test
+    public void testIgnoreSameHostNameCollections_RealWorldExample() throws Exception {
+        // Setup: Exact example from requirements
+        ApiCollection collection = TagMismatchDataMother.createApiCollection(
+            -107935017,
+            "EBE Credit Card Service",
+            "local.ebe-creditcard-service-netcore.svc:5000-ebe-creditcard-service-netcore"
+        );
+        TagMismatchDataMother.insertApiCollections(Arrays.asList(collection));
+
+        // Reload collections
+        TagMismatchCron.loadApiCollections();
+
+        // Create set
+        Set<Integer> collectionIds = new HashSet<>(Arrays.asList(-107935017));
+
+        // Invoke method
+        TagMismatchCron.ignoreSameHostNameCollections(collectionIds);
+
+        // Verify collection was ignored
+        assertTrue("Real-world example should be ignored", collectionIds.isEmpty());
+    }
+
+    /**
+     * Test 21: Integration test - collections with matching hostnames should not get tags
+     */
+    @Test
+    public void testEvaluateTagsMismatch_WithHostnameFiltering() throws Exception {
+        // Setup: Create 3 collections
+        // Collection 100: Matching hostname pattern (should be ignored)
+        // Collection 200: Non-matching hostname pattern (should get tag)
+        // Collection 300: No hostname (should get tag)
+        List<ApiCollection> collections = Arrays.asList(
+            TagMismatchDataMother.createApiCollection(
+                100, "Payment Service", "local.payment-service.svc:8080-payment-service"
+            ),
+            TagMismatchDataMother.createApiCollection(
+                200, "Auth Service", "api.external.com:9000-different-name"
+            ),
+            TagMismatchDataMother.createApiCollection(
+                300, "User Service", null
+            )
+        );
+        TagMismatchDataMother.insertApiCollections(collections);
+
+        // Create SampleData with mismatches for all 3 collections
+        List<SampleData> sampleDataList = Arrays.asList(
+            TagMismatchDataMother.createSampleDataWithAllMismatchSamples(
+                100, "GET", "https://server.akto.io/api/payment", 3
+            ),
+            TagMismatchDataMother.createSampleDataWithAllMismatchSamples(
+                200, "GET", "https://server.akto.io/api/auth", 3
+            ),
+            TagMismatchDataMother.createSampleDataWithAllMismatchSamples(
+                300, "GET", "https://server.akto.io/api/user", 3
+            )
+        );
+        TagMismatchDataMother.insertSampleDataBatch(sampleDataList);
+
+        // Execute
+        java.lang.reflect.Method method = TagMismatchCron.class.getDeclaredMethod("evaluateTagsMismatch", int.class);
+        method.setAccessible(true);
+        method.invoke(tagMismatchCron, TEST_ACCOUNT_ID);
+
+        // Verify results
+        // Collection 100: Should NOT have tag (filtered out by hostname logic)
+        List<CollectionTags> tags100 = TagMismatchDataMother.getApiCollectionTags(100);
+        if (tags100 != null) {
+            assertNull("Collection 100 should NOT have tag (hostname filter)",
+                TagMismatchDataMother.findTagByKeyName(tags100, "tags-mismatch"));
+        }
+
+        // Collection 200: Should have tag (hostname doesn't match pattern)
+        List<CollectionTags> tags200 = TagMismatchDataMother.getApiCollectionTags(200);
+        assertNotNull("Collection 200 should have tag (hostname doesn't match)",
+            TagMismatchDataMother.findTagByKeyName(tags200, "tags-mismatch"));
+
+        // Collection 300: Should have tag (no hostname in map)
+        List<CollectionTags> tags300 = TagMismatchDataMother.getApiCollectionTags(300);
+        assertNotNull("Collection 300 should have tag (no hostname)",
+            TagMismatchDataMother.findTagByKeyName(tags300, "tags-mismatch"));
     }
 }

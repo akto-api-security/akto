@@ -3,7 +3,9 @@ package com.akto.utils;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
+import com.akto.data_actor.DbLayer;
 import com.akto.dto.Account;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.Key;
@@ -19,9 +21,12 @@ import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.Iterator;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -33,6 +38,45 @@ public class TagMismatchCron {
     private static final LoggerMaker loggerMaker = new LoggerMaker(TagMismatchCron.class, LoggerMaker.LogDb.CYBORG);
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     public static final List<Integer> TAGS_MISMATCH_ACCOUNT_IDS = Arrays.asList(1736798101, 1718042191);
+
+    // Static in-memory HashMap to store API collection ID to hostname mapping
+    private static Map<Integer, String> apiCollectionIdHostNameMap = new HashMap<>();
+
+    // Static block to initialize the HashMap when class is loaded
+    static {
+        loadApiCollections();
+    }
+
+    /**
+     * Loads all API collections from database into the static HashMap.
+     * Maps apiCollectionId -> hostName for quick lookup.
+     * Only stores collections with non-null and non-blank hostNames.
+     */
+    public static void loadApiCollections() {
+        try {
+            List<ApiCollection> apiCollections = DbLayer.fetchAllApiCollections();
+            Map<Integer, String> newMap = new HashMap<>();
+
+            if (apiCollections != null) {
+                for (ApiCollection collection : apiCollections) {
+                    String hostName = collection.getHostName();
+                    // Only add to map if hostName is not null and not blank
+                    if (hostName != null && !hostName.trim().isEmpty()) {
+                        newMap.put(collection.getId(), hostName);
+                    }
+                }
+            }
+
+            apiCollectionIdHostNameMap = newMap;
+            loggerMaker.infoAndAddToDb(
+                String.format("Loaded %d API collections with hostNames into memory", apiCollectionIdHostNameMap.size())
+            );
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(
+                String.format("Error loading API collections: %s", e.toString())
+            );
+        }
+    }
 
     public void runCron() {
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -85,6 +129,74 @@ public class TagMismatchCron {
     }
 
     /**
+     * Filters out collection IDs that should be ignored based on hostname matching logic.
+     * Directly modifies the input set by removing collection IDs that should be ignored.
+     *
+     * Logic: Extract service name from hostname and check if it's a substring of the remaining hostname.
+     * Example: "local.ebe-creditcard-service-netcore.svc:5000-ebe-creditcard-service-netcore"
+     * - Split by "."
+     * - Last segment: "svc:5000-ebe-creditcard-service-netcore"
+     * - Extract service name (everything after first "-"): "ebe-creditcard-service-netcore"
+     * - Remaining hostname: everything except the extracted service name = "local.ebe-creditcard-service-netcore.svc:5000"
+     * - Check if remaining hostname contains the extracted service name
+     * - If yes, ignore this collection (remove from set)
+     *
+     * @param uniqueCollectionIds Set of collection IDs to filter (modified in place)
+     */
+    public static void ignoreSameHostNameCollections(Set<Integer> uniqueCollectionIds) {
+        // Use iterator to safely remove elements while iterating
+        Iterator<Integer> iterator = uniqueCollectionIds.iterator();
+
+        while (iterator.hasNext()) {
+            Integer collectionId = iterator.next();
+            String hostname = apiCollectionIdHostNameMap.get(collectionId);
+
+            if (hostname == null) {
+                continue;
+            }
+
+            // Split hostname by "."
+            String[] parts = hostname.split("\\.");
+
+            // Check if hostname has the expected format
+            if (parts.length == 0) {
+                continue;
+            }
+
+            // Get the last segment
+            String lastPart = parts[parts.length - 1];
+
+            // Check if last part contains "-"
+            if (!lastPart.contains("-")) {
+                continue;
+            }
+
+            // Find the last occurrence of dash in the full hostname
+            int dashIndexInHostname = hostname.lastIndexOf("-");
+
+            // Extract service name: everything after the dash
+            String extractedServiceName = hostname.substring(dashIndexInHostname + 1);
+
+            // If extracted service name is empty, skip
+            if (extractedServiceName.isEmpty()) {
+                continue;
+            }
+
+            // Remaining hostname: everything before the dash
+            String remainingHostName = hostname.substring(0, dashIndexInHostname);
+
+            // Check if remaining hostname contains the extracted service name
+            if (remainingHostName.contains(extractedServiceName)) {
+                iterator.remove();
+                loggerMaker.infoAndAddToDb(
+                    String.format("Ignoring collection %d - remaining hostname: %s, extracted service: %s",
+                        collectionId, remainingHostName, extractedServiceName)
+                );
+            }
+        }
+    }
+
+    /**
      * Handles mismatched samples by updating ApiCollection tags in bulk.
      * Adds or updates "tags-mismatch" tag for all affected collections.
      *
@@ -103,6 +215,25 @@ public class TagMismatchCron {
             }
 
             if (uniqueCollectionIds.isEmpty()) {
+                return;
+            }
+
+            // Store original size to track how many were filtered
+            int originalSize = uniqueCollectionIds.size();
+
+            // Filter out collections that should be ignored based on hostname logic
+            // This method modifies uniqueCollectionIds in place
+            ignoreSameHostNameCollections(uniqueCollectionIds);
+
+            int filteredCount = originalSize - uniqueCollectionIds.size();
+            if (filteredCount > 0) {
+                loggerMaker.infoAndAddToDb(
+                    String.format("Ignored %d collections based on hostname filtering", filteredCount)
+                );
+            }
+
+            if (uniqueCollectionIds.isEmpty()) {
+                loggerMaker.infoAndAddToDb("All collections were filtered out, nothing to update");
                 return;
             }
 
@@ -163,6 +294,10 @@ public class TagMismatchCron {
     private void evaluateTagsMismatch(int accountId) {
         try {
             Context.accountId.set(accountId);
+
+            // Refresh API collections cache at the start of each cron run
+            loadApiCollections();
+
             loggerMaker.infoAndAddToDb("Starting tags mismatch evaluation for account: " + accountId);
             long cronStartTime = System.currentTimeMillis();
 
