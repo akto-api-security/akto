@@ -48,9 +48,9 @@ public class InitializerListener implements ServletContextListener {
                             Cron cron = new Cron();
                             logger.info("triggering merging cron for db abstractor " + Context.now());
                             cron.cron(true);
-                            // TagMismatchCron tagsMismatchCron = new TagMismatchCron();
-                            // logger.info("triggering tags mismatch cron for db abstractor " + Context.now());
-                            // tagsMismatchCron.runCron();
+                            TagMismatchCron tagsMismatchCron = new TagMismatchCron();
+                            logger.info("triggering tags mismatch cron for db abstractor " + Context.now());
+                            tagsMismatchCron.runCron();
                         }
 
                     } catch (Exception e) {
