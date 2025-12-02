@@ -128,9 +128,10 @@ public class TestingAlertsCron {
                                     continue;
                                 }
                                 
-                                // Check mini-testing module heartbeat for this account
-                                checkMiniTestingHeartbeat(account, org);
-                                
+                                if(account.getHybridTestingEnabled()) {
+                                    checkMiniTestingHeartbeat(account, org);
+                                }
+
                                 // Check scheduled tests that should have started for this account
                                 checkScheduledTests(account, org);
                             } catch (Exception e) {
