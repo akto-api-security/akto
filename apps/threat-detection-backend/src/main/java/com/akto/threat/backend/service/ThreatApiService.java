@@ -10,7 +10,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountResponse;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.mongodb.client.MongoCursor;
-import com.mongodb.client.model.Filters;
+
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.bson.Document;
-import org.bson.conversions.Bson;
+
 
 public class ThreatApiService {
 
