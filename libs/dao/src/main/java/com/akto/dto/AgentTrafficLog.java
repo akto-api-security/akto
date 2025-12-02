@@ -20,9 +20,6 @@ public class AgentTrafficLog {
     public static final String API_COLLECTION_ID = "apiCollectionId";
     private int apiCollectionId;
 
-    public static final String ACCOUNT_ID = "accountId";
-    private String accountId;
-
     public static final String REQUEST_PAYLOAD = "requestPayload";
     private String requestPayload;
 
@@ -76,11 +73,10 @@ public class AgentTrafficLog {
     public static AgentTrafficLog fromHttpResponseParams(HttpResponseParams httpResponseParams) {
         AgentTrafficLog log = new AgentTrafficLog();
 
-        // Collection and account context
+        // Collection context 
         if (httpResponseParams.requestParams != null) {
             log.setApiCollectionId(httpResponseParams.requestParams.getApiCollectionId());
         }
-        log.setAccountId(httpResponseParams.accountId);
 
         // Core request/response data (raw/unprocessed)
         if (httpResponseParams.requestParams != null) {

@@ -2962,21 +2962,21 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    List<AgentTrafficLog> writesForAgentTrafficLogs;
+    List<AgentTrafficLog> agentTrafficLogs;
 
-    public List<AgentTrafficLog> getWritesForAgentTrafficLogs() {
-        return writesForAgentTrafficLogs;
+    public List<AgentTrafficLog> getAgentTrafficLogs() {
+        return agentTrafficLogs;
     }
 
-    public void setWritesForAgentTrafficLogs(List<AgentTrafficLog> writesForAgentTrafficLogs) {
-        this.writesForAgentTrafficLogs = writesForAgentTrafficLogs;
+    public void setAgentTrafficLogs(List<AgentTrafficLog> agentTrafficLogs) {
+        this.agentTrafficLogs = agentTrafficLogs;
     }
 
     public String bulkWriteAgentTrafficLogs() {
         try {
-            if (writesForAgentTrafficLogs != null && !writesForAgentTrafficLogs.isEmpty()) {
-                loggerMaker.infoAndAddToDb("bulkWriteAgentTrafficLogs called with " + writesForAgentTrafficLogs.size() + " logs");
-                DbLayer.bulkWriteAgentTrafficLogs(writesForAgentTrafficLogs);
+            if (agentTrafficLogs != null && !agentTrafficLogs.isEmpty()) {
+                loggerMaker.infoAndAddToDb("bulkWriteAgentTrafficLogs called with " + agentTrafficLogs.size() + " logs");
+                DbLayer.bulkWriteAgentTrafficLogs(agentTrafficLogs);
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in bulkWriteAgentTrafficLogs " + e.toString());

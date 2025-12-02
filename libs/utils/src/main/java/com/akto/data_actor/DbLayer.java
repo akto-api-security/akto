@@ -2018,8 +2018,16 @@ public class DbLayer {
                 return; // Base prompt already set
             }
             
-            // Fetch from selected collection's detectedBasePrompt
-            String selectedCollectionId = policy.getSelectedCollection();
+            // Fetch from selected agent servers' collection detectedBasePrompt
+            // Note: Assumes single collection - uses first selected agent server's collection ID
+            List<GuardrailPolicies.SelectedServer> selectedAgentServers = policy.getEffectiveSelectedAgentServers();
+            if (selectedAgentServers == null || selectedAgentServers.isEmpty()) {
+                return;
+            }
+            
+            // Use first selected agent server's collection ID (single collection assumption)
+            GuardrailPolicies.SelectedServer firstServer = selectedAgentServers.get(0);
+            String selectedCollectionId = firstServer.getId();
             if (selectedCollectionId == null || selectedCollectionId.isEmpty()) {
                 return;
             }
