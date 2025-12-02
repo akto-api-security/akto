@@ -52,7 +52,7 @@ public class AccountConfigurationCache {
      * Thread-safe with double-check locking.
      *
      * @param dataActor DataActor instance to fetch data if refresh is needed
-     * @return AccountConfig containing account settings and API collections
+     * @return AccountConfig containing account settings and API collections, or default config with redact=false if cache fails
      */
     public AccountConfig getConfig(DataActor dataActor) {
         long currentTime = System.currentTimeMillis();
@@ -68,10 +68,28 @@ public class AccountConfigurationCache {
         }
 
         if (cachedConfig == null) {
-            logger.errorAndAddToDb("getConfig returning null - cache refresh failed");
+            logger.errorAndAddToDb("getConfig returning null - cache refresh failed, returning default config with redact=false");
+            return getDefaultConfig();
         }
 
         return cachedConfig;
+    }
+
+    /**
+     * Returns a default AccountConfig with redaction disabled.
+     * Used as fallback when cache refresh fails.
+     *
+     * @return Default AccountConfig with accountId=0, isRedacted=false, and empty collections
+     */
+    private AccountConfig getDefaultConfig() {
+        return new AccountConfig(
+            0,                          // accountId
+            false,                      // isRedacted = false (as requested)
+            new ArrayList<>(),          // empty apiCollections
+            new ArrayList<>(),          // empty apiInfos
+            new HashMap<>(),            // empty apiCollectionUrlTemplates
+            new HashMap<>()             // empty apiInfoUrlToMethods
+        );
     }
 
     /**
