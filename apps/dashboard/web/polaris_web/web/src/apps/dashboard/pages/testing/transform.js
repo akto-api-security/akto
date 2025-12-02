@@ -1371,6 +1371,10 @@ getMissingConfigs(testResults){
                 systemMessage = systemMessage.substring(0, rootCauseIndex).trim()
             }
         }
+
+        if(conversation?.validationMessage !== null && conversation?.validationMessage !== undefined && conversation?.validationMessage?.length > 0){
+          systemMessage += ("\n\n### VALIDATION MESSAGE ###\n" + conversation?.validationMessage);
+        }
         
         conversationsListCopy.push({
             ...commonObj,
