@@ -52,7 +52,7 @@ public class AccountConfigurationCache {
      * Thread-safe with double-check locking.
      *
      * @param dataActor DataActor instance to fetch data if refresh is needed
-     * @return AccountConfig containing account settings and API collections
+     * @return AccountConfig containing account settings and API collections, or default config with redact=false if cache fails
      */
     public AccountConfig getConfig(DataActor dataActor) {
         long currentTime = System.currentTimeMillis();
@@ -67,7 +67,29 @@ public class AccountConfigurationCache {
             }
         }
 
+        if (cachedConfig == null) {
+            logger.errorAndAddToDb("getConfig returning null - cache refresh failed, returning default config with redact=false");
+            return getDefaultConfig();
+        }
+
         return cachedConfig;
+    }
+
+    /**
+     * Returns a default AccountConfig with redaction disabled.
+     * Used as fallback when cache refresh fails.
+     *
+     * @return Default AccountConfig with accountId=0, isRedacted=false, and empty collections
+     */
+    private AccountConfig getDefaultConfig() {
+        return new AccountConfig(
+            0,                          // accountId
+            false,                      // isRedacted = false (as requested)
+            new ArrayList<>(),          // empty apiCollections
+            new ArrayList<>(),          // empty apiInfos
+            new HashMap<>(),            // empty apiCollectionUrlTemplates
+            new HashMap<>()             // empty apiInfoUrlToMethods
+        );
     }
 
     /**
@@ -78,7 +100,16 @@ public class AccountConfigurationCache {
         try {
             logger.infoAndAddToDb("Refreshing account configuration cache");
             AccountSettings accountSettings = dataActor.fetchAccountSettings();
-            logger.infoAndAddToDb("Fetched accountSettings in configuration cache");
+
+            logger.infoAndAddToDb("Fetched accountSettings in configuration cache. accountSettings is null: " + (accountSettings == null));
+
+            if (accountSettings == null) {
+                logger.errorAndAddToDb("fetchAccountSettings returned null. Cannot refresh cache");
+                return;
+            }
+
+            logger.infoAndAddToDb("AccountSettings ID: " + accountSettings.getId());
+
             List <ApiCollection> apiCollections = new ArrayList<>();
             if (accountSettings.getId() != 1758179941) {
                 apiCollections = dataActor.fetchAllApiCollections();
@@ -133,6 +164,7 @@ public class AccountConfigurationCache {
                                   ", API Infos: " + (apiInfos != null ? apiInfos.size() : 0));
         } catch (Exception e) {
             logger.errorAndAddToDb(e, "Error refreshing account configuration cache. Keeping old cache if available.");
+            e.printStackTrace();
         }
     }
 

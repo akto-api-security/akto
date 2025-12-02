@@ -189,8 +189,11 @@ public class MaliciousTrafficDetectorTask implements Task {
               }
 
               AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
-              Context.accountId.set(config.getAccountId());
-              Context.isRedactPayload.set(config.isRedacted());
+              if (config == null) {
+                Context.isRedactPayload.set(false);
+              } else {
+                Context.isRedactPayload.set(config.isRedacted());
+              }
 
               for (ConsumerRecord<String, byte[]> record : records) {
                 HttpResponseParam httpResponseParam = HttpResponseParam.parseFrom(record.value());
@@ -433,8 +436,8 @@ public class MaliciousTrafficDetectorTask implements Task {
 
   private void processRecord(HttpResponseParam record) throws Exception {
     HttpResponseParams responseParam = buildHttpResponseParam(record);
+    Context.accountId.set(Integer.parseInt(responseParam.getAccountId()));
     String actor = this.threatConfigEvaluator.getActorId(responseParam);
-
     if (actor == null || actor.isEmpty()) {
       logger.warnAndAddToDb("Dropping processing of record with no actor IP, account: " + responseParam.getAccountId());
       return;

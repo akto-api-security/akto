@@ -74,6 +74,8 @@ public class ApiCollection {
 
     String detectedBasePrompt;
     public static final String DETECTED_BASE_PROMPT = "detectedBasePrompt";
+    int mcpMaliciousnessLastCheck;
+    public static final String MCP_MALICIOUSNESS_LAST_CHECK = "mcpMaliciousnessLastCheck";
 
     private static final List<String> ENV_KEYWORDS_WITH_DOT = Arrays.asList(
         "staging", "preprod", "qa", "demo", "dev", "test", "svc", 
@@ -477,5 +479,11 @@ public class ApiCollection {
 
     public void setDetectedBasePrompt(String detectedBasePrompt) {
         this.detectedBasePrompt = detectedBasePrompt;
+    public int getMcpMaliciousnessLastCheck() {
+        return mcpMaliciousnessLastCheck;
+    }
+
+    public void setMcpMaliciousnessLastCheck(int mcpMaliciousnessLastCheck) {
+        this.mcpMaliciousnessLastCheck = mcpMaliciousnessLastCheck;
     }
 }

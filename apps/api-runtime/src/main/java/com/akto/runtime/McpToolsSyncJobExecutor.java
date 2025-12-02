@@ -74,8 +74,8 @@ public class McpToolsSyncJobExecutor {
     private static final String LOCAL_IP = "127.0.0.1";
     
     // MCP Transport types
-    private static final String TRANSPORT_SSE = "SSE";
-    private static final String TRANSPORT_HTTP = "HTTP";
+    public static final String TRANSPORT_SSE = "SSE";
+    public static final String TRANSPORT_HTTP = "HTTP";
 
     private ServerCapabilities mcpServerCapabilities = null;
     private String mcpSessionId = null;

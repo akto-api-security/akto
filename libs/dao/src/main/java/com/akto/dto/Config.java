@@ -37,7 +37,8 @@ public abstract class Config {
     public String id;
 
     public enum ConfigType {
-        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, GOOGLE_SAML, AWS_WAF, SPLUNK_SIEM, AKTO_DASHBOARD_HOST_URL, CLOUDFLARE_WAF, RSA_KP, MCP_REGISTRY;
+        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, GOOGLE_SAML, AWS_WAF, SPLUNK_SIEM, AKTO_DASHBOARD_HOST_URL, CLOUDFLARE_WAF, RSA_KP, MCP_REGISTRY,
+        SLACK_ALERT_INTERNAL;
     }
 
     public ConfigType configType;
@@ -675,6 +676,27 @@ public abstract class Config {
             this.slackWebhookUrl = slackWebhookUrl;
         }
     }
+
+    @BsonDiscriminator
+    public static class SlackAlertInternalConfig extends Config {
+        private String slackWebhookUrl;
+
+        public static final String CONFIG_ID = ConfigType.SLACK_ALERT_INTERNAL.name() + CONFIG_SALT;
+
+        public SlackAlertInternalConfig() {
+            this.configType = ConfigType.SLACK_ALERT_INTERNAL;
+            this.id = CONFIG_ID;
+        }
+
+        public String getSlackWebhookUrl() {
+            return slackWebhookUrl;
+        }
+
+        public void setSlackWebhookUrl(String slackWebhookUrl) {
+            this.slackWebhookUrl = slackWebhookUrl;
+        }
+    }
+
     @BsonDiscriminator
     public static class HybridSaasConfig extends Config {
         String privateKey;
