@@ -658,34 +658,65 @@ const transform = {
     return conditions;
   },
   async getAllSubcategoriesData(fetchActive,type){
-    let finalDataSubCategories = [], promises = [], categories = [];
+    let finalDataSubCategories = [], categories = [];
     let testSourceConfigs = []
     const limit = 50;
-    for(var i = 0 ; i < 40; i++){
-      promises.push(
-        api.fetchAllSubCategories(fetchActive, type, i * limit, limit)
-      )
-    }
-    const allResults = await Promise.allSettled(promises);
-    for (const result of allResults) {
-      if (result.status === "fulfilled"){
-        if(result?.value?.subCategories && result?.value?.subCategories !== undefined && result?.value?.subCategories.length > 0){
-          finalDataSubCategories.push(...result.value.subCategories);
-        }
+    const maxBatches = 125; // Maximum 6000 entries
+    const batchSize = 10; // Fetch 10 batches at a time for parallel requests
+    
+    let currentBatch = 0;
+    let hasMoreData = true;
+    
+    while (currentBatch < maxBatches && hasMoreData) {
+      let promises = [];
+      const batchesToFetch = Math.min(batchSize, maxBatches - currentBatch);
+      
+      // Create parallel requests for current batch range
+      for (let i = 0; i < batchesToFetch; i++) {
+        const skip = (currentBatch + i) * limit;
+        promises.push(
+          api.fetchAllSubCategories(fetchActive, type, skip, limit)
+        );
+      }
+      
+      const allResults = await Promise.allSettled(promises);
+      let foundIncompleteBatch = false;
+      
+      for (const result of allResults) {
+        if (result.status === "fulfilled"){
+          const subCategoriesCount = result?.value?.subCategories?.length || 0;
+          
+          if(subCategoriesCount > 0){
+            finalDataSubCategories.push(...result.value.subCategories);
+            
+            // If a batch returned fewer than limit items, we've reached the end
+            if (subCategoriesCount < limit) {
+              foundIncompleteBatch = true;
+            }
+          }
 
-        if(result?.value?.categories && result?.value?.categories !== undefined && result?.value?.categories.length > 0){
-          if(categories.length === 0){
-            categories.push(...result.value.categories);
+          if(result?.value?.categories && result?.value?.categories !== undefined && result?.value?.categories.length > 0){
+            if(categories.length === 0){
+              categories.push(...result.value.categories);
+            }
+          }
+
+          if (result?.value?.testSourceConfigs &&
+            result?.value?.testSourceConfigs !== undefined &&
+            result?.value?.testSourceConfigs.length > 0) {
+            testSourceConfigs = result?.value?.testSourceConfigs
           }
         }
-
-        if (result?.value?.testSourceConfigs &&
-          result?.value?.testSourceConfigs !== undefined &&
-          result?.value?.testSourceConfigs.length > 0) {
-          testSourceConfigs = result?.value?.testSourceConfigs
-        }
+      }
+      
+      currentBatch += batchesToFetch;
+      
+      // Stop if we found an incomplete batch (fewer than limit items)
+      if (foundIncompleteBatch) {
+        hasMoreData = false;
       }
     }
+    
     return {
       categories: categories,
       subCategories: finalDataSubCategories,
