@@ -133,11 +133,12 @@ public class TagMismatchCron {
      * Directly modifies the input set by removing collection IDs that should be ignored.
      *
      * Logic: Extract service name from hostname and check if it's a substring of the remaining hostname.
-     * Example: "local.ebe-creditcard-service-netcore.svc:5000-ebe-creditcard-service-netcore"
+     * Example: "local.ebe-my-payment-service.svc:5000-my-payment-service"
      * - Split by "."
-     * - Last segment: "svc:5000-ebe-creditcard-service-netcore"
-     * - Extract service name (everything after first "-"): "ebe-creditcard-service-netcore"
-     * - Remaining hostname: everything except the extracted service name = "local.ebe-creditcard-service-netcore.svc:5000"
+     * - Last segment: "svc:5000-my-payment-service"
+     * - Find first dash in last segment: at index 8 (after "5000")
+     * - Extract service name (everything after first dash in last segment): "my-payment-service"
+     * - Remaining hostname: everything before that dash = "local.ebe-my-payment-service.svc:5000"
      * - Check if remaining hostname contains the extracted service name
      * - If yes, ignore this collection (remove from set)
      *
@@ -171,11 +172,14 @@ public class TagMismatchCron {
                 continue;
             }
 
-            // Find the last occurrence of dash in the full hostname
-            int dashIndexInHostname = hostname.lastIndexOf("-");
+            // Find the first dash in the last segment
+            int dashIndexInLastSegment = lastPart.indexOf("-");
+
+            // Calculate position of this dash in the full hostname
+            int dashIndexInHostname = hostname.length() - lastPart.length() + dashIndexInLastSegment;
 
             // Extract service name: everything after the dash
-            String extractedServiceName = hostname.substring(dashIndexInHostname + 1);
+            String extractedServiceName = lastPart.substring(dashIndexInLastSegment+ 1);
 
             // If extracted service name is empty, skip
             if (extractedServiceName.isEmpty()) {
