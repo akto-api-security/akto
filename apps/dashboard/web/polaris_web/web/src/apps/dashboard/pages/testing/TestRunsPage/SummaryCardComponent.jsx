@@ -30,6 +30,20 @@ const SummaryCardComponent = ({
   
   const iconSource = collapsible ? ChevronUpMinor : ChevronDownMinor;
   
+  // Convert keys from CAPS_SNAKE_CASE to PascalCase (first letter capitalized)
+  const subCategoryInfoCamel = React.useMemo(() => {
+    if (!subCategoryInfo || Object.keys(subCategoryInfo).length === 0) {
+      return subCategoryInfo;
+    }
+    const converted = {};
+    Object.entries(subCategoryInfo).forEach(([key, value]) => {
+      const camelKey = func.capsSnakeToCamel(key);
+      const pascalKey = camelKey.charAt(0).toUpperCase() + camelKey.slice(1);
+      converted[pascalKey] = value;
+    });
+    return converted;
+  }, [subCategoryInfo]);
+
   return (
     <LegacyCard>
       <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued">Vulnerabilities</Text>}>
@@ -43,7 +57,7 @@ const SummaryCardComponent = ({
             <Box paddingBlockStart={3}><Divider/></Box>
             <VerticalStack gap={"5"}>
               <HorizontalGrid columns={2} gap={6}>
-                <ChartypeComponent chartSize={190} navUrl={"/dashboard/issues"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
+                <ChartypeComponent chartSize={190} navUrl={"/dashboard/issues"} data={subCategoryInfoCamel} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
                 <ChartypeComponent
                     data={severityMap}
                     navUrl={"/dashboard/issues"} title={"Severity"} isNormal={true} boxHeight={'250px'} dataTableWidth="250px" boxPadding={8}
