@@ -12,7 +12,8 @@ export const BasePromptConfig = {
         if (!enableBasePromptRule) return null;
         const autoDetectText = basePromptAutoDetect ? ' (Auto-detect)' : '';
         const promptText = basePrompt ? ` - ${basePrompt.substring(0, 30)}${basePrompt.length > 30 ? '...' : ''}` : '';
-        return `Enabled${autoDetectText}${promptText}, Confidence: ${basePromptConfidenceScore.toFixed(2)}`;
+        if (!(autoDetectText && promptText)) return null; 
+        return `${autoDetectText}${promptText}, Confidence: ${basePromptConfidenceScore.toFixed(2)}`;
     }
 };
 
@@ -50,6 +51,7 @@ const BasePromptStep = ({
                             helpText="Automatically detect the base prompt pattern from agent traffic. If disabled, you must provide the base prompt manually."
                         />
 
+                        { /* TODO: Add auto-detected base prompt display with fallback placeholder text when auto-detect is enabled */ }
                         {!basePromptAutoDetect && (
                             <TextField
                                 label="Base Prompt Template"
@@ -65,11 +67,11 @@ const BasePromptStep = ({
                             <Text variant="bodyMd" fontWeight="medium">Confidence Score: {basePromptConfidenceScore.toFixed(2)}</Text>
                             <Box paddingBlockStart="2">
                                 <RangeSlider
-                                    label=""
+                                    label="Confidence Threshold"
                                     value={basePromptConfidenceScore}
                                     min={0}
                                     max={1}
-                                    step={0.01}
+                                    step={0.1}
                                     output
                                     onChange={setBasePromptConfidenceScore}
                                     helpText="Set the confidence threshold (0-1). Higher values require more confidence to block content."

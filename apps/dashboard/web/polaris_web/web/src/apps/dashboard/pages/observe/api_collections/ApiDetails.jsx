@@ -4,6 +4,7 @@ import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import ApiGroups from "../../../components/shared/ApiGroups";
 import SampleDataList from "../../../components/shared/SampleDataList";
+import SampleData from "../../../components/shared/SampleData";
 import { useEffect, useState, useRef } from "react";
 import api from "../api";
 import ApiSchema from "./ApiSchema";
@@ -87,6 +88,7 @@ function ApiDetails(props) {
     const apiDistributionAvailableRef = useRef(false);
     const [selectedTabId, setSelectedTabId] = useState('values');
     const [showForbidden, setShowForbidden] = useState(false);
+    const [detectedBasePrompt, setDetectedBasePrompt] = useState(null);
 
     const statusFunc = getStatus ? getStatus : (x) => {
         try {
@@ -250,6 +252,25 @@ function ApiDetails(props) {
             const { apiCollectionId, endpoint, method, description } = apiDetail
             setSelectedUrl({ url: endpoint, method: method })
             
+            // Fetch ApiInfo to get detectedBasePrompt
+            try {
+                const apiInfoResp = await api.fetchEndpoint({
+                    url: endpoint,
+                    method: method,
+                    apiCollectionId: apiCollectionId
+                });
+                // Check both apiInfoResp.data and apiInfoResp.data.apiInfo (depending on response structure)
+                const detectedPrompt = apiInfoResp?.data?.detectedBasePrompt || apiInfoResp?.detectedBasePrompt;
+                if (detectedPrompt && detectedPrompt.trim().length > 0) {
+                    setDetectedBasePrompt(detectedPrompt);
+                } else {
+                    setDetectedBasePrompt(null);
+                }
+            } catch (error) {
+                console.error("Error fetching ApiInfo:", error);
+                setDetectedBasePrompt(null);
+            }
+            
             try {
                 await api.checkIfDependencyGraphAvailable(apiCollectionId, endpoint, method).then((resp) => {
                     if (!resp.dependencyGraphExists) {
@@ -384,6 +405,8 @@ function ApiDetails(props) {
 
         fetchData();
         setHeadersWithData([])
+        // Reset detectedBasePrompt when apiDetail changes
+        setDetectedBasePrompt(null);
     }, [apiDetail])
 
     useEffect(() => {
@@ -572,6 +595,37 @@ function ApiDetails(props) {
                     method: apiDetail.method
                 }}
             />
+        </Box>
+    }
+
+    const BasePromptTab = {
+        id: 'base-prompt',
+        content: "Prompt Template",
+        component: <Box paddingBlockStart={"4"}>
+            <VerticalStack gap="4">
+                <Box background="bg-surface-secondary" padding="4" borderRadius="2">
+                    <VerticalStack gap="2">
+                        <Text variant="headingSm" fontWeight="semibold">
+                            Detected Prompt Template
+                        </Text>
+                        <Box background="bg-surface" padding="2" borderRadius="1" style={{ minHeight: '200px' }}>
+                            <SampleData
+                                data={{ 
+                                    message: detectedBasePrompt,
+                                    vulnerabilitySegments: func.findPlaceholders(detectedBasePrompt)
+                                }}
+                                editorLanguage="plaintext"
+                                readOnly={true}
+                                minHeight="200px"
+                                wordWrap={true}
+                            />
+                        </Box>
+                        <Text variant="bodySm" color="subdued">
+                            Auto-detected prompt template with placeholders from agent traffic. This template represents the common structure of prompts sent to this endpoint.
+                        </Text>
+                    </VerticalStack>
+                </Box>
+            </VerticalStack>
         </Box>
     }
     const ValuesTab = {
@@ -784,6 +838,7 @@ function ApiDetails(props) {
                 tabs={[
                     ValuesTab,
                     SchemaTab,
+                    ...(detectedBasePrompt ? [BasePromptTab] : []),
                     ...(hasIssues ? [IssuesTab] : []),
                     ApiCallStatsTab,
                     DependencyTab

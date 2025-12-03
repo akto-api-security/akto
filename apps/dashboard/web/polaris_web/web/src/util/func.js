@@ -2329,6 +2329,42 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   },
   isLimitedAccount(){
     return window?.ACTIVE_ACCOUNT === 1753372418
+  },
+  /**
+   * Find all placeholder positions in a text string (e.g., {}, {var}, {variable})
+   * Returns an array of objects with start, end, and phrase properties for highlighting
+   * @param {string} text - The text to search for placeholders
+   * @returns {Array} Array of placeholder objects with {start, end, phrase}
+   */
+  findPlaceholders: function(text) {
+    if (!text) return [];
+    const placeholders = [];
+    // Find all individual {} pairs, including overlapping ones like {{}}
+    // We search from each position to find the nearest closing brace
+    for (let i = 0; i < text.length; i++) {
+      if (text[i] === '{') {
+        // Find the nearest matching closing brace
+        let depth = 1;
+        for (let j = i + 1; j < text.length && depth > 0; j++) {
+          if (text[j] === '{') {
+            depth++;
+          } else if (text[j] === '}') {
+            depth--;
+            if (depth === 0) {
+              // Found a complete placeholder
+              const placeholder = text.substring(i, j + 1);
+              placeholders.push({
+                start: i,
+                end: j + 1,
+                phrase: placeholder
+              });
+              break; // Found the match for this opening brace, move on
+            }
+          }
+        }
+      }
+    }
+    return placeholders;
   }
 }
 

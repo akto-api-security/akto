@@ -523,8 +523,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     };
 
     const renderAllSteps = () => (
-            <VerticalStack gap="2">
-                {steps.map((step) => (
+        <VerticalStack gap="2">
+            {steps.map((step) => (
                 <Box
                     key={step.number}
                     ref={(el) => stepRefs.current[step.number] = el}
@@ -545,17 +545,17 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                                 >
                                     <HorizontalStack gap="3" blockAlign="center">
                                         <Box style={{
-                                width: "24px",
-                                height: "24px",
-                                borderRadius: "50%",
-                                backgroundColor: step.number === currentStep ? "#0070f3" : 
+                                            width: "24px",
+                                            height: "24px",
+                                            borderRadius: "50%",
+                                            backgroundColor: step.number === currentStep ? "#0070f3" :
                                                             (!step.isValid && step.number < currentStep) ? "#d72c0d" :
-                                                step.number < currentStep ? "#008060" : "#e1e3e5",
+                                                            step.number < currentStep ? "#008060" : "#e1e3e5",
                                             color: step.number <= currentStep || !step.isValid ? "white" : "#6d7175",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                fontSize: "12px",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            fontSize: "12px",
                                             fontWeight: "bold",
                                             flexShrink: 0
                                         }}>
@@ -565,47 +565,47 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                                         <Box style={{ flexGrow: 1 }}>
                                             <VerticalStack gap="1">
                                                 <HorizontalStack gap="2" blockAlign="center">
-                            <Text 
-                                variant="bodyMd" 
+                                                    <Text
+                                                        variant="bodyMd"
                                                         color={step.number === currentStep ? "success" : "subdued"}
-                                fontWeight={step.number === currentStep ? "bold" : "regular"}
-                            >
-                                {step.title}
-                            </Text>
+                                                        fontWeight={step.number === currentStep ? "bold" : "regular"}
+                                                    >
+                                                        {step.title}
+                                                    </Text>
                                                     {!step.isValid && step.number !== currentStep && (
                                                         <Icon source={AlertMinor} color="critical" />
-                            )}
-                        </HorizontalStack>
+                                                    )}
+                                                </HorizontalStack>
                                                 {step.number !== currentStep && (
                                                     <>
-                        {step.summary && (
-                                <Text variant="bodySm" color="subdued" fontWeight="medium">
-                                    {step.summary}
-                                </Text>
+                                                        {step.summary && (
+                                                            <Text variant="bodySm" color="subdued" fontWeight="medium">
+                                                                {step.summary}
+                                                            </Text>
                                                         )}
                                                         {!step.isValid && step.errorMessage && (
                                                             <Text variant="bodySm" color="critical" fontWeight="medium">
                                                                 {step.errorMessage}
-                </Text>
+                                                            </Text>
                                                         )}
                                                     </>
-                        )}
-            </VerticalStack>
-        </Box>
-                                </HorizontalStack>
-                                            </Box>
+                                                )}
+                                            </VerticalStack>
+                                        </Box>
+                                    </HorizontalStack>
+                                </Box>
 
                                 {step.number === currentStep && (
-                                <Box paddingBlockStart="2">
+                                    <Box paddingBlockStart="2">
                                         {renderStepContent(step.number)}
-                            </Box>
-                        )}
-                    </VerticalStack>
+                                    </Box>
+                                )}
+                            </VerticalStack>
+                        </Box>
+                    </LegacyCard>
                 </Box>
-        </LegacyCard>
-                            </Box>
             ))}
-            </VerticalStack>
+        </VerticalStack>
     );
 
     const renderStepContent = (stepNumber) => {
