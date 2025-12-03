@@ -86,6 +86,14 @@ const func = {
     }
     return res
   },
+  capsSnakeToCamel(str) {
+    if (!str) return str;
+    return str
+      .toLowerCase()
+      .split('_')
+      .map((word, index) => index === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1))
+      .join('');
+  },
   nameValidationFunc(nameVal, initialCond){
     let error = ""
     if(nameVal.length === 0 || initialCond){
