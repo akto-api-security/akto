@@ -1,14 +1,15 @@
-import { Spinner } from "@shopify/polaris"
+import { Spinner, Text } from "@shopify/polaris"
 
 const SpinnerCentered = (
-    {height}
+    {height, text}
 ) => {
 
     const heightValue = height ? height : "50vh"
 
     return (
-        <div style={{width: "100%", height: heightValue, display: "flex", alignItems: "center", justifyContent: "center"}}>
+        <div style={{width: "100%", height: heightValue, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px"}}>
             <Spinner size="small"/>
+            {text ? <Text variant="bodyMd" color="subdued">{text}</Text> : null}
         </div>
     )   
 }

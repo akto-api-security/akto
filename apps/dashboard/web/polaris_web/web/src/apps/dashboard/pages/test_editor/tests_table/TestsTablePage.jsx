@@ -141,6 +141,7 @@ function TestsTablePage() {
     const categoryMap = LocalStore.getState().categoryMap;
     const dashboardCategory = getDashboardCategory();
     const [loading, setLoading] = useState(false)
+    const [testsLoaded, setTestsLoaded] = useState(0);
 
     const severityOrder = { CRITICAL: 5, HIGH: 4, MEDIUM: 3, LOW: 2, dynamic_severity: 1 };
 
@@ -208,7 +209,7 @@ function TestsTablePage() {
             }
 
             if (localSubCategoryMap == undefined || localSubCategoryMap == null || Object.keys(localSubCategoryMap).length === 0) {
-                await transform.setTestMetadata()
+                await transform.setTestMetadata("testEditor", setTestsLoaded)
                 localSubCategoryMap = LocalStore.getState().subCategoryMap
             }
 
@@ -218,7 +219,7 @@ function TestsTablePage() {
                     categories: Object.keys(categoryMap)
                 }
             } else { 
-                metaDataObj = await transform.getAllSubcategoriesData(false, "testEditor")
+                metaDataObj = await transform.getAllSubcategoriesData(false, "testEditor", setTestsLoaded)
                 categoriesName = metaDataObj?.categories.map(x => x.name)
             }
             if (!metaDataObj?.subCategories?.length) return;
@@ -296,6 +297,7 @@ function TestsTablePage() {
             data={data[selectedTab]}
             filters={[]}
             loading={loading}
+            loadingText={`Loading tests... ${testsLoaded} tests loaded`}
         />,
         <TestsFlyLayout data={selectedTest} setShowDetails={setShowDetails} showDetails={showDetails} ></TestsFlyLayout>
     ]

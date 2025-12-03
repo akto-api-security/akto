@@ -33,7 +33,7 @@ const TestEditor = () => {
     const setSubCategoryMap = LocalStore(state => state.setSubCategoryMap)
 
     const [loading, setLoading] = useState(true)
-
+    const [testsLoaded, setTestsLoaded] = useState(0)
 
     const handleExit = () => {
         navigate("/dashboard/test-library/tests")
@@ -60,7 +60,7 @@ const TestEditor = () => {
     }
 
     const fetchSubcategories = async () => {
-        const metaDataObj = await transform.getAllSubcategoriesData(false, "testEditor")
+        const metaDataObj = await transform.getAllSubcategoriesData(false, "testEditor", setTestsLoaded)
         return metaDataObj.subCategories
     }
 
@@ -151,7 +151,7 @@ const TestEditor = () => {
 
     return (
         loading ?
-            <SpinnerCentered />
+            <SpinnerCentered height="100vh" text={`Loading tests... ${testsLoaded} tests loaded`}/>
         : 
         <Frame topBar={
             headerEditor

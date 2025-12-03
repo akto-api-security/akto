@@ -657,7 +657,7 @@ const transform = {
     }
     return conditions;
   },
-  async getAllSubcategoriesData(fetchActive,type){
+  async getAllSubcategoriesData(fetchActive, type, setTestsLoaded) {
     let finalDataSubCategories = [], categories = [];
     let testSourceConfigs = []
     const limit = 50;
@@ -666,6 +666,8 @@ const transform = {
     
     let currentBatch = 0;
     let hasMoreData = true;
+    
+    let totalTestsLoaded = 0;
     
     while (currentBatch < maxBatches && hasMoreData) {
       let promises = [];
@@ -688,7 +690,11 @@ const transform = {
           
           if(subCategoriesCount > 0){
             finalDataSubCategories.push(...result.value.subCategories);
-            
+            totalTestsLoaded += subCategoriesCount;
+            if(setTestsLoaded){
+              setTestsLoaded(totalTestsLoaded)
+            }
+
             // If a batch returned fewer than limit items, we've reached the end
             if (subCategoriesCount < limit) {
               foundIncompleteBatch = true;
@@ -723,8 +729,12 @@ const transform = {
       testSourceConfigs: testSourceConfigs
     }
   },
-  async setTestMetadata() {
-    const resp = await this.getAllSubcategoriesData(false, "Dashboard")
+  async setTestMetadata(category, setTestsLoaded) {
+    let type = "Dashboard";
+    if(category){
+      type = category;
+    }
+    const resp = await this.getAllSubcategoriesData(false, type, setTestsLoaded)
     let subCategoryMap = {};
     resp.subCategories.forEach((x) => {
       func.trimContentFromSubCategory(x)
