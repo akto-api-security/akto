@@ -697,7 +697,7 @@ public class TagMismatchCronTest extends MongoBasedTest {
         ApiCollection collection = TagMismatchDataMother.createApiCollection(
             -107935017,
             "EBE Credit Card Service",
-            "local.ebe-creditcard-service-netcore.svc:5000-ebe-creditcard-service-netcore"
+            "central.ebe-creditcard-service-netcore.svc:5000-ebe-creditcard-service"
         );
         TagMismatchDataMother.insertApiCollections(Arrays.asList(collection));
 
