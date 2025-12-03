@@ -49,8 +49,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static com.akto.task.Cluster.callDibs;
-
 public class SyncCron {
     private static final LoggerMaker loggerMaker = new LoggerMaker(SyncCron.class, LogDb.DASHBOARD);
     private static final String AKTO_API_INFO_CRONS = "AKTO_API_INFO_CRONS";
