@@ -2268,7 +2268,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return defaultLabel
   },
   formatCollectionType(type) {
-    return (type?.keyName?.replace(/^(userSetEnvType|envType)/, 'env')?.slice(0, 30) ?? '') + '=' + (type?.value?.slice(0, 30) ?? '')
+    return (type?.keyName?.replace(/^(userSetEnvType|envType)/, 'env')?.slice(0, 40) ?? '') + '=' + (type?.value?.slice(0, 30) ?? '')
   },
   getRecurringContext(periodInSeconds) {
     if (periodInSeconds === 86400) return "Daily"
