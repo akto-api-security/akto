@@ -88,11 +88,14 @@ const func = {
   },
   capsSnakeToCamel(str) {
     if (!str) return str;
-    return str
-      .toLowerCase()
-      .split('_')
-      .map((word, index) => index === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1))
-      .join('');
+    if (str.includes("_")) {
+      return str
+        .toLowerCase()
+        .split('_')
+        .map((word, index) => index === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1))
+        .join('');
+    }
+    return str;
   },
   nameValidationFunc(nameVal, initialCond){
     let error = ""
