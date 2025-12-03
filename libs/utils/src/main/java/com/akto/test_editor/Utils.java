@@ -164,9 +164,26 @@ public class Utils {
         return data;
     }
 
+    private static Object parseNumericString(Object data) {
+        if (!(data instanceof String)) {
+            return data;
+        }
+        String dataStr = (String) data;
+        try {
+            return Integer.parseInt(dataStr);
+        } catch (NumberFormatException e) {
+            try {
+                return Double.parseDouble(dataStr);
+            } catch (NumberFormatException e2) {
+                return data;
+            }
+        }
+    }
+
     public static Boolean applyIneqalityOperation(Object data, Object querySet, String operator) {
         Boolean result = false;
         try {
+            data = parseNumericString(data);
             if (data instanceof Integer) {
                 List<Integer> queryList = (List) querySet;
                 if (queryList == null || queryList.size() == 0) {
