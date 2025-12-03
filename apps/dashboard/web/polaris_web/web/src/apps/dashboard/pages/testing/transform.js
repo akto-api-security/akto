@@ -808,7 +808,7 @@ getInfoSectionsHeaders(){
   ]
   return moreInfoSections
   },
-convertSubIntoSubcategory(resp){
+async convertSubIntoSubcategory(resp){
   let obj = {}
   let countObj = {
     CRITICAL: 0,
@@ -816,7 +816,11 @@ convertSubIntoSubcategory(resp){
     MEDIUM: 0,
     LOW: 0,
   }
-  const subCategoryMap = LocalStore.getState().subCategoryMap
+  let subCategoryMap = LocalStore.getState().subCategoryMap
+  if(subCategoryMap==undefined || subCategoryMap==null || Object.keys(subCategoryMap).length === 0){
+    await this.setTestMetadata()
+    subCategoryMap = LocalStore.getState().subCategoryMap
+  }
   Object.keys(resp).forEach((key)=>{
     const objectKey = subCategoryMap[key] ? subCategoryMap[key].superCategory.shortName : key;
     const objectKeyName = subCategoryMap[key] ? subCategoryMap[key].superCategory.name : key;
