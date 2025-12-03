@@ -10,13 +10,8 @@ import func from "../../../../../util/func"
 import transform from "./transform";
 import api from "../api"
 import { CellType } from "../../../components/tables/rows/GithubRow"
-import { getDashboardCategory } from "../../../../main/labelHelper"
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper"
 
-
-const sortOptions = [
-    { label: 'Template Name', value: 'template asc', directionLabel: 'A-Z', sortKey: 'testSuiteName', columnIndex: 1 },
-    { label: 'Template Name', value: 'template desc', directionLabel: 'Z-A', sortKey: 'testSuiteName', columnIndex: 1 },
-];
 
 function TestSuite() {
     const [show, setShow] = useState(false)
@@ -69,8 +64,8 @@ function TestSuite() {
     ]
 
     const resourceName = {
-        singular: 'test suite',
-        plural: 'test suites',
+        singular: mapLabel('test', getDashboardCategory()) + ' suite',
+        plural: mapLabel('test', getDashboardCategory()) + ' suites',
     };
 
     const handleRowClick = (data) => {
@@ -80,7 +75,7 @@ function TestSuite() {
 
     const fetchData = async () => {
         const subCategoryMap = await transform.getSubCategoryMap(LocalStore);
-        const all = [], by_akto = [], custom = [];
+        let all = [], by_akto = [], custom = [];
 
         // Get dashboard category using the existing helper function
         const dashboardCategory = getDashboardCategory();
@@ -103,9 +98,9 @@ function TestSuite() {
             if (dashboardCategory === 'MCP Security') {
                 // For MCP Security, only show test suites with MCP_SECURITY suiteType
                 shouldInclude = testSuiteItem.suiteType === 'MCP_SECURITY';
-            } else if (dashboardCategory === 'Gen AI') {
-                // For Gen AI (AI Agent Security), only show test suites with AI_AGENT_SECURITY suiteType
-                shouldInclude = testSuiteItem.suiteType === 'AI_AGENT_SECURITY';
+            } else if (dashboardCategory === 'Agentic Security') {
+                // For Agentic Security, show test suites with both MCP_SECURITY and AI_AGENT_SECURITY suiteTypes
+                shouldInclude = testSuiteItem.suiteType === 'MCP_SECURITY' || testSuiteItem.suiteType === 'AI_AGENT_SECURITY';
             } else {
                 // For API Security, show test suites with OWASP suiteType (default API security)
                 shouldInclude = testSuiteItem.suiteType === 'OWASP';
@@ -131,11 +126,16 @@ function TestSuite() {
             all.push(customTestSuite);
             custom.push(customTestSuite);
         });
-        
+
+        // sort here by category priority
+        all = func.sortByCategoryPriority(all, 'testSuiteName');
+        by_akto = func.sortByCategoryPriority(by_akto, 'testSuiteName');
+        custom = func.sortByCategoryPriority(custom, 'testSuiteName');
+
         setData({
-            all: [...all],
-            by_akto: [...by_akto],
-            custom: [...custom],
+            all,
+            by_akto,
+            custom,
         });
 
     };
@@ -185,7 +185,6 @@ function TestSuite() {
     const components = [
         <GithubSimpleTable
             key={"test-suite-table"}
-            sortOptions={sortOptions}
             tableTabs={tableTabs}
             loading={tableLoading}
             selected={selected}
@@ -221,7 +220,7 @@ function TestSuite() {
             title={
                 <TitleWithInfo
                     tooltipContent={"Create or manage custom test suites by combining tests across categories for simplified test execution and reusability."}
-                    titleText={"Test Suites"}
+                    titleText={mapLabel("Test", getDashboardCategory()) + " Suites"}
                     docsUrl={"https://docs.akto.io/api-security-testing/concepts/test"}
                 />
             }

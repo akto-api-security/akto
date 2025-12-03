@@ -4,7 +4,9 @@ import java.util.List;
 
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.util.enums.GlobalEnums.Severity;
+import io.swagger.v3.oas.models.media.StringSchema;
 
 public class AktoDataType {
     private String name;
@@ -55,6 +57,13 @@ public class AktoDataType {
         this.sampleDataFixed = sampleDataFixed;
         this.categoriesList = categoriesList;
         this.dataTypePriority = severity;
+    }
+
+    public SingleTypeInfo.SubType toSubType() {
+        return new SingleTypeInfo.SubType(
+                this.name,this.sensitiveAlways, SuperType.STRING,
+                StringSchema.class, this.sensitivePosition
+        );
     }
 
     public String getName() {

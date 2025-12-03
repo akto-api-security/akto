@@ -405,8 +405,8 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
     public List<ApiInfo.ApiInfoKey> fetchEndpointsBySubType(SingleTypeInfo.SubType subType, int skip, int limit) {
         Bson filter = Filters.eq("subType", subType.getName());
         List<Bson> pipeline = getPipelineForEndpoints(filter);
-        pipeline.add(Aggregates.limit(limit));
         pipeline.add(Aggregates.skip(skip));
+        pipeline.add(Aggregates.limit(limit));
         return processPipelineForEndpoint(pipeline);
     }
 
@@ -426,8 +426,8 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         );
 
         pipeline.add(Aggregates.project(projections));
-        pipeline.add(Aggregates.group(groupedId));
         pipeline.add(Aggregates.sort(Sorts.descending(SingleTypeInfo._TIMESTAMP)));
+        pipeline.add(Aggregates.group(groupedId));
         return pipeline;
     }
 
@@ -798,20 +798,43 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
             }
         }
 
-        Bson filterQWithTs = Filters.and(
+        // OPTIMIZED APPROACH: Count all, then subtract excluded (total - excluded)
+        // This is much faster than using $nin with large arrays
+
+        // Query 1: Count ALL documents matching host filter + timestamp
+        Bson filterAllWithTs = Filters.and(
+                hostFilterQ,
                 Filters.gte(SingleTypeInfo._TIMESTAMP, startTimestamp),
                 Filters.lte(SingleTypeInfo._TIMESTAMP, endTimestamp),
-                Filters.nin(SingleTypeInfo._API_COLLECTION_ID, nonHostApiCollectionIds),
-                hostFilterQ,
                 userCollectionFilter
         );
 
-        long count = 0;
+        long totalCount = 0;
         if (useRbacUserCollections) {
-            count = SingleTypeInfoDao.instance.count(filterQWithTs);
+            totalCount = SingleTypeInfoDao.instance.count(filterAllWithTs);
         } else {
-            count = SingleTypeInfoDao.instance.getMCollection().countDocuments(filterQWithTs);
+            totalCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(filterAllWithTs);
         }
+
+        // Query 2: Count EXCLUDED collections using $in (much faster than $nin)
+        long excludedCount = 0;
+        if (!nonHostApiCollectionIds.isEmpty()) {
+            Bson filterExcludedWithTs = Filters.and(
+                    hostFilterQ,
+                    Filters.gte(SingleTypeInfo._TIMESTAMP, startTimestamp),
+                    Filters.lte(SingleTypeInfo._TIMESTAMP, endTimestamp),
+                    Filters.in(SingleTypeInfo._API_COLLECTION_ID, nonHostApiCollectionIds),
+                    userCollectionFilter
+            );
+
+            if (useRbacUserCollections) {
+                excludedCount = SingleTypeInfoDao.instance.count(filterExcludedWithTs);
+            } else {
+                excludedCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(filterExcludedWithTs);
+            }
+        }
+
+        long count = totalCount - excludedCount;
 
         nonHostApiCollectionIds.removeAll(deactivatedCollections);
 

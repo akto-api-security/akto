@@ -150,9 +150,18 @@ const learnMoreObject = {
             {
                 content:"How to create Swagger File using Akto",
                 value:"https://docs.akto.io/api-inventory/how-to/create-swagger-file-using-akto"
-            }, {
+            }, 
+            {
                 content: 'What is risk score',
                 value: 'https://docs.akto.io/api-discovery/concepts/risk-score'
+            },
+            {
+                content: `How Akto detects Shadow APIs`,
+                value: `https://docs.akto.io/api-inventory/concepts/shadow-apis`
+            },
+            {
+                content: `How Akto detects Zombie APIs`,
+                value: `https://docs.akto.io/api-inventory/concepts/zombie-apis`
             }
         ],
         videoLink: [
@@ -716,6 +725,14 @@ const learnMoreObject = {
             {
                 content: "How to configure Successful Exploits",
                 value: "https://docs.akto.io/api-protection/concepts/successful-exploits"
+            }
+        ]
+    },
+    dashboard_protection_configure_ignored_events: {
+        docsLink: [
+            {
+                content: "How to configure Ignored Events",
+                value: "https://docs.akto.io/api-protection/concepts/threat-ignored-events"
             }
         ]
     }

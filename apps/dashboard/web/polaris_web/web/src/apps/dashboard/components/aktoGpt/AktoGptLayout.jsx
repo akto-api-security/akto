@@ -10,6 +10,7 @@ import api from './api'
 import ResponseComponent from './ResponseComponent'
 import { useNavigate } from 'react-router-dom'
 import {ClipboardMinor} from '@shopify/polaris-icons';
+import { mapLabel, getDashboardCategory } from '../../../main/labelHelper';
 
 function AktoGptLayout({prompts,closeModal, runCustomTests}) {
 
@@ -158,7 +159,7 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
                                     </div>
                                 : queryType === "suggest_tests" && response?.responses[0]?.tests ?
                                 <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>
-                                    <Button primary onClick={runTests}>Run tests via Akto</Button>
+                                    <Button primary onClick={runTests}>{mapLabel('Run tests', getDashboardCategory())} via Akto</Button>
                                 </div>
                                 : queryType === "find_auth_related_tokens" && response?.responses?.length>0 ?
                                 <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>

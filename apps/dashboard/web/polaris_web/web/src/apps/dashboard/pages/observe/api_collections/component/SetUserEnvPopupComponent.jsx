@@ -164,6 +164,7 @@ const SetUserEnvPopupComponent = ({ popover, setPopover, tags, apiCollectionIds,
                 <>
                     <Popover.Section>
                         <VerticalStack gap={2}>
+                            <Text variant='headingXs'>Environment</Text>
                             <RadioButton
                                 label="Staging"
                                 checked={selectedEnvType === 'staging'}
@@ -184,7 +185,7 @@ const SetUserEnvPopupComponent = ({ popover, setPopover, tags, apiCollectionIds,
                     {allEnvTypes?.length > 0 && (
                         <Popover.Section>
                             <VerticalStack gap={2}>
-                                <Text variant='headingXs'>Custom Env</Text>
+                                <Text variant='headingXs'>Custom tags</Text>
                                 <VerticalStack gap={3}>
                                     {
                                         allEnvTypes.map((env) => {
@@ -205,7 +206,7 @@ const SetUserEnvPopupComponent = ({ popover, setPopover, tags, apiCollectionIds,
                                                         icon={DeleteMajor}
                                                         plain
                                                         onClick={() => {
-                                                            const deleteConfirmationMessage = "Are you sure you want to delete this custom enviroment type?"
+                                                            const deleteConfirmationMessage = "Are you sure you want to delete this custom tag?"
                                                             func.showConfirmationModal(deleteConfirmationMessage, "Delete", () => toggleTags(env, apiCollectionIds) )}
                                                         }
                                                     />
@@ -256,7 +257,7 @@ const SetUserEnvPopupComponent = ({ popover, setPopover, tags, apiCollectionIds,
                             </HorizontalStack>
                         ) : 
                         <div onClick={() => setShowInputBox(true)} style={{ cursor: 'pointer' }}>
-                            <Text fontWeight="regular" variant="bodyMd">Add custom</Text>
+                            <Text fontWeight="regular" variant="bodyMd">Add custom tag</Text>
                         </div>
                     }
                     <div onClick={() => toggleTags("reset", apiCollectionIds)} style={{ cursor: 'pointer' }}>

@@ -53,6 +53,7 @@ import RunTest from '../../observe/api_collections/RunTest';
 import TableStore from '../../../components/tables/TableStore'
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import TestingRunEndpointsModal from './TestingRunEndpointsModal';
+import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 
 let sortOptions = [
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 3 },
@@ -110,14 +111,14 @@ let filterOptions = [
   },
   {
     key: 'collectionIds',
-    label: 'API groups',
-    title: 'API groups',
+    label: mapLabel('API', getDashboardCategory()) + ' groups',
+    title: mapLabel('API', getDashboardCategory()) + ' groups',
     choices: [],
   },
   {
     key: 'apiNameFilter',
-    label: 'API Name',
-    title: 'API name',
+    label: mapLabel('API', getDashboardCategory()) + ' Name',
+    title: mapLabel('API', getDashboardCategory()) + ' name',
     choices: [],
   }
 ]
@@ -449,37 +450,62 @@ function SingleTestRunPage() {
     setTestingRunConfigId(testingRun.testingRunConfig?.id || -1)
     setSelectedTestRun(localSelectedTestRun);
     if (localSelectedTestRun.testingRunResultSummaryHexId) {
-      await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId, tableTabMap[selectedTab], sortKey, sortOrder, skip, limit, filters, queryValue).then(({ testingRunResults, errorEnums, issuesDescriptionMap, jiraIssuesMapForResults }) => {
-          testRunResultsRes = transform.prepareTestRunResults(hexId, testingRunResults, localSubCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults)
-          if (selectedTab === 'domain_unreachable' || selectedTab === 'skipped' || selectedTab === 'need_configurations') {
-            errorEnums['UNKNOWN_ERROR_OCCURRED'] = "OOPS! Unknown error occurred."
-            setErrorsObject(errorEnums)
-            setMissingConfigs(transform.getMissingConfigs(testRunResultsRes))
-          }
-      })
-      if (!func.deepComparison(copyFilters, filters) || copyUpdateTable !== updateTable) {
+      // Start both API calls in parallel
+      const shouldFetchCount = !func.deepComparison(copyFilters, filters) || copyUpdateTable !== updateTable;
+      
+      const fetchResultsPromise = api.fetchTestingRunResults(
+        localSelectedTestRun.testingRunResultSummaryHexId, 
+        tableTabMap[selectedTab], 
+        sortKey, 
+        sortOrder, 
+        skip, 
+        limit, 
+        filters, 
+        queryValue
+      ).then(({ testingRunResults, errorEnums, issuesDescriptionMap, jiraIssuesMapForResults }) => {
+        testRunResultsRes = transform.prepareTestRunResults(hexId, testingRunResults, localSubCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults)
+        if (selectedTab === 'domain_unreachable' || selectedTab === 'skipped' || selectedTab === 'need_configurations') {
+          errorEnums['UNKNOWN_ERROR_OCCURRED'] = "OOPS! Unknown error occurred."
+          setErrorsObject(errorEnums)
+          setMissingConfigs(transform.getMissingConfigs(testRunResultsRes))
+        }
+      }).catch((error) => {
+        console.error('Error fetching test run results:', error);
+        // Continue with empty results if this fails
+      });
+
+      const fetchCountPromise = shouldFetchCount ? api.fetchTestRunResultsCount(
+        localSelectedTestRun.testingRunResultSummaryHexId, 
+        filters
+      ).then((testCountMap) => {
         if(copyUpdateTable !== updateTable){
           setCopyUpdateTable(updateTable)
         }else{
           setCopyFilters(filters)
         }
-        await api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId, filters).then((testCountMap) => {
-          if(testCountMap !== null){
-            localCountMap = JSON.parse(JSON.stringify(testCountMap))  
+        if(testCountMap !== null){
+          localCountMap = JSON.parse(JSON.stringify(testCountMap))  
+        }
+        let countOthers = 0;
+        Object.keys(localCountMap).forEach((x) => {
+          if (x !== 'ALL') {
+            countOthers += localCountMap[x]
           }
-          let countOthers = 0;
-          Object.keys(localCountMap).forEach((x) => {
-            if (x !== 'ALL') {
-              countOthers += localCountMap[x]
-            }
-          })
-          localCountMap['SECURED'] = localCountMap['ALL'] >= countOthers ? localCountMap['ALL'] - countOthers : 0
-          localCountMap['VULNERABLE'] = Math.abs(localCountMap['VULNERABLE'] - localCountMap['IGNORED_ISSUES']);
-          const orderedValues = tableTabsOrder.map(key => localCountMap[tableTabMap[key]] || 0)
-          setTestRunResultsCount(orderedValues)
-          setTestRunCountMap(JSON.parse(JSON.stringify(localCountMap)));
         })
-      }
+        localCountMap['SECURED'] = localCountMap['ALL'] >= countOthers ? localCountMap['ALL'] - countOthers : 0
+        localCountMap['VULNERABLE'] = Math.abs(localCountMap['VULNERABLE'] - localCountMap['IGNORED_ISSUES']);
+        const orderedValues = tableTabsOrder.map(key => localCountMap[tableTabMap[key]] || 0)
+        setTestRunResultsCount(orderedValues)
+        setTestRunCountMap(JSON.parse(JSON.stringify(localCountMap)));
+      }).catch((error) => {
+        console.error('Error fetching test run results count:', error);
+        // Continue with existing count map if this fails
+      }) : Promise.resolve();
+
+      // Wait for the results promise (needed for return value), but don't wait for count promise
+      await fetchResultsPromise;
+      // Start count promise in background - it will set state when it completes
+      fetchCountPromise.catch(() => {}); // Suppress unhandled rejection warning
     }
     const key = tableTabMap[selectedTab]
     const total = localCountMap[key]
@@ -518,10 +544,7 @@ function SingleTestRunPage() {
       }
     }
 
-    // Fetch jira integration field metadata
-    if (window.JIRA_INTEGRATED === 'true') {
-      issuesFunctions.fetchCreateIssueFieldMetaData()
-    }
+    issuesFunctions.fetchIntegrationCustomFieldsMetadata();
   }, []);
 
   const promotedBulkActions = () => {
@@ -762,7 +785,7 @@ function SingleTestRunPage() {
         ]}
       >
         <Modal.Section>
-          <Text>Are you sure you want to re-calculate issues count? This will recalculate the total number of issues based on the latest test results and may affect the FIXED or IGNORED issues in the current testing run</Text>
+          <Text>{"Are you sure you want to re-calculate issues count? This will recalculate the total number of issues based on the latest" + mapLabel('test results', getDashboardCategory()) + " and may affect the FIXED or IGNORED issues in the current testing run"}</Text>
         </Modal.Section>
       </Modal>
     </>
@@ -1027,7 +1050,7 @@ function SingleTestRunPage() {
     title: 'Edit',
     items: [
       {
-        content: 'Tests',
+        content: mapLabel("More Tests", getDashboardCategory()),
         icon: PlusMinor,
         onAction: () => { setActiveFromTesting(true) }
       },
@@ -1042,7 +1065,7 @@ function SingleTestRunPage() {
     title: 'More',
     items: [
       {
-        content: 'See APIs',
+        content: 'See ' + mapLabel("APIs", getDashboardCategory()),
         icon: ViewMajor,
         onAction: () => { setShowTestingEndpointsModal(true) }
       },

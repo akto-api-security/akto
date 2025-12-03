@@ -188,7 +188,7 @@ public class InventoryAction extends UserAction {
                     return;
                 }
                 ApiInfoKey apiInfoKey = new ApiInfoKey(
-                        apiCollectionId,
+                        item.getInt(ApiInfoKey.API_COLLECTION_ID),
                         item.getString(ApiInfoKey.URL),
                         Method.fromString(item.getString(ApiInfoKey.METHOD)));
                 listOfEndpointsInCollection.add(apiInfoKey);

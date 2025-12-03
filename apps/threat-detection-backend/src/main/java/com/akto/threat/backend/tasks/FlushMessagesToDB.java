@@ -1,26 +1,24 @@
 package com.akto.threat.backend.tasks;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
+import com.akto.threat.backend.cache.IgnoredEventCache;
 import com.akto.threat.backend.constants.KafkaTopic;
 import com.akto.threat.backend.constants.MongoDBCollection;
+import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.db.AggregateSampleMaliciousEventModel;
-import com.akto.threat.backend.db.MaliciousEventModel;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.utils.SplunkEvent;
-import com.akto.threat.backend.cache.IgnoredEventCache;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
-import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.InsertOneModel;
-import com.mongodb.client.model.WriteModel;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
@@ -121,32 +119,9 @@ public class FlushMessagesToDB {
     logger.debug("inserting malicious event in db for accountId " + accountId + " eventType " + eventType);
 
     switch (eventType) {
-      case MongoDBCollection.ThreatDetection.AGGREGATE_SAMPLE_MALICIOUS_REQUESTS:
-        List<WriteModel<AggregateSampleMaliciousEventModel>> bulkUpdates = new ArrayList<>();
-        List<AggregateSampleMaliciousEventModel> events =
-            mapper.readValue(
-                payload, new TypeReference<List<AggregateSampleMaliciousEventModel>>() {});
-        events.forEach(
-            event -> {
-              bulkUpdates.add(new InsertOneModel<>(event));
-              executorService.submit(() ->{
-                  sendEventToSplunk(event, accountId);
-              });
-            });
-        
-        if (bulkUpdates.isEmpty()){
-          break;
-        }
-
-        this.mClient
-            .getDatabase(accountId + "")
-            .getCollection(eventType, AggregateSampleMaliciousEventModel.class)
-            .bulkWrite(bulkUpdates, new BulkWriteOptions().ordered(false));
-        break;
-
       case MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS:
-        MaliciousEventModel event =
-            mapper.readValue(payload, new TypeReference<MaliciousEventModel>() {});
+        MaliciousEventDto event =
+            mapper.readValue(payload, new TypeReference<MaliciousEventDto>() {});
         
         if (event == null){
           break;
@@ -158,10 +133,7 @@ public class FlushMessagesToDB {
                        event.getLatestApiEndpoint() + " + " + event.getFilterId());
         } else {
             // No ignored event exists, safe to insert
-            MongoCollection<MaliciousEventModel> collection = this.mClient
-                .getDatabase(accountId + "")
-                .getCollection(eventType, MaliciousEventModel.class);
-            collection.insertOne(event);
+            MaliciousEventDao.instance.insertOne(accountId, event);
         }
         break;
       default:

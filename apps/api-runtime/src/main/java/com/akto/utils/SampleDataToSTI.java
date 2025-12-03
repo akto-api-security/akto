@@ -154,7 +154,13 @@ public class SampleDataToSTI {
 
         for (int i = 0; i < singleTypeInfos.size(); i++) {
             singleTypeInfos.get(i).setUrl(url);
-            if(queryParamSet.contains(singleTypeInfos.get(i).getParam())){
+            String param = singleTypeInfos.get(i).getParam();
+            // Strip _queryParam suffix if present for comparison
+            String cleanParam = param;
+            if (param != null && param.endsWith("_queryParam")) {
+                cleanParam = param.substring(0, param.length() - "_queryParam".length());
+            }
+            if(queryParamSet.contains(cleanParam)){
                 singleTypeInfos.get(i).setQueryParam(true);
             }
         }

@@ -123,7 +123,7 @@ public class KeyTypes {
         return aktoDataType != null && aktoDataType.validate(value, key);
     }
 
-    private static SubType matchesSubType(SingleTypeInfo.SubType subType, Object key, Object val) {
+    public static SubType matchesSubType(SingleTypeInfo.SubType subType, Object key, Object val) {
         String name = subType.getName();
         // check if user has overriden the default behaviour of the subtype
         if (aktoDataTypeChanged(name)) {
@@ -144,6 +144,9 @@ public class KeyTypes {
                 case "PHONE_NUMBER":
                     if (isPhoneNumber(val.toString())) return subType;
                     break;
+                case "VIN":
+                    if (VinValidator.isValid(val.toString())) return subType;    
+                    break; 
                 default:
                     return null;
             }
@@ -230,6 +233,10 @@ public class KeyTypes {
 
             if (checkForSubtypes && matchesSubType(SingleTypeInfo.IP_ADDRESS, key, oString) != null) {
                 return SingleTypeInfo.IP_ADDRESS;
+            }
+            
+            if (checkForSubtypes  && matchesSubType(SingleTypeInfo.VIN, key, oString) != null) {
+                return SingleTypeInfo.VIN;
             }
 
             return SingleTypeInfo.GENERIC;

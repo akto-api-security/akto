@@ -12,7 +12,7 @@ import homeFunctions from '../apps/dashboard/pages/home/module';
 import { tokens } from "@shopify/polaris-tokens" 
 import PersistStore from '../apps/main/PersistStore';
 
-import { circle_cancel, circle_tick_minor } from "@/apps/dashboard/components/icons";
+import { circle_cancel, circle_tick_minor, car_icon } from "@/apps/dashboard/components/icons";
 import quickStartFunc from '../apps/dashboard/pages/quick_start/transform';
 import { Box } from '@shopify/polaris';
 import TooltipText from '../apps/dashboard/components/shared/TooltipText';
@@ -21,8 +21,8 @@ import observeFunc from '../apps/dashboard/pages/observe/transform';
 
 const iconsUsedMap = {
   CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
-  EmailMajor, CreditCardMajor, IdentityCardMajor, LocationsMinor,PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor, 
-  ReceiptMajor, MobileMajor, CalendarTimeMinor,LocationMajor, IdentityCardFilledMajor, CalendarMajor
+  EmailMajor, CreditCardMajor, IdentityCardMajor, LocationsMinor,PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor,
+  ReceiptMajor, MobileMajor, CalendarTimeMinor,LocationMajor, IdentityCardFilledMajor, CalendarMajor, car_icon
 }
 
 const searchResultSections = {
@@ -46,7 +46,30 @@ const searchResultSections = {
   },
 }
 
+const categoryMapping = {
+  "BOLA": { label: "API1:2023 Broken Object Level Authorization", url: "https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/" },
+  "Broken Authentication": { label: "API2:2023 Broken Authentication", url: "https://owasp.org/API-Security/editions/2023/en/0xa2-broken-authentication/" },
+  "Broken User Authentication": { label: "API2:2023 Broken Authentication", url: "https://owasp.org/API-Security/editions/2023/en/0xa2-broken-authentication/" },
+  "BFLA": { label: "API5:2023 Broken Function Level Authorization", url: "https://owasp.org/API-Security/editions/2023/en/0xa5-broken-function-level-authorization/" },
+  "IAM": { label: "API9:2023 Improper Inventory Management", url: "https://owasp.org/API-Security/editions/2023/en/0xa9-improper-inventory-management/" },
+  "EDE": { label: "API6:2023 Unrestricted Access to Sensitive Business Flows", url: "https://owasp.org/API-Security/editions/2023/en/0xa6-unrestricted-access-to-sensitive-business-flows/" },
+  "Lack of Resources & Rate Limiting": { label: "API4:2023 Unrestricted Resource Consumption", url: "https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/" },
+  "Mass Assignment": { label: "API3:2023 Broken Object Property Level Authorization", url: "https://owasp.org/API-Security/editions/2023/en/0xa3-broken-object-property-level-authorization/" },
+  "Injection": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
+  "Security Misconfiguration": { label: "API8:2023 Security Misconfiguration", url: "https://owasp.org/API-Security/editions/2023/en/0xa8-security-misconfiguration/" },
+  "Misconfiguration": { label: "API8:2023 Security Misconfiguration", url: "https://owasp.org/API-Security/editions/2023/en/0xa8-security-misconfiguration/" },
+  "Server Side Request Forgery": { label: "API7:2023 Server Side Request Forgery", url: "https://owasp.org/API-Security/editions/2023/en/0xa7-server-side-request-forgery/" },
+  "CORS Misconfiguration": { label: "API8:2023 Security Misconfiguration", url: "https://owasp.org/API-Security/editions/2023/en/0xa8-security-misconfiguration/" },
+  "Command Injection": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
+  "CRLF Injection": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
+  "Server Side Template Injection": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
+  "Local File Inclusion": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
+  "XXS": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
+  "Improper Inventory Management": { label: "API9:2023 Improper Inventory Management", url: "https://owasp.org/API-Security/editions/2023/en/0xa9-improper-inventory-management/" }
+}
+
 const func = {
+  categoryMapping: categoryMapping,
   setToast (isActive, isError, message) {
     Store.getState().setToastConfig({
           isActive: isActive,
@@ -526,6 +549,11 @@ prettifyEpoch(epoch) {
   timeNow: () => {
     return parseInt(new Date().getTime() / 1000)
   },
+  // Check if API collections data caching is enabled for current account
+  isApiCollectionsCachingEnabled: () => {
+    const allowedAccounts = [1736798101, 1718042191];
+    return allowedAccounts.includes(window.ACTIVE_ACCOUNT);
+  },
   convertKeysToLowercase: function (obj){
     return Object.keys(obj).reduce((acc, k) => {
       acc[k.toLowerCase()] = obj[k];
@@ -706,6 +734,17 @@ prettifyEpoch(epoch) {
     })
 
     return collectionsObj
+  },
+
+  mapCollectionIdToRegistryStatus(collections) {
+    let registryStatusObj = {}
+    collections.forEach((collection)=>{
+      if(!registryStatusObj[collection.id] && collection.registryStatus){
+        registryStatusObj[collection.id] = collection.registryStatus
+      }
+    })
+
+    return registryStatusObj
   },
 
   mapCollectionIdsToTagName(collections) {
@@ -960,6 +999,16 @@ toMethodUrlString({method,url, shouldParse =false}){
   }
   return method + " " + url;
 },
+
+toMethodUrlApiCollectionIdString({ method, url, apiCollectionId, shouldParse = false }) {
+  if (shouldParse) {
+    const finalMethod = getMethod(url, method);
+    const finalUrl = observeFunc.getTruncatedUrl(url);
+    return finalMethod + " " + finalUrl + " " + apiCollectionId;
+  }
+  return method + " " + url + " " + apiCollectionId;
+},
+
 toMethodUrlObject(str){
 
   if(!str){
@@ -967,6 +1016,14 @@ toMethodUrlObject(str){
   }
 
   return {method:str.split(" ")[0], url:str.split(" ")[1]}
+},
+
+toMethodUrlApiCollectionIdObject(str){
+  if(!str){
+    return {method:"", url:"", apiCollectionId:0}  
+  }
+
+  return {method:str.split(" ")[0], url:str.split(" ")[1], apiCollectionId:str.split(" ")[2]}
 },
 validateMethod(methodName) {
   let m = methodName.toUpperCase()
@@ -1727,7 +1784,9 @@ joinWordsWithUnderscores(input) {
           return CalendarMinor;
         case "BIRTH":
           return CalendarTimeMinor;
-        default: 
+        case "VIN":
+          return car_icon;
+        default:
           return KeyMajor;
     }
   },
@@ -1808,13 +1867,6 @@ joinWordsWithUnderscores(input) {
     })
     return url;
   },
-  async refreshApiCollections() {
-    let apiCollections = await homeFunctions.getAllCollections()
-    const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
-
-    PersistStore.getState().setAllCollections(apiCollections);
-    PersistStore.getState().setCollectionsMap(allCollectionsMap);
-  },
   transformString(inputString) {
     let transformedString = inputString.replace(/^\//, '').replace(/\/$/, '').replace(/#$/, '');
     const segments = transformedString.split('/');
@@ -1865,7 +1917,8 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     tableTabs.forEach((tab,ind) => {
       const tabId = this.getKeyFromName(tab)
       const tabKey = baseUrl + tabId
-      const count = currentState[tabKey] || data[tabId]?.length || initialCountArr[ind] || 0
+      // Check _counts first (for accurate counts with memory optimization), then fall back to array length
+      const count = currentState[tabKey] || data._counts?.[tabId] || data[tabId]?.length || initialCountArr[ind] || 0
       finalCountObj[tabId] = count
     })
 
@@ -2246,6 +2299,36 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       default:
         return 'new';
     }
+  },
+  // Category priority helpers: mcp > agentic > llm > others
+  getCategoryPriority(name){
+    const lower = (name || '').toLowerCase();
+    if (lower.includes('mcp')) return 0;
+    if (lower.includes('agentic')) return 1;
+    if (lower.includes('llm')) return 2;
+    return 3;
+  },
+  // Generic sorter: accepts array of strings or objects. If objects, pass a key string or a getter fn.
+  sortByCategoryPriority(items, keyOrGetter){
+    if(!Array.isArray(items)) return items;
+    const getName = typeof keyOrGetter === 'function'
+      ? keyOrGetter
+      : (item) => {
+          if (typeof item === 'string') return item;
+          const key = keyOrGetter || 'name';
+          return item?.[key];
+        };
+    return [...items].sort((a,b)=>{
+      const nameA = getName(a);
+      const nameB = getName(b);
+      const pA = this.getCategoryPriority(nameA);
+      const pB = this.getCategoryPriority(nameB);
+      if(pA !== pB) return pA - pB;
+      return (nameA || '').localeCompare(nameB || '');
+    })
+  },
+  isLimitedAccount(){
+    return window?.ACTIVE_ACCOUNT === 1753372418
   }
 }
 

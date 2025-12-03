@@ -36,6 +36,7 @@ import testingApi from "../../testing/api.js"
 import { saveAs } from 'file-saver'
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import IssuesGraphsGroup from "./IssuesGraphsGroup.jsx";
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper.js";
 
 
 const sortOptions = [
@@ -79,8 +80,8 @@ let filtersOptions = [
     },
     {
         key: 'collectionIds',
-        label: 'API groups',
-        title: 'API groups',
+        label: mapLabel('Api', getDashboardCategory()) + ' groups',
+        title: mapLabel('Api', getDashboardCategory()) + ' groups',
         choices: [],
     },
     {
@@ -185,7 +186,12 @@ function IssuesPage() {
     const [projectId, setProjectId] = useState('')
     const [workItemType, setWorkItemType] = useState('')
     const [issuesByApis, setIssuesByApis] = useState({});
-    
+
+    const [serviceNowModalActive, setServiceNowModalActive] = useState(false)
+    const [serviceNowTables, setServiceNowTables] = useState([])
+    const [serviceNowTable, setServiceNowTable] = useState('')
+    const [labelsText, setLabelsText] = useState('')
+
     // Compulsory description modal states
     const [compulsoryDescriptionModal, setCompulsoryDescriptionModal] = useState(false)
     const [pendingIgnoreAction, setPendingIgnoreAction] = useState(null)
@@ -318,10 +324,15 @@ function IssuesPage() {
             });
         }
 
-    const handleSaveJiraAction = () => {
+    const handleSaveJiraAction = (issueId, labels) => {
         let jiraMetaData;
         try {
             jiraMetaData = issuesFunctions.prepareAdditionalIssueFieldsJiraMetaData(projId, issueType);
+            // Use labels parameter if provided, otherwise fall back to state
+            const labelsToUse = labels !== undefined ? labels : labelsText;
+            if (labelsToUse && labelsToUse.trim()) {
+                jiraMetaData.labels = labelsToUse.trim();
+            }
         } catch (error) {
             setToast(true, true, "Please fill all required fields before creating a Jira ticket.");
             resetResourcesSelected()
@@ -341,13 +352,34 @@ function IssuesPage() {
     }
 
     const handleSaveBulkAzureWorkItemsAction = () => {
+        let customABWorkItemFieldsPayload = [];
+        try {
+            customABWorkItemFieldsPayload = issuesFunctions.prepareCustomABWorkItemFieldsPayload(projectId, workItemType);
+        } catch (error) {
+            setToast(true, true, "Please fill all required fields before creating a Azure boards work item.");
+            return;
+        }
+
         setToast(true, false, "Please wait while we create your Azure Boards Work Item.")
         setBoardsModalActive(false)
-        api.bulkCreateAzureWorkItems(selectedIssuesItems, projectId, workItemType, window.location.origin).then((res) => {
+        api.bulkCreateAzureWorkItems(selectedIssuesItems, projectId, workItemType, window.location.origin, customABWorkItemFieldsPayload).then((res) => {
             if(res?.errorMessage) {
                 setToast(true, false, res?.errorMessage)
             } else {
                 setToast(true, false, `${selectedIssuesItems.length} Azure Boards Work Item${selectedIssuesItems.length === 1 ? "" : "s"} created.`)
+            }
+            resetResourcesSelected()
+        })
+    }
+
+    const handleSaveBulkServiceNowTicketsAction = () => {
+        setToast(true, false, "Please wait while we create your ServiceNow tickets.")
+        setServiceNowModalActive(false)
+        api.bulkCreateServiceNowTickets(selectedIssuesItems, serviceNowTable).then((res) => {
+            if(res?.errorMessage) {
+                setToast(true, false, res?.errorMessage)
+            } else {
+                setToast(true, false, `${selectedIssuesItems.length} ServiceNow ticket${selectedIssuesItems.length === 1 ? "" : "s"} created.`)
             }
             resetResourcesSelected()
         })
@@ -448,6 +480,17 @@ function IssuesPage() {
                 setBoardsModalActive(true)
             })
         }
+
+        function createServiceNowTicketBulk() {
+            setSelectedIssuesItems(items)
+            settingFunctions.fetchServiceNowIntegration().then((serviceNowIntegration) => {
+                if(serviceNowIntegration.tableNames && serviceNowIntegration.tableNames.length > 0){
+                    setServiceNowTables(serviceNowIntegration.tableNames)
+                    setServiceNowTable(serviceNowIntegration.tableNames[0])
+                }
+                setServiceNowModalActive(true)
+            })
+        }
         
         let issues = [
             {
@@ -482,6 +525,11 @@ function IssuesPage() {
                 content: 'Create azure work item',
                 onAction: () => { createAzureBoardWorkItemBulk() },
                 disabled: (window.AZURE_BOARDS_INTEGRATED === 'false')
+            },
+            {
+                content: 'Create ServiceNow ticket',
+                onAction: () => { createServiceNowTicketBulk() },
+                disabled: (window.SERVICENOW_INTEGRATED === 'false')
             }
         ];
         
@@ -598,11 +646,8 @@ function IssuesPage() {
 
 
     useEffect(() => {
-        // Fetch jira integration field metadata
         fetchIssuesByApisData()
-        if (window.JIRA_INTEGRATED === 'true') {
-            issuesFunctions.fetchCreateIssueFieldMetaData()
-        }
+        issuesFunctions.fetchIntegrationCustomFieldsMetadata();
     }, [])
 
 
@@ -857,7 +902,7 @@ function IssuesPage() {
                     iconSrc={"/public/alert_hexagon.svg"}
                     headingText={"No issues yet!"}
                     description={"There are currently no issues with your APIs. Haven't run your tests yet? Start testing now to prevent any potential issues."}
-                    buttonText={"Run test"}
+                    buttonText={mapLabel("Run test", getDashboardCategory())}
                     infoItems={infoItems}
                     infoTitle={"Once you have issues:"}
                     learnText={"issues"}
@@ -904,6 +949,8 @@ function IssuesPage() {
                 setIssueType={setIssueType}
                 projId={projId}
                 issueType={issueType}
+                labelsText={labelsText}
+                setLabelsText={setLabelsText}
             />
 
             <JiraTicketCreationModal
@@ -917,7 +964,19 @@ function IssuesPage() {
                 issueType={workItemType}
                 isAzureModal={true}
             />
-            
+
+            <JiraTicketCreationModal
+                modalActive={serviceNowModalActive}
+                setModalActive={setServiceNowModalActive}
+                handleSaveAction={handleSaveBulkServiceNowTicketsAction}
+                jiraProjectMaps={serviceNowTables}
+                setProjId={setServiceNowTable}
+                setIssueType={() => {}}
+                projId={serviceNowTable}
+                issueType=""
+                isServiceNowModal={true}
+            />
+
             <Modal
                 open={compulsoryDescriptionModal}
                 onClose={() => setCompulsoryDescriptionModal(false)}
