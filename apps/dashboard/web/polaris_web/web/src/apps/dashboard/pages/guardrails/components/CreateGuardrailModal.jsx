@@ -27,6 +27,8 @@ import {
     SensitiveInfoConfig,
     LlmPromptStep,
     LlmPromptConfig,
+    BasePromptStep,
+    BasePromptConfig,
     ExternalModelStep,
     ExternalModelConfig,
     ServerSettingsStep,
@@ -76,24 +78,30 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [llmPrompt, setLlmPrompt] = useState("");
     const [llmConfidenceScore, setLlmConfidenceScore] = useState(0.5);
 
-    // Step 7: External model based evaluation
+    // Step 7: Base Prompt Rule
+    const [enableBasePromptRule, setEnableBasePromptRule] = useState(false);
+    const [basePrompt, setBasePrompt] = useState("");
+    const [basePromptAutoDetect, setBasePromptAutoDetect] = useState(true);
+    const [basePromptConfidenceScore, setBasePromptConfidenceScore] = useState(0.5);
+
+    // Step 8: External model based evaluation
     const [url, setUrl] = useState("");
     const [confidenceScore, setConfidenceScore] = useState(25); // Start with 25 (first checkpoint)
 
-    // Step 8: Server settings
+    // Step 9: Server settings
     const [selectedMcpServers, setSelectedMcpServers] = useState([]);
     const [selectedAgentServers, setSelectedAgentServers] = useState([]);
     const [applyOnResponse, setApplyOnResponse] = useState(false);
     const [applyOnRequest, setApplyOnRequest] = useState(false);
-
+    
     // Collections data
     const [mcpServers, setMcpServers] = useState([]);
     const [agentServers, setAgentServers] = useState([]);
     const [collectionsLoading, setCollectionsLoading] = useState(false);
-
+    
     // Get collections from PersistStore
     const allCollections = PersistStore(state => state.allCollections);
-
+    
     // Create validation state object
     const getStoredStateData = () => ({
         // Step 1
@@ -113,9 +121,14 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         llmPrompt,
         llmConfidenceScore,
         // Step 7
+        enableBasePromptRule,
+        basePromptAutoDetect,
+        basePrompt,
+        basePromptConfidenceScore,
+        // Step 8
         url,
         confidenceScore,
-        // Step 8
+        // Step 9
         selectedMcpServers,
         selectedAgentServers,
         mcpServers,
@@ -163,6 +176,12 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 title: LlmPromptConfig.title,
                 summary: LlmPromptConfig.getSummary(storedStateData),
                 ...LlmPromptConfig.validate(storedStateData)
+            },
+            {
+                number: BasePromptConfig.number,
+                title: BasePromptConfig.title,
+                summary: BasePromptConfig.getSummary(storedStateData),
+                ...BasePromptConfig.validate(storedStateData)
             },
             {
                 number: ExternalModelConfig.number,
@@ -269,6 +288,10 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setNewRegexPattern("");
         setLlmPrompt("");
         setLlmConfidenceScore(0.5);
+        setEnableBasePromptRule(false);
+        setBasePrompt("");
+        setBasePromptAutoDetect(true);
+        setBasePromptConfidenceScore(0.5);
         setUrl("");
         setConfidenceScore(25);
         setSelectedMcpServers([]);
@@ -282,7 +305,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setDescription(policy.description || "");
         setBlockedMessage(policy.blockedMessage || "");
         setApplyToResponses(policy.applyToResponses || false);
-
+        
         // Content filters
         if (policy.contentFiltering) {
             if (policy.contentFiltering.harmfulCategories) {
@@ -301,19 +324,19 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 setPromptAttackLevel(policy.contentFiltering.promptAttacks.level || "HIGH");
             }
         }
-
+        
         // Denied topics
         setDeniedTopics(policy.deniedTopics || []);
-
+        
         // Word filters
         setWordFilters({
             profanity: policy.wordFilters?.profanity || false,
             custom: policy.wordFilters?.custom || []
         });
-
+        
         // PII filters
         setPiiTypes(policy.piiTypes || []);
-
+        
         // Regex patterns - prefer V2 format with behavior, fallback to old format
         if (policy.regexPatternsV2 && policy.regexPatternsV2.length > 0) {
             setRegexPatterns(policy.regexPatternsV2);
@@ -335,6 +358,19 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         } else {
             setLlmPrompt("");
             setLlmConfidenceScore(0.5);
+        }
+
+        // Base Prompt Rule
+        if (policy.basePromptRule) {
+            setEnableBasePromptRule(policy.basePromptRule.enabled || false);
+            setBasePrompt(policy.basePromptRule.basePrompt || "");
+            setBasePromptAutoDetect(policy.basePromptRule.autoDetect !== undefined ? policy.basePromptRule.autoDetect : true);
+            setBasePromptConfidenceScore(policy.basePromptRule.confidenceScore !== undefined ? policy.basePromptRule.confidenceScore : 0.5);
+        } else {
+            setEnableBasePromptRule(false);
+            setBasePrompt("");
+            setBasePromptAutoDetect(true);
+            setBasePromptConfidenceScore(0.5);
         }
 
         // External model based evaluation
@@ -435,6 +471,14 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         confidenceScore: llmConfidenceScore
                     }
                 } : {}),
+                ...(enableBasePromptRule ? {
+                    basePromptRule: {
+                        enabled: true,
+                        basePrompt: basePromptAutoDetect ? "" : basePrompt.trim(), // Send empty if auto-detect
+                        autoDetect: basePromptAutoDetect,
+                        confidenceScore: basePromptConfidenceScore
+                    }
+                } : {}),
                 url: url || null,
                 confidenceScore: confidenceScore,
                 selectedMcpServers: selectedMcpServers, // Old format (just IDs)
@@ -479,8 +523,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     };
 
     const renderAllSteps = () => (
-        <VerticalStack gap="2">
-            {steps.map((step) => (
+            <VerticalStack gap="2">
+                {steps.map((step) => (
                 <Box
                     key={step.number}
                     ref={(el) => stepRefs.current[step.number] = el}
@@ -501,17 +545,17 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                                 >
                                     <HorizontalStack gap="3" blockAlign="center">
                                         <Box style={{
-                                            width: "24px",
-                                            height: "24px",
-                                            borderRadius: "50%",
-                                            backgroundColor: step.number === currentStep ? "#0070f3" :
+                                width: "24px",
+                                height: "24px",
+                                borderRadius: "50%",
+                                backgroundColor: step.number === currentStep ? "#0070f3" : 
                                                             (!step.isValid && step.number < currentStep) ? "#d72c0d" :
-                                                            step.number < currentStep ? "#008060" : "#e1e3e5",
+                                                step.number < currentStep ? "#008060" : "#e1e3e5",
                                             color: step.number <= currentStep || !step.isValid ? "white" : "#6d7175",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            fontSize: "12px",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: "12px",
                                             fontWeight: "bold",
                                             flexShrink: 0
                                         }}>
@@ -521,47 +565,47 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                                         <Box style={{ flexGrow: 1 }}>
                                             <VerticalStack gap="1">
                                                 <HorizontalStack gap="2" blockAlign="center">
-                                                    <Text
-                                                        variant="bodyMd"
+                            <Text 
+                                variant="bodyMd" 
                                                         color={step.number === currentStep ? "success" : "subdued"}
-                                                        fontWeight={step.number === currentStep ? "bold" : "regular"}
-                                                    >
-                                                        {step.title}
-                                                    </Text>
+                                fontWeight={step.number === currentStep ? "bold" : "regular"}
+                            >
+                                {step.title}
+                            </Text>
                                                     {!step.isValid && step.number !== currentStep && (
                                                         <Icon source={AlertMinor} color="critical" />
-                                                    )}
-                                                </HorizontalStack>
+                            )}
+                        </HorizontalStack>
                                                 {step.number !== currentStep && (
                                                     <>
-                                                        {step.summary && (
-                                                            <Text variant="bodySm" color="subdued" fontWeight="medium">
-                                                                {step.summary}
-                                                            </Text>
+                        {step.summary && (
+                                <Text variant="bodySm" color="subdued" fontWeight="medium">
+                                    {step.summary}
+                                </Text>
                                                         )}
                                                         {!step.isValid && step.errorMessage && (
                                                             <Text variant="bodySm" color="critical" fontWeight="medium">
                                                                 {step.errorMessage}
-                                                            </Text>
+                </Text>
                                                         )}
                                                     </>
-                                                )}
-                                            </VerticalStack>
-                                        </Box>
-                                    </HorizontalStack>
-                                </Box>
+                        )}
+            </VerticalStack>
+        </Box>
+                                </HorizontalStack>
+                                            </Box>
 
                                 {step.number === currentStep && (
-                                    <Box paddingBlockStart="2">
+                                <Box paddingBlockStart="2">
                                         {renderStepContent(step.number)}
-                                    </Box>
-                                )}
-                            </VerticalStack>
-                        </Box>
-                    </LegacyCard>
+                            </Box>
+                        )}
+                    </VerticalStack>
                 </Box>
+        </LegacyCard>
+                            </Box>
             ))}
-        </VerticalStack>
+            </VerticalStack>
     );
 
     const renderStepContent = (stepNumber) => {
@@ -630,6 +674,19 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 );
             case 7:
                 return (
+                    <BasePromptStep
+                        enableBasePromptRule={enableBasePromptRule}
+                        setEnableBasePromptRule={setEnableBasePromptRule}
+                        basePrompt={basePrompt}
+                        setBasePrompt={setBasePrompt}
+                        basePromptAutoDetect={basePromptAutoDetect}
+                        setBasePromptAutoDetect={setBasePromptAutoDetect}
+                        basePromptConfidenceScore={basePromptConfidenceScore}
+                        setBasePromptConfidenceScore={setBasePromptConfidenceScore}
+                    />
+                );
+            case 8:
+                return (
                     <ExternalModelStep
                         url={url}
                         setUrl={setUrl}
@@ -637,7 +694,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         setConfidenceScore={setConfidenceScore}
                     />
                 );
-            case 8:
+            case 9:
                 return (
                     <ServerSettingsStep
                         selectedMcpServers={selectedMcpServers}
@@ -669,7 +726,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             });
         }
 
-        if (currentStep < 8) {
+        if (currentStep < steps.length) {
             actions.push({
                 content: "Next",
                 onAction: handleNext
@@ -683,10 +740,10 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         // Check if all steps are valid
         const allStepsValid = steps.every(step => step.isValid);
 
-        return {
-            content: isEditMode ? "Update Guardrail" : "Create Guardrail",
-            onAction: handleSave,
-            loading: loading,
+            return {
+                content: isEditMode ? "Update Guardrail" : "Create Guardrail",
+                onAction: handleSave,
+                loading: loading,
             disabled: !allStepsValid
         };
     };
@@ -710,7 +767,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 <Modal.Section>
                     <Scrollable style={{ height: "600px" }}>
                         {renderAllSteps()}
-                    </Scrollable>
+                            </Scrollable>
                 </Modal.Section>
             </Modal>
         </>
