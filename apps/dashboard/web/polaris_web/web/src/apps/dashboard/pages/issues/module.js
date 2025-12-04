@@ -10,6 +10,10 @@ const updateDisplayJiraIssueFieldValues = IssuesStore.getState().updateDisplayJi
 
 const setCreateABWorkItemFieldMetaData = IssuesStore.getState().setCreateABWorkItemFieldMetaData;
 const updateDisplayABWorkItemFieldValues = IssuesStore.getState().updateDisplayABWorkItemFieldValues;
+const ALLOWED_AB_SYSTEM_FIELDS = {
+    "System.State": { "isPicklist": true, "defaultValue": "To do" },
+    "System.Reason": { "isPicklist": true, "defaultValue": "Added to backlog" },
+}
 
 const issuesFunctions = {
     fetchIntegrationCustomFieldsMetadata: () => {
@@ -181,11 +185,18 @@ const issuesFunctions = {
         const fieldReferenceName = organizationFieldDetails?.referenceName || "";
         const fieldName = organizationFieldDetails?.name || "";
         const fieldType = organizationFieldDetails?.type || "";
-        const isFieldPicklist = organizationFieldDetails?.isPicklist || false;
-        
-        const fieldDefaultValue = workItemTypeFieldDetails?.defaultValue || null;
         const fieldAllowedValues = workItemTypeFieldDetails?.allowedValues || [];
         const isFieldRequired = workItemTypeFieldDetails?.alwaysRequired || false;
+
+        const isAllowedSystemField = issuesFunctions.isAllowedABSystemField(fieldReferenceName);
+        const isFieldPicklist = isAllowedSystemField
+            ? ALLOWED_AB_SYSTEM_FIELDS[fieldReferenceName]?.isPicklist
+            : organizationFieldDetails?.isPicklist || false;
+        
+        const fieldDefaultValue = isAllowedSystemField
+            ? ALLOWED_AB_SYSTEM_FIELDS[fieldReferenceName]?.defaultValue
+            : workItemTypeFieldDetails?.defaultValue || null;
+        
 
         const handleFieldChange = (fieldReferenceName, value) => {
             updateDisplayABWorkItemFieldValues(fieldReferenceName, value)
@@ -399,6 +410,9 @@ const issuesFunctions = {
 
         return customABWorkItemFieldsPayload;
     },
+    isAllowedABSystemField: (fieldReferenceName) => {
+        return Object.keys(ALLOWED_AB_SYSTEM_FIELDS).includes(fieldReferenceName);
+    }
 }
 
 export default issuesFunctions
