@@ -163,6 +163,7 @@ const [subCategoryInfo, setSubCategoryInfo] = useState({})
 const [collapsible, setCollapsible] = useState(true)
 const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
 const [totalNumberOfTests, setTotalNumberOfTests] = useState(0)
+const [summaryLoading, setSummaryLoading] = useState(false)
 
   async function fetchTableData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) {
     setLoading(true);
@@ -253,8 +254,8 @@ const [totalNumberOfTests, setTotalNumberOfTests] = useState(0)
   }
 
   const fetchSummaryInfo = async()=>{
-    await api.getSummaryInfo(startTimestamp, endTimestamp).then((resp)=>{
-      const severityObj = transform.convertSubIntoSubcategory(resp)
+    await api.getSummaryInfo(startTimestamp, endTimestamp).then(async (resp)=>{
+      const severityObj = await transform.convertSubIntoSubcategory(resp)
       setSubCategoryInfo(severityObj.subCategoryMap)
     })
     await testingApi.fetchSeverityInfoForIssues({}, [], 0).then(({ severityInfo }) => {
@@ -296,18 +297,20 @@ const [totalNumberOfTests, setTotalNumberOfTests] = useState(0)
     })
   }
 
-  const fetchTotalCount = () =>{
+  const fetchTotalCount = async () =>{
     setLoading(true)
-    api.getUserTestRuns().then((resp)=> {
+    await api.getUserTestRuns().then((resp)=> {
       setHasUserInitiatedTestRuns(resp)
     })
     setLoading(false)    
   }
 
-  useEffect(()=>{
-    fetchTotalCount()
-    fetchCountsMap()
-    fetchSummaryInfo()
+  useEffect(async ()=>{
+    setSummaryLoading(true)
+    await fetchTotalCount()
+    await fetchCountsMap()
+    await fetchSummaryInfo()
+    setSummaryLoading(false)
   },[currDateRange])
 
   const handleSelectedTab = (selectedIndex) => {
@@ -378,6 +381,7 @@ const components = !hasUserInitiatedTestRuns ? [
     setCollapsible={setCollapsible}
     startTimestamp={startTimestamp}
     endTimestamp={endTimestamp}
+    loading={summaryLoading}
   />,
   <TestrunsBannerComponent key={"banner-comp"}/>, 
   coreTable
@@ -390,6 +394,7 @@ const components = !hasUserInitiatedTestRuns ? [
     setCollapsible={setCollapsible}
     startTimestamp={startTimestamp}
     endTimestamp={endTimestamp}
+    loading={summaryLoading}
   />, 
   coreTable
 ]

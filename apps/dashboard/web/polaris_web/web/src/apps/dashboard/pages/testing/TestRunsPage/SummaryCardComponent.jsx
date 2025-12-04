@@ -8,6 +8,7 @@ import TestRunOverTimeGraph from './TestRunOverTimeGraph';
 import CategoryWiseScoreGraph from './CategoryWiseScoreGraph';
 import { isApiSecurityCategory, isDastCategory } from '../../../../main/labelHelper';
 import func from '@/util/func';
+import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 
 // Memoize only the child components that make API calls to prevent unnecessary re-renders
 const MemoizedApiCollectionCoverageGraph = memo(ApiCollectionCoverageGraph);
@@ -21,7 +22,8 @@ const SummaryCardComponent = ({
   collapsible, 
   setCollapsible, 
   startTimestamp, 
-  endTimestamp 
+  endTimestamp,
+  loading
 }) => {
   const totalVulnerabilities = (severityMap?.CRITICAL?.text || 0) + 
                               (severityMap?.HIGH?.text || 0) + 
@@ -49,7 +51,14 @@ const SummaryCardComponent = ({
       <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued">Vulnerabilities</Text>}>
         <HorizontalStack align="space-between">
           <Text fontWeight="semibold" variant="bodyMd">Found {totalVulnerabilities} vulnerabilities in total</Text>
-          <Button plain monochrome icon={iconSource} onClick={() => setCollapsible(!collapsible)} />
+          {
+            loading ?
+              <Text variant="bodySm" color="subdued">
+                <SpinnerCentered height="0px" />
+              </Text>
+              :
+              <Button plain monochrome icon={iconSource} onClick={() => setCollapsible(!collapsible)} />
+          }
         </HorizontalStack>
         {totalVulnerabilities > 0 ? 
         <Collapsible open={collapsible} transition={{duration: '500ms', timingFunction: 'ease-in-out'}}>

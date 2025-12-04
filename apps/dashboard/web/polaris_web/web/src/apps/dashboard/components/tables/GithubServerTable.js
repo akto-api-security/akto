@@ -29,6 +29,7 @@ import func from '../../../../util/func';
 import values from "@/util/values"
 import { produce } from 'immer';
 import DateRangePicker from '../layouts/DateRangePicker';
+import SpinnerCentered from '../progress/SpinnerCentered';
 
 function GithubServerTable(props) {
 
@@ -621,6 +622,9 @@ function GithubServerTable(props) {
               ></IndexFilters>
               {props?.bannerComp?.selected === props?.selected ? props?.bannerComp?.comp : null}
               <div className={tableHeightClass}>
+              {props.loading && props.loadingText ? (
+                <SpinnerCentered text={props.loadingText}/>
+              ) : (
               <IndexTable
                 resourceName={props.resourceName}
                 itemCount={data.length}
@@ -648,6 +652,7 @@ function GithubServerTable(props) {
               >
                 {rowMarkup}
               </IndexTable>
+              )}
             </div>
             </LegacyCard.Section>
             {(total !== 0 && !props?.hidePagination) && <LegacyCard.Section>
