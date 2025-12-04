@@ -416,7 +416,7 @@ function About() {
                     disabled={window.USER_ROLE !== 'ADMIN'}
                 />
                 <Checkbox
-                    label="Acceptable Fix - Require description when marking issues as acceptable fix"
+                    label="Acceptable Risk - Require description when marking issues as acceptable risk"
                     checked={compulsoryDescription.acceptableFix}
                     onChange={(checked) => handleCompulsoryToggle('acceptableFix', checked)}
                     disabled={window.USER_ROLE !== 'ADMIN'}
