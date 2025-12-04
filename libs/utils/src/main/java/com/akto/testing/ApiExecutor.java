@@ -185,6 +185,23 @@ public class ApiExecutor {
         return null;
     }
 
+    /**
+     * Extract boundary from Content-Type header for multipart/form-data
+     * @param contentType Content-Type header value
+     * @return boundary string or null if not found
+     */
+    private static String extractBoundaryFromContentType(String contentType) {
+        if (contentType == null) return null;
+        String[] parts = contentType.split(";");
+        for (String part : parts) {
+            part = part.trim();
+            if (part.startsWith("boundary=")) {
+                return part.substring("boundary=".length()).trim();
+            }
+        }
+        return null;
+    }
+
     public static Map<String, List<String>> generateHeadersMapFromHeadersObject(Headers headers) {
         if (headers == null || headers.size() == 0) {
             return Collections.emptyMap();
@@ -602,6 +619,21 @@ public class ApiExecutor {
                 // remove the temp headers
                 request.getHeaders().remove("x-akto-original-url");
                 request.getHeaders().remove("x-akto-original-method");
+            }  
+        } else if (contentType.contains(HttpRequestResponseUtils.MULTIPART_FORM_DATA_CONTENT_TYPE)) {
+            String boundary = extractBoundaryFromContentType(contentType);
+            if (boundary != null && payload.startsWith("{")) {
+                try {
+                    loggerMaker.infoAndAddToDb("converting json to multipart payload:" + payload, LogDb.TESTING);
+                    payload = HttpRequestResponseUtils.jsonToMultipart(payload, boundary);
+                    body = RequestBody.create(
+                        payload.getBytes(StandardCharsets.UTF_8),
+                        MediaType.parse(contentType)
+                    );
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Unable to convert to multipart:" + payload, LogDb.TESTING);
+                    payload = request.getBody();
+                }
             }  
         } 
 

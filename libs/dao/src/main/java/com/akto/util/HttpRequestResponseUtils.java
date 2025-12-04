@@ -19,6 +19,7 @@ import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -37,6 +38,7 @@ public class HttpRequestResponseUtils {
 
     public static final String FORM_URL_ENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
     public static final String GRPC_CONTENT_TYPE = "application/grpc";
+    public static final String MULTIPART_FORM_DATA_CONTENT_TYPE = "multipart/form-data";
     public static final String TEXT_EVENT_STREAM_CONTENT_TYPE = "text/event-stream";
     public static final String CONTENT_TYPE = "CONTENT-TYPE";
     public static final String APPLICATION_JSON = "application/json";
@@ -99,6 +101,12 @@ public class HttpRequestResponseUtils {
                 return convertFormUrlEncodedToJson(rawRequest);
             } else if (acceptableContentType.equals(GRPC_CONTENT_TYPE)) {
                 return convertGRPCEncodedToJson(rawRequest);
+            } else if (acceptableContentType.equals(MULTIPART_FORM_DATA_CONTENT_TYPE)) {
+                // For multipart, we need the full header value with boundary parameter
+                // getAcceptableContentType() returns only the constant, so get the actual header value
+                String contentTypeHeader = getHeaderValue(requestHeaders, CONTENT_TYPE);
+                String boundary = extractBoundary(contentTypeHeader);
+                return convertMultipartToJson(rawRequest, boundary);
             } else if (acceptableContentType.contains(XML) || acceptableContentType.contains(SOAP) ) {
                 return convertXmlToJson(rawRequest);
             }
@@ -234,7 +242,7 @@ public class HttpRequestResponseUtils {
     }
     
     public static String getAcceptableContentType(Map<String,List<String>> headers) {
-        List<String> acceptableContentTypes = Arrays.asList(JSON_CONTENT_TYPE, FORM_URL_ENCODED_CONTENT_TYPE, GRPC_CONTENT_TYPE, XML, SOAP);
+        List<String> acceptableContentTypes = Arrays.asList(JSON_CONTENT_TYPE, FORM_URL_ENCODED_CONTENT_TYPE, GRPC_CONTENT_TYPE, MULTIPART_FORM_DATA_CONTENT_TYPE, XML, SOAP);
         List<String> contentTypeValues;
         if (headers == null) return null;
         contentTypeValues = headers.get("content-type");
@@ -357,6 +365,180 @@ public class HttpRequestResponseUtils {
             }
         }
 
+        return null;
+    }
+
+    /**
+     * Extract boundary from Content-Type header
+     * @param contentType Content-Type header value (e.g., "multipart/form-data; boundary=----WebKitFormBoundary...")
+     * @return boundary string or null if not found
+     */
+    private static String extractBoundary(String contentType) {
+        if (contentType == null) return null;
+        // Parse "multipart/form-data; boundary=----WebKitFormBoundary..."
+        String[] parts = contentType.split(";");
+        for (String part : parts) {
+            part = part.trim();
+            if (part.startsWith("boundary=")) {
+                return part.substring("boundary=".length()).trim();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Convert multipart/form-data body to JSON
+     * @param rawRequest The raw multipart body
+     * @param boundary The boundary string from Content-Type header
+     * @return JSON string representation of the multipart data
+     */
+    public static String convertMultipartToJson(String rawRequest, String boundary) {
+        if (boundary == null || rawRequest == null || rawRequest.isEmpty()) {
+            return rawRequest;
+        }
+
+        try {
+            Map<String, Object> result = new LinkedHashMap<>();
+            String delimiter = "--" + boundary;
+            String[] parts = rawRequest.split(delimiter);
+
+            for (String part : parts) {
+                part = part.trim();
+                if (part.isEmpty() || part.equals("--")) continue;
+
+                // Parse headers and body of each part
+                // Split on double CRLF or double LF
+                String[] sections = part.split("\\r?\\n\\r?\\n", 2);
+                if (sections.length < 2) continue;
+
+                String headers = sections[0];
+                String body = sections[1];
+                // Remove trailing CRLF or LF
+                body = body.replaceAll("\\r?\\n$", "");
+
+                // Extract field name from Content-Disposition header
+                String fieldName = extractFieldName(headers);
+                if (fieldName == null) continue;
+
+                // Check if it's a file upload
+                String filename = extractFilename(headers);
+
+                if (filename != null) {
+                    // File upload: store as object with metadata
+                    String contentType = extractContentTypeFromPart(headers);
+                    Map<String, String> fileObj = new LinkedHashMap<>();
+                    fileObj.put("filename", filename);
+                    fileObj.put("content", Base64.getEncoder().encodeToString(body.getBytes(StandardCharsets.UTF_8)));
+                    fileObj.put("contentType", contentType != null ? contentType : "application/octet-stream");
+                    result.put(fieldName, fileObj);
+                } else {
+                    // Regular text field
+                    result.put(fieldName, body);
+                }
+            }
+
+            return mapper.writeValueAsString(result);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return rawRequest;
+        }
+    }
+
+    /**
+     * Convert JSON back to multipart/form-data format
+     * @param jsonBody JSON string
+     * @param boundary Boundary string to use
+     * @return Multipart formatted string
+     */
+    public static String jsonToMultipart(String jsonBody, String boundary) {
+        if (jsonBody == null || boundary == null) {
+            return jsonBody;
+        }
+
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> fields = mapper.readValue(jsonBody, LinkedHashMap.class);
+            StringBuilder multipart = new StringBuilder();
+
+            for (Map.Entry<String, Object> entry : fields.entrySet()) {
+                multipart.append("--").append(boundary).append("\r\n");
+
+                if (entry.getValue() instanceof Map) {
+                    // File upload
+                    @SuppressWarnings("unchecked")
+                    Map<String, String> fileObj = (Map<String, String>) entry.getValue();
+                    String filename = fileObj.get("filename");
+                    String contentType = fileObj.getOrDefault("contentType", "application/octet-stream");
+                    String content = fileObj.get("content");
+
+                    multipart.append("Content-Disposition: form-data; name=\"");
+                    multipart.append(entry.getKey());
+                    multipart.append("\"; filename=\"");
+                    multipart.append(filename);
+                    multipart.append("\"\r\n");
+                    multipart.append("Content-Type: ").append(contentType).append("\r\n\r\n");
+                    
+                    // Decode base64 content
+                    byte[] decodedContent = Base64.getDecoder().decode(content);
+                    multipart.append(new String(decodedContent, StandardCharsets.UTF_8));
+                } else {
+                    // Text field
+                    multipart.append("Content-Disposition: form-data; name=\"");
+                    multipart.append(entry.getKey());
+                    multipart.append("\"\r\n\r\n");
+                    multipart.append(entry.getValue().toString());
+                }
+                multipart.append("\r\n");
+            }
+
+            multipart.append("--").append(boundary).append("--\r\n");
+            return multipart.toString();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return jsonBody;
+        }
+    }
+
+    /**
+     * Extract field name from Content-Disposition header
+     */
+    private static String extractFieldName(String headers) {
+        // Look for: name="fieldname"
+        int nameIndex = headers.indexOf("name=\"");
+        if (nameIndex == -1) return null;
+        
+        int startQuote = nameIndex + 6; // length of "name=\""
+        int endQuote = headers.indexOf("\"", startQuote);
+        if (endQuote == -1) return null;
+        
+        return headers.substring(startQuote, endQuote).trim();
+    }
+
+    /**
+     * Extract filename from Content-Disposition header
+     */
+    private static String extractFilename(String headers) {
+        // Look for: filename="file.txt"
+        int filenameIndex = headers.indexOf("filename=\"");
+        if (filenameIndex == -1) return null;
+        
+        int startQuote = filenameIndex + 10; // length of "filename=\""
+        int endQuote = headers.indexOf("\"", startQuote);
+        if (endQuote == -1) return null;
+        
+        return headers.substring(startQuote, endQuote);
+    }
+
+    /**
+     * Extract Content-Type from part headers
+     */
+    private static String extractContentTypeFromPart(String headers) {
+        String[] lines = headers.split("\\r?\\n");
+        for (String line : lines) {
+            if (line.toLowerCase().startsWith("content-type:")) {
+                return line.substring("content-type:".length()).trim();
+            }
+        }
         return null;
     }
 }
