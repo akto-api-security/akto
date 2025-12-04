@@ -25,8 +25,8 @@ try:
 except:
     pass
 
-from llm_guard import input_scanners, output_scanners
-from intent_analyzer import IntentAnalysisScanner
+from llm_guard.input_scanners import Toxicity, PromptInjection
+from llm_guard.output_scanners import Toxicity as OutputToxicity
 
 logging.basicConfig(
     level=logging.INFO,
@@ -55,37 +55,12 @@ class ScanResponse(BaseModel):
     details: Dict[str, Any] = {}
 
 PROMPT_SCANNERS = {
-    "Anonymize": input_scanners.Anonymize,
-    "BanCode": input_scanners.BanCode,
-    "BanCompetitors": input_scanners.BanCompetitors,
-    "BanSubstrings": input_scanners.BanSubstrings,
-    "BanTopics": input_scanners.BanTopics,
-    "Code": input_scanners.Code,
-    "Gibberish": input_scanners.Gibberish,
-    "IntentAnalysis": IntentAnalysisScanner,
-    "Language": input_scanners.Language,
-    "PromptInjection": input_scanners.PromptInjection,
-    "Secrets": input_scanners.Secrets,
-    "Sentiment": input_scanners.Sentiment,
-    "TokenLimit": input_scanners.TokenLimit,
-    "Toxicity": input_scanners.Toxicity,
+    "PromptInjection": PromptInjection,
+    "Toxicity": Toxicity,
 }
 
 OUTPUT_SCANNERS = {
-    "BanCode": output_scanners.BanCode,
-    "BanCompetitors": output_scanners.BanCompetitors,
-    "BanSubstrings": output_scanners.BanSubstrings,
-    "BanTopics": output_scanners.BanTopics,
-    "Bias": output_scanners.Bias,
-    "Code": output_scanners.Code,
-    "Deanonymize": output_scanners.Deanonymize,
-    "Language": output_scanners.Language,
-    "MaliciousURLs": output_scanners.MaliciousURLs,
-    "NoRefusal": output_scanners.NoRefusal,
-    "Relevance": output_scanners.Relevance,
-    "Sensitive": output_scanners.Sensitive,
-    "Sentiment": output_scanners.Sentiment,
-    "Toxicity": output_scanners.Toxicity,
+    "Toxicity": OutputToxicity,
 }
 
 def get_scanner(scanner_type: str, scanner_name: str, config: Dict[str, Any]):
@@ -106,11 +81,8 @@ def get_scanner(scanner_type: str, scanner_name: str, config: Dict[str, Any]):
         raise ValueError(f"Scanner {scanner_name} not found")
     
     try:
-        onnx_scanners = ["Toxicity", "PromptInjection", "Bias", "Relevance", 
-                        "NoRefusal", "MaliciousURLs", "Sensitive"]
-        
         config = config or {}
-        
+
         # Apply optimized configurations for best attack coverage
         if scanner_name == "PromptInjection":
             # Use lower threshold (0.5) for better coverage of sophisticated attacks
@@ -120,12 +92,14 @@ def get_scanner(scanner_type: str, scanner_name: str, config: Dict[str, Any]):
             # Use FULL match type to scan entire input
             if "match_type" not in config:
                 config["match_type"] = "full"
-            # Note: Library defaults to TangoBeeAkto/deberta-prompt-injection model
+            # Note: Library defaults to TangoBeeAkto/deberta-prompt-injection-v2 model
             # Enable ONNX for 27x faster performance (60-120ms vs 1500ms)
             if "use_onnx" not in config:
                 config["use_onnx"] = True
-        elif scanner_name in onnx_scanners:
-            config["use_onnx"] = True
+        elif scanner_name == "Toxicity":
+            # Enable ONNX for faster toxicity detection
+            if "use_onnx" not in config:
+                config["use_onnx"] = True
         
         scanner = scanner_class(**config)
         scanner_cache[cache_key] = scanner
