@@ -1058,7 +1058,10 @@ public class Main {
 
         // check for webhooks here 
         CustomWebhook customWebhook = CustomWebhooksDao.instance.findOne(
-            Filters.eq(CustomWebhook.WEBHOOK_TYPE, CustomWebhook.WebhookType.GMAIL.toString())
+            Filters.and(
+                Filters.eq(CustomWebhook.WEBHOOK_TYPE, CustomWebhook.WebhookType.GMAIL.toString()),
+                Filters.eq("activeStatus", CustomWebhook.ActiveStatus.ACTIVE.toString())
+            )
         );
 
         if(customWebhook != null && customWebhook.getActiveStatus().equals(CustomWebhook.ActiveStatus.ACTIVE)) {
