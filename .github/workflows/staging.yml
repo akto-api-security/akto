@@ -3,8 +3,9 @@ name: Staging
 # Controls when the workflow will run
 on:
   push:
-    branches: [ master ]
-  pull_request:
+    branches: [ feature/mini-runtime-release ]
+  pull_request_review:
+    types: [ submitted ]
   workflow_dispatch:
 
 jobs:
