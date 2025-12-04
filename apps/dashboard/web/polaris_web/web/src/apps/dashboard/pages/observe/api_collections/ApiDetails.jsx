@@ -72,6 +72,7 @@ function ApiDetails(props) {
     const [loading, setLoading] = useState(false)
     const [showMoreActions, setShowMoreActions] = useState(false)
     const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
+    const allCollections = PersistStore(state => state.allCollections)
     const [disabledTabs, setDisabledTabs] = useState([])
     const [description, setDescription] = useState("")
     const [headersWithData, setHeadersWithData] = useState([])
@@ -608,21 +609,31 @@ function ApiDetails(props) {
                         <Text variant="headingSm" fontWeight="semibold">
                             Detected Prompt Template
                         </Text>
-                        <Box background="bg-surface" padding="2" borderRadius="1" style={{ minHeight: '200px' }}>
-                            <SampleData
-                                data={{ 
-                                    message: detectedBasePrompt,
-                                    vulnerabilitySegments: func.findPlaceholders(detectedBasePrompt)
-                                }}
-                                editorLanguage="plaintext"
-                                readOnly={true}
-                                minHeight="200px"
-                                wordWrap={true}
-                            />
-                        </Box>
-                        <Text variant="bodySm" color="subdued">
-                            Auto-detected prompt template with placeholders from agent traffic. This template represents the common structure of prompts sent to this endpoint.
-                        </Text>
+                        {detectedBasePrompt ? (
+                            <>
+                                <Box background="bg-surface" padding="2" borderRadius="1" style={{ minHeight: '200px' }}>
+                                    <SampleData
+                                        data={{ 
+                                            message: detectedBasePrompt,
+                                            vulnerabilitySegments: func.findPlaceholders(detectedBasePrompt)
+                                        }}
+                                        editorLanguage="plaintext"
+                                        readOnly={true}
+                                        minHeight="200px"
+                                        wordWrap={true}
+                                    />
+                                </Box>
+                                <Text variant="bodySm" color="subdued">
+                                    Auto-detected prompt template with placeholders from agent traffic. This template represents the common structure of prompts sent to this endpoint.
+                                </Text>
+                            </>
+                        ) : (
+                            <Box padding="4">
+                                <Text variant="bodyMd" color="subdued">
+                                    No prompt template detected yet. The base prompt template will be automatically detected from agent traffic when requests are made to this endpoint.
+                                </Text>
+                            </Box>
+                        )}
                     </VerticalStack>
                 </Box>
             </VerticalStack>
@@ -829,6 +840,20 @@ function ApiDetails(props) {
         </VerticalStack>
     )
 
+    // Check if collection has gen-ai tag (same pattern as CreateGuardrailModal.jsx)
+    const hasGenAiTag = () => {
+        if (!apiDetail?.apiCollectionId || !allCollections) return false;
+        const collection = allCollections.find(c => c.id === apiDetail.apiCollectionId);
+        if (!collection) return false;
+        
+        return collection.envType && collection.envType.some(envType =>
+            envType.keyName === 'gen-ai'
+        );
+    };
+
+    // Always show BasePromptTab for AI agents (collections with gen-ai tag)
+    const shouldShowBasePromptTab = hasGenAiTag();
+
     const components = showForbidden
         ? [<Box padding="4" key="forbidden"><ForbiddenRole /></Box>]
         : [
@@ -838,7 +863,7 @@ function ApiDetails(props) {
                 tabs={[
                     ValuesTab,
                     SchemaTab,
-                    ...(detectedBasePrompt ? [BasePromptTab] : []),
+                    ...(shouldShowBasePromptTab ? [BasePromptTab] : []),
                     ...(hasIssues ? [IssuesTab] : []),
                     ApiCallStatsTab,
                     DependencyTab
