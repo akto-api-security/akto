@@ -386,7 +386,7 @@ public class ApiCollection {
     public String getSseCallbackUrl() {
         return sseCallbackUrl;
     }   
-
+    
     public void setSseCallbackUrl(String sseCallbackUrl) {
         this.sseCallbackUrl = sseCallbackUrl;
     }

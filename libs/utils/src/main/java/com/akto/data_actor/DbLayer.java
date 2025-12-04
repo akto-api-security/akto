@@ -16,6 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
+import com.akto.dao.AgentTrafficLogDao;
 import com.akto.dao.CyborgLogsDao;
 import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dao.graph.SvcToSvcGraphEdgesDao;
@@ -26,6 +27,7 @@ import com.akto.dao.settings.DataControlSettingsDao;
 import com.akto.dao.testing.config.TestSuiteDao;
 import com.akto.dependency_analyser.DependencyAnalyserUtils;
 import com.akto.dto.*;
+import com.akto.dto.AgentTrafficLog;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.graph.SvcToSvcGraphEdge;
 import com.akto.dto.graph.SvcToSvcGraphNode;
@@ -1986,11 +1988,14 @@ public class DbLayer {
 
     public static List<GuardrailPolicies> fetchGuardrailPolicies(Integer updatedAfter) {
         try {
+            List<GuardrailPolicies> policies;
             if (updatedAfter != null && updatedAfter > 0) {
-                return GuardrailPoliciesDao.instance.findAll(Filters.gt("updatedTimestamp", updatedAfter));
+                policies = GuardrailPoliciesDao.instance.findAll(Filters.gt("updatedTimestamp", updatedAfter));
             } else {
-                return GuardrailPoliciesDao.instance.findAll();
+                policies = GuardrailPoliciesDao.instance.findAll();
             }
+            
+            return policies;
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchGuardrailPolicies: " + e.getMessage());
             return new ArrayList<>();
@@ -1999,5 +2004,9 @@ public class DbLayer {
 
     public static void storeConversationResults(List<AgentConversationResult> conversationResults) {
         AgentConversationResultDao.instance.insertMany(conversationResults);
+    }
+
+    public static void bulkWriteAgentTrafficLogs(List<AgentTrafficLog> agentTrafficLogs) {
+        AgentTrafficLogDao.instance.insertMany(agentTrafficLogs);
     }
 }
