@@ -1055,7 +1055,7 @@ function ApiEndpoints(props) {
     function getTagsCompactComponent(envTypeList) {
         const list = envTypeList || []
         // Use shared badge renderer to show 1 tag and a +N badge with tooltip inline
-        return transform.getCollectionTypeList(list, 1, false)
+        return transform.getCollectionTypeList(list, 1, true)
     }
 
     function getCollectionTypeListComp(collectionsObj) {
