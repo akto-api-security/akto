@@ -196,21 +196,6 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
         return apiCollectionIds;
     }
 
-    public List<Integer> fetchExistingCollectionIds() {
-        Bson deactivatedFilter = Filters.or(
-                    Filters.exists(ApiCollection._DEACTIVATED, false),
-                    Filters.eq(ApiCollection._DEACTIVATED, false)
-            );
-
-        List<ApiCollection> existingCollections = ApiCollectionsDao.instance.findAll(deactivatedFilter, Projections.include(ApiCollection.ID));
-        List<Integer> apiCollectionIds = new ArrayList<>();
-        for (ApiCollection apiCollection: existingCollections) {
-            apiCollectionIds.add(apiCollection.getId());
-        }
-
-        return apiCollectionIds;
-    }
-
     public Map<Integer, Integer> buildEndpointsCountToApiCollectionMap(Bson filter) {
         Map<Integer, Integer> countMap = new HashMap<>();
         List<Bson> pipeline = new ArrayList<>();
