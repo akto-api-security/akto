@@ -78,10 +78,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [llmPrompt, setLlmPrompt] = useState("");
     const [llmConfidenceScore, setLlmConfidenceScore] = useState(0.5);
 
-    // Step 7: Base Prompt Rule
+    // Step 7: Base Prompt Based Validation (AI Agents)
     const [enableBasePromptRule, setEnableBasePromptRule] = useState(false);
-    const [basePrompt, setBasePrompt] = useState("");
-    const [basePromptAutoDetect, setBasePromptAutoDetect] = useState(true);
     const [basePromptConfidenceScore, setBasePromptConfidenceScore] = useState(0.5);
 
     // Step 8: External model based evaluation
@@ -122,8 +120,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         llmConfidenceScore,
         // Step 7
         enableBasePromptRule,
-        basePromptAutoDetect,
-        basePrompt,
         basePromptConfidenceScore,
         // Step 8
         url,
@@ -289,8 +285,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setLlmPrompt("");
         setLlmConfidenceScore(0.5);
         setEnableBasePromptRule(false);
-        setBasePrompt("");
-        setBasePromptAutoDetect(true);
         setBasePromptConfidenceScore(0.5);
         setUrl("");
         setConfidenceScore(25);
@@ -360,16 +354,12 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             setLlmConfidenceScore(0.5);
         }
 
-        // Base Prompt Rule
+        // Base Prompt Based Validation (AI Agents)
         if (policy.basePromptRule) {
             setEnableBasePromptRule(policy.basePromptRule.enabled || false);
-            setBasePrompt(policy.basePromptRule.basePrompt || "");
-            setBasePromptAutoDetect(policy.basePromptRule.autoDetect !== undefined ? policy.basePromptRule.autoDetect : true);
             setBasePromptConfidenceScore(policy.basePromptRule.confidenceScore !== undefined ? policy.basePromptRule.confidenceScore : 0.5);
         } else {
             setEnableBasePromptRule(false);
-            setBasePrompt("");
-            setBasePromptAutoDetect(true);
             setBasePromptConfidenceScore(0.5);
         }
 
@@ -474,8 +464,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 ...(enableBasePromptRule ? {
                     basePromptRule: {
                         enabled: true,
-                        basePrompt: basePromptAutoDetect ? "" : basePrompt.trim(), // Send empty if auto-detect
-                        autoDetect: basePromptAutoDetect,
                         confidenceScore: basePromptConfidenceScore
                     }
                 } : {}),
@@ -677,10 +665,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                     <BasePromptStep
                         enableBasePromptRule={enableBasePromptRule}
                         setEnableBasePromptRule={setEnableBasePromptRule}
-                        basePrompt={basePrompt}
-                        setBasePrompt={setBasePrompt}
-                        basePromptAutoDetect={basePromptAutoDetect}
-                        setBasePromptAutoDetect={setBasePromptAutoDetect}
                         basePromptConfidenceScore={basePromptConfidenceScore}
                         setBasePromptConfidenceScore={setBasePromptConfidenceScore}
                     />
