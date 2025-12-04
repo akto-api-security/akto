@@ -3,10 +3,7 @@ package com.akto.runtime.policies;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.ApiInfo.ApiAccessType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.security.web.util.matcher.IpAddressMatcher;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -17,7 +14,6 @@ public class ApiAccessTypePolicy {
     private List<String> partnerIpList;
 
 	public static final String X_FORWARDED_FOR = "x-forwarded-for";
-    private static final Logger logger = LoggerFactory.getLogger(ApiAccessTypePolicy.class);
     private static List<IpAddressMatcher> privateMatchers;
 
     public ApiAccessTypePolicy(List<String> privateCidrList, List<String> partnerIpList) {
@@ -52,6 +48,8 @@ public class ApiAccessTypePolicy {
         }
         return ip;
     }
+
+    final private static String STANDARD_PRIVATE_IP = "0.0.0.0";
 
     private static List<IpAddressMatcher> buildMatchers(List<String> cidrs) {
         if (cidrs == null || cidrs.isEmpty()) return Collections.emptyList();
@@ -109,6 +107,7 @@ public class ApiAccessTypePolicy {
 
         for (String ip: ipList) {
            if (ip == null) continue;
+           if (ip.equals(STANDARD_PRIVATE_IP)) continue;
            ip = ip.replaceAll(" ", "");
            try {
                 boolean result = ipInCidr(ip);
