@@ -786,13 +786,19 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         nonHostApiCollectionIds.addAll(deactivatedCollections);
 
         Bson hostFilterQ = SingleTypeInfoDao.filterForHostHeader(0, false);
-        Bson userCollectionFilter = Filters.empty();
+        List<Integer> existingCollectionIds = ApiCollectionsDao.instance.fetchExistingCollectionIds();
+        existingCollectionIds.removeAll(nonHostApiCollectionIds);
+        Bson existingCollectionFilter = Filters.in("apiCollectionId", existingCollectionIds);
+        Bson userCollectionFilter = existingCollectionFilter;
         if (useRbacUserCollections) {
             try {
                 List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
                         Context.accountId.get());
                 if (collectionIds != null) {
-                    userCollectionFilter = Filters.in("collectionIds", collectionIds);
+                    userCollectionFilter = Filters.and(
+                            Filters.in("collectionIds", collectionIds),
+                            Filters.in("apiCollectionId", existingCollectionIds)
+                        );
                 }
             } catch (Exception e) {
             }
