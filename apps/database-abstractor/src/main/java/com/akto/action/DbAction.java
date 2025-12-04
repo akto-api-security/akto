@@ -813,6 +813,12 @@ public class DbAction extends ActionSupport {
                     String url = (String) mObj.get("url");
                     String method = (String) mObj.get("method");
 
+                    // Debug logging for specific collections and wallet APIs
+                    if ((apiCollectionId == 1967507934 || apiCollectionId == -813289937) && url != null) {
+                        loggerMaker.infoAndAddToDb("bulkWriteSampleData: Processing sample for apiCollectionId=" + apiCollectionId +
+                            ", url=" + url + ", method=" + method + ", responseCode=" + responseCode);
+                    }
+
                     // Skip URLs based on validation rules
                     if (DataInsertionPreChecks.shouldSkipUrl(accId, url, responseCode)) {
                         continue;
@@ -847,6 +853,13 @@ public class DbAction extends ActionSupport {
                             List<String> dVal = (List) json.get("val");
                             RedactAlert.submitSampleDataForChecking(dVal, apiCollectionId, method, url);
                             SampleDataLogs.insertCount(apiCollectionId, method, url, dVal.size());
+
+                            // Debug logging for wallet API samples
+                            if ((apiCollectionId == 1967507934 || apiCollectionId == -813289937) && url != null) {
+                                loggerMaker.infoAndAddToDb("bulkWriteSampleData: Adding " + dVal.size() + " samples for apiCollectionId=" +
+                                    apiCollectionId + ", url=" + url + ", method=" + method);
+                            }
+
                             updatePayload = new UpdatePayload((String) json.get("field"), dVal , (String) json.get("op"));
                             updates.add(Updates.pushEach(updatePayload.getField(), dVal, new PushOptions().slice(-10)));
                         } else {
@@ -861,6 +874,7 @@ public class DbAction extends ActionSupport {
                 }
                 if(writes!=null && !writes.isEmpty()){
                     DbLayer.bulkWriteSampleData(writes);
+                    loggerMaker.infoAndAddToDb("bulkWriteSampleData: Successfully wrote " + writes.size() + " sample updates to MongoDB");
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error in bulkWriteSampleData " + e.toString());
