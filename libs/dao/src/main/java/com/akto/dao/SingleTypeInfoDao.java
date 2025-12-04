@@ -795,10 +795,7 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
                 List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
                         Context.accountId.get());
                 if (collectionIds != null) {
-                    userCollectionFilter = Filters.and(
-                            Filters.in("collectionIds", collectionIds),
-                            Filters.in("apiCollectionId", existingCollectionIds)
-                        );
+                    userCollectionFilter = Filters.in("collectionIds", collectionIds);
                 }
             } catch (Exception e) {
             }
