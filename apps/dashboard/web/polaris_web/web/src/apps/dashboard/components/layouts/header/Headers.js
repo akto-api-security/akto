@@ -182,8 +182,8 @@ useEffect(() => {
         LocalStore.getState().setSubCategoryMap({});
         SessionStore.getState().setThreatFiltersMap({});
         setDashboardCategory(value);
-        window.location.reload();
-        window.location.href("/dashboard/observe/inventory")
+        navigate("/dashboard/observe/inventory");
+        navigate(0);    
     }
 
     function createNewAccount() {
