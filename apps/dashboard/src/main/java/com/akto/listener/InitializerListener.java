@@ -2623,18 +2623,17 @@ public class InitializerListener implements ServletContextListener {
 
                     syncCronInfo.setUpUpdateCronScheduler();
                     syncCronInfo.setUpMcpMaliciousnessCronScheduler();
-                    setUpTestEditorTemplatesScheduler();
-                    JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
-                    updateApiGroupsForAccounts(); 
-                    setupAutomatedApiGroupsScheduler();
                     if(runJobFunctionsAnyway) {
                         crons.trafficAlertsScheduler();
-                        crons.insertHistoricalDataJob();
-                        if(DashboardMode.isOnPremDeployment()){
-                            crons.insertHistoricalDataJobForOnPrem();
-                        }
+//                        crons.insertHistoricalDataJob();
+//                        if(DashboardMode.isOnPremDeployment()){
+//                            crons.insertHistoricalDataJobForOnPrem();
+//                        }
 
-                        trimCappedCollectionsJob();
+//                        trimCappedCollectionsJob();
+                        setUpTestEditorTemplatesScheduler();
+                        JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
+                        setupAutomatedApiGroupsScheduler();
                         setUpPiiAndTestSourcesScheduler();
                         cleanInventoryJobRunner();
                         setUpDefaultPayloadRemover();
