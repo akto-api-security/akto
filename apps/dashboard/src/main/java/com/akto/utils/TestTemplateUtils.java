@@ -97,6 +97,8 @@ public class TestTemplateUtils {
             TestCategory.MCP_PRIVILEGE_ABUSE,
             TestCategory.MCP_INDIRECT_PROMPT_INJECTION,
             TestCategory.MCP_MALICIOUS_CODE_EXECUTION,
+            TestCategory.MCP_FUNCTION_MANIPULATION,
+            TestCategory.MCP_SECURITY,
         };
 
         TestCategory[] llmCategories = {
@@ -110,16 +112,28 @@ public class TestTemplateUtils {
             GlobalEnums.TestCategory.SYSTEM_PROMPT_LEAKAGE,
             GlobalEnums.TestCategory.VECTOR_AND_EMBEDDING_WEAKNESSES,
             GlobalEnums.TestCategory.MISINFORMATION,
-            GlobalEnums.TestCategory.UNBOUNDED_CONSUMPTION
+            GlobalEnums.TestCategory.UNBOUNDED_CONSUMPTION,
+            TestCategory.AGENTIC_BUSINESS_ALIGNMENT,
+            TestCategory.AGENTIC_HALLUCINATION_AND_TRUSTWORTHINESS,
+            TestCategory.AGENTIC_SAFETY,
+            TestCategory.AGENTIC_SECURITY,
         };
 
         switch (contextSource) {
             case MCP:
-                return mcpCategories;
+                return Arrays.stream(allCategories)
+                .filter(category ->  !Arrays.asList(llmCategories).contains(category))
+                .toArray(TestCategory[]::new);
 
             case GEN_AI:
                 return llmCategories;
             
+            case AGENTIC:
+                return allCategories;
+            
+            // for DAST and API security
+            case DAST:
+            case API:
             default:
                 return Arrays.stream(allCategories)
                     .filter(category -> !Arrays.asList(mcpCategories).contains(category) && !Arrays.asList(llmCategories).contains(category))

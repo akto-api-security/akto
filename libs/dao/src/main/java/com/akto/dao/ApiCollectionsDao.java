@@ -4,6 +4,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.rbac.UsersCollectionsList;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
 import com.akto.util.Pair;
@@ -73,8 +74,54 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
         return (ret != null && ret.size() > 0) ? ret.get(0) : null;
     }
 
+    public void updateTransportType(ApiCollection apiCollection, String transportType) {
+        try {
+            Bson filter = Filters.eq(ApiCollection.ID, apiCollection.getId());
+            
+            // Update the transport type field
+            Bson update = Updates.set(ApiCollection.MCP_TRANSPORT_TYPE, transportType);
+            ApiCollectionsDao.instance.updateOne(filter, update);
+            apiCollection.setMcpTransportType(transportType);
+            
+            // Update the mcp-server-type tag by replacing entire tags array
+            // Get current tags list
+            List<CollectionTags> currentTags = apiCollection.getTagsList();
+            if (currentTags == null) {
+                currentTags = new ArrayList<>();
+            }
+            
+            // Create a new list without the mcp-server-type tag
+            List<CollectionTags> updatedTags = new ArrayList<>();
+            for (CollectionTags tag : currentTags) {
+                if (!Constants.AKTO_MCP_SERVER_TYPE_TAG.equals(tag.getKeyName())) {
+                    updatedTags.add(tag);
+                }
+            }
+            
+            // Add the new mcp-server-type tag
+            CollectionTags serverTypeTag = new CollectionTags(
+                Context.now(), 
+                Constants.AKTO_MCP_SERVER_TYPE_TAG, 
+                transportType, 
+                CollectionTags.TagSource.KUBERNETES
+            );
+            updatedTags.add(serverTypeTag);
+            
+            // Replace entire tags array with a single update operation
+            Bson tagUpdate = Updates.set(ApiCollection.TAGS_STRING, updatedTags);
+            ApiCollectionsDao.instance.updateOne(filter, tagUpdate);
+        } catch (Exception e) {
+        }
+    }
+
+
     public List<ApiCollection> getMetaForIds(List<Integer> apiCollectionIds) {
         return ApiCollectionsDao.instance.findAll(Filters.in("_id", apiCollectionIds), Projections.exclude("urls"));
+    }
+
+    public ApiCollection getMetaForId(int apiCollectionId) {
+        return ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId),
+                Projections.exclude("urls"));
     }
 
     public Map<Integer, ApiCollection> getApiCollectionsMetaMap() {

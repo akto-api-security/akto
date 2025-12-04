@@ -295,6 +295,34 @@ const settingFunctions = {
       })
       return trafficData
     },
+    fetchServiceNowIntegration: async function(){
+      let serviceNowInteg = {}
+      await settingRequests.fetchServiceNowIntegration().then((resp)=>{
+        serviceNowInteg = resp.serviceNowIntegration
+      })
+      return serviceNowInteg
+    },
+    fetchServiceNowTables: async function(instanceUrl, clientId, clientSecret) {
+      let tables = []
+      await settingRequests.fetchServiceNowTables(instanceUrl, clientId, clientSecret).then((resp)=>{
+        tables = resp.tables
+      })
+      return tables
+    },
+    addServiceNowIntegration: async function(instanceUrl, clientId, clientSecret, tableNames) {
+      let trafficData = {}
+      await settingRequests.addServiceNowIntegration(instanceUrl, clientId, clientSecret, tableNames).then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
+    removeServiceNowIntegration: async function() {
+      let trafficData = {}
+      await settingRequests.removeServiceNowIntegration().then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
     getSetupOptions: function(){
       return setupOptions;
     },

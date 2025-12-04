@@ -154,6 +154,7 @@ public class StartTestAction extends UserAction {
     private CallSource source;
     private boolean sendSlackAlert = false;
     private boolean sendMsTeamsAlert = false;
+    private boolean doNotMarkIssuesAsFixed = false;
 
     private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds, String miniTestingServiceName, int selectedSlackChannelId) {
         User user = getSUser();
@@ -213,9 +214,11 @@ public class StartTestAction extends UserAction {
             TestingRunConfigDao.instance.insertOne(testingRunConfig);
         }
 
-        return new TestingRun(scheduleTimestamp, user.getLogin(),
+        TestingRun testingRun = new TestingRun(scheduleTimestamp, user.getLogin(),
                 testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds, testName, this.testRunTime,
                 this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert, miniTestingServiceName,selectedSlackChannelId);
+        testingRun.setDoNotMarkIssuesAsFixed(this.doNotMarkIssuesAsFixed);
+        return testingRun;
     }
 
     String selectedMiniTestingServiceName;
@@ -1657,6 +1660,19 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    @Getter
+    List<AgentConversationResult> conversationsList;
+    @Setter
+    String conversationId;
+
+    public String fetchConversationsFromConversationId() {
+        if(this.conversationId == null || this.conversationId.isEmpty()){
+            addActionError("Conversation id is required");
+            return ERROR.toUpperCase();
+        }
+        this.conversationsList = AgentConversationResultDao.instance.findAll(Filters.eq("conversationId", this.conversationId));
+        return SUCCESS.toUpperCase();
+    }
 
     public void setType(TestingEndpoints.Type type) {
         this.type = type;
@@ -2034,6 +2050,14 @@ public class StartTestAction extends UserAction {
 
     public void setSendMsTeamsAlert(boolean sendMsTeamsAlert) {
         this.sendMsTeamsAlert = sendMsTeamsAlert;
+    }
+
+    public void setDoNotMarkIssuesAsFixed(boolean doNotMarkIssuesAsFixed) {
+        this.doNotMarkIssuesAsFixed = doNotMarkIssuesAsFixed;
+    }
+
+    public boolean getDoNotMarkIssuesAsFixed() {
+        return doNotMarkIssuesAsFixed;
     }
 
     public void setRecurringWeekly(boolean recurringWeekly) {

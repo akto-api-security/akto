@@ -2,7 +2,7 @@ import { Box, Text, HorizontalStack, DataTable, VerticalStack } from '@shopify/p
 import ChartypeComponent from './ChartypeComponent';
 import observeFunc from "../../observe/transform";
 import InfoCard from '../../dashboard/new_components/InfoCard';
-import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
+import { CATEGORY_AGENTIC_SECURITY, CATEGORY_API_SECURITY, CATEGORY_GEN_AI, CATEGORY_MCP_SECURITY, getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 import { mcpCategoryTestData, genAICategoryTestData, apiCategoryTestData } from './dummyData';
 import api from '../api';
 import { useState, useEffect } from 'react';
@@ -52,11 +52,13 @@ function CategoryWiseScoreGraph({
         }
         
         switch (dashboardCategory) {
-            case 'MCP Security':
+            case CATEGORY_MCP_SECURITY:
                 return mcpCategoryTestData;
-            case 'Gen AI':
+            case CATEGORY_GEN_AI:
                 return genAICategoryTestData;
-            case 'API Security':
+            case CATEGORY_AGENTIC_SECURITY:
+                return [...mcpCategoryTestData, ...genAICategoryTestData]
+            case CATEGORY_API_SECURITY:
             default:
                 return apiCategoryTestData || [];
         }
@@ -238,23 +240,13 @@ function CategoryWiseScoreGraph({
                             {executedTotal === 0 ? '0%' : `${primaryRate}%`} {executedTotal === 0 ? 'No data' : primaryLabel}
                         </span>
                     </Text>
-                </HorizontalStack>
-                
-                {/* Detailed breakdown with visual indicators */}
-                <HorizontalStack gap="3">
                     <Text variant="bodySm" color='subdued'>
                         <span style={{ color: '#54b074', fontWeight: '500' }}>✓{passCount}</span>
                     </Text>
                     <Text variant="bodySm" color='subdued'>
                         <span style={{ color: '#f05352', fontWeight: '500' }}>✗{failCount}</span>
                     </Text>
-                    {/* Skip count commented out for now */}
-                    {/* {statusLabels.hasSkip && skipCount > 0 && (
-                        <Text variant="bodySm" color='subdued'>
-                            <span style={{ color: '#ffa500', fontWeight: '500' }}>⊘{skipCount}</span>
-                        </Text>
-                    )} */}
-            </HorizontalStack>
+                </HorizontalStack>
             </VerticalStack>
         ];
     });

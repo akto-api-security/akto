@@ -5,6 +5,7 @@ import EmptyCard from '../../dashboard/new_components/EmptyCard';
 import LineChart from '../../../components/charts/LineChart';
 import api from '../api';
 import func from '@/util/func';
+import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 
 const TestRunOverTimeGraph = ({ showOnlyTable = false }) => {
   const [chartData, setChartData] = useState([]);
@@ -24,7 +25,7 @@ const TestRunOverTimeGraph = ({ showOnlyTable = false }) => {
     tempData.sort((a, b) => a[0] - b[0]); // Sort by timestamp
 
     setChartData([{
-        name: 'Test Runs',
+        name: mapLabel("Test runs", getDashboardCategory()),
         data: tempData,
         color: '#6D3BEF'  // Using a consistent color for test runs
     }]);
@@ -47,12 +48,12 @@ const TestRunOverTimeGraph = ({ showOnlyTable = false }) => {
             showGridLines={true}
           />
       }
-      title="Test Runs Over Time"
-      titleToolTip="Track test run activity over the last 5 weeks, showing the number of test runs per week."
+      title={mapLabel("Test runs", getDashboardCategory()) + " Over Time"}
+      titleToolTip={"Track test run activity over the last 5 weeks, showing the number of" + mapLabel("Test runs", getDashboardCategory()) + " per week."}
     />
   ) : (
     <EmptyCard 
-      title="Test Runs Over Time" 
+      title={mapLabel("Test runs", getDashboardCategory()) + " Over Time"} 
       subTitleComponent={
         showTestingComponents ? 
           <Text alignment='center' color='subdued'>No test run data found for the selected time period.</Text> : 

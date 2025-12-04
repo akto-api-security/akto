@@ -19,6 +19,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Up
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.UpdateMaliciousEventStatusResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DeleteMaliciousEventsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DeleteMaliciousEventsResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataRequest;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
@@ -61,6 +62,9 @@ public class DashboardRouter implements ARouter {
         if (!protoFilter.getLatestAttackList().isEmpty()) {
             filterMap.put("latestAttack", new ArrayList<>(protoFilter.getLatestAttackList()));
         }
+        if (!protoFilter.getHostsList().isEmpty()) {
+            filterMap.put("hosts", new ArrayList<>(protoFilter.getHostsList()));
+        }
         if (protoFilter.hasStatusFilter()) {
             filterMap.put("statusFilter", protoFilter.getStatusFilter());
         }
@@ -73,6 +77,10 @@ public class DashboardRouter implements ARouter {
                 timeRange.put("end", (int) protoFilter.getDetectedAtTimeRange().getEnd());
             }
             filterMap.put("detected_at_time_range", timeRange);
+        }
+
+        if (protoFilter.hasLatestApiOrigRegex() && !protoFilter.getLatestApiOrigRegex().isEmpty()) {
+            filterMap.put("latestApiOrigRegex", protoFilter.getLatestApiOrigRegex());
         }
 
         return filterMap;
@@ -426,7 +434,6 @@ public class DashboardRouter implements ARouter {
                 // Determine which type of update to perform
                 List<String> eventIds = null;
                 Map<String, Object> filterMap = null;
-
                 if (req.hasEventId()) {
                     // Single event update
                     eventIds = java.util.Arrays.asList(req.getEventId());
@@ -445,7 +452,8 @@ public class DashboardRouter implements ARouter {
                     ctx.get("accountId"),
                     eventIds,
                     filterMap,
-                    req.getStatus()
+                    req.getStatus(),
+                    req.getJiraTicketUrl()
                 );
 
                 UpdateMaliciousEventStatusResponse resp = UpdateMaliciousEventStatusResponse.newBuilder()
@@ -507,6 +515,33 @@ public class DashboardRouter implements ARouter {
 
                 ProtoMessageUtils.toString(resp)
                     .ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
+
+        router
+            .post("/get_top_n_data")
+            .blockingHandler(ctx -> {
+                RequestBody reqBody = ctx.body();
+                FetchTopNDataRequest req = ProtoMessageUtils.<
+                FetchTopNDataRequest
+                >toProtoMessage(
+                    FetchTopNDataRequest.class,
+                    reqBody.asString()
+                ).orElse(null);
+
+                if (req == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
+                ProtoMessageUtils.toString(
+                    threatActorService.fetchTopNData(
+                        ctx.get("accountId"),
+                        req.getStartTs(),
+                        req.getEndTs(),
+                        req.getLatestAttackList(),
+                        req.getLimit()
+                    )
+                ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
 
         return router;

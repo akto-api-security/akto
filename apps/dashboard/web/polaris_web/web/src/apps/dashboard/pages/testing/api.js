@@ -637,5 +637,15 @@ export default {
             }
         })
         return resp
-    }
+    },
+    async fetchConversationsFromConversationId(conversationId) {
+        const resp = await request({
+            url: '/api/fetchConversationsFromConversationId',
+            method: 'post',
+            data: {
+                conversationId
+            }
+        })
+        return resp
+    },
 }

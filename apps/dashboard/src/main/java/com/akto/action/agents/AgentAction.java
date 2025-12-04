@@ -174,6 +174,40 @@ public class AgentAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String deleteAgentRun() {
+        if (processId == null || processId.isEmpty()) {
+            addActionError("Process ID is required");
+            return Action.ERROR.toUpperCase();
+        }
+
+        Bson processIdFilter = Filters.eq(AgentRun.PROCESS_ID, processId);
+        AgentRun agentRun = AgentRunDao.instance.findOne(processIdFilter);
+
+        if (agentRun == null) {
+            addActionError("No agent run found with the given process ID");
+            return Action.ERROR.toUpperCase();
+        }
+
+        // Only allow deletion of scheduled or running agents
+        if (!State.SCHEDULED.equals(agentRun.getState()) && !State.RUNNING.equals(agentRun.getState()) && !State.STOPPED.equals(agentRun.getState())) {
+            addActionError("Only scheduled or running agent runs can be deleted");
+            return Action.ERROR.toUpperCase();
+        }
+
+        try {
+            // Delete the agent run
+            AgentRunDao.instance.deleteAll(processIdFilter);
+            
+            // Also delete associated subprocesses if they exist
+            AgentSubProcessSingleAttemptDao.instance.deleteAll(Filters.eq(AgentSubProcessSingleAttempt.PROCESS_ID, processId));
+            
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            addActionError("Failed to delete agent run: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
     @Setter
     Map<String, Object> results;
 

@@ -11,10 +11,21 @@ message Metadata {
 }
 
 message SchemaConformanceError {
+  enum Location {
+    LOCATION_UNSPECIFIED = 0;
+    LOCATION_URL = 1;
+    LOCATION_HEADER = 2;
+    LOCATION_BODY = 3;
+  }
+  
   string schema_path = 1;
   string instance_path = 2;
   string attribute = 3;
   string message = 4;
+  Location location = 5;
+  int32 start = 6;       // Start position of threat in the text
+  int32 end = 7;         // End position of threat in the text
+  string phrase = 8;     // The actual threat phrase/keyword detected
 }
 
 message SampleMaliciousRequest {
@@ -27,6 +38,7 @@ message SampleMaliciousRequest {
   string filter_id = 7;
   Metadata metadata = 8; 
   bool successful_exploit = 9;
+  string status = 10;
 }
 
 message SampleRequestKafkaEnvelope {

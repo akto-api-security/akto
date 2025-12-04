@@ -5,10 +5,9 @@ import {
     MarketingFilledMinor,
     ReportFilledMinor,
     DiamondAlertMinor,
-    StarFilledMinor,
     FinancesMinor,
     LockMajor,
-    AutomationFilledMajor,
+    AutomationFilledMajor
 } from "@shopify/polaris-icons";
 import {useLocation, useNavigate} from "react-router-dom";
 
@@ -22,7 +21,7 @@ import func from "@/util/func";
 import Dropdown from "../Dropdown";
 import SessionStore from "../../../../main/SessionStore";
 import IssuesStore from "../../../pages/issues/issuesStore";
-import { mapLabel } from "../../../../main/labelHelper";
+import { CATEGORY_DAST, mapLabel } from "../../../../main/labelHelper";
 
 export default function LeftNav() {
     const navigate = useNavigate();
@@ -163,7 +162,16 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_sensitive",
                     },
-                    ...(dashboardCategory === "MCP Security" ? [{
+                    ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AKTO_DAST?.isGranted && dashboardCategory === CATEGORY_DAST ? [{
+                        label: "DAST scans",
+                        onClick: () => {
+                            navigate("/dashboard/observe/dast-progress");
+                            handleSelect("dashboard_observe_dast_progress");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_observe_dast_progress"
+                    }] : []),
+                    ...((dashboardCategory === "MCP Security" || dashboardCategory === "Agentic Security") ? [{
                         label: "Audit Data",
                         onClick: () => {
                             navigate("/dashboard/observe/audit");
@@ -171,6 +179,15 @@ export default function LeftNav() {
                             setActive("active");
                         },
                         selected: leftNavSelected === "dashboard_observe_audit",
+                    }] : []),
+                    ...((dashboardCategory === "MCP Security" || dashboardCategory === "Agentic Security") ? [{
+                        label: "Endpoint Shield",
+                        onClick: () => {
+                            navigate("/dashboard/observe/endpoint-shield");
+                            handleSelect("dashboard_observe_endpoint_shield");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_observe_endpoint_shield",
                     }] : []),
                 ],
                 key: "3",
@@ -210,7 +227,7 @@ export default function LeftNav() {
                         selected: leftNavSelected === "dashboard_testing",
                     },
                     {
-                        label: "Test Roles",
+                        label: mapLabel("Test", dashboardCategory) + " Roles",
                         onClick: () => {
                             navigate("/dashboard/testing/roles");
                             handleSelect("dashboard_testing_roles");
@@ -228,7 +245,7 @@ export default function LeftNav() {
                         selected: leftNavSelected === "dashboard_testing_user_config",
                     },
                     {
-                        label:"Test Suite",
+                        label:mapLabel("Test", dashboardCategory) + " Suite",
                         onClick:()=>{
                             navigate("/dashboard/testing/test-suite");
                             handleSelect("dashboard_testing_test_suite");
@@ -243,7 +260,7 @@ export default function LeftNav() {
                 url: "#",
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
-                        Test library
+                        {mapLabel("Test library", dashboardCategory)}
                     </Text>
                 ),
                 icon: FinancesMinor,
@@ -255,7 +272,7 @@ export default function LeftNav() {
                 selected: leftNavSelected.includes("_test_library"),
                 subNavigationItems: [
                     {
-                        label: "Tests",
+                        label: mapLabel("More Tests", dashboardCategory),
                         onClick: () => {
                             navigate("/dashboard/test-library/tests");
                             handleSelect("dashboard_test_library_tests");
@@ -275,6 +292,21 @@ export default function LeftNav() {
                 ],
                 key: "5",
             },
+            ...(dashboardCategory === "Agentic Security" && func.isDemoAccount() ? [{
+                label: (
+                    <Text variant="bodyMd" fontWeight="medium">
+                        Prompt Hardening
+                    </Text>
+                ),
+                icon: AutomationFilledMajor,
+                onClick: () => {
+                    handleSelect("dashboard_prompt_hardening");
+                    navigate("/dashboard/prompt-hardening");
+                    setActive("normal");
+                },
+                selected: leftNavSelected === "dashboard_prompt_hardening",
+                key: "prompt_hardening",
+            }] : []),
             {
                 url: "#",
                 label: (
@@ -302,7 +334,7 @@ export default function LeftNav() {
                 subNavigationItems: reportsSubNavigationItems,
                 key: "6",
             },
-            ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted ? [{
+            ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted && dashboardCategory !== CATEGORY_DAST  ?  [{
                     label: (
                         <Text variant="bodyMd" fontWeight="medium">
                             {mapLabel("Threat Detection", dashboardCategory)}
@@ -314,12 +346,21 @@ export default function LeftNav() {
                         navigate("/dashboard/protection/threat-actor");
                         setActive("normal");
                     },
-                    selected: leftNavSelected.includes("_threat"),
+                    selected: leftNavSelected.includes("_threat") ||  leftNavSelected.includes("_guardrails"),
                     url: "#",
                     key: "7",
                     subNavigationItems: [
+                        ...(dashboardCategory === "API Security" ? [{
+                            label: "Dashboard",
+                            onClick: () => {
+                                navigate("/dashboard/protection/threat-dashboard");
+                                handleSelect("dashboard_threat_dashboard");
+                                setActive("active");
+                            },
+                            selected: leftNavSelected === "dashboard_threat_dashboard",
+                        }] : []),
                         {
-                            label: "Threat Actors",
+                            label: `${mapLabel("Threat", dashboardCategory)} Actors`,
                             onClick: () => {
                                 navigate("/dashboard/protection/threat-actor");
                                 handleSelect("dashboard_threat_actor");
@@ -328,7 +369,7 @@ export default function LeftNav() {
                             selected: leftNavSelected === "dashboard_threat_actor",
                         },
                         {
-                            label: "Threat Activity",
+                            label: `${mapLabel("Threat", dashboardCategory)} Activity`,
                             onClick: () => {
                                 navigate("/dashboard/protection/threat-activity");
                                 handleSelect("dashboard_threat_activity");
@@ -338,7 +379,7 @@ export default function LeftNav() {
                                 leftNavSelected === "dashboard_threat_activity",
                         },
                         {
-                            label: `${mapLabel("APIs", dashboardCategory)} Under Threat`,
+                            label: `${mapLabel("APIs", dashboardCategory)} Under ${mapLabel("Threat", dashboardCategory)}`,
                             onClick: () => {
                                 navigate("/dashboard/protection/threat-api");
                                 handleSelect("dashboard_threat_api");
@@ -347,8 +388,17 @@ export default function LeftNav() {
                             selected:
                                 leftNavSelected === "dashboard_threat_api",
                         },
+                        ...(dashboardCategory === "Agentic Security" ? [{
+                            label: "Guardrail Policies",
+                            onClick: () => {
+                                navigate("/dashboard/guardrails/policies");
+                                handleSelect("dashboard_guardrails_policies");
+                                setActive("active");
+                            },
+                            selected: leftNavSelected === "dashboard_guardrails_policies",
+                            }] : []),
                         {
-                            label: "Threat Policy",
+                            label: "Threat Policies",
                             onClick: () => {
                                 navigate("/dashboard/protection/threat-policy");
                                 handleSelect("dashboard_threat_policy");
@@ -356,25 +406,25 @@ export default function LeftNav() {
                             },
                             selected:
                                 leftNavSelected === "dashboard_threat_policy",
-                        },
+                        }
                     ],
                 }] : []),
-                ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AI_AGENTS?.isGranted && dashboardCategory==="API Security" ? [{
-                label: (
-                    <Text variant="bodyMd" fontWeight="medium">
-                        AI Agents
-                    </Text>
-                ),
-                icon: StarFilledMinor,
-                onClick: () => {
-                    handleSelect("agent_team_members");
-                    navigate("/dashboard/agent-team/members");
-                    setActive("normal");
-                },
-                selected: leftNavSelected.includes("agent_team"),
-                url: "#",
-                key: "8",
-            }] : []),
+            // ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AI_AGENTS?.isGranted && dashboardCategory === "API Security" ? [{
+            //     label: (
+            //         <Text variant="bodyMd" fontWeight="medium">
+            //             AI Agents
+            //         </Text>
+            //     ),
+            //     icon: StarFilledMinor,
+            //     onClick: () => {
+            //         handleSelect("agent_team_members");
+            //         navigate("/dashboard/agent-team/members");
+            //         setActive("normal");
+            //     },
+            //     selected: leftNavSelected.includes("agent_team"),
+            //     url: "#",
+            //     key: "8",
+            // }] : []),
             ...(dashboardCategory === "MCP Security" ? [{
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
@@ -449,7 +499,7 @@ export default function LeftNav() {
                             leftNavSelected === "dashboard_guardrails_policies",
                     }
                 ]
-            }] : []),
+            }] : [])
         ]
 
         const exists = items.find(item => item.key === "quick_start")
@@ -471,7 +521,7 @@ export default function LeftNav() {
     }, [dashboardCategory, leftNavSelected])
 
     const navigationMarkup = (
-        <div className={active}>
+        <div className={`${active} ${dashboardCategory === "Agentic Security" ? "agentic-security-nav" : ""}`}>
             <Navigation location="/">
                 <Navigation.Section
                     items={navItems}

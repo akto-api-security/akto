@@ -2,6 +2,7 @@ import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
 import { Box, Button, Popover, Modal, Tooltip, ActionList, VerticalStack, HorizontalStack, Tag, Text } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
+import ApiGroups from "../../../components/shared/ApiGroups";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import { useEffect, useState, useRef } from "react";
 import api from "../api";
@@ -21,6 +22,7 @@ import InlineEditableText from "../../../components/shared/InlineEditableText";
 import GridRows from "../../../components/shared/GridRows";
 import Dropdown from "../../../components/layouts/Dropdown";
 import ApiIssuesTab from "./ApiIssuesTab";
+import ForbiddenRole from "../../../components/shared/ForbiddenRole";
 
 import Highcharts from 'highcharts';
 import HighchartsMore from 'highcharts/highcharts-more';
@@ -75,7 +77,7 @@ function ApiDetails(props) {
     const [isEditingDescription, setIsEditingDescription] = useState(false)
     const [editableDescription, setEditableDescription] = useState(description)
     const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
-    const [apiCallStats, setApiCallStats] = useState([]); 
+    const [apiCallStats, setApiCallStats] = useState([]);
     const [apiCallDistribution, setApiCallDistribution] = useState([]);
     const endTs = func.timeNow();
     const [startTime, setStartTime] = useState(endTs - statsOptions[6].value)
@@ -84,6 +86,7 @@ function ApiDetails(props) {
     const apiStatsAvailableRef = useRef(false);
     const apiDistributionAvailableRef = useRef(false);
     const [selectedTabId, setSelectedTabId] = useState('values');
+    const [showForbidden, setShowForbidden] = useState(false);
 
     const statusFunc = getStatus ? getStatus : (x) => {
         try {
@@ -222,7 +225,7 @@ function ApiDetails(props) {
                 {
                     data: res.result.apiCallStats.sort((a, b) => b.ts - a.ts).map((item) => [item.ts * 60 * 1000, item.count]),
                     color: "",
-                    name: 'API Calls',
+                    name: mapLabel('Api', getDashboardCategory()) + ' Calls',
                 },
             ];
 
@@ -246,13 +249,22 @@ function ApiDetails(props) {
             setLoading(true)
             const { apiCollectionId, endpoint, method, description } = apiDetail
             setSelectedUrl({ url: endpoint, method: method })
-            api.checkIfDependencyGraphAvailable(apiCollectionId, endpoint, method).then((resp) => {
-                if (!resp.dependencyGraphExists) {
-                    setDisabledTabs(["dependency"])
-                } else {
-                    setDisabledTabs([])
+            
+            try {
+                await api.checkIfDependencyGraphAvailable(apiCollectionId, endpoint, method).then((resp) => {
+                    if (!resp.dependencyGraphExists) {
+                        setDisabledTabs(["dependency"])
+                    } else {
+                        setDisabledTabs([])
+                    }
+                })
+            } catch (error) {
+                if (error?.response?.status === 403 || error?.status === 403) {
+                    setShowForbidden(true);
+                    setLoading(false);
+                    return;
                 }
-            })
+            }
 
             setTimeout(() => {
                 setDescription(description == null ? "" : description)
@@ -265,8 +277,10 @@ function ApiDetails(props) {
             })
 
             let commonMessages = []
-            await api.fetchSampleData(endpoint, apiCollectionId, method).then((res) => {
-                api.fetchSensitiveSampleData(endpoint, apiCollectionId, method).then(async (resp) => {
+            try {
+                const res = await api.fetchSampleData(endpoint, apiCollectionId, method)
+                try {
+                    const resp = await api.fetchSensitiveSampleData(endpoint, apiCollectionId, method)
                     if (resp.sensitiveSampleData && Object.keys(resp.sensitiveSampleData).length > 0) {
                         if (res.sampleDataList.length > 0) {
                             commonMessages = transform.getCommonSamples(res.sampleDataList[0].samples, resp)
@@ -275,9 +289,16 @@ function ApiDetails(props) {
                         }
                     } else {
                         let sensitiveData = []
-                        await api.loadSensitiveParameters(apiCollectionId, endpoint, method).then((res3) => {
+                        try {
+                            const res3 = await api.loadSensitiveParameters(apiCollectionId, endpoint, method)
                             sensitiveData = res3.data.endpoints;
-                        })
+                        } catch (error) {
+                            if (error?.response?.status === 403 || error?.status === 403) {
+                                setShowForbidden(true);
+                                setLoading(false);
+                                return;
+                            }
+                        }
                         let samples = res.sampleDataList.map(x => x.samples)
                         samples = samples.reverse();
                         samples = samples.flat()
@@ -285,8 +306,21 @@ function ApiDetails(props) {
                         commonMessages = transform.prepareSampleData(newResp, '')
                     }
                     setSampleData(commonMessages)
-                })
-            })
+                } catch (error) {
+                    if (error?.response?.status === 403 || error?.status === 403) {
+                        setShowForbidden(true);
+                        setLoading(false);
+                        return;
+                    }
+                }
+            } catch (error) {
+                if (error?.response?.status === 403 || error?.status === 403) {
+                    setShowForbidden(true);
+                    setLoading(false);
+                    return;
+                }
+            }
+            
             setTimeout(() => {
                 setLoading(false)
             }, 100)
@@ -427,7 +461,7 @@ function ApiDetails(props) {
         },
         xAxis: {
             title: {
-                text: 'API Call Frequency',
+                text: mapLabel('Api', getDashboardCategory()) + ' Call Frequency',
                 style: {
                     fontSize: '12px',
                 },
@@ -483,7 +517,7 @@ function ApiDetails(props) {
         xAxis: {
             categories: apiCallDistribution?.[0]?.categories || [],
             title: {
-                text: 'Api Call Count',
+                text: mapLabel('Api', getDashboardCategory()) + ' Call Count',
                 style: { fontSize: '12px' }
             },
             labels: {
@@ -578,7 +612,7 @@ function ApiDetails(props) {
 
     const ApiCallStatsTab = {
         id: 'api-call-stats',
-        content: 'API Call Stats',
+        content: mapLabel('Api', getDashboardCategory()) + ' Call Stats',
         component: 
             <Box paddingBlockStart={'4'}>
                 <HorizontalStack align="end">
@@ -606,7 +640,7 @@ function ApiDetails(props) {
                             color='#6200EA'
                             areaFillHex='true'
                             height='330'
-                            title='API Call Count'
+                            title={mapLabel('Api', getDashboardCategory()) + ' Call Count'}
                             subtitle='Number of API calls over time'
                             defaultChartOptions={defaultChartOptions(false)}
                             backgroundColor='#ffffff'
@@ -679,19 +713,24 @@ function ApiDetails(props) {
     newData['description'] = (isEditingDescription?<InlineEditableText textValue={editableDescription} setTextValue={setEditableDescription} handleSaveClick={handleSaveDescription} setIsEditing={setIsEditingDescription}  placeholder={"Add a brief description"} maxLength={64}/> : description )
 
     const headingComp = (
-        <HorizontalStack align="space-between" wrap={false} key="heading">
-            <VerticalStack>
-                <HorizontalStack gap={"2"} wrap={false} >
-                    <GithubCell
-                        width="32vw"
-                        data={newData}
-                        headers={headers}
-                        getStatus={statusFunc}
+        <VerticalStack gap="4" key="heading">
+            <HorizontalStack align="space-between" wrap={false}>
+                <VerticalStack gap="3">
+                    <HorizontalStack gap={"2"} wrap={false} >
+                        <GithubCell
+                            width="32vw"
+                            data={newData}
+                            headers={headers}
+                            getStatus={statusFunc}
+                        />
+                    </HorizontalStack>
+                    <ApiGroups
+                        collectionIds={apiDetail?.collectionIds}
+                        onGroupClick={() => setShowDetails(false)}
                     />
-                </HorizontalStack>
-            </VerticalStack>
-            <VerticalStack gap="3" align="space-between">
-                <HorizontalStack gap={"1"} wrap={false} >
+                </VerticalStack>
+                <VerticalStack gap="3" align="space-between">
+                    <HorizontalStack gap={"1"} wrap={false} >
                     <RunTest
                         apiCollectionId={apiDetail["apiCollectionId"]}
                         endpoints={[apiDetail]}
@@ -732,24 +771,27 @@ function ApiDetails(props) {
                     </VerticalStack>
                 }
             </VerticalStack>
-        </HorizontalStack>
+            </HorizontalStack>
+        </VerticalStack>
     )
 
-    const components = [
-        headingComp,
-        <LayoutWithTabs
-            key="tabs"
-            tabs={[
-                ValuesTab,
-                SchemaTab,
-                ...(hasIssues ? [IssuesTab] : []),
-                ApiCallStatsTab,
-                DependencyTab
-            ]}
-            currTab={(tab) => setSelectedTabId(tab.id)}
-            disabledTabs={disabledTabs}
-        />
-    ]
+    const components = showForbidden
+        ? [<Box padding="4" key="forbidden"><ForbiddenRole /></Box>]
+        : [
+            headingComp,
+            <LayoutWithTabs
+                key="tabs"
+                tabs={[
+                    ValuesTab,
+                    SchemaTab,
+                    ...(hasIssues ? [IssuesTab] : []),
+                    ApiCallStatsTab,
+                    DependencyTab
+                ]}
+                currTab={(tab) => setSelectedTabId(tab.id)}
+                disabledTabs={disabledTabs}
+            />
+        ]
 
     return (
         <div>

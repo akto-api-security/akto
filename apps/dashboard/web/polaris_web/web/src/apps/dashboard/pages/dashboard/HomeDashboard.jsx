@@ -67,6 +67,8 @@ function HomeDashboard() {
         },
     ];
 
+    const ALL_COLLECTION_INVENTORY_ID = 111111121
+
 
     const allCollections = PersistStore(state => state.allCollections)
     const hostNameMap = PersistStore(state => state.hostNameMap)
@@ -131,21 +133,25 @@ function HomeDashboard() {
             "text": 0,
             "color": "#147CF6",
             "filterKey": "Partner",
+            "filterValue": "Partner"
         },
         "Internal": {
             "text": 0,
             "color": "#FDB33D",
-            "filterKey": "Internal"
+            "filterKey": "Internal",
+            "filterValue": "Private"
         },
         "External": {
             "text": 0,
             "color": "#658EE2",
-            "filterKey": "External"
+            "filterKey": "External",
+            "filterValue": "Public"
         },
         "Third Party": {
             "text": 0,
             "color": "#68B3D0",
-            "filterKey": "Third Party"
+            "filterKey": "Third Party",
+            "filterValue": "Third Party"
         },
         "Need more data": {
             "text": 0,
@@ -577,7 +583,7 @@ function HomeDashboard() {
         )
     }
 
-    const runTestEmptyCardComponent = <Text alignment='center' color='subdued'>There's no data to show. <Link url="/dashboard/testing" target='_blank'>Run test</Link> to get data populated. </Text>
+    const runTestEmptyCardComponent = <Text alignment='center' color='subdued'>There's no data to show. <Link url="/dashboard/testing" target='_blank'>{mapLabel('Run test', getDashboardCategory())}</Link> to get data populated. </Text>
 
     function mapAccessTypes(apiStats, missingCount, redundantCount, apiTypeMissing) {
         if (!apiStats) return
@@ -624,6 +630,11 @@ function HomeDashboard() {
         // Initialize colors list
         const colors = ["#7F56D9", "#8C66E1", "#9E77ED", "#AB88F1", "#B692F6", "#D6BBFB", "#E9D7FE", "#F4EBFF"];
 
+        const formatFilterValue = (key) => {
+            if (key === undefined || key === null) return undefined
+            return String(key).toLowerCase()
+        }
+
         // Convert and sort the authTypeMap entries by value (count) in descending order
         const sortedAuthTypes = Object.entries(apiStatsEnd.authTypeMap)
             .map(([key, value]) => ({ key: key, text: value }))
@@ -636,10 +647,12 @@ function HomeDashboard() {
 
         // Fill in the authMap with sorted entries and corresponding colors
         sortedAuthTypes.forEach((item, index) => {
-            authMap[convertKey(item.key)] = {
+            const displayKey = convertKey(item.key)
+            authMap[displayKey] = {
                 "text": item.text,
                 "color": colors[index] || "#F4EBFF", // Assign color; default to last color if out of range
-                "filterKey": convertKey(item.key),
+                "filterKey": displayKey,
+                "filterValue": formatFilterValue(item.key),
                 "dataTableComponent": apiStatsStart && apiStatsStart.authTypeMap && apiStatsStart.authTypeMap[item.key] ? generateChangeComponent((item.text - apiStatsStart.authTypeMap[item.key]), item.key === "UNAUTHENTICATED") : null
             };
         });
@@ -651,6 +664,7 @@ function HomeDashboard() {
                 "text": countMissing,
                 "color": "#EFE3FF",
                 "filterKey": "Need more data",
+                "filterValue": undefined,
                 "dataTableComponent": generateChangeComponent(0, false) // No change component for missing auth types
             };
         }
@@ -659,6 +673,18 @@ function HomeDashboard() {
         setAuthMap(authMap)
     }
 
+
+    const buildAuthFiltersUrl = useCallback((baseUrl, filterValue, baseFilter) => {
+        if(!func.checkForFeatureSaas("AKTO_API_GROUP_CRONS")){
+            return undefined;
+        }
+        if (!baseUrl) return undefined
+        if (!filterValue) {
+            return baseUrl
+        }
+        const separator = baseUrl.includes('?') ? '&' : '?'
+        return `${baseUrl}${separator}filters=${baseFilter}__${encodeURIComponent(filterValue)}`
+    }, [])
 
     function buildAPITypesData(apiStats, missingCount, redundantCount, apiTypeMissing) {
         // Initialize the data with default values for all API types
@@ -813,9 +839,9 @@ function HomeDashboard() {
     const testSummaryCardsList = showTestingComponents ? (
         <InfoCard
             component={<TestSummaryCardsList summaryItems={testSummaryInfo} />}
-            title="Recent Tests"
-            titleToolTip="View details of recent API security tests, APIs tested and number of issues found of last 7 days."
-            linkText="Increase test coverage"
+            title={"Recent " + mapLabel("Tests", getDashboardCategory())}
+            titleToolTip={"View details of recent" + mapLabel("API security tests", getDashboardCategory()) + ", APIs tested and number of issues found of last 7 days."}
+            linkText={"Increase " + mapLabel("test coverage", getDashboardCategory())}
             linkUrl="/dashboard/testing"
         />
     ) : null
@@ -836,22 +862,22 @@ function HomeDashboard() {
             "Critical": {
                 "text": countMap.CRITICAL || 0,
                 "color": func.getHexColorForSeverity("CRITICAL"),
-                "filterKey": "Critical"
+                "filterKey": "CRITICAL"
             },
             "High": {
                 "text": countMap.HIGH || 0,
                 "color": func.getHexColorForSeverity("HIGH"),
-                "filterKey": "High"
+                "filterKey": "HIGH"
             },
             "Medium": {
                 "text": countMap.MEDIUM || 0,
                 "color": func.getHexColorForSeverity("MEDIUM"),
-                "filterKey": "Medium"
+                "filterKey": "MEDIUM"
             },
             "Low": {
                 "text": countMap.LOW || 0,
                 "color": func.getHexColorForSeverity("LOW"),
-                "filterKey": "Low"
+                "filterKey": "LOW"
             }
         };
 
@@ -890,7 +916,7 @@ function HomeDashboard() {
             <div style={{ marginTop: "20px" }}>
                 <ChartypeComponent
                     data={severityMap}
-                    navUrl={"/dashboard/issues/"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0}
+                    navUrl={"/dashboard/issues"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0}
                     pieInnerSize="50%"
                 />
             </div>
@@ -917,27 +943,31 @@ function HomeDashboard() {
         linkUrl="/dashboard/observe/inventory"
     />
 
+    const inventoryAllCollectionBaseUrl = `/dashboard/observe/inventory/${ALL_COLLECTION_INVENTORY_ID}`
+
     const apisByAccessTypeComponent = <InfoCard
         component={
-            <ChartypeComponent data={accessTypeMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0} pieInnerSize="50%" />
+            <ChartypeComponent data={accessTypeMap} navUrl={inventoryAllCollectionBaseUrl}  navUrlBuilder={(baseUrl, filterValue) => buildAuthFiltersUrl(baseUrl, filterValue, "access_type")} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0} pieInnerSize="50%" />
         }
         title={`${mapLabel("APIs", getDashboardCategory())} by Access type`}
         titleToolTip={`Categorization of ${mapLabel("APIs", getDashboardCategory())} based on their access permissions and intended usage (Partner, Internal, External, etc.).`}
         linkText="Check out"
-        linkUrl="/dashboard/observe/inventory"
+        linkUrl={inventoryAllCollectionBaseUrl}
     />
+
+    
 
     const apisByAuthTypeComponent =
         <InfoCard
             component={
                 <div style={{ marginTop: showTestingComponents ? '0px' : '20px' }}>
-                    <ChartypeComponent data={authMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0} pieInnerSize="50%"/>
+                    <ChartypeComponent data={authMap} navUrl={inventoryAllCollectionBaseUrl} navUrlBuilder={(baseUrl, filterValue) => buildAuthFiltersUrl(baseUrl, filterValue, "auth_type")} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0} pieInnerSize="50%"/>
                 </div>
             }
             title={`${mapLabel("APIs", getDashboardCategory())} by Authentication`}
             titleToolTip={`Breakdown of ${mapLabel("APIs", getDashboardCategory())} by the authentication methods they use, including unauthenticated APIs which may pose security risks.`}
             linkText="Check out"
-            linkUrl="/dashboard/observe/inventory"
+            linkUrl={inventoryAllCollectionBaseUrl}
         />
 
     const apisByTypeComponent = (!isMCPSecurityCategory()) ? <InfoCard
@@ -1313,7 +1343,7 @@ function HomeDashboard() {
     }
 
     const gridComponent = (
-        isMCPSecurityCategory() ? (
+        (isMCPSecurityCategory()) ? (
             <VerticalStack gap={5}>
                 {/* First row with MCP Components Requests and Policy Guardrails side by side */}
                 <HorizontalGrid gap={5} columns={2}>

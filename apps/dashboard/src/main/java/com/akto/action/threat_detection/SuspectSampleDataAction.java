@@ -7,8 +7,6 @@ import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.type.URLMethods;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
-import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.UpdateMaliciousEventStatusRequest;
-import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.UpdateMaliciousEventStatusResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DeleteMaliciousEventsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DeleteMaliciousEventsResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsRequest.Filter;
@@ -31,6 +29,7 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 
 import static com.akto.action.threat_detection.utils.ThreatsUtils.getTemplates;
+import com.akto.action.threat_detection.utils.ThreatDetectionHelper;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -51,7 +50,8 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   int startTimestamp, endTimestamp;
   List<String> types;
   List<String> latestAttack;
-  Boolean successfulExploit; 
+  Boolean successfulExploit;
+  @Getter @Setter String label;
   @Getter @Setter String eventId;
   @Getter @Setter String status;
   @Getter @Setter boolean updateSuccess;
@@ -64,6 +64,8 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   @Getter @Setter boolean deleteSuccess;
   @Getter @Setter String deleteMessage;
   @Getter @Setter int deletedCount;
+  @Getter @Setter List<String> hosts;
+  @Getter @Setter String latestApiOrigRegex;
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -104,6 +106,18 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
     if (this.successfulExploit != null) {
       filter.put("successfulExploit", this.successfulExploit);
+    }
+
+    if (this.label != null && !this.label.isEmpty()) {
+      filter.put("label", this.label);
+    }
+
+    if (this.hosts != null && !this.hosts.isEmpty()) {
+      filter.put("hosts", this.hosts);
+    }
+
+    if (this.latestApiOrigRegex != null && !this.latestApiOrigRegex.isEmpty()) {
+      filter.put("latestApiOrigRegex", this.latestApiOrigRegex);
     }
 
     List<String> templates = getTemplates(latestAttack);
@@ -164,7 +178,10 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
                             smr.getPayload(),
                             smr.getMetadata(),
                             smr.getSuccessfulExploit(),
-                            smr.getStatus()))
+                            smr.getStatus(),
+                            smr.getLabel(),
+                            smr.getHost(),
+                            smr.getJiraTicketUrl()))
                     .collect(Collectors.toList());
                 this.total = m.getTotal();
               });
@@ -193,6 +210,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
               msg -> {
                 this.ips = msg.getActorsList();
                 this.urls = msg.getUrlsList();
+                this.hosts = msg.getHostsList();
                 Set<String> allowedTemplates = FilterYamlTemplateDao.getContextTemplatesForAccount(accountId, source);
                 this.subCategory =
                     msg.getSubCategoryList().stream()
@@ -241,12 +259,20 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     if (this.types != null && !this.types.isEmpty()) {
       filterBuilder.addAllTypes(this.types);
     }
-    if (this.latestAttack != null && !this.latestAttack.isEmpty()) {
-      List<String> templates = getTemplates(latestAttack);
+    // Always populate latestAttack with available templates, even if empty
+    List<String> templates = getTemplates(latestAttack);
+    if (!templates.isEmpty()) {
       filterBuilder.addAllLatestAttack(templates);
     }
     if (this.statusFilter != null) {
       filterBuilder.setStatusFilter(this.statusFilter);
+    }
+    if (this.label != null && !this.label.isEmpty()) {
+      filterBuilder.setLabel(this.label);
+    }
+
+    if (this.latestApiOrigRegex != null && !this.latestApiOrigRegex.isEmpty()) {
+      filterBuilder.setLatestApiOrigRegex(this.latestApiOrigRegex);
     }
 
     if (this.startTimestamp > 0 || this.endTimestamp > 0) {
@@ -264,64 +290,52 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   }
 
   public String updateMaliciousEventStatus() {
-    HttpPost post = new HttpPost(
-            String.format("%s/api/dashboard/update_malicious_event_status", this.getBackendUrl()));
-    post.addHeader("Authorization", "Bearer " + this.getApiToken());
-    post.addHeader("Content-Type", "application/json");
-
-    UpdateMaliciousEventStatusRequest.Builder requestBuilder = UpdateMaliciousEventStatusRequest.newBuilder();
-
-    // Check which type of update this is
-    if (this.eventId != null && !this.eventId.isEmpty()) {
-      // Single event update
-      requestBuilder.setEventId(this.eventId);
-    } else if (this.eventIds != null && !this.eventIds.isEmpty()) {
-      // Bulk update by IDs
-      requestBuilder.addAllEventIds(this.eventIds);
-    } else {
-      // Filter-based update
-      Filter.Builder filterBuilder = buildFilterFromParams();
-      requestBuilder.setFilter(filterBuilder);
+    // Build filter if needed for filter-based updates
+    Filter.Builder filterBuilder = null;
+    if ((this.eventId == null || this.eventId.isEmpty()) &&
+        (this.eventIds == null || this.eventIds.isEmpty())) {
+      filterBuilder = buildFilterFromParams();
     }
 
-    requestBuilder.setStatus(this.status);
-    UpdateMaliciousEventStatusRequest request = requestBuilder.build();
+    // Use the helper method to perform the update
+    ThreatDetectionHelper.UpdateResult result =
+        ThreatDetectionHelper.updateMaliciousEvent(
+            this.httpClient,
+            this.getBackendUrl(),
+            this.getApiToken(),
+            this.eventId,
+            this.eventIds,
+            filterBuilder,
+            this.status,
+            null  // No Jira URL in this method
+        );
 
-    String msg = ProtoMessageUtils.toString(request).orElse("{}");
-    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
-    post.setEntity(requestEntity);
+    // Set response fields from result
+    this.updateSuccess = result.isSuccess();
+    this.updateMessage = result.getMessage();
+    this.updatedCount = result.getUpdatedCount();
 
-    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+    return this.updateSuccess ? SUCCESS.toUpperCase() : ERROR.toUpperCase();
+  }
 
-      if (resp.getStatusLine().getStatusCode() != 200) {
-        this.updateSuccess = false;
-        this.updateMessage = "Failed to update status: " + responseBody;
-        this.updatedCount = 0;
-        return ERROR.toUpperCase();
-      }
+  /**
+   * Updates malicious event with Jira ticket URL using the shared helper
+   */
+  public String updateMaliciousEventJiraUrl(String eventId, String jiraTicketUrl) {
+    ThreatDetectionHelper.UpdateResult result =
+        ThreatDetectionHelper.updateMaliciousEventJiraUrl(
+            this.httpClient,
+            this.getBackendUrl(),
+            this.getApiToken(),
+            eventId,
+            jiraTicketUrl
+        );
 
-      Optional<UpdateMaliciousEventStatusResponse> responseOpt = ProtoMessageUtils.<UpdateMaliciousEventStatusResponse>toProtoMessage(
-          UpdateMaliciousEventStatusResponse.class, responseBody);
-      if (responseOpt.isPresent()) {
-        UpdateMaliciousEventStatusResponse response = responseOpt.get();
-        this.updateSuccess = response.getSuccess();
-        this.updateMessage = response.getMessage();
-        this.updatedCount = response.getUpdatedCount();
-      } else {
-        this.updateSuccess = false;
-        this.updateMessage = "Failed to update status: Invalid response format";
-        this.updatedCount = 0;
-      }
-    } catch (Exception e) {
-      e.printStackTrace();
-      this.updateSuccess = false;
-      this.updateMessage = "Error updating status: " + e.getMessage();
-      this.updatedCount = 0;
-      return ERROR.toUpperCase();
-    }
+    this.updateSuccess = result.isSuccess();
+    this.updateMessage = result.getMessage();
+    this.updatedCount = result.getUpdatedCount();
 
-    return SUCCESS.toUpperCase();
+    return result.isSuccess() ? SUCCESS.toUpperCase() : ERROR.toUpperCase();
   }
 
 

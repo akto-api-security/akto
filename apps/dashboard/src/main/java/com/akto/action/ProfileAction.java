@@ -128,6 +128,16 @@ public class ProfileAction extends UserAction {
         } catch (Exception e) {
         }
 
+
+        boolean servicenowIntegrated = false;
+        try {
+            long documentCount = ServiceNowIntegrationDao.instance.estimatedDocumentCount();
+            if (documentCount > 0) {
+                servicenowIntegrated = true;
+            }
+        } catch (Exception e) {
+        }
+
         InitializerListener.insertStateInAccountSettings(accountSettings);
 
         Organization organization = OrganizationsDao.instance.findOne(
@@ -167,6 +177,7 @@ public class ProfileAction extends UserAction {
                 .append("aktoUIMode", userFromDB.getAktoUIMode().name())
                 .append("jiraIntegrated", jiraIntegrated)
                 .append("azureBoardsIntegrated", azureBoardsIntegrated)
+                .append("servicenowIntegrated", servicenowIntegrated)
                 .append("userRole", userRole.toString().toUpperCase())
                 .append("currentTimeZone", timeZone)
                 .append("organizationName", orgName)

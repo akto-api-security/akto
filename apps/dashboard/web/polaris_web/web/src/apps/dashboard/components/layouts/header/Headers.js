@@ -44,6 +44,61 @@ export default function Header() {
     const dashboardCategory = PersistStore.getState().dashboardCategory;
     const setDashboardCategory = PersistStore.getState().setDashboardCategory
 
+useEffect(() => {
+        if (window.beamer_config) {
+            const isOnPrem = window.DASHBOARD_MODE === 'ON_PREM';
+            const isAgentic = dashboardCategory === 'Agentic Security';
+
+            const productId = isAgentic
+                ? (isOnPrem ? 'shUignSe80215' : 'ijUqfdSQ80078')
+                : (isOnPrem ? 'rggteHBr72897' : 'cJtNevEq80216');
+
+            const filterTag = isOnPrem ? 'onprem' : 'saas';
+
+            if (window.beamer_config.product_id !== productId || window.beamer_config.filter !== filterTag) {
+                window.beamer_config.product_id = productId;
+                window.beamer_config.filter = filterTag;
+                if (window.Beamer) {
+                    window.Beamer.destroy();
+                    window.Beamer.init();
+                }
+            }
+        }
+    }, [dashboardCategory]);
+
+
+    const logoSrc = dashboardCategory === "Agentic Security" ? "/public/white_logo.svg" : "/public/akto_name_with_logo.svg";
+    const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {};
+    const agenticSecurityGranted =
+        stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || true
+    const mcpSecurityGranted =
+        stiggFeatures?.MCP_SECURITY?.isGranted || true;
+    const dastGranted = func.checkForFeatureSaas("AKTO_DAST")
+
+    const disabledDashboardCategories = useMemo(() => {
+        const disabled = [];
+        if (mcpSecurityGranted === false) {
+            disabled.push("MCP Security");
+        }
+        if (agenticSecurityGranted === false) {
+            disabled.push("Agentic Security");
+        }
+        if (dastGranted === false) {
+            disabled.push("DAST")
+        }
+        return disabled;
+    }, [mcpSecurityGranted, agenticSecurityGranted]);
+
+    const dropdownInitial = disabledDashboardCategories.includes(dashboardCategory)
+        ? "API Security"
+        : (dashboardCategory || "API Security");
+
+    useEffect(() => {
+        if (disabledDashboardCategories.includes(dashboardCategory) && dashboardCategory !== "API Security") {
+            setDashboardCategory("API Security");
+        }
+    }, [dashboardCategory, disabledDashboardCategories, setDashboardCategory]);
+
     /* Search bar */
     //const allRoutes = Store((state) => state.allRoutes)
     const allCollections = PersistStore((state) => state.allCollections)
@@ -237,18 +292,19 @@ export default function Header() {
                     <Box paddingInlineStart={3} paddingInlineEnd={3}>
                         <HorizontalStack gap={4} wrap={false}>
                             <div style={{ cursor: 'pointer' }} onClick={() => window.location.href = "/dashboard/observe/inventory"} className='logo'>
-                                <img src="/public/akto_name_with_logo.svg" alt="Akto Logo" style={{ maxWidth: '78px' }} />
+                                <img src={logoSrc} alt="Akto Logo" style={{ maxWidth: '78px' }} />
                             </div>
 
                             <Box minWidth='170px'>
                                 <Dropdown
                                     menuItems={[
                                         { value: "API Security", label: "API Security", id: "api-security" },
-                                        { value: "MCP Security", label: "MCP Security", id: "mcp-security" },
-                                        { value: "Gen AI", label: "AI Agent Security", id: "gen-ai" },
+                                        { value: "Agentic Security", label: "Agentic Security", id: "agentic-security" },
+                                        { value: "DAST", label: "DAST", id: "dast" },
                                     ]}
-                                    initial={dashboardCategory || "API Security"}
+                                    initial={dropdownInitial}
                                     selected={(val) => handleDashboardChange(val)}
+                                    disabledOptions={disabledDashboardCategories}
                                 />
                             </Box>
                         </HorizontalStack>

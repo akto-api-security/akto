@@ -1,0 +1,55 @@
+services:
+  python-service:
+    build:
+      context: ./python-service/container
+      dockerfile: Dockerfile
+    container_name: agent-guard-python
+    ports:
+      - "127.0.0.1:8092:8092"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PORT=8092
+      - HF_HOME=/app/.cache/huggingface
+    volumes:
+      - model-cache:/app/.cache/huggingface
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 6G
+        reservations:
+          memory: 2G
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8092/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - agent-guard-network
+
+  go-service:
+    build:
+      context: ./go-service/container
+      dockerfile: Dockerfile
+    container_name: agent-guard-go
+    ports:
+      - "127.0.0.1:8091:8091"
+    depends_on:
+      python-service:
+        condition: service_healthy
+    environment:
+      - GIN_MODE=release
+      - PORT=8091
+      - PYTHON_SERVICE_URL=http://python-service:8092
+    networks:
+      - agent-guard-network
+
+networks:
+  agent-guard-network:
+    driver: bridge
+
+volumes:
+  model-cache:
+    driver: local
+
