@@ -58,9 +58,6 @@ public class ApiCollection {
     String sseCallbackUrl;
     public static final String SSE_CALLBACK_URL = "sseCallbackUrl";
 
-    String detectedBasePrompt;
-    public static final String DETECTED_BASE_PROMPT = "detectedBasePrompt";
-
     private static final List<String> ENV_KEYWORDS_WITH_DOT = Arrays.asList(
         "staging", "preprod", "qa", "demo", "dev", "test", "svc", 
         "localhost", "local", "intranet", "lan", "example", "invalid", 
@@ -392,14 +389,6 @@ public class ApiCollection {
     
     public void setSseCallbackUrl(String sseCallbackUrl) {
         this.sseCallbackUrl = sseCallbackUrl;
-    }
-
-    public String getDetectedBasePrompt() {
-        return detectedBasePrompt;
-    }
-
-    public void setDetectedBasePrompt(String detectedBasePrompt) {
-        this.detectedBasePrompt = detectedBasePrompt;
     }
 
 }

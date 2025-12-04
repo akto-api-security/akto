@@ -55,6 +55,9 @@ public class ApiInfo {
     public static final String PARENT_MCP_TOOL_NAMES = "parentMcpToolNames";
     private List<String> parentMcpToolNames;
 
+    public static final String DETECTED_BASE_PROMPT = "detectedBasePrompt";
+    private String detectedBasePrompt;
+
     public enum AuthType {
         UNAUTHENTICATED, BASIC, AUTHORIZATION_HEADER, JWT, API_TOKEN, BEARER, CUSTOM, API_KEY, MTLS, SESSION_TOKEN
     }
@@ -408,5 +411,13 @@ public class ApiInfo {
 
     public void setParentMcpToolNames(List<String> parentMcpToolNames) {
         this.parentMcpToolNames = parentMcpToolNames;
+    }
+
+    public String getDetectedBasePrompt() {
+        return detectedBasePrompt;
+    }
+
+    public void setDetectedBasePrompt(String detectedBasePrompt) {
+        this.detectedBasePrompt = detectedBasePrompt;
     }
 }

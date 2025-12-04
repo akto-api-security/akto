@@ -1986,65 +1986,10 @@ public class DbLayer {
                 policies = GuardrailPoliciesDao.instance.findAll();
             }
             
-            // Populate base prompt from detected base prompt if auto-detect is enabled
-            for (GuardrailPolicies policy : policies) {
-                populateBasePromptIfNeeded(policy);
-            }
-            
             return policies;
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchGuardrailPolicies: " + e.getMessage());
             return new ArrayList<>();
-        }
-    }
-
-    private static void populateBasePromptIfNeeded(GuardrailPolicies policy) {
-        try {
-            if (policy == null || policy.getBasePromptRule() == null) {
-                return;
-            }
-            
-            GuardrailPolicies.BasePromptRule basePromptRule = policy.getBasePromptRule();
-            
-            // Only populate if:
-            // 1. Rule is enabled
-            // 2. Auto-detect is true
-            // 3. Base prompt is not already set
-            if (!basePromptRule.isEnabled() || !basePromptRule.isAutoDetect()) {
-                return;
-            }
-            
-            if (basePromptRule.getBasePrompt() != null && !basePromptRule.getBasePrompt().isEmpty()) {
-                return; // Base prompt already set
-            }
-            
-            // Fetch from selected agent servers' collection detectedBasePrompt
-            // Note: Assumes single collection - uses first selected agent server's collection ID
-            List<GuardrailPolicies.SelectedServer> selectedAgentServers = policy.getEffectiveSelectedAgentServers();
-            if (selectedAgentServers == null || selectedAgentServers.isEmpty()) {
-                return;
-            }
-            
-            // Use first selected agent server's collection ID (single collection assumption)
-            GuardrailPolicies.SelectedServer firstServer = selectedAgentServers.get(0);
-            String selectedCollectionId = firstServer.getId();
-            if (selectedCollectionId == null || selectedCollectionId.isEmpty()) {
-                return;
-            }
-            
-            try {
-                int collectionId = Integer.parseInt(selectedCollectionId);
-                ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(collectionId);
-                
-                if (apiCollection != null && apiCollection.getDetectedBasePrompt() != null 
-                    && !apiCollection.getDetectedBasePrompt().isEmpty()) {
-                    basePromptRule.setBasePrompt(apiCollection.getDetectedBasePrompt());
-                }
-            } catch (NumberFormatException e) {
-                loggerMaker.errorAndAddToDb("Invalid collection ID format: " + selectedCollectionId, LoggerMaker.LogDb.DASHBOARD);
-            }
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in populateBasePromptIfNeeded: " + e.getMessage());
         }
     }
 

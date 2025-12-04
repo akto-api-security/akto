@@ -226,14 +226,10 @@ public class GuardrailPolicies {
     @NoArgsConstructor
     public static class BasePromptRule {
         private boolean enabled;
-        private String basePrompt; // base prompt template with placeholders (like {var} or {})
-        private boolean autoDetect; // whether to auto-detect from traffic
         private double confidenceScore;
 
-        public BasePromptRule(boolean enabled, String basePrompt, boolean autoDetect, double confidenceScore) {
+        public BasePromptRule(boolean enabled, double confidenceScore) {
             this.enabled = enabled;
-            this.basePrompt = basePrompt;
-            this.autoDetect = autoDetect;
             this.confidenceScore = confidenceScore;
         }
     }
