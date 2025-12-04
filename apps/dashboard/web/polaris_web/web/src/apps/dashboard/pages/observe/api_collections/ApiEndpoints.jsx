@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon, Tooltip } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon, Tooltip, Badge } from "@shopify/polaris"
 import TitleWithInfo from "../../../components/shared/TitleWithInfo"
 import api from "../api"
 import { useEffect, useState } from "react"
@@ -395,13 +395,46 @@ function ApiEndpoints(props) {
                 }
             })
 
+            // Create collection tags map for shadow APIs (needed before shadow API creation)
+            const shadowCollectionTagsMap = {}
+            ;(allCollections || []).forEach((c) => {
+                const envType = c?.envType
+                const envTypeList = envType?.map(func.formatCollectionType) || []
+                shadowCollectionTagsMap[c.id] = {
+                    list: envTypeList,
+                    comp: getTagsCompactComponent(envTypeList, 2),
+                    str: envTypeList.join(" ")
+                }
+            })
+
             shadowApis = Object.entries(shadowApis).map(([ codeAnalysisApiKey, codeAnalysisApi ]) => {
                 const {id, lastSeenTs, discoveredTs, location,  } = codeAnalysisApi
                 const { method, endpoint} = id
 
+                // Get collection tags
+                const t = shadowCollectionTagsMap[apiCollectionId];
+                
+                // Default values for missing fields
+                const riskScore = 0;
+                const isNew = transform.isNewEndpoint(lastSeenTs);
+                const lastTested = 0;
+                const sensitiveTags = [];
+                const sensitive = new Set();
+                const severityObj = {};
+                
+                // Get hostname
+                const hostName = hostNameMap[apiCollectionId] !== null && hostNameMap[apiCollectionId] !== undefined 
+                    ? hostNameMap[apiCollectionId] 
+                    : transform.getHostName(endpoint);
+
+                let lastTestedText = "Never";
+                if (lastTested > 0) {
+                    lastTestedText = func.prettifyEpoch(lastTested);
+                }
+
                 return {
                     id: codeAnalysisApiKey,
-                    endpointComp: <GetPrettifyEndpoint method={method} url={endpoint} isNew={false} />,
+                    endpointComp: <GetPrettifyEndpoint method={method} url={endpoint} isNew={isNew} />,
                     method: method,
                     endpoint: endpoint,
                     apiCollectionId: apiCollectionId,
@@ -412,7 +445,40 @@ function ApiEndpoints(props) {
                     apiCollectionName: collectionsMap[apiCollectionId],
                     last_seen: func.prettifyEpoch(lastSeenTs),
                     added: func.prettifyEpoch(discoveredTs),
+                    lastSeenTs: lastSeenTs,
+                    detectedTs: discoveredTs,
                     descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={codeAnalysisApi.description} text={codeAnalysisApi.description}/></Box>),
+                    description: codeAnalysisApi.description || "",
+                    // Risk score fields
+                    riskScore: riskScore,
+                    riskScoreComp: <Badge status={transform.getStatus(riskScore)} size="small">{riskScore.toString()}</Badge>,
+                    // Issues fields
+                    issuesComp: transform.getIssuesList(severityObj),
+                    severity: Object.keys(severityObj),
+                    severityObj: severityObj,
+                    // Hostname
+                    hostName: hostName,
+                    // Access and auth type
+                    access_type: undefined,
+                    auth_type: undefined,
+                    authTypeTag: undefined,
+                    // Sensitive data fields
+                    sensitiveTagsComp: transform.prettifySubtypes(sensitiveTags),
+                    sensitiveDataTags: sensitiveTags.join(" "),
+                    sensitiveTags: sensitiveTags,
+                    sensitive: sensitive,
+                    sensitiveInReq: [],
+                    sensitiveInResp: [],
+                    // Last tested
+                    lastTestedComp: <Text variant="bodyMd" fontWeight={transform.isNewEndpoint(lastTested) ? "regular" : "semibold"} color={transform.isNewEndpoint(lastTested) ? "" : "subdued"}>{lastTestedText}</Text>,
+                    lastTested: lastTested,
+                    // Tags
+                    tagsComp: t?.comp || null,
+                    tagsString: t?.str || "",
+                    // Other fields
+                    isNew: isNew,
+                    open: false,
+                    responseCodes: "",
                 }
             })
         }
@@ -595,8 +661,13 @@ function ApiEndpoints(props) {
             data['high_risk'] = prettifyData.filter(x => x.riskScore >= 4);
             data['new'] = prettifyData.filter(x => x.isNew);
             data['no_auth'] = prettifyData.filter(x => x.open);
-            data['shadow'] = [...shadowApis, ...undocumentedEndpoints];
-            data['zombie'] = zombieEndpoints;
+            // Filter undocumented endpoints from prettified data to ensure all fields are present
+            const undocumentedEndpointsSet = new Set(undocumentedEndpoints.map(u => u.method + " " + u.endpoint + " " + u.apiCollectionId));
+            const prettifiedUndocumentedEndpoints = prettifyData.filter(x => undocumentedEndpointsSet.has(x.method + " " + x.endpoint + " " + x.apiCollectionId));
+            data['shadow'] = [...shadowApis, ...prettifiedUndocumentedEndpoints];
+            // Filter zombie endpoints from prettified data to ensure all fields are present
+            const zombieEndpointsSet = new Set(zombieEndpoints.map(z => z.method + " " + z.endpoint + " " + z.apiCollectionId));
+            data['zombie'] = prettifyData.filter(x => zombieEndpointsSet.has(x.method + " " + x.endpoint + " " + x.apiCollectionId));
         }
         setEndpointData(data)
         setSelectedTab("all")
@@ -1326,7 +1397,7 @@ function ApiEndpoints(props) {
                 content: 'Yes',
                 onAction: deleteApisAction
             }}
-            key="redact-modal-1"
+            key="delete-api-modal"
         >
             <Modal.Section>
                 <Text>Are you sure you want to delete {(apis || []).length} API(s)?</Text>
@@ -1410,9 +1481,9 @@ function ApiEndpoints(props) {
                 />] : showSequencesFlow ? [
                 <SequencesFlow key="sequences-flow" apiCollectionId={apiCollectionId}  />
             ] : [
-                func.isDemoAccount() ? <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : <></>,
-                (!isCategory(CATEGORY_API_SECURITY)) && <McpToolsGraph key="mcp-tools-graph" apiCollectionId={apiCollectionId} />,
-                (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null),
+                func.isDemoAccount() ? <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : null,
+                (!isCategory(CATEGORY_API_SECURITY)) ? <McpToolsGraph key="mcp-tools-graph" apiCollectionId={apiCollectionId} /> : null,
+                (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId))) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null,
                 <div className="apiEndpointsTable" key="table">
                     {apiEndpointTable}
                       <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
