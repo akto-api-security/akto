@@ -277,7 +277,9 @@ useEffect(() => {
             />
             <TopBar.Menu
                 activatorContent={
-                    <Button plain monochrome icon={SettingsMajor} onClick={() => navigate("/dashboard/settings/about")} />
+                    <span style={{ cursor: 'pointer' }} onClick={() => navigate("/dashboard/settings/about")}>
+                        <Icon source={SettingsMajor} />
+                    </span>
                 }
             />
         </HorizontalStack>

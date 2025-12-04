@@ -201,10 +201,13 @@ function TestsTablePage() {
         }
     };
 
-    useEffect(async () => {
-        setLoading(true)
-        await fetchAllTests()
-        setLoading(false)
+    useEffect(() => {
+        async function fetchData() {
+            setLoading(true)
+            await fetchAllTests()
+            setLoading(false)
+        }
+        fetchData()
     }, [dashboardCategory])
 
 

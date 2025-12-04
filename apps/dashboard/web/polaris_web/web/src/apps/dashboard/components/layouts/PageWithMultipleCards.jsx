@@ -83,6 +83,11 @@ const PageWithMultipleCards = (props) => {
             <VerticalStack gap="4">
                 {components?.filter((component) => {
                     return component
+                }).map((component, index) => {
+                    // If component already has a key, return as is, otherwise add index-based key
+                    return component && typeof component === 'object' && component.key 
+                        ? component 
+                        : <div key={`component-${index}`}>{component}</div>
                 })}
             </VerticalStack>
         </Page>
