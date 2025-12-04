@@ -814,7 +814,7 @@ public class DbAction extends ActionSupport {
                     String method = (String) mObj.get("method");
 
                     // Debug logging for specific collections and wallet APIs
-                    if ((apiCollectionId == 1967507934 || apiCollectionId == -813289937) && url != null && url.contains("wallet/api")) {
+                    if ((apiCollectionId == 1967507934 || apiCollectionId == -813289937) && url != null) {
                         loggerMaker.infoAndAddToDb("bulkWriteSampleData: Processing sample for apiCollectionId=" + apiCollectionId +
                             ", url=" + url + ", method=" + method + ", responseCode=" + responseCode);
                     }
@@ -855,7 +855,7 @@ public class DbAction extends ActionSupport {
                             SampleDataLogs.insertCount(apiCollectionId, method, url, dVal.size());
 
                             // Debug logging for wallet API samples
-                            if ((apiCollectionId == 1967507934 || apiCollectionId == -813289937) && url != null && url.contains("wallet/api")) {
+                            if ((apiCollectionId == 1967507934 || apiCollectionId == -813289937) && url != null) {
                                 loggerMaker.infoAndAddToDb("bulkWriteSampleData: Adding " + dVal.size() + " samples for apiCollectionId=" +
                                     apiCollectionId + ", url=" + url + ", method=" + method);
                             }
