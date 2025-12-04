@@ -16,12 +16,14 @@ import GithubSource from "./components/GithubSource"
 import AktoJax from "./components/AktoJax"  
 import McpScan from "./components/McpScan" 
 import AiAgentScan from "./components/AiAgentScan"
-import { isApiSecurityCategory, isGenAISecurityCategory, isMCPSecurityCategory } from "../../../main/labelHelper"
+import { isGenAISecurityCategory, isMCPSecurityCategory, isAgenticSecurityCategory, isDastCategory, isApiSecurityCategory } from "../../../main/labelHelper"
 import McpRecon from "./components/McpRecon"
 import McpProxy from "./components/McpProxy"
 import AwsLogAccountComponent from "./components/shared/AwsLogAccountComponent"
 import McpGateway from "./McpGateway"
 import AIAgentsGateway from "./AIAgentsGateway"
+import ImpervaImport from "./components/ImpervaImport"
+import BrowserExtension from "./components/BrowserExtension"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -595,6 +597,15 @@ const openApiObj = {
     key: "OPENAPI"
 }
 
+const impervaImportObj = {
+    icon: '/public/imperva.svg',
+    label: 'Imperva Import',
+    text: 'Upload Imperva specification file to Akto to create an API inventory.',
+    docsUrl: 'https://docs.akto.io/traffic-connector/manual/imperva',
+    component: <ImpervaImport/>,
+    key: "IMPERVA_IMPORT"
+}
+
 const wsdlApiObj = {
     icon: '/public/xml_api.svg',
     label: 'SOAP API',
@@ -802,6 +813,50 @@ const azurefuncObj = {
     docsUrl: 'https://docs.akto.io/traffic-connector/azure-services/connect-akto-with-azure-functions',
     component: <AddOnComponenet/>,
     key: "Azure Functions",
+}
+
+const cloudflareWarpObj = {
+    icon: '/public/cloudflare.svg',
+    label: "Cloudflare WARP",
+    text: "Cloudflare WARP setup is recommended, if you use Cloudflare WARP for secure, accelerated device-to-internet connectivity.",
+    docsUrl: 'https://docs.akto.io/traffic-connector',
+    component: <AddOnComponenet/>,
+    key: "CLOUDFLARE_WARP",
+}
+
+const zscalerObj = {
+    icon: '/public/zscaler_logo.svg',
+    label: "Zscaler",
+    text: "Zscaler setup is recommended,if your organization uses Zscaler for secure, zero-trust internet and app access.",
+    docsUrl: 'https://docs.akto.io/traffic-connector',
+    component: <AddOnComponenet/>,
+    key: "ZSCALER",
+}
+const chromeExtensionObj = {
+    icon: '/public/chrome.svg',
+    label: "Chrome Extension",
+    text: "A browser extension that enforces your company's AI usage policies when interacting with ChatGPT and other LLM preventing sensitive data leaks, applying guardrails, and logging policy-relevant events.",
+    docsUrl: 'https://docs.akto.io/browser-extension',
+    component: <BrowserExtension browserName="Google chrome"/>,
+    key: "CHROME_BROWSER_EXTENSION",
+}
+
+const firefoxExtensionObj = {
+    icon: '/public/firefox.svg',
+    label: "Firefox Extension",
+    text: "A browser extension that enforces your company's AI usage policies when interacting with ChatGPT and other LLM preventing sensitive data leaks, applying guardrails, and logging policy-relevant events.",
+    docsUrl: 'https://docs.akto.io/browser-extension',
+    component: <BrowserExtension browserName="Firefox"/>,
+    key: "FIREFOX_BROWSER_EXTENSION",
+}
+
+const safariExtensionObj = {
+    icon: '/public/safari.svg',
+    label: "Safari Extension",
+    text: "A browser extension that enforces your company's AI usage policies when interacting with ChatGPT and other LLM preventing sensitive data leaks, applying guardrails, and logging policy-relevant events.",
+    docsUrl: 'https://docs.akto.io/browser-extension',
+    component: <BrowserExtension browserName="Safari"/>,
+    key: "SAFARI_BROWSER_EXTENSION",
 }
 
 
@@ -1386,7 +1441,7 @@ const quickStartFunc = {
 
         // Manual
         const manual = [
-            burpObj, postmanObj, harFileUploadObj, openApiObj, wsdlApiObj, graphqlApiIObj
+            burpObj, postmanObj, harFileUploadObj, openApiObj, wsdlApiObj, graphqlApiIObj, impervaImportObj
         ];
 
         // Crawler
@@ -1417,7 +1472,16 @@ const quickStartFunc = {
             goObj, javaObj, nodejsObj, pythonObj
         ];
 
-       if(func.checkLocal()){
+        // Secure Web Networks
+        const secureWebNetworks = [
+            cloudflareWarpObj, zscalerObj
+        ];
+
+        const browserExtensions = [
+            chromeExtensionObj, firefoxExtensionObj, safariExtensionObj
+        ]
+
+       if(func.checkLocal() || func.isLimitedAccount()){
            return {
                "Manual": manual
            }
@@ -1425,17 +1489,19 @@ const quickStartFunc = {
 
         let connectors = {}
 
-        if(isGenAISecurityCategory()){
+        if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
             connectors["AI Agent Scan"] = aiAgentGateways
             connectors["AI Agent Security"] = aiAgentConnectors
             connectors["AI Model Security"] = aiScanConnectors
+            connectors["Browser Extension"] = browserExtensions
+            connectors["Secure Web Networks"] = secureWebNetworks
         }
 
-        if(isMCPSecurityCategory()){
+        if(isMCPSecurityCategory() || isAgenticSecurityCategory()){
             connectors["MCP Scan"] = mcpScan
         }
 
-        if(isApiSecurityCategory()){
+        if (isDastCategory()) {
             connectors["DAST"] = crawler
         }
 
@@ -1465,20 +1531,21 @@ const quickStartFunc = {
 
     getConnectorsList: function () {
 
-        if(func.checkLocal()){
-            return [burpObj, postmanObj, openApiObj, harFileUploadObj]
+        if(func.checkLocal() || func.isLimitedAccount()){
+            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj]
         }
 
         // Combine all categories into connectorsList
         let connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj,
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
-            apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj
+            apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,
+            cloudflareWarpObj, zscalerObj
         ]
 
-        if(isGenAISecurityCategory()){
+        if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj,
                 awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj

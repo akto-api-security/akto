@@ -22,6 +22,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Ra
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatConfiguration;
 import com.akto.testing.ApiExecutor;
 import com.akto.threat.detection.actor.SourceIPActorGenerator;
+import com.akto.threat.detection.cache.AccountConfigurationCache;
 import com.akto.threat.detection.cache.ApiCountCacheLayer;
 import com.akto.threat.detection.utils.Utils;
 import com.akto.util.Constants;
@@ -51,7 +52,6 @@ public class ThreatConfigurationEvaluator {
     private ThreatConfiguration threatConfiguration;
     private int threatConfigurationUpdateIntervalSec = 15 * 60; // 15 minutes
     private int threatConfigLastUpdatedAt = 0;
-    private List<ApiInfo> apiInfos;
     private DataActor dataActor;
     private ApiCountCacheLayer apiCountCacheLayer;
     private ScheduledExecutorService scheduledExecutor;
@@ -132,13 +132,21 @@ public class ThreatConfigurationEvaluator {
         return fetchThreatConfigApi(now);
     }
 
+    /**
+     * Syncs API rate limit information from the account configuration cache to Redis.
+     * This method leverages AccountConfigurationCache (15-min refresh) to avoid duplicate DB calls.
+     * Populates Redis with rate limit percentiles (p50, p75, p90) for each API.
+     */
     public void resyncApiInfos() {
         try {
             if(this.apiCountCacheLayer == null){
                 logger.warn("Skipping ratelimiting, redis not available");
                 return;
             }
-            this.apiInfos = dataActor.fetchApiRateLimits(null);
+
+            // Fetch API infos directly from AccountConfigurationCache instead of storing as instance field
+            // This eliminates duplicate fetching since cache already loads API infos every 15 minutes
+            List<ApiInfo> apiInfos = AccountConfigurationCache.getInstance().getConfig(dataActor).getApiInfos();
 
             if (apiInfos == null || apiInfos.isEmpty()) {
                 logger.warnAndAddToDb("No api infos found for accountId: " + Context.accountId.get());
@@ -146,7 +154,7 @@ public class ThreatConfigurationEvaluator {
             }
             logger.debug(apiInfos.size() + ": APIs found for accountId: " + Context.accountId.get());
 
-            for (ApiInfo apiInfo : this.apiInfos) {
+            for (ApiInfo apiInfo : apiInfos) {
 
                 if (apiInfo.getRateLimits() == null || apiInfo.getRateLimits().isEmpty()) {
                     continue;

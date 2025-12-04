@@ -24,6 +24,7 @@ import LocalStore from "../../../main/LocalStorageStore";
 import GetPrettifyEndpoint from "@/apps/dashboard/pages/observe/GetPrettifyEndpoint";
 import JiraTicketDisplay from "../../components/shared/JiraTicketDisplay";
 import { getMethod } from "../observe/GetPrettifyEndpoint";
+import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
 
 let headers = [
     {
@@ -52,7 +53,7 @@ let headers = [
       tooltipContent: "CWE tags associated with the test from akto's test library"
     },
     {
-      title: 'Number of urls',
+      title: 'Number of ' + mapLabel('URLs', getDashboardCategory()),
       value: 'totalUrls',
       type: CellType.TEXT
     },
@@ -365,6 +366,7 @@ const transform = {
       obj['cveDisplay'] = minimizeTagList(obj['cve'])
       obj['errorsList'] = data.errorsList || []
       obj['testCategoryId'] = data.testSubType
+      obj['conversationId'] = data?.conversationId
 
       let testingRunResultHexId = data.hexId;
 
@@ -436,9 +438,9 @@ const transform = {
     return details.replace(/{{percentageMatch}}/g, func.prettifyShort(percentageMatch))
   },
 
-  fillMoreInformation(category, moreInfoSections, affectedEndpoints, jiraIssueUrl, createJiraTicket) {
+  getJiraComponent(jiraIssueUrl) {
     var key = /[^/]*$/.exec(jiraIssueUrl)[0];
-    const jiraComponent = jiraIssueUrl?.length > 0 ? (
+    return jiraIssueUrl?.length > 0 ? (
       <Box>
               <Tag>
                   <HorizontalStack gap={1}>
@@ -452,6 +454,10 @@ const transform = {
                 </Tag>
           </Box>
     ) : <Text> No Jira ticket created. Click on the top right button to create a new ticket.</Text>
+  },
+
+  fillMoreInformation(category, moreInfoSections, affectedEndpoints, jiraIssueUrl, createJiraTicket) {
+    const jiraComponent = this.getJiraComponent(jiraIssueUrl)
     
     //<Box width="300px"><Button onClick={createJiraTicket} plain disabled={window.JIRA_INTEGRATED != "true"}>Click here to create a new ticket</Button></Box>
     let filledSection = []
@@ -602,7 +608,7 @@ const transform = {
           if (collectionMap[collectionId]) {
             let apiKeyInfoList = []
             collectionMap[collectionId].forEach(apiKeyInfo => {
-              apiKeyInfoList.push({ 'url': apiKeyInfo['url'], 'method': apiKeyInfo['method'], 'apiCollectionId': Number(collectionId) })
+              apiKeyInfoList.push({ 'url': apiKeyInfo['url'], 'method': apiKeyInfo['method'], 'apiCollectionId': Number(apiKeyInfo['apiCollectionId']) })
               found = true
             })
             if (apiKeyInfoList.length > 0) {
@@ -627,12 +633,10 @@ const transform = {
         for (var index = 0; index < valueFromPredicate.length; index++) {
           let apiEndpoint = {
             method: valueFromPredicate[index]['method'],
-            url: valueFromPredicate[index]['url']
+            url: valueFromPredicate[index]['url'],
+            apiCollectionId: valueFromPredicate[index]['apiCollectionId']
           }
-          apiInfoKeyList.push({
-            method: apiEndpoint.method,
-            url: apiEndpoint.url
-          })
+          apiInfoKeyList.push(apiEndpoint)
         }
         valueForCondition[collectionId] = apiInfoKeyList
         conditions.push({ operator: operator, type: e.type, value: valueForCondition })
@@ -653,43 +657,84 @@ const transform = {
     }
     return conditions;
   },
-  async getAllSubcategoriesData(fetchActive,type){
-    let finalDataSubCategories = [], promises = [], categories = [];
+  async getAllSubcategoriesData(fetchActive, type, setTestsLoaded) {
+    let finalDataSubCategories = [], categories = [];
     let testSourceConfigs = []
     const limit = 50;
-    for(var i = 0 ; i < 40; i++){
-      promises.push(
-        api.fetchAllSubCategories(fetchActive, type, i * limit, limit)
-      )
-    }
-    const allResults = await Promise.allSettled(promises);
-    for (const result of allResults) {
-      if (result.status === "fulfilled"){
-        if(result?.value?.subCategories && result?.value?.subCategories !== undefined && result?.value?.subCategories.length > 0){
-          finalDataSubCategories.push(...result.value.subCategories);
-        }
+    const maxBatches = 125; // Maximum 6000 entries
+    const batchSize = 10; // Fetch 10 batches at a time for parallel requests
+    
+    let currentBatch = 0;
+    let hasMoreData = true;
+    
+    let totalTestsLoaded = 0;
+    
+    while (currentBatch < maxBatches && hasMoreData) {
+      let promises = [];
+      const batchesToFetch = Math.min(batchSize, maxBatches - currentBatch);
+      
+      // Create parallel requests for current batch range
+      for (let i = 0; i < batchesToFetch; i++) {
+        const skip = (currentBatch + i) * limit;
+        promises.push(
+          api.fetchAllSubCategories(fetchActive, type, skip, limit)
+        );
+      }
+      
+      const allResults = await Promise.allSettled(promises);
+      let foundIncompleteBatch = false;
+      
+      for (const result of allResults) {
+        if (result.status === "fulfilled"){
+          const subCategoriesCount = result?.value?.subCategories?.length || 0;
+          
+          if(subCategoriesCount > 0){
+            finalDataSubCategories.push(...result.value.subCategories);
+            totalTestsLoaded += subCategoriesCount;
+            if(setTestsLoaded){
+              setTestsLoaded(Math.min(totalTestsLoaded, 4000))
+            }
 
-        if(result?.value?.categories && result?.value?.categories !== undefined && result?.value?.categories.length > 0){
-          if(categories.length === 0){
-            categories.push(...result.value.categories);
+            // If a batch returned fewer than limit items, we've reached the end
+            if (subCategoriesCount < limit) {
+              foundIncompleteBatch = true;
+            }
+          }
+
+          if(result?.value?.categories && result?.value?.categories !== undefined && result?.value?.categories.length > 0){
+            if(categories.length === 0){
+              categories.push(...result.value.categories);
+            }
+          }
+
+          if (result?.value?.testSourceConfigs &&
+            result?.value?.testSourceConfigs !== undefined &&
+            result?.value?.testSourceConfigs.length > 0) {
+            testSourceConfigs = result?.value?.testSourceConfigs
           }
         }
-
-        if (result?.value?.testSourceConfigs &&
-          result?.value?.testSourceConfigs !== undefined &&
-          result?.value?.testSourceConfigs.length > 0) {
-          testSourceConfigs = result?.value?.testSourceConfigs
-        }
+      }
+      
+      currentBatch += batchesToFetch;
+      
+      // Stop if we found an incomplete batch (fewer than limit items)
+      if (foundIncompleteBatch) {
+        hasMoreData = false;
       }
     }
+    
     return {
       categories: categories,
       subCategories: finalDataSubCategories,
       testSourceConfigs: testSourceConfigs
     }
   },
-  async setTestMetadata() {
-    const resp = await this.getAllSubcategoriesData(false, "Dashboard")
+  async setTestMetadata(category, setTestsLoaded) {
+    let type = "Dashboard";
+    if(category){
+      type = category;
+    }
+    const resp = await this.getAllSubcategoriesData(false, type, setTestsLoaded)
     let subCategoryMap = {};
     resp.subCategories.forEach((x) => {
       func.trimContentFromSubCategory(x)
@@ -773,7 +818,7 @@ getInfoSectionsHeaders(){
   ]
   return moreInfoSections
   },
-convertSubIntoSubcategory(resp){
+async convertSubIntoSubcategory(resp){
   let obj = {}
   let countObj = {
     CRITICAL: 0,
@@ -781,7 +826,11 @@ convertSubIntoSubcategory(resp){
     MEDIUM: 0,
     LOW: 0,
   }
-  const subCategoryMap = LocalStore.getState().subCategoryMap
+  let subCategoryMap = LocalStore.getState().subCategoryMap
+  if(subCategoryMap==undefined || subCategoryMap==null || Object.keys(subCategoryMap).length === 0){
+    await this.setTestMetadata()
+    subCategoryMap = LocalStore.getState().subCategoryMap
+  }
   Object.keys(resp).forEach((key)=>{
     const objectKey = subCategoryMap[key] ? subCategoryMap[key].superCategory.shortName : key;
     const objectKeyName = subCategoryMap[key] ? subCategoryMap[key].superCategory.name : key;
@@ -1010,12 +1059,13 @@ getPrettifiedTestRunResults(testRunResults){
 getTestingRunResultUrl(testingResult){
   let urlString = testingResult.url
   const methodObj = func.toMethodUrlObject(urlString)
+  const finalMethod = getMethod(methodObj.url, methodObj.method);
   const truncatedUrl = observeFunc.getTruncatedUrl(methodObj.url)
   
-  return methodObj.method + " " + truncatedUrl
+  return finalMethod + " " + truncatedUrl
   
 },
-getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoardsWorkItemUrl){
+getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoardsWorkItemUrl, serviceNowTicketUrl, servicenowTicketId){
   if(apiInfo == null || apiInfo === undefined){
     apiInfo = {
       allAuthTypesFound: [],
@@ -1051,7 +1101,7 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoards
       <Tag>
           <HorizontalStack gap={1}>
             <Avatar size="extraSmall" shape='round' source="/public/logo_jira.svg" />
-            <Link url={jiraIssueUrl}>
+            <Link target="_blank" url={jiraIssueUrl}>
               <Text>
                 {key}
               </Text>
@@ -1067,9 +1117,24 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoards
       <Tag>
         <HorizontalStack gap={1}>
           <Avatar size="extraSmall" shape='round' source="/public/azure-boards.svg" />
-          <Link url={azureBoardsWorkItemUrl}>
+          <Link target="_blank" url={azureBoardsWorkItemUrl}>
             <Text>
               {azureBoardsWorkItemUrl?.split("/")?.[azureBoardsWorkItemUrl?.split("/")?.length - 1]}
+            </Text>
+          </Link>
+        </HorizontalStack>
+      </Tag>
+    </Box>
+  ) : null
+
+  const serviceNowComp = serviceNowTicketUrl?.length > 0 ? (
+    <Box>
+      <Tag>
+        <HorizontalStack gap={1}>
+          <Avatar size="extraSmall" shape='round' source="/public/servicenow.svg" />
+          <Link target="_blank" url={serviceNowTicketUrl}>
+            <Text>
+              {servicenowTicketId || "View Ticket"}
             </Text>
           </Link>
         </HorizontalStack>
@@ -1084,12 +1149,9 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoards
       tooltipContent: "Severity of the test run result"
     },
     {
-      title: "API",
+      title: mapLabel('API', getDashboardCategory()),
       value: (
-        <HorizontalStack gap={"1"}>
-          <Text color="subdued" fontWeight="semibold">{apiInfo.id.method}</Text>
-          <TextComp value={observeFunc.getTruncatedUrl(apiInfo.id.url)} />
-        </HorizontalStack>
+          <GetPrettifyEndpoint methodBoxWidth="38px" maxWidth="180px" method={apiInfo.id.method} url={apiInfo.id.url} />
       ),
       tooltipContent: "Name of the api on which test is run"
     },
@@ -1117,24 +1179,39 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoards
       title: "Detected",
       value: <TextComp value={func.prettifyEpoch(apiInfo.lastSeen)} />,
       tooltipContent: "Discovered time of the API"
-    },
-    {
+    }
+  ]
+
+  if(jiraComponent != null) {
+    rowItems.push({
       title: "Jira ticket",
       value: jiraComponent,
       tooltipContent:"Jira ticket number attached to the testing run issue"
-    },
-    {
+    })
+  }
+
+  if(azureBoardsComp != null) {
+    rowItems.push({
       title: "Azure work item",
       value: azureBoardsComp,
       tooltipContent: "Azure boards work item number attached to the testing run issue"
-    }
-  ]
+    })
+  }
+
+  if(serviceNowComp != null) {
+    rowItems.push({
+      title: "ServiceNow ticket",
+      value: serviceNowComp,
+      tooltipContent: "ServiceNow ticket attached to the testing run issue"
+    })
+  }
+
   return rowItems
 },
 
 stopTest(hexId){
   api.stopTest(hexId).then((resp) => {
-    func.setToast(true, false, "Test run stopped")
+    func.setToast(true, false, mapLabel("Test", getDashboardCategory()) + " run stopped")
   }).catch((resp) => {
     func.setToast(true, true, "Unable to stop test run")
   });
@@ -1143,7 +1220,7 @@ stopTest(hexId){
 rerunTest(hexId, refreshSummaries, shouldRefresh, selectedTestRunForRerun, testingRunResultSummaryHexId){
   api.rerunTest(hexId, selectedTestRunForRerun, testingRunResultSummaryHexId).then((resp) => {
     window.location.reload()
-    func.setToast(true, false, "Test re-run initiated")
+    func.setToast(true, false, mapLabel("Test", getDashboardCategory()) + " re-run initiated")
     if(shouldRefresh){
       setTimeout(() => {
         refreshSummaries();
@@ -1156,7 +1233,7 @@ rerunTest(hexId, refreshSummaries, shouldRefresh, selectedTestRunForRerun, testi
     if (actionErrors !== null && actionErrors !== undefined && actionErrors.length > 0) {
       additionalMessage = ", " + actionErrors[0]
     }
-    func.setToast(true, true, "Unable to re-run test" + additionalMessage);
+    func.setToast(true, true, "Unable to re-" + mapLabel("run test", getDashboardCategory()) + additionalMessage);
   });
 },
 getActionsList(hexId){
@@ -1307,6 +1384,55 @@ getMissingConfigs(testResults){
       apiCollectionName: collectionsMap?.[api.apiCollectionId] || ""
     }));
     return testingEndpointsApisList;
+  },
+  prepareConversationsList(agentConversationResults){
+    let conversationsListCopy = []
+    let extractedRemediationText = ''
+    
+    agentConversationResults.forEach(conversation => {
+        let commonObj = {
+            creationTimestamp: conversation.timestamp,
+            conversationId: conversation.conversationId,
+        }
+        conversationsListCopy.push({
+            ...commonObj,
+            _id: "user_" + conversation.prompt,
+            message: conversation?.finalSentPrompt || conversation.prompt,
+            role: "user"
+        })
+        
+        // Check if response contains "## ROOT CAUSE ANALYSIS"
+        let systemMessage = conversation.response
+        extractedRemediationText = conversation.remediationMessage || "";
+        
+        if (systemMessage && typeof systemMessage === 'string') {
+            const rootCauseIndex = systemMessage.indexOf('ROOT CAUSE ANALYSIS')
+            if (rootCauseIndex !== -1) {
+                // Extract remediation text (from "## ROOT CAUSE ANALYSIS" to the end)
+                if (!extractedRemediationText) {
+                    extractedRemediationText = systemMessage.substring(rootCauseIndex)
+                }
+                // Keep only the part before "## ROOT CAUSE ANALYSIS" for the conversation
+                systemMessage = systemMessage.substring(0, rootCauseIndex).trim()
+            }
+        }
+
+        if(conversation?.validationMessage !== null && conversation?.validationMessage !== undefined && conversation?.validationMessage?.length > 0){
+          systemMessage += ("\n\n### VALIDATION MESSAGE ###\n" + conversation?.validationMessage);
+        }
+        
+        conversationsListCopy.push({
+            ...commonObj,
+            _id: "system_" + conversation.response,
+            message: systemMessage,
+            role: "system"
+        })
+    })
+    
+    return {
+        conversations: conversationsListCopy,
+        remediationText: extractedRemediationText
+    }
   }
 }
 

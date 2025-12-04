@@ -28,6 +28,10 @@ public class ApiHitCountInfoDao extends AccountsContextDao<ApiHitCountInfo> {
 
         fieldNames = new String[]{"apiCollectionId", "url", "method"};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+
+        // Compound index to support time-bounded queries per endpoint
+        fieldNames = new String[]{"apiCollectionId", "url", "method", "ts"};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
 
     @Override

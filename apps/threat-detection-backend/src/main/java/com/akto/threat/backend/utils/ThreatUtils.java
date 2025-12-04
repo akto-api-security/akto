@@ -1,7 +1,8 @@
 package com.akto.threat.backend.utils;
 
-import com.akto.threat.backend.constants.MongoDBCollection;
-import com.mongodb.client.*;
+import com.akto.threat.backend.dao.MaliciousEventDao;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.IndexOptions;
 import com.mongodb.client.model.Indexes;
 import org.bson.Document;
@@ -11,28 +12,12 @@ import java.util.*;
 
 public class ThreatUtils {
 
-    public static void createIndexIfAbsent(String accountId, MongoClient mongoClient) {
-        MongoDatabase database = mongoClient.getDatabase(accountId);
-
-        MongoCursor<String> stringMongoCursor = database.listCollectionNames().cursor();
-        boolean maliciousEventCollectionExists = false;
-
-        while (stringMongoCursor.hasNext()) {
-            String collectionName = stringMongoCursor.next();
-            if(collectionName.equalsIgnoreCase(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS)) {
-                maliciousEventCollectionExists = true;
-                break;
-            }
-        }
-
-        if (!maliciousEventCollectionExists) {
-            database.createCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS);
-        }
-
-        MongoCollection<Document> coll = database.getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
+    public static void createIndexIfAbsent(String accountId, MaliciousEventDao maliciousEventDao) {
+        // Get the collection from DAO - this will create the collection if it doesn't exist
+        MongoCollection<?> collection = maliciousEventDao.getCollection(accountId);
 
         Set<String> existingIndexes = new HashSet<>();
-        try (MongoCursor<Document> cursor = coll.listIndexes().iterator()) {
+        try (MongoCursor<Document> cursor = collection.listIndexes().iterator()) {
             while (cursor.hasNext()) {
                 Document index = cursor.next();
                 existingIndexes.add(index.get("name", ""));
@@ -51,7 +36,7 @@ public class ThreatUtils {
 
         for (Map.Entry<String, Bson> entry : requiredIndexes.entrySet()) {
             if (!existingIndexes.contains(entry.getKey())) {
-                coll.createIndex(entry.getValue(), new IndexOptions().name(entry.getKey()));
+                collection.createIndex(entry.getValue(), new IndexOptions().name(entry.getKey()));
             }
         }
     }

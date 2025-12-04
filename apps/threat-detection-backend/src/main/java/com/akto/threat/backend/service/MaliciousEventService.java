@@ -1,5 +1,6 @@
 package com.akto.threat.backend.service;
 
+import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.dto.type.URLMethods;
 import com.akto.kafka.Kafka;
 import com.akto.kafka.KafkaConfig;
@@ -16,16 +17,19 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Ti
 import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
 import com.akto.threat.backend.constants.KafkaTopic;
 import com.akto.threat.backend.constants.MongoDBCollection;
-import com.akto.threat.backend.db.MaliciousEventModel;
+import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.utils.KafkaUtils;
 import com.akto.threat.backend.utils.ThreatUtils;
-import com.akto.threat.backend.constants.StatusConstants;
+import com.akto.util.ThreatDetectionConstants;
 import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.DistinctIterable;
+import com.mongodb.client.MongoCursor;
+import org.bson.conversions.Bson;
 
 import java.util.*;
-import java.util.List;
 
+import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -33,15 +37,73 @@ import org.bson.conversions.Bson;
 public class MaliciousEventService {
 
   private final Kafka kafka;
-  private final MongoClient mongoClient;
+  private final MaliciousEventDao maliciousEventDao;
   private static final LoggerMaker logger = new LoggerMaker(MaliciousEventService.class);
 
   private static final HashMap<String, Boolean> shouldNotCreateIndexes = new HashMap<>();
 
   public MaliciousEventService(
-      KafkaConfig kafkaConfig, MongoClient mongoClient) {
+      KafkaConfig kafkaConfig, MaliciousEventDao maliciousEventDao) {
     this.kafka = new Kafka(kafkaConfig);
-    this.mongoClient = mongoClient;
+    this.maliciousEventDao = maliciousEventDao;
+  }
+
+  // Convert string label to model Label enum
+  private static MaliciousEventDto.Label convertStringLabelToModelLabel(String labelString) {
+    if (labelString == null || labelString.isEmpty()) {
+      return MaliciousEventDto.Label.THREAT; // Default for backward compatibility
+    }
+
+    String normalized = labelString.toUpperCase().trim();
+    switch (normalized) {
+      case "THREAT":
+        return MaliciousEventDto.Label.THREAT;
+      case "GUARDRAIL":
+        return MaliciousEventDto.Label.GUARDRAIL;
+      default:
+        logger.debug("Unknown label string: " + labelString + ", defaulting to THREAT");
+        return MaliciousEventDto.Label.THREAT;
+    }
+  }
+
+  // Convert model Label enum to string
+  private static String convertModelLabelToString(MaliciousEventDto.Label modelLabel) {
+    if (modelLabel == null) {
+      return "threat";
+    }
+
+    switch (modelLabel) {
+      case THREAT:
+        return "threat";
+      case GUARDRAIL:
+        return "guardrail";
+      default:
+        return "threat";
+    }
+  }
+
+  // Helper method to apply label filter with backward compatibility
+  private static void applyLabelFilter(Document query, MaliciousEventDto.Label labelEnum) {
+    List<Document> orConditions = new ArrayList<>();
+    orConditions.add(new Document("label", labelEnum.name()));
+
+    if (labelEnum == MaliciousEventDto.Label.THREAT) {
+      // For backward compatibility: treat null/missing label as "threat"
+      orConditions.add(new Document("label", new Document("$exists", false)));
+      orConditions.add(new Document("label", null));
+    }
+
+    if (orConditions.size() > 1) {
+      List<Document> andConditions = new ArrayList<>();
+      if (!query.isEmpty()) {
+        andConditions.add(new Document(query));
+      }
+      andConditions.add(new Document("$or", orConditions));
+      query.clear();
+      query.append("$and", andConditions);
+    } else {
+      query.append("label", labelEnum.name());
+    }
   }
 
   public void recordMaliciousEvent(String accountId, RecordMaliciousEventRequest request) {
@@ -54,13 +116,18 @@ public class MaliciousEventService {
 
     EventType eventType = evt.getEventType();
 
-    MaliciousEventModel.EventType maliciousEventType =
+    MaliciousEventDto.EventType maliciousEventType =
         EventType.EVENT_TYPE_AGGREGATED.equals(eventType)
-            ? MaliciousEventModel.EventType.AGGREGATED
-            : MaliciousEventModel.EventType.SINGLE;
+            ? MaliciousEventDto.EventType.AGGREGATED
+            : MaliciousEventDto.EventType.SINGLE;
 
-    MaliciousEventModel maliciousEventModel =
-        MaliciousEventModel.newBuilder()
+    // Convert string label to model enum
+    MaliciousEventDto.Label label = convertStringLabelToModelLabel(evt.getLabel());
+
+    String status = (evt.getStatus() != null && !evt.getStatus().isEmpty()) ? evt.getStatus() : ThreatDetectionConstants.ACTIVE;
+
+    MaliciousEventDto maliciousEventModel =
+        MaliciousEventDto.newBuilder()
             .setDetectedAt(evt.getDetectedAt())
             .setActor(actor)
             .setFilterId(filterId)
@@ -78,6 +145,9 @@ public class MaliciousEventService {
             .setType(evt.getType())
             .setMetadata(evt.getMetadata().toString())
             .setSuccessfulExploit(evt.getSuccessfulExploit())
+            .setStatus(MaliciousEventDto.Status.valueOf(status.toUpperCase()))
+            .setLabel(label)
+            .setHost(evt.getHost() != null ? evt.getHost() : "")
             .build();
 
     this.kafka.send(
@@ -86,9 +156,9 @@ public class MaliciousEventService {
         KafkaTopic.ThreatDetection.INTERNAL_DB_MESSAGES);
   }
 
-  private static <T> Set<T> findDistinctFields(
-      MongoCollection<MaliciousEventModel> coll, String fieldName, Class<T> tClass, Bson filters) {
-    DistinctIterable<T> r = coll.distinct(fieldName, filters, tClass);
+  private <T> Set<T> findDistinctFields(
+      String accountId, String fieldName, Class<T> tClass, Bson filters) {
+    DistinctIterable<T> r = maliciousEventDao.getCollection(accountId).distinct(fieldName, filters, tClass);
     Set<T> result = new HashSet<>();
     MongoCursor<T> cursor = r.cursor();
     while (cursor.hasNext()) {
@@ -99,44 +169,35 @@ public class MaliciousEventService {
 
   public  ThreatActorFilterResponse fetchThreatActorFilters(
       String accountId, ThreatActorFilterRequest request) {
-    MongoCollection<MaliciousEventModel> coll =
-        this.mongoClient
-            .getDatabase(accountId)
-            .getCollection("malicious_events", MaliciousEventModel.class);
 
     Set<String> latestAttack =
-        MaliciousEventService.<String>findDistinctFields(
-            coll, "filterId", String.class, Filters.empty());
+        this.findDistinctFields(accountId, "filterId", String.class, Filters.empty());
 
     Set<String> countries =
-        MaliciousEventService.<String>findDistinctFields(
-            coll, "country", String.class, Filters.empty());
+        this.findDistinctFields(accountId, "country", String.class, Filters.empty());
 
     Set<String> actorIds =
-        MaliciousEventService.<String>findDistinctFields(
-            coll, "actor", String.class, Filters.empty());
+        this.findDistinctFields(accountId, "actor", String.class, Filters.empty());
 
-    return ThreatActorFilterResponse.newBuilder().addAllSubCategories(latestAttack).addAllCountries(countries).addAllActorId(actorIds).build();
+    Set<String> hosts =
+        this.findDistinctFields(accountId, "host", String.class, Filters.empty());
+
+    return ThreatActorFilterResponse.newBuilder().addAllSubCategories(latestAttack).addAllCountries(countries).addAllActorId(actorIds).addAllHost(hosts).build();
   }
 
   public FetchAlertFiltersResponse fetchAlertFilters(
       String accountId, FetchAlertFiltersRequest request) {
-    MongoCollection<MaliciousEventModel> coll =
-        this.mongoClient
-            .getDatabase(accountId)
-            .getCollection("malicious_events", MaliciousEventModel.class);
 
     Set<String> actors =
-        MaliciousEventService.<String>findDistinctFields(
-            coll, "actor", String.class, Filters.empty());
+        this.findDistinctFields(accountId, "actor", String.class, Filters.empty());
     Set<String> urls =
-        MaliciousEventService.<String>findDistinctFields(
-            coll, "latestApiEndpoint", String.class, Filters.empty());
+        this.findDistinctFields(accountId, "latestApiEndpoint", String.class, Filters.empty());
     Set<String> subCategories =
-        MaliciousEventService.<String>findDistinctFields(
-            coll, "filterId", String.class, Filters.empty());
+        this.findDistinctFields(accountId, "filterId", String.class, Filters.empty());
+    Set<String> hosts =
+        this.findDistinctFields(accountId, "host", String.class, Filters.empty());
 
-    return FetchAlertFiltersResponse.newBuilder().addAllActors(actors).addAllUrls(urls).addAllSubCategory(subCategories).build();
+    return FetchAlertFiltersResponse.newBuilder().addAllActors(actors).addAllUrls(urls).addAllSubCategory(subCategories).addAllHosts(hosts).build();
   }
 
   public ListMaliciousRequestsResponse listMaliciousRequests(
@@ -154,12 +215,6 @@ public class MaliciousEventService {
     if(filter.getLatestAttackList() == null || filter.getLatestAttackList().isEmpty()) {
       return ListMaliciousRequestsResponse.newBuilder().build();
     }
-
-    MongoCollection<MaliciousEventModel> coll =
-        this.mongoClient
-            .getDatabase(accountId)
-            .getCollection(
-                MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, MaliciousEventModel.class);
 
     Document query = new Document();
     if (!filter.getActorsList().isEmpty()) {
@@ -180,6 +235,14 @@ public class MaliciousEventService {
 
     if (!filter.getSubCategoryList().isEmpty()) {
       query.append("subCategory", new Document("$in", filter.getSubCategoryList()));
+    }
+
+    if (!filter.getHostsList().isEmpty()) {
+      query.append("host", new Document("$in", filter.getHostsList()));
+    }
+
+    if (filter.hasLatestApiOrigRegex() && !filter.getLatestApiOrigRegex().isEmpty()) {
+      query.append("latestApiOrig", new Document("$regex", filter.getLatestApiOrigRegex()));
     }
 
 
@@ -216,16 +279,23 @@ public class MaliciousEventService {
       }
     }
 
-    long total = coll.countDocuments(query);
-    try (MongoCursor<MaliciousEventModel> cursor =
-        coll.find(query)
+    if (filter.hasLabel()) {
+      String labelString = filter.getLabel();
+      MaliciousEventDto.Label labelEnum = convertStringLabelToModelLabel(labelString);
+      applyLabelFilter(query, labelEnum);
+    }
+
+    long total = maliciousEventDao.countDocuments(accountId, query);
+    try (MongoCursor<MaliciousEventDto> cursor =
+        maliciousEventDao.getCollection(accountId)
+            .find(query)
             .sort(new Document("detectedAt", sort.getOrDefault("detectedAt", -1)))
             .skip(skip)
             .limit(limit)
             .cursor()) {
       List<ListMaliciousRequestsResponse.MaliciousEvent> maliciousEvents = new ArrayList<>();
       while (cursor.hasNext()) {
-        MaliciousEventModel evt = cursor.next();
+        MaliciousEventDto evt = cursor.next();
         String metadata = evt.getMetadata() != null ? evt.getMetadata() : "";
 
         maliciousEvents.add(
@@ -247,8 +317,11 @@ public class MaliciousEventService {
                 .setRefId(evt.getRefId())
                 .setEventTypeVal(evt.getEventType().toString())
                 .setMetadata(metadata)
-                .setStatus(evt.getStatus() != null ? evt.getStatus().toString() : StatusConstants.ACTIVE)
+                .setStatus(evt.getStatus() != null ? evt.getStatus().toString() : ThreatDetectionConstants.ACTIVE)
                 .setSuccessfulExploit(evt.getSuccessfulExploit() != null ? evt.getSuccessfulExploit() : false)
+                .setLabel(convertModelLabelToString(evt.getLabel()))
+                .setHost(evt.getHost() != null ? evt.getHost() : "")
+                .setJiraTicketUrl(evt.getJiraTicketUrl() != null ? evt.getJiraTicketUrl() : "")
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()
@@ -259,26 +332,32 @@ public class MaliciousEventService {
   }
 
   public void createIndexIfAbsent(String accountId) {
-    ThreatUtils.createIndexIfAbsent(accountId, mongoClient);
+    ThreatUtils.createIndexIfAbsent(accountId, maliciousEventDao);
     shouldNotCreateIndexes.put(accountId, true);
   }
 
-  public int updateMaliciousEventStatus(String accountId, List<String> eventIds, Map<String, Object> filterMap, String status) {
+  public int updateMaliciousEventStatus(String accountId, List<String> eventIds, Map<String, Object> filterMap, String status, String jiraTicketUrl) {
     try {
-      MongoCollection<MaliciousEventModel> coll = getMaliciousEventCollection(accountId);
-      MaliciousEventModel.Status eventStatus = MaliciousEventModel.Status.valueOf(status.toUpperCase());
-      Bson update = Updates.set("status", eventStatus.toString());
+      Bson update = null;
+
+      if(status != null && !status.isEmpty()) {
+        MaliciousEventDto.Status eventStatus = MaliciousEventDto.Status.valueOf(status.toUpperCase());
+        update = Updates.set("status", eventStatus.toString());
+      }
+      if (jiraTicketUrl != null && !jiraTicketUrl.isEmpty()) {
+        update = Updates.set("jiraTicketUrl", jiraTicketUrl);
+      }
 
       Document query = buildQuery(eventIds, filterMap, "update");
       if (query == null) {
         return 0;
       }
 
-      String logMessage = String.format("Updating events %s to status: %s", 
-          getQueryDescription(eventIds, filterMap), status);
+      String logMessage = String.format("Updating events %s to status: %s and jiraTicketUrl: %s",
+          getQueryDescription(eventIds, filterMap), status, jiraTicketUrl != null && !jiraTicketUrl.isEmpty() ? jiraTicketUrl : "null");
       logger.info(logMessage);
-      
-      long modifiedCount = coll.updateMany(query, update).getModifiedCount();
+
+      long modifiedCount = maliciousEventDao.getCollection(accountId).updateMany(query, update).getModifiedCount();
       return (int) modifiedCount;
     } catch (Exception e) {
       logger.error("Error updating malicious event status", e);
@@ -288,8 +367,6 @@ public class MaliciousEventService {
 
   public int deleteMaliciousEvents(String accountId, List<String> eventIds, Map<String, Object> filterMap) {
     try {
-      MongoCollection<MaliciousEventModel> coll = getMaliciousEventCollection(accountId);
-      
       Document query = buildQuery(eventIds, filterMap, "delete");
       if (query == null) {
         return 0;
@@ -297,22 +374,15 @@ public class MaliciousEventService {
 
       String logMessage = "Deleting events " + getQueryDescription(eventIds, filterMap);
       logger.info(logMessage);
-      
-      long deletedCount = coll.deleteMany(query).getDeletedCount();
+
+      long deletedCount = maliciousEventDao.getCollection(accountId).deleteMany(query).getDeletedCount();
       logger.info("Deleted " + deletedCount + " malicious events");
-      
+
       return (int) deletedCount;
     } catch (Exception e) {
       logger.error("Error deleting malicious events", e);
       return 0;
     }
-  }
-
-  private MongoCollection<MaliciousEventModel> getMaliciousEventCollection(String accountId) {
-    return this.mongoClient
-        .getDatabase(accountId)
-        .getCollection(
-            MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, MaliciousEventModel.class);
   }
 
   private Document buildQuery(List<String> eventIds, Map<String, Object> filterMap, String operation) {
@@ -344,17 +414,17 @@ public class MaliciousEventService {
       return;
     }
 
-    if (StatusConstants.UNDER_REVIEW.equals(statusFilter)) {
-      query.append("status", StatusConstants.UNDER_REVIEW);
-    } else if (StatusConstants.IGNORED.equals(statusFilter)) {
-      query.append("status", StatusConstants.IGNORED);
-    } else if (StatusConstants.ACTIVE.equals(statusFilter) || StatusConstants.EVENTS_FILTER.equals(statusFilter)) {
+    if (ThreatDetectionConstants.UNDER_REVIEW.equals(statusFilter)) {
+      query.append("status", ThreatDetectionConstants.UNDER_REVIEW);
+    } else if (ThreatDetectionConstants.IGNORED.equals(statusFilter)) {
+      query.append("status", ThreatDetectionConstants.IGNORED);
+    } else if (ThreatDetectionConstants.ACTIVE.equals(statusFilter) || ThreatDetectionConstants.EVENTS_FILTER.equals(statusFilter)) {
       // For Events tab: show null, empty, or ACTIVE status
       List<Document> orConditions = Arrays.asList(
         new Document("status", new Document("$exists", false)),
         new Document("status", null),
         new Document("status", ""),
-        new Document("status", StatusConstants.ACTIVE)
+        new Document("status", ThreatDetectionConstants.ACTIVE)
       );
       query.append("$or", orConditions);
     }
@@ -407,6 +477,18 @@ public class MaliciousEventService {
     // Handle status filter
     String statusFilter = (String) filter.get("statusFilter");
     applyStatusFilter(query, statusFilter);
+
+    // Handle label filter with backward compatibility
+    String label = (String) filter.get("label");
+    if (label != null && !label.isEmpty()) {
+      MaliciousEventDto.Label labelEnum = convertStringLabelToModelLabel(label);
+      applyLabelFilter(query, labelEnum);
+    }
+
+    String latestApiOrigRegex = (String) filter.get("latestApiOrigRegex");
+    if (latestApiOrigRegex != null && !latestApiOrigRegex.isEmpty()) {
+      query.append("latestApiOrig", new Document("$regex", latestApiOrigRegex));
+    }
 
     return query;
   }

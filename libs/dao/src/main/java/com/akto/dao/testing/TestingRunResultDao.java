@@ -70,10 +70,6 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         );
     }
 
-    public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters) {
-        return fetchLatestTestingRunResult(filters, 10_000);
-    }
-
     private Bson getLatestTestingRunResultProjections() {
         return Projections.include(
                 TestingRunResult.TEST_RUN_ID,
@@ -96,7 +92,7 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                 getLatestTestingRunResultProjections()
             );
 
-        return fetchLatestTestingRunResult(filters, limit, 0, Arrays.asList(Aggregates.project(projections)));
+        return fetchLatestTestingRunResult(filters, limit, 0, Arrays.asList(Aggregates.project(projections)), false);
     }
 
     public List<TestingRunResult> fetchLatestTestingRunResultWithCustomAggregations(Bson filters, int limit, int skip, Bson customSort) {
@@ -120,23 +116,25 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                 ))
         );
 
-        return fetchLatestTestingRunResult(filters, limit, skip, Arrays.asList(Aggregates.project(projections), addSeverityValueStage, customSort));
+        return fetchLatestTestingRunResult(filters, limit, skip, Arrays.asList(Aggregates.project(projections), addSeverityValueStage, customSort), true);
     }
 
-    public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit, int skip, List<Bson> customAggregation) {
+    public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit, int skip, List<Bson> customAggregation, boolean skipCollectionFilter) {
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(filters));
-        try {
-            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if (collectionIds != null) {
-                pipeline.add(Aggregates.match(Filters.in(getFilterKeyString(), collectionIds)));
+        if (!skipCollectionFilter) {
+            try {
+                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+                if (collectionIds != null) {
+                    pipeline.add(Aggregates.match(Filters.in(getFilterKeyString(), collectionIds)));
+                }
+            } catch (Exception e) {
             }
-        } catch (Exception e) {
         }
         pipeline.add(Aggregates.sort(Sorts.descending(Constants.ID)));
+        pipeline.addAll(customAggregation);
         pipeline.add(Aggregates.skip(skip));
         pipeline.add(Aggregates.limit(limit));
-        pipeline.addAll(customAggregation);
         MongoCursor<BasicDBObject> cursor = this.getMCollection()
                 .aggregate(pipeline, BasicDBObject.class).cursor();
         List<TestingRunResult> testingRunResults = new ArrayList<>();

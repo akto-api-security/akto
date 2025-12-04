@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import api from "../api";
 import { CellType } from "../../../components/tables/rows/GithubRow";
@@ -10,12 +11,12 @@ import dayjs from "dayjs";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
 import { formatActorId } from "../utils/formatUtils";
-import useTable from "../../../components/tables/TableContext";
 import threatDetectionRequests from "../api";
+import { LABELS } from "../constants";
 
 const resourceName = {
-  singular: "sample",
-  plural: "samples",
+  singular: "activity",
+  plural: "activities",
 };
 
 const headers = [
@@ -28,6 +29,11 @@ const headers = [
     text: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"],
     value: "endpointComp",
     title: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"],
+  },
+  {
+    text: "Host",
+    value: "host",
+    title: "Host",
   },
   {
     text: "Threat Actor",
@@ -81,7 +87,8 @@ const sortOptions = [
 
 let filters = [];
 
-function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
+function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABELS.THREAT }) {
+  const location = useLocation();
   const getTimeEpoch = (key) => {
     return Math.floor(Date.parse(currDateRange.period[key]) / 1000);
   };
@@ -140,7 +147,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
     // Check if any other filters are applied (only URL and attack category are allowed)
     const hasOtherFilters = (currentFilters.actor && currentFilters.actor.length > 0) ||
                            (currentFilters.type && currentFilters.type.length > 0) ||
-                           (currentFilters.apiCollectionId && currentFilters.apiCollectionId.length > 0);
+                           (currentFilters.apiCollectionId && currentFilters.apiCollectionId.length > 0)
     
     if (hasOtherFilters) {
       const message = 'Only URL and Attack Category filters are allowed for bulk operations. Please remove other filters (Actor, Type, Collection) and try again.';
@@ -223,7 +230,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
         currentFilters.latestAttack || [],
         startTimestamp,
         endTimestamp,
-        currentTab.toUpperCase()
+        currentTab.toUpperCase(),
+        currentFilters.host || []
       ];
 
       if (operation === 'delete') {
@@ -234,7 +242,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
           latestAttack: filterParams[3],
           startTimestamp: filterParams[4],
           endTimestamp: filterParams[5],
-          statusFilter: filterParams[6]
+          statusFilter: filterParams[6],
+          hosts: filterParams[7]
         });
       } else {
         response = await threatDetectionRequests.updateMaliciousEventStatus({
@@ -245,7 +254,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
           startTimestamp: filterParams[4],
           endTimestamp: filterParams[5],
           statusFilter: filterParams[6],
-          status: newState
+          status: newState,
+          hosts: filterParams[7]
         });
       }
 
@@ -378,14 +388,16 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
     _limit,
     filters,
     _filterOperators,
-    _queryValue
+    queryValue
   ) {
     setLoading(true);
     let sourceIpsFilter = [],
       apiCollectionIdsFilter = [],
       matchingUrlFilter = [],
       typeFilter = [],
-      latestAttack = [];
+      latestAttack = [],
+      hostFilter = [];
+    let latestApiOrigRegex = queryValue.length > 3 ? queryValue : "";
     if (filters?.actor) {
       sourceIpsFilter = filters?.actor;
     }
@@ -401,6 +413,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
     if(filters?.latestAttack){
       latestAttack = filters?.latestAttack
     }
+    if(filters?.host){
+      hostFilter = filters?.host
+    }
     
     // Store current filters for bulk operations
     setCurrentFilters({
@@ -409,6 +424,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
       url: matchingUrlFilter,
       type: typeFilter,
       latestAttack: latestAttack,
+      host: hostFilter,
       sortKey: sortKey,
       sortOrder: sortOrder
     });
@@ -430,7 +446,10 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
       latestAttack,
       50,
       currentTab.toUpperCase(),
-      successfulBool
+      successfulBool,
+      label, // Use the label prop (THREAT or GUARDRAIL)
+      hostFilter,
+      latestApiOrigRegex
     );
 
     // Store the total count for filtered results
@@ -439,10 +458,26 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
     let total = res.total;
     let ret = res?.maliciousEvents.map((x) => {
       const severity = threatFiltersMap[x?.filterId]?.severity || "HIGH"
+      
+      // Build nextUrl for table navigation (similar to prepareTestRunResult)
+      let nextUrl = null;
+      if (x.refId && x.eventType && x.actor && x.filterId) {
+        const params = new URLSearchParams();
+        params.set("refId", x.refId);
+        params.set("eventType", x.eventType);
+        params.set("actor", x.actor);
+        params.set("filterId", x.filterId);
+        if (x.status) {
+          params.set("eventStatus", x.status.toUpperCase());
+        }
+        nextUrl = `${location.pathname}?${params.toString()}`;
+      }
+      
       return {
         ...x,
         id: x.id,
         actorComp: formatActorId(x.actor),
+        host: x.host || "-",
         endpointComp: (
           <GetPrettifyEndpoint 
             maxWidth="300px" 
@@ -461,7 +496,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
         severityComp: (<div className={`badge-wrapper-${severity}`}>
                           <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                       </div>
-        )
+        ),
+        nextUrl: nextUrl
       };
     });
     setLoading(false);
@@ -478,6 +514,14 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
     let ipChoices = res?.ips.map((x) => {
       return { label: x, value: x };
     });
+    
+    // Extract unique hosts from the fetched data
+    let hostChoices = [];
+    if (res?.hosts && Array.isArray(res.hosts) && res.hosts.length > 0) {
+      hostChoices = res.hosts
+        .filter(host => host && host.trim() !== '' && host !== '-')
+        .map(x => ({ label: x, value: x }));
+    }
 
     const attackTypeChoices = Object.keys(threatFiltersMap).length === 0 ? [] : Object.entries(threatFiltersMap).map(([key, value]) => {
       return {
@@ -498,6 +542,12 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
         label: "URL",
         title: "URL",
         choices: urlChoices,
+      },
+      {
+        key: 'host',
+        label: "Host",
+        title: "Host",
+        choices: hostChoices,
       },
       {
         key: 'type',
@@ -563,7 +613,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
       selected={selected}
       onSelect={handleSelectedTab}
       mode={IndexFiltersMode.Default}
-      hideQueryField={true}
     />
   );
 }

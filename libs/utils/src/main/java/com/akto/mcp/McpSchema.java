@@ -46,6 +46,10 @@ public final class McpSchema {
     public static final String MCP_NOTIFICATIONS_CANCELLED_METHOD = "notifications/cancelled";
     public static final String MCP_NOTIFICATIONS_PROGRESS_METHOD = "notifications/progress";
     public static final String MCP_NOTIFICATIONS_RESOURCES_UPDATED_METHOD = "notifications/resources/updated";
+    public static final String MCP_JSONRPC_KEY = "jsonrpc";
+    public static final String MCP_ERROR_KEY = "error";
+    public static final String MCP_RESULT_KEY = "result";
+
 
     public static final Set<String> MCP_METHOD_SET = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
         McpSchema.METHOD_TOOLS_LIST,

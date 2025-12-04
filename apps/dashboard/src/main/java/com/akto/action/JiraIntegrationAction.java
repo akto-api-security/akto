@@ -47,6 +47,8 @@ import com.opensymphony.xwork2.Action;
 
 import java.net.URI;
 import java.util.function.Function;
+
+import lombok.Getter;
 import lombok.Setter;
 
 import java.io.File;
@@ -64,6 +66,7 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
+import com.akto.action.threat_detection.SuspectSampleDataAction;
 import com.akto.dao.AccountSettingsDao;
 
 import static com.akto.utils.jira.Utils.buildAdditionalIssueFieldsForJira;
@@ -98,6 +101,13 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     @Setter
     private String actionItemType;
 
+    @Getter
+    @Setter
+    private String threatEventId;
+
+    @Getter @Setter
+    private String jiraTicketUrl;
+
     private Map<String,List<BasicDBObject>> projectAndIssueMap;
     private Map<String, ProjectMapping> projectMappings;
 
@@ -122,6 +132,8 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private String title;
     @Setter
     private String description;
+    @Setter
+    private String labels;
 
     public String testIntegration() {
 
@@ -774,8 +786,14 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                 String endpoint = url.getPath();
 
                 Map<String, Object> additionalFields = null;
-                if (this.jiraMetaData != null && this.jiraMetaData.getAdditionalIssueFields() != null) {
-                    additionalFields = this.jiraMetaData.getAdditionalIssueFields();
+                String labels = null;
+                if (this.jiraMetaData != null) {
+                    if (this.jiraMetaData.getAdditionalIssueFields() != null) {
+                        additionalFields = this.jiraMetaData.getAdditionalIssueFields();
+                    }
+                    if (this.jiraMetaData.getLabels() != null) {
+                        labels = this.jiraMetaData.getLabels();
+                    }
                 }
 
                 jiraMetaData = new JiraMetaData(
@@ -786,7 +804,8 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                         info.getDescription(),
                         testingIssuesId,
                         null,
-                        additionalFields
+                        additionalFields,
+                        labels
                 );
 
             } catch (Exception e) {
@@ -960,7 +979,23 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         }
 
         BasicDBObject fields = buildPayloadForJiraTicket(summary, this.projId, this.issueType, contentList,jiraMetaData.getAdditionalIssueFields());
-        fields.put("labels", new String[] {JobConstants.TICKET_LABEL_AKTO_SYNC});
+        
+        // Combine user labels with AKTO_SYNC label
+        List<String> labelsList = new ArrayList<>();
+        labelsList.add(JobConstants.TICKET_LABEL_AKTO_SYNC);
+        
+        // Parse and add user-provided labels
+        if (jiraMetaData.getLabels() != null && !jiraMetaData.getLabels().trim().isEmpty()) {
+            String[] userLabels = jiraMetaData.getLabels().split(",");
+            for (String label : userLabels) {
+                String trimmedLabel = label.trim();
+                if (!trimmedLabel.isEmpty() && !labelsList.contains(trimmedLabel)) {
+                    labelsList.add(trimmedLabel);
+                }
+            }
+        }
+        
+        fields.put("labels", labelsList.toArray(new String[0]));
         return fields;
     }
 
@@ -1256,6 +1291,23 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             BasicDBList contentList = new BasicDBList();
             contentList.add(buildContentDetails(this.description, null));
             BasicDBObject fields = buildPayloadForJiraTicket(this.title, this.projId, this.issueType, contentList, null);
+            
+            // Combine user labels with AKTO_SYNC label
+            List<String> labelsList = new ArrayList<>();
+            labelsList.add(JobConstants.TICKET_LABEL_AKTO_SYNC);
+            
+            // Parse and add user-provided labels
+            if (this.labels != null && !this.labels.trim().isEmpty()) {
+                String[] userLabels = this.labels.split(",");
+                for (String label : userLabels) {
+                    String trimmedLabel = label.trim();
+                    if (!trimmedLabel.isEmpty() && !labelsList.contains(trimmedLabel)) {
+                        labelsList.add(trimmedLabel);
+                    }
+                }
+            }
+            
+            fields.put("labels", labelsList.toArray(new String[0]));
 
             BasicDBObject reqPayload = new BasicDBObject();
             reqPayload.put("fields", fields);
@@ -1287,13 +1339,25 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
                 Pair<String, String> pair = getJiraTicketUrlPair(responsePayload, jiraIntegration.getBaseUrl());
                 this.jiraTicketKey = pair.getSecond();
-                String jiraTicketUrl = pair.getFirst();
+                this.jiraTicketUrl = pair.getFirst();
                 if (!StringUtils.isEmpty(this.actionItemType)) {
                     storeTicketUrlInAccountSettings(jiraTicketUrl);
                 }
 
             } catch (Exception e) {
                 // TODO: handle exception
+                loggerMaker.errorAndAddToDb("Error creating general Jira ticket: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+                return Action.ERROR.toUpperCase();
+            }
+
+            if(!StringUtils.isEmpty(this.threatEventId)) {
+               // utilise the updateMaliciousEventStatus to update the jiraTicket url in the malicious event
+               SuspectSampleDataAction suspectSampleDataAction = new SuspectSampleDataAction();
+               suspectSampleDataAction.setEventId(this.threatEventId);
+               String result = suspectSampleDataAction.updateMaliciousEventJiraUrl(this.threatEventId, jiraTicketUrl);
+               if(!result.equals(Action.SUCCESS.toUpperCase())) {
+                addActionError("Error updating malicious event Jira URL: " + result);
+               }
             }
             return Action.SUCCESS.toUpperCase();
 

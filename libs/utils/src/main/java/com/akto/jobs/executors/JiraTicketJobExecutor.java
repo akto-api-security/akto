@@ -136,7 +136,8 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
                     info.getDescription(),
                     id,
                     summaryId,
-                    null
+                    null,
+                    ""
                 );
             } catch (Exception e) {
                 logger.error("Error parsing URL for issue {}: {}", id, e.getMessage(), e);

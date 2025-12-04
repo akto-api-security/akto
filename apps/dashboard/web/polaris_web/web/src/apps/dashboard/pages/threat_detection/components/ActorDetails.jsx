@@ -4,6 +4,7 @@ import FlyLayout from "../../../components/layouts/FlyLayout"
 import { ActivityLog } from "./ActivityLog";
 import Store from "../../../store";
 import api from "../api";
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 export const ActorDetails = ({ actorDetails, setShowActorDetails }) => {
     const [ipStatus, setIpStatus] = useState(actorDetails.status || "active")
     const [showModal, setShowModal] = useState(false)
@@ -73,7 +74,7 @@ export const ActorDetails = ({ actorDetails, setShowActorDetails }) => {
     ]
     return (
         <FlyLayout
-            title="Threat actor details"
+            title={`${mapLabel("Threat", getDashboardCategory())} actor details`}
             show={true}
             setShow={setShowActorDetails}
             components={components}
