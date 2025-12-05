@@ -75,7 +75,7 @@ function About() {
         setNewMerging(resp.urlRegexMatchingEnabled)
         setTrafficThreshold(resp.trafficAlertThresholdSeconds)
         setObjectArr(arr)
-        setEnableTelemetry(resp.telemetrySettings.customerEnabled)
+        setEnableTelemetry(resp.telemetrySettings?.customerEnabled || false)
         if (resp.filterHeaderValueMap)
             setTrafficFiltersMap(resp.filterHeaderValueMap)
 
@@ -660,6 +660,7 @@ function About() {
                             type={"partner"}
                         /> : null,
                         <Modal
+                            key="merging-on-versions-modal"
                             open={modalOpen}
                             onClose={() => setModalOpen(false)}
                             title={mergingOnVersions ? "Do not merge on versions" : "Allow merging on versions"}

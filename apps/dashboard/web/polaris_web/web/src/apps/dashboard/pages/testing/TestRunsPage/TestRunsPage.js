@@ -305,12 +305,15 @@ const [summaryLoading, setSummaryLoading] = useState(false)
     setLoading(false)    
   }
 
-  useEffect(async ()=>{
-    setSummaryLoading(true)
-    await fetchTotalCount()
-    await fetchCountsMap()
-    await fetchSummaryInfo()
-    setSummaryLoading(false)
+  useEffect(()=>{
+    async function fetchData() {
+      setSummaryLoading(true)
+      await fetchTotalCount()
+      await fetchCountsMap()
+      await fetchSummaryInfo()
+      setSummaryLoading(false)
+    }
+    fetchData()
   },[currDateRange])
 
   const handleSelectedTab = (selectedIndex) => {
