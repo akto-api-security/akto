@@ -1,7 +1,7 @@
 package com.akto.test_editor.filter.data_operands_impl;
 
 import org.apache.commons.validator.routines.InetAddressValidator;
-import inet.ipaddr.IPAddressString;
+import com.akto.util.http_util.CoreHTTPClient;
 
 public class NotContainsIpFilter extends NotContainsFilter {
 
@@ -16,12 +16,9 @@ public class NotContainsIpFilter extends NotContainsFilter {
         
         // Check if query is a valid CIDR range and if data IP is NOT contained in it
         try {
-            IPAddressString cidrAddress = new IPAddressString(query);
-            IPAddressString ipAddress = new IPAddressString(data);
-            return !cidrAddress.contains(ipAddress);
+            return !CoreHTTPClient.ipContains(query, data);
         } catch (Exception e) {
-            // If query is not a valid CIDR, consider it as not containing the IP
-            return true;
+            return false; // If query is not a valid CIDR, consider it as not containing the IP
         }
     }
 }

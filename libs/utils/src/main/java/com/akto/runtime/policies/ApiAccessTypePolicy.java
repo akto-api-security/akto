@@ -6,8 +6,7 @@ import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-
-import inet.ipaddr.IPAddressString;
+import com.akto.util.http_util.CoreHTTPClient;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -164,11 +163,7 @@ public class ApiAccessTypePolicy {
                 /*
                  * matches ipv4 and ipv6 CIDR and subnet ranges.
                  */
-                IPAddressString cidrAddress = new IPAddressString(cidr);
-                IPAddressString ipAddress = new IPAddressString(ip);
-                if (cidrAddress.contains(ipAddress)) {
-                    return true;
-                }
+                return CoreHTTPClient.ipContains(cidr, ip);
             } catch (Exception e) {
                 logger.error("Error checking IP in CIDR range: " + e.getMessage());
             }
