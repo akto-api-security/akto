@@ -762,7 +762,36 @@ public class Executor {
                 if (isMcpRequest) {
                     return new ExecutorSingleOperationResp(false, "DDOS is not supported for MCP requests");
                 }
-                return Operations.addHeader(rawApi, Constants.AKTO_ATTACH_FILE , key.toString());
+                // Support custom field name: key can be a Map {fieldName: fileUrl} or a string (legacy)
+                String fieldName = "file"; // Default field name
+                String fileUrl = null;
+                
+                if (key instanceof Map) {
+                    Map<String, Object> fileAttachMap = (Map<String, Object>) key;
+                    if (fileAttachMap.size() == 1) {
+                        Map.Entry<String, Object> entry = fileAttachMap.entrySet().iterator().next();
+                        fieldName = entry.getKey();
+                        fileUrl = entry.getValue().toString();
+                    } else {
+                        return new ExecutorSingleOperationResp(false, "attach_file: Map must have exactly one key-value pair");
+                    }
+                } else if (key != null && value != null) {
+                    // YAML format: attach_file: {key: fieldName, value: fileUrl}
+                    fieldName = key.toString();
+                    fileUrl = value.toString();
+                } else if (key != null) {
+                    // Legacy format: attach_file: fileUrl (key is the URL, no field name)
+                    fileUrl = key.toString();
+                } else {
+                    return new ExecutorSingleOperationResp(false, "attach_file: Missing file URL");
+                }
+                
+                if (fileUrl == null || fileUrl.isEmpty()) {
+                    return new ExecutorSingleOperationResp(false, "attach_file: Missing file URL");
+                }
+                
+                String headerValue = fieldName + "::" + fileUrl;
+                return Operations.addHeader(rawApi, Constants.AKTO_ATTACH_FILE , headerValue);
 
             case "modify_header":
                 Object epochVal = Utils.getEpochTime(value);

@@ -63,6 +63,15 @@ const snippets = [
             "\t\t\t\t<PAYLOAD_KEY>: <NEW_PAYLOAD_VALUE>"
         ]
     },
+    {
+        label: "execute-attach-file-SAMPLE",
+        desc: "Attach a file (multipart) while executing the test",
+        text: [
+            ...executeBasic,
+            "\t\t\t- attach_file:",
+            "\t\t\t\t<FIELD_NAME>: <FILE_URL>"
+        ]
+    },
 ]
 
 export default snippets;
