@@ -852,7 +852,7 @@ function ApiDetails(props) {
     };
 
     // Always show BasePromptTab for AI agents (collections with gen-ai tag)
-    const shouldShowBasePromptTab = hasGenAiTag();
+    const shouldShowBasePromptTab = detectedBasePrompt && hasGenAiTag();
 
     const components = showForbidden
         ? [<Box padding="4" key="forbidden"><ForbiddenRole /></Box>]
