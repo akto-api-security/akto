@@ -226,6 +226,14 @@ const api = {
         })
     },
 
+    initiateN8NImport(n8nUrl, apiKey, dataIngestionUrl, dashboardUrl) {
+        return request({
+            url: '/api/initiateN8NImport',
+            method: 'post',
+            data: {n8nUrl, apiKey, dataIngestionUrl, dashboardUrl}
+        })
+    },
+
 }
 
 export default api
