@@ -1,0 +1,7 @@
+# Local development secrets for Cloudflare Worker
+# Copy this file to .dev.vars and fill in your actual tokens
+# Used for: wrangler dev (local development only)
+# For production: Use wrangler secret put <SECRET_NAME>
+
+DATABASE_ABSTRACTOR_SERVICE_TOKEN=your-database-token-here
+THREAT_BACKEND_TOKEN=your-threat-backend-token-here

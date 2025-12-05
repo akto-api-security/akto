@@ -1,0 +1,46 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "akto-guardrails-service",
+	"account_id": "53a10bdb35f546522193c9670ad3e7e5",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-06-23",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"observability": {
+		"enabled": true
+	},
+	"vars": {
+		"DATABASE_ABSTRACTOR_SERVICE_URL": "https://cyborg.akto.io",
+		"AGENT_GUARD_ENGINE_URL": "https://akto-agent-guard-engine.billing-53a.workers.dev",
+		"THREAT_BACKEND_URL": "https://tbs.akto.io",
+		"SERVER_PORT": "8080",
+		"LOG_LEVEL": "info",
+		"GIN_MODE": "release"
+	},
+	"containers": [
+		{
+			"name": "akto-guardrails-service-container",
+			"class_name": "Backend",
+			"image": "registry.cloudflare.com/53a10bdb35f546522193c9670ad3e7e5/guardrails-service:1.0.0_local",
+			"instance_type": "standard-1",
+			"max_instances": 2
+		}
+	],
+	"durable_objects": {
+		"bindings": [
+			{
+				"class_name": "Backend",
+				"name": "BACKEND"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"new_sqlite_classes": [
+				"Backend"
+			],
+			"tag": "v1"
+		}
+	]
+}
