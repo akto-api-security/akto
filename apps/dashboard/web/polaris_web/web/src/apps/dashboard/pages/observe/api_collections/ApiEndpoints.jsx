@@ -395,46 +395,13 @@ function ApiEndpoints(props) {
                 }
             })
 
-            // Create collection tags map for shadow APIs (needed before shadow API creation)
-            const shadowCollectionTagsMap = {}
-            ;(allCollections || []).forEach((c) => {
-                const envType = c?.envType
-                const envTypeList = envType?.map(func.formatCollectionType) || []
-                shadowCollectionTagsMap[c.id] = {
-                    list: envTypeList,
-                    comp: getTagsCompactComponent(envTypeList, 2),
-                    str: envTypeList.join(" ")
-                }
-            })
-
             shadowApis = Object.entries(shadowApis).map(([ codeAnalysisApiKey, codeAnalysisApi ]) => {
                 const {id, lastSeenTs, discoveredTs, location,  } = codeAnalysisApi
                 const { method, endpoint} = id
 
-                // Get collection tags
-                const t = shadowCollectionTagsMap[apiCollectionId];
-                
-                // Default values for missing fields
-                const riskScore = 0;
-                const isNew = transform.isNewEndpoint(lastSeenTs);
-                const lastTested = 0;
-                const sensitiveTags = [];
-                const sensitive = new Set();
-                const severityObj = {};
-                
-                // Get hostname
-                const hostName = hostNameMap[apiCollectionId] !== null && hostNameMap[apiCollectionId] !== undefined 
-                    ? hostNameMap[apiCollectionId] 
-                    : transform.getHostName(endpoint);
-
-                let lastTestedText = "Never";
-                if (lastTested > 0) {
-                    lastTestedText = func.prettifyEpoch(lastTested);
-                }
-
                 return {
                     id: codeAnalysisApiKey,
-                    endpointComp: <GetPrettifyEndpoint method={method} url={endpoint} isNew={isNew} />,
+                    endpointComp: <GetPrettifyEndpoint method={method} url={endpoint} isNew={false} />,
                     method: method,
                     endpoint: endpoint,
                     apiCollectionId: apiCollectionId,
@@ -445,40 +412,7 @@ function ApiEndpoints(props) {
                     apiCollectionName: collectionsMap[apiCollectionId],
                     last_seen: func.prettifyEpoch(lastSeenTs),
                     added: func.prettifyEpoch(discoveredTs),
-                    lastSeenTs: lastSeenTs,
-                    detectedTs: discoveredTs,
                     descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={codeAnalysisApi.description} text={codeAnalysisApi.description}/></Box>),
-                    description: codeAnalysisApi.description || "",
-                    // Risk score fields
-                    riskScore: riskScore,
-                    riskScoreComp: <Badge status={transform.getStatus(riskScore)} size="small">{riskScore.toString()}</Badge>,
-                    // Issues fields
-                    issuesComp: transform.getIssuesList(severityObj),
-                    severity: Object.keys(severityObj),
-                    severityObj: severityObj,
-                    // Hostname
-                    hostName: hostName,
-                    // Access and auth type
-                    access_type: undefined,
-                    auth_type: undefined,
-                    authTypeTag: undefined,
-                    // Sensitive data fields
-                    sensitiveTagsComp: transform.prettifySubtypes(sensitiveTags),
-                    sensitiveDataTags: sensitiveTags.join(" "),
-                    sensitiveTags: sensitiveTags,
-                    sensitive: sensitive,
-                    sensitiveInReq: [],
-                    sensitiveInResp: [],
-                    // Last tested
-                    lastTestedComp: <Text variant="bodyMd" fontWeight={transform.isNewEndpoint(lastTested) ? "regular" : "semibold"} color={transform.isNewEndpoint(lastTested) ? "" : "subdued"}>{lastTestedText}</Text>,
-                    lastTested: lastTested,
-                    // Tags
-                    tagsComp: t?.comp || null,
-                    tagsString: t?.str || "",
-                    // Other fields
-                    isNew: isNew,
-                    open: false,
-                    responseCodes: "",
                 }
             })
         }
