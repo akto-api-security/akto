@@ -185,4 +185,7 @@
     <listener>
         <listener-class>com.akto.listener.RequestEventListener</listener-class>
     </listener>
+    <listener>
+        <listener-class>com.akto.listener.AiAgentDiscoveryListener</listener-class>
+    </listener>
 </web-app>
