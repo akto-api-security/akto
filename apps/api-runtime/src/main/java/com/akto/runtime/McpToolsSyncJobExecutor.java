@@ -10,6 +10,7 @@ import com.akto.dto.HttpResponseParams.Source;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.traffic.CollectionTags;
+import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mcp.McpSchema;
@@ -56,8 +57,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import javax.ws.rs.HttpMethod;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -263,7 +262,7 @@ public class McpToolsSyncJobExecutor {
                     HttpResponseParams toolsCallHttpResponseParams = convertToAktoFormat(apiCollection.getId(),
                         urlWithQueryParams,
                         toolsCallRequestHeaders,
-                        HttpMethod.POST,
+                        URLMethods.Method.POST.name(),
                         mapper.writeValueAsString(request),
                         new OriginalHttpResponse("", Collections.emptyMap(), HttpStatus.SC_OK));
 
@@ -316,7 +315,7 @@ public class McpToolsSyncJobExecutor {
                     HttpResponseParams readResourceHttpResponseParams = convertToAktoFormat(apiCollection.getId(),
                         urlWithQueryParams,
                         resourcesReadRequestHeaders,
-                        HttpMethod.POST,
+                        URLMethods.Method.POST.name(),
                         mapper.writeValueAsString(request),
                         new OriginalHttpResponse("", Collections.emptyMap(), HttpStatus.SC_OK));
 
@@ -369,7 +368,7 @@ public class McpToolsSyncJobExecutor {
                     HttpResponseParams getPromptHttpResponseParams = convertToAktoFormat(apiCollection.getId(),
                         urlWithQueryParams,
                         promptsGetRequestHeaders,
-                        HttpMethod.POST,
+                        URLMethods.Method.POST.name(),
                         mapper.writeValueAsString(request),
                         new OriginalHttpResponse("", Collections.emptyMap(), HttpStatus.SC_OK));
 
@@ -451,7 +450,7 @@ public class McpToolsSyncJobExecutor {
                 apiCollection.getId(),
                 mcpRequest.getPathWithQueryParams(),
                 buildHeaders(host, authHeader),
-                HttpMethod.POST,
+                URLMethods.Method.POST.name(),
                 mcpRequest.getBody(),
                 new OriginalHttpResponse(jsonrpcResponse, Collections.emptyMap(), HttpStatus.SC_OK)
             );
@@ -489,7 +488,7 @@ public class McpToolsSyncJobExecutor {
         // Build full URL with scheme and host
         return new OriginalHttpRequest(path,
             queryParams,
-            HttpMethod.POST,
+            URLMethods.Method.POST.name(),
             mcpMethodRequestJson,
             OriginalHttpRequest.buildHeadersMap(buildHeaders(host, authHeader)),
             "HTTP/1.1"
