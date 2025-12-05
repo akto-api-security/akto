@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class N8NImportInfoDao extends AccountsContextDao<N8NImportInfo> {
-    public static final String COLLECTION_NAME = "n8n_import_info";
+    public static final String COLLECTION_NAME = "ai_agent_discovery_connectors";
     public static final N8NImportInfoDao instance = new N8NImportInfoDao();
 
     @Override
@@ -34,7 +34,10 @@ public class N8NImportInfoDao extends AccountsContextDao<N8NImportInfo> {
             clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
         }
 
-        String[] fieldNames = {"createdTimestamp"};
+        String[] fieldNames = {"type"};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
+        fieldNames = new String[]{"createdTimestamp"};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
         fieldNames = new String[]{"updatedTimestamp"};
@@ -60,6 +63,32 @@ public class N8NImportInfoDao extends AccountsContextDao<N8NImportInfo> {
 
     public List<N8NImportInfo> findByStatus(String status, int pageNumber, int pageSize) {
         BasicDBObject query = new BasicDBObject("status", status);
+        BasicDBObject sort = new BasicDBObject();
+        sort.put("createdTimestamp", -1);
+        int skip = (pageNumber - 1) * pageSize;
+        return this.getMCollection().find(query)
+            .sort(sort)
+            .skip(skip)
+            .limit(pageSize)
+            .into(new ArrayList<>());
+    }
+
+    public List<N8NImportInfo> findByType(String type, int pageNumber, int pageSize) {
+        BasicDBObject query = new BasicDBObject("type", type);
+        BasicDBObject sort = new BasicDBObject();
+        sort.put("createdTimestamp", -1);
+        int skip = (pageNumber - 1) * pageSize;
+        return this.getMCollection().find(query)
+            .sort(sort)
+            .skip(skip)
+            .limit(pageSize)
+            .into(new ArrayList<>());
+    }
+
+    public List<N8NImportInfo> findByTypeAndStatus(String type, String status, int pageNumber, int pageSize) {
+        BasicDBObject query = new BasicDBObject();
+        query.put("type", type);
+        query.put("status", status);
         BasicDBObject sort = new BasicDBObject();
         sort.put("createdTimestamp", -1);
         int skip = (pageNumber - 1) * pageSize;

@@ -41,8 +41,9 @@ public class N8NImportAction extends UserAction {
             // Get current timestamp
             int currentTimestamp = Context.now();
 
-            // Create N8NImportInfo object with default status CREATED
+            // Create N8NImportInfo object with default status CREATED and type N8N
             createdImportInfo = new N8NImportInfo(
+                N8NImportInfo.TYPE_N8N,
                 n8nUrl,
                 apiKey,
                 dataIngestionUrl,
@@ -56,8 +57,9 @@ public class N8NImportAction extends UserAction {
             // Insert the document into the collection
             N8NImportInfoDao.instance.insertOne(createdImportInfo);
 
-            loggerMaker.info("Successfully saved N8N Import data to collection: " + N8NImportInfoDao.COLLECTION_NAME + " with status: " + N8NImportInfo.STATUS_CREATED, LogDb.DASHBOARD);
+            loggerMaker.info("Successfully saved N8N Import data to collection: " + N8NImportInfoDao.COLLECTION_NAME + " with type: " + N8NImportInfo.TYPE_N8N + " and status: " + N8NImportInfo.STATUS_CREATED, LogDb.DASHBOARD);
             System.out.println("Successfully saved N8N Import data to collection: " + N8NImportInfoDao.COLLECTION_NAME);
+            System.out.println("Type: " + N8NImportInfo.TYPE_N8N);
             System.out.println("Status: " + N8NImportInfo.STATUS_CREATED);
             System.out.println("Document ID: " + createdImportInfo.getHexId());
 
@@ -71,6 +73,7 @@ public class N8NImportAction extends UserAction {
             try {
                 int currentTimestamp = Context.now();
                 createdImportInfo = new N8NImportInfo(
+                    N8NImportInfo.TYPE_N8N,
                     n8nUrl,
                     apiKey,
                     dataIngestionUrl,

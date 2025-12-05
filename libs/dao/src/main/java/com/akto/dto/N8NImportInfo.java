@@ -19,11 +19,18 @@ public class N8NImportInfo {
     public static final String STATUS_SCHEDULED = "SCHEDULED";
     public static final String STATUS_FAILED_SCHEDULING = "FAILED_SCHEDULING";
 
+    public static final String TYPE_N8N = "N8N";
+    public static final String TYPE_COPILOT_STUDIO = "COPILOT_STUDIO";
+    public static final String TYPE_LANGCHAIN = "LANGCHAIN";
+    public static final String TYPE_BEDROCK = "BEDROCK";
+    public static final String TYPE_AZURE_FOUNDRY = "AZURE_FOUNDRY";
+
     private ObjectId id;
 
     @BsonIgnore
     private String hexId;
 
+    private String type; // N8N, COPILOT_STUDIO, LANGCHAIN, BEDROCK, AZURE_FOUNDRY
     private String n8nUrl;
     private String apiKey;
     private String dataIngestionUrl;
@@ -37,8 +44,9 @@ public class N8NImportInfo {
         return this.id != null ? this.id.toHexString() : null;
     }
 
-    public N8NImportInfo(String n8nUrl, String apiKey, String dataIngestionUrl, String dashboardUrl,
+    public N8NImportInfo(String type, String n8nUrl, String apiKey, String dataIngestionUrl, String dashboardUrl,
                          int createdTimestamp, int updatedTimestamp, String status, String errorMessage) {
+        this.type = type;
         this.n8nUrl = n8nUrl;
         this.apiKey = apiKey;
         this.dataIngestionUrl = dataIngestionUrl;
