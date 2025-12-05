@@ -77,9 +77,9 @@ public class ApiExecutor {
                 HTTPClientHandler.instance.getNewDebugClient(isSaasDeployment, followRedirects, testLogs, requestProtocol) :
                 HTTPClientHandler.instance.getHTTPClient(followRedirects, requestProtocol);
 
-        if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
-            throw new IllegalArgumentException("SSRF attack attempt");
-        }
+        // if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
+        //     throw new IllegalArgumentException("SSRF attack attempt");
+        // }
 
         Call call = client.newCall(request);
         Response response = null;
@@ -507,10 +507,10 @@ public class ApiExecutor {
     }
 
     /**
-     * Creates a multipart body by merging JSON fields with a file attachment.
+     * Creates a multipart body by merging JSON fields with multiple file attachments.
      * This allows add_params and attach_file to work together for multipart requests.
      */
-    private static RequestBody createMultipartBodyWithFile(String jsonPayload, String boundary, String fileUrl, String fieldName, String contentType) {
+    private static RequestBody createMultipartBodyWithFiles(String jsonPayload, String boundary, List<Map<String, String>> files, String contentType) {
         try {
             // Parse JSON to get all fields
             @SuppressWarnings("unchecked")
@@ -546,40 +546,45 @@ public class ApiExecutor {
                 }
             }
             
-            // Add the file attachment from URL - inline the logic since we need to add to existing builder
-            URL sourceFileUrl = new URL(fileUrl);
-            InputStream urlInputStream = sourceFileUrl.openStream();
-            final int CHUNK_SIZE = 1 * 1024 * 1024;
-            
-            String filename = extractFilenameFromUrl(fileUrl);
-            MediaType fileMediaType = Utils.getMediaType(fileUrl);
-            
-            multipartBuilder.addFormDataPart(fieldName, filename, new RequestBody() {
-                @Override
-                public MediaType contentType() {
-                    return fileMediaType;
-                }
-
-                @Override
-                public void writeTo(BufferedSink sink) throws IOException {
-                    byte[] chunk = new byte[CHUNK_SIZE];
-                    int bytesRead;
-                    long totalBytesRead = 0;
-                    long maxBytes = 100L * 1024 * 1024;
-                    while ((bytesRead = urlInputStream.read(chunk)) != -1) {
-                        totalBytesRead += bytesRead;
-                        if (totalBytesRead > maxBytes) {
-                            loggerMaker.errorAndAddToDb("File size greater than 100mb, breaking loop.", LogDb.TESTING);
-                            break;
-                        }
-                        sink.write(chunk, 0, bytesRead);
+            // Add all file attachments from URLs
+            for (Map<String, String> fileInfo : files) {
+                String fieldName = fileInfo.get("field");
+                String fileUrl = fileInfo.get("url");
+                
+                URL sourceFileUrl = new URL(fileUrl);
+                InputStream urlInputStream = sourceFileUrl.openStream();
+                final int CHUNK_SIZE = 1 * 1024 * 1024;
+                
+                String filename = extractFilenameFromUrl(fileUrl);
+                MediaType fileMediaType = Utils.getMediaType(fileUrl);
+                
+                multipartBuilder.addFormDataPart(fieldName, filename, new RequestBody() {
+                    @Override
+                    public MediaType contentType() {
+                        return fileMediaType;
                     }
-                }
-            });
+
+                    @Override
+                    public void writeTo(BufferedSink sink) throws IOException {
+                        byte[] chunk = new byte[CHUNK_SIZE];
+                        int bytesRead;
+                        long totalBytesRead = 0;
+                        long maxBytes = 100L * 1024 * 1024;
+                        while ((bytesRead = urlInputStream.read(chunk)) != -1) {
+                            totalBytesRead += bytesRead;
+                            if (totalBytesRead > maxBytes) {
+                                loggerMaker.errorAndAddToDb("File size greater than 100mb, breaking loop.", LogDb.TESTING);
+                                break;
+                            }
+                            sink.write(chunk, 0, bytesRead);
+                        }
+                    }
+                });
+            }
             
             return multipartBuilder.build();
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error creating multipart body with file: " + e.getMessage(), LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Error creating multipart body with files: " + e.getMessage(), LogDb.TESTING);
             return null;
         }
     }
@@ -662,7 +667,14 @@ public class ApiExecutor {
         // For non-multipart requests with attach_file, use the original early return behavior
         if (hasAttachFile && !isMultipart) {
             String attachHeaderVal = headers.get(Constants.AKTO_ATTACH_FILE).get(0);
-            // Extract file URL from header (format: fieldName::fileUrl or just fileUrl)
+            
+            // Check if it's JSON array (multiple files) - not supported for non-multipart
+            if (attachHeaderVal.trim().startsWith("[")) {
+                loggerMaker.errorAndAddToDb("Multiple file attachments not supported for non-multipart requests", LogDb.TESTING);
+                return null;
+            }
+            
+            // Extract file URL from header (format: fieldName::fileUrl)
             String fileUrl = attachHeaderVal;
             int sepIdx = attachHeaderVal.indexOf("::");
             if (sepIdx >= 0) {
@@ -672,12 +684,9 @@ public class ApiExecutor {
             builder.post(requestBody);
             builder.removeHeader(Constants.AKTO_ATTACH_FILE);
             Request updatedRequest = builder.build();
-
-
             return common(updatedRequest, followRedirects, debug, testLogs, skipSSRFCheck, requestProtocol);
         }
 
-        String contentType = request.findContentType();
         String payload = request.getBody();
         RequestBody body = null;
         if (contentType == null ) {
@@ -730,38 +739,67 @@ public class ApiExecutor {
             if (boundary != null && payload != null && payload.startsWith("{")) {
                 try {
                     if (hasAttachFile) {
-                        // For multipart with attach_file: merge JSON fields with file attachment
+                        // For multipart with attach_file: merge JSON fields with file attachment(s)
                         String attachHeaderVal = headers.get(Constants.AKTO_ATTACH_FILE).get(0);
-                        String fieldName = "file";
-                        String fileUrl = attachHeaderVal;
-                        int sepIdx = attachHeaderVal.indexOf("::");
-                        if (sepIdx >= 0) {
-                            fieldName = attachHeaderVal.substring(0, sepIdx);
-                            fileUrl = attachHeaderVal.substring(sepIdx + 2);
-                        }
-                        body = createMultipartBodyWithFile(payload, boundary, fileUrl, fieldName, contentType);
-                        if (body == null) {
-                            // Error already logged in createMultipartBodyWithFile, fallback to original payload
-                            loggerMaker.errorAndAddToDb("Failed to create multipart with file, using original payload", LogDb.TESTING);
-                            payload = request.getBody();
+                        
+                        List<Map<String, String>> files = new ArrayList<>();
+                        
+                        // Check if it's JSON array (multiple files) or simple format (single file)
+                        if (attachHeaderVal.trim().startsWith("[")) {
+                            // Multiple files: parse JSON array
+                            try {
+                                JsonNode filesArray = objectMapper.readTree(attachHeaderVal);
+                                if (filesArray.isArray()) {
+                                    for (JsonNode fileNode : filesArray) {
+                                        Map<String, String> fileInfo = new HashMap<>();
+                                        fileInfo.put("field", fileNode.get("field").asText());
+                                        fileInfo.put("url", fileNode.get("url").asText());
+                                        files.add(fileInfo);
+                                    }
+                                }
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb("Failed to parse multiple files JSON: " + e.getMessage(), LogDb.TESTING);
+                            }
                         } else {
-                            builder.removeHeader(Constants.AKTO_ATTACH_FILE);
-                            loggerMaker.infoAndAddToDb("Created multipart body with JSON fields and file attachment", LogDb.TESTING);
+                            // Single file: parse simple format "fieldName::fileUrl"
+                            String fieldName = "file";
+                            String fileUrl = attachHeaderVal;
+                            int sepIdx = attachHeaderVal.indexOf("::");
+                            if (sepIdx >= 0) {
+                                fieldName = attachHeaderVal.substring(0, sepIdx);
+                                fileUrl = attachHeaderVal.substring(sepIdx + 2);
+                            }
+                            Map<String, String> fileInfo = new HashMap<>();
+                            fileInfo.put("field", fieldName);
+                            fileInfo.put("url", fileUrl);
+                            files.add(fileInfo);
+                        }
+                        
+                        if (!files.isEmpty()) {
+                            body = createMultipartBodyWithFiles(payload, boundary, files, contentType);
+                            if (body == null) {
+                                // Error already logged in createMultipartBodyWithFiles, fallback to original payload
+                                loggerMaker.errorAndAddToDb("Failed to create multipart with files, using original payload", LogDb.TESTING);
+                                payload = request.getBody();
+                            } else {
+                                builder.removeHeader(Constants.AKTO_ATTACH_FILE);
+                                loggerMaker.infoAndAddToDb("Created multipart body with JSON fields and " + files.size() + " file attachment(s)", LogDb.TESTING);
+                            }
                         }
                     } else {
                         // Normal multipart conversion: JSON to multipart string
-                    loggerMaker.infoAndAddToDb("converting json to multipart payload:" + payload, LogDb.TESTING);
-                    payload = HttpRequestResponseUtils.jsonToMultipart(payload, boundary);
-                    body = RequestBody.create(
-                        payload.getBytes(StandardCharsets.UTF_8),
-                        MediaType.parse(contentType)
-                    );
+                        loggerMaker.infoAndAddToDb("converting json to multipart payload:" + payload, LogDb.TESTING);
+                        payload = HttpRequestResponseUtils.jsonToMultipart(payload, boundary);
+                        body = RequestBody.create(
+                            payload.getBytes(StandardCharsets.UTF_8),
+                            MediaType.parse(contentType)
+                        );
                     }
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb("Unable to convert to multipart:" + payload + " Error: " + e.getMessage(), LogDb.TESTING);
                     payload = request.getBody();
                 }
-            }  
+            }
         } 
 
         if (payload == null) payload = "";

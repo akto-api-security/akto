@@ -762,35 +762,44 @@ public class Executor {
                 if (isMcpRequest) {
                     return new ExecutorSingleOperationResp(false, "DDOS is not supported for MCP requests");
                 }
-                // Support custom field name: key can be a Map {fieldName: fileUrl} or a string (legacy)
-                String fieldName = "file"; // Default field name
-                String fileUrl = null;
+                
+                String headerValue;
                 
                 if (key instanceof Map) {
                     Map<String, Object> fileAttachMap = (Map<String, Object>) key;
+                    if (fileAttachMap.isEmpty()) {
+                        return new ExecutorSingleOperationResp(false, "attach_file: Map cannot be empty");
+                    }
+                    
                     if (fileAttachMap.size() == 1) {
+                        // Single file: use simple format "fieldName::fileUrl"
                         Map.Entry<String, Object> entry = fileAttachMap.entrySet().iterator().next();
-                        fieldName = entry.getKey();
-                        fileUrl = entry.getValue().toString();
+                        String fieldName = entry.getKey();
+                        String fileUrl = entry.getValue().toString();
+                        headerValue = fieldName + "::" + fileUrl;
                     } else {
-                        return new ExecutorSingleOperationResp(false, "attach_file: Map must have exactly one key-value pair");
+                        // Multiple files: use JSON array format [{"field":"name","url":"url"},...]
+                        JSONArray filesArray = new JSONArray();
+                        for (Map.Entry<String, Object> entry : fileAttachMap.entrySet()) {
+                            JSONObject fileObj = new JSONObject();
+                            fileObj.put("field", entry.getKey());
+                            fileObj.put("url", entry.getValue().toString());
+                            filesArray.put(fileObj);
+                        }
+                        headerValue = filesArray.toString();
                     }
                 } else if (key != null && value != null) {
                     // YAML format: attach_file: {key: fieldName, value: fileUrl}
-                    fieldName = key.toString();
-                    fileUrl = value.toString();
+                    String fieldName = key.toString();
+                    String fileUrl = value.toString();
+                    headerValue = fieldName + "::" + fileUrl;
                 } else if (key != null) {
                     // Legacy format: attach_file: fileUrl (key is the URL, no field name)
-                    fileUrl = key.toString();
+                    headerValue = "file::" + key.toString();
                 } else {
                     return new ExecutorSingleOperationResp(false, "attach_file: Missing file URL");
                 }
                 
-                if (fileUrl == null || fileUrl.isEmpty()) {
-                    return new ExecutorSingleOperationResp(false, "attach_file: Missing file URL");
-                }
-                
-                String headerValue = fieldName + "::" + fileUrl;
                 return Operations.addHeader(rawApi, Constants.AKTO_ATTACH_FILE , headerValue);
 
             case "modify_header":
