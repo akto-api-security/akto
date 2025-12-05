@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon, Tooltip } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon } from "@shopify/polaris"
 import TitleWithInfo from "../../../components/shared/TitleWithInfo"
 import api from "../api"
 import { useEffect, useState } from "react"
@@ -595,8 +595,13 @@ function ApiEndpoints(props) {
             data['high_risk'] = prettifyData.filter(x => x.riskScore >= 4);
             data['new'] = prettifyData.filter(x => x.isNew);
             data['no_auth'] = prettifyData.filter(x => x.open);
-            data['shadow'] = [...shadowApis, ...undocumentedEndpoints];
-            data['zombie'] = zombieEndpoints;
+            // Filter undocumented endpoints from prettified data to ensure all fields are present
+            const undocumentedEndpointsSet = new Set(undocumentedEndpoints.map(u => u.method + " " + u.endpoint + " " + u.apiCollectionId));
+            const prettifiedUndocumentedEndpoints = prettifyData.filter(x => undocumentedEndpointsSet.has(x.method + " " + x.endpoint + " " + x.apiCollectionId));
+            data['shadow'] = [...shadowApis, ...prettifiedUndocumentedEndpoints];
+            // Filter zombie endpoints from prettified data to ensure all fields are present
+            const zombieEndpointsSet = new Set(zombieEndpoints.map(z => z.method + " " + z.endpoint + " " + z.apiCollectionId));
+            data['zombie'] = prettifyData.filter(x => zombieEndpointsSet.has(x.method + " " + x.endpoint + " " + x.apiCollectionId));
         }
         setEndpointData(data)
         setSelectedTab("all")
@@ -1326,7 +1331,7 @@ function ApiEndpoints(props) {
                 content: 'Yes',
                 onAction: deleteApisAction
             }}
-            key="redact-modal-1"
+            key="delete-api-modal"
         >
             <Modal.Section>
                 <Text>Are you sure you want to delete {(apis || []).length} API(s)?</Text>
@@ -1410,9 +1415,9 @@ function ApiEndpoints(props) {
                 />] : showSequencesFlow ? [
                 <SequencesFlow key="sequences-flow" apiCollectionId={apiCollectionId}  />
             ] : [
-                func.isDemoAccount() ? <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : <></>,
-                (!isCategory(CATEGORY_API_SECURITY)) && <McpToolsGraph key="mcp-tools-graph" apiCollectionId={apiCollectionId} />,
-                (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null),
+                func.isDemoAccount() ? <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : null,
+                (!isCategory(CATEGORY_API_SECURITY)) ? <McpToolsGraph key="mcp-tools-graph" apiCollectionId={apiCollectionId} /> : null,
+                (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId))) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null,
                 <div className="apiEndpointsTable" key="table">
                     {apiEndpointTable}
                       <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
