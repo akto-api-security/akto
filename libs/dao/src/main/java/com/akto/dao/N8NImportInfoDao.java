@@ -37,16 +37,13 @@ public class N8NImportInfoDao extends AccountsContextDao<N8NImportInfo> {
         String[] fieldNames = {"type"};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
+        fieldNames = new String[]{"status"};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
         fieldNames = new String[]{"createdTimestamp"};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
         fieldNames = new String[]{"updatedTimestamp"};
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
-
-        fieldNames = new String[]{"status"};
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
-
-        fieldNames = new String[]{"n8nUrl"};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
 

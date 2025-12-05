@@ -226,11 +226,11 @@ const api = {
         })
     },
 
-    initiateN8NImport(n8nUrl, apiKey, dataIngestionUrl, dashboardUrl) {
+    initiateN8NImport(n8nUrl, apiKey, dataIngestionUrl) {
         return request({
             url: '/api/initiateN8NImport',
             method: 'post',
-            data: {n8nUrl, apiKey, dataIngestionUrl, dashboardUrl}
+            data: {n8nUrl, apiKey, dataIngestionUrl}
         })
     },
 

@@ -3,6 +3,8 @@ package com.akto.dto;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
+import java.util.Map;
+
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -25,16 +27,17 @@ public class N8NImportInfo {
     public static final String TYPE_BEDROCK = "BEDROCK";
     public static final String TYPE_AZURE_FOUNDRY = "AZURE_FOUNDRY";
 
+    public static final String CONFIG_N8N_BASE_URL = "N8N_BASE_URL";
+    public static final String CONFIG_N8N_API_KEY = "N8N_API_KEY";
+    public static final String CONFIG_DATA_INGESTION_SERVICE_URL = "DATA_INGESTION_SERVICE_URL";
+
     private ObjectId id;
 
     @BsonIgnore
     private String hexId;
 
     private String type; // N8N, COPILOT_STUDIO, LANGCHAIN, BEDROCK, AZURE_FOUNDRY
-    private String n8nUrl;
-    private String apiKey;
-    private String dataIngestionUrl;
-    private String dashboardUrl;
+    private Map<String, String> config; // Key-value pairs for configuration
     private int createdTimestamp;
     private int updatedTimestamp;
     private String status; // CREATED, SCHEDULING, SCHEDULED, FAILED_SCHEDULING
@@ -44,13 +47,10 @@ public class N8NImportInfo {
         return this.id != null ? this.id.toHexString() : null;
     }
 
-    public N8NImportInfo(String type, String n8nUrl, String apiKey, String dataIngestionUrl, String dashboardUrl,
+    public N8NImportInfo(String type, Map<String, String> config,
                          int createdTimestamp, int updatedTimestamp, String status, String errorMessage) {
         this.type = type;
-        this.n8nUrl = n8nUrl;
-        this.apiKey = apiKey;
-        this.dataIngestionUrl = dataIngestionUrl;
-        this.dashboardUrl = dashboardUrl;
+        this.config = config;
         this.createdTimestamp = createdTimestamp;
         this.updatedTimestamp = updatedTimestamp;
         this.status = status;

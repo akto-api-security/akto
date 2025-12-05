@@ -31,7 +31,7 @@ const N8NImport = () => {
         }
 
         setLoading(true)
-        api.initiateN8NImport(n8nUrl, apiKey, dataIngestionUrl, window.location.origin).then((res) => {
+        api.initiateN8NImport(n8nUrl, apiKey, dataIngestionUrl).then((res) => {
             func.setToast(true, false, "N8N Import initiated successfully. Please check your dashboard for updates.")
         }).catch((err) => {
             console.error("Error initiating N8N import:", err)

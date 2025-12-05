@@ -7,12 +7,14 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.opensymphony.xwork2.Action;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class N8NImportAction extends UserAction {
 
     private String n8nUrl;
     private String apiKey;
     private String dataIngestionUrl;
-    private String dashboardUrl;
     private N8NImportInfo createdImportInfo;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(N8NImportAction.class, LoggerMaker.LogDb.DASHBOARD);
@@ -24,7 +26,6 @@ public class N8NImportAction extends UserAction {
             loggerMaker.info("N8N URL: " + n8nUrl, LogDb.DASHBOARD);
             loggerMaker.info("API Key: " + apiKey, LogDb.DASHBOARD);
             loggerMaker.info("Data Ingestion Service URL: " + dataIngestionUrl, LogDb.DASHBOARD);
-            loggerMaker.info("Dashboard URL: " + dashboardUrl, LogDb.DASHBOARD);
             loggerMaker.info("========================", LogDb.DASHBOARD);
 
             // Print to standard output as well
@@ -32,7 +33,6 @@ public class N8NImportAction extends UserAction {
             System.out.println("N8N URL: " + n8nUrl);
             System.out.println("API Key: " + apiKey);
             System.out.println("Data Ingestion Service URL: " + dataIngestionUrl);
-            System.out.println("Dashboard URL: " + dashboardUrl);
             System.out.println("========================\n");
 
             // Create the collection if it doesn't exist and set up indices
@@ -41,13 +41,16 @@ public class N8NImportAction extends UserAction {
             // Get current timestamp
             int currentTimestamp = Context.now();
 
+            // Create config map
+            Map<String, String> config = new HashMap<>();
+            config.put(N8NImportInfo.CONFIG_N8N_BASE_URL, n8nUrl);
+            config.put(N8NImportInfo.CONFIG_N8N_API_KEY, apiKey);
+            config.put(N8NImportInfo.CONFIG_DATA_INGESTION_SERVICE_URL, dataIngestionUrl);
+
             // Create N8NImportInfo object with default status CREATED and type N8N
             createdImportInfo = new N8NImportInfo(
                 N8NImportInfo.TYPE_N8N,
-                n8nUrl,
-                apiKey,
-                dataIngestionUrl,
-                dashboardUrl,
+                config,
                 currentTimestamp,
                 currentTimestamp,
                 N8NImportInfo.STATUS_CREATED,
@@ -72,12 +75,16 @@ public class N8NImportAction extends UserAction {
             // Try to save error information to collection
             try {
                 int currentTimestamp = Context.now();
+
+                // Create config map
+                Map<String, String> config = new HashMap<>();
+                config.put(N8NImportInfo.CONFIG_N8N_BASE_URL, n8nUrl);
+                config.put(N8NImportInfo.CONFIG_N8N_API_KEY, apiKey);
+                config.put(N8NImportInfo.CONFIG_DATA_INGESTION_SERVICE_URL, dataIngestionUrl);
+
                 createdImportInfo = new N8NImportInfo(
                     N8NImportInfo.TYPE_N8N,
-                    n8nUrl,
-                    apiKey,
-                    dataIngestionUrl,
-                    dashboardUrl,
+                    config,
                     currentTimestamp,
                     currentTimestamp,
                     N8NImportInfo.STATUS_FAILED_SCHEDULING,
@@ -115,14 +122,6 @@ public class N8NImportAction extends UserAction {
 
     public void setDataIngestionUrl(String dataIngestionUrl) {
         this.dataIngestionUrl = dataIngestionUrl;
-    }
-
-    public String getDashboardUrl() {
-        return dashboardUrl;
-    }
-
-    public void setDashboardUrl(String dashboardUrl) {
-        this.dashboardUrl = dashboardUrl;
     }
 
     public N8NImportInfo getCreatedImportInfo() {
