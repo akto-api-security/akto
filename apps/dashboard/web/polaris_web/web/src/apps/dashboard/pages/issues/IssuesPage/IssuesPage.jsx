@@ -499,7 +499,7 @@ function IssuesPage() {
                 onAction: () => { ignoreAction('falsePositive') }
             },
             {
-                content: 'Acceptable fix',
+                content: 'Acceptable risk',
                 key: 'acceptableFix',
                 onAction: () => { ignoreAction('acceptableFix') }
             },
