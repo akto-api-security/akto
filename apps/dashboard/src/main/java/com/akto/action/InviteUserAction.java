@@ -31,7 +31,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.regex.Pattern;
 
-import org.springframework.util.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 public class InviteUserAction extends UserAction{
 
@@ -215,7 +215,7 @@ public class InviteUserAction extends UserAction{
 
         // check if user who is being invited has sso-signup 
         boolean hasSSOSignup = false;
-        if (StringUtils.hasText(inviteeEmail)) {
+        if (StringUtils.isNotBlank(inviteeEmail) && !inviteeEmail.isEmpty()) {
             User invitedUser = UsersDao.instance.findOne(Filters.and(
                 Filters.eq(User.LOGIN, inviteeEmail)
             ));
