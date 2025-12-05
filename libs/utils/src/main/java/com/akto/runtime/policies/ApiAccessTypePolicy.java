@@ -6,8 +6,7 @@ import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-
-import org.springframework.security.web.util.matcher.IpAddressMatcher;
+import com.akto.util.http_util.CoreHTTPClient;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -152,7 +151,7 @@ public class ApiAccessTypePolicy {
     }
 
     public boolean ipInCidr(String ip) {
-        IpAddressMatcher ipAddressMatcher;
+
         // todo: add standard private IP list
         List<String> checkList = new ArrayList<>();
         if (privateCidrList != null && !privateCidrList.isEmpty()) {
@@ -160,9 +159,14 @@ public class ApiAccessTypePolicy {
         }
 
         for (String cidr : checkList) {
-            ipAddressMatcher = new IpAddressMatcher(cidr);
-            boolean result = ipAddressMatcher.matches(ip);
-            if (result) return true;
+            try {
+                /*
+                 * matches ipv4 and ipv6 CIDR and subnet ranges.
+                 */
+                return CoreHTTPClient.ipContains(cidr, ip);
+            } catch (Exception e) {
+                logger.error("Error checking IP in CIDR range: " + e.getMessage());
+            }
         }
 
         return false;
