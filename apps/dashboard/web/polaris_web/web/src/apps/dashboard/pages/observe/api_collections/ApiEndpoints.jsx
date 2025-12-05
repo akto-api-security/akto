@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon, Tooltip, Badge } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon } from "@shopify/polaris"
 import TitleWithInfo from "../../../components/shared/TitleWithInfo"
 import api from "../api"
 import { useEffect, useState } from "react"
