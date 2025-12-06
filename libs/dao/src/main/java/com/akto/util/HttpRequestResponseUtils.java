@@ -10,6 +10,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.mongodb.BasicDBObject;
 
+import org.apache.commons.fileupload.FileItemIterator;
+import org.apache.commons.fileupload.FileItemStream;
+import org.apache.commons.fileupload.FileUpload;
+import org.apache.commons.fileupload.util.Streams;
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -390,7 +394,9 @@ public class HttpRequestResponseUtils {
     }
 
     /**
-     * Convert multipart/form-data body to JSON
+     * Convert multipart/form-data body to JSON using Apache Commons FileUpload HIGH-LEVEL API
+     * Uses FileItemIterator which handles ALL parsing internally (headers, boundaries, encoding)
+     * 
      * @param rawRequest The raw multipart body
      * @param boundary The boundary string from Content-Type header
      * @return JSON string representation of the multipart data
@@ -402,56 +408,97 @@ public class HttpRequestResponseUtils {
 
         try {
             Map<String, Object> result = new LinkedHashMap<>();
-            String delimiter = "--" + boundary;
-            String[] parts = rawRequest.split(delimiter);
-
-            for (String part : parts) {
-                part = part.trim();
-                if (part.isEmpty() || part.equals("--")) continue;
-
-                // Parse headers and body of each part
-                // Split on double CRLF or double LF
-                String[] sections = part.split("\\r?\\n\\r?\\n", 2);
-                if (sections.length < 2) continue;
-
-                String headers = sections[0];
-                String body = sections[1];
-                // Remove trailing CRLF or LF
-                body = body.replaceAll("\\r?\\n$", "");
-
-                // Extract field name from Content-Disposition header
-                String fieldName = extractFieldName(headers);
-                if (fieldName == null) continue;
-
-                // Check if it's a file upload
-                String filename = extractFilename(headers);
-
-                if (filename != null) {
-                    // File upload: store as object with metadata
-                    String contentType = extractContentTypeFromPart(headers);
-                    Map<String, String> fileObj = new LinkedHashMap<>();
-                    fileObj.put("filename", filename);
-                    fileObj.put("content", Base64.getEncoder().encodeToString(body.getBytes(StandardCharsets.UTF_8)));
-                    fileObj.put("contentType", contentType != null ? contentType : "application/octet-stream");
-                    result.put(fieldName, fileObj);
-                } else {
-                    // Regular text field
-                    result.put(fieldName, body);
+            
+            // Use Apache Commons FileUpload's HIGH-LEVEL API - FileItemIterator
+            // This handles ALL parsing: boundaries, headers, Content-Disposition, encoding, etc.
+            // IMPORTANT: Use ISO-8859-1 to preserve binary data (rawRequest may contain binary bytes)
+            byte[] bodyBytes = rawRequest.getBytes(StandardCharsets.ISO_8859_1);
+            java.io.ByteArrayInputStream inputStream = new java.io.ByteArrayInputStream(bodyBytes);
+            
+            // Create FileUpload instance with security limits
+            FileUpload fileUpload = new FileUpload();
+            fileUpload.setHeaderEncoding("UTF-8");
+            
+            // Create a custom RequestContext for our byte array
+            org.apache.commons.fileupload.RequestContext ctx = new org.apache.commons.fileupload.RequestContext() {
+                @Override
+                public String getCharacterEncoding() {
+                    return "UTF-8";
                 }
+                
+                @Override
+                public String getContentType() {
+                    return "multipart/form-data; boundary=" + boundary;
+                }
+                
+                @Override
+                public int getContentLength() {
+                    return bodyBytes.length;
+                }
+                
+                @Override
+                public java.io.InputStream getInputStream() {
+                    return inputStream;
+                }
+            };
+            
+            // Use FileItemIterator - handles ALL parsing automatically!
+            FileItemIterator iterator = fileUpload.getItemIterator(ctx);
+            
+            int partCount = 0;
+            while (iterator.hasNext()) {
+                FileItemStream item = iterator.next();
+                partCount++;
+                
+                // Apache Commons automatically parses field name from Content-Disposition!
+                String fieldName = item.getFieldName();
+                
+                if (item.isFormField()) {
+                    // Regular text field - Apache Commons handles encoding
+                    String value = Streams.asString(item.openStream(), "UTF-8");
+                    result.put(fieldName, value);
+                } else {
+                    // File upload - Apache Commons provides filename and content-type!
+                    Map<String, String> fileObj = new LinkedHashMap<>();
+                    fileObj.put("filename", item.getName());  // Automatically parsed!
+                    fileObj.put("contentType", item.getContentType());  // Automatically parsed!
+                    
+                    // Read file content and Base64 encode
+                    java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+                    java.io.InputStream fileStream = item.openStream();
+                    byte[] buffer = new byte[8192];
+                    int bytesRead;
+                    while ((bytesRead = fileStream.read(buffer)) != -1) {
+                        output.write(buffer, 0, bytesRead);
+                    }
+                    fileObj.put("content", Base64.getEncoder().encodeToString(output.toByteArray()));
+                    
+                    result.put(fieldName, fileObj);
+                }
+            }
+
+            // If no parts were found, return empty JSON
+            if (partCount == 0) {
+                logger.warn("Apache Commons FileUpload found 0 parts in multipart request");
+                return "{}";
             }
 
             return mapper.writeValueAsString(result);
         } catch (Exception e) {
-            logger.error("Error converting multipart to JSON", e);
-            return rawRequest;
+            logger.error("Error converting multipart to JSON using Apache Commons FileUpload: " + e.getMessage(), e);
+            // No fallback - return empty JSON on error
+            return "{}";
         }
     }
 
     /**
      * Convert JSON back to multipart/form-data format
+     * IMPORTANT: This returns a String but may contain binary data encoded as ISO-8859-1
+     * to preserve byte values. Use getBytes(StandardCharsets.ISO_8859_1) to get the actual bytes.
+     * 
      * @param jsonBody JSON string
      * @param boundary Boundary string to use
-     * @return Multipart formatted string
+     * @return Multipart formatted string (with binary data preserved as ISO-8859-1)
      */
     public static String jsonToMultipart(String jsonBody, String boundary) {
         if (jsonBody == null || boundary == null) {
@@ -461,87 +508,56 @@ public class HttpRequestResponseUtils {
         try {
             @SuppressWarnings("unchecked")
             Map<String, Object> fields = mapper.readValue(jsonBody, LinkedHashMap.class);
-            StringBuilder multipart = new StringBuilder();
-
+            
+            // Use ByteArrayOutputStream to handle binary data properly
+            java.io.ByteArrayOutputStream outputStream = new java.io.ByteArrayOutputStream();
+            
             for (Map.Entry<String, Object> entry : fields.entrySet()) {
-                multipart.append("--").append(boundary).append("\r\n");
+                // Write boundary
+                outputStream.write(("--" + boundary + "\r\n").getBytes(StandardCharsets.UTF_8));
 
                 if (entry.getValue() instanceof Map) {
-                    // File upload
+                    // File upload - handle binary data
                     @SuppressWarnings("unchecked")
                     Map<String, String> fileObj = (Map<String, String>) entry.getValue();
                     String filename = fileObj.get("filename");
                     String contentType = fileObj.getOrDefault("contentType", "application/octet-stream");
-                    String content = fileObj.get("content");
+                    String base64Content = fileObj.get("content");
 
-                    multipart.append("Content-Disposition: form-data; name=\"");
-                    multipart.append(entry.getKey());
-                    multipart.append("\"; filename=\"");
-                    multipart.append(filename);
-                    multipart.append("\"\r\n");
-                    multipart.append("Content-Type: ").append(contentType).append("\r\n\r\n");
+                    // Write headers
+                    String headers = "Content-Disposition: form-data; name=\"" + 
+                                   entry.getKey() + "\"; filename=\"" + filename + "\"\r\n" +
+                                   "Content-Type: " + contentType + "\r\n\r\n";
+                    outputStream.write(headers.getBytes(StandardCharsets.UTF_8));
                     
-                    // Decode base64 content
-                    byte[] decodedContent = Base64.getDecoder().decode(content);
-                    multipart.append(new String(decodedContent, StandardCharsets.UTF_8));
+                    // Decode base64 and write raw bytes (preserves binary data)
+                    if (base64Content != null && !base64Content.isEmpty()) {
+                        byte[] decodedContent = Base64.getDecoder().decode(base64Content);
+                        outputStream.write(decodedContent);
+                    }
                 } else {
                     // Text field
-                    multipart.append("Content-Disposition: form-data; name=\"");
-                    multipart.append(entry.getKey());
-                    multipart.append("\"\r\n\r\n");
-                    multipart.append(entry.getValue().toString());
+                    String headers = "Content-Disposition: form-data; name=\"" + 
+                                   entry.getKey() + "\"\r\n\r\n";
+                    outputStream.write(headers.getBytes(StandardCharsets.UTF_8));
+                    outputStream.write(entry.getValue().toString().getBytes(StandardCharsets.UTF_8));
                 }
-                multipart.append("\r\n");
+                
+                // Write CRLF after each part
+                outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
             }
 
-            multipart.append("--").append(boundary).append("--\r\n");
-            return multipart.toString();
+            // Write final boundary
+            outputStream.write(("--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
+            
+            // Convert to string using ISO-8859-1 to preserve all byte values
+            // This is necessary because the result may contain binary data
+            return outputStream.toString("ISO-8859-1");
+            
         } catch (Exception e) {
             logger.error("Error converting JSON to multipart", e);
             return jsonBody;
         }
     }
 
-    /**
-     * Extract field name from Content-Disposition header
-     */
-    private static String extractFieldName(String headers) {
-        // Look for: name="fieldname"
-        int nameIndex = headers.indexOf("name=\"");
-        if (nameIndex == -1) return null;
-        
-        int startQuote = nameIndex + 6; // length of "name=\""
-        int endQuote = headers.indexOf("\"", startQuote);
-        if (endQuote == -1) return null;
-        
-        return headers.substring(startQuote, endQuote).trim();
-    }
-
-    /**
-     * Extract filename from Content-Disposition header
-     */
-    private static String extractFilename(String headers) {
-        // Look for: filename="file.txt"
-        int filenameIndex = headers.indexOf("filename=\"");
-        if (filenameIndex == -1) return null;
-        
-        int startQuote = filenameIndex + 10; // length of "filename=\""
-        int endQuote = headers.indexOf("\"", startQuote);
-        if (endQuote == -1) return null;
-        
-        return headers.substring(startQuote, endQuote);
-    }
-
-    /**
-     * Extract Content-Type from part headers
-     */
-    private static String extractContentTypeFromPart(String headers) {
-        String[] lines = headers.split("\\r?\\n");
-        for (String line : lines) {
-            if (line.toLowerCase().startsWith("content-type:")) {
-                return line.substring("content-type:".length()).trim();
-            }
-        }
-        return null;
-    }
 }

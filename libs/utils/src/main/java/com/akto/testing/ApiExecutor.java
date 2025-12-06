@@ -774,8 +774,10 @@ public class ApiExecutor {
                         // Normal multipart conversion: JSON to multipart string
                         loggerMaker.infoAndAddToDb("converting json to multipart payload:" + payload, LogDb.TESTING);
                         payload = HttpRequestResponseUtils.jsonToMultipart(payload, boundary);
+                        // IMPORTANT: Use ISO-8859-1 to preserve binary data bytes (0-255)
+                        // jsonToMultipart() returns ISO-8859-1 encoded string to preserve binary file content
                         body = RequestBody.create(
-                            payload.getBytes(StandardCharsets.UTF_8),
+                            payload.getBytes(java.nio.charset.StandardCharsets.ISO_8859_1),
                             MediaType.parse(contentType)
                         );
                     }
