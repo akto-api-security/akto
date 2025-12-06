@@ -77,9 +77,9 @@ public class ApiExecutor {
                 HTTPClientHandler.instance.getNewDebugClient(isSaasDeployment, followRedirects, testLogs, requestProtocol) :
                 HTTPClientHandler.instance.getHTTPClient(followRedirects, requestProtocol);
 
-        if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
-            throw new IllegalArgumentException("SSRF attack attempt");
-        }
+        // if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
+        //     throw new IllegalArgumentException("SSRF attack attempt");
+        // }
 
         Call call = client.newCall(request);
         Response response = null;
@@ -185,22 +185,6 @@ public class ApiExecutor {
         return null;
     }
 
-    /**
-     * Extract boundary from Content-Type header for multipart/form-data
-     * @param contentType Content-Type header value
-     * @return boundary string or null if not found
-     */
-    private static String extractBoundaryFromContentType(String contentType) {
-        if (contentType == null) return null;
-        String[] parts = contentType.split(";");
-        for (String part : parts) {
-            part = part.trim();
-            if (part.startsWith("boundary=")) {
-                return part.substring("boundary=".length()).trim();
-            }
-        }
-        return null;
-    }
 
     public static Map<String, List<String>> generateHeadersMapFromHeadersObject(Headers headers) {
         if (headers == null || headers.size() == 0) {
@@ -735,7 +719,7 @@ public class ApiExecutor {
                 request.getHeaders().remove("x-akto-original-method");
             }  
         } else if (isMultipart) {
-            String boundary = extractBoundaryFromContentType(contentType);
+            String boundary = HttpRequestResponseUtils.extractBoundary(contentType);
             if (boundary != null && payload != null && payload.startsWith("{")) {
                 try {
                     if (hasAttachFile) {

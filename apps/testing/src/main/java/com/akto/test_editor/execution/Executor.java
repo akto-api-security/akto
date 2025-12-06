@@ -685,8 +685,7 @@ public class Executor {
                     }
                     calculatedAuthParams.add(new HardcodedAuthParam(authParam.getWhere(), key, value, authParam.getShowHeader()));
                 } catch (Exception e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
+                    loggerMaker.errorAndAddToDb(e, "SAMPLE_DATA: Error executing code for auth param: " + key, LogDb.TESTING);
                 }
                 
             }

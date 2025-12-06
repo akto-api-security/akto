@@ -12,6 +12,8 @@ import com.mongodb.BasicDBObject;
 
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.xml.sax.InputSource;
 
 import java.io.StringReader;
@@ -35,6 +37,7 @@ import static com.akto.dto.OriginalHttpRequest.*;
 public class HttpRequestResponseUtils {
 
     private final static ObjectMapper mapper = new ObjectMapper();
+    private static final Logger logger = LoggerFactory.getLogger(HttpRequestResponseUtils.class);
 
     public static final String FORM_URL_ENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
     public static final String GRPC_CONTENT_TYPE = "application/grpc";
@@ -293,7 +296,7 @@ public class HttpRequestResponseUtils {
                 String tmp = encode(key) + "=" + encode(String.valueOf(jsonObject.get(key))) + "&";
                 formUrlEncoded.append(tmp);
             } catch (Exception e) {
-                e.printStackTrace();
+                logger.error("Error encoding form URL parameter: " + key, e);
             }
         }
 
@@ -337,7 +340,7 @@ public class HttpRequestResponseUtils {
                         decryptedMap.put("type", GlobalEnums.ENCODING_TYPE.JWT.name());
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    logger.error("Error decoding JWT payload", e);
                 }
             }
             decryptedMap.put("payload", decodedString);
@@ -373,7 +376,7 @@ public class HttpRequestResponseUtils {
      * @param contentType Content-Type header value (e.g., "multipart/form-data; boundary=----WebKitFormBoundary...")
      * @return boundary string or null if not found
      */
-    private static String extractBoundary(String contentType) {
+    public static String extractBoundary(String contentType) {
         if (contentType == null) return null;
         // Parse "multipart/form-data; boundary=----WebKitFormBoundary..."
         String[] parts = contentType.split(";");
@@ -439,7 +442,7 @@ public class HttpRequestResponseUtils {
 
             return mapper.writeValueAsString(result);
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Error converting multipart to JSON", e);
             return rawRequest;
         }
     }
@@ -494,7 +497,7 @@ public class HttpRequestResponseUtils {
             multipart.append("--").append(boundary).append("--\r\n");
             return multipart.toString();
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Error converting JSON to multipart", e);
             return jsonBody;
         }
     }
