@@ -11,6 +11,7 @@ import org.bson.conversions.Bson;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,13 +27,18 @@ public class AiAgentDiscoveryCron {
     private static final LoggerMaker logger = new LoggerMaker(AiAgentDiscoveryCron.class, LogDb.DASHBOARD);
 
     private static final int CRON_INTERVAL_SECONDS = 60; // Run every 60 seconds
+    private int accountId; // Store account ID to set in each thread
 
     public void startScheduler() {
-        logger.info("Starting AI Agent Discovery Cron Scheduler");
+        // Get and store the account ID from the current thread context
+        this.accountId = Context.accountId.get();
+        logger.info("Starting AI Agent Discovery Cron Scheduler for account: " + accountId);
 
         scheduler.scheduleAtFixedRate(() -> {
             try {
-                logger.debug("Running AI Agent Discovery Cron");
+                // Set account context for this thread
+                Context.accountId.set(accountId);
+                logger.debug("Running AI Agent Discovery Cron for account: " + accountId);
                 processConnectors();
             } catch (Exception e) {
                 logger.error("Error in AI Agent Discovery Cron: " + e.getMessage(), LogDb.DASHBOARD);
@@ -42,6 +48,10 @@ public class AiAgentDiscoveryCron {
     }
 
     private void processConnectors() {
+        // Log current account context for debugging
+        Integer currentAccountId = Context.accountId.get();
+        logger.info("Processing connectors for account: " + currentAccountId);
+
         // Find all connectors that are not in SCHEDULING or SCHEDULED state
         Bson filter = Filters.and(
             Filters.nin("status", N8NImportInfo.STATUS_SCHEDULING, N8NImportInfo.STATUS_SCHEDULED)
@@ -74,7 +84,36 @@ public class AiAgentDiscoveryCron {
         updateConnectorStatus(connectorId, N8NImportInfo.STATUS_SCHEDULING, null);
 
         // Build docker compose command
-        String dockerComposeFile = "~/docker/docker-compose-" + type.toLowerCase() + ".yaml";
+        // Expand ~ to user home directory
+        String homeDir = System.getProperty("user.home");
+        String dockerDir = homeDir + "/docker";
+        String dockerComposeFile = dockerDir + "/docker-compose-" + type.toLowerCase() + ".yaml";
+
+        // Create {type}-cron.env file for Docker Compose
+        // Map CONFIG_* keys to actual environment variable names (strip CONFIG_ prefix)
+        String envFileName = type.toLowerCase() + "-cron.env";
+        File envFile = new File(dockerDir, envFileName);
+        try (FileWriter writer = new FileWriter(envFile)) {
+            if (config != null) {
+                for (Map.Entry<String, String> entry : config.entrySet()) {
+                    String configKey = entry.getKey();
+                    String envVarName = configKey;
+
+                    // Strip CONFIG_ prefix if present
+                    if (configKey.startsWith("CONFIG_")) {
+                        envVarName = configKey.substring(7); // Remove "CONFIG_" prefix (7 characters)
+                    }
+
+                    String envLine = envVarName + "=" + entry.getValue() + "\n";
+                    writer.write(envLine);
+                    logger.info("Writing to " + envFileName + ": " + envVarName + " = " + entry.getValue());
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Failed to create env file: " + e.getMessage(), LogDb.DASHBOARD);
+            throw new RuntimeException("Failed to create env file", e);
+        }
+
         List<String> command = new ArrayList<>();
         command.add("docker");
         command.add("compose");
@@ -83,19 +122,9 @@ public class AiAgentDiscoveryCron {
         command.add("up");
         command.add("-d");
 
-        // Prepare environment variables
+        // Prepare process builder
         ProcessBuilder processBuilder = new ProcessBuilder(command);
-        Map<String, String> env = processBuilder.environment();
-
-        // Add all config values as environment variables
-        if (config != null) {
-            for (Map.Entry<String, String> entry : config.entrySet()) {
-                env.put(entry.getKey(), entry.getValue());
-                logger.debug("Setting env var: " + entry.getKey() + " = " + entry.getValue());
-            }
-        }
-
-        processBuilder.directory(new File(System.getProperty("user.home")));
+        processBuilder.directory(new File(dockerDir));
         processBuilder.redirectErrorStream(true);
 
         try {
