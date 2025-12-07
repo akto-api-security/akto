@@ -26,6 +26,7 @@ import ImpervaImport from "./components/ImpervaImport"
 import BrowserExtension from "./components/BrowserExtension"
 import N8NImport from "./components/N8NImport"
 import LangchainImport from "./components/LangchainImport"
+import CopilotStudioImport from "./components/CopilotStudioImport"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -879,6 +880,15 @@ const langchainImportObj = {
     component: <LangchainImport/>
 }
 
+const copilotStudioImportObj = {
+    icon: '/public/copilot-studio.svg',
+    label: "Copilot Studio Import",
+    text: "Use our Copilot Studio Import feature to capture traffic from Azure Application Insights and instantly send it to your dashboard for real-time insights.",
+    docsUrl: 'https://docs.akto.io/copilot-studio-import',
+    key: "COPILOT_STUDIO_IMPORT",
+    component: <CopilotStudioImport/>
+}
+
 
 const quick_start_policy_lines= [
     `{`,
@@ -1479,7 +1489,7 @@ const quickStartFunc = {
         ]
 
         const aiAgentConnectors = [
-            awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj, n8nImportObj, langchainImportObj
+            awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj, n8nImportObj, langchainImportObj, copilotStudioImportObj
         ]
 
         // MCP Scan
@@ -1552,13 +1562,13 @@ const quickStartFunc = {
     getConnectorsList: function () {
 
         if(func.checkLocal() || func.isLimitedAccount()){
-            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj]
+            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj]
         }
 
         // Combine all categories into connectorsList
         let connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj,
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,

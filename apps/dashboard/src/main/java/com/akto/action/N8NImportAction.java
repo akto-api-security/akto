@@ -1,8 +1,8 @@
 package com.akto.action;
 
-import com.akto.dao.N8NImportInfoDao;
+import com.akto.dao.AIAgentConnectorInfoDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.N8NImportInfo;
+import com.akto.dto.AIAgentConnectorInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.opensymphony.xwork2.Action;
@@ -15,7 +15,7 @@ public class N8NImportAction extends UserAction {
     private String n8nUrl;
     private String apiKey;
     private String dataIngestionUrl;
-    private N8NImportInfo createdImportInfo;
+    private AIAgentConnectorInfo createdImportInfo;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(N8NImportAction.class, LoggerMaker.LogDb.DASHBOARD);
 
@@ -36,34 +36,34 @@ public class N8NImportAction extends UserAction {
             System.out.println("========================\n");
 
             // Create the collection if it doesn't exist and set up indices
-            N8NImportInfoDao.instance.createIndicesIfAbsent();
+            AIAgentConnectorInfoDao.instance.createIndicesIfAbsent();
 
             // Get current timestamp
             int currentTimestamp = Context.now();
 
             // Create config map
             Map<String, String> config = new HashMap<>();
-            config.put(N8NImportInfo.CONFIG_N8N_BASE_URL, n8nUrl);
-            config.put(N8NImportInfo.CONFIG_N8N_API_KEY, apiKey);
-            config.put(N8NImportInfo.CONFIG_DATA_INGESTION_SERVICE_URL, dataIngestionUrl);
+            config.put(AIAgentConnectorInfo.CONFIG_N8N_BASE_URL, n8nUrl);
+            config.put(AIAgentConnectorInfo.CONFIG_N8N_API_KEY, apiKey);
+            config.put(AIAgentConnectorInfo.CONFIG_DATA_INGESTION_SERVICE_URL, dataIngestionUrl);
 
-            // Create N8NImportInfo object with default status CREATED and type N8N
-            createdImportInfo = new N8NImportInfo(
-                N8NImportInfo.TYPE_N8N,
+            // Create AIAgentConnectorInfo object with default status CREATED and type N8N
+            createdImportInfo = new AIAgentConnectorInfo(
+                AIAgentConnectorInfo.TYPE_N8N,
                 config,
                 currentTimestamp,
                 currentTimestamp,
-                N8NImportInfo.STATUS_CREATED,
+                AIAgentConnectorInfo.STATUS_CREATED,
                 null
             );
 
             // Insert the document into the collection
-            N8NImportInfoDao.instance.insertOne(createdImportInfo);
+            AIAgentConnectorInfoDao.instance.insertOne(createdImportInfo);
 
-            loggerMaker.info("Successfully saved N8N Import data to collection: " + N8NImportInfoDao.COLLECTION_NAME + " with type: " + N8NImportInfo.TYPE_N8N + " and status: " + N8NImportInfo.STATUS_CREATED, LogDb.DASHBOARD);
-            System.out.println("Successfully saved N8N Import data to collection: " + N8NImportInfoDao.COLLECTION_NAME);
-            System.out.println("Type: " + N8NImportInfo.TYPE_N8N);
-            System.out.println("Status: " + N8NImportInfo.STATUS_CREATED);
+            loggerMaker.info("Successfully saved N8N Import data to collection: " + AIAgentConnectorInfoDao.COLLECTION_NAME + " with type: " + AIAgentConnectorInfo.TYPE_N8N + " and status: " + AIAgentConnectorInfo.STATUS_CREATED, LogDb.DASHBOARD);
+            System.out.println("Successfully saved N8N Import data to collection: " + AIAgentConnectorInfoDao.COLLECTION_NAME);
+            System.out.println("Type: " + AIAgentConnectorInfo.TYPE_N8N);
+            System.out.println("Status: " + AIAgentConnectorInfo.STATUS_CREATED);
             System.out.println("Document ID: " + createdImportInfo.getHexId());
 
             return Action.SUCCESS.toUpperCase();
@@ -78,19 +78,19 @@ public class N8NImportAction extends UserAction {
 
                 // Create config map
                 Map<String, String> config = new HashMap<>();
-                config.put(N8NImportInfo.CONFIG_N8N_BASE_URL, n8nUrl);
-                config.put(N8NImportInfo.CONFIG_N8N_API_KEY, apiKey);
-                config.put(N8NImportInfo.CONFIG_DATA_INGESTION_SERVICE_URL, dataIngestionUrl);
+                config.put(AIAgentConnectorInfo.CONFIG_N8N_BASE_URL, n8nUrl);
+                config.put(AIAgentConnectorInfo.CONFIG_N8N_API_KEY, apiKey);
+                config.put(AIAgentConnectorInfo.CONFIG_DATA_INGESTION_SERVICE_URL, dataIngestionUrl);
 
-                createdImportInfo = new N8NImportInfo(
-                    N8NImportInfo.TYPE_N8N,
+                createdImportInfo = new AIAgentConnectorInfo(
+                    AIAgentConnectorInfo.TYPE_N8N,
                     config,
                     currentTimestamp,
                     currentTimestamp,
-                    N8NImportInfo.STATUS_FAILED_SCHEDULING,
+                    AIAgentConnectorInfo.STATUS_FAILED_SCHEDULING,
                     e.getMessage()
                 );
-                N8NImportInfoDao.instance.insertOne(createdImportInfo);
+                AIAgentConnectorInfoDao.instance.insertOne(createdImportInfo);
             } catch (Exception insertException) {
                 loggerMaker.error("Failed to save error information to collection: " + insertException.getMessage(), LogDb.DASHBOARD);
             }
@@ -124,11 +124,11 @@ public class N8NImportAction extends UserAction {
         this.dataIngestionUrl = dataIngestionUrl;
     }
 
-    public N8NImportInfo getCreatedImportInfo() {
+    public AIAgentConnectorInfo getCreatedImportInfo() {
         return createdImportInfo;
     }
 
-    public void setCreatedImportInfo(N8NImportInfo createdImportInfo) {
+    public void setCreatedImportInfo(AIAgentConnectorInfo createdImportInfo) {
         this.createdImportInfo = createdImportInfo;
     }
 }

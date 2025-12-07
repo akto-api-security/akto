@@ -10,28 +10,28 @@ import com.opensymphony.xwork2.Action;
 import java.util.HashMap;
 import java.util.Map;
 
-public class LangchainImportAction extends UserAction {
+public class CopilotStudioImportAction extends UserAction {
 
-    private String langsmithUrl;
-    private String apiKey;
+    private String appInsightsAppId;
+    private String appInsightsApiKey;
     private String dataIngestionUrl;
     private AIAgentConnectorInfo createdImportInfo;
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(LangchainImportAction.class, LoggerMaker.LogDb.DASHBOARD);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(CopilotStudioImportAction.class, LoggerMaker.LogDb.DASHBOARD);
 
-    public String initiateLangchainImport() {
+    public String initiateCopilotStudioImport() {
         try {
             // Print the filled data to console
-            loggerMaker.info("=== Langchain Import Request ===", LogDb.DASHBOARD);
-            loggerMaker.info("LangSmith URL: " + langsmithUrl, LogDb.DASHBOARD);
-            loggerMaker.info("API Key: " + apiKey, LogDb.DASHBOARD);
+            loggerMaker.info("=== Copilot Studio Import Request ===", LogDb.DASHBOARD);
+            loggerMaker.info("App Insights App ID: " + appInsightsAppId, LogDb.DASHBOARD);
+            loggerMaker.info("App Insights API Key: " + appInsightsApiKey, LogDb.DASHBOARD);
             loggerMaker.info("Data Ingestion Service URL: " + dataIngestionUrl, LogDb.DASHBOARD);
             loggerMaker.info("========================", LogDb.DASHBOARD);
 
             // Print to standard output as well
-            System.out.println("\n=== Langchain Import Request ===");
-            System.out.println("LangSmith URL: " + langsmithUrl);
-            System.out.println("API Key: " + apiKey);
+            System.out.println("\n=== Copilot Studio Import Request ===");
+            System.out.println("App Insights App ID: " + appInsightsAppId);
+            System.out.println("App Insights API Key: " + appInsightsApiKey);
             System.out.println("Data Ingestion Service URL: " + dataIngestionUrl);
             System.out.println("========================\n");
 
@@ -43,13 +43,13 @@ public class LangchainImportAction extends UserAction {
 
             // Create config map
             Map<String, String> config = new HashMap<>();
-            config.put(AIAgentConnectorInfo.CONFIG_LANGSMITH_BASE_URL, langsmithUrl);
-            config.put(AIAgentConnectorInfo.CONFIG_LANGSMITH_API_KEY, apiKey);
+            config.put(AIAgentConnectorInfo.CONFIG_APPINSIGHTS_APP_ID, appInsightsAppId);
+            config.put(AIAgentConnectorInfo.CONFIG_APPINSIGHTS_API_KEY, appInsightsApiKey);
             config.put(AIAgentConnectorInfo.CONFIG_DATA_INGESTION_SERVICE_URL, dataIngestionUrl);
 
-            // Create AIAgentConnectorInfo object with default status CREATED and type LANGCHAIN
+            // Create AIAgentConnectorInfo object with default status CREATED and type COPILOT_STUDIO
             createdImportInfo = new AIAgentConnectorInfo(
-                AIAgentConnectorInfo.TYPE_LANGCHAIN,
+                AIAgentConnectorInfo.TYPE_COPILOT_STUDIO,
                 config,
                 currentTimestamp,
                 currentTimestamp,
@@ -60,16 +60,16 @@ public class LangchainImportAction extends UserAction {
             // Insert the document into the collection
             AIAgentConnectorInfoDao.instance.insertOne(createdImportInfo);
 
-            loggerMaker.info("Successfully saved Langchain Import data to collection: " + AIAgentConnectorInfoDao.COLLECTION_NAME + " with type: " + AIAgentConnectorInfo.TYPE_LANGCHAIN + " and status: " + AIAgentConnectorInfo.STATUS_CREATED, LogDb.DASHBOARD);
-            System.out.println("Successfully saved Langchain Import data to collection: " + AIAgentConnectorInfoDao.COLLECTION_NAME);
-            System.out.println("Type: " + AIAgentConnectorInfo.TYPE_LANGCHAIN);
+            loggerMaker.info("Successfully saved Copilot Studio Import data to collection: " + AIAgentConnectorInfoDao.COLLECTION_NAME + " with type: " + AIAgentConnectorInfo.TYPE_COPILOT_STUDIO + " and status: " + AIAgentConnectorInfo.STATUS_CREATED, LogDb.DASHBOARD);
+            System.out.println("Successfully saved Copilot Studio Import data to collection: " + AIAgentConnectorInfoDao.COLLECTION_NAME);
+            System.out.println("Type: " + AIAgentConnectorInfo.TYPE_COPILOT_STUDIO);
             System.out.println("Status: " + AIAgentConnectorInfo.STATUS_CREATED);
             System.out.println("Document ID: " + createdImportInfo.getHexId());
 
             return Action.SUCCESS.toUpperCase();
 
         } catch (Exception e) {
-            loggerMaker.error("Error while initiating Langchain Import. Error: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.error("Error while initiating Copilot Studio Import. Error: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             e.printStackTrace();
 
             // Try to save error information to collection
@@ -78,12 +78,12 @@ public class LangchainImportAction extends UserAction {
 
                 // Create config map
                 Map<String, String> config = new HashMap<>();
-                config.put(AIAgentConnectorInfo.CONFIG_LANGSMITH_BASE_URL, langsmithUrl);
-                config.put(AIAgentConnectorInfo.CONFIG_LANGSMITH_API_KEY, apiKey);
+                config.put(AIAgentConnectorInfo.CONFIG_APPINSIGHTS_APP_ID, appInsightsAppId);
+                config.put(AIAgentConnectorInfo.CONFIG_APPINSIGHTS_API_KEY, appInsightsApiKey);
                 config.put(AIAgentConnectorInfo.CONFIG_DATA_INGESTION_SERVICE_URL, dataIngestionUrl);
 
                 createdImportInfo = new AIAgentConnectorInfo(
-                    AIAgentConnectorInfo.TYPE_LANGCHAIN,
+                    AIAgentConnectorInfo.TYPE_COPILOT_STUDIO,
                     config,
                     currentTimestamp,
                     currentTimestamp,
@@ -100,20 +100,20 @@ public class LangchainImportAction extends UserAction {
     }
 
     // Getters and Setters
-    public String getLangsmithUrl() {
-        return langsmithUrl;
+    public String getAppInsightsAppId() {
+        return appInsightsAppId;
     }
 
-    public void setLangsmithUrl(String langsmithUrl) {
-        this.langsmithUrl = langsmithUrl;
+    public void setAppInsightsAppId(String appInsightsAppId) {
+        this.appInsightsAppId = appInsightsAppId;
     }
 
-    public String getApiKey() {
-        return apiKey;
+    public String getAppInsightsApiKey() {
+        return appInsightsApiKey;
     }
 
-    public void setApiKey(String apiKey) {
-        this.apiKey = apiKey;
+    public void setAppInsightsApiKey(String appInsightsApiKey) {
+        this.appInsightsApiKey = appInsightsApiKey;
     }
 
     public String getDataIngestionUrl() {

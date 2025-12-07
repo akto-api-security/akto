@@ -242,6 +242,14 @@ const api = {
         })
     },
 
+    initiateCopilotStudioImport(appInsightsAppId, appInsightsApiKey, dataIngestionUrl) {
+        return request({
+            url: '/api/initiateCopilotStudioImport',
+            method: 'post',
+            data: {appInsightsAppId, appInsightsApiKey, dataIngestionUrl}
+        })
+    },
+
 }
 
 export default api

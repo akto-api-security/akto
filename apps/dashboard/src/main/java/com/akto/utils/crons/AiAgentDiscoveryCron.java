@@ -1,8 +1,8 @@
 package com.akto.utils.crons;
 
-import com.akto.dao.N8NImportInfoDao;
+import com.akto.dao.AIAgentConnectorInfoDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.N8NImportInfo;
+import com.akto.dto.AIAgentConnectorInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.client.model.Filters;
@@ -54,26 +54,26 @@ public class AiAgentDiscoveryCron {
 
         // Find all connectors that are not in SCHEDULING or SCHEDULED state
         Bson filter = Filters.and(
-            Filters.nin("status", N8NImportInfo.STATUS_SCHEDULING, N8NImportInfo.STATUS_SCHEDULED)
+            Filters.nin("status", AIAgentConnectorInfo.STATUS_SCHEDULING, AIAgentConnectorInfo.STATUS_SCHEDULED)
         );
 
-        List<N8NImportInfo> connectors = N8NImportInfoDao.instance.getMCollection()
+        List<AIAgentConnectorInfo> connectors = AIAgentConnectorInfoDao.instance.getMCollection()
             .find(filter)
             .into(new ArrayList<>());
 
         logger.info("Found " + connectors.size() + " connectors to schedule");
 
-        for (N8NImportInfo connector : connectors) {
+        for (AIAgentConnectorInfo connector : connectors) {
             try {
                 scheduleConnector(connector);
             } catch (Exception e) {
                 logger.error("Error scheduling connector " + connector.getHexId() + ": " + e.getMessage(), LogDb.DASHBOARD);
-                updateConnectorStatus(connector.getId().toString(), N8NImportInfo.STATUS_FAILED_SCHEDULING, e.getMessage());
+                updateConnectorStatus(connector.getId().toString(), AIAgentConnectorInfo.STATUS_FAILED_SCHEDULING, e.getMessage());
             }
         }
     }
 
-    private void scheduleConnector(N8NImportInfo connector) {
+    private void scheduleConnector(AIAgentConnectorInfo connector) {
         String connectorId = connector.getHexId();
         String type = connector.getType();
         Map<String, String> config = connector.getConfig();
@@ -81,7 +81,7 @@ public class AiAgentDiscoveryCron {
         logger.info("Scheduling connector: " + connectorId + " of type: " + type);
 
         // Update status to SCHEDULING
-        updateConnectorStatus(connectorId, N8NImportInfo.STATUS_SCHEDULING, null);
+        updateConnectorStatus(connectorId, AIAgentConnectorInfo.STATUS_SCHEDULING, null);
 
         // Build docker compose command
         // Expand ~ to user home directory
@@ -146,18 +146,18 @@ public class AiAgentDiscoveryCron {
             if (exitCode == 0) {
                 logger.info("Successfully scheduled connector: " + connectorId);
                 logger.info("Docker output: " + output.toString());
-                updateConnectorStatus(connectorId, N8NImportInfo.STATUS_SCHEDULED, null);
+                updateConnectorStatus(connectorId, AIAgentConnectorInfo.STATUS_SCHEDULED, null);
             } else {
                 String errorMsg = "Docker compose failed with exit code: " + exitCode + ". Output: " + output.toString();
                 logger.error(errorMsg, LogDb.DASHBOARD);
-                updateConnectorStatus(connectorId, N8NImportInfo.STATUS_FAILED_SCHEDULING, errorMsg);
+                updateConnectorStatus(connectorId, AIAgentConnectorInfo.STATUS_FAILED_SCHEDULING, errorMsg);
             }
 
         } catch (Exception e) {
             String errorMsg = "Exception executing docker compose: " + e.getMessage();
             logger.error(errorMsg, LogDb.DASHBOARD);
             e.printStackTrace();
-            updateConnectorStatus(connectorId, N8NImportInfo.STATUS_FAILED_SCHEDULING, errorMsg);
+            updateConnectorStatus(connectorId, AIAgentConnectorInfo.STATUS_FAILED_SCHEDULING, errorMsg);
             throw new RuntimeException(errorMsg, e);
         }
     }
@@ -171,7 +171,7 @@ public class AiAgentDiscoveryCron {
                 Updates.set("errorMessage", errorMessage)
             );
 
-            N8NImportInfoDao.instance.getMCollection().updateOne(filter, update);
+            AIAgentConnectorInfoDao.instance.getMCollection().updateOne(filter, update);
             logger.info("Updated connector " + connectorId + " status to: " + status);
         } catch (Exception e) {
             logger.error("Failed to update connector status: " + e.getMessage(), LogDb.DASHBOARD);

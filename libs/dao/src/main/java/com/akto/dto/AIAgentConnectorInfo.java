@@ -14,7 +14,7 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class N8NImportInfo {
+public class AIAgentConnectorInfo {
 
     public static final String STATUS_CREATED = "CREATED";
     public static final String STATUS_SCHEDULING = "SCHEDULING";
@@ -34,6 +34,9 @@ public class N8NImportInfo {
     public static final String CONFIG_LANGSMITH_BASE_URL = "LANGSMITH_BASE_URL";
     public static final String CONFIG_LANGSMITH_API_KEY = "LANGSMITH_API_KEY";
 
+    public static final String CONFIG_APPINSIGHTS_APP_ID = "APPINSIGHTS_APP_ID";
+    public static final String CONFIG_APPINSIGHTS_API_KEY = "APPINSIGHTS_API_KEY";
+
     private ObjectId id;
 
     @BsonIgnore
@@ -50,7 +53,7 @@ public class N8NImportInfo {
         return this.id != null ? this.id.toHexString() : null;
     }
 
-    public N8NImportInfo(String type, Map<String, String> config,
+    public AIAgentConnectorInfo(String type, Map<String, String> config,
                          int createdTimestamp, int updatedTimestamp, String status, String errorMessage) {
         this.type = type;
         this.config = config;

@@ -1,15 +1,15 @@
 package com.akto.dao;
 
-import com.akto.dto.N8NImportInfo;
+import com.akto.dto.AIAgentConnectorInfo;
 import com.akto.dao.context.Context;
 import com.mongodb.BasicDBObject;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class N8NImportInfoDao extends AccountsContextDao<N8NImportInfo> {
+public class AIAgentConnectorInfoDao extends AccountsContextDao<AIAgentConnectorInfo> {
     public static final String COLLECTION_NAME = "ai_agent_discovery_connectors";
-    public static final N8NImportInfoDao instance = new N8NImportInfoDao();
+    public static final AIAgentConnectorInfoDao instance = new AIAgentConnectorInfoDao();
 
     @Override
     public String getCollName() {
@@ -17,8 +17,8 @@ public class N8NImportInfoDao extends AccountsContextDao<N8NImportInfo> {
     }
 
     @Override
-    public Class<N8NImportInfo> getClassT() {
-        return N8NImportInfo.class;
+    public Class<AIAgentConnectorInfo> getClassT() {
+        return AIAgentConnectorInfo.class;
     }
 
     public void createIndicesIfAbsent() {
@@ -47,7 +47,7 @@ public class N8NImportInfoDao extends AccountsContextDao<N8NImportInfo> {
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
 
-    public List<N8NImportInfo> findAllSortedByCreatedTimestamp(int pageNumber, int pageSize) {
+    public List<AIAgentConnectorInfo> findAllSortedByCreatedTimestamp(int pageNumber, int pageSize) {
         BasicDBObject sort = new BasicDBObject();
         sort.put("createdTimestamp", -1); // descending order
         int skip = (pageNumber - 1) * pageSize;
@@ -58,7 +58,7 @@ public class N8NImportInfoDao extends AccountsContextDao<N8NImportInfo> {
             .into(new ArrayList<>());
     }
 
-    public List<N8NImportInfo> findByStatus(String status, int pageNumber, int pageSize) {
+    public List<AIAgentConnectorInfo> findByStatus(String status, int pageNumber, int pageSize) {
         BasicDBObject query = new BasicDBObject("status", status);
         BasicDBObject sort = new BasicDBObject();
         sort.put("createdTimestamp", -1);
@@ -70,7 +70,7 @@ public class N8NImportInfoDao extends AccountsContextDao<N8NImportInfo> {
             .into(new ArrayList<>());
     }
 
-    public List<N8NImportInfo> findByType(String type, int pageNumber, int pageSize) {
+    public List<AIAgentConnectorInfo> findByType(String type, int pageNumber, int pageSize) {
         BasicDBObject query = new BasicDBObject("type", type);
         BasicDBObject sort = new BasicDBObject();
         sort.put("createdTimestamp", -1);
@@ -82,7 +82,7 @@ public class N8NImportInfoDao extends AccountsContextDao<N8NImportInfo> {
             .into(new ArrayList<>());
     }
 
-    public List<N8NImportInfo> findByTypeAndStatus(String type, String status, int pageNumber, int pageSize) {
+    public List<AIAgentConnectorInfo> findByTypeAndStatus(String type, String status, int pageNumber, int pageSize) {
         BasicDBObject query = new BasicDBObject();
         query.put("type", type);
         query.put("status", status);
