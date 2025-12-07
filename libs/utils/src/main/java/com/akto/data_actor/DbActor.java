@@ -669,4 +669,14 @@ public class DbActor extends DataActor {
     public void storeConversationResults(List<AgentConversationResult> conversationResults) {
         DbLayer.storeConversationResults(conversationResults);
     }
+
+    @Override
+    public void bulkWriteAgentTrafficLogs(List<Object> trafficLogs) {
+        ArrayList<AgentTrafficLog> agentTrafficLogs = new ArrayList<>();
+        for (Object obj : trafficLogs) {
+            AgentTrafficLog log = (AgentTrafficLog) obj;
+            agentTrafficLogs.add(log);
+        }
+        DbLayer.bulkWriteAgentTrafficLogs(agentTrafficLogs);
+    }
 }
