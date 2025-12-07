@@ -585,18 +585,18 @@ public class Main {
                     }
                 }
 
+                accWiseResponse = filterBasedOnHeaders(accWiseResponse, accountInfo.accountSettings);
+                loggerMaker.infoAndAddToDb("Initiating sync function for account: " + accountId);
+                parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI, accountInfo.accountSettings);
+                loggerMaker.infoAndAddToDb("Sync function completed for account: " + accountId);
+
                 // Save raw agent traffic logs to MongoDB for future training
                 try {
                     saveAgentTrafficLogs(accWiseResponse);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Error saving agent traffic logs: " + e.getMessage());
                 }
-
-                accWiseResponse = filterBasedOnHeaders(accWiseResponse, accountInfo.accountSettings);
-                loggerMaker.infoAndAddToDb("Initiating sync function for account: " + accountId);
-                parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI, accountInfo.accountSettings);
-                loggerMaker.infoAndAddToDb("Sync function completed for account: " + accountId);
-
+                
                 sendToCentralKafka(centralKafkaTopicName, accWiseResponse);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error in handleResponseParams: " + e.toString());

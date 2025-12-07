@@ -1832,17 +1832,6 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String bulkWriteAgentTrafficLogs() {
-        try {
-            DbLayer.bulkWriteAgentTrafficLogs(agentTrafficLogs);
-        } catch (Exception e) {
-            e.printStackTrace();
-            loggerMaker.errorAndAddToDb(e, "Error bulkWriteAgentTrafficLogs " + e.toString());
-            return Action.ERROR.toUpperCase();
-        }
-        return Action.SUCCESS.toUpperCase();
-    }
-
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }

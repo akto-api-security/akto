@@ -317,5 +317,5 @@ public abstract class DataActor {
 
     public abstract void storeConversationResults(List<AgentConversationResult> conversationResults);
 
-    public abstract void bulkWriteAgentTrafficLogs(List<Object> writesForAgentTrafficLogs);
+    public abstract void bulkWriteAgentTrafficLogs(List<Object> trafficLogs);
 }

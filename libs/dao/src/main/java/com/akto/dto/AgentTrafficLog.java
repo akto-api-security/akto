@@ -1,6 +1,5 @@
 package com.akto.dto;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -10,96 +9,106 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * DTO for storing raw agent traffic logs for future training and analysis.
- * This stores unprocessed request/response data with collection context.
+ * DTO for storing raw agent traffic logs from Cloudflare queue.
+ * Used for future training on prompts and request payloads.
  */
 @Getter
 @Setter
 @NoArgsConstructor
-@AllArgsConstructor
 public class AgentTrafficLog {
-    
-    // Collection and account context
+
+    public static final String API_COLLECTION_ID = "apiCollectionId";
     private int apiCollectionId;
-    private String accountId;
-    
-    // Core request/response data (raw/unprocessed)
+
+    public static final String REQUEST_PAYLOAD = "requestPayload";
     private String requestPayload;
+
+    public static final String RESPONSE_PAYLOAD = "responsePayload";
     private String responsePayload;
+
+    public static final String METHOD = "method";
     private String method;
+
+    public static final String URL = "url";
     private String url;
+
+    public static final String STATUS_CODE = "statusCode";
     private int statusCode;
-    
-    // Headers (for context)
+
+    public static final String REQUEST_HEADERS = "requestHeaders";
     private Map<String, List<String>> requestHeaders;
+
+    public static final String RESPONSE_HEADERS = "responseHeaders";
     private Map<String, List<String>> responseHeaders;
-    
-    // Metadata
+
+    public static final String TIMESTAMP = "timestamp";
     private int timestamp;
+
+    public static final String SOURCE_IP = "sourceIP";
     private String sourceIP;
+
+    public static final String DEST_IP = "destIP";
     private String destIP;
-    private String source;  // HAR, PCAP, MIRRORING, SDK, OTHER, POSTMAN
-    
-    // Threat/Guardrail information
+
+    public static final String SOURCE = "source";
+    private String source;
+
+    public static final String IS_BLOCKED = "isBlocked";
     private Boolean isBlocked;
-    private String threatInfo;  // JSON string with threat details
-    
-    // MCP context
+
+    public static final String THREAT_INFO = "threatInfo";
+    private String threatInfo;
+
+    public static final String PARENT_MCP_TOOL_NAMES = "parentMcpToolNames";
     private List<String> parentMcpToolNames;
-    
-    // TTL for auto-cleanup (MongoDB will auto-delete based on this)
+
+    public static final String EXPIRES_AT = "expiresAt";
     private Date expiresAt;
-    
+
     /**
-     * Create AgentTrafficLog from HttpResponseParams
+     * Factory method to create AgentTrafficLog from HttpResponseParams
+     * @param httpResponseParams The HTTP response parameters
+     * @return AgentTrafficLog instance
      */
-    public static AgentTrafficLog fromHttpResponseParams(HttpResponseParams params, Boolean isBlocked, String threatInfo) {
+    public static AgentTrafficLog fromHttpResponseParams(HttpResponseParams httpResponseParams) {
         AgentTrafficLog log = new AgentTrafficLog();
-        
-        // Collection and account
-        if (params.getRequestParams() != null) {
-            log.setApiCollectionId(params.getRequestParams().getApiCollectionId());
+
+        // Collection context 
+        if (httpResponseParams.requestParams != null) {
+            log.setApiCollectionId(httpResponseParams.requestParams.getApiCollectionId());
         }
-        log.setAccountId(params.getAccountId());
-        
-        // Request data
-        if (params.getRequestParams() != null) {
-            log.setRequestPayload(params.getRequestParams().getPayload());
-            log.setMethod(params.getRequestParams().getMethod());
-            log.setUrl(params.getRequestParams().getURL());
-            log.setRequestHeaders(params.getRequestParams().getHeaders());
+
+        // Core request/response data (raw/unprocessed)
+        if (httpResponseParams.requestParams != null) {
+            log.setRequestPayload(httpResponseParams.requestParams.getPayload());
+            log.setMethod(httpResponseParams.requestParams.getMethod());
+            log.setUrl(httpResponseParams.requestParams.getURL());
+            log.setRequestHeaders(httpResponseParams.requestParams.getHeaders());
         }
-        
-        // Response data
-        log.setResponsePayload(params.getPayload());
-        log.setStatusCode(params.getStatusCode());
-        log.setResponseHeaders(params.getHeaders());
-        
+        log.setResponsePayload(httpResponseParams.getPayload());
+        log.setStatusCode(httpResponseParams.getStatusCode());
+        log.setResponseHeaders(httpResponseParams.getHeaders());
+
         // Metadata
-        log.setTimestamp(params.getTime());
-        log.setSourceIP(params.getSourceIP());
-        log.setDestIP(params.getDestIP());
-        log.setSource(params.getSource() != null ? params.getSource().name() : null);
-        
-        // Threat info
-        log.setIsBlocked(isBlocked);
-        log.setThreatInfo(threatInfo);
-        
-        // MCP context
-        log.setParentMcpToolNames(params.getParentMcpToolNames());
-        
-        // Set TTL - 90 days from now
-        long expiryMillis = System.currentTimeMillis() + (2L * 24 * 60 * 60 * 1000);
+        log.setTimestamp(httpResponseParams.getTimeOrNow());
+        log.setSourceIP(httpResponseParams.getSourceIP());
+        log.setDestIP(httpResponseParams.getDestIP());
+        if (httpResponseParams.getSource() != null) {
+            log.setSource(httpResponseParams.getSource().name());
+        }
+
+        // Threat/Guardrail information (defaults to null, populated later if needed)
+        log.setIsBlocked(null);
+        log.setThreatInfo(null);
+
+        // MCP context (defaults to null, populated later if needed)
+        log.setParentMcpToolNames(null);
+
+        // TTL for auto-cleanup (default 7 days)
+        long expiryMillis = System.currentTimeMillis() + (7L * 24 * 60 * 60 * 1000);
         log.setExpiresAt(new Date(expiryMillis));
-        
+
         return log;
-    }
-    
-    /**
-     * Create AgentTrafficLog from HttpResponseParams with default values
-     */
-    public static AgentTrafficLog fromHttpResponseParams(HttpResponseParams params) {
-        return fromHttpResponseParams(params, null, null);
     }
 }
 
