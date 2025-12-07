@@ -1,9 +1,7 @@
 package com.akto.action;
 
-import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.GuardrailPoliciesDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.ApiCollection;
 import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
@@ -12,7 +10,6 @@ import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
-import org.apache.commons.lang3.StringUtils;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -50,11 +47,6 @@ public class GuardrailPoliciesAction extends UserAction {
             this.guardrailPolicies  = GuardrailPoliciesDao.instance.findAllSortedByCreatedTimestamp(0, 20);
             this.total = GuardrailPoliciesDao.instance.getTotalCount();
             
-            // Populate basePrompt for policies with autoDetect enabled
-            for (GuardrailPolicies policy : guardrailPolicies) {
-                populateBasePromptIfNeeded(policy);
-            }
-            
             loggerMaker.info("Fetched " + guardrailPolicies.size() + " guardrail policies out of " + total + " total");
 
             return SUCCESS.toUpperCase();
@@ -64,52 +56,6 @@ public class GuardrailPoliciesAction extends UserAction {
         }
     }
 
-    /**
-     * Populates basePrompt in basePromptRule if:
-     * 1. basePromptRule exists and is enabled
-     * 2. autoDetect is true
-     * 3. basePrompt is not already set (or is empty)
-     * 4. There are selected agent servers
-     * 
-     * Fetches detectedBasePrompt from the first selected agent collection
-     */
-    private void populateBasePromptIfNeeded(GuardrailPolicies policy) {
-        try {
-            GuardrailPolicies.BasePromptRule basePromptRule = policy.getBasePromptRule();
-            if (basePromptRule == null || !basePromptRule.isEnabled() || !basePromptRule.isAutoDetect()) {
-                return;
-            }
-
-            // If basePrompt is already set, use it
-            if (StringUtils.isNotBlank(basePromptRule.getBasePrompt())) {
-                return;
-            }
-
-            // Get selected agent servers (prefer V2 format, fallback to old format)
-            List<GuardrailPolicies.SelectedServer> agentServers = policy.getEffectiveSelectedAgentServers();
-            if (agentServers == null || agentServers.isEmpty()) {
-                return;
-            }
-
-            // Try to fetch detected base prompt from the first selected agent collection
-            try {
-                int firstAgentCollectionId = Integer.parseInt(agentServers.get(0).getId());
-                ApiCollection agentCollection = ApiCollectionsDao.instance.getMeta(firstAgentCollectionId);
-                
-                if (agentCollection != null && StringUtils.isNotBlank(agentCollection.getDetectedBasePrompt())) {
-                    basePromptRule.setBasePrompt(agentCollection.getDetectedBasePrompt());
-                    loggerMaker.debug("Populated basePrompt from collection " + firstAgentCollectionId + 
-                        " for policy: " + policy.getName());
-                }
-            } catch (NumberFormatException e) {
-                loggerMaker.debug("Invalid agent collection ID format: " + agentServers.get(0).getId());
-            } catch (Exception e) {
-                loggerMaker.debug("Error fetching detected base prompt for policy " + policy.getName() + ": " + e.getMessage());
-            }
-        } catch (Exception e) {
-            loggerMaker.debug("Error populating base prompt: " + e.getMessage());
-        }
-    }
 
     public String createGuardrailPolicy() {
         try {

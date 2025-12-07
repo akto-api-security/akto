@@ -100,7 +100,7 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
-import org.springframework.util.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 public class Main {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.TESTING);
@@ -125,7 +125,7 @@ public class Main {
     }
 
     public static void sendSlackAlertForFailedTest(int accountId, String customMessage){
-        if(StringUtils.hasLength(AKTO_SLACK_WEBHOOK)){
+        if(StringUtils.isNotBlank(AKTO_SLACK_WEBHOOK)){
             try {
                 String slackMessage = "Test failed for accountId: " + accountId + "\n with reason and details: " + customMessage;
                 CustomTextAlert customTextAlert = new CustomTextAlert(slackMessage);
@@ -1058,7 +1058,10 @@ public class Main {
 
         // check for webhooks here 
         CustomWebhook customWebhook = CustomWebhooksDao.instance.findOne(
-            Filters.eq(CustomWebhook.WEBHOOK_TYPE, CustomWebhook.WebhookType.GMAIL.toString())
+            Filters.and(
+                Filters.eq(CustomWebhook.WEBHOOK_TYPE, CustomWebhook.WebhookType.GMAIL.toString()),
+                Filters.eq("activeStatus", CustomWebhook.ActiveStatus.ACTIVE.toString())
+            )
         );
 
         if(customWebhook != null && customWebhook.getActiveStatus().equals(CustomWebhook.ActiveStatus.ACTIVE)) {

@@ -72,8 +72,6 @@ public class ApiCollection {
     String registryStatus;
     public static final String REGISTRY_STATUS = "registryStatus";
 
-    String detectedBasePrompt;
-    public static final String DETECTED_BASE_PROMPT = "detectedBasePrompt";
     int mcpMaliciousnessLastCheck;
     public static final String MCP_MALICIOUSNESS_LAST_CHECK = "mcpMaliciousnessLastCheck";
 
@@ -473,12 +471,6 @@ public class ApiCollection {
         this.registryStatus = registryStatus;
     }
 
-    public String getDetectedBasePrompt() {
-        return detectedBasePrompt;
-    }
-
-    public void setDetectedBasePrompt(String detectedBasePrompt) {
-        this.detectedBasePrompt = detectedBasePrompt;
     public int getMcpMaliciousnessLastCheck() {
         return mcpMaliciousnessLastCheck;
     }

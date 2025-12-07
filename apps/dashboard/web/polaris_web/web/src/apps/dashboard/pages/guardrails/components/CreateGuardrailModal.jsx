@@ -78,10 +78,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [llmPrompt, setLlmPrompt] = useState("");
     const [llmConfidenceScore, setLlmConfidenceScore] = useState(0.5);
 
-    // Step 7: Base Prompt Rule
+    // Step 7: Base Prompt Based Validation (AI Agents)
     const [enableBasePromptRule, setEnableBasePromptRule] = useState(false);
-    const [basePrompt, setBasePrompt] = useState("");
-    const [basePromptAutoDetect, setBasePromptAutoDetect] = useState(true);
     const [basePromptConfidenceScore, setBasePromptConfidenceScore] = useState(0.5);
 
     // Step 8: External model based evaluation
@@ -122,8 +120,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         llmConfidenceScore,
         // Step 7
         enableBasePromptRule,
-        basePromptAutoDetect,
-        basePrompt,
         basePromptConfidenceScore,
         // Step 8
         url,
@@ -289,8 +285,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setLlmPrompt("");
         setLlmConfidenceScore(0.5);
         setEnableBasePromptRule(false);
-        setBasePrompt("");
-        setBasePromptAutoDetect(true);
         setBasePromptConfidenceScore(0.5);
         setUrl("");
         setConfidenceScore(25);
@@ -360,16 +354,12 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             setLlmConfidenceScore(0.5);
         }
 
-        // Base Prompt Rule
+        // Base Prompt Based Validation (AI Agents)
         if (policy.basePromptRule) {
             setEnableBasePromptRule(policy.basePromptRule.enabled || false);
-            setBasePrompt(policy.basePromptRule.basePrompt || "");
-            setBasePromptAutoDetect(policy.basePromptRule.autoDetect !== undefined ? policy.basePromptRule.autoDetect : true);
             setBasePromptConfidenceScore(policy.basePromptRule.confidenceScore !== undefined ? policy.basePromptRule.confidenceScore : 0.5);
         } else {
             setEnableBasePromptRule(false);
-            setBasePrompt("");
-            setBasePromptAutoDetect(true);
             setBasePromptConfidenceScore(0.5);
         }
 
@@ -474,8 +464,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 ...(enableBasePromptRule ? {
                     basePromptRule: {
                         enabled: true,
-                        basePrompt: basePromptAutoDetect ? "" : basePrompt.trim(), // Send empty if auto-detect
-                        autoDetect: basePromptAutoDetect,
                         confidenceScore: basePromptConfidenceScore
                     }
                 } : {}),
@@ -523,8 +511,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     };
 
     const renderAllSteps = () => (
-            <VerticalStack gap="2">
-                {steps.map((step) => (
+        <VerticalStack gap="2">
+            {steps.map((step) => (
                 <Box
                     key={step.number}
                     ref={(el) => stepRefs.current[step.number] = el}
@@ -545,17 +533,17 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                                 >
                                     <HorizontalStack gap="3" blockAlign="center">
                                         <Box style={{
-                                width: "24px",
-                                height: "24px",
-                                borderRadius: "50%",
-                                backgroundColor: step.number === currentStep ? "#0070f3" : 
+                                            width: "24px",
+                                            height: "24px",
+                                            borderRadius: "50%",
+                                            backgroundColor: step.number === currentStep ? "#0070f3" :
                                                             (!step.isValid && step.number < currentStep) ? "#d72c0d" :
-                                                step.number < currentStep ? "#008060" : "#e1e3e5",
+                                                            step.number < currentStep ? "#008060" : "#e1e3e5",
                                             color: step.number <= currentStep || !step.isValid ? "white" : "#6d7175",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                fontSize: "12px",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            fontSize: "12px",
                                             fontWeight: "bold",
                                             flexShrink: 0
                                         }}>
@@ -565,47 +553,47 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                                         <Box style={{ flexGrow: 1 }}>
                                             <VerticalStack gap="1">
                                                 <HorizontalStack gap="2" blockAlign="center">
-                            <Text 
-                                variant="bodyMd" 
+                                                    <Text
+                                                        variant="bodyMd"
                                                         color={step.number === currentStep ? "success" : "subdued"}
-                                fontWeight={step.number === currentStep ? "bold" : "regular"}
-                            >
-                                {step.title}
-                            </Text>
+                                                        fontWeight={step.number === currentStep ? "bold" : "regular"}
+                                                    >
+                                                        {step.title}
+                                                    </Text>
                                                     {!step.isValid && step.number !== currentStep && (
                                                         <Icon source={AlertMinor} color="critical" />
-                            )}
-                        </HorizontalStack>
+                                                    )}
+                                                </HorizontalStack>
                                                 {step.number !== currentStep && (
                                                     <>
-                        {step.summary && (
-                                <Text variant="bodySm" color="subdued" fontWeight="medium">
-                                    {step.summary}
-                                </Text>
+                                                        {step.summary && (
+                                                            <Text variant="bodySm" color="subdued" fontWeight="medium">
+                                                                {step.summary}
+                                                            </Text>
                                                         )}
                                                         {!step.isValid && step.errorMessage && (
                                                             <Text variant="bodySm" color="critical" fontWeight="medium">
                                                                 {step.errorMessage}
-                </Text>
+                                                            </Text>
                                                         )}
                                                     </>
-                        )}
-            </VerticalStack>
-        </Box>
-                                </HorizontalStack>
-                                            </Box>
+                                                )}
+                                            </VerticalStack>
+                                        </Box>
+                                    </HorizontalStack>
+                                </Box>
 
                                 {step.number === currentStep && (
-                                <Box paddingBlockStart="2">
+                                    <Box paddingBlockStart="2">
                                         {renderStepContent(step.number)}
-                            </Box>
-                        )}
-                    </VerticalStack>
+                                    </Box>
+                                )}
+                            </VerticalStack>
+                        </Box>
+                    </LegacyCard>
                 </Box>
-        </LegacyCard>
-                            </Box>
             ))}
-            </VerticalStack>
+        </VerticalStack>
     );
 
     const renderStepContent = (stepNumber) => {
@@ -677,10 +665,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                     <BasePromptStep
                         enableBasePromptRule={enableBasePromptRule}
                         setEnableBasePromptRule={setEnableBasePromptRule}
-                        basePrompt={basePrompt}
-                        setBasePrompt={setBasePrompt}
-                        basePromptAutoDetect={basePromptAutoDetect}
-                        setBasePromptAutoDetect={setBasePromptAutoDetect}
                         basePromptConfidenceScore={basePromptConfidenceScore}
                         setBasePromptConfidenceScore={setBasePromptConfidenceScore}
                     />

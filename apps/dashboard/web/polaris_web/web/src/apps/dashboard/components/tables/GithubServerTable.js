@@ -29,6 +29,7 @@ import func from '../../../../util/func';
 import values from "@/util/values"
 import { produce } from 'immer';
 import DateRangePicker from '../layouts/DateRangePicker';
+import SpinnerCentered from '../progress/SpinnerCentered';
 
 function GithubServerTable(props) {
 
@@ -538,31 +539,52 @@ function GithubServerTable(props) {
   // let tmp = data && data.length <= pageLimit ? data :
   //   data.slice(page * pageLimit, Math.min((page + 1) * pageLimit, data.length))
 
+  // Ensure all headings have unique id properties to avoid duplicate key warnings
+  const processedHeadings = useMemo(() => {
+    if (props?.headings) {
+      return props.headings.map((heading, index) => ({
+        ...heading,
+        id: heading.id || heading.value || heading.text || `heading-${index}`
+      }));
+    }
+    return [
+      {
+        id: "data",
+        hidden: true,
+        flush: true
+      }
+    ];
+  }, [props?.headings]);
+
   const rowMarkup = useMemo(() => {
     return data.map(
-      (data, index) => (
-        <GithubRow
-          key={data.id}
-          id={data.id}
-          dataObj={data}
-          index={index}
-          getActions={props.getActions}
-          getStatus={props.getStatus}
-          selectedResources={selectedResources}
-          headers={props.headers}
-          isRowClickable={props.rowClickable}
-          hasRowActions={props.hasRowActions || false}
-          page={props.page || 0}
-          getNextUrl={props?.getNextUrl}
-          onRowClick={props.onRowClick}
-          newRow={props?.useNewRow}
-          headings={props?.headings}
-          notHighlightOnselected={props.notHighlightOnselected}
-          popoverActive={popoverActive}
-          setPopoverActive={setPopoverActive}
-          treeView={props?.treeView}
-        />
-      ),
+      (data, index) => {
+        // Ensure row key is never empty - use index as fallback
+        const rowKey = data.id || `row-${index}`;
+        return (
+          <GithubRow
+            key={rowKey}
+            id={data.id}
+            dataObj={data}
+            index={index}
+            getActions={props.getActions}
+            getStatus={props.getStatus}
+            selectedResources={selectedResources}
+            headers={props.headers}
+            isRowClickable={props.rowClickable}
+            hasRowActions={props.hasRowActions || false}
+            page={props.page || 0}
+            getNextUrl={props?.getNextUrl}
+            onRowClick={props.onRowClick}
+            newRow={props?.useNewRow}
+            headings={props?.headings}
+            notHighlightOnselected={props.notHighlightOnselected}
+            popoverActive={popoverActive}
+            setPopoverActive={setPopoverActive}
+            treeView={props?.treeView}
+          />
+        );
+      },
     );
   }, [data, selectedResources, props, popoverActive, setPopoverActive]);
 
@@ -583,9 +605,13 @@ function GithubServerTable(props) {
   let tableHeightClass = props.increasedHeight ? "control-row" : (props.condensedHeight ? "condensed-row" : '') 
   let tableClass = props.useNewRow ? "new-table" : (props.selectable ? "removeHeaderColor" : "hideTableHead")
   const bulkActionResources = selectedItems.length > 0 ? selectedItems : selectedResources
-  if (typeof props.setSelectedResourcesForPrimaryAction === 'function') {
-    props.setSelectedResourcesForPrimaryAction(bulkActionResources)
-  }
+  
+  // Move setState out of render to avoid "Cannot update a component while rendering" warning
+  useEffect(() => {
+    if (typeof props.setSelectedResourcesForPrimaryAction === 'function') {
+      props.setSelectedResourcesForPrimaryAction(bulkActionResources)
+    }
+  }, [bulkActionResources, props.setSelectedResourcesForPrimaryAction])
   return (
     <div className={tableClass} style={{display: "flex", flexDirection: "column", gap: "20px"}}>
       <LegacyCard>
@@ -621,6 +647,9 @@ function GithubServerTable(props) {
               ></IndexFilters>
               {props?.bannerComp?.selected === props?.selected ? props?.bannerComp?.comp : null}
               <div className={tableHeightClass}>
+              {props.loading && props.loadingText ? (
+                <SpinnerCentered text={props.loadingText}/>
+              ) : (
               <IndexTable
                 resourceName={props.resourceName}
                 itemCount={data.length}
@@ -630,13 +659,7 @@ function GithubServerTable(props) {
                 // condensed
                 selectable={props.selectable || false}
                 onSelectionChange={customSelectionChange}
-                headings={props?.headings ? props.headings :[
-                  {
-                    id: "data",
-                    hidden: true,
-                    flush: true
-                  }
-                ]}
+                headings={processedHeadings}
                 promotedBulkActions={props.selectable ? props.promotedBulkActions && props.promotedBulkActions(bulkActionResources) : []}
                 hasZebraStriping={props.hasZebraStriping || false}
                 sortable={sortableColumns}
@@ -648,6 +671,7 @@ function GithubServerTable(props) {
               >
                 {rowMarkup}
               </IndexTable>
+              )}
             </div>
             </LegacyCard.Section>
             {(total !== 0 && !props?.hidePagination) && <LegacyCard.Section>
