@@ -1,8 +1,6 @@
 package com.akto.testing;
 
 import com.akto.RuntimeMode;
-import com.akto.agent.AgentClient;
-import com.akto.agent.AgenticUtils;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
@@ -91,7 +89,7 @@ public class Main {
             public void run() {
                 try {
                     Context.accountId.set(accountSettings.getId());
-                    int timestamp = Context.now()-5*60;
+                    int timestamp = Context.now() - 5 * 60;
                     TestingRunPlayground testingRunPlayground =  dataActor.getCurrentTestingRunDetailsFromEditor(timestamp); // fetch from Db
                     
                     if (testingRunPlayground == null) {
@@ -107,19 +105,50 @@ public class Main {
                             break;
                     }
                 } catch (Exception e) {
-                    loggerMaker.error("Error in running playground tests: " + e.getMessage());
+                    loggerMaker.errorAndAddToDb(e, "Error in running playground tests: " + e.getMessage());
                 }
             }
         }, 0, 2, TimeUnit.SECONDS);
     }
 
     private static void handleTestEditorPlayground(TestingRunPlayground testingRunPlayground) {
+        ApiInfo.ApiInfoKey infoKey = testingRunPlayground.getApiInfoKey();
+        TestingRunResult testingRunResult = new TestingRunResult(
+                null, infoKey, "", "", null,
+                false, new ArrayList<>(), 100,
+                Context.now(), Context.now(), null, null, new ArrayList<>());
+        List<TestResult> testResults = new ArrayList<>();
+        testResults.add(new TestResult("", "", Collections.emptyList(), 0, false, TestResult.Confidence.HIGH, null));
+        testingRunResult.setSingleTestResults(testResults);
+        try {
+            testingRunResult = createTestEditorPlayground(testingRunPlayground, testingRunResult);
+        } catch (Exception e) {
+            String errorMessage = "Error in handling test editor playground: " + e.getMessage();
+            loggerMaker.errorAndAddToDb(e, errorMessage);
+            testResults.clear();
+            testResults.add(new TestResult("","", Arrays.asList(errorMessage), 0, false, TestResult.Confidence.HIGH, null));
+            testingRunResult.setSingleTestResults(testResults);
+        }
+        if (testingRunResult != null) {
+            testingRunResult.setId(testingRunPlayground.getId());
+            testingRunResult.setTestRunId(testingRunPlayground.getId());
+            testingRunResult.setTestRunResultSummaryId(testingRunPlayground.getId());
+            testingRunResult.setTestResults(null);
+            testingRunResult.setTestLogs(null);
+            testingRunPlayground.setTestingRunResult(testingRunResult);
+            // update testingRunPlayground in DB
+            dataActor.updateTestingRunPlayground(testingRunPlayground);
+        }
+    }
+
+    private static TestingRunResult createTestEditorPlayground(TestingRunPlayground testingRunPlayground, TestingRunResult testingRunResult) {
         TestExecutor executor = new TestExecutor();
         TestConfig testConfig = null;
         try {
             testConfig = TestConfigYamlParser.parseTemplate(testingRunPlayground.getTestTemplate());
         } catch (Exception e) {
-            return;
+            loggerMaker.errorAndAddToDb(e, "Error in parsing template for handleTestEditorPlayground");
+            return null;
         }
         ApiInfo.ApiInfoKey infoKey = testingRunPlayground.getApiInfoKey();
 
@@ -134,10 +163,7 @@ public class Main {
 
         TestingUtil testingUtil = new TestingUtil(messageStore, null, null, customAuthTypes);
         String message = messageStore.getSampleDataMap().get(infoKey).get(messageStore.getSampleDataMap().get(infoKey).size() - 1);
-        TestingRunResult testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null, true, testLogs, message);
-        testingRunResult.setId(testingRunPlayground.getId());
-        testingRunResult.setTestRunId(testingRunPlayground.getId());
-        testingRunResult.setTestRunResultSummaryId(testingRunPlayground.getId());
+        testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null, true, testLogs, message);
 
         GenericTestResult testRes = testingRunResult.getTestResults().get(0);
         if (testRes instanceof TestResult) {
@@ -153,11 +179,7 @@ public class Main {
             }
             testingRunResult.setMultiExecTestResults(list);
         }
-        testingRunResult.setTestResults(null);
-        testingRunResult.setTestLogs(null);
-        testingRunPlayground.setTestingRunResult(testingRunResult);
-        // update testingRunPlayground in DB
-        dataActor.updateTestingRunPlayground(testingRunPlayground);
+        return testingRunResult;
     }
 
     private static void handlePostmanImports(TestingRunPlayground testingRunPlayground) {
@@ -221,7 +243,7 @@ public class Main {
                 return null;
             }
         } catch (Exception e) {
-            loggerMaker.error("Error in reading the testing state file: " + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "Error in reading the testing state file: " + e.getMessage());
             return null;
         }
     }
@@ -244,7 +266,7 @@ public class Main {
             loggerMaker.infoAndAddToDb("evaluating second trrs condition");
             int maxRetries = 5;
             for (int i = 0; i < maxRetries; i++) {
-                loggerMaker.infoAndAddToDb("fetching baseconfig in second trrs condition");
+                loggerMaker.infoAndAddToDb("fetching base config in second trrs condition");
                 baseConfig = dataActor.findTestingRunConfig(testingRun.getTestIdConfig());
                 if (baseConfig != null) {
                     break;
@@ -252,6 +274,7 @@ public class Main {
                 try {
                     Thread.sleep(1000);
                 } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error in fetching base config in second trrs condition");
                 }
             }
 
@@ -364,7 +387,7 @@ public class Main {
         TestCompletion testCompletion = new TestCompletion();
         ModuleInfoWorker.init(ModuleInfo.ModuleType.MINI_TESTING, dataActor, customMiniTestingServiceName);
         LoggerMaker.setModuleId(customMiniTestingServiceName);
-        loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
+        loggerMaker.warnAndAddToDb("Starting.......");
 
         if(Constants.IS_NEW_TESTING_ENABLED){
             boolean val = Utils.createFolder(Constants.TESTING_STATE_FOLDER_PATH);
@@ -382,16 +405,16 @@ public class Main {
                     matrixAnalyzerRunning = true;
                     matrixAnalyzer.run();
                 } catch (Exception e) {
-                    loggerMaker.infoAndAddToDb("could not run matrixAnalyzer: " + e.getMessage(), LogDb.TESTING);
+                    loggerMaker.errorAndAddToDb(e, "could not run matrixAnalyzer: " + e.getMessage());
                 } finally {
                     matrixAnalyzerRunning = false;
                 }
             }
         }, 0, 1, TimeUnit.MINUTES);
 
-        loggerMaker.infoAndAddToDb("sun.arch.data.model: " +  System.getProperty("sun.arch.data.model"), LogDb.TESTING);
-        loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);
-        loggerMaker.infoAndAddToDb("os.version: " + System.getProperty("os.version"), LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("sun.arch.data.model: " +  System.getProperty("sun.arch.data.model"));
+        loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"));
+        loggerMaker.infoAndAddToDb("os.version: " + System.getProperty("os.version"));
         
         Map<Integer, Integer> logSentMap = new HashMap<>();
 
@@ -449,13 +472,16 @@ public class Main {
                     // });
                 }
             } catch (Exception e) {
-                loggerMaker.error("Error in running failed tests from file.", e);
+                loggerMaker.errorAndAddToDb(e, "Error in running failed tests from file.");
             }
         }
 
         singleTypeInfoInit(accountId);
 
         while (true) {
+            TestExecutor testExecutor = new TestExecutor();
+            // Reset current execution fallback flag for new test cycle
+            testExecutor.resetCurrentExecutionFallback();
             PrometheusMetricsHandler.markModuleIdle();
             int start = Context.now();
             long startDetailed = System.currentTimeMillis();
@@ -651,7 +677,7 @@ public class Main {
                     summaryId = trrs.getId();
                 }
 
-                TestExecutor testExecutor = new TestExecutor();
+
                 if (trrs.getState() == State.SCHEDULED) {
                     if (trrs.getMetadata()!= null && trrs.getMetadata().containsKey("pull_request_id") && trrs.getMetadata().containsKey("commit_sha_head") ) {
                         //case of github status push

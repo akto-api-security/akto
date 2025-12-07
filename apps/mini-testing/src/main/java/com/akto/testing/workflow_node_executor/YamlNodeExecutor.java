@@ -45,6 +45,7 @@ import com.akto.testing.TestExecutor;
 import com.akto.testing.kafka_utils.TestingConfigurations;
 import com.akto.util.Constants;
 import com.google.gson.Gson;
+import com.akto.testing.Utils;
 
 import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 
@@ -130,7 +131,7 @@ public class YamlNodeExecutor extends NodeExecutor {
         List<TestResult> result = new ArrayList<>();
         boolean vulnerable = false;
 
-        OriginalHttpResponse testResponse;
+        OriginalHttpResponse testResponse = null;
         List<String> message = new ArrayList<>();
         //String message = null;
         String savedResponses = null;
@@ -200,7 +201,9 @@ public class YamlNodeExecutor extends NodeExecutor {
         calcTimeAndLenStats(node.getId(), responseTimeArr, responseLenArr, varMap);
 
         if (savedResponses != null) {
-            varMap.put(node.getId() + ".response.body", savedResponses);
+            Utils.populateValuesMap(varMap, savedResponses, node.getId(),
+                    testResponse != null ? testResponse.getHeaders() : new HashMap<>(),
+                    false, null);
             varMap.put(node.getId() + ".response.status_code", String.valueOf(statusCode));
         }
         if (eventStreamResponse != null) {
@@ -279,7 +282,8 @@ public class YamlNodeExecutor extends NodeExecutor {
         for (int i = 0; i < 10; i++) {
             yamlTemplates.addAll(dataActor.fetchYamlTemplates(true, i*50));
         }
-        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false, yamlTemplates);
+        YamlTemplate commonTemplate = dataActor.fetchCommonWordList();
+        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false, yamlTemplates, commonTemplate);
         TestConfig testConfig = testConfigMap.get(testSubCategory);
 
         ExecutorNode executorNode = yamlNodeDetails.getExecutorNode();

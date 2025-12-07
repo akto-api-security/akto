@@ -549,6 +549,7 @@ public class Main {
                     syncImmediately,
                     centralKafkaTopicName);
                 AllMetrics.instance.setRuntimeProcessLatency(System.currentTimeMillis()-start);
+                AllMetrics.instance.setRuntimeApiReceivedCount((float) records.count());
                 loggerMaker.infoAndAddToDb("Processed " + responseParamsToAccountMap.size() + " total records " + records.count() + " accounts in " + (System.currentTimeMillis()-start) + " ms");
             }
 

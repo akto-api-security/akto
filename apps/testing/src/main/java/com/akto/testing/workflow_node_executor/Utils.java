@@ -15,7 +15,6 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
-import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.*;
 import com.akto.test_editor.execution.Memory;
 import org.apache.commons.lang3.StringUtils;
@@ -31,10 +30,8 @@ import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.api_workflow.Graph;
 import com.akto.dto.api_workflow.Node;
 import com.akto.dto.type.KeyTypes;
-import com.akto.dto.type.RequestTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.util.JSONUtils;
 import com.akto.util.RecordedLoginFlowUtil;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
@@ -361,89 +358,6 @@ public class Utils {
         LoginFlowStepsDao.instance.updateOne(filter, update);
         return valuesMap;
     }
-
-        public static void populateValuesMap(Map<String, Object> valuesMap, String payloadStr, String nodeId, Map<String,
-            List<String>> headers, boolean isRequest, String queryParams) {
-        boolean isList = false;
-        String reqOrResp = isRequest ? "request"  : "response";
-
-        if (payloadStr == null) payloadStr = "{}";
-        if (payloadStr.startsWith("[")) {
-            payloadStr = "{\"json\": "+payloadStr+"}";
-            isList = true;
-        }
-
-        String fullBodyKey = nodeId + "." + reqOrResp + "." + "body";
-
-        valuesMap.put(fullBodyKey, payloadStr);
-
-        BasicDBObject payloadObj;
-        try {
-            payloadObj = BasicDBObject.parse(payloadStr);
-        } catch (Exception e) {
-            boolean isPostFormData = payloadStr.contains("&") && payloadStr.contains("=");
-            if (isPostFormData) {
-                String mockUrl = "url?"+ payloadStr; // because getQueryJSON function needs complete url
-                payloadObj = RequestTemplate.getQueryJSON(mockUrl);
-            } else {
-                payloadObj = BasicDBObject.parse("{}");
-            }
-        }
-
-        BasicDBObject queryParamsObject = null;
-        if (queryParams != null) {
-            try {
-                String mockUrl = "url?"+ queryParams; // because getQueryJSON function needs complete url
-                queryParamsObject = RequestTemplate.getQueryJSON(mockUrl);
-            } catch (Exception e) {
-                ;
-            }
-        }
-
-        Object obj;
-        if (isList) {
-            obj = payloadObj.get("json");
-        } else {
-            obj = payloadObj;
-        }
-
-        BasicDBObject flattened = JSONUtils.flattenWithDots(obj);
-
-
-        for (String param: flattened.keySet()) {
-            String key = nodeId + "." + reqOrResp + "." + "body" + "." + param;
-            valuesMap.put(key, flattened.get(param));
-        }
-
-        if (queryParamsObject != null) {
-            BasicDBObject queryFlattened = JSONUtils.flattenWithDots(queryParamsObject);
-            for (String param: queryFlattened.keySet()) {
-                String key = nodeId + "." + reqOrResp + "." + "query" + "." + param;
-                valuesMap.put(key, queryFlattened.get(param));
-            }
-        }
-
-        for (String headerName: headers.keySet()) {
-            List<String> headerValues = headers.get(headerName);
-            String key = nodeId + "." + reqOrResp + "." + "header" + "." + headerName;
-
-            switch (headerValues.size()) {
-                case 0: 
-                    continue;
-                case 1: 
-                    valuesMap.put(key, headerValues.get(0));
-                    continue;
-                default: 
-                    String val =  String.join(";", headers.get(headerName));
-                    valuesMap.put(key, val);
-            }
-            
-            
-        }
-    }
-
-
-
 
     public static OriginalHttpRequest buildHttpRequest(WorkflowUpdatedSampleData updatedSampleData, Map<String, Object> valuesMap) throws Exception {
 

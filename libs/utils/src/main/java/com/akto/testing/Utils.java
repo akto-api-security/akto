@@ -37,7 +37,6 @@ import com.akto.dto.testing.WorkflowUpdatedSampleData;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.sql.SampleDataAltDb;
 import com.akto.test_editor.filter.Filter;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.testing_db_layer_client.ClientLayer;
@@ -55,7 +54,7 @@ import static com.akto.test_editor.execution.Operations.modifyCookie;
 
 public class Utils {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class, LogDb.TESTING);
     private static final ClientLayer clientLayer = new ClientLayer();
     private static final boolean shouldCallClientLayerForSampleData = System.getenv("TESTING_DB_LAYER_SERVICE_URL") != null && !System.getenv("TESTING_DB_LAYER_SERVICE_URL").isEmpty();
 
@@ -134,8 +133,6 @@ public class Utils {
                     String val =  String.join(";", headers.get(headerName));
                     valuesMap.put(key, val);
             }
-            
-            
         }
     }
 
@@ -154,21 +151,21 @@ public class Utils {
 
         boolean userSuppliedQueryParamsNullOrEmpty = queryParams == null || queryParams.trim().length() == 0;
         if (requestUrl != null) {
-            loggerMaker.infoAndAddToDb("requestUrl: " + requestUrl, LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("requestUrl: " + requestUrl);
             String rawUrl = executeCode(requestUrl, valuesMap);
-            loggerMaker.infoAndAddToDb("rawUrl: " + requestUrl, LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("rawUrl: " + requestUrl);
             // this url might contain urlQueryParams. We need to move it queryParams
             String[] rawUrlArr = rawUrl.split("\\?");
             request.setUrl(rawUrlArr[0]);
             if (rawUrlArr.length > 1) {
                 queryFromReplacedUrl = rawUrlArr[1];
             }
-            loggerMaker.infoAndAddToDb("final url: " + request.getUrl(), LogDb.TESTING);
-            loggerMaker.infoAndAddToDb("queryFromReplacedUrl: " + queryFromReplacedUrl, LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("final url: " + request.getUrl());
+            loggerMaker.infoAndAddToDb("queryFromReplacedUrl: " + queryFromReplacedUrl);
         }
 
         if (userSuppliedQueryParamsNullOrEmpty) {
-            loggerMaker.infoAndAddToDb("setting null", LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("setting null");
             request.setQueryParams(null);
         }
 
@@ -186,15 +183,15 @@ public class Utils {
         boolean queryFromReplacedUrlNullOrEmpty = queryFromReplacedUrl == null || queryFromReplacedUrl.trim().isEmpty();
 
         if (!userSuppliedQueryParamsNullOrEmpty) {
-            loggerMaker.infoAndAddToDb("user has supplied query params", LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("user has supplied query params");
             String finalQueryParams = executeCode(queryParams, valuesMap);
-            loggerMaker.infoAndAddToDb("finalQueryParams: " + finalQueryParams, LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("finalQueryParams: " + finalQueryParams);
             if (queryFromReplacedUrlNullOrEmpty) {
                 request.setQueryParams(finalQueryParams);
             } else {
                 // combine original query params and user defined query params and latter overriding former
                 String combinedQueryParams = OriginalHttpRequest.combineQueryParams(queryFromReplacedUrl, finalQueryParams);
-                loggerMaker.infoAndAddToDb("combinedQueryParams: " + combinedQueryParams, LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("combinedQueryParams: " + combinedQueryParams);
                 request.setQueryParams(combinedQueryParams);
             }
         } else if (!queryFromReplacedUrlNullOrEmpty) {
@@ -250,7 +247,7 @@ public class Utils {
                     String suffix = key.substring(key.toLowerCase().indexOf("_")+1);
                     obj = suffix+"_"+System.nanoTime();
                 } else {
-                    loggerMaker.errorAndAddToDb("couldn't find: " + key, LogDb.TESTING);
+                    loggerMaker.errorAndAddToDb("couldn't find: " + key);
                     throw new Exception("Couldn't find " + key);
                 }
             }
@@ -284,12 +281,12 @@ public class Utils {
         ScriptEngine engine = factory.getEngineByName("nashorn");
         try {
             String code = replaceVariables(testValidatorCode, valuesMap, true);
-            loggerMaker.infoAndAddToDb("*******************************************************************", LogDb.TESTING);
-            loggerMaker.infoAndAddToDb("TEST VALIDATOR CODE:", LogDb.TESTING);
-            loggerMaker.infoAndAddToDb(code, LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("*******************************************************************");
+            loggerMaker.infoAndAddToDb("TEST VALIDATOR CODE:");
+            loggerMaker.infoAndAddToDb(code);
             Object o = engine.eval(code);
-            loggerMaker.infoAndAddToDb("TEST VALIDATOR RESULT: " + o.toString(), LogDb.TESTING);
-            loggerMaker.infoAndAddToDb("*******************************************************************", LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("TEST VALIDATOR RESULT: " + o.toString());
+            loggerMaker.infoAndAddToDb("*******************************************************************");
             vulnerable = ! (boolean) o;
         } catch (Exception e) {
             ;
@@ -584,6 +581,9 @@ public class Utils {
         if(shouldCallClientLayerForSampleData){
             try {
                 msg = clientLayer.fetchLatestSample(apiInfoKey);
+                if(msg == null){
+                    loggerMaker.infoAndAddToDb("No fetchLatestSample response found for " + apiInfoKey.toString() + " from testing db layer in generateFailedRunResultForMessage");
+                }
             } catch (Exception e) {
             }   
         }
