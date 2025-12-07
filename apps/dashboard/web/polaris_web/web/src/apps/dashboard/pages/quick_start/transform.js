@@ -25,6 +25,7 @@ import AIAgentsGateway from "./AIAgentsGateway"
 import ImpervaImport from "./components/ImpervaImport"
 import BrowserExtension from "./components/BrowserExtension"
 import N8NImport from "./components/N8NImport"
+import LangchainImport from "./components/LangchainImport"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -869,6 +870,15 @@ const n8nImportObj = {
     component: <N8NImport/>
 }
 
+const langchainImportObj = {
+    icon: '/public/langchain.svg',
+    label: "Langchain Import",
+    text: "Use our Langchain Import feature to capture traffic from LangSmith and instantly send it to your dashboard for real-time insights.",
+    docsUrl: 'https://docs.akto.io/langchain-import',
+    key: "LANGCHAIN_IMPORT",
+    component: <LangchainImport/>
+}
+
 
 const quick_start_policy_lines= [
     `{`,
@@ -1469,7 +1479,7 @@ const quickStartFunc = {
         ]
 
         const aiAgentConnectors = [
-            awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj, n8nImportObj
+            awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj, n8nImportObj, langchainImportObj
         ]
 
         // MCP Scan
@@ -1542,13 +1552,13 @@ const quickStartFunc = {
     getConnectorsList: function () {
 
         if(func.checkLocal() || func.isLimitedAccount()){
-            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj]
+            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj]
         }
 
         // Combine all categories into connectorsList
         let connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj,
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,

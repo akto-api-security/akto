@@ -31,6 +31,9 @@ public class N8NImportInfo {
     public static final String CONFIG_N8N_API_KEY = "N8N_API_KEY";
     public static final String CONFIG_DATA_INGESTION_SERVICE_URL = "DATA_INGESTION_SERVICE_URL";
 
+    public static final String CONFIG_LANGSMITH_BASE_URL = "LANGSMITH_BASE_URL";
+    public static final String CONFIG_LANGSMITH_API_KEY = "LANGSMITH_API_KEY";
+
     private ObjectId id;
 
     @BsonIgnore

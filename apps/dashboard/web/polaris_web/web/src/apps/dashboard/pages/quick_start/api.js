@@ -234,6 +234,14 @@ const api = {
         })
     },
 
+    initiateLangchainImport(langsmithUrl, apiKey, dataIngestionUrl) {
+        return request({
+            url: '/api/initiateLangchainImport',
+            method: 'post',
+            data: {langsmithUrl, apiKey, dataIngestionUrl}
+        })
+    },
+
 }
 
 export default api
