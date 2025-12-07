@@ -71,10 +71,12 @@ public class StatusCodeAnalyser {
             try {
                 OriginalHttpRequest request = TestExecutor.findOriginalHttpRequest(apiInfoKey, sampleDataMap, sampleMessageStore);
                 host = TestExecutor.findHostFromOriginalHttpRequest(request);
-                if(hostAndContentType.containsKey(host)) continue;
+                if (host == null || hostAndContentType.containsKey(host)){
+                    continue;
+                }
                 contentType = TestExecutor.findContentTypeFromOriginalHttpRequest(request);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while finding host in status code analyser: " + e, LogDb.TESTING);
+                loggerMaker.errorAndAddToDb(e, "Error while finding host in status code analyser: " + e);
                 continue;
             }
             if(host != null ){

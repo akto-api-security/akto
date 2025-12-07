@@ -1,5 +1,6 @@
 package com.akto.data_actor;
 
+import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
@@ -42,6 +43,7 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.jobs.JobScheduler;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.WriteModel;
 
 import java.util.ArrayList;
@@ -485,6 +487,11 @@ public class DbActor extends DataActor {
         DbLayer.updateLastTestedField(apiCollectionId, url, method);
     }
 
+    @Override
+    public void bulkUpdateLastTestedField(Map<ApiInfo.ApiInfoKey, Integer> testedApisMap) {
+        DbLayer.bulkUpdateLastTestedField(testedApisMap);
+    }
+
     public void updateTestInitiatedCountInTestSummary(String summaryId, int testInitiatedCount) {
         DbLayer.updateTestInitiatedCountInTestSummary(summaryId, testInitiatedCount);
     }
@@ -678,5 +685,9 @@ public class DbActor extends DataActor {
             agentTrafficLogs.add(log);
         }
         DbLayer.bulkWriteAgentTrafficLogs(agentTrafficLogs);
+    }
+    
+    public YamlTemplate fetchCommonWordList() {
+        return YamlTemplateDao.instance.findOne(Filters.empty());
     }
 }

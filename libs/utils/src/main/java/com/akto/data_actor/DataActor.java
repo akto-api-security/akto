@@ -185,6 +185,8 @@ public abstract class DataActor {
 
     public abstract void updateLastTestedField(int apiCollectionId, String url, String method);
 
+    public abstract void bulkUpdateLastTestedField(Map<ApiInfo.ApiInfoKey, Integer> testedApisMap);
+
     public abstract void insertTestingRunResults(TestingRunResult testingRunResults);
 
     public abstract void updateTotalApiCountInTestSummary(String summaryId, int totalApiCount);
@@ -320,4 +322,5 @@ public abstract class DataActor {
     public abstract void storeConversationResults(List<AgentConversationResult> conversationResults);
 
     public abstract void bulkWriteAgentTrafficLogs(List<Object> trafficLogs);
+    public abstract YamlTemplate fetchCommonWordList();
 }

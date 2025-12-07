@@ -149,4 +149,19 @@ public class TestConfigYamlParser {
         return config.get(field);
     }
 
+    public static Map<String, List<String>> parseWordLists(String content) {
+        Map<String, List<String>> wordListMap = new HashMap<>();
+        try {
+            ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+
+            Map<String, Object> config = mapper.readValue(content, Map.class);
+            if (config.containsKey("wordLists")) {
+                wordListMap = (Map) config.get("wordLists");
+            }
+        } catch (Exception e) {
+            return wordListMap;
+        }
+        return wordListMap;
+    }
+
 }

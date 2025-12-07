@@ -30,6 +30,7 @@ public class AllMetrics {
             runtimeKafkaRecordCount = new SumMetric("RT_KAFKA_RECORD_COUNT", 60, accountId, orgId);
             runtimeKafkaRecordSize = new SumMetric("RT_KAFKA_RECORD_SIZE", 60, accountId, orgId);
             runtimeProcessLatency = new LatencyMetric("RT_KAFKA_LATENCY", 60, accountId, orgId);
+            runtimeApiReceivedCount = new SumMetric("RT_API_RECEIVED_COUNT", 60, accountId, orgId);
             kafkaRecordsLagMax = new SumMetric("KAFKA_RECORDS_LAG_MAX", 60, accountId, orgId);
             kafkaRecordsConsumedRate = new SumMetric("KAFKA_RECORDS_CONSUMED_RATE", 60, accountId, orgId);
             kafkaFetchAvgLatency = new LatencyMetric("KAFKA_FETCH_AVG_LATENCY", 60, accountId, orgId);
@@ -38,7 +39,7 @@ public class AllMetrics {
             cyborgTotalApiCount = new SumMetric("CYBORG_TOTAL_API_COUNT", 60, accountId, orgId);
             deltaCatalogTotalCount = new SumMetric("DELTA_CATALOG_TOTAL_COUNT", 60, accountId, orgId);
             deltaCatalogNewCount = new SumMetric("DELTA_CATALOG_NEW_COUNT", 60, accountId, orgId);
-            cyborgApiPayloadSize = new SumMetric("CYBORG_API_PAYLOAD_SIZE", 60, accountId, orgId);    
+            cyborgApiPayloadSize = new SumMetric("CYBORG_API_PAYLOAD_SIZE", 60, accountId, orgId);
         }
 
         if(pgMetrics){
@@ -73,7 +74,7 @@ public class AllMetrics {
                 cyborgCallCount, cyborgDataSize, testingRunCount, testingRunLatency, totalSampleDataCount, sampleDataFetchLatency,
                 pgDataSizeInMb, kafkaRecordsLagMax, kafkaRecordsConsumedRate, kafkaFetchAvgLatency,
                 kafkaBytesConsumedRate, cyborgNewApiCount, cyborgTotalApiCount, deltaCatalogNewCount, deltaCatalogTotalCount,
-                cyborgApiPayloadSize, multipleSampleDataFetchLatency);
+                cyborgApiPayloadSize, multipleSampleDataFetchLatency, runtimeApiReceivedCount);
 
         AllMetrics _this = this;
         executorService.scheduleWithFixedDelay(() -> {
@@ -162,6 +163,7 @@ public class AllMetrics {
     private Metric deltaCatalogTotalCount = null;
     private Metric cyborgApiPayloadSize = null;
     private Metric multipleSampleDataFetchLatency = null;
+    private Metric runtimeApiReceivedCount = null;
 
     private List<Metric> metrics = null;
 
@@ -178,6 +180,11 @@ public class AllMetrics {
     public void setRuntimeProcessLatency(float val){
         if(runtimeProcessLatency != null)
             runtimeProcessLatency.record(val);
+    }
+
+    public void setRuntimeApiReceivedCount(float val){
+        if(runtimeApiReceivedCount != null)
+            runtimeApiReceivedCount.record(val);
     }
 
     public void setPostgreSampleDataInsertedCount(float val){
