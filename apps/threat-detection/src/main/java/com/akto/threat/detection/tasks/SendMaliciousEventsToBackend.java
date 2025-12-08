@@ -63,7 +63,7 @@ public class SendMaliciousEventsToBackend extends AbstractKafkaConsumerTask<byte
                         if (response.getStatusCode() >= 400 || responsePayload == null) {
                           logger.errorAndAddToDb(
                               "record_malicious_event failed: status="
-                                  + response.getStatusCode()
+                                  + response.getStatusCode() + "body=" + responsePayload
                           );
                         }
                       } catch (Exception e) {
