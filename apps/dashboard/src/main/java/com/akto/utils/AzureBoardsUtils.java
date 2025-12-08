@@ -32,6 +32,7 @@ public class AzureBoardsUtils {
 
     private static final String FIELDS_ENDPOINT = "/%s/_apis/wit/fields?api-version=%s";
     public static final String WORK_ITEM_TYPE_FIELDS_ENDPOINT = "/%s/%s/_apis/wit/workitemtypes/%s/fields?$expand=allowedValues&api-version=%s";
+    public static final String CLASSIFICATION_NODES_ENDPOINT = "/%s/%s/_apis/wit/classificationnodes/%s?$depth=%s&api-version=%s";
 
     // Caching for Account Wise Azure Boards Integration Work Item Creation Fields
     private static final ConcurrentHashMap<Integer, Pair<Map<String, Map<String, BasicDBList>>, Integer>> accountWiseABFields = new ConcurrentHashMap<>();
@@ -92,7 +93,31 @@ public class AzureBoardsUtils {
         return respPayloadObj;
     }
 
-    public static BasicDBList parseWorkItemTypeFieldsEndpointPayload(BasicDBList payloadFieldsList,  Map<String, BasicDBObject> organizationFieldsMap) {         
+    public static BasicDBObject callClassificationNodesEndpoint(AzureBoardsIntegration azureBoardsIntegration, String projectName, String structureGroup, String depth) throws Exception {
+        /*
+         * Fetch classification nodes of a given structure group in a Azure Boards project
+         * docs:https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/classification-nodes/get?view=azure-devops-rest-7.1&tabs=HTTP
+         */
+        String formattedEndpoint = String.format(CLASSIFICATION_NODES_ENDPOINT, azureBoardsIntegration.getOrganization(), projectName, structureGroup, depth, version);
+        String requestUrl = azureBoardsIntegration.getBaseUrl() + formattedEndpoint;
+
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("Authorization", Collections.singletonList("Basic " + azureBoardsIntegration.getPersonalAuthToken()));
+
+        OriginalHttpRequest request = new OriginalHttpRequest(requestUrl, "", "GET", null, headers, "");
+        OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+        String responsePayload = response.getBody();
+        BasicDBObject respPayloadObj = BasicDBObject.parse(responsePayload);
+
+        if (response.getStatusCode() > 201 || responsePayload == null) {
+            loggerMaker.errorAndAddToDb(String.format("Error while making Azure boards request for fetching classiciation nodes - (%s,%s). Response Code %d", projectName, structureGroup, response.getStatusCode()));
+            return null;
+        }
+        
+        return respPayloadObj;
+    }
+
+    public static BasicDBList parseWorkItemTypeFieldsEndpointPayload(BasicDBList payloadFieldsList,  Map<String, BasicDBObject> organizationFieldsMap, List<String> areasClassificationNodes) {         
         if (payloadFieldsList == null || payloadFieldsList.isEmpty()) {
             return null;
         }
@@ -114,10 +139,16 @@ public class AzureBoardsUtils {
                 if (organizationFieldDetails == null) {
                     continue;
                 }
-                
+
                 BasicDBObject combinedFieldDetails = new BasicDBObject();
+                combinedFieldDetails.put("fieldReferenceName", fieldReferenceName);
                 combinedFieldDetails.put("workItemTypeFieldDetails", workTypeFieldDetails);
                 combinedFieldDetails.put("organizationFieldDetails", organizationFieldDetails);
+
+                if ("System.AreaPath".equals(fieldReferenceName)) {
+                    combinedFieldDetails.put("areasClassificationNodes", areasClassificationNodes);
+                }
+                
                 workItemTypeFieldsList.add(combinedFieldDetails);
             } catch (Exception e) {
                 // continue processing other fields
@@ -125,6 +156,27 @@ public class AzureBoardsUtils {
         }
 
         return workItemTypeFieldsList;
+    }
+
+    public static List<String> parseAreasClassificationNodesPayload(BasicDBObject payload) {
+        if (payload == null || payload.isEmpty()) {
+            return null;
+        }
+
+        /*
+        List<String> areasClassificationNodes = new ArrayList<>();
+        areasClassificationNodes.add("akto-test");
+        areasClassificationNodes.add("akto-test\\ui");
+        areasClassificationNodes.add("akto-test\\ui\\rewrite");
+        areasClassificationNodes.add("akto-test\\ui\\rewrite\\old-components");
+        areasClassificationNodes.add("akto-test\\ui\\rewrite\\new-components");
+        areasClassificationNodes.add("akto-test\\backend");
+        areasClassificationNodes.add("akto-test\\devops");
+        
+
+        return areasClassificationNodes;
+        */
+        return null;
     }
 
     public static Map<String, Map<String, BasicDBList>> fetchAccountAzureBoardFields() {
@@ -195,6 +247,22 @@ public class AzureBoardsUtils {
             futures.add(adoPool.submit(() -> {
                 Context.accountId.set(accountId);
 
+                List<String> areasClassificationNodes = null;
+                try {
+                    loggerMaker.infoAndAddToDb("Fetching classification nodes for project: " + projectName);
+                    BasicDBObject areasClassificationNodesPayload = callClassificationNodesEndpoint(
+                            azureBoardsIntegration, projectName, "Areas", "3");
+                    loggerMaker.infoAndAddToDb(String.format("Fetched classification nodes from Azure Boards for project: %s", projectName));
+                    areasClassificationNodes = parseAreasClassificationNodesPayload(areasClassificationNodesPayload);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Exception in fetching classification nodes for project: " + projectName);
+                }
+
+                if (areasClassificationNodes == null) {
+                    areasClassificationNodes = new ArrayList<>();
+                    areasClassificationNodes.add(projectName);
+                }
+
                 // Map of work item type to its fields for a given project
                 Map<String, BasicDBList> workItemTypeToFieldsMap = new HashMap<>();
 
@@ -211,8 +279,7 @@ public class AzureBoardsUtils {
                                 "Fetched %d work item fields from Azure Boards for work item type: %s in project: %s",
                                 count, workItemType, projectName));
                         BasicDBList payloadFieldsList = (BasicDBList) workItemTypeFieldsEndpointPayload.get("value");
-                        workItemTypeFieldsList = parseWorkItemTypeFieldsEndpointPayload(payloadFieldsList,
-                                organizationFieldsMap);    
+                        workItemTypeFieldsList = parseWorkItemTypeFieldsEndpointPayload(payloadFieldsList, organizationFieldsMap, areasClassificationNodes);    
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e,
                                 String.format("Exception while fetching work item fields for - (%s, %s): %s", projectName,
