@@ -1115,6 +1115,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
             discoveredTimestamp = x.startTs
           }
           let description = apiInfoMap[key] ? apiInfoMap[key]['description'] : ""
+          let lastSeenTs = Math.max(apiInfoMap[key] ? apiInfoMap[key]["lastSeen"] : x.startTs, x.startTs)
           ret[key] = {
               id: x.method + "###" + x.url + "###" + x.apiCollectionId + "###" + Math.random(),
               shadow: x.shadow ? x.shadow : false,
@@ -1127,8 +1128,8 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
               method: x.method,
               color: x.sensitive && x.sensitive.size > 0 ? "#f44336" : "#00bfa5",
               apiCollectionId: x.apiCollectionId,
-              last_seen: apiInfoMap[key] ? (this.prettifyEpoch(apiInfoMap[key]["lastSeen"])) : this.prettifyEpoch(x.startTs),
-              lastSeenTs: apiInfoMap[key] ? apiInfoMap[key]["lastSeen"] : x.startTs,
+              last_seen: this.prettifyEpoch(lastSeenTs),
+              lastSeenTs: lastSeenTs,
               detectedTs: discoveredTimestamp === 0 ? x.startTs : discoveredTimestamp,
               changesCount: x.changesCount,
               changes: x.changesCount && x.changesCount > 0 ? (x.changesCount +" new parameter"+(x.changesCount > 1? "s": "")) : 'No new changes',
