@@ -79,6 +79,7 @@ public class MergingLogic {
                 counter++;
             }
         }
+        loggerMaker.infoAndAddToDb("build deletedStaticUrlsString for collection " + apiCollectionId, LogDb.RUNTIME);
         loggerMaker.debugInfoAddToDb("deleteStaticUrls: " + deletedStaticUrlsString, LoggerMaker.LogDb.RUNTIME);
 
         loggerMaker.debugInfoAddToDb("merged URLs: ", LoggerMaker.LogDb.RUNTIME);
@@ -263,6 +264,8 @@ public class MergingLogic {
         // Check once at collection level whether STRING merging is allowed
         boolean allowStringMerging = !ApiCollectionsDao.shouldSkipMerging(apiCollection);
 
+        loggerMaker.infoAndAddToDb("allowStringMerging value for collection " + apiCollectionId + " is " + allowStringMerging, LogDb.DB_ABS);
+
         Bson filterQ = null;
         if (apiCollection != null && apiCollection.getHostName() == null) {
             filterQ = Filters.eq("apiCollectionId", apiCollectionId);
@@ -282,12 +285,17 @@ public class MergingLogic {
         ApiMergerResult finalResult = new ApiMergerResult(new HashMap<>());
         do {
             singleTypeInfos = SingleTypeInfoDao.instance.findAll(filterQ, offset, limit, null, Projections.exclude("values"));
+            loggerMaker.infoAndAddToDb("sti count " + singleTypeInfos.size() + " for collection " + apiCollectionId, LogDb.DB_ABS);
             System.out.println(singleTypeInfos.size());
 
             Map<String, Set<String>> staticUrlToSti = new HashMap<>();
             Set<String> templateUrlSet = new HashSet<>();
             List<String> templateUrls = new ArrayList<>();
             for(SingleTypeInfo sti: singleTypeInfos) {
+                if (sti.getMethod() == null || sti.getUrl() == null || sti.getUrl().isEmpty()) {
+                    loggerMaker.errorAndAddToDb("STI with null/empty method or url: method=" + sti.getMethod() + " url=" + sti.getUrl(), LogDb.DB_ABS);
+                    continue;
+                }
                 String key = sti.getMethod() + " " + sti.getUrl();
                 if (key.contains("INTEGER") || key.contains("STRING") || key.contains("UUID") || key.contains("OBJECT_ID") || key.contains("FLOAT") || key.contains("VERSIONED") || key.contains("LOCALE")) {
                     templateUrlSet.add(key);
@@ -367,14 +375,28 @@ public class MergingLogic {
             offset += limit;
         } while (!singleTypeInfos.isEmpty());
 
+        loggerMaker.infoAndAddToDb("done with tryMergeUrlsInCollection for collection" + apiCollectionId, LogDb.DB_ABS);
+
         return finalResult;
     }
 
     private static Map<Integer, Map<String, Set<String>>> groupByTokenSize(Map<String, Set<String>> catalog) {
         Map<Integer, Map<String, Set<String>>> sizeToURL = new HashMap<>();
         for(String rawURLPlusMethod: catalog.keySet()) {
+            if (rawURLPlusMethod == null || rawURLPlusMethod.isEmpty()) {
+                loggerMaker.errorAndAddToDb("Empty rawURLPlusMethod in groupByTokenSize", LoggerMaker.LogDb.RUNTIME);
+                continue;
+            }
             String[] rawUrlPlusMethodSplit = rawURLPlusMethod.split(" ");
+            if (rawUrlPlusMethodSplit.length == 0) {
+                loggerMaker.errorAndAddToDb("Split resulted in empty array for: '" + rawURLPlusMethod + "'", LoggerMaker.LogDb.RUNTIME);
+                continue;
+            }
             String rawURL = rawUrlPlusMethodSplit.length > 1 ? rawUrlPlusMethodSplit[1] : rawUrlPlusMethodSplit[0];
+            if (rawURL == null || rawURL.isEmpty()) {
+                loggerMaker.errorAndAddToDb("Empty rawURL for rawURLPlusMethod: '" + rawURLPlusMethod + "'", LoggerMaker.LogDb.RUNTIME);
+                continue;
+            }
             Set<String> reqTemplate = catalog.get(rawURLPlusMethod);
             String url = trim(rawURL);
             String[] tokens = url.split("/");
