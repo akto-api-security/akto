@@ -692,7 +692,7 @@ const transform = {
             finalDataSubCategories.push(...result.value.subCategories);
             totalTestsLoaded += subCategoriesCount;
             if(setTestsLoaded){
-              setTestsLoaded(totalTestsLoaded)
+              setTestsLoaded(Math.min(totalTestsLoaded, 4000))
             }
 
             // If a batch returned fewer than limit items, we've reached the end

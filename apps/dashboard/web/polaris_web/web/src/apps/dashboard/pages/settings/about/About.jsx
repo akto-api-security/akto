@@ -75,7 +75,7 @@ function About() {
         setNewMerging(resp.urlRegexMatchingEnabled)
         setTrafficThreshold(resp.trafficAlertThresholdSeconds)
         setObjectArr(arr)
-        setEnableTelemetry(resp.telemetrySettings.customerEnabled)
+        setEnableTelemetry(resp.telemetrySettings?.customerEnabled || false)
         if (resp.filterHeaderValueMap)
             setTrafficFiltersMap(resp.filterHeaderValueMap)
 
@@ -416,7 +416,7 @@ function About() {
                     disabled={window.USER_ROLE !== 'ADMIN'}
                 />
                 <Checkbox
-                    label="Acceptable Fix - Require description when marking issues as acceptable fix"
+                    label="Acceptable Risk - Require description when marking issues as acceptable risk"
                     checked={compulsoryDescription.acceptableFix}
                     onChange={(checked) => handleCompulsoryToggle('acceptableFix', checked)}
                     disabled={window.USER_ROLE !== 'ADMIN'}
@@ -660,6 +660,7 @@ function About() {
                             type={"partner"}
                         /> : null,
                         <Modal
+                            key="merging-on-versions-modal"
                             open={modalOpen}
                             onClose={() => setModalOpen(false)}
                             title={mergingOnVersions ? "Do not merge on versions" : "Allow merging on versions"}

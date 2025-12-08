@@ -15,7 +15,7 @@ import {
     HorizontalDotsMinor, ChevronDownMinor, ChevronRightMinor
 } from '@shopify/polaris-icons';
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import './row.css'
 import GithubCell from '../cells/GithubCell';
 import func from "@/util/func"
@@ -237,8 +237,16 @@ function GithubRow(props) {
     function NewCell(){
         return(
             <>
-                {headings.map((header, index) =>{
-                    return getHeader(header, index);
+                {headings.map((header, index) => {
+                    // Use index-based key to ensure uniqueness even if header properties are duplicated
+                    const cellKey = `cell-${index}`;
+                    const headerElement = getHeader(header, index);
+                    // Wrap in Fragment with key to handle null returns and ensure unique keys
+                    return headerElement ? (
+                        <Fragment key={cellKey}>
+                            {headerElement}
+                        </Fragment>
+                    ) : null;
                 })}
             </>
         )

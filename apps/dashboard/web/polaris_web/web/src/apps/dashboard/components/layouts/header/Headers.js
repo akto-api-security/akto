@@ -182,8 +182,8 @@ useEffect(() => {
         LocalStore.getState().setSubCategoryMap({});
         SessionStore.getState().setThreatFiltersMap({});
         setDashboardCategory(value);
-        window.location.reload();
-        window.location.href("/dashboard/observe/inventory")
+        navigate("/dashboard/observe/inventory");
+        navigate(0);    
     }
 
     function createNewAccount() {
@@ -277,7 +277,9 @@ useEffect(() => {
             />
             <TopBar.Menu
                 activatorContent={
-                    <Button plain monochrome icon={SettingsMajor} onClick={() => navigate("/dashboard/settings/about")} />
+                    <span style={{ cursor: 'pointer' }} onClick={() => navigate("/dashboard/settings/about")}>
+                        <Icon source={SettingsMajor} />
+                    </span>
                 }
             />
         </HorizontalStack>

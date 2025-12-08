@@ -146,3 +146,7 @@
 .control-row .Polaris-DataTable__Cell--firstColumn {
     padding-left: 8px !important;
 }
+
+.Polaris-Tooltip-TooltipOverlay__Content {
+    max-width: 50vw !important;
+}

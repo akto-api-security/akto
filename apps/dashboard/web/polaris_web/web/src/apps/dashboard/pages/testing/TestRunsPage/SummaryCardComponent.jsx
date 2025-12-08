@@ -53,9 +53,9 @@ const SummaryCardComponent = ({
           <Text fontWeight="semibold" variant="bodyMd">Found {totalVulnerabilities} vulnerabilities in total</Text>
           {
             loading ?
-              <Text variant="bodySm" color="subdued">
+              <Box key="spinner-box">
                 <SpinnerCentered height="0px" />
-              </Text>
+              </Box>
               :
               <Button plain monochrome icon={iconSource} onClick={() => setCollapsible(!collapsible)} />
           }

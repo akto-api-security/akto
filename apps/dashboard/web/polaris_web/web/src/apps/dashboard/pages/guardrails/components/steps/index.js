@@ -5,5 +5,6 @@ export { default as DeniedTopicsStep, DeniedTopicsConfig } from './DeniedTopicsS
 export { default as WordFiltersStep, WordFiltersConfig } from './WordFiltersStep';
 export { default as SensitiveInfoStep, SensitiveInfoConfig } from './SensitiveInfoStep';
 export { default as LlmPromptStep, LlmPromptConfig } from './LlmPromptStep';
+export { default as BasePromptStep, BasePromptConfig } from './BasePromptStep';
 export { default as ExternalModelStep, ExternalModelConfig } from './ExternalModelStep';
 export { default as ServerSettingsStep, ServerSettingsConfig } from './ServerSettingsStep';
