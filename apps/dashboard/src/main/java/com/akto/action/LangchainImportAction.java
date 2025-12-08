@@ -21,19 +21,9 @@ public class LangchainImportAction extends UserAction {
 
     public String initiateLangchainImport() {
         try {
-            // Print the filled data to console
             loggerMaker.info("=== Langchain Import Request ===", LogDb.DASHBOARD);
             loggerMaker.info("LangSmith URL: " + langsmithUrl, LogDb.DASHBOARD);
-            loggerMaker.info("API Key: " + apiKey, LogDb.DASHBOARD);
             loggerMaker.info("Data Ingestion Service URL: " + dataIngestionUrl, LogDb.DASHBOARD);
-            loggerMaker.info("========================", LogDb.DASHBOARD);
-
-            // Print to standard output as well
-            System.out.println("\n=== Langchain Import Request ===");
-            System.out.println("LangSmith URL: " + langsmithUrl);
-            System.out.println("API Key: " + apiKey);
-            System.out.println("Data Ingestion Service URL: " + dataIngestionUrl);
-            System.out.println("========================\n");
 
             // Create the collection if it doesn't exist and set up indices
             AIAgentConnectorInfoDao.instance.createIndicesIfAbsent();
@@ -60,11 +50,7 @@ public class LangchainImportAction extends UserAction {
             // Insert the document into the collection
             AIAgentConnectorInfoDao.instance.insertOne(createdImportInfo);
 
-            loggerMaker.info("Successfully saved Langchain Import data to collection: " + AIAgentConnectorInfoDao.COLLECTION_NAME + " with type: " + AIAgentConnectorInfo.TYPE_LANGCHAIN + " and status: " + AIAgentConnectorInfo.STATUS_CREATED, LogDb.DASHBOARD);
-            System.out.println("Successfully saved Langchain Import data to collection: " + AIAgentConnectorInfoDao.COLLECTION_NAME);
-            System.out.println("Type: " + AIAgentConnectorInfo.TYPE_LANGCHAIN);
-            System.out.println("Status: " + AIAgentConnectorInfo.STATUS_CREATED);
-            System.out.println("Document ID: " + createdImportInfo.getHexId());
+            loggerMaker.info("Successfully saved Langchain Import data to collection: " + AIAgentConnectorInfoDao.COLLECTION_NAME + " with type: " + AIAgentConnectorInfo.TYPE_LANGCHAIN + " and status: " + AIAgentConnectorInfo.STATUS_CREATED + ", Document ID: " + createdImportInfo.getHexId(), LogDb.DASHBOARD);
 
             return Action.SUCCESS.toUpperCase();
 

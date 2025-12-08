@@ -21,19 +21,9 @@ public class CopilotStudioImportAction extends UserAction {
 
     public String initiateCopilotStudioImport() {
         try {
-            // Print the filled data to console
             loggerMaker.info("=== Copilot Studio Import Request ===", LogDb.DASHBOARD);
             loggerMaker.info("App Insights App ID: " + appInsightsAppId, LogDb.DASHBOARD);
-            loggerMaker.info("App Insights API Key: " + appInsightsApiKey, LogDb.DASHBOARD);
             loggerMaker.info("Data Ingestion Service URL: " + dataIngestionUrl, LogDb.DASHBOARD);
-            loggerMaker.info("========================", LogDb.DASHBOARD);
-
-            // Print to standard output as well
-            System.out.println("\n=== Copilot Studio Import Request ===");
-            System.out.println("App Insights App ID: " + appInsightsAppId);
-            System.out.println("App Insights API Key: " + appInsightsApiKey);
-            System.out.println("Data Ingestion Service URL: " + dataIngestionUrl);
-            System.out.println("========================\n");
 
             // Create the collection if it doesn't exist and set up indices
             AIAgentConnectorInfoDao.instance.createIndicesIfAbsent();
@@ -60,11 +50,7 @@ public class CopilotStudioImportAction extends UserAction {
             // Insert the document into the collection
             AIAgentConnectorInfoDao.instance.insertOne(createdImportInfo);
 
-            loggerMaker.info("Successfully saved Copilot Studio Import data to collection: " + AIAgentConnectorInfoDao.COLLECTION_NAME + " with type: " + AIAgentConnectorInfo.TYPE_COPILOT_STUDIO + " and status: " + AIAgentConnectorInfo.STATUS_CREATED, LogDb.DASHBOARD);
-            System.out.println("Successfully saved Copilot Studio Import data to collection: " + AIAgentConnectorInfoDao.COLLECTION_NAME);
-            System.out.println("Type: " + AIAgentConnectorInfo.TYPE_COPILOT_STUDIO);
-            System.out.println("Status: " + AIAgentConnectorInfo.STATUS_CREATED);
-            System.out.println("Document ID: " + createdImportInfo.getHexId());
+            loggerMaker.info("Successfully saved Copilot Studio Import data to collection: " + AIAgentConnectorInfoDao.COLLECTION_NAME + " with type: " + AIAgentConnectorInfo.TYPE_COPILOT_STUDIO + " and status: " + AIAgentConnectorInfo.STATUS_CREATED + ", Document ID: " + createdImportInfo.getHexId(), LogDb.DASHBOARD);
 
             return Action.SUCCESS.toUpperCase();
 

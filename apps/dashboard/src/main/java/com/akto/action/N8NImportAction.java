@@ -21,19 +21,9 @@ public class N8NImportAction extends UserAction {
 
     public String initiateN8NImport() {
         try {
-            // Print the filled data to console
             loggerMaker.info("=== N8N Import Request ===", LogDb.DASHBOARD);
             loggerMaker.info("N8N URL: " + n8nUrl, LogDb.DASHBOARD);
-            loggerMaker.info("API Key: " + apiKey, LogDb.DASHBOARD);
             loggerMaker.info("Data Ingestion Service URL: " + dataIngestionUrl, LogDb.DASHBOARD);
-            loggerMaker.info("========================", LogDb.DASHBOARD);
-
-            // Print to standard output as well
-            System.out.println("\n=== N8N Import Request ===");
-            System.out.println("N8N URL: " + n8nUrl);
-            System.out.println("API Key: " + apiKey);
-            System.out.println("Data Ingestion Service URL: " + dataIngestionUrl);
-            System.out.println("========================\n");
 
             // Create the collection if it doesn't exist and set up indices
             AIAgentConnectorInfoDao.instance.createIndicesIfAbsent();
@@ -60,11 +50,7 @@ public class N8NImportAction extends UserAction {
             // Insert the document into the collection
             AIAgentConnectorInfoDao.instance.insertOne(createdImportInfo);
 
-            loggerMaker.info("Successfully saved N8N Import data to collection: " + AIAgentConnectorInfoDao.COLLECTION_NAME + " with type: " + AIAgentConnectorInfo.TYPE_N8N + " and status: " + AIAgentConnectorInfo.STATUS_CREATED, LogDb.DASHBOARD);
-            System.out.println("Successfully saved N8N Import data to collection: " + AIAgentConnectorInfoDao.COLLECTION_NAME);
-            System.out.println("Type: " + AIAgentConnectorInfo.TYPE_N8N);
-            System.out.println("Status: " + AIAgentConnectorInfo.STATUS_CREATED);
-            System.out.println("Document ID: " + createdImportInfo.getHexId());
+            loggerMaker.info("Successfully saved N8N Import data to collection: " + AIAgentConnectorInfoDao.COLLECTION_NAME + " with type: " + AIAgentConnectorInfo.TYPE_N8N + " and status: " + AIAgentConnectorInfo.STATUS_CREATED + ", Document ID: " + createdImportInfo.getHexId(), LogDb.DASHBOARD);
 
             return Action.SUCCESS.toUpperCase();
 
