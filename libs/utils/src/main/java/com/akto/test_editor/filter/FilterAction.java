@@ -204,6 +204,10 @@ public final class FilterAction {
             }
         }
 
+        if (filterActionRequest.getOperand().equalsIgnoreCase(TestEditorEnums.DataOperands.REGEX_EXTRACT.toString())) {
+                return extractRegexMatches(filterActionRequest, url);
+        }
+
         DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(url, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
         ValidationResult res = invokeFilter(dataOperandFilterRequest);
         return new DataOperandsFilterResponse(res.getIsValid(), null, null, null, res.getValidationReason());
@@ -220,7 +224,11 @@ public final class FilterAction {
         if (varMap.containsKey(querySet.get(0)) && varMap.get(querySet.get(0)) != null) {
             return;
         }
-        varMap.put(querySet.get(0), url);
+        String val = url;
+        if (filterActionRequest.getConcernedSubProperty() == null && filterActionRequest.getMatchingKeySet() != null && filterActionRequest.getMatchingKeySet().size() > 0) {
+                    val = filterActionRequest.getMatchingKeySet().get(0);
+            }
+        varMap.put(querySet.get(0), val);
     }
 
     public DataOperandsFilterResponse applyFilterOnMethod(FilterActionRequest filterActionRequest) {
@@ -506,15 +514,7 @@ public final class FilterAction {
             }
 
             if (filterActionRequest.getOperand().equalsIgnoreCase(TestEditorEnums.DataOperands.REGEX_EXTRACT.toString())) {
-                List<String> querySet = Utils.convertObjectToListOfString(filterActionRequest.getQuerySet());
-                List<String> matches = new ArrayList<>();
-                for (String query : querySet) {
-                    matches.addAll(Utils.extractRegex(payload, query));
-                }
-                if (matches.size() > 0) {
-                    return new DataOperandsFilterResponse(true, matches, null, null);
-                }
-                return new DataOperandsFilterResponse(false, null, null, null);
+                return extractRegexMatches(filterActionRequest, payload);
             }
             
             DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(val, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
@@ -522,6 +522,18 @@ public final class FilterAction {
             return new DataOperandsFilterResponse(validationResult.getIsValid(), null, null, null, validationResult.getValidationReason());
         }
 
+        return new DataOperandsFilterResponse(false, null, null, null);
+    }
+
+    private DataOperandsFilterResponse extractRegexMatches(FilterActionRequest filterActionRequest, String payload) {
+        List<String> querySet = Utils.convertObjectToListOfString(filterActionRequest.getQuerySet());
+        List<String> matches = new ArrayList<>();
+        for (String query : querySet) {
+            matches.addAll(Utils.extractRegex(payload, query));
+        }
+        if (matches.size() > 0) {
+            return new DataOperandsFilterResponse(true, matches, null, null);
+        }
         return new DataOperandsFilterResponse(false, null, null, null);
     }
 

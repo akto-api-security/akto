@@ -61,4 +61,15 @@ public class UtilsTest {
         String actual = Utils.buildResponseIHttpFormat(rawApi).trim();
         assertEquals(expected, actual);
     }
+
+    @Test
+    public void testExtractRegex(){
+        String payload = "https://api.stage.store.ignite.akto.com/v1/users/43017713-831f-458c-ae42-918215550c16/vehicles/663c72c829e603366a4bceb1/store/activity?since=1765000248&till=1765005649";
+        String regex = "/users/([^/]+)";
+
+        List<String> result = Utils.extractRegex(payload, regex);
+
+        assertEquals(1, result.size());
+        assertEquals("43017713-831f-458c-ae42-918215550c16", result.get(0));
+    }
 }
