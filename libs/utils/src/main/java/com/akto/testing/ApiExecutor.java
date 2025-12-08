@@ -771,6 +771,8 @@ public class ApiExecutor {
                     payload = request.getBody();
                 }
             }
+        }
+        
 
         if (payload == null) payload = "";
         if (body == null) {// body not created by GRPC block yet
