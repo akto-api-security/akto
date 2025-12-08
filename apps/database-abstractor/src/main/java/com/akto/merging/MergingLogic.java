@@ -338,6 +338,11 @@ public class MergingLogic {
                 }
                 URLMethods.Method staticMethod = URLMethods.Method.fromString(staticParts[0]);
                 String staticEndpoint = staticParts[1];
+                if (staticEndpoint.contains("//") || staticEndpoint.isEmpty()) {
+                    loggerMaker.errorAndAddToDb("staticEndpoint has empty tokens: '" + staticEndpoint + "'", LoggerMaker.LogDb.RUNTIME);
+                    iterator.remove();
+                    continue;
+                }
 
                 for (String templateURL: templateUrls) {
                     if (templateURL == null || templateURL.isEmpty() || !templateURL.contains(" ")) {
@@ -351,6 +356,10 @@ public class MergingLogic {
                     }
                     URLMethods.Method templateMethod = URLMethods.Method.fromString(templateParts[0]);
                     String templateEndpoint = templateParts[1];
+                    if (templateEndpoint.contains("//") || templateEndpoint.isEmpty()) {
+                        loggerMaker.errorAndAddToDb("templateEndpoint has empty tokens: '" + templateEndpoint + "'", LoggerMaker.LogDb.RUNTIME);
+                        continue;
+                    }
 
                     URLTemplate urlTemplate = createUrlTemplate(templateEndpoint, templateMethod);
                     if (urlTemplate.match(staticEndpoint, staticMethod)) {
