@@ -60,8 +60,11 @@ public class SendMaliciousEventsToBackend extends AbstractKafkaConsumerTask<byte
                         logger.debugAndAddToDb("sending malicious event to threat backend for url " + evt.getLatestApiEndpoint() + " filterId " + evt.getFilterId() + " eventType " + evt.getEventType().toString());
                         OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
                         String responsePayload = response.getBody();
-                        if (response.getStatusCode() != 200 || responsePayload == null) {
-                          logger.errorAndAddToDb("non 2xx response in record_malicious_event");
+                        if (response.getStatusCode() >= 400 || responsePayload == null) {
+                          logger.errorAndAddToDb(
+                              "record_malicious_event failed: status="
+                                  + response.getStatusCode()
+                          );
                         }
                       } catch (Exception e) {
                         logger.errorAndAddToDb("error sending malicious event " + e.getMessage());
