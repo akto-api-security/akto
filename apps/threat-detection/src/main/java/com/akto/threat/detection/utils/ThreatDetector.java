@@ -206,12 +206,11 @@ public class ThreatDetector {
         return ssrfTrie.containsMatch(httpResponseParams.getRequestParams().getPayload());
     }
 
-    private static final int AUTH_MISMATCH_ACCOUNT_ID = 1758858035;
     private static final String USER_ID_URL_REGEX = "/users/([^/]+)";
 
     public boolean isUserAuthMismatchThreat(HttpResponseParams httpResponseParams, RawApi rawApi) {
         // Early return if not target account or not successful response
-        if (Context.accountId.get() != AUTH_MISMATCH_ACCOUNT_ID || httpResponseParams.getStatusCode() != 200) {
+        if (httpResponseParams.getStatusCode() != 200) {
             return false;
         }
 
