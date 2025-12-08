@@ -110,11 +110,8 @@ public class DistributionDataForwardLayer {
                                       try {
                                         OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
                                         String responsePayload = response.getBody();
-                                        if (response.getStatusCode() >= 400 || responsePayload == null) {
-                                        logger.errorAndAddToDb(
-                                            "save_api_distribution_data returned status: "
-                                                + response.getStatusCode()
-                                            );
+                                        if (response.getStatusCode() != 200 || responsePayload == null) {
+                                        logger.errorAndAddToDb("non 2xx response in save_api_distribution_data");
                                         }
                                       } catch (Exception e) {
                                         logger.errorAndAddToDb("error sending api distribution data " + e.getMessage());
