@@ -114,11 +114,13 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
         command.add(binaryCanonical);
         command.add("-once");
 
-        // Create ProcessBuilder
+        // Create ProcessBuilder with security hardening
         ProcessBuilder processBuilder = new ProcessBuilder(command);
+        processBuilder.environment().clear(); // Clear inherited environment to avoid using untrusted env vars
+        processBuilder.directory(new File(baseDirCanonical)); // Restrict working directory to known safe directory
         processBuilder.redirectErrorStream(true); // Merge stdout and stderr
 
-        // Set environment variables based on connector type
+        // Set only the required environment variables for the connector
         Map<String, String> env = processBuilder.environment();
         setConnectorEnvironmentVariables(env, connectorType, config, dataIngestionUrl);
 
