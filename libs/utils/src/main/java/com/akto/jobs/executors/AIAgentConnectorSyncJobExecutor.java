@@ -118,6 +118,11 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
         // Get canonical base directory for containment validation
         String baseCanonical = new File(BINARY_BASE_PATH).getCanonicalPath();
 
+        // Explicit absolute path check (defense-in-depth, though toRealPath already returns absolute)
+        if (!new File(execCanonical).isAbsolute()) {
+            throw new Exception("Binary path is not absolute: " + execCanonical);
+        }
+
         // Check for shell meta-characters in the path we'll execute (defense-in-depth)
         // Note: Allow backslashes for Windows paths, but block other shell meta-characters
         if (execCanonical.matches(".*[;&|<>`$].*")) {
@@ -141,11 +146,14 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
             throw new Exception("Binary does not exist or is not executable: " + execCanonical);
         }
 
-        // Create ProcessBuilder with explicit command list (tokens passed as separate elements, no shell)
+        // Create ProcessBuilder with unmodifiable explicit command list (discrete tokens, no shell)
         // Uses: (1) execCanonical - fully validated absolute real path (no symlinks) with no user influence
         //       (2) "-once" - hardcoded argument (no user input)
-        // Explicit list ensures executable and arguments are discrete tokens with no shell interpretation
-        ProcessBuilder processBuilder = new ProcessBuilder(java.util.Arrays.asList(execCanonical, "-once"));
+        // Unmodifiable list ensures tokens cannot be altered and prevents shell interpretation
+        java.util.List<String> command = java.util.Collections.unmodifiableList(
+            java.util.Arrays.asList(execCanonical, "-once")
+        );
+        ProcessBuilder processBuilder = new ProcessBuilder(command);
         processBuilder.environment().clear(); // Clear inherited environment to avoid using untrusted env vars
         processBuilder.directory(new File(baseCanonical)); // Use the resolved canonical base directory to avoid symlink/relative path bypass
         processBuilder.redirectErrorStream(true); // Merge stdout and stderr
