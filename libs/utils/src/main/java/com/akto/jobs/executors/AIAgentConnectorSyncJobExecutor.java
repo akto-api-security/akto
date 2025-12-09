@@ -146,7 +146,7 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
         // This prevents shell/meta-character injection and untrusted search path issues
         java.util.List<String> command = java.util.Arrays.asList(binCanonical, "-once");
         ProcessBuilder processBuilder = new ProcessBuilder();
-        processBuilder.command(new java.util.ArrayList<>(command)); // Defensive copy prevents any accidental modification
+        processBuilder.command(java.util.Collections.unmodifiableList(new java.util.ArrayList<>(command))); // Immutable, validated full-path command; no user input allowed
         processBuilder.environment().clear(); // Clear inherited environment to avoid using untrusted env vars
         processBuilder.directory(new File(baseCanonical)); // Use the resolved canonical base directory to avoid symlink/relative path bypass
         processBuilder.redirectErrorStream(true); // Merge stdout and stderr
