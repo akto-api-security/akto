@@ -35,7 +35,7 @@ public class DevRevIntegrationManager {
     private String orgUrl;
     private String personalAccessToken;
 
-    public DevRevIntegration addIntegration() throws Exception {
+    public DevRevIntegration addIntegration(Map<String, String> partsIdToNameMap) throws Exception {
         if (orgUrl == null || orgUrl.isEmpty()) {
             throw new Exception("Please enter a valid organization URL.");
         }
@@ -46,10 +46,8 @@ public class DevRevIntegrationManager {
 
         String actualToken = getPersonalAccessToken(personalAccessToken);
 
-        Map<String, String> partsIdToNameMap = fetchAllPartsFromDevRev(actualToken);
-
-        if (partsIdToNameMap.isEmpty()) {
-            throw new Exception("Something went wrong. Please verify your configurations and try again.");
+        if (partsIdToNameMap == null || partsIdToNameMap.isEmpty()) {
+            throw new Exception("Please select at least one part.");
         }
 
         int currTimeStamp = Context.now();

@@ -23,7 +23,7 @@ public class DevRevIntegrationAction extends UserAction {
     public String addDevRevIntegration() {
         try {
             DevRevIntegrationManager manager = new DevRevIntegrationManager(orgUrl, personalAccessToken);
-            devrevIntegration = manager.addIntegration();
+            devrevIntegration = manager.addIntegration(partsIdToNameMap);
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             logger.errorAndAddToDb("Error adding DevRev integration: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
