@@ -125,9 +125,9 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
             throw new Exception("Binary path contains illegal shell meta-characters: " + execPath);
         }
 
-        // Create ProcessBuilder with explicit List to ensure executable and args are separate tokens
+        // Create ProcessBuilder with explicit List using the whitelisted expected path
         ProcessBuilder processBuilder = new ProcessBuilder();
-        processBuilder.command(java.util.Arrays.asList(execPath, "-once")); // Defense-in-depth: explicit list prevents any implicit shell parsing
+        processBuilder.command(java.util.Arrays.asList(expectedBinaryCanonical, "-once")); // Use the previously validated canonical expected path to avoid any user-influenced execPath
         processBuilder.environment().clear(); // Clear inherited environment to avoid using untrusted env vars
         processBuilder.directory(new File(BINARY_BASE_PATH)); // Restrict working directory to known safe directory
         processBuilder.redirectErrorStream(true); // Merge stdout and stderr
