@@ -5,6 +5,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.devrev_integration.DevRevIntegration;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.testing.ApiExecutor;
 import com.mongodb.BasicDBList;
@@ -84,7 +85,7 @@ public class DevRevIntegrationManager {
         headers.put("Authorization", Collections.singletonList("Bearer " + token));
         headers.put("Content-Type", Collections.singletonList("application/json"));
 
-        OriginalHttpRequest request = new OriginalHttpRequest(url, "", "GET", null, headers, "");
+        OriginalHttpRequest request = new OriginalHttpRequest(url, "", Method.GET.name(), null, headers, "");
 
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
