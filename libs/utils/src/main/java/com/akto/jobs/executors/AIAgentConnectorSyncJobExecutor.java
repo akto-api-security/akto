@@ -148,7 +148,7 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
         ProcessBuilder processBuilder = new ProcessBuilder();
         processBuilder.command(command);
         processBuilder.environment().clear(); // Clear inherited environment to avoid using untrusted env vars
-        processBuilder.directory(new File(BINARY_BASE_PATH)); // Restrict working directory to known safe directory
+        processBuilder.directory(new File(baseCanonical)); // Use the resolved canonical base directory to avoid symlink/relative path bypass
         processBuilder.redirectErrorStream(true); // Merge stdout and stderr
 
         // Set only the required environment variables for the connector
