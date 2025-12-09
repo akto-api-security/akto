@@ -18,11 +18,10 @@ export const DOCS_URL_N8N = 'https://docs.akto.io/n8n-import';
 export const DOCS_URL_LANGCHAIN = 'https://docs.akto.io/langchain-import';
 export const DOCS_URL_COPILOT_STUDIO = 'https://docs.akto.io/copilot-studio-import';
 
-// Recurring Interval Seconds
+// Recurring Interval Seconds (in seconds)
 export const INTERVAL_N8N = 300; // 5 minutes
-export const INTERVAL_LANGCHAIN = 10; // 10 seconds
-export const INTERVAL_COPILOT_STUDIO = 10; // 10 seconds
-export const DEFAULT_INTERVAL = 300; // 5 minutes
+export const INTERVAL_LANGCHAIN = 300; // 5 minutes
+export const INTERVAL_COPILOT_STUDIO = 300; // 5 minutes
 
 // Field Names
 export const FIELD_N8N_URL = 'n8nUrl';
