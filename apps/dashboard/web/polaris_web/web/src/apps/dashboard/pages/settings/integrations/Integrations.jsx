@@ -89,7 +89,7 @@ function Integrations() {
     let devRevObj={
       id: 'devrev',
       name:'DevRev',
-      source: '/public/devrev.svg'
+      source: '/public/devrev-ai.svg'
     }
     let jenkinsObj={
       id: `jenkins`,
