@@ -98,18 +98,21 @@ const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handl
             const initialFieldMetaData = createABWorkItemFieldMetaData?.[projId]?.[issueType] || [];
 
             // filter out fields that are not custom fields or allowed system fields
-            const allowedSystemFields = initialFieldMetaData.filter(field => {
-                const fieldReferenceName = field?.organizationFieldDetails?.referenceName;
-                return typeof fieldReferenceName === "string" && issuesFunctions.isAllowedABSystemField(fieldReferenceName);
+            let tagSystemField = null, areaPathSystemField = null, customFields = [];
+            initialFieldMetaData.forEach(field => {
+                const fieldReferenceName = field?.fieldReferenceName;
+                if (typeof fieldReferenceName !== "string") return;
+
+                if (fieldReferenceName === "System.Tags") tagSystemField = field;
+                if (fieldReferenceName === "System.AreaPath") areaPathSystemField = field;
+                if (fieldReferenceName.startsWith("Custom.")) customFields.push(field);
             });
 
-            const customFields = initialFieldMetaData.filter(field => {
-                const fieldReferenceName = field?.organizationFieldDetails?.referenceName;
-                return typeof fieldReferenceName === "string" && fieldReferenceName.startsWith("Custom.");
-            });
-
-            const filteredFieldMetaData = [...allowedSystemFields, ...customFields];
-
+            const filteredFieldMetaData = [];
+            if (tagSystemField) filteredFieldMetaData.push(tagSystemField);
+            if (areaPathSystemField) filteredFieldMetaData.push(areaPathSystemField);
+            filteredFieldMetaData.push(...customFields);
+            
             setDisplayABWorkItemFieldMetadata(filteredFieldMetaData);
 
             const initialValues = filteredFieldMetaData.reduce((acc, field) => {
