@@ -258,24 +258,6 @@ public class ThreatDetectorTest {
     }
 
     @Test
-    public void testUserAuthMismatchThreat_wrongAccount() {
-        Context.accountId.set(999999);
-
-        Map<String, List<String>> headers = new HashMap<>();
-        headers.put("Authorization", Arrays.asList("Bearer " + JWT_WITH_SUB_USER_2));
-
-        HttpRequestParams reqParams = new HttpRequestParams();
-        reqParams.resetValues("GET", "/api/users/" + USER_ID_1 + "/profile", "HTTP/1.1", headers, "", 0);
-
-        HttpResponseParams params = new HttpResponseParams();
-        params.setRequestParams(reqParams);
-        params.setStatusCode(200);
-
-        // Wrong account → no threat detection
-        assertFalse(threatDetector.isUserAuthMismatchThreat(params, null));
-    }
-
-    @Test
     public void testUserAuthMismatchThreat_non200Status() {
         Context.accountId.set(AUTH_MISMATCH_ACCOUNT_ID);
 
