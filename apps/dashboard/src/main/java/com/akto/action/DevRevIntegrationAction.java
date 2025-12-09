@@ -44,7 +44,7 @@ public class DevRevIntegrationAction extends UserAction {
         }
     }
 
-    public String fetchDevrevProjects() {
+    public String fetchDevRevParts() {
         try {
             DevRevIntegrationManager manager = new DevRevIntegrationManager(null, personalAccessToken);
             partsIdToNameMap = manager.fetchDevrevProjects();

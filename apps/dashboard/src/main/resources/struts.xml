@@ -11557,15 +11557,15 @@
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ</param>
             </interceptor-ref>
-            <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">DEVREV_INTEGRATION</param>
-            </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
+            <interceptor-ref name="usageInterceptor">
+              <param name="featureLabel">DEVREV_INTEGRATION</param>
+            </interceptor-ref>
 
             <result name="SUCCESS" type="json">
                 <param name="ignoreHierarchy">false</param>
@@ -11593,7 +11593,6 @@
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User added DevRev integration</param>
             </interceptor-ref>
-
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
@@ -11618,13 +11617,13 @@
             </result>
         </action>
 
-        <action name="api/fetchDevrevProjects" class="com.akto.action.DevRevIntegrationAction" method="fetchDevrevProjects" >
+        <action name="api/fetchDevRevParts" class="com.akto.action.DevRevIntegrationAction" method="fetchDevRevParts" >
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">User fetched DevRev projects</param>
+                <param name="actionDescription">User fetched DevRev parts</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -11632,6 +11631,9 @@
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
+            <interceptor-ref name="usageInterceptor">
+              <param name="featureLabel">DEVREV_INTEGRATION</param>
+            </interceptor-ref>
             <result name="SUCCESS" type="json">
               <param name="ignoreHierarchy">false</param>
               <param name="includeProperties">^partsIdToNameMap.*</param>
@@ -11662,6 +11664,9 @@
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
+            <interceptor-ref name="usageInterceptor">
+              <param name="featureLabel">DEVREV_INTEGRATION</param>
+            </interceptor-ref>
             <result name="SUCCESS" type="json">
               <param name="ignoreHierarchy">false</param>
             </result>
