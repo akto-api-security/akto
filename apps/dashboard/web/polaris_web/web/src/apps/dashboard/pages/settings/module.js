@@ -332,7 +332,7 @@ const settingFunctions = {
     },
     fetchDevRevParts: async function(personalAccessToken) {
       let parts = {}
-      await settingRequests.fetchDevrevProjects(personalAccessToken).then((resp)=>{
+      await settingRequests.fetchDevRevParts(personalAccessToken).then((resp)=>{
         parts = resp.partsIdToNameMap
       })
       return parts
