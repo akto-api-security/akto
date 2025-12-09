@@ -638,6 +638,38 @@ const settingRequests = {
             data: {}
         })
     },
+
+    fetchDevRevIntegration() {
+        return request({
+            url: '/api/fetchDevRevIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchDevrevProjects(personalAccessToken) {
+        return request({
+            url: '/api/fetchDevrevProjects',
+            method: 'post',
+            data: { personalAccessToken }
+        })
+    },
+
+    addDevRevIntegration(orgUrl, personalAccessToken, partsIdToNameMap) {
+        return request({
+            url: '/api/addDevRevIntegration',
+            method: 'post',
+            data: { orgUrl, personalAccessToken, partsIdToNameMap }
+        })
+    },
+
+    removeDevRevIntegration() {
+        return request({
+            url: '/api/removeDevRevIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
     removeInvitation(email) {
         return request({
             url: '/api/removeInvitation',
