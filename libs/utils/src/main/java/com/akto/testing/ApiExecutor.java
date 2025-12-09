@@ -476,6 +476,107 @@ public class ApiExecutor {
         
     }
 
+     /**
+     * Creates a multipart body by merging JSON fields with multiple file attachments.
+     * This allows add_params and attach_file to work together for multipart requests.
+     */
+     private static RequestBody createMultipartBodyWithFiles(String jsonPayload, String boundary, List<Map<String, String>> files, String contentType) {
+        try {
+            // Parse JSON to get all fields
+            @SuppressWarnings("unchecked")
+            Map<String, Object> fields = objectMapper.readValue(jsonPayload, LinkedHashMap.class);
+            
+            MultipartBody.Builder multipartBuilder = new MultipartBody.Builder()
+                .setType(MediaType.parse(contentType));
+
+            // Add all fields from JSON (text fields and existing file fields)
+            for (Map.Entry<String, Object> entry : fields.entrySet()) {
+                String partFieldName = entry.getKey();
+                Object fieldValue = entry.getValue();
+                
+                if (fieldValue instanceof Map) {
+                    // Existing file field from JSON - decode and add as form data part
+                    @SuppressWarnings("unchecked")
+                    Map<String, String> fileObj = (Map<String, String>) fieldValue;
+                    String filename = fileObj.get("filename");
+                    String fileContentType = fileObj.getOrDefault("contentType", "application/octet-stream");
+                    String base64Content = fileObj.get("content");
+                    
+                    if (base64Content != null) {
+                        byte[] decodedContent = Base64.getDecoder().decode(base64Content);
+                        multipartBuilder.addFormDataPart(
+                            partFieldName,
+                            filename != null ? filename : "file",
+                            RequestBody.create(decodedContent, MediaType.parse(fileContentType))
+                        );
+                    }
+                } else {
+                    // Text field - add as string
+                    multipartBuilder.addFormDataPart(partFieldName, fieldValue != null ? fieldValue.toString() : "");
+                }
+            }
+            
+            // Add all file attachments from URLs
+            for (Map<String, String> fileInfo : files) {
+                String fieldName = fileInfo.get("field");
+                String fileUrl = fileInfo.get("url");
+                
+                URL sourceFileUrl = new URL(fileUrl);
+                InputStream urlInputStream = sourceFileUrl.openStream();
+                final int CHUNK_SIZE = 1 * 1024 * 1024;
+                
+                String filename = extractFilenameFromUrl(fileUrl);
+                MediaType fileMediaType = Utils.getMediaType(fileUrl);
+                
+                multipartBuilder.addFormDataPart(fieldName, filename, new RequestBody() {
+                    @Override
+                    public MediaType contentType() {
+                        return fileMediaType;
+                    }
+
+                    @Override
+                    public void writeTo(BufferedSink sink) throws IOException {
+                        byte[] chunk = new byte[CHUNK_SIZE];
+                        int bytesRead;
+                        long totalBytesRead = 0;
+                        long maxBytes = 100L * 1024 * 1024;
+                        while ((bytesRead = urlInputStream.read(chunk)) != -1) {
+                            totalBytesRead += bytesRead;
+                            if (totalBytesRead > maxBytes) {
+                                loggerMaker.errorAndAddToDb("File size greater than 100mb, breaking loop.", LogDb.TESTING);
+                                break;
+                            }
+                            sink.write(chunk, 0, bytesRead);
+                        }
+                    }
+                });
+            }
+            
+            return multipartBuilder.build();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error creating multipart body with files: " + e.getMessage(), LogDb.TESTING);
+            return null;
+        }
+    }
+
+    /**
+     * Extracts filename from URL (e.g., "http://example.com/file.txt" -> "file.txt")
+     */
+    private static String extractFilenameFromUrl(String fileUrl) {
+        try {
+            String path = new URL(fileUrl).getPath();
+            if (path != null && !path.isEmpty()) {
+                int lastSlash = path.lastIndexOf('/');
+                if (lastSlash >= 0 && lastSlash < path.length() - 1) {
+                    return path.substring(lastSlash + 1);
+                }
+            }
+        } catch (Exception e) {
+            // Ignore
+        }
+        return "file"; // Default filename
+    }
+
     private static void calculateFinalRequestFromAdvancedSettings(OriginalHttpRequest originalHttpRequest, List<TestConfigsAdvancedSettings> advancedSettings){
         Map<String,List<ConditionsType>> headerConditions = new HashMap<>();
         Map<String,List<ConditionsType>> payloadConditions = new HashMap<>();
@@ -529,10 +630,27 @@ public class ApiExecutor {
             request.setHeaders(headers);
         }
 
-        if(headers != null && headers.containsKey(Constants.AKTO_ATTACH_FILE)){
-            String fileUrl = headers.get(Constants.AKTO_ATTACH_FILE).get(0);
-            RequestBody requestBody = null;
-            requestBody = getFileRequestBody(fileUrl);
+        String contentType = request.findContentType();
+        boolean isMultipart = contentType != null && contentType.contains(HttpRequestResponseUtils.MULTIPART_FORM_DATA_CONTENT_TYPE);
+        boolean hasAttachFile = headers != null && headers.containsKey(Constants.AKTO_ATTACH_FILE);
+
+        // For non-multipart requests with attach_file, use the original early return behavior
+        if (hasAttachFile && !isMultipart) {
+            String attachHeaderVal = headers.get(Constants.AKTO_ATTACH_FILE).get(0);
+            
+            // Check if it's JSON array (multiple files) - not supported for non-multipart
+            if (attachHeaderVal.trim().startsWith("[")) {
+                loggerMaker.errorAndAddToDb("Multiple file attachments not supported for non-multipart requests", LogDb.TESTING);
+                return null;
+            }
+            
+            // Extract file URL from header (format: fieldName::fileUrl)
+            String fileUrl = attachHeaderVal;
+            int sepIdx = attachHeaderVal.indexOf("::");
+            if (sepIdx >= 0) {
+                fileUrl = attachHeaderVal.substring(sepIdx + 2);
+            }
+            RequestBody requestBody = getFileRequestBody(fileUrl);
         
             builder.post(requestBody);
             builder.removeHeader(Constants.AKTO_ATTACH_FILE);
@@ -541,7 +659,6 @@ public class ApiExecutor {
             return common(updatedRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, requestProtocol, request.getTlsAuthParam());
         }
 
-        String contentType = request.findContentType();
         String payload = request.getBody();
         RequestBody body = null;
         if (contentType == null ) {
@@ -586,7 +703,76 @@ public class ApiExecutor {
                 request.getHeaders().remove("x-akto-original-url");
                 request.getHeaders().remove("x-akto-original-method");
             }  
-        } 
+        } else if (isMultipart) {
+            String boundary = HttpRequestResponseUtils.extractBoundary(HttpRequestResponseUtils.getHeaderValue(headers, HttpRequestResponseUtils.CONTENT_TYPE));
+            if (boundary != null && payload != null && payload.startsWith("{")) {
+                try {
+                    if (hasAttachFile) {
+                        // For multipart with attach_file: merge JSON fields with file attachment(s)
+                        String attachHeaderVal = headers.get(Constants.AKTO_ATTACH_FILE).get(0);
+                        
+                        List<Map<String, String>> files = new ArrayList<>();
+                        
+                        // Check if it's JSON array (multiple files) or simple format (single file)
+                        if (attachHeaderVal.trim().startsWith("[")) {
+                            // Multiple files: parse JSON array
+                            try {
+                                JsonNode filesArray = objectMapper.readTree(attachHeaderVal);
+                                if (filesArray.isArray()) {
+                                    for (JsonNode fileNode : filesArray) {
+                                        Map<String, String> fileInfo = new HashMap<>();
+                                        fileInfo.put("field", fileNode.get("field").asText());
+                                        fileInfo.put("url", fileNode.get("url").asText());
+                                        files.add(fileInfo);
+                                    }
+                                }
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb("Failed to parse multiple files JSON: " + e.getMessage(), LogDb.TESTING);
+                            }
+                        } else {
+                            // Single file: parse simple format "fieldName::fileUrl"
+                            String fieldName = "file";
+                            String fileUrl = attachHeaderVal;
+                            int sepIdx = attachHeaderVal.indexOf("::");
+                            if (sepIdx >= 0) {
+                                fieldName = attachHeaderVal.substring(0, sepIdx);
+                                fileUrl = attachHeaderVal.substring(sepIdx + 2);
+                            }
+                            Map<String, String> fileInfo = new HashMap<>();
+                            fileInfo.put("field", fieldName);
+                            fileInfo.put("url", fileUrl);
+                            files.add(fileInfo);
+                        }
+                        
+                        if (!files.isEmpty()) {
+                            body = createMultipartBodyWithFiles(payload, boundary, files, contentType);
+                            if (body == null) {
+                                // Error already logged in createMultipartBodyWithFiles, fallback to original payload
+                                loggerMaker.errorAndAddToDb("Failed to create multipart with files, using original payload", LogDb.TESTING);
+                                payload = request.getBody();
+                            } else {
+                                builder.removeHeader(Constants.AKTO_ATTACH_FILE);
+                                loggerMaker.infoAndAddToDb("Created multipart body with JSON fields and " + files.size() + " file attachment(s)", LogDb.TESTING);
+                            }
+                        }
+                    } else {
+                        // Normal multipart conversion: JSON to multipart string
+                        loggerMaker.infoAndAddToDb("converting json to multipart payload:" + payload, LogDb.TESTING);
+                        payload = HttpRequestResponseUtils.jsonToMultipart(payload, boundary);
+                        // IMPORTANT: Use ISO-8859-1 to preserve binary data bytes (0-255)
+                        // jsonToMultipart() returns ISO-8859-1 encoded string to preserve binary file content
+                        body = RequestBody.create(
+                            payload.getBytes(java.nio.charset.StandardCharsets.ISO_8859_1),
+                            MediaType.parse(contentType)
+                        );
+                    }
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Unable to convert to multipart:" + payload + " Error: " + e.getMessage(), LogDb.TESTING);
+                    payload = request.getBody();
+                }
+            }
+        }
+        
 
         if (payload == null) payload = "";
         if (body == null) {// body not created by GRPC block yet

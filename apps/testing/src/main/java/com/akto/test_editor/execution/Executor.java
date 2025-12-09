@@ -33,6 +33,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.net.URI;
 
+
 import org.json.JSONObject;
 
 import com.mongodb.BasicDBObject;
@@ -519,7 +520,7 @@ public class Executor {
                     return new ExecutorSingleOperationResp(false, response.getString("error"));
                 }
             case "attach_file":
-                return Operations.addHeader(rawApi, Constants.AKTO_ATTACH_FILE , key.toString());
+                return Operations.addHeader(rawApi, Constants.AKTO_ATTACH_FILE, key.toString());
 
             case "modify_header":
                 Object epochVal = Utils.getEpochTime(value);
