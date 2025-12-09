@@ -7,12 +7,8 @@ import com.akto.dto.metrics.MetricData;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.OrgUtils;
-import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
-import okhttp3.*;
-
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -124,11 +120,6 @@ public class AllMetrics {
     private AllMetrics(){}
 
     public static AllMetrics instance = new AllMetrics();
-
-    private static final String URL = "https://logs.akto.io/ingest-metrics";
-
-    // Using default timeouts [10 seconds], as this is a slow API.
-    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
 
     private final static LoggerMaker loggerMaker = new LoggerMaker(AllMetrics.class, LogDb.RUNTIME);
     private DataActor dataActor;
@@ -435,30 +426,11 @@ public class AllMetrics {
         }
     }
 
-    public void sendDataToAkto(BasicDBList list,List<MetricData> metricDataList){
-        MediaType mediaType = MediaType.parse("application/json");
-        RequestBody body = RequestBody.create(new BasicDBObject("data", list).toJson(), mediaType);
-        Request request = new Request.Builder()
-                .url(URL)
-                .method("POST", body)
-                .addHeader("Content-Type", "application/json")
-                .build();
-        Response response = null;
+    private void sendDataToAkto(BasicDBList list,List<MetricData> metricDataList){
         try {
-            response =  client.newCall(request).execute();
-            //Ingesting metrics in mongodb
             dataActor.ingestMetricData(metricDataList);
-        } catch (IOException e) {
-            loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
-        } finally {
-            if (response != null) {
-                response.close();
-            }
-        }
-        if (response!= null && response.isSuccessful()) {
-            loggerMaker.infoAndAddToDb("Updated data_metrics", LoggerMaker.LogDb.RUNTIME);
-        } else {
-            loggerMaker.infoAndAddToDb("data_metrics not sent", LoggerMaker.LogDb.RUNTIME);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while executing request " + e.getMessage());
         }
     }
 }
