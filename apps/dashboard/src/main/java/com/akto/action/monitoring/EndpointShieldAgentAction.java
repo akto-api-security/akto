@@ -124,7 +124,7 @@ public class EndpointShieldAgentAction extends UserAction {
                                 }
                             }
 
-                            server.setCollectionName(collectionName);
+                            server.setCollectionName(collectionName.toLowerCase());
                             
                             // Set detected as true since server exists
                             server.setDetected(true);
