@@ -11550,6 +11550,104 @@
             </result>
         </action>
 
+        <action name="api/fetchDevRevIntegration" class="com.akto.action.DevRevIntegrationAction" method="fetchDevRevIntegration" >
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">DEVREV_INTEGRATION</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+
+            <result name="SUCCESS" type="json">
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^devrevIntegration.*</param>
+            </result>
+
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
+            </result>
+
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/addDevRevIntegration" class="com.akto.action.DevRevIntegrationAction" method="addDevRevIntegration" >
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User added DevRev integration</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">DEVREV_INTEGRATION</param>
+            </interceptor-ref>
+            <result name="SUCCESS" type="json">
+              <param name="ignoreHierarchy">false</param>
+              <param name="includeProperties">^devrevIntegration.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchDevrevProjects" class="com.akto.action.DevRevIntegrationAction" method="fetchDevrevProjects" >
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User fetched DevRev projects</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+              <param name="ignoreHierarchy">false</param>
+              <param name="includeProperties">^partsIdToNameMap.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchServiceNowIntegration" class="com.akto.action.ServiceNowIntegrationAction" method="fetchServiceNowIntegration" >
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
