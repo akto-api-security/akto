@@ -93,8 +93,38 @@ public class EndpointShieldAgentAction extends UserAction {
                                 }
                             }
                             
-                            // Set collectionName as name + "." + mcpServerName
-                            server.setCollectionName(moduleInfo.getName() + "." + serverName);
+                            // Set collectionName - priority order:
+                            // 1. Check if collectionName exists in serverData (additionalInfo)
+                            // 2. Fallback to constructed name based on server type
+                            Object collectionNameObj = serverData.get("collectionName");
+                            String collectionName;
+
+                            if (collectionNameObj instanceof String && !((String) collectionNameObj).isEmpty()) {
+                                // Priority 1: Use collection name from additionalInfo
+                                collectionName = (String) collectionNameObj;
+                            } else {
+                                // Priority 2: Construct collection name based on server type
+                                String deviceId = moduleInfo.getName();
+                                String serverUrl = server.getServerUrl();
+
+                                // Check if it's a streamable case (contains URL pattern)
+                                if (serverUrl != null && (serverUrl.startsWith("http://") || serverUrl.startsWith("https://"))) {
+                                    // Streamable case: extract hostname from URL
+                                    try {
+                                        java.net.URL url = new java.net.URL(serverUrl);
+                                        String hostname = url.getHost();
+                                        collectionName = deviceId + "." + hostname;
+                                    } catch (Exception e) {
+                                        // If URL parsing fails, fallback to serverName
+                                        collectionName = deviceId + "." + serverName;
+                                    }
+                                } else {
+                                    // Stdio case: use deviceID.serverName
+                                    collectionName = deviceId + "." + serverName;
+                                }
+                            }
+
+                            server.setCollectionName(collectionName);
                             
                             // Set detected as true since server exists
                             server.setDetected(true);
