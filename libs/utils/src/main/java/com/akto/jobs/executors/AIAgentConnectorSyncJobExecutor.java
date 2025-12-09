@@ -138,7 +138,12 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
 
         // Ensure execCanonical is inside trusted base directory
         if (!execCanonical.startsWith(baseCanonical + File.separator)) {
-            throw new Exception("Binary path is outside allowed base path: " + execCanonical);
+// Validate binary name to prevent path traversal or injection
+String binaryName = getBinaryName(connectorType);
+if (binaryName == null || !binaryName.matches("^[a-zA-Z0-9._-]+$")) {
+    throw new Exception("Invalid binary name for connector: " + binaryName);
+}
+String expectedBinaryCanonical = new File(BINARY_BASE_PATH, binaryName).getCanonicalPath();
         }
 
         // Final check: Ensure the binary exists and is executable
