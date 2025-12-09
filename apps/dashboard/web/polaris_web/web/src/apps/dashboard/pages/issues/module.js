@@ -1,9 +1,12 @@
 import issuesApi from "@/apps/dashboard/pages/issues/api"
 import IssuesStore from '@/apps/dashboard/pages/issues/issuesStore';
-import { Checkbox, TextField } from "@shopify/polaris";
+import { Button, Checkbox, HorizontalStack, Popover, Text, TextField } from "@shopify/polaris";
 import DropdownSearch from "@/apps/dashboard/components/shared/DropdownSearch";
 import Dropdown from "@/apps/dashboard/components/layouts/Dropdown";
-import SingleDate from "../../components/layouts/SingleDate";
+import SingleDate from "@/apps/dashboard/components/layouts/SingleDate";
+import ShowListInBadge from "@/apps/dashboard/components/shared/ShowListInBadge"
+import TagManager from "@/apps/dashboard/components/shared/TagManager";
+import { useState } from "react";
 
 const setCreateJiraIssueFieldMetaData = IssuesStore.getState().setCreateJiraIssueFieldMetaData;
 const updateDisplayJiraIssueFieldValues = IssuesStore.getState().updateDisplayJiraIssueFieldValues;
@@ -175,17 +178,36 @@ const issuesFunctions = {
         } catch (error) {
         }
     },
+    getOverriddenABFieldType: (fieldReferenceName, fieldType) => {
+        let overriddenFieldType;
+
+        switch (fieldReferenceName) {
+            case "System.AreaPath": 
+                overriddenFieldType = "AreaPath";
+                break;
+            case "System.Tags":
+                overriddenFieldType = "Tags";
+                break;
+            default:
+                overriddenFieldType = fieldType;
+                break;
+        }
+
+        return overriddenFieldType;
+    },
     getABFieldConfigurations: (field) => {
         const { organizationFieldDetails, workItemTypeFieldDetails } = field;
 
         const fieldReferenceName = organizationFieldDetails?.referenceName || "";
         const fieldName = organizationFieldDetails?.name || "";
-        const fieldType = organizationFieldDetails?.type || "";
         const isFieldPicklist = organizationFieldDetails?.isPicklist || false;
-        
-        const fieldDefaultValue = workItemTypeFieldDetails?.defaultValue || null;
+
         const fieldAllowedValues = workItemTypeFieldDetails?.allowedValues || [];
         const isFieldRequired = workItemTypeFieldDetails?.alwaysRequired || false;
+        const fieldDefaultValue = workItemTypeFieldDetails?.defaultValue || null;
+
+        let fieldType = organizationFieldDetails?.type || "";
+        fieldType = issuesFunctions.getOverriddenABFieldType(fieldReferenceName, fieldType);
 
         const handleFieldChange = (fieldReferenceName, value) => {
             updateDisplayABWorkItemFieldValues(fieldReferenceName, value)
@@ -249,7 +271,7 @@ const issuesFunctions = {
                     }
                 }
             case "integer":
-            case "double":  
+            case "double":
                 if (isFieldPicklist) {
                     const { initialValue, menuItems } = getPicklistFieldConfiguration(fieldType, fieldDefaultValue, fieldAllowedValues);
 
@@ -349,12 +371,113 @@ const issuesFunctions = {
                         )
                     }
                 }
+            case "AreaPath":
+                const areasClassificationNodes = Array.isArray(field?.areasClassificationNodes) ? field.areasClassificationNodes : [];
+                areasClassificationNodes.sort((a, b) => a.length - b.length);
+                
+                const initialAreaPathValue = areasClassificationNodes.length > 0 ? areasClassificationNodes[0] : "";
+
+                return {
+                    initialValue: initialAreaPathValue,
+                    getComponent: () => { 
+                        const displayABWorkItemFieldValues = IssuesStore(state => state.displayABWorkItemFieldValues);
+                        const areaPathOptions = areasClassificationNodes.map((areaPath) => ({
+                            label: typeof areaPath === "string" ? areaPath.replace(/\\\\/g, "\\") : "",
+                            value: areaPath
+                        }));
+
+                        return (
+                            <DropdownSearch
+                                id={`${fieldReferenceName}-dropdown`}
+                                label="Area"
+                                placeholder="Select Area"
+                                optionsList={areaPathOptions}
+                                setSelected={(value) => handleFieldChange(fieldReferenceName, value)}
+                                preSelected={initialAreaPathValue}
+                                value={displayABWorkItemFieldValues[fieldReferenceName] || ""}
+                            />
+                        ) 
+                    }
+                }
+            case "Tags":
+                const initialTagsValue = [];
+
+                return {
+                    initialValue: initialTagsValue,
+                    getComponent: () => {
+                        const [popover, setPopover] = useState(false);
+
+                        const displayABWorkItemFieldValues = IssuesStore(state => state.displayABWorkItemFieldValues);
+                        const tagList = Array.isArray(displayABWorkItemFieldValues[fieldReferenceName]) ? displayABWorkItemFieldValues[fieldReferenceName] : [];
+
+                        const tagsOperationsHandler = (fieldReferenceName, operation, value) => {
+                            const exists = tagList.includes(value);
+
+                            if (operation === "RESET") handleFieldChange(fieldReferenceName, []);
+                            else if (operation === "ADD" && !exists) handleFieldChange(fieldReferenceName, [...tagList, value]);
+                            else if (operation === "DELETE" && exists) handleFieldChange(fieldReferenceName, tagList.filter(tag => tag !== value));
+
+                            setPopover(false);
+                        } 
+
+                        const tagsResetHandler = () => { tagsOperationsHandler(fieldReferenceName, "RESET", null); }
+                        const tagsAddHandler = (val) => { tagsOperationsHandler(fieldReferenceName, "ADD", val); }
+                        const tagsDeleteHandler = (val) => { tagsOperationsHandler(fieldReferenceName, "DELETE", val); }
+                        
+                        return (
+                            <HorizontalStack gap="2">
+                                <Popover
+                                    activator={<Button onClick={() => setPopover(!popover)}>Set tags</Button>}
+                                    onClose={() => { setPopover(false) }}
+                                    active={popover}
+                                    autofocusTarget="first-node"
+                                >
+                                    <Popover.Pane>
+                                        <TagManager 
+                                            isKvTypeTag={false} displayConfirmationModals={false}
+                                            showEnvSelector={false}
+                                            showTagList={true} tagList={tagList} tagDeletionHandler={tagsDeleteHandler}
+                                            showTagListOperationsManager={true} tagsAddHandler={tagsAddHandler} tagsResetHandler={tagsResetHandler}
+                                        />
+                                    </Popover.Pane>
+                                </Popover>
+                                { tagList.length > 0 ? (
+                                    <ShowListInBadge 
+                                        status={"info"} 
+                                        useTooltip={true} wrap={false} allowFullWidth={true}
+                                        itemsArr={tagList}  maxItems={3}
+                                    />) : ( <Text>No tags set</Text> )
+                                }
+                            </HorizontalStack>
+                        ) 
+                    }
+                }
             default: 
                 return {
                     initialValue: null,
                     getComponent: () => { return null }
                 }
         }
+    },
+    formatABWorkItemFieldValue: (fieldType, fieldValue) => {
+        let formattedValue;
+
+        switch (fieldType) {
+            case "dateTime":
+                // Add default time for dateTime fields
+                formattedValue = `${fieldValue} 16:00`; 
+                break;
+            case "Tags":
+                // Convert array of tags to semicolon separated string required by Azure Boards API
+                if (Array.isArray(fieldValue)) formattedValue = fieldValue.join("; ");
+                else formattedValue = "";
+                break;
+            default:
+                formattedValue = fieldValue;
+                break;
+        }
+
+        return formattedValue;
     },
     prepareCustomABWorkItemFieldsPayload: (project, workItemType) => {
         const displayABWorkItemFieldValues = IssuesStore.getState().displayABWorkItemFieldValues;
@@ -389,16 +512,20 @@ const issuesFunctions = {
                 }
             }
 
-            const fieldType = fieldMetaData?.fieldType || "string";
+            let fieldType = fieldMetaData?.fieldType || "string";
+            fieldType = issuesFunctions.getOverriddenABFieldType(fieldReferenceName, fieldType);
+
+            const formattedFieldValue = issuesFunctions.formatABWorkItemFieldValue(fieldType, fieldValue);
+
             customABWorkItemFieldsPayload.push({
                 referenceName: fieldReferenceName,
-                value: fieldType !== "dateTime" ? fieldValue : `${fieldValue} 16:00`, // Add default time for dateTime fields
+                value: formattedFieldValue,
                 type: fieldType
             })
         }
 
         return customABWorkItemFieldsPayload;
-    },
+    }
 }
 
 export default issuesFunctions
