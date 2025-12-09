@@ -3,7 +3,7 @@ import { Box, Text, VerticalStack, HorizontalStack, Card, Badge, Avatar } from '
 import ReactFlow, { Background, Handle, Position, getBezierPath } from 'react-flow-renderer';
 import 'react-flow-renderer/dist/style.css';
 import 'react-flow-renderer/dist/theme-default.css';
-import { AutomationMajor, ApiMajor } from "@shopify/polaris-icons";
+import { AutomationMajor, ConnectMinor } from "@shopify/polaris-icons";
 import api from '../api';
 import MCPIcon from "@/assets/MCP_Icon.svg";
 import func from '@/util/func';
@@ -28,7 +28,7 @@ function McpNode({ data }) {
       case 'tool':
         return MCPIcon;
       case 'api':
-        return ApiMajor;
+        return ConnectMinor;
       default:
         return AutomationMajor;
     }
