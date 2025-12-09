@@ -101,29 +101,34 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
         logger.info("Executing Go binary at: {} for connector type: {}", binaryFile.getAbsolutePath(), connectorType);
 
         // Validate canonical path to prevent path traversal or symlink attacks
-        String baseDirCanonical = new File(BINARY_BASE_PATH).getCanonicalPath();
         String binaryCanonical = binaryFile.getCanonicalPath();
 
-        // Ensure binary is under the expected directory (not the directory itself)
-        if (!binaryCanonical.startsWith(baseDirCanonical + File.separator)) {
-            throw new Exception("Invalid binary path detected: " + binaryCanonical);
+        // Enforce exact expected binary path to avoid any injection vector from manipulated paths
+        String expectedBinaryCanonical = new File(BINARY_BASE_PATH, getBinaryName(connectorType)).getCanonicalPath();
+        if (!binaryCanonical.equals(expectedBinaryCanonical)) {
+            throw new Exception("Binary path mismatch. Expected: " + expectedBinaryCanonical + ", Actual: " + binaryCanonical);
         }
 
         // Ensure canonical path is absolute (defense-in-depth)
-        if (!new File(binaryCanonical).isAbsolute()) {
-            throw new Exception("Binary path is not absolute: " + binaryCanonical);
+        if (!new File(expectedBinaryCanonical).isAbsolute()) {
+            throw new Exception("Binary path is not absolute: " + expectedBinaryCanonical);
         }
 
         // Check for shell meta-characters (defense-in-depth, though ProcessBuilder doesn't use shell)
         // Note: Allow backslashes for Windows paths, but block other shell meta-characters
-        if (binaryCanonical.matches(".*[;&|<>`$].*")) {
-            throw new Exception("Binary path contains illegal shell meta-characters: " + binaryCanonical);
+        if (expectedBinaryCanonical.matches(".*[;&|<>`$].*")) {
+            throw new Exception("Binary path contains illegal shell meta-characters: " + expectedBinaryCanonical);
         }
 
+        // Construct explicit command list to avoid any injection vector
+        List<String> command = new ArrayList<>();
+        command.add(expectedBinaryCanonical);
+        command.add("-once");
+
         // Create ProcessBuilder with explicit arguments to avoid shell interpretation
-        ProcessBuilder processBuilder = new ProcessBuilder(binaryCanonical, "-once");
+        ProcessBuilder processBuilder = new ProcessBuilder(command);
         processBuilder.environment().clear(); // Clear inherited environment to avoid using untrusted env vars
-        processBuilder.directory(new File(baseDirCanonical)); // Restrict working directory to known safe directory
+        processBuilder.directory(new File(BINARY_BASE_PATH)); // Restrict working directory to known safe directory
         processBuilder.redirectErrorStream(true); // Merge stdout and stderr
 
         // Set only the required environment variables for the connector
