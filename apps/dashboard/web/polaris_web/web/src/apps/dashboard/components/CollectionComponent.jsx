@@ -22,6 +22,20 @@ const HTTP_METHODS = [
     {'label': 'TRACK', 'value': 'TRACK'}
 ]
 
+// Auth types matching ApiInfo.AuthType enum
+const AUTH_TYPES = [
+    { label: 'Unauthenticated', value: 'UNAUTHENTICATED' },
+    { label: 'Basic', value: 'BASIC' },
+    { label: 'Authorization Header', value: 'AUTHORIZATION_HEADER' },
+    { label: 'JWT', value: 'JWT' },
+    { label: 'API Token', value: 'API_TOKEN' },
+    { label: 'Bearer', value: 'BEARER' },
+    { label: 'Custom', value: 'CUSTOM' },
+    { label: 'API Key', value: 'API_KEY' },
+    { label: 'MTLS', value: 'MTLS' },
+    { label: 'Session Token', value: 'SESSION_TOKEN' }
+]
+
 function CollectionComponent(props) {
 
     const { condition, index, dispatch, operatorComponent } = props
@@ -29,9 +43,11 @@ function CollectionComponent(props) {
     const initialRegexText = (condition && condition?.type === 'REGEX') ? (condition?.data?.regex || '') : ''
     const initialHostRegexText = (condition && condition?.type === 'HOST_REGEX') ? (condition?.data?.host_regex || '') : ''
     const initialTagsText = (condition && condition?.type === 'TAGS') ? (condition?.data?.query || '') : ''
+    const initialAuthTypes = (condition && condition?.type === 'AUTH_TYPE') ? (condition?.data?.authTypes || []) : []
     const [regexText, setRegexText] = useState(initialRegexText)
     const [hostRegexText, setHostRegexText] = useState(initialHostRegexText)
     const [tagsText, setTagsText] = useState(initialTagsText)
+    const [selectedAuthTypes, setSelectedAuthTypes] = useState(initialAuthTypes)
     const dashboardCategory = PersistStore(state => state.dashboardCategory)
 
     useEffect(() => {
@@ -159,6 +175,8 @@ function CollectionComponent(props) {
                 return {}
             case "TAGS":
                 return {}
+            case "AUTH_TYPE":
+                return {authTypes:[]}
             default:
                 return {}
         }
@@ -186,6 +204,10 @@ function CollectionComponent(props) {
             {
                 label: 'Tags',
                 value: 'TAGS'
+            },
+            {
+                label: 'Auth Type',
+                value: 'AUTH_TYPE'
             }
         ]}
             initial={condition.type}
@@ -208,6 +230,11 @@ function CollectionComponent(props) {
     const handleTagsText = (val) => {
         setTagsText(val)
         dispatch({ type: "overwrite", index: index, key: "data", obj: {"query":val } })
+    }
+
+    const handleAuthTypesSelected = (authTypes) => {
+        setSelectedAuthTypes(authTypes)
+        dispatch({ type: "overwrite", index: index, key: "data", obj: {"authTypes": authTypes } })
     }
 
     const component = (condition, index) => {
@@ -237,6 +264,18 @@ function CollectionComponent(props) {
             case "TAGS":
                 return(
                     <TextField onChange={(val) => handleTagsText(val)} value={tagsText} />
+                )
+            case "AUTH_TYPE":
+                return(
+                    <DropdownSearch
+                        id={`auth-type-${index}`}
+                        placeholder="Select auth types"
+                        optionsList={AUTH_TYPES}
+                        setSelected={(authTypes) => handleAuthTypesSelected(authTypes)}
+                        preSelected={selectedAuthTypes}
+                        value={selectedAuthTypes.length > 0 ? `${selectedAuthTypes.length} auth type${selectedAuthTypes.length === 1 ? '' : 's'} selected` : undefined}
+                        allowMultiple
+                    />
                 )
             default:
                 break;
