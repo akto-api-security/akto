@@ -365,8 +365,9 @@ public class HttpCallParser {
         }
 
         int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
+        boolean useHostConditionResult = useHostCondition(hostName, httpResponseParam.getSource());
 
-        if (useHostCondition(hostName, httpResponseParam.getSource())) {
+        if (useHostConditionResult) {
             hostName = hostName.toLowerCase();
             hostName = hostName.trim();
 
@@ -391,6 +392,7 @@ public class HttpCallParser {
             }
 
         } else {
+            loggerMaker.warnAndAddToDb("not using host condition - hostName=" + hostName + ", vxlanId=" + vxlanId + ", source=" + httpResponseParam.getSource() + ", useHostCondition=" + useHostConditionResult, LogDb.THREAT_DETECTION);
             String key = "null" + " " + vxlanId;
             if (!hostNameToIdMap.containsKey(key)) {
                 createCollectionSimple(vxlanId);
@@ -399,6 +401,11 @@ public class HttpCallParser {
 
             apiCollectionId = vxlanId;
         }
+
+        if (apiCollectionId != 0) {
+            loggerMaker.warnAndAddToDb("createApiCollectionId: hostName=" + hostName + ", vxlanId=" + vxlanId + ", apiCollectionId=" + apiCollectionId + ", source=" +  httpResponseParam.getSource() +  ", useHostCondition=" + useHostConditionResult, LogDb.THREAT_DETECTION);
+        }
+
         return apiCollectionId;
     }
 

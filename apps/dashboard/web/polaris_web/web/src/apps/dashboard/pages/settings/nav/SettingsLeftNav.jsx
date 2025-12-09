@@ -129,12 +129,6 @@ const SettingsLeftNav = () => {
                         onClick: () => navigate("/dashboard/settings/advanced-filters")
                     }, 
                     {
-                        label: 'Tags',
-                        icon: CollectionsFilledMajor,
-                        selected: page === "tags",
-                        onClick: () => navigate("/dashboard/settings/tags")
-                    },
-                    {
                         label: 'Test library',
                         icon: VocabularyMajor,
                         selected: page === "test-library",

@@ -93,6 +93,13 @@ export default {
             data: payload
         })
     },
+    createGeneralAzureBoardsWorkItem(payload) {
+        return request({
+            url: 'api/createGeneralAzureBoardsWorkItem',
+            method: 'post',
+            data: payload
+        })
+    },
     fetchIssuesByApis() {
         return request({
             url: 'api/fetchIssuesByApis',

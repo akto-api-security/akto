@@ -109,6 +109,10 @@ public class MaliciousTrafficDetectorTask implements Task {
   private int recordsReadCount = 0;
   private long lastRecordCountLogTime = System.currentTimeMillis();
 
+  // Valid hostname tracking (non-IP, not localhost, no port)
+  private int validHostnameCount = 0;
+  private long lastValidHostnameLogTime = System.currentTimeMillis();
+
     public MaliciousTrafficDetectorTask(
       KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient, DistributionCalculator distributionCalculator, boolean apiDistributionEnabled) throws Exception {
     this.kafkaConfig = trafficConfig;
@@ -227,6 +231,53 @@ public class MaliciousTrafficDetectorTask implements Task {
     return headers != null && headers.get("x-debug-trace") != null;
   }
 
+  private boolean isValidHostname(String hostname) {
+    try {
+      if (hostname == null || hostname.isEmpty()) {
+        return false;
+      }
+
+      // Remove port if present (e.g., "example.com:8080" -> "example.com")
+      String hostnameWithoutPort = hostname.split(":")[0];
+
+      // Check if it's localhost
+      if (hostnameWithoutPort.equalsIgnoreCase("localhost")) {
+        return false;
+      }
+
+      // Simple check: if lowercase != uppercase, it has letters (valid hostname)
+      // This elegantly filters out IP addresses (which are case-insensitive)
+      // Examples:
+      //   "192.168.1.1" -> toLowerCase() == toUpperCase() -> false (IP)
+      //   "example.com" -> toLowerCase() != toUpperCase() -> true (valid hostname)
+      //   "::1" -> toLowerCase() == toUpperCase() -> false (IPv6)
+      return !hostnameWithoutPort.toLowerCase().equals(hostnameWithoutPort.toUpperCase());
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private void trackAndLogValidHostname(HttpResponseParams responseParam) {
+    Map<String, List<String>> headers = responseParam.getRequestParams().getHeaders();
+    String hostname = null;
+    if (headers != null && headers.containsKey("host") && !headers.get("host").isEmpty()) {
+      hostname = headers.get("host").get(0);
+    }
+    if (isValidHostname(hostname)) {
+      validHostnameCount++;
+    }
+
+    // Log valid hostname count every minute
+    long currentTime = System.currentTimeMillis();
+    long validHostnameTimeDiff = currentTime - lastValidHostnameLogTime;
+    if (validHostnameTimeDiff >= 60000) { // 60 seconds = 1 minute
+      logger.warnAndAddToDb("Valid hostnames in last minute: " + validHostnameCount +
+                            " (non-IP, not localhost, no port) in " + String.format("%.2f", validHostnameTimeDiff / 1000.0) + " seconds");
+      validHostnameCount = 0;
+      lastValidHostnameLogTime = currentTime;
+    }
+  }
+
   private Map<String, FilterConfig> getFilters() {
     int now = (int) (System.currentTimeMillis() / 1000);
     if (now - filterLastUpdatedAt < filterUpdateIntervalSec) {
@@ -309,6 +360,10 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     int apiCollectionId = httpCallParser.createApiCollectionId(responseParam);
     responseParam.requestParams.setApiCollectionId(apiCollectionId);
+
+    // Track and log valid hostnames
+    trackAndLogValidHostname(responseParam);
+
     String url = responseParam.getRequestParams().getURL();
     URLMethods.Method method =
         URLMethods.Method.fromString(responseParam.getRequestParams().getMethod());
@@ -332,7 +387,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     if (!ignoredEventFilters.isEmpty()) {
       isIgnoredEvent = threatDetector.isIgnoredEvent(ignoredEventFilters, rawApi, apiInfoKey);
     }
-      if (apiDistributionEnabled) {
+    if (apiDistributionEnabled && apiCollectionId != 0) {
       String apiCollectionIdStr = Integer.toString(apiCollectionId);
       String distributionKey = Utils.buildApiDistributionKey(apiCollectionIdStr, url, method.toString());
       String ipApiCmsKey = Utils.buildIpApiCmsDataKey(actor, apiCollectionIdStr, url, method.toString());
@@ -351,8 +406,8 @@ public class MaliciousTrafficDetectorTask implements Task {
         logger.debugAndAddToDb("Ratelimit hit for url " + apiInfoKey.getUrl() + " actor: " + actor + " ratelimitConfig "
             + ratelimitConfig.toString());
 
-          RedactionType redactionType = getRedactionType(responseParam.getRequestParams().getHeaders());
-          // Send event to BE.
+        RedactionType redactionType = getRedactionType(responseParam.getRequestParams().getHeaders());
+        // Send event to BE.
         SampleMaliciousRequest maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam,
             ipApiRateLimitFilter, metadata, errors, successfulExploit, isIgnoredEvent, redactionType);
         generateAndPushMaliciousEventRequest(ipApiRateLimitFilter, actor, responseParam, maliciousReq,
