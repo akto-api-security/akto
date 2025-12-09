@@ -25,7 +25,7 @@ public class CopilotStudioImportAction extends UserAction {
     private String jobId;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(CopilotStudioImportAction.class, LoggerMaker.LogDb.DASHBOARD);
-    private static final int CONNECTOR_SYNC_JOB_RECURRING_INTERVAL_SECONDS = 3600;
+    private static final int CONNECTOR_SYNC_JOB_RECURRING_INTERVAL_SECONDS = 10;
 
     public String initiateCopilotStudioImport() {
         try {
