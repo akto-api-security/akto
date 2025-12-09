@@ -7,6 +7,9 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.mongodb.BasicDBObject;
 import org.json.JSONObject;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
@@ -29,6 +32,7 @@ import javax.xml.transform.*;
 import org.apache.commons.fileupload.FileItemIterator;
 import org.apache.commons.fileupload.FileItemStream;
 import org.apache.commons.fileupload.FileUpload;
+import org.apache.commons.fileupload.RequestContext;
 import org.apache.commons.fileupload.util.Streams;
 
 import org.slf4j.Logger;
@@ -345,14 +349,14 @@ public class HttpRequestResponseUtils {
             // This handles ALL parsing: boundaries, headers, Content-Disposition, encoding, etc.
             // IMPORTANT: Use ISO-8859-1 to preserve binary data (rawRequest may contain binary bytes)
             byte[] bodyBytes = rawRequest.getBytes(StandardCharsets.ISO_8859_1);
-            java.io.ByteArrayInputStream inputStream = new java.io.ByteArrayInputStream(bodyBytes);
+            ByteArrayInputStream inputStream = new ByteArrayInputStream(bodyBytes);
             
             // Create FileUpload instance with security limits
             FileUpload fileUpload = new FileUpload();
             fileUpload.setHeaderEncoding("UTF-8");
             
             // Create a custom RequestContext for our byte array
-            org.apache.commons.fileupload.RequestContext ctx = new org.apache.commons.fileupload.RequestContext() {
+            RequestContext ctx = new RequestContext() {
                 @Override
                 public String getCharacterEncoding() {
                     return "UTF-8";
@@ -369,7 +373,7 @@ public class HttpRequestResponseUtils {
                 }
                 
                 @Override
-                public java.io.InputStream getInputStream() {
+                public InputStream getInputStream() {
                     return inputStream;
                 }
             };
@@ -396,8 +400,8 @@ public class HttpRequestResponseUtils {
                     fileObj.put("contentType", item.getContentType());  // Automatically parsed!
                     
                     // Read file content and Base64 encode
-                    java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
-                    java.io.InputStream fileStream = item.openStream();
+                    ByteArrayOutputStream output = new ByteArrayOutputStream();
+                    InputStream fileStream = item.openStream();
                     byte[] buffer = new byte[8192];
                     int bytesRead;
                     while ((bytesRead = fileStream.read(buffer)) != -1) {
@@ -442,7 +446,7 @@ public class HttpRequestResponseUtils {
             Map<String, Object> fields = mapper.readValue(jsonBody, LinkedHashMap.class);
             
             // Use ByteArrayOutputStream to handle binary data properly
-            java.io.ByteArrayOutputStream outputStream = new java.io.ByteArrayOutputStream();
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
             
             for (Map.Entry<String, Object> entry : fields.entrySet()) {
                 // Write boundary
