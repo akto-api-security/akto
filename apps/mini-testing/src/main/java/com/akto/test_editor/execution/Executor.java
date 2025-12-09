@@ -659,7 +659,45 @@ public class Executor {
                 rawApi.setConversationsList(conversationsList);
                 return Operations.addHeader(rawApi, Constants.AKTO_AGENT_CONVERSATIONS , "0");
             case "attach_file":
-                return Operations.addHeader(rawApi, Constants.AKTO_ATTACH_FILE , key.toString());
+                String headerValue;
+
+                if (key instanceof Map) {
+                    Map<String, Object> fileAttachMap = (Map<String, Object>) key;
+                    if (fileAttachMap.isEmpty()) {
+                        return new ExecutorSingleOperationResp(false, "attach_file: Map cannot be empty");
+                    }
+                    
+                    if (fileAttachMap.size() == 1) {
+                        // Single file: use simple format "fieldName::fileUrl"
+                        Map.Entry<String, Object> entry = fileAttachMap.entrySet().iterator().next();
+                        String fieldName = entry.getKey();
+                        String fileUrl = entry.getValue().toString();
+                        headerValue = fieldName + "::" + fileUrl;
+                    } else {
+                        // Multiple files: use JSON array format [{"field":"name","url":"url"},...]
+                        JSONArray filesArray = new JSONArray();
+                        for (Map.Entry<String, Object> entry : fileAttachMap.entrySet()) {
+                            JSONObject fileObj = new JSONObject();
+                            fileObj.put("field", entry.getKey());
+                            fileObj.put("url", entry.getValue().toString());
+                            filesArray.put(fileObj);
+                        }
+                        headerValue = filesArray.toString();
+                    }
+                } else if (key != null && value != null) {
+                    // YAML format: attach_file: {key: fieldName, value: fileUrl}
+                    String fieldName = key.toString();
+                    String fileUrl = value.toString();
+                    headerValue = fieldName + "::" + fileUrl;
+                } else if (key != null) {
+                    // Legacy format: attach_file: fileUrl (key is the URL, no field name)
+                    headerValue = "file::" + key.toString();
+                } else {
+                    return new ExecutorSingleOperationResp(false, "attach_file: Missing file URL");
+                }
+                
+                return Operations.addHeader(rawApi, Constants.AKTO_ATTACH_FILE , headerValue);
+
             case "add_body_param":
                 return Operations.addBody(rawApi, key.toString(), value);
             case "modify_body_param":
