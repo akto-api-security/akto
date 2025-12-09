@@ -186,7 +186,11 @@ String expectedBinaryCanonical = new File(BINARY_BASE_PATH, binaryName).getCanon
 if (!new File(execCanonical).getCanonicalPath().equals(expectedBinaryCanonical)) throw new Exception("Binary path not trusted or mismatch. Expected: " + expectedBinaryCanonical + ", Actual: " + execCanonical);
 if (!binaryFile.exists() || !binaryFile.canExecute()) throw new Exception("Binary does not exist or is not executable: " + execCanonical);
 ProcessBuilder processBuilder = new ProcessBuilder(expectedBinaryCanonical, "-once");
-processBuilder.environment().clear(); processBuilder.directory(new File(baseCanonical)); processBuilder.redirectErrorStream(true);
+// Use the fully resolved, validated canonical path and a hardcoded argument to avoid shell interpretation
+ProcessBuilder processBuilder = new ProcessBuilder(expectedBinaryCanonical, "-once");
+processBuilder.environment().clear();
+processBuilder.directory(new File(baseCanonical));
+processBuilder.redirectErrorStream(true);
         }
 
         // Final check: Ensure the binary exists and is executable
