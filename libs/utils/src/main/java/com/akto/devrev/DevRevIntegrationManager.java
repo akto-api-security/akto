@@ -44,17 +44,7 @@ public class DevRevIntegrationManager {
             orgUrl = orgUrl.substring(0, orgUrl.length() - 1);
         }
 
-        String actualToken;
-        if (personalAccessToken != null && !personalAccessToken.isEmpty() && !personalAccessToken.equals(
-            Constants.ASTERISK)) {
-            actualToken = personalAccessToken;
-        } else {
-            DevRevIntegration existingIntegration = DevRevIntegrationDao.instance.findOne(new BasicDBObject());
-            if (existingIntegration == null || existingIntegration.getPersonalAccessToken() == null || existingIntegration.getPersonalAccessToken().isEmpty()) {
-                throw new Exception("Please enter a valid personal access token.");
-            }
-            actualToken = existingIntegration.getPersonalAccessToken();
-        }
+        String actualToken = getPersonalAccessToken(personalAccessToken);
 
         Map<String, String> partsIdToNameMap = fetchAllPartsFromDevRev(actualToken);
 
@@ -141,7 +131,9 @@ public class DevRevIntegrationManager {
             throw new Exception("Please enter a valid personal access token.");
         }
 
-        Map<String, String> partsIdToNameMap = fetchAllPartsFromDevRev(personalAccessToken);
+        String actualToken = getPersonalAccessToken(personalAccessToken);
+
+        Map<String, String> partsIdToNameMap = fetchAllPartsFromDevRev(actualToken);
 
         if (partsIdToNameMap.isEmpty()) {
             throw new Exception("Failed to fetch projects from DevRev. Please verify your personal access token and try again.");
@@ -150,4 +142,27 @@ public class DevRevIntegrationManager {
         return partsIdToNameMap;
     }
 
+    public void removeIntegration() throws Exception {
+        try {
+            DevRevIntegrationDao.instance.getMCollection().deleteOne(new BasicDBObject());
+            logger.infoAndAddToDb("DevRev integration removed successfully", LoggerMaker.LogDb.DASHBOARD);
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Error removing DevRev integration: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            throw new Exception("Failed to remove DevRev integration. Please try again.");
+        }
+    }
+
+    private String getPersonalAccessToken(String token) throws Exception {
+        if (token != null && !token.isEmpty() && !token.equals(
+            Constants.ASTERISK)) {
+            return token;
+        } else {
+            DevRevIntegration existingIntegration = DevRevIntegrationDao.instance.findOne(new BasicDBObject());
+            if (existingIntegration == null || existingIntegration.getPersonalAccessToken() == null
+                || existingIntegration.getPersonalAccessToken().isEmpty()) {
+                throw new Exception("Please enter a valid personal access token.");
+            }
+            return existingIntegration.getPersonalAccessToken();
+        }
+    }
 }

@@ -55,4 +55,16 @@ public class DevRevIntegrationAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
     }
+
+    public String removeDevRevIntegration() {
+        try {
+            DevRevIntegrationManager manager = new DevRevIntegrationManager();
+            manager.removeIntegration();
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Error removing DevRev integration: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            addActionError(e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
 }
