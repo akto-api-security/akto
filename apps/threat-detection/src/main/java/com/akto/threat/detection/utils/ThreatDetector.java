@@ -235,7 +235,7 @@ public class ThreatDetector {
         }
 
         // Threat detected if sub doesn't match userId
-        return !sub.equals(userId);
+        return !sub.contains(userId);
     }
 
     private String findJwtFromHeaders(Map<String, List<String>> headers) {
