@@ -124,9 +124,6 @@
             <artifactId>okhttp</artifactId>
             <version>4.12.0</version>
         </dependency>
-        <!-- Apache Commons FileUpload for robust multipart/form-data parsing -->
-        <!-- Using 1.5 (latest stable). Note: CVE-2025-48976 affects header size limits -->
-        <!-- Mitigation: We control input size in our environment -->
         <dependency>
             <groupId>commons-fileupload</groupId>
             <artifactId>commons-fileupload</artifactId>

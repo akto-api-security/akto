@@ -13,6 +13,7 @@ import com.mongodb.BasicDBObject;
 import org.apache.commons.fileupload.FileItemIterator;
 import org.apache.commons.fileupload.FileItemStream;
 import org.apache.commons.fileupload.FileUpload;
+import org.apache.commons.fileupload.RequestContext;
 import org.apache.commons.fileupload.util.Streams;
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONObject;
@@ -20,6 +21,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xml.sax.InputSource;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
@@ -318,7 +322,7 @@ public class HttpRequestResponseUtils {
          * Ref: https://www.w3.org/TR/html401/interact/forms.html#h-17.13.4.1
          */
 
-        return URLEncoder.encode(s, java.nio.charset.StandardCharsets.UTF_8.name());
+        return URLEncoder.encode(s, StandardCharsets.UTF_8.name());
                 // .replaceAll("\\+", "%20")
                 // .replaceAll("\\%21", "!")
                 // .replaceAll("\\%27", "'")
@@ -413,14 +417,14 @@ public class HttpRequestResponseUtils {
             // This handles ALL parsing: boundaries, headers, Content-Disposition, encoding, etc.
             // IMPORTANT: Use ISO-8859-1 to preserve binary data (rawRequest may contain binary bytes)
             byte[] bodyBytes = rawRequest.getBytes(StandardCharsets.ISO_8859_1);
-            java.io.ByteArrayInputStream inputStream = new java.io.ByteArrayInputStream(bodyBytes);
+            ByteArrayInputStream inputStream = new ByteArrayInputStream(bodyBytes);
             
             // Create FileUpload instance with security limits
             FileUpload fileUpload = new FileUpload();
             fileUpload.setHeaderEncoding("UTF-8");
             
             // Create a custom RequestContext for our byte array
-            org.apache.commons.fileupload.RequestContext ctx = new org.apache.commons.fileupload.RequestContext() {
+            RequestContext ctx = new RequestContext() {
                 @Override
                 public String getCharacterEncoding() {
                     return "UTF-8";
@@ -437,7 +441,7 @@ public class HttpRequestResponseUtils {
                 }
                 
                 @Override
-                public java.io.InputStream getInputStream() {
+                public InputStream getInputStream() {
                     return inputStream;
                 }
             };
@@ -464,8 +468,8 @@ public class HttpRequestResponseUtils {
                     fileObj.put("contentType", item.getContentType());  // Automatically parsed!
                     
                     // Read file content and Base64 encode
-                    java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
-                    java.io.InputStream fileStream = item.openStream();
+                    ByteArrayOutputStream output = new ByteArrayOutputStream();
+                    InputStream fileStream = item.openStream();
                     byte[] buffer = new byte[8192];
                     int bytesRead;
                     while ((bytesRead = fileStream.read(buffer)) != -1) {
@@ -510,7 +514,7 @@ public class HttpRequestResponseUtils {
             Map<String, Object> fields = mapper.readValue(jsonBody, LinkedHashMap.class);
             
             // Use ByteArrayOutputStream to handle binary data properly
-            java.io.ByteArrayOutputStream outputStream = new java.io.ByteArrayOutputStream();
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
             
             for (Map.Entry<String, Object> entry : fields.entrySet()) {
                 // Write boundary

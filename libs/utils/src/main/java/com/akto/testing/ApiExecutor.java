@@ -517,12 +517,16 @@ public class ApiExecutor {
                     String base64Content = fileObj.get("content");
                     
                     if (base64Content != null) {
-                        byte[] decodedContent = Base64.getDecoder().decode(base64Content);
-                        multipartBuilder.addFormDataPart(
-                            partFieldName,
-                            filename != null ? filename : "file",
-                            RequestBody.create(decodedContent, MediaType.parse(fileContentType))
-                        );
+                        try {
+                            byte[] decodedContent = Base64.getDecoder().decode(base64Content);
+                            multipartBuilder.addFormDataPart(
+                                partFieldName,
+                                filename != null ? filename : "file",
+                                RequestBody.create(decodedContent, MediaType.parse(fileContentType))
+                            );
+                        } catch (IllegalArgumentException e) {
+                            loggerMaker.errorAndAddToDb("Invalid Base64 content for field: " + partFieldName, LogDb.TESTING);
+                        }
                     }
                 } else {
                     // Text field - add as string
@@ -548,6 +552,11 @@ public class ApiExecutor {
                         return fileMediaType;
                     }
 
+                    /* TODO : CACHE THE FILES WHICH ARE DOWNLOADED FOR MULTIPLE API CALLS
+                    use case: say a test is run on 10 APIs, with the same file.
+                    then the same file will be downloaded 10 times.
+                    download the files, store them somewhere, and add a TTL to it.
+                    if the file is not found, download it and store it. */
                     @Override
                     public void writeTo(BufferedSink sink) throws IOException {
                         byte[] chunk = new byte[CHUNK_SIZE];
@@ -750,8 +759,12 @@ public class ApiExecutor {
                             String fileUrl = attachHeaderVal;
                             int sepIdx = attachHeaderVal.indexOf("::");
                             if (sepIdx >= 0) {
-                                fieldName = attachHeaderVal.substring(0, sepIdx);
-                                fileUrl = attachHeaderVal.substring(sepIdx + 2);
+                                fieldName = attachHeaderVal.substring(0, sepIdx).trim();
+                                fileUrl = attachHeaderVal.substring(sepIdx + 2).trim();
+                            }
+                            if (fieldName.isEmpty() || fileUrl.isEmpty()) {
+                                loggerMaker.errorAndAddToDb("Invalid attach_file format: field name or URL is empty", LogDb.TESTING);
+                                throw new IllegalArgumentException("Invalid attach_file format: field name or URL is empty");
                             }
                             Map<String, String> fileInfo = new HashMap<>();
                             fileInfo.put("field", fieldName);
@@ -777,13 +790,15 @@ public class ApiExecutor {
                         // IMPORTANT: Use ISO-8859-1 to preserve binary data bytes (0-255)
                         // jsonToMultipart() returns ISO-8859-1 encoded string to preserve binary file content
                         body = RequestBody.create(
-                            payload.getBytes(java.nio.charset.StandardCharsets.ISO_8859_1),
+                            payload.getBytes(StandardCharsets.ISO_8859_1),
                             MediaType.parse(contentType)
                         );
                     }
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb("Unable to convert to multipart:" + payload + " Error: " + e.getMessage(), LogDb.TESTING);
+                    e.printStackTrace();
                     payload = request.getBody();
+                    body = RequestBody.create(payload.getBytes(StandardCharsets.ISO_8859_1), MediaType.parse(contentType));
                 }
             }
         } 
