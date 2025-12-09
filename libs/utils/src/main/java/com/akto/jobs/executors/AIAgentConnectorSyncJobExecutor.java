@@ -130,6 +130,13 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
             throw new Exception("Binary path contains illegal shell meta-characters: " + binCanonical);
         }
 
+        // Whitelist allowed characters in canonical path to prevent injection
+        // Allows: alphanumeric, slash (/), backslash (\), dot (.), underscore (_), colon (:), hyphen (-)
+        // This prevents any unexpected characters that could enable command injection
+        if (!binCanonical.matches("^[a-zA-Z0-9/\\\\._:\\-]+$")) {
+            throw new Exception("Binary path contains illegal characters (only alphanumeric, /, \\, ., _, :, - allowed): " + binCanonical);
+        }
+
         // Ensure binCanonical is inside trusted base directory
         if (!binCanonical.startsWith(baseCanonical + File.separator)) {
             throw new Exception("Binary path is outside allowed base path: " + binCanonical);
