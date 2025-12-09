@@ -148,7 +148,15 @@ if (binaryName == null || !binaryName.matches("^[a-zA-Z0-9._-]+$"))
     throw new Exception("Invalid binary name for connector: " + binaryName);
 String expectedBinaryCanonical = new File(BINARY_BASE_PATH, binaryName).getCanonicalPath();
 if (!execCanonical.startsWith(baseCanonical + File.separator) || !new File(execCanonical).getCanonicalPath().equals(expectedBinaryCanonical))
+// Validate binary name to prevent path traversal or injection
+String binaryName = getBinaryName(connectorType);
+if (binaryName == null || !binaryName.matches("^[a-zA-Z0-9._-]+$")) {
+    throw new Exception("Invalid binary name for connector: " + binaryName);
+}
+String expectedBinaryCanonical = new File(BINARY_BASE_PATH, binaryName).getCanonicalPath();
+if (!execCanonical.startsWith(baseCanonical + File.separator) || !new File(execCanonical).getCanonicalPath().equals(expectedBinaryCanonical)) {
     throw new Exception("Binary path not trusted or mismatch. Expected: " + expectedBinaryCanonical + ", Actual: " + execCanonical);
+}
         }
 
         // Final check: Ensure the binary exists and is executable
