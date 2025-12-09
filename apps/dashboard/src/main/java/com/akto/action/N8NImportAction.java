@@ -25,7 +25,7 @@ public class N8NImportAction extends UserAction {
     private String jobId;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(N8NImportAction.class, LoggerMaker.LogDb.DASHBOARD);
-    private static final int CONNECTOR_SYNC_JOB_RECURRING_INTERVAL_SECONDS = 3600;
+    private static final int CONNECTOR_SYNC_JOB_RECURRING_INTERVAL_SECONDS = 5;
 
     public String initiateN8NImport() {
         try {
