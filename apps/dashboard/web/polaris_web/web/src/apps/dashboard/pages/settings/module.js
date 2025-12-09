@@ -323,6 +323,34 @@ const settingFunctions = {
       })
       return trafficData
     },
+    fetchDevRevIntegration: async function(){
+      let devRevInteg = {}
+      await settingRequests.fetchDevRevIntegration().then((resp)=>{
+        devRevInteg = resp.devrevIntegration
+      })
+      return devRevInteg
+    },
+    fetchDevRevParts: async function(personalAccessToken) {
+      let parts = {}
+      await settingRequests.fetchDevrevProjects(personalAccessToken).then((resp)=>{
+        parts = resp.partsIdToNameMap
+      })
+      return parts
+    },
+    addDevRevIntegration: async function(orgUrl, personalAccessToken, partsMap) {
+      let trafficData = {}
+      await settingRequests.addDevRevIntegration(orgUrl, personalAccessToken, partsMap).then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
+    removeDevRevIntegration: async function() {
+      let trafficData = {}
+      await settingRequests.removeDevRevIntegration().then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
     getSetupOptions: function(){
       return setupOptions;
     },
