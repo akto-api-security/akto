@@ -114,31 +114,35 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
             throw new Exception("Binary real path mismatch. Expected: " + expectedBinaryCanonical + ", Actual: " + execPath);
         }
 
-        // Ensure canonical path is absolute (defense-in-depth)
-        if (!new File(execPath).isAbsolute()) {
-            throw new Exception("Binary path is not absolute: " + execPath);
-        }
-
-        // Check for shell meta-characters (defense-in-depth, though ProcessBuilder doesn't use shell)
-        // Note: Allow backslashes for Windows paths, but block other shell meta-characters
-        if (execPath.matches(".*[;&|<>`$].*")) {
-            throw new Exception("Binary path contains illegal shell meta-characters: " + execPath);
-        }
-
-        // Final validation: Ensure expectedBinaryCanonical is inside trusted base directory and is executable
+        // Resolve the canonical path we'll execute and validate it (not execPath)
         File binFile = new File(expectedBinaryCanonical);
         String baseCanonical = new File(BINARY_BASE_PATH).getCanonicalPath();
         String binCanonical = binFile.getCanonicalPath();
-        if (!binCanonical.startsWith(baseCanonical + File.separator)) {
-            throw new Exception("Binary path is outside allowed base path: " + expectedBinaryCanonical);
+
+        // Validate binCanonical: the actual path we'll execute (replaces any use of potentially tainted execPath)
+        if (!new File(binCanonical).isAbsolute()) {
+            throw new Exception("Binary path is not absolute: " + binCanonical);
         }
+
+        // Check for shell meta-characters in the path we'll execute (defense-in-depth)
+        // Note: Allow backslashes for Windows paths, but block other shell meta-characters
+        if (binCanonical.matches(".*[;&|<>`$].*")) {
+            throw new Exception("Binary path contains illegal shell meta-characters: " + binCanonical);
+        }
+
+        // Ensure binCanonical is inside trusted base directory
+        if (!binCanonical.startsWith(baseCanonical + File.separator)) {
+            throw new Exception("Binary path is outside allowed base path: " + binCanonical);
+        }
+
+        // Final check: Ensure the binary exists and is executable
         if (!binFile.exists() || !binFile.canExecute()) {
-            throw new Exception("Binary does not exist or is not executable: " + expectedBinaryCanonical);
+            throw new Exception("Binary does not exist or is not executable: " + binCanonical);
         }
 
         // Create ProcessBuilder with explicit List using the resolved canonical path (binCanonical)
         ProcessBuilder processBuilder = new ProcessBuilder();
-        processBuilder.command(java.util.Arrays.asList(binCanonical, "-once")); // Execute validated canonical path with hardcoded args
+        processBuilder.command(java.util.Arrays.asList(binCanonical, "-once")); // Use the resolved canonical, validated binary path to avoid shell/meta-character injection and untrusted search path
         processBuilder.environment().clear(); // Clear inherited environment to avoid using untrusted env vars
         processBuilder.directory(new File(BINARY_BASE_PATH)); // Restrict working directory to known safe directory
         processBuilder.redirectErrorStream(true); // Merge stdout and stderr
