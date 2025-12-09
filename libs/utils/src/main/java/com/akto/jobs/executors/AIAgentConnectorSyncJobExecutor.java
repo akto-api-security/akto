@@ -144,8 +144,9 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
         // Uses: (1) binCanonical - fully validated canonical path with no user influence
         //       (2) "-once" - hardcoded argument (no user input)
         // This prevents shell/meta-character injection and untrusted search path issues
+        java.util.List<String> command = java.util.Arrays.asList(binCanonical, "-once");
         ProcessBuilder processBuilder = new ProcessBuilder();
-        processBuilder.command(java.util.Arrays.asList(binCanonical, "-once"));
+        processBuilder.command(command);
         processBuilder.environment().clear(); // Clear inherited environment to avoid using untrusted env vars
         processBuilder.directory(new File(BINARY_BASE_PATH)); // Restrict working directory to known safe directory
         processBuilder.redirectErrorStream(true); // Merge stdout and stderr
