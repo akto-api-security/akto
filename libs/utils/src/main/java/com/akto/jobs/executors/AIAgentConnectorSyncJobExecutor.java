@@ -110,18 +110,13 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
         }
 
         // Enforce exact expected binary path to avoid any injection vector from manipulated paths
-        String expectedBinaryCanonical = new File(BINARY_BASE_PATH, getBinaryName(connectorType)).getCanonicalPath();
-        if (!new File(execCanonical).getCanonicalPath().equals(expectedBinaryCanonical)) {
+        String expectedBinaryCanonical = new File(BINARY_BASE_PATH, binaryName).getCanonicalPath();
+        if (!execCanonical.equals(expectedBinaryCanonical)) {
             throw new Exception("Binary real path mismatch. Expected: " + expectedBinaryCanonical + ", Actual: " + execCanonical);
         }
 
         // Get canonical base directory for containment validation
         String baseCanonical = new File(BINARY_BASE_PATH).getCanonicalPath();
-
-        // Validate execCanonical: the actual real path we'll execute
-        if (!new File(execCanonical).isAbsolute()) {
-            throw new Exception("Binary path is not absolute: " + execCanonical);
-        }
 
         // Check for shell meta-characters in the path we'll execute (defense-in-depth)
         // Note: Allow backslashes for Windows paths, but block other shell meta-characters
@@ -138,68 +133,7 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
 
         // Ensure execCanonical is inside trusted base directory
         if (!execCanonical.startsWith(baseCanonical + File.separator)) {
-// Validate binary name to prevent path traversal or injection
-String binaryName = getBinaryName(connectorType);
-if (binaryName == null || !binaryName.matches("^[a-zA-Z0-9._-]+$")) {
-    throw new Exception("Invalid binary name for connector: " + binaryName);
-}
-String binaryName = getBinaryName(connectorType);
-if (binaryName == null || !binaryName.matches("^[a-zA-Z0-9._-]+$"))
-    throw new Exception("Invalid binary name for connector: " + binaryName);
-String expectedBinaryCanonical = new File(BINARY_BASE_PATH, binaryName).getCanonicalPath();
-if (!execCanonical.startsWith(baseCanonical + File.separator) || !new File(execCanonical).getCanonicalPath().equals(expectedBinaryCanonical))
-// Validate binary name to prevent path traversal or injection
-String binaryName = getBinaryName(connectorType);
-if (binaryName == null || !binaryName.matches("^[a-zA-Z0-9._-]+$")) {
-    throw new Exception("Invalid binary name for connector: " + binaryName);
-}
-String expectedBinaryCanonical = new File(BINARY_BASE_PATH, binaryName).getCanonicalPath();
-if (!execCanonical.startsWith(baseCanonical + File.separator) || !new File(execCanonical).getCanonicalPath().equals(expectedBinaryCanonical)) {
-    throw new Exception("Binary path not trusted or mismatch. Expected: " + expectedBinaryCanonical + ", Actual: " + execCanonical);
-String binaryName = getBinaryName(connectorType);
-if (binaryName == null || !binaryName.matches("^[a-zA-Z0-9._-]+$")) throw new Exception("Invalid binary name for connector: " + binaryName);
-String expectedBinaryCanonical = new File(BINARY_BASE_PATH, binaryName).getCanonicalPath();
-if (!new File(execCanonical).getCanonicalPath().equals(expectedBinaryCanonical)) throw new Exception("Binary path not trusted or mismatch. Expected: " + expectedBinaryCanonical + ", Actual: " + execCanonical);
-if (!binaryFile.exists() || !binaryFile.canExecute()) throw new Exception("Binary does not exist or is not executable: " + execCanonical);
-ProcessBuilder processBuilder = new ProcessBuilder(execCanonical, "-once");
-// Validate binary name and expected canonical path
-String binaryName = getBinaryName(connectorType); if (binaryName == null || !binaryName.matches("^[a-zA-Z0-9._-]+$")) throw new Exception("Invalid binary name for connector: " + binaryName);
-String expectedBinaryCanonical = new File(BINARY_BASE_PATH, binaryName).getCanonicalPath();
-if (!new File(execCanonical).getCanonicalPath().equals(expectedBinaryCanonical)) throw new Exception("Binary path not trusted or mismatch. Expected: " + expectedBinaryCanonical + ", Actual: " + execCanonical);
-if (!binaryFile.exists() || !binaryFile.canExecute()) throw new Exception("Binary does not exist or is not executable: " + execCanonical);
-ProcessBuilder processBuilder = new ProcessBuilder(execCanonical, "-once"); processBuilder.environment().clear(); processBuilder.directory(new File(baseCanonical));
-String binaryName = getBinaryName(connectorType);
-if (binaryName == null || !binaryName.matches("^[a-zA-Z0-9._-]+$")) throw new Exception("Invalid binary name for connector: " + binaryName);
-String expectedBinaryCanonical = new File(BINARY_BASE_PATH, binaryName).getCanonicalPath();
-if (!new File(execCanonical).getCanonicalPath().equals(expectedBinaryCanonical)) throw new Exception("Binary path not trusted or mismatch. Expected: " + expectedBinaryCanonical + ", Actual: " + execCanonical);
-if (!binaryFile.exists() || !binaryFile.canExecute()) throw new Exception("Binary does not exist or is not executable: " + execCanonical);
-ProcessBuilder processBuilder = new ProcessBuilder(expectedBinaryCanonical, "-once");
-String binaryName = getBinaryName(connectorType);
-if (binaryName == null || !binaryName.matches("^[a-zA-Z0-9._-]+$")) throw new Exception("Invalid binary name for connector: " + binaryName);
-String expectedBinaryCanonical = new File(BINARY_BASE_PATH, binaryName).getCanonicalPath();
-if (!new File(execCanonical).getCanonicalPath().equals(expectedBinaryCanonical)) throw new Exception("Binary path mismatch. Expected: " + expectedBinaryCanonical + ", Actual: " + execCanonical);
-if (!binaryFile.exists() || !binaryFile.canExecute()) throw new Exception("Binary does not exist or is not executable: " + execCanonical);
-ProcessBuilder processBuilder = new ProcessBuilder(expectedBinaryCanonical, "-once");
-String binaryName = getBinaryName(connectorType);
-if (binaryName == null || !binaryName.matches("^[a-zA-Z0-9._-]+$")) throw new Exception("Invalid binary name for connector: " + binaryName);
-String expectedBinaryCanonical = new File(BINARY_BASE_PATH, binaryName).getCanonicalPath();
-if (!new File(execCanonical).getCanonicalPath().equals(expectedBinaryCanonical)) throw new Exception("Binary path not trusted or mismatch. Expected: " + expectedBinaryCanonical + ", Actual: " + execCanonical);
-if (!binaryFile.exists() || !binaryFile.canExecute()) throw new Exception("Binary does not exist or is not executable: " + execCanonical);
-ProcessBuilder processBuilder = new ProcessBuilder(expectedBinaryCanonical, "-once");
-// Use the fully resolved, validated canonical path and a hardcoded argument to avoid shell interpretation
-ProcessBuilder processBuilder = new ProcessBuilder(expectedBinaryCanonical, "-once");
-processBuilder.environment().clear();
-processBuilder.directory(new File(baseCanonical));
-ProcessBuilder processBuilder = new ProcessBuilder(expectedBinaryCanonical, "-once");
-processBuilder.environment().clear();
-processBuilder.directory(new File(baseCanonical));
-// Use validated expected canonical path, not the raw exec path to avoid injection
-String binaryName = getBinaryName(connectorType);
-if (binaryName == null || !binaryName.matches("^[a-zA-Z0-9._-]+$")) throw new Exception("Invalid binary name for connector: " + binaryName);
-String expectedBinaryCanonical = new File(BINARY_BASE_PATH, binaryName).getCanonicalPath();
-if (!new File(execCanonical).getCanonicalPath().equals(expectedBinaryCanonical)) throw new Exception("Binary path mismatch. Expected: " + expectedBinaryCanonical + ", Actual: " + execCanonical);
-if (!binaryFile.exists() || !binaryFile.canExecute()) throw new Exception("Binary does not exist or is not executable: " + expectedBinaryCanonical);
-ProcessBuilder processBuilder = new ProcessBuilder(expectedBinaryCanonical, "-once");
+            throw new Exception("Binary path is outside allowed base path: " + execCanonical);
         }
 
         // Final check: Ensure the binary exists and is executable
