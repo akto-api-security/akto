@@ -5,13 +5,21 @@ import com.akto.dto.jobs.AIAgentConnectorSyncJobParams;
 import com.akto.dto.jobs.Job;
 import com.akto.jobs.JobExecutor;
 import com.akto.log.LoggerMaker;
+import com.azure.storage.blob.BlobClient;
+import com.azure.storage.blob.BlobContainerClient;
+import com.azure.storage.blob.BlobServiceClient;
+import com.azure.storage.blob.BlobServiceClientBuilder;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.nio.file.attribute.PosixFilePermission;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnectorSyncJobParams> {
 
@@ -21,6 +29,13 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
     // Path to the Go binary (relative to the project root)
     private static final String GO_BINARY_PATH = "apps/dashboard/src/main/java/com/akto/action/n8n-shield";
     private static final int BINARY_TIMEOUT_SECONDS = 300; // 5 minutes timeout
+
+    // Azure Blob Storage configuration
+    // Set via environment variable: AZURE_BINARY_STORAGE_CONNECTION_STRING or AZURE_BINARY_BLOB_URL
+    private static final String AZURE_CONNECTION_STRING_ENV = "AZURE_BINARY_STORAGE_CONNECTION_STRING";
+    private static final String AZURE_BLOB_URL_ENV = "AZURE_BINARY_BLOB_URL";
+    private static final String AZURE_CONTAINER_NAME = "binaries";
+    private static final String AZURE_BLOB_NAME = "n8n-shield";
 
     public AIAgentConnectorSyncJobExecutor() {
         super(AIAgentConnectorSyncJobParams.class);
@@ -69,9 +84,8 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
         // Get the absolute path to the Go binary
         File binaryFile = new File(GO_BINARY_PATH);
 
-        if (!binaryFile.exists()) {
-            throw new Exception("Go binary not found at path: " + binaryFile.getAbsolutePath());
-        }
+        // Ensure binary exists (download from Azure if needed)
+        ensureBinaryExists(binaryFile);
 
         if (!binaryFile.canExecute()) {
             throw new Exception("Go binary is not executable at path: " + binaryFile.getAbsolutePath());
@@ -146,6 +160,128 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
                 process.destroyForcibly();
             }
             throw new Exception("Error executing Go binary: " + e.getMessage() + ". Output: " + output.toString(), e);
+        }
+    }
+
+    /**
+     * Ensures the Go binary exists locally. If not found, attempts to download from Azure Blob Storage.
+     *
+     * @param binaryFile The File object pointing to the binary location
+     * @throws Exception if binary cannot be found or downloaded
+     */
+    private void ensureBinaryExists(File binaryFile) throws Exception {
+        if (binaryFile.exists()) {
+            logger.info("Go binary already exists at: {}", binaryFile.getAbsolutePath());
+            return;
+        }
+
+        logger.info("Go binary not found locally. Attempting to download from Azure Blob Storage...");
+
+        // Check if Azure configuration is available
+        String connectionString = System.getenv(AZURE_CONNECTION_STRING_ENV);
+        String blobUrl = System.getenv(AZURE_BLOB_URL_ENV);
+
+        if (connectionString == null && blobUrl == null) {
+            throw new Exception(
+                "Go binary not found at: " + binaryFile.getAbsolutePath() +
+                " and no Azure configuration found. Please set either " +
+                AZURE_CONNECTION_STRING_ENV + " or " + AZURE_BLOB_URL_ENV
+            );
+        }
+
+        // Create parent directories if they don't exist
+        File parentDir = binaryFile.getParentFile();
+        if (parentDir != null && !parentDir.exists()) {
+            if (!parentDir.mkdirs()) {
+                throw new Exception("Failed to create directory: " + parentDir.getAbsolutePath());
+            }
+        }
+
+        // Download from Azure
+        downloadBinaryFromAzure(binaryFile, connectionString, blobUrl);
+
+        // Set executable permissions
+        makeExecutable(binaryFile);
+
+        logger.info("Go binary downloaded and configured successfully");
+    }
+
+    /**
+     * Downloads the Go binary from Azure Blob Storage.
+     *
+     * @param targetFile The target file location
+     * @param connectionString Azure storage connection string (can be null if using blobUrl)
+     * @param blobUrl Direct blob URL with SAS token (can be null if using connectionString)
+     * @throws Exception if download fails
+     */
+    private void downloadBinaryFromAzure(File targetFile, String connectionString, String blobUrl) throws Exception {
+        try {
+            BlobClient blobClient;
+
+            if (connectionString != null && !connectionString.isEmpty()) {
+                logger.info("Using Azure connection string to download binary");
+                BlobServiceClient blobServiceClient = new BlobServiceClientBuilder()
+                    .connectionString(connectionString)
+                    .buildClient();
+
+                BlobContainerClient containerClient = blobServiceClient.getBlobContainerClient(AZURE_CONTAINER_NAME);
+                blobClient = containerClient.getBlobClient(AZURE_BLOB_NAME);
+            } else {
+                logger.info("Using Azure blob URL to download binary");
+                // When using SAS URL, construct the full blob path
+                String fullBlobUrl = blobUrl;
+                if (!fullBlobUrl.contains(AZURE_CONTAINER_NAME)) {
+                    // Append container and blob name if not in URL
+                    fullBlobUrl = blobUrl.split("\\?")[0] + "/" + AZURE_CONTAINER_NAME + "/" + AZURE_BLOB_NAME;
+                    if (blobUrl.contains("?")) {
+                        fullBlobUrl += "?" + blobUrl.split("\\?")[1];
+                    }
+                }
+                blobClient = new BlobServiceClientBuilder()
+                    .endpoint(fullBlobUrl)
+                    .buildClient()
+                    .getBlobContainerClient(AZURE_CONTAINER_NAME)
+                    .getBlobClient(AZURE_BLOB_NAME);
+            }
+
+            logger.info("Downloading binary from Azure: {}/{}", AZURE_CONTAINER_NAME, AZURE_BLOB_NAME);
+
+            // Download to target file
+            blobClient.downloadToFile(targetFile.getAbsolutePath(), true);
+
+            logger.info("Binary downloaded successfully. Size: {} bytes", targetFile.length());
+
+        } catch (Exception e) {
+            throw new Exception("Failed to download Go binary from Azure: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Sets executable permissions on the binary file.
+     *
+     * @param binaryFile The binary file to make executable
+     * @throws Exception if permissions cannot be set
+     */
+    private void makeExecutable(File binaryFile) throws Exception {
+        try {
+            // Try POSIX permissions first (Linux/Mac)
+            Set<PosixFilePermission> perms = new HashSet<>();
+            perms.add(PosixFilePermission.OWNER_READ);
+            perms.add(PosixFilePermission.OWNER_WRITE);
+            perms.add(PosixFilePermission.OWNER_EXECUTE);
+            perms.add(PosixFilePermission.GROUP_READ);
+            perms.add(PosixFilePermission.GROUP_EXECUTE);
+            perms.add(PosixFilePermission.OTHERS_READ);
+            perms.add(PosixFilePermission.OTHERS_EXECUTE);
+
+            Files.setPosixFilePermissions(binaryFile.toPath(), perms);
+            logger.info("Binary permissions set successfully (POSIX)");
+        } catch (UnsupportedOperationException e) {
+            // Fall back to basic setExecutable for Windows
+            if (!binaryFile.setExecutable(true, false)) {
+                throw new Exception("Failed to set executable permissions on binary");
+            }
+            logger.info("Binary permissions set successfully (setExecutable)");
         }
     }
 }
