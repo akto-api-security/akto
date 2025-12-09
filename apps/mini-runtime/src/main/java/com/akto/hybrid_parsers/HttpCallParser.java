@@ -42,18 +42,12 @@ import com.akto.hybrid_runtime.Main;
 import com.akto.hybrid_runtime.URLAggregator;
 import com.akto.util.Pair;
 import com.akto.util.Constants;
-import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
-import okhttp3.*;
-
-import java.io.IOException;
 import java.util.*;
 import java.util.Map.Entry;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.collections.CollectionUtils;
@@ -75,16 +69,9 @@ public class HttpCallParser {
     private Map<String, Integer> hostNameToIdMap = new HashMap<>();
     private Map<TrafficMetrics.Key, TrafficMetrics> trafficMetricsMap = new HashMap<>();
     public static final ScheduledExecutorService trafficMetricsExecutor = Executors.newScheduledThreadPool(1);
-    private static final String trafficMetricsUrl = "https://logs.akto.io/traffic-metrics";
     private static final String NON_HOSTNAME_KEY = "null" + " "; // used for collections created without hostnames
 
     private static final List<Integer> INPROCESS_ADVANCED_FILTERS_ACCOUNTS = Arrays.asList(1736798101, 1718042191, 1759692400);
-
-    // Using default timeouts [10 seconds], as this is a slow API.
-    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
-
-
-    private static final ConcurrentLinkedQueue<BasicDBObject> queue = new ConcurrentLinkedQueue<>();
     private DataActor dataActor = DataActorFactory.fetchInstance();
     private Map<Integer, ApiCollection> apiCollectionsMap = new HashMap<>();
 
@@ -99,21 +86,6 @@ public class HttpCallParser {
         "kubernetes.default.svc"
     );
 
-    public static void init() {
-        trafficMetricsExecutor.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                while(!queue.isEmpty()) {
-                    BasicDBObject metrics = queue.poll();
-                    try {
-                        sendTrafficMetricsToTelemetry(metrics);
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e, "Error while sending traffic_metrics data to prometheus");
-                    }
-                }
-            }
-        },0,5,TimeUnit.MINUTES);
-    }
     public HttpCallParser(String userIdentifier, int thresh, int sync_threshold_count, int sync_threshold_time, boolean fetchAllSTI) {
         last_synced = 0;
         this.sync_threshold_count = sync_threshold_count;
@@ -474,37 +446,9 @@ public class HttpCallParser {
         }
 
         if (bulkUpdates.size() > 0) {
-            if (metricsData.size() != 0 && (Main.isOnprem || RuntimeMode.isHybridDeployment())) {
-                queue.add(metricsData);
-            }
             List<Object> writesForTraffic = new ArrayList<>();
             writesForTraffic.addAll(bulkUpdates);
             dataActor.bulkWriteTrafficMetrics(writesForTraffic);
-        }
-    }
-
-    private static void sendTrafficMetricsToTelemetry(BasicDBObject metricsData) {
-        MediaType mediaType = MediaType.parse("application/json");
-        RequestBody body = RequestBody.create(new BasicDBObject("data", metricsData).toJson(), mediaType);
-        Request request = new Request.Builder()
-                .url(trafficMetricsUrl)
-                .method("POST", body)
-                .addHeader("Content-Type", "application/json")
-                .build();
-        Response response = null;
-        try {
-            response =  client.newCall(request).execute();
-        } catch (IOException e) {
-            loggerMaker.errorAndAddToDb(e, "Error while executing request " + request.url() + ": " + e.getMessage());
-        } finally {
-            if (response != null) {
-                response.close();
-            }
-        }
-        if (response!= null && response.isSuccessful()) {
-            loggerMaker.infoAndAddToDb("Updated traffic_metrics");
-        } else {
-            loggerMaker.infoAndAddToDb("Traffic_metrics not sent");
         }
     }
 

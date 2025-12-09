@@ -90,7 +90,7 @@ public class TelemetryJob {
         }
     }
 
-    public static void fetchAndSendLogs(int toTs, LoggerMaker.LogDb dbName, Organization org, int accountId, String version){
+    private static void fetchAndSendLogs(int toTs, LoggerMaker.LogDb dbName, Organization org, int accountId, String version){
 
       AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
         Map<String, Integer> telemetryUpdateSentTsMap = accountSettings.getTelemetryUpdateSentTsMap();
