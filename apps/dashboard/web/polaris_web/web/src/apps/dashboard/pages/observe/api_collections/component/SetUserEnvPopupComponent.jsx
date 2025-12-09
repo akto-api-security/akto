@@ -267,6 +267,25 @@ const SetUserEnvPopupComponent = ({ popover, setPopover, tags, apiCollectionIds,
             </Popover.Section>
         </Popover.Pane>
     )
+    
+
+    /* todo: test TagManager implementation and remove above code */
+    /*
+    const isSingleSelection = Array.isArray(apiCollectionIds) && apiCollectionIds.length === 1;
+
+    const tagDeletionHandler = (tag) => { toggleTags(tag, apiCollectionIds) }
+    const tagsAddHandler = (newTag) => { toggleTags(newTag, apiCollectionIds) }
+    const tagsResetHandler = () => { toggleTags("reset", apiCollectionIds) }
+
+    return (
+        <TagManager 
+            isKvTypeTag={true} displayConfirmationModals={true}
+            showEnvSelector={isSingleSelection} selectedEnvType={selectedEnvType} handleEnvChange={handleEnvChange}
+            showTagList={isSingleSelection} tagList={allEnvTypes} tagDeletionHandler={tagDeletionHandler}
+            showTagListOperationsManager={true} tagsAddHandler={tagsAddHandler} tagsResetHandler={tagsResetHandler}
+        />
+    )
+    */
 }
 
 export default SetUserEnvPopupComponent
