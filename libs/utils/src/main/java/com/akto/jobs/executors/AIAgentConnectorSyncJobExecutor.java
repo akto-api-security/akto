@@ -15,9 +15,7 @@ import java.io.File;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.attribute.PosixFilePermission;
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -120,13 +118,9 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
             throw new Exception("Binary path contains illegal shell meta-characters: " + expectedBinaryCanonical);
         }
 
-        // Construct explicit command list to avoid any injection vector
-        List<String> command = new ArrayList<>();
-        command.add(expectedBinaryCanonical);
-        command.add("-once");
-
-        // Create ProcessBuilder with explicit arguments to avoid shell interpretation
-        ProcessBuilder processBuilder = new ProcessBuilder(command);
+        // Create ProcessBuilder with explicit varargs to ensure executable and args are passed as separate elements
+        ProcessBuilder processBuilder = new ProcessBuilder();
+        processBuilder.command(expectedBinaryCanonical, "-once"); // No shell interpretation, explicit parameters
         processBuilder.environment().clear(); // Clear inherited environment to avoid using untrusted env vars
         processBuilder.directory(new File(BINARY_BASE_PATH)); // Restrict working directory to known safe directory
         processBuilder.redirectErrorStream(true); // Merge stdout and stderr
