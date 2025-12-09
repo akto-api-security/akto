@@ -1,5 +1,5 @@
 """
-Base Prompt Detection Service
+Agent Traffic Analyzer Service
 FastAPI service that detects base prompts with placeholders from a list of prompts
 using SentenceTransformer embeddings and clustering.
 """
@@ -18,7 +18,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Base Prompt Detector", version="1.0.0")
+app = FastAPI(title="Agent Traffic Analyzer", version="1.0.0")
 
 # Load model once at startup
 logger.info("Loading SentenceTransformer model...")

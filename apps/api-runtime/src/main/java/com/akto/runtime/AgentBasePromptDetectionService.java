@@ -1,17 +1,22 @@
 package com.akto.runtime;
 
-import com.akto.DaoInit;
 import com.akto.dao.AgentTrafficLogDao;
 import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.context.Context;
+import com.akto.dao.ApiInfoDao;
+import com.akto.dto.AgentTrafficLog;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.traffic.CollectionTags;
+import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
-import com.mongodb.ConnectionString;
+import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.UpdateManyModel;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -29,7 +34,6 @@ public class AgentBasePromptDetectionService {
     
     
     private static final int MIN_PROMPTS_FOR_DETECTION = 100;
-    private static final int WINDOW_SECONDS = 24 * 60 * 60; // 24 hours
     private static final int MAX_PROMPTS_PER_REQUEST = 1000; // Batch size for Python service
     private static final int MAX_TOTAL_PROMPTS = 10000; // Max prompts to process per collection (sampling)
     private static final int MAX_REQUEST_SIZE_BYTES = 5 * 1024 * 1024; // 5MB max per HTTP request
@@ -72,55 +76,93 @@ public class AgentBasePromptDetectionService {
 
     /**
      * Process a single agent collection to detect base prompts
-     * Fetches prompts from agent_traffic_logs collection for the last 24 hours
+     * Processes each endpoint separately using fetchLogsByCollectionAndEndpoint
      */
     private void processAgentCollection(ApiCollection apiCollection) {
         try {
             logger.info("Processing agent collection: {} (ID: {})", 
                 apiCollection.getName(), apiCollection.getId());
 
-            // Calculate 24-hour window timestamps
-            int currentTimestamp = Context.now();
-            int startTimestamp = currentTimestamp - WINDOW_SECONDS;
+            // Get unique endpoints that have logs
+            Set<String[]> uniqueEndpoints = AgentTrafficLogDao.instance.getUniqueEndpoints(apiCollection.getId());
 
-            // Fetch prompts from agent_traffic_logs collection
-            List<String> prompts = AgentTrafficLogDao.instance.fetchPromptsForCollection(
-                apiCollection.getId(), 
-                startTimestamp, 
-                currentTimestamp
-            );
-
-            if (CollectionUtils.isEmpty(prompts)) {
-                logger.info("No prompts found in agent_traffic_logs for collection: {} in last 24 hours", 
+            if (uniqueEndpoints.isEmpty()) {
+                logger.info("No endpoints with prompts found in agent_traffic_logs for collection: {}", 
                     apiCollection.getId());
                 return;
             }
 
-            if (prompts.size() < MIN_PROMPTS_FOR_DETECTION) {
-                logger.info("Skipping collection {} due to insufficient prompts in 24h window. Found: {}, Required: {}",
-                        apiCollection.getId(), prompts.size(), MIN_PROMPTS_FOR_DETECTION);
-                return;
+            logger.info("Found {} unique endpoints with prompts for collection {}", 
+                uniqueEndpoints.size(), apiCollection.getId());
+
+            int updatedCount = 0;
+            int skippedCount = 0;
+
+            // Process each endpoint separately
+            for (String[] endpoint : uniqueEndpoints) {
+                String url = endpoint[0];
+                String methodStr = endpoint[1];
+                
+                try {
+                    // Fetch logs for this specific endpoint
+                    List<AgentTrafficLog> logs = AgentTrafficLogDao.instance.fetchLogsByCollectionAndEndpoint(
+                        apiCollection.getId(), url, methodStr);
+
+                    if (logs.isEmpty()) {
+                        continue;
+                    }
+
+                    // Extract prompts for this endpoint
+                    List<String> prompts = new ArrayList<>();
+                    for (AgentTrafficLog log : logs) {
+                        String requestPayload = log.getRequestPayload();
+                        if (requestPayload != null && !requestPayload.trim().isEmpty()) {
+                            prompts.add(requestPayload);
+                        }
+                    }
+
+                    if (prompts.size() < MIN_PROMPTS_FOR_DETECTION) {
+                        logger.debug("Skipping endpoint {} {} due to insufficient prompts. Found: {}, Required: {}",
+                                url, methodStr, prompts.size(), MIN_PROMPTS_FOR_DETECTION);
+                        skippedCount++;
+                        continue;
+                    }
+
+                    // Sample prompts if needed
+                    List<String> processedPrompts = samplePromptsIfNeeded(prompts);
+                    logger.debug("Processing {} prompts for endpoint {} {}", 
+                        processedPrompts.size(), url, methodStr);
+
+                    // Detect base prompt for this endpoint
+                    String detectedBasePrompt = detectUsingExternalServiceWithBatching(processedPrompts);
+                    
+                    if (StringUtils.isBlank(detectedBasePrompt)) {
+                        logger.debug("No base prompt detected for endpoint {} {}", url, methodStr);
+                        skippedCount++;
+                        continue;
+                    }
+
+                    // Update this specific endpoint
+                    URLMethods.Method method = URLMethods.Method.fromString(methodStr);
+                    if (method != null) {
+                        Set<ApiInfoKey> endpointSet = new HashSet<>();
+                        endpointSet.add(new ApiInfoKey(apiCollection.getId(), url, method));
+                        updateEndpointsWithBasePrompt(apiCollection.getId(), endpointSet, detectedBasePrompt);
+                        updatedCount++;
+                    } else {
+                        logger.warn("Failed to parse method: {} for URL: {}", methodStr, url);
+                        skippedCount++;
+                    }
+
+                } catch (Exception e) {
+                    logger.error("Error processing endpoint {} {} in collection {}: {}", 
+                        url, methodStr, apiCollection.getId(), e.getMessage(), e);
+                    skippedCount++;
+                }
             }
 
-            logger.info("Found {} prompts for collection {} in last 24 hours", 
-                prompts.size(), apiCollection.getId());
-
-            // Sample prompts if collection is too large
-            List<String> processedPrompts = samplePromptsIfNeeded(prompts);
-            logger.debug("Processing {} prompts for base prompt detection", processedPrompts.size());
-
-            String detectedBasePrompt = detectUsingExternalServiceWithBatching(processedPrompts);
-            
-            if (StringUtils.isBlank(detectedBasePrompt)) {
-                logger.warnAndAddToDb("External base prompt detection failed for collection " + apiCollection.getId()
-                        + ". No base prompt detected.", LogDb.RUNTIME);
-                return;
-            }
-
-            // Update the collection with detected base prompt
-            updateCollectionWithBasePrompt(apiCollection, detectedBasePrompt);
-            logger.info("Successfully detected and updated base prompt for collection: {}", 
-                apiCollection.getId());
+            logger.info("Completed processing collection {}. Updated: {}, Skipped: {}", 
+                apiCollection.getId(), updatedCount, skippedCount);
 
         } catch (Exception e) {
             logger.error("Error processing agent collection: " + apiCollection.getId(), e);
@@ -256,7 +298,7 @@ public class AgentBasePromptDetectionService {
 
             return basePrompt;
         } catch (Exception e) {
-            logger.errorAndAddToDb("Error during external base prompt detection: " + e.getMessage(), LogDb.RUNTIME);
+            logger.error("Error during external base prompt detection: " + e.getMessage(), e);
             return null;
         }
     }
@@ -291,78 +333,57 @@ public class AgentBasePromptDetectionService {
     }
 
     /**
-     * Update API collection with detected base prompt
+     * Update only the specific ApiInfo endpoints that had prompts with detected base prompt.
+     * 
+     * Note: ApiInfo has a composite key (_id: {apiCollectionId, url, method}).
+     * We update only the endpoints that were part of the detection process.
+     * 
+     * Following PR #3597: base prompt is stored in ApiInfo, not ApiCollection.
      */
-    private void updateCollectionWithBasePrompt(ApiCollection apiCollection, String basePrompt) {
+    private void updateEndpointsWithBasePrompt(int apiCollectionId, Set<ApiInfoKey> endpoints, String basePrompt) {
+        if (endpoints.isEmpty()) {
+            logger.warn("No endpoints to update for collection: {}", apiCollectionId);
+            return;
+        }
+
         try {
-            Bson filter = Filters.eq(ApiCollection.ID, apiCollection.getId());
-            Bson update = Updates.set(ApiCollection.DETECTED_BASE_PROMPT, basePrompt);
+            List<UpdateManyModel<ApiInfo>> updateModels = new ArrayList<>();
             
-            ApiCollectionsDao.instance.updateOne(filter, update);
+            // Update each endpoint individually using its composite key
+            for (ApiInfoKey endpoint : endpoints) {
+                // Create filter for this specific endpoint (apiCollectionId + url + method)
+                Bson filter = Filters.and(
+                    Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId),
+                    Filters.eq(ApiInfo.ID_URL, endpoint.getUrl()),
+                    Filters.eq(ApiInfo.ID_METHOD, endpoint.getMethod().name())
+                );
+                
+                Bson update = Updates.set(ApiInfo.DETECTED_BASE_PROMPT, basePrompt);
+                
+                updateModels.add(new UpdateManyModel<>(
+                    filter,
+                    update,
+                    new UpdateOptions()
+                ));
+            }
             
-            logger.info("Updated collection {} with base prompt: {}", 
-                apiCollection.getId(), 
-                basePrompt.length() > 100 ? basePrompt.substring(0, 100) + "..." : basePrompt);
+            // Bulk update all endpoints
+            if (!updateModels.isEmpty()) {
+                ApiInfoDao.instance.getMCollection().bulkWrite(
+                    updateModels,
+                    new BulkWriteOptions().ordered(false)
+                );
+                
+                logger.info("Updated {} ApiInfo endpoints for collection {} with base prompt: {}", 
+                    endpoints.size(),
+                    apiCollectionId, 
+                    basePrompt.length() > 100 ? basePrompt.substring(0, 100) + "..." : basePrompt);
+            }
                 
         } catch (Exception e) {
-            logger.error("Error updating collection with base prompt: " + apiCollection.getId(), e);
+            logger.error("Error updating ApiInfo endpoints with base prompt for collection: " + apiCollectionId, e);
         }
     }
 
-    /**
-     * Main method to run the service standalone
-     * Usage:
-     *   export AKTO_MONGO_CONN=mongodb://localhost:27017
-     *   export BASE_PROMPT_DETECTOR_URL=http://localhost:8093/detect (optional)
-     *   export AKTO_ACCOUNT_ID=1000000 (optional)
-     *   java -cp <classpath> com.akto.runtime.AgentBasePromptDetectionService
-     */
-    public static void main(String[] args) {
-        try {
-            // Get MongoDB connection string from environment or use default
-            String mongoURI = System.getenv("AKTO_MONGO_CONN");
-            if (mongoURI == null || mongoURI.isEmpty()) {
-                mongoURI = "mongodb://localhost:27017";
-                logger.info("AKTO_MONGO_CONN not set, using default: " + mongoURI);
-            }
-            
-            // Initialize DAOs with MongoDB connection
-            DaoInit.init(new ConnectionString(mongoURI));
-            logger.info("Connected to MongoDB: " + mongoURI);
-            
-            // Set account context
-            String accountIdStr = System.getenv("AKTO_ACCOUNT_ID");
-            if (accountIdStr != null && !accountIdStr.isEmpty()) {
-                try {
-                    Context.accountId.set(Integer.parseInt(accountIdStr));
-                } catch (NumberFormatException e) {
-                    logger.warn("Invalid AKTO_ACCOUNT_ID, using default");
-                    Context.accountId.set(1_000_000);
-                }
-            } else {
-                Context.accountId.set(1_000_000);
-            }
-            
-            logger.info("Using account ID: " + Context.accountId.get());
-            logger.info("Starting Agent Base Prompt Detection Service...");
-            
-            // Check Python service URL
-            String pythonServiceUrl = System.getenv("BASE_PROMPT_DETECTOR_URL");
-            if (pythonServiceUrl != null && !pythonServiceUrl.isEmpty()) {
-                logger.info("Python service URL: " + pythonServiceUrl);
-            } else {
-                logger.warn("BASE_PROMPT_DETECTOR_URL not set, detection will fail");
-            }
-            
-            // Run the detection service
-            AgentBasePromptDetectionService service = new AgentBasePromptDetectionService();
-            service.runJob();
-            
-            logger.info("Base prompt detection completed!");
-            
-        } catch (Exception e) {
-            logger.error("Error running base prompt detection: " + e.getMessage(), e);
-            System.exit(1);
-        }
-    }
+ 
 }

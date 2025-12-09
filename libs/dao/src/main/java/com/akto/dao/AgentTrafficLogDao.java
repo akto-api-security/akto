@@ -8,11 +8,16 @@ import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.IndexOptions;
 import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Projections;
+import com.mongodb.BasicDBObject;
+import com.mongodb.client.MongoCursor;
 import org.bson.conversions.Bson;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Set;
 
 /**
  * DAO for AgentTrafficLog collection.
@@ -73,42 +78,89 @@ public class AgentTrafficLogDao extends AccountsContextDao<AgentTrafficLog> {
                 .expireAfter(0L, java.util.concurrent.TimeUnit.SECONDS);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), ttlIndex, ttlOptions);
 
-         // Compound index optimized for cardinality: high -> high -> low
-         // Order: apiCollectionId (high cardinality) -> timestamp (high cardinality) -> isBlocked (low cardinality)
-         String[] fieldNames = new String[]{
-                 AgentTrafficLog.API_COLLECTION_ID,
-                 AgentTrafficLog.TIMESTAMP,
-                 AgentTrafficLog.IS_BLOCKED
-         };
-         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
-     }
+        // Compound index optimized for cardinality: high -> high -> low
+        // Order: apiCollectionId (high cardinality) -> timestamp (high cardinality) -> isBlocked (low cardinality)
+        String[] fieldNames = new String[]{
+                AgentTrafficLog.API_COLLECTION_ID,
+                AgentTrafficLog.TIMESTAMP,
+                AgentTrafficLog.IS_BLOCKED
+        };
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+    }
 
     /**
-     * Fetch prompts from agent traffic logs for a specific collection within a time window.
-     * Only returns non-null requestPayload values.
+     * Get unique endpoints (url + method combinations) that have logs with request payloads for a collection.
      * 
      * @param apiCollectionId The API collection ID
-     * @param startTimestamp Start timestamp (epoch seconds)
-     * @param endTimestamp End timestamp (epoch seconds)
-     * @return List of request payloads (prompts)
+     * @return Set of endpoint pairs as arrays: [url, method]
      */
-    public List<String> fetchPromptsForCollection(int apiCollectionId, int startTimestamp, int endTimestamp) {
-        Bson filter = Filters.and(
-            Filters.eq(AgentTrafficLog.API_COLLECTION_ID, apiCollectionId),
-            Filters.gte(AgentTrafficLog.TIMESTAMP, startTimestamp),
-            Filters.lte(AgentTrafficLog.TIMESTAMP, endTimestamp),
-            Filters.exists(AgentTrafficLog.REQUEST_PAYLOAD),
-            Filters.ne(AgentTrafficLog.REQUEST_PAYLOAD, null)
-        );
-
-        Bson projection = Projections.include(AgentTrafficLog.REQUEST_PAYLOAD);
-
-        List<AgentTrafficLog> logs = findAll(filter, 0, 0, null, projection);
+    public Set<String[]> getUniqueEndpoints(int apiCollectionId) {
+        Set<String[]> endpoints = new HashSet<>();
         
-        return logs.stream()
-            .map(AgentTrafficLog::getRequestPayload)
-            .filter(payload -> payload != null && !payload.trim().isEmpty())
-            .collect(Collectors.toList());
+        try {
+            List<Bson> pipeline = new ArrayList<>();
+            pipeline.add(Aggregates.match(Filters.and(
+                Filters.eq(AgentTrafficLog.API_COLLECTION_ID, apiCollectionId),
+                Filters.exists(AgentTrafficLog.REQUEST_PAYLOAD),
+                Filters.ne(AgentTrafficLog.REQUEST_PAYLOAD, null),
+                Filters.ne(AgentTrafficLog.REQUEST_PAYLOAD, ""),
+                Filters.exists(AgentTrafficLog.URL),
+                Filters.exists(AgentTrafficLog.METHOD)
+            )));
+            pipeline.add(Aggregates.group(
+                new BasicDBObject("url", "$" + AgentTrafficLog.URL)
+                    .append("method", "$" + AgentTrafficLog.METHOD)
+            ));
+            
+            MongoCursor<BasicDBObject> cursor = getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+            while (cursor.hasNext()) {
+                BasicDBObject group = cursor.next();
+                BasicDBObject id = (BasicDBObject) group.get("_id");
+                String url = id.getString("url");
+                String method = id.getString("method");
+                if (url != null && method != null) {
+                    endpoints.add(new String[]{url, method});
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error fetching unique endpoints for collection " + apiCollectionId + ": " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        return endpoints;
+    }
+
+    /**
+     * Fetch AgentTrafficLog records for a specific collection and endpoint (url + method).
+     * 
+     * @param apiCollectionId The API collection ID
+     * @param url The URL of the endpoint
+     * @param method The HTTP method of the endpoint
+     * @return List of AgentTrafficLog records for the specified collection and endpoint
+     */
+    public List<AgentTrafficLog> fetchLogsByCollectionAndEndpoint(int apiCollectionId, String url, String method) {
+        List<AgentTrafficLog> logs = new ArrayList<>();
+        
+        try {
+            Bson filter = Filters.and(
+                Filters.eq(AgentTrafficLog.API_COLLECTION_ID, apiCollectionId),
+                Filters.eq(AgentTrafficLog.URL, url),
+                Filters.eq(AgentTrafficLog.METHOD, method),
+                Filters.exists(AgentTrafficLog.REQUEST_PAYLOAD),
+                Filters.ne(AgentTrafficLog.REQUEST_PAYLOAD, null),
+                Filters.ne(AgentTrafficLog.REQUEST_PAYLOAD, "")
+            );
+            
+            logs = findAll(filter, 0, 0, null, 
+                Projections.include(AgentTrafficLog.REQUEST_PAYLOAD, AgentTrafficLog.URL, AgentTrafficLog.METHOD));
+            
+        } catch (Exception e) {
+            // Log error but return empty list
+            System.err.println("Error fetching logs for collection " + apiCollectionId + 
+                ", endpoint " + url + " " + method + ": " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        return logs;
     }
 }
-

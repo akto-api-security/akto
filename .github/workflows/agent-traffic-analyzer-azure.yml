@@ -1,0 +1,247 @@
+name: Agent Traffic Analyzer - Azure Deployment
+
+# Controls when the workflow will run
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Release version for the deployment (e.g., v1.0.0)'
+        required: true
+      docker_registry:
+        description: 'Docker registry to use'
+        required: true
+        type: choice
+        options:
+          - 'dockerhub'
+          - 'acr'
+      skip_tests:
+        description: 'Skip unit tests?'
+        required: true
+        default: 'False'
+        type: choice
+        options:
+          - 'False'
+          - 'True'
+      build_image:
+        type: boolean
+        default: true
+        description: Build and push Docker image
+      deploy_infrastructure:
+        type: boolean
+        default: false
+        description: Deploy/update Azure infrastructure with Terraform
+      terraform_action:
+        description: 'Terraform action to perform'
+        required: false
+        default: 'plan'
+        type: choice
+        options:
+          - 'plan'
+          - 'apply'
+          - 'destroy'
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # Build and push Docker image
+  build-image:
+    runs-on: ubuntu-22.04
+    if: ${{ github.event.inputs.build_image == 'true' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to Docker Hub
+        if: ${{ github.event.inputs.docker_registry == 'dockerhub' }}
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Login to Azure Container Registry
+        if: ${{ github.event.inputs.docker_registry == 'acr' }}
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ secrets.AZURE_ACR_LOGIN_SERVER }}
+          username: ${{ secrets.AZURE_ACR_USERNAME }}
+          password: ${{ secrets.AZURE_ACR_PASSWORD }}
+
+      - name: Build Docker image
+        working-directory: ./apps/agent-traffic-analyzer
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            -t ${{ secrets.DOCKER_USERNAME }}/agent-traffic-analyzer:${{ github.event.inputs.release_version }} \
+            -t ${{ secrets.DOCKER_USERNAME }}/agent-traffic-analyzer:latest \
+            . \
+            --push
+
+      - name: Build Docker image for ACR
+        if: ${{ github.event.inputs.docker_registry == 'acr' }}
+        working-directory: ./apps/agent-traffic-analyzer
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            -t ${{ secrets.AZURE_ACR_LOGIN_SERVER }}/agent-traffic-analyzer:${{ github.event.inputs.release_version }} \
+            -t ${{ secrets.AZURE_ACR_LOGIN_SERVER }}/agent-traffic-analyzer:latest \
+            . \
+            --push
+
+      - name: Output image details
+        run: |
+          if [ "${{ github.event.inputs.docker_registry }}" == "dockerhub" ]; then
+            echo "IMAGE=${{ secrets.DOCKER_USERNAME }}/agent-traffic-analyzer:${{ github.event.inputs.release_version }}" >> $GITHUB_ENV
+          else
+            echo "IMAGE=${{ secrets.AZURE_ACR_LOGIN_SERVER }}/agent-traffic-analyzer:${{ github.event.inputs.release_version }}" >> $GITHUB_ENV
+          fi
+          echo "Built and pushed: $IMAGE"
+
+  # Deploy infrastructure with Terraform
+  deploy-infrastructure:
+    runs-on: ubuntu-22.04
+    needs: build-image
+    if: ${{ github.event.inputs.deploy_infrastructure == 'true' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: "1.5.0"
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup Terraform variables
+        working-directory: ./infra/azure/vmss/terraform
+        run: |
+          cat > terraform.tfvars << EOF
+          resource_group_name = "${{ secrets.AZURE_RESOURCE_GROUP_NAME }}"
+          location            = "${{ secrets.AZURE_LOCATION }}"
+          service_name        = "akto-agent-traffic-vmss"
+          instance_count      = 1
+          vm_size            = "Standard_D2s"
+          
+          admin_username = "azureuser"
+          ssh_public_key = "${{ secrets.AZURE_SSH_PUBLIC_KEY }}"
+          
+          vnet_address_space    = "10.2.0.0/16"
+          subnet_address_prefix = "10.2.32.0/24"
+          
+          docker_image = "${{ github.event.inputs.docker_registry == 'dockerhub' && format('{0}/agent-traffic-analyzer:{1}', secrets.DOCKER_USERNAME, github.event.inputs.release_version) || format('{0}/agent-traffic-analyzer:{1}', secrets.AZURE_ACR_LOGIN_SERVER, github.event.inputs.release_version) }}"
+          
+          create_container_registry = false
+          external_acr_login_server = "${{ secrets.AZURE_ACR_LOGIN_SERVER }}"
+          external_acr_username     = "${{ secrets.AZURE_ACR_USERNAME }}"
+          external_acr_password      = "${{ secrets.AZURE_ACR_PASSWORD }}"
+          
+          nginx_port          = 80
+          python_service_port = 8093
+          
+          allowed_source_addresses = []
+          enable_api_key_auth      = false
+          
+          tags = {
+            Environment = "Production"
+            Service     = "AgentTrafficAnalyzer"
+            ManagedBy   = "GitHubActions"
+            Version     = "${{ github.event.inputs.release_version }}"
+          }
+          EOF
+
+      - name: Terraform Init
+        working-directory: ./infra/azure/vmss/terraform
+        run: terraform init
+
+      - name: Terraform Validate
+        working-directory: ./infra/azure/vmss/terraform
+        run: terraform validate
+
+      - name: Terraform Plan
+        if: ${{ github.event.inputs.terraform_action == 'plan' || github.event.inputs.terraform_action == 'apply' }}
+        working-directory: ./infra/azure/vmss/terraform
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        if: ${{ github.event.inputs.terraform_action == 'apply' }}
+        working-directory: ./infra/azure/vmss/terraform
+        run: terraform apply -auto-approve tfplan
+
+      - name: Terraform Destroy
+        if: ${{ github.event.inputs.terraform_action == 'destroy' }}
+        working-directory: ./infra/azure/vmss/terraform
+        run: terraform destroy -auto-approve
+
+      - name: Output Terraform outputs
+        if: ${{ github.event.inputs.terraform_action == 'apply' }}
+        working-directory: ./infra/azure/vmss/terraform
+        run: terraform output -json
+
+      - name: Push git tag
+        if: ${{ github.event.inputs.terraform_action == 'apply' }}
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          custom_tag: agent-traffic-analyzer-${{ github.event.inputs.release_version }}
+
+      - name: Create a GitHub release
+        if: ${{ github.event.inputs.terraform_action == 'apply' }}
+        uses: ncipollo/release-action@v1.12.0
+        with:
+          tag: ${{ steps.tag_version.outputs.new_tag }}
+          name: Release Agent Traffic Analyzer ${{ github.event.inputs.release_version }}
+          omitBody: true
+
+      - name: Send deployment notification to Slack
+        if: ${{ github.event.inputs.terraform_action == 'apply' }}
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "Agent Traffic Analyzer v${{ github.event.inputs.release_version }} deployed to Azure VMSS!"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+  # Summary job
+  summary:
+    runs-on: ubuntu-latest
+    needs: [build-image, deploy-infrastructure]
+    if: always()
+    
+    steps:
+      - name: Deployment Summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Release Version:** ${{ github.event.inputs.release_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Docker Registry:** ${{ github.event.inputs.docker_registry }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Service:** Agent Traffic Analyzer" >> $GITHUB_STEP_SUMMARY
+          echo "**Docker Image:** agent-traffic-analyzer:${{ github.event.inputs.release_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Image:** ${{ github.event.inputs.build_image }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Deploy Infrastructure:** ${{ github.event.inputs.deploy_infrastructure }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event.inputs.deploy_infrastructure }}" == "true" ]; then
+            echo "**Terraform Action:** ${{ github.event.inputs.terraform_action }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Service Name:** akto-agent-traffic-analyzer" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event.inputs.deploy_infrastructure }}" == "true" ] && [ "${{ github.event.inputs.terraform_action }}" == "apply" ]; then
+            echo "1. Verify deployment in Azure Portal" >> $GITHUB_STEP_SUMMARY
+            echo "2. Test service endpoint: \`curl http://<lb-ip>:80/health\`" >> $GITHUB_STEP_SUMMARY
+            echo "3. Check VMSS instances are healthy" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "1. Review Terraform plan/output" >> $GITHUB_STEP_SUMMARY
+            echo "2. Run deployment with \`terraform_action: apply\` to deploy infrastructure" >> $GITHUB_STEP_SUMMARY
+          fi
+

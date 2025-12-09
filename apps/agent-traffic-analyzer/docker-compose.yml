@@ -1,11 +1,11 @@
 version: '3.8'
 
 services:
-  base-prompt-detector:
+  agent-traffic-analyzer:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: base-prompt-detector
+    container_name: agent-traffic-analyzer
     ports:
       - "8093:8093"
     environment:

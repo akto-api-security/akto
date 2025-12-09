@@ -43,6 +43,10 @@ on:
         type: boolean
         default: false
         description: Threat Detection Backend
+      agent_traffic_analyzer:
+        type: boolean
+        default: false
+        description: Agent Traffic Analyzer
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -150,6 +154,13 @@ jobs:
             cd ../internal
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG_2 . --push
             echo "::set-output name=image::$ECR_REGISTRY/akto-internal:$IMAGE_TAG"
+          fi
+
+          if [[ "${{ github.event.inputs.agent_traffic_analyzer }}" == "true" ]]; then
+            cd ../agent-traffic-analyzer
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/agent-traffic-analyzer:$IMAGE_TAG_1 -t $ECR_REGISTRY/agent-traffic-analyzer:$IMAGE_TAG_2 . --push
+            echo "::set-output name=image::$ECR_REGISTRY/agent-traffic-analyzer:$IMAGE_TAG"
+            echo "::notice title=Azure Deployment::Image built. To deploy to Azure, manually run 'Agent Traffic Analyzer - Azure Deployment' workflow with the same version."
           fi
 
       - name: Configure AWS Credentials for ECR
