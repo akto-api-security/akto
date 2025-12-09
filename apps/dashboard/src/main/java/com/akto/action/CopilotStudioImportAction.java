@@ -1,8 +1,10 @@
 package com.akto.action;
 
-import com.akto.dao.AIAgentConnectorInfoDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.AIAgentConnectorInfo;
+import com.akto.dto.jobs.AIAgentConnectorSyncJobParams;
+import com.akto.dto.jobs.Job;
+import com.akto.dto.jobs.JobExecutorType;
+import com.akto.jobs.JobScheduler;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.opensymphony.xwork2.Action;
@@ -12,12 +14,18 @@ import java.util.Map;
 
 public class CopilotStudioImportAction extends UserAction {
 
+    private static final String CONNECTOR_TYPE_COPILOT_STUDIO = "COPILOT_STUDIO";
+    private static final String CONFIG_APPINSIGHTS_APP_ID = "APPINSIGHTS_APP_ID";
+    private static final String CONFIG_APPINSIGHTS_API_KEY = "APPINSIGHTS_API_KEY";
+    private static final String CONFIG_DATA_INGESTION_SERVICE_URL = "DATA_INGESTION_SERVICE_URL";
+
     private String appInsightsAppId;
     private String appInsightsApiKey;
     private String dataIngestionUrl;
-    private AIAgentConnectorInfo createdImportInfo;
+    private String jobId;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(CopilotStudioImportAction.class, LoggerMaker.LogDb.DASHBOARD);
+    private static final int CONNECTOR_SYNC_JOB_RECURRING_INTERVAL_SECONDS = 10;
 
     public String initiateCopilotStudioImport() {
         try {
@@ -25,62 +33,37 @@ public class CopilotStudioImportAction extends UserAction {
             loggerMaker.info("App Insights App ID: " + appInsightsAppId, LogDb.DASHBOARD);
             loggerMaker.info("Data Ingestion Service URL: " + dataIngestionUrl, LogDb.DASHBOARD);
 
-            // Create the collection if it doesn't exist and set up indices
-            AIAgentConnectorInfoDao.instance.createIndicesIfAbsent();
-
-            // Get current timestamp
-            int currentTimestamp = Context.now();
-
             // Create config map
             Map<String, String> config = new HashMap<>();
-            config.put(AIAgentConnectorInfo.CONFIG_APPINSIGHTS_APP_ID, appInsightsAppId);
-            config.put(AIAgentConnectorInfo.CONFIG_APPINSIGHTS_API_KEY, appInsightsApiKey);
-            config.put(AIAgentConnectorInfo.CONFIG_DATA_INGESTION_SERVICE_URL, dataIngestionUrl);
+            config.put(CONFIG_APPINSIGHTS_APP_ID, appInsightsAppId);
+            config.put(CONFIG_APPINSIGHTS_API_KEY, appInsightsApiKey);
+            config.put(CONFIG_DATA_INGESTION_SERVICE_URL, dataIngestionUrl);
 
-            // Create AIAgentConnectorInfo object with default status CREATED and type COPILOT_STUDIO
-            createdImportInfo = new AIAgentConnectorInfo(
-                AIAgentConnectorInfo.TYPE_COPILOT_STUDIO,
-                config,
-                currentTimestamp,
-                currentTimestamp,
-                AIAgentConnectorInfo.STATUS_CREATED,
-                null
+            // Schedule recurring job using JobScheduler - job params will store the config
+            Job job = JobScheduler.scheduleRecurringJob(
+                Context.accountId.get(),
+                new AIAgentConnectorSyncJobParams(
+                    CONNECTOR_TYPE_COPILOT_STUDIO,
+                    config,
+                    Context.now()
+                ),
+                JobExecutorType.DASHBOARD,
+                CONNECTOR_SYNC_JOB_RECURRING_INTERVAL_SECONDS
             );
 
-            // Insert the document into the collection
-            AIAgentConnectorInfoDao.instance.insertOne(createdImportInfo);
+            if (job == null) {
+                loggerMaker.error("Failed to schedule recurring job for Copilot Studio connector", LogDb.DASHBOARD);
+                return Action.ERROR.toUpperCase();
+            }
 
-            loggerMaker.info("Successfully saved Copilot Studio Import data to collection: " + AIAgentConnectorInfoDao.COLLECTION_NAME + " with type: " + AIAgentConnectorInfo.TYPE_COPILOT_STUDIO + " and status: " + AIAgentConnectorInfo.STATUS_CREATED + ", Document ID: " + createdImportInfo.getHexId(), LogDb.DASHBOARD);
+            this.jobId = job.getId().toHexString();
+            loggerMaker.info("Successfully scheduled recurring job for Copilot Studio connector with job ID: " + this.jobId, LogDb.DASHBOARD);
 
             return Action.SUCCESS.toUpperCase();
 
         } catch (Exception e) {
             loggerMaker.error("Error while initiating Copilot Studio Import. Error: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             e.printStackTrace();
-
-            // Try to save error information to collection
-            try {
-                int currentTimestamp = Context.now();
-
-                // Create config map
-                Map<String, String> config = new HashMap<>();
-                config.put(AIAgentConnectorInfo.CONFIG_APPINSIGHTS_APP_ID, appInsightsAppId);
-                config.put(AIAgentConnectorInfo.CONFIG_APPINSIGHTS_API_KEY, appInsightsApiKey);
-                config.put(AIAgentConnectorInfo.CONFIG_DATA_INGESTION_SERVICE_URL, dataIngestionUrl);
-
-                createdImportInfo = new AIAgentConnectorInfo(
-                    AIAgentConnectorInfo.TYPE_COPILOT_STUDIO,
-                    config,
-                    currentTimestamp,
-                    currentTimestamp,
-                    AIAgentConnectorInfo.STATUS_FAILED_SCHEDULING,
-                    e.getMessage()
-                );
-                AIAgentConnectorInfoDao.instance.insertOne(createdImportInfo);
-            } catch (Exception insertException) {
-                loggerMaker.error("Failed to save error information to collection: " + insertException.getMessage(), LogDb.DASHBOARD);
-            }
-
             return Action.ERROR.toUpperCase();
         }
     }
@@ -110,11 +93,11 @@ public class CopilotStudioImportAction extends UserAction {
         this.dataIngestionUrl = dataIngestionUrl;
     }
 
-    public AIAgentConnectorInfo getCreatedImportInfo() {
-        return createdImportInfo;
+    public String getJobId() {
+        return jobId;
     }
 
-    public void setCreatedImportInfo(AIAgentConnectorInfo createdImportInfo) {
-        this.createdImportInfo = createdImportInfo;
+    public void setJobId(String jobId) {
+        this.jobId = jobId;
     }
 }
