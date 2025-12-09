@@ -109,13 +109,19 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
             throw new Exception("Invalid binary path detected: " + binaryCanonical);
         }
 
-        // Build the command with -once flag using canonical path
-        List<String> command = new ArrayList<>();
-        command.add(binaryCanonical);
-        command.add("-once");
+        // Ensure canonical path is absolute (defense-in-depth)
+        if (!new File(binaryCanonical).isAbsolute()) {
+            throw new Exception("Binary path is not absolute: " + binaryCanonical);
+        }
 
-        // Create ProcessBuilder with security hardening
-        ProcessBuilder processBuilder = new ProcessBuilder(command);
+        // Check for shell meta-characters (defense-in-depth, though ProcessBuilder doesn't use shell)
+        // Note: Allow backslashes for Windows paths, but block other shell meta-characters
+        if (binaryCanonical.matches(".*[;&|<>`$].*")) {
+            throw new Exception("Binary path contains illegal shell meta-characters: " + binaryCanonical);
+        }
+
+        // Create ProcessBuilder with explicit arguments to avoid shell interpretation
+        ProcessBuilder processBuilder = new ProcessBuilder(binaryCanonical, "-once");
         processBuilder.environment().clear(); // Clear inherited environment to avoid using untrusted env vars
         processBuilder.directory(new File(baseDirCanonical)); // Restrict working directory to known safe directory
         processBuilder.redirectErrorStream(true); // Merge stdout and stderr
