@@ -113,7 +113,7 @@ public class AzureBoardsUtils {
         String responsePayload = response.getBody();
 
         if (response.getStatusCode() > 201 || responsePayload == null) {
-            loggerMaker.errorAndAddToDb(String.format("Error while making Azure boards request for fetching classiciation nodes - (%s,%s). Response Code %d", projectName, structureGroup, response.getStatusCode()));
+            loggerMaker.errorAndAddToDb(String.format("Error while making Azure boards request for fetching classification nodes - (%s,%s). Response Code %d", projectName, structureGroup, response.getStatusCode()));
             return null;
         }
 

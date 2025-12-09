@@ -34,7 +34,7 @@ const TagList = ({ tagList, isKvTypeTag, displayConfirmationModals, tagDeletionH
                             {
                                 tagList.map((tag) => {
                                     
-                                    let keyName, value;;
+                                    let keyName, value;
                                     if (isKvTypeTag) {
                                         if (typeof tag !== "object" || tag === null) return null;
 
