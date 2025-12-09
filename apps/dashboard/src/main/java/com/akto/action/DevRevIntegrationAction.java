@@ -1,6 +1,6 @@
 package com.akto.action;
 
-import com.akto.devrev.DevRevIntegrationManager;
+import com.akto.devrev.DevRevIntegrationService;
 import com.akto.dto.devrev_integration.DevRevIntegration;
 import com.akto.log.LoggerMaker;
 import com.opensymphony.xwork2.Action;
@@ -22,8 +22,8 @@ public class DevRevIntegrationAction extends UserAction {
 
     public String addDevRevIntegration() {
         try {
-            DevRevIntegrationManager manager = new DevRevIntegrationManager(orgUrl, personalAccessToken);
-            devrevIntegration = manager.addIntegration(partsIdToNameMap);
+            DevRevIntegrationService devRevService = new DevRevIntegrationService(orgUrl, personalAccessToken);
+            devrevIntegration = devRevService.addIntegration(partsIdToNameMap);
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             logger.errorAndAddToDb("Error adding DevRev integration: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
@@ -34,8 +34,8 @@ public class DevRevIntegrationAction extends UserAction {
 
     public String fetchDevRevIntegration() {
         try {
-            DevRevIntegrationManager manager = new DevRevIntegrationManager();
-            devrevIntegration = manager.fetchIntegration();
+            DevRevIntegrationService devRevService = new DevRevIntegrationService();
+            devrevIntegration = devRevService.fetchIntegration();
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             logger.errorAndAddToDb("Error fetching DevRev integration: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
@@ -46,8 +46,8 @@ public class DevRevIntegrationAction extends UserAction {
 
     public String fetchDevRevParts() {
         try {
-            DevRevIntegrationManager manager = new DevRevIntegrationManager(null, personalAccessToken);
-            partsIdToNameMap = manager.fetchDevrevProjects();
+            DevRevIntegrationService devRevService = new DevRevIntegrationService(null, personalAccessToken);
+            partsIdToNameMap = devRevService.fetchDevrevProjects();
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             logger.errorAndAddToDb("Error fetching DevRev projects: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
@@ -58,8 +58,8 @@ public class DevRevIntegrationAction extends UserAction {
 
     public String removeDevRevIntegration() {
         try {
-            DevRevIntegrationManager manager = new DevRevIntegrationManager();
-            manager.removeIntegration();
+            DevRevIntegrationService devRevService = new DevRevIntegrationService();
+            devRevService.removeIntegration();
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             logger.errorAndAddToDb("Error removing DevRev integration: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
