@@ -125,9 +125,20 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
             throw new Exception("Binary path contains illegal shell meta-characters: " + execPath);
         }
 
-        // Create ProcessBuilder with explicit List using the whitelisted expected path
+        // Final validation: Ensure expectedBinaryCanonical is inside trusted base directory and is executable
+        File binFile = new File(expectedBinaryCanonical);
+        String baseCanonical = new File(BINARY_BASE_PATH).getCanonicalPath();
+        String binCanonical = binFile.getCanonicalPath();
+        if (!binCanonical.startsWith(baseCanonical + File.separator)) {
+            throw new Exception("Binary path is outside allowed base path: " + expectedBinaryCanonical);
+        }
+        if (!binFile.exists() || !binFile.canExecute()) {
+            throw new Exception("Binary does not exist or is not executable: " + expectedBinaryCanonical);
+        }
+
+        // Create ProcessBuilder with explicit List using the validated whitelisted path
         ProcessBuilder processBuilder = new ProcessBuilder();
-        processBuilder.command(java.util.Arrays.asList(expectedBinaryCanonical, "-once")); // Use the previously validated canonical expected path to avoid any user-influenced execPath
+        processBuilder.command(java.util.Arrays.asList(expectedBinaryCanonical, "-once")); // Execute the final validated canonical path
         processBuilder.environment().clear(); // Clear inherited environment to avoid using untrusted env vars
         processBuilder.directory(new File(BINARY_BASE_PATH)); // Restrict working directory to known safe directory
         processBuilder.redirectErrorStream(true); // Merge stdout and stderr
