@@ -7,7 +7,6 @@ import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.devrev_integration.DevRevIntegration;
 import com.akto.log.LoggerMaker;
 import com.akto.testing.ApiExecutor;
-import com.akto.util.Constants;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
@@ -70,7 +69,7 @@ public class DevRevIntegrationManager {
         logger.infoAndAddToDb("DevRev integration added successfully", LoggerMaker.LogDb.DASHBOARD);
 
         if (updatedIntegration != null) {
-            updatedIntegration.setPersonalAccessToken(Constants.ASTERISK);
+            updatedIntegration.setPersonalAccessToken(null);
         }
 
         return updatedIntegration;
@@ -119,16 +118,12 @@ public class DevRevIntegrationManager {
     public DevRevIntegration fetchIntegration() {
         DevRevIntegration integration = DevRevIntegrationDao.instance.findOne(new BasicDBObject());
         if (integration != null) {
-            integration.setPersonalAccessToken(Constants.ASTERISK);
+            integration.setPersonalAccessToken(null);
         }
         return integration;
     }
 
     public Map<String, String> fetchDevrevProjects() throws Exception {
-        if (personalAccessToken == null || personalAccessToken.isEmpty()) {
-            throw new Exception("Please enter a valid personal access token.");
-        }
-
         String actualToken = getPersonalAccessToken(personalAccessToken);
 
         Map<String, String> partsIdToNameMap = fetchAllPartsFromDevRev(actualToken);
@@ -151,16 +146,15 @@ public class DevRevIntegrationManager {
     }
 
     private String getPersonalAccessToken(String token) throws Exception {
-        if (token != null && !token.isEmpty() && !token.equals(
-            Constants.ASTERISK)) {
+        if (token != null && !token.isEmpty()) {
             return token;
-        } else {
-            DevRevIntegration existingIntegration = DevRevIntegrationDao.instance.findOne(new BasicDBObject());
-            if (existingIntegration == null || existingIntegration.getPersonalAccessToken() == null
-                || existingIntegration.getPersonalAccessToken().isEmpty()) {
-                throw new Exception("Please enter a valid personal access token.");
-            }
-            return existingIntegration.getPersonalAccessToken();
         }
+
+        DevRevIntegration existingIntegration = DevRevIntegrationDao.instance.findOne(new BasicDBObject());
+        if (existingIntegration == null || existingIntegration.getPersonalAccessToken() == null
+            || existingIntegration.getPersonalAccessToken().isEmpty()) {
+            throw new Exception("Please enter a valid personal access token.");
+        }
+        return existingIntegration.getPersonalAccessToken();
     }
 }
