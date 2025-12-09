@@ -147,13 +147,11 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
             throw new Exception("Binary does not exist or is not executable: " + binCanonical);
         }
 
-        // Create ProcessBuilder with explicit, validated List - no user input in command
-        // Uses: (1) binCanonical - fully validated canonical path with no user influence
+        // Create ProcessBuilder with validated canonical path and hardcoded arguments passed directly to constructor
+        // Uses: (1) binCanonical - fully validated absolute canonical path with no user influence
         //       (2) "-once" - hardcoded argument (no user input)
-        // This prevents shell/meta-character injection and untrusted search path issues
-        java.util.List<String> command = java.util.Arrays.asList(binCanonical, "-once");
-        ProcessBuilder processBuilder = new ProcessBuilder();
-        processBuilder.command(java.util.Collections.unmodifiableList(new java.util.ArrayList<>(command))); // Immutable, validated full-path command; no user input allowed
+        // Constructor avoids mutable command lists and passes args directly to OS without shell interpretation
+        ProcessBuilder processBuilder = new ProcessBuilder(binCanonical, "-once");
         processBuilder.environment().clear(); // Clear inherited environment to avoid using untrusted env vars
         processBuilder.directory(new File(baseCanonical)); // Use the resolved canonical base directory to avoid symlink/relative path bypass
         processBuilder.redirectErrorStream(true); // Merge stdout and stderr
