@@ -98,29 +98,36 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
 
         logger.info("Executing Go binary at: {} for connector type: {}", binaryFile.getAbsolutePath(), connectorType);
 
-        // Validate canonical path to prevent path traversal or symlink attacks
-        String binaryCanonical = binaryFile.getCanonicalPath();
+        // Resolve real (no-follow-symlink) path to prevent symlink-based attacks
+        String execPath;
+        try {
+            execPath = binaryFile.toPath().toRealPath(java.nio.file.LinkOption.NOFOLLOW_LINKS).toString();
+        } catch (java.nio.file.NoSuchFileException e) {
+            throw new Exception("Binary file does not exist: " + binaryFile.getAbsolutePath(), e);
+        } catch (Exception e) {
+            throw new Exception("Failed to resolve real path for binary (possible symlink): " + binaryFile.getAbsolutePath(), e);
+        }
 
         // Enforce exact expected binary path to avoid any injection vector from manipulated paths
         String expectedBinaryCanonical = new File(BINARY_BASE_PATH, getBinaryName(connectorType)).getCanonicalPath();
-        if (!binaryCanonical.equals(expectedBinaryCanonical)) {
-            throw new Exception("Binary path mismatch. Expected: " + expectedBinaryCanonical + ", Actual: " + binaryCanonical);
+        if (!new File(execPath).getCanonicalPath().equals(expectedBinaryCanonical)) {
+            throw new Exception("Binary real path mismatch. Expected: " + expectedBinaryCanonical + ", Actual: " + execPath);
         }
 
         // Ensure canonical path is absolute (defense-in-depth)
-        if (!new File(expectedBinaryCanonical).isAbsolute()) {
-            throw new Exception("Binary path is not absolute: " + expectedBinaryCanonical);
+        if (!new File(execPath).isAbsolute()) {
+            throw new Exception("Binary path is not absolute: " + execPath);
         }
 
         // Check for shell meta-characters (defense-in-depth, though ProcessBuilder doesn't use shell)
         // Note: Allow backslashes for Windows paths, but block other shell meta-characters
-        if (expectedBinaryCanonical.matches(".*[;&|<>`$].*")) {
-            throw new Exception("Binary path contains illegal shell meta-characters: " + expectedBinaryCanonical);
+        if (execPath.matches(".*[;&|<>`$].*")) {
+            throw new Exception("Binary path contains illegal shell meta-characters: " + execPath);
         }
 
-        // Create ProcessBuilder with explicit varargs to ensure executable and args are passed as separate elements
+        // Create ProcessBuilder with explicit varargs using the validated real path
         ProcessBuilder processBuilder = new ProcessBuilder();
-        processBuilder.command(expectedBinaryCanonical, "-once"); // No shell interpretation, explicit parameters
+        processBuilder.command(execPath, "-once"); // Execute the exact path we validated (not a symlink)
         processBuilder.environment().clear(); // Clear inherited environment to avoid using untrusted env vars
         processBuilder.directory(new File(BINARY_BASE_PATH)); // Restrict working directory to known safe directory
         processBuilder.redirectErrorStream(true); // Merge stdout and stderr
