@@ -327,7 +327,6 @@ public class Main {
         final boolean checkPg = aSettings != null && aSettings.isRedactPayload();
 
         AllMetrics.instance.init(LogDb.RUNTIME, checkPg, dataActor, DataActor.actualAccountId);
-        HttpCallParser.init();
         loggerMaker.infoAndAddToDb("All metrics initialized");
 
         dataActor.modifyHybridSaasSetting(RuntimeMode.isHybridDeployment());
