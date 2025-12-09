@@ -190,6 +190,9 @@ ProcessBuilder processBuilder = new ProcessBuilder(expectedBinaryCanonical, "-on
 ProcessBuilder processBuilder = new ProcessBuilder(expectedBinaryCanonical, "-once");
 processBuilder.environment().clear();
 processBuilder.directory(new File(baseCanonical));
+ProcessBuilder processBuilder = new ProcessBuilder(expectedBinaryCanonical, "-once");
+processBuilder.environment().clear();
+processBuilder.directory(new File(baseCanonical));
 processBuilder.redirectErrorStream(true);
         }
 
