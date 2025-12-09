@@ -24,9 +24,27 @@ import McpGateway from "./McpGateway"
 import AIAgentsGateway from "./AIAgentsGateway"
 import ImpervaImport from "./components/ImpervaImport"
 import BrowserExtension from "./components/BrowserExtension"
-import N8NImport from "./components/N8NImport"
-import LangchainImport from "./components/LangchainImport"
-import CopilotStudioImport from "./components/CopilotStudioImport"
+import AIAgentConnectorImport from "./components/AIAgentConnectorImport"
+import {
+    CONNECTOR_TYPE_N8N,
+    CONNECTOR_NAME_N8N,
+    DESCRIPTION_N8N,
+    DOCS_URL_N8N,
+    INTERVAL_N8N,
+    N8N_FIELDS,
+    CONNECTOR_TYPE_LANGCHAIN,
+    CONNECTOR_NAME_LANGCHAIN,
+    DESCRIPTION_LANGCHAIN,
+    DOCS_URL_LANGCHAIN,
+    INTERVAL_LANGCHAIN,
+    LANGCHAIN_FIELDS,
+    CONNECTOR_TYPE_COPILOT_STUDIO,
+    CONNECTOR_NAME_COPILOT_STUDIO,
+    DESCRIPTION_COPILOT_STUDIO,
+    DOCS_URL_COPILOT_STUDIO,
+    INTERVAL_COPILOT_STUDIO,
+    COPILOT_STUDIO_FIELDS
+} from "./constants/aiAgentConnectorConstants"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -868,7 +886,14 @@ const n8nImportObj = {
     text: "Use our N8N Import feature to capture traffic and instantly send it to your dashboard for real-time insights.",
     docsUrl: 'https://docs.akto.io/n8n-import',
     key: "N8N_IMPORT",
-    component: <N8NImport/>
+    component: <AIAgentConnectorImport
+        connectorType={CONNECTOR_TYPE_N8N}
+        connectorName={CONNECTOR_NAME_N8N}
+        description={DESCRIPTION_N8N}
+        fields={N8N_FIELDS}
+        docsUrl={DOCS_URL_N8N}
+        recurringIntervalSeconds={INTERVAL_N8N}
+    />
 }
 
 const langchainImportObj = {
@@ -877,7 +902,14 @@ const langchainImportObj = {
     text: "Use our Langchain Import feature to capture traffic from LangSmith and instantly send it to your dashboard for real-time insights.",
     docsUrl: 'https://docs.akto.io/langchain-import',
     key: "LANGCHAIN_IMPORT",
-    component: <LangchainImport/>
+    component: <AIAgentConnectorImport
+        connectorType={CONNECTOR_TYPE_LANGCHAIN}
+        connectorName={CONNECTOR_NAME_LANGCHAIN}
+        description={DESCRIPTION_LANGCHAIN}
+        fields={LANGCHAIN_FIELDS}
+        docsUrl={DOCS_URL_LANGCHAIN}
+        recurringIntervalSeconds={INTERVAL_LANGCHAIN}
+    />
 }
 
 const copilotStudioImportObj = {
@@ -886,7 +918,14 @@ const copilotStudioImportObj = {
     text: "Use our Copilot Studio Import feature to capture traffic from Azure Application Insights and instantly send it to your dashboard for real-time insights.",
     docsUrl: 'https://docs.akto.io/copilot-studio-import',
     key: "COPILOT_STUDIO_IMPORT",
-    component: <CopilotStudioImport/>
+    component: <AIAgentConnectorImport
+        connectorType={CONNECTOR_TYPE_COPILOT_STUDIO}
+        connectorName={CONNECTOR_NAME_COPILOT_STUDIO}
+        description={DESCRIPTION_COPILOT_STUDIO}
+        fields={COPILOT_STUDIO_FIELDS}
+        docsUrl={DOCS_URL_COPILOT_STUDIO}
+        recurringIntervalSeconds={INTERVAL_COPILOT_STUDIO}
+    />
 }
 
 

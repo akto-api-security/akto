@@ -20,6 +20,8 @@ import java.util.Map;
 import java.util.Set;
 
 import static com.akto.jobs.executors.AIAgentConnectorConstants.*;
+import com.akto.jobs.executors.strategy.AIAgentConnectorStrategy;
+import com.akto.jobs.executors.strategy.AIAgentConnectorStrategyFactory;
 
 public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnectorSyncJobParams> {
 
@@ -66,8 +68,11 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
     }
 
     private void executeGoBinary(String connectorType, Map<String, String> config, String dataIngestionUrl, Job job) throws Exception {
-        // Determine binary name and path based on connector type
-        String binaryName = getBinaryName(connectorType);
+        // Get strategy for this connector type using Factory pattern
+        AIAgentConnectorStrategy strategy = AIAgentConnectorStrategyFactory.getStrategy(connectorType);
+
+        // Determine binary name and path using strategy
+        String binaryName = strategy.getBinaryName();
         String binaryPath = BINARY_BASE_PATH + binaryName;
         File binaryFile = new File(binaryPath);
 
@@ -142,7 +147,13 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
 
         // Set only the required environment variables for the connector
         Map<String, String> env = processBuilder.environment();
-        setConnectorEnvironmentVariables(env, connectorType, config, dataIngestionUrl);
+
+        // Set common environment variables
+        env.put("DATA_INGESTION_SERVICE_URL", dataIngestionUrl);
+        env.put("ACCOUNT_ID", String.valueOf(Context.accountId.get()));
+
+        // Set connector-specific environment variables using strategy
+        strategy.setEnvironmentVariables(env, config);
 
         Process process = null;
         StringBuilder output = new StringBuilder();
@@ -198,75 +209,6 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
         }
     }
 
-    /**
-     * Gets the binary name for the given connector type.
-     *
-     * @param connectorType The connector type (N8N, LANGCHAIN, COPILOT_STUDIO)
-     * @return The binary name
-     */
-    private String getBinaryName(String connectorType) {
-        switch (connectorType) {
-            case CONNECTOR_TYPE_N8N:
-                return BINARY_NAME_N8N;
-            case CONNECTOR_TYPE_LANGCHAIN:
-                return BINARY_NAME_LANGCHAIN;
-            case CONNECTOR_TYPE_COPILOT_STUDIO:
-                return BINARY_NAME_COPILOT_STUDIO;
-            default:
-                throw new IllegalArgumentException("Unsupported connector type: " + connectorType);
-        }
-    }
-
-    /**
-     * Sets environment variables for the binary based on connector type.
-     *
-     * @param env The environment map to populate
-     * @param connectorType The connector type
-     * @param config The configuration map
-     * @param dataIngestionUrl The data ingestion service URL
-     */
-    private void setConnectorEnvironmentVariables(Map<String, String> env, String connectorType,
-                                                  Map<String, String> config, String dataIngestionUrl) throws Exception {
-        // Common environment variables
-        env.put("DATA_INGESTION_SERVICE_URL", dataIngestionUrl);
-        env.put("ACCOUNT_ID", String.valueOf(Context.accountId.get()));
-
-        // Connector-specific environment variables
-        switch (connectorType) {
-            case CONNECTOR_TYPE_N8N:
-                String n8nUrl = config.get("N8N_BASE_URL");
-                String n8nApiKey = config.get("N8N_API_KEY");
-                if (n8nUrl == null || n8nApiKey == null) {
-                    throw new Exception("Missing required N8N configuration: N8N_BASE_URL or N8N_API_KEY");
-                }
-                env.put("N8N_BASE_URL", n8nUrl);
-                env.put("N8N_API_KEY", n8nApiKey);
-                break;
-
-            case CONNECTOR_TYPE_LANGCHAIN:
-                String langsmithUrl = config.get("LANGSMITH_BASE_URL");
-                String langsmithApiKey = config.get("LANGSMITH_API_KEY");
-                if (langsmithUrl == null || langsmithApiKey == null) {
-                    throw new Exception("Missing required Langchain configuration: LANGSMITH_BASE_URL or LANGSMITH_API_KEY");
-                }
-                env.put("LANGSMITH_BASE_URL", langsmithUrl);
-                env.put("LANGSMITH_API_KEY", langsmithApiKey);
-                break;
-
-            case CONNECTOR_TYPE_COPILOT_STUDIO:
-                String appInsightsAppId = config.get("APPINSIGHTS_APP_ID");
-                String appInsightsApiKey = config.get("APPINSIGHTS_API_KEY");
-                if (appInsightsAppId == null || appInsightsApiKey == null) {
-                    throw new Exception("Missing required Copilot Studio configuration: APPINSIGHTS_APP_ID or APPINSIGHTS_API_KEY");
-                }
-                env.put("APPINSIGHTS_APP_ID", appInsightsAppId);
-                env.put("APPINSIGHTS_API_KEY", appInsightsApiKey);
-                break;
-
-            default:
-                throw new IllegalArgumentException("Unsupported connector type: " + connectorType);
-        }
-    }
 
     /**
      * Ensures the Go binary exists locally. If not found, attempts to download from Azure Blob Storage.
