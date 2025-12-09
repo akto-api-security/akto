@@ -28,9 +28,9 @@ import org.bson.conversions.Bson;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class DevRevIntegrationManager {
+public class DevRevIntegrationService {
 
-    private static final LoggerMaker logger = new LoggerMaker(DevRevIntegrationManager.class, LoggerMaker.LogDb.DASHBOARD);
+    private static final LoggerMaker logger = new LoggerMaker(DevRevIntegrationService.class, LoggerMaker.LogDb.DASHBOARD);
 
     private String orgUrl;
     private String personalAccessToken;
@@ -89,7 +89,7 @@ public class DevRevIntegrationManager {
 
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-            logger.infoAndAddToDb("Status and Response from DevRev parts.list API: " + response.getStatusCode() + " | " + response.getBody(), LoggerMaker.LogDb.DASHBOARD);
+            logger.infoAndAddToDb("Status from DevRev parts.list API: " + response.getStatusCode(), LoggerMaker.LogDb.DASHBOARD);
 
             if (response.getStatusCode() > 201) {
                 logger.errorAndAddToDb("Failed to fetch parts from DevRev: " + response.getBody(), LoggerMaker.LogDb.DASHBOARD);
