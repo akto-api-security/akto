@@ -100,9 +100,18 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
 
         logger.info("Executing Go binary at: {} for connector type: {}", binaryFile.getAbsolutePath(), connectorType);
 
-        // Build the command with -once flag
+        // Validate canonical path to prevent path traversal or symlink attacks
+        String baseDirCanonical = new File(BINARY_BASE_PATH).getCanonicalPath();
+        String binaryCanonical = binaryFile.getCanonicalPath();
+
+        // Ensure binary is under the expected directory (not the directory itself)
+        if (!binaryCanonical.startsWith(baseDirCanonical + File.separator)) {
+            throw new Exception("Invalid binary path detected: " + binaryCanonical);
+        }
+
+        // Build the command with -once flag using canonical path
         List<String> command = new ArrayList<>();
-        command.add(binaryFile.getAbsolutePath());
+        command.add(binaryCanonical);
         command.add("-once");
 
         // Create ProcessBuilder
