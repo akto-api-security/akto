@@ -226,27 +226,16 @@ const api = {
         })
     },
 
-    initiateN8NImport(n8nUrl, apiKey, dataIngestionUrl) {
+    initiateAIAgentConnectorImport(connectorType, connectorConfig, dataIngestionUrl, recurringIntervalSeconds) {
         return request({
-            url: '/api/initiateN8NImport',
+            url: '/api/initiateAIAgentConnectorImport',
             method: 'post',
-            data: {n8nUrl, apiKey, dataIngestionUrl}
-        })
-    },
-
-    initiateLangchainImport(langsmithUrl, apiKey, dataIngestionUrl) {
-        return request({
-            url: '/api/initiateLangchainImport',
-            method: 'post',
-            data: {langsmithUrl, apiKey, dataIngestionUrl}
-        })
-    },
-
-    initiateCopilotStudioImport(appInsightsAppId, appInsightsApiKey, dataIngestionUrl) {
-        return request({
-            url: '/api/initiateCopilotStudioImport',
-            method: 'post',
-            data: {appInsightsAppId, appInsightsApiKey, dataIngestionUrl}
+            data: {
+                connectorType,
+                dataIngestionUrl,
+                recurringIntervalSeconds,
+                ...connectorConfig
+            }
         })
     },
 

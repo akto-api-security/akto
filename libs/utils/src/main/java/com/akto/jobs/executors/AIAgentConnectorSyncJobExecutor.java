@@ -19,30 +19,12 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import static com.akto.jobs.executors.AIAgentConnectorConstants.*;
+
 public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnectorSyncJobParams> {
 
     private static final LoggerMaker logger = new LoggerMaker(AIAgentConnectorSyncJobExecutor.class);
     public static final AIAgentConnectorSyncJobExecutor INSTANCE = new AIAgentConnectorSyncJobExecutor();
-
-    // Base path for Go binaries (relative to the project root)
-    private static final String BINARY_BASE_PATH = "apps/dashboard/src/main/java/com/akto/action/";
-    private static final int BINARY_TIMEOUT_SECONDS = 300; // 5 minutes timeout
-
-    // Connector type constants
-    private static final String CONNECTOR_TYPE_N8N = "N8N";
-    private static final String CONNECTOR_TYPE_LANGCHAIN = "LANGCHAIN";
-    private static final String CONNECTOR_TYPE_COPILOT_STUDIO = "COPILOT_STUDIO";
-
-    // Binary names for each connector
-    private static final String BINARY_NAME_N8N = "n8n-shield";
-    private static final String BINARY_NAME_LANGCHAIN = "langchain-shield";
-    private static final String BINARY_NAME_COPILOT_STUDIO = "copilot-shield";
-
-    // Azure Blob Storage configuration
-    // Set via environment variable: AZURE_BINARY_STORAGE_CONNECTION_STRING or AZURE_BINARY_BLOB_URL
-    private static final String AZURE_CONNECTION_STRING_ENV = "AZURE_BINARY_STORAGE_CONNECTION_STRING";
-    private static final String AZURE_BLOB_URL_ENV = "AZURE_BINARY_BLOB_URL";
-    private static final String AZURE_CONTAINER_NAME = "binaries";
 
     public AIAgentConnectorSyncJobExecutor() {
         super(AIAgentConnectorSyncJobParams.class);

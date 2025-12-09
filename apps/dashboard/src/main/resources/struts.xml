@@ -3143,67 +3143,14 @@
             </result>
         </action>
 
-        <action name="api/initiateN8NImport" class="com.akto.action.N8NImportAction" method="initiateN8NImport">
+        <!-- Unified AI Agent Connector Import Action -->
+        <action name="api/initiateAIAgentConnectorImport" class="com.akto.action.AIAgentConnectorImportAction" method="initiateImport">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">User started N8N Import</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS"  type="json">
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="UNAUTHORIZED" type="json">
-                 <param name="statusCode">403</param>
-                 <param name="ignoreHierarchy">false</param>
-                 <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="api/initiateLangchainImport" class="com.akto.action.LangchainImportAction" method="initiateLangchainImport">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">User started Langchain Import</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS"  type="json">
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="UNAUTHORIZED" type="json">
-                 <param name="statusCode">403</param>
-                 <param name="ignoreHierarchy">false</param>
-                 <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="api/initiateCopilotStudioImport" class="com.akto.action.CopilotStudioImportAction" method="initiateCopilotStudioImport">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">User started Copilot Studio Import</param>
+                <param name="actionDescription">User started AI Agent Connector Import</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
