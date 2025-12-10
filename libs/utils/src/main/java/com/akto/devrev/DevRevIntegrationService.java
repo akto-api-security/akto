@@ -224,7 +224,7 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
 
     @Override
     protected TicketInfo createTicketForIssue(DevRevIntegration integration, String authToken, TestingIssuesId issueId,
-        Info testInfo, TestingRunResult testingRunResult, GlobalEnums.Severity severity, String partId, String workItemType) {
+        Info testInfo, TestingRunResult testingRunResult, GlobalEnums.Severity severity, String partId, String workItemType, String aktoDashboardHost) {
 
         try {
             BasicDBObject ticketPayload = buildDevRevTicketPayload(
@@ -233,7 +233,8 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
                 issueId,
                 severity,
                 partId,
-                workItemType
+                workItemType,
+                aktoDashboardHost
             );
 
             return createDevRevWorkItem(integration, authToken, ticketPayload);
@@ -250,7 +251,8 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
             TestingIssuesId issueId,
             GlobalEnums.Severity severity,
             String partId,
-            String workItemType) {
+            String workItemType,
+            String aktoDashboardHost) {
 
         BasicDBObject payload = new BasicDBObject();
 
@@ -274,7 +276,13 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
         body.append("**HTTP Method:** ").append(method).append("\n\n");
 
         if (testingRunResult != null) {
-            body.append("**Test Result ID:** ").append(testingRunResult.getId().toHexString()).append("\n\n");
+            body.append("**Test Result ID:** ").append(testingRunResult.getId().toHexString()).append("\n");
+
+            if (StringUtils.isNotBlank(aktoDashboardHost)) {
+                String issueUrl = aktoDashboardHost + "/dashboard/issues?result=" + testingRunResult.getId().toHexString();
+                body.append("**View in Akto Dashboard:** ").append(issueUrl).append("\n");
+            }
+            body.append("\n");
 
             String requestResponseData = buildRequestResponseData(testingRunResult);
             if (StringUtils.isNotBlank(requestResponseData)) {
