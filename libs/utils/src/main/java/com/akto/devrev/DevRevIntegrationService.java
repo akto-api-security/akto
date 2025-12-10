@@ -16,6 +16,7 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.testing.ApiExecutor;
 import com.akto.ticketing.ATicketIntegrationService;
+import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.TicketSource;
 import com.akto.utils.CurlUtils;
@@ -259,10 +260,15 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
         String type = StringUtils.isBlank(workItemType) ? "issue" : workItemType;
         payload.put("type", type);
 
-        String endpoint = issueId.getApiInfoKey().getUrl();
+        String fullUrl = issueId.getApiInfoKey().getUrl();
         String method = issueId.getApiInfoKey().getMethod().name();
-        String truncatedEndpoint = endpoint.length() > 50 ?
-            endpoint.substring(0, 25) + "..." + endpoint.substring(endpoint.length() - 25) : endpoint;
+
+        Pair<String, String> endpointDetails = getEndpointDetails(fullUrl);
+        String hostname = endpointDetails.getFirst();
+        String endpointPath = endpointDetails.getSecond();
+
+        String truncatedEndpoint = endpointPath.length() > 50 ?
+            endpointPath.substring(0, 25) + "..." + endpointPath.substring(endpointPath.length() - 25) : endpointPath;
 
         String title = String.format("Security Issue: %s (%s - %s)",
             testInfo.getName(), method, truncatedEndpoint);
@@ -270,18 +276,20 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
 
         StringBuilder body = new StringBuilder();
         body.append("**Test Name:** ").append(testInfo.getName()).append("\n\n");
+        if (StringUtils.isNotEmpty(hostname)) {
+            body.append("**Host - ").append(hostname).append("**\n\n");
+        }
+        body.append("**Endpoint - ").append(endpointPath).append("**\n\n");
+        if (StringUtils.isNotBlank(aktoDashboardHost)) {
+            String issueUrl = aktoDashboardHost + "/dashboard/issues?result=" + testingRunResult.getId().toHexString();
+            body.append("<a href=\"").append(issueUrl).append("\">Issue Link - Akto Dashboard</a>").append("\n\n");
+        }
         body.append("**Description:** ").append(testInfo.getDescription()).append("\n\n");
         body.append("**Severity:** ").append(severity.name()).append("\n\n");
-        body.append("**API Endpoint:** ").append(endpoint).append("\n");
         body.append("**HTTP Method:** ").append(method).append("\n\n");
 
         if (testingRunResult != null) {
             body.append("**Test Result ID:** ").append(testingRunResult.getId().toHexString()).append("\n");
-
-            if (StringUtils.isNotBlank(aktoDashboardHost)) {
-                String issueUrl = aktoDashboardHost + "/dashboard/issues?result=" + testingRunResult.getId().toHexString();
-                body.append("**View in Akto Dashboard:** ").append(issueUrl).append("\n");
-            }
             body.append("\n");
 
             String requestResponseData = buildRequestResponseData(testingRunResult);
@@ -397,7 +405,7 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
             BasicDBObject work = (BasicDBObject) respPayloadObj.get("work");
 
             if (work != null) {
-                String workId = work.getString("id");
+                String workId = work.getString("display_id");
                 String workItemUrl = integration.getOrgUrl() + "/works/" + workId;
                 logger.infoAndAddToDb("Created DevRev work item: " + workId, LoggerMaker.LogDb.DASHBOARD);
                 return new TicketInfo(workId, workItemUrl);

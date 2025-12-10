@@ -11,10 +11,12 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.log.LoggerMaker;
 import com.akto.util.Constants;
+import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
+import java.net.URI;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -212,6 +214,19 @@ public abstract class ATicketIntegrationService<T> {
                 Updates.set(TestingRunIssues.TICKET_LAST_UPDATED_AT, Context.now())
             )
         );
+    }
+
+    protected Pair<String, String> getEndpointDetails(String fullUrl) {
+        String hostname = "";
+        String endpointPath;
+        try {
+            URI uri = new URI(fullUrl);
+            hostname = uri.getHost();
+            endpointPath = uri.getPath();
+        } catch (Exception e) {
+            endpointPath = fullUrl;
+        }
+        return new Pair<>(hostname, endpointPath);
     }
 
     protected abstract String getIntegrationName();
