@@ -1065,7 +1065,7 @@ getTestingRunResultUrl(testingResult){
   return finalMethod + " " + truncatedUrl
   
 },
-getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoardsWorkItemUrl, serviceNowTicketUrl, servicenowTicketId){
+getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoardsWorkItemUrl, serviceNowTicketUrl, servicenowTicketId, devrevWorkUrl){
   if(apiInfo == null || apiInfo === undefined){
     apiInfo = {
       allAuthTypesFound: [],
@@ -1142,6 +1142,22 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoards
     </Box>
   ) : null
 
+  const devrevKey = devrevWorkUrl?.length > 0 ? /[^/]*$/.exec(devrevWorkUrl)[0] : ""
+  const devrevComp = devrevWorkUrl?.length > 0 ? (
+    <Box>
+      <Tag>
+        <HorizontalStack gap={1}>
+          <Avatar size="extraSmall" shape='round' source="/public/devrev-ai.svg" />
+          <Link target="_blank" url={devrevWorkUrl}>
+            <Text>
+              {devrevKey}
+            </Text>
+          </Link>
+        </HorizontalStack>
+      </Tag>
+    </Box>
+  ) : null
+
   const rowItems = [
     {
       title: 'Severity',
@@ -1203,6 +1219,14 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoards
       title: "ServiceNow ticket",
       value: serviceNowComp,
       tooltipContent: "ServiceNow ticket attached to the testing run issue"
+    })
+  }
+
+  if(devrevComp != null) {
+    rowItems.push({
+      title: "DevRev ticket",
+      value: devrevComp,
+      tooltipContent: "DevRev ticket attached to the testing run issue"
     })
   }
 

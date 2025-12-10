@@ -29,7 +29,7 @@ import LegendLabel from './LegendLabel.jsx'
 function TestRunResultFlyout(props) {
 
 
-    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, conversations, conversationRemediationText, showForbidden} = props
+    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, showForbidden} = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
@@ -48,6 +48,11 @@ function TestRunResultFlyout(props) {
     const [serviceNowModalActive, setServiceNowModalActive] = useState(false)
     const [serviceNowTables, setServiceNowTables] = useState([])
     const [serviceNowTable, setServiceNowTable] = useState('')
+
+    const [devrevModalActive, setDevRevModalActive] = useState(false)
+    const [devrevParts, setDevRevParts] = useState([])
+    const [devrevPartId, setDevRevPartId] = useState('')
+    const [devrevWorkItemType, setDevRevWorkItemType] = useState('issue')
 
     const [description, setDescription] = useState("")
     const [editDescription, setEditDescription] = useState("")
@@ -91,7 +96,7 @@ function TestRunResultFlyout(props) {
                 })
             })
 
-            setRowItems(transform.getRowInfo(issueDetails.severity,apiInfoData,issueDetails.jiraIssueUrl,sensitiveParam,issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl, issueDetails.servicenowIssueUrl, issueDetails.ticketId))
+            setRowItems(transform.getRowInfo(issueDetails.severity,apiInfoData,issueDetails.jiraIssueUrl,sensitiveParam,issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl, issueDetails.servicenowIssueUrl, issueDetails.ticketId, issueDetails.devrevWorkUrl))
         }
     },[issueDetails])
 
@@ -250,7 +255,38 @@ function TestRunResultFlyout(props) {
         }
         setServiceNowModalActive(false)
     }
-    
+
+    const handleDevRevClick = async() => {
+        if(!devrevModalActive){
+            const devrevIntegration = await settingFunctions.fetchDevRevIntegration()
+            const partsMap = devrevIntegration.partsMap || {}
+            const partsArray = Object.entries(partsMap).map(([id, name]) => ({id, name}))
+            if(partsArray.length > 0){
+                setDevRevParts(partsArray)
+                setDevRevPartId(partsArray[0].id)
+            }
+        }
+        setDevRevModalActive(!devrevModalActive)
+    }
+
+    const handleDevRevTicketCreation = async() => {
+        if(devrevPartId && devrevPartId.length > 0){
+            func.setToast(true, false, "Please wait while we create your DevRev ticket.")
+            await issuesApi.createDevRevTickets([issueDetails.id], devrevPartId, devrevWorkItemType, window.location.origin).then((res) => {
+                if(res?.errorMessage) {
+                    func.setToast(true, false, res?.errorMessage)
+                } else {
+                    func.setToast(true, false, "DevRev ticket created successfully")
+                }
+            }).catch((err) => {
+                func.setToast(true, true, err?.response?.data?.errorMessage || "Error creating DevRev ticket")
+            })
+        } else {
+            func.setToast(true, true, "Invalid DevRev part")
+        }
+        setDevRevModalActive(false)
+    }
+
     const issues = [{
         content: 'False positive',
         onAction: () => { ignoreAction("False positive") }
@@ -408,6 +444,19 @@ function TestRunResultFlyout(props) {
                                 issueType=""
                                 issueId={issueDetails.id}
                                 isServiceNowModal={true}
+                            />
+                            <JiraTicketCreationModal
+                                activator={window.DEVREV_INTEGRATED === 'true' ? <Button id={"create-devrev-ticket-button"} primary onClick={handleDevRevClick} disabled={devrevWorkUrl !== "" || window.DEVREV_INTEGRATED !== "true"}>Create DevRev Ticket</Button> : <></>}
+                                modalActive={devrevModalActive}
+                                setModalActive={setDevRevModalActive}
+                                handleSaveAction={handleDevRevTicketCreation}
+                                jiraProjectMaps={devrevParts}
+                                setProjId={setDevRevPartId}
+                                setIssueType={setDevRevWorkItemType}
+                                projId={devrevPartId}
+                                issueType={devrevWorkItemType}
+                                issueId={issueDetails.id}
+                                isDevRevModal={true}
                             />
                         </HorizontalStack>
                     }

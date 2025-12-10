@@ -66,6 +66,7 @@ function TestRunResultPage(props) {
   const [jiraIssueUrl, setJiraIssueUrl] = useState({});
   const [azureBoardsWorkItemUrl, setAzureBoardsWorkItemUrl] = useState({});
   const [serviceNowTicketUrl, setServiceNowTicketUrl] = useState({});
+  const [devrevWorkUrl, setDevRevWorkUrl] = useState({});
   const subCategoryMap = LocalStore(state => state.subCategoryMap);
   const params = useParams();
   const hexId = params.hexId;
@@ -257,10 +258,12 @@ function TestRunResultPage(props) {
       let jiraIssueCopy = runIssues.jiraIssueUrl || "";
       let azureBoardsWorkItemUrlCopy = runIssues.azureBoardsWorkItemUrl || "";
       let serviceNowTicketUrlCopy = runIssues.servicenowIssueUrl || "";
+      let devrevWorkUrlCopy = runIssues.devrevWorkUrl || "";
       const moreInfoSections = transform.getInfoSectionsHeaders()
       setJiraIssueUrl(jiraIssueCopy)
       setAzureBoardsWorkItemUrl(azureBoardsWorkItemUrlCopy)
       setServiceNowTicketUrl(serviceNowTicketUrlCopy)
+      setDevRevWorkUrl(devrevWorkUrlCopy)
       setInfoState(transform.fillMoreInformation(subCategoryMap[runIssues?.id?.testSubCategory],moreInfoSections, runIssuesArr, jiraIssueCopy, onClickButton))
       setRemediation(subCategoryMap[runIssues?.id?.testSubCategory]?.remediation)
       // setJiraIssueUrl(jiraIssueUrl)
@@ -294,6 +297,7 @@ function TestRunResultPage(props) {
       isIssuePage={location.pathname.includes("issues")}
       azureBoardsWorkItemUrl={azureBoardsWorkItemUrl}
       serviceNowTicketUrl={serviceNowTicketUrl}
+      devrevWorkUrl={devrevWorkUrl}
       conversations={conversations}
       conversationRemediationText={conversationRemediationText}
       showForbidden={showForbidden}
