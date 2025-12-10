@@ -57,7 +57,17 @@ public class Utils {
         return properties;
     }
 
+    public static String convertOriginalReqRespToString(OriginalHttpRequest request, OriginalHttpResponse response, int responseTime)  {
+        BasicDBObject ret = convertOriginalReqRespToStringUtil(request, response);
+        ret.append("responseTime", responseTime);
+        return ret.toString();
+    }
+
     public static String convertOriginalReqRespToString(OriginalHttpRequest request, OriginalHttpResponse response)  {
+        return convertOriginalReqRespToStringUtil(request, response).toString();
+    }
+
+    public static BasicDBObject convertOriginalReqRespToStringUtil(OriginalHttpRequest request, OriginalHttpResponse response)  {
         BasicDBObject req = new BasicDBObject();
         if (request != null) {
             req.put("url", request.getUrl());
@@ -79,7 +89,7 @@ public class Utils {
         ret.put("request", req);
         ret.put("response", resp);
 
-        return ret.toString();
+        return ret;
     }
 
         public static String convertToSampleMessage(String message) throws Exception {
