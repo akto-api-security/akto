@@ -14,19 +14,8 @@ import lombok.Setter;
 import java.util.HashMap;
 import java.util.Map;
 
-import static com.akto.jobs.executors.AIAgentConnectorConstants.CONNECTOR_TYPE_N8N;
-import static com.akto.jobs.executors.AIAgentConnectorConstants.CONNECTOR_TYPE_LANGCHAIN;
-import static com.akto.jobs.executors.AIAgentConnectorConstants.CONNECTOR_TYPE_COPILOT_STUDIO;
-import static com.akto.jobs.executors.AIAgentConnectorConstants.CONFIG_DATA_INGESTION_SERVICE_URL;
-import static com.akto.jobs.executors.AIAgentConnectorConstants.CONFIG_DATA_INGESTION_API_KEY;
-import static com.akto.jobs.executors.AIAgentConnectorConstants.CONFIG_N8N_BASE_URL;
-import static com.akto.jobs.executors.AIAgentConnectorConstants.CONFIG_N8N_API_KEY;
-import static com.akto.jobs.executors.AIAgentConnectorConstants.CONFIG_LANGSMITH_BASE_URL;
-import static com.akto.jobs.executors.AIAgentConnectorConstants.CONFIG_LANGSMITH_API_KEY;
-import static com.akto.jobs.executors.AIAgentConnectorConstants.CONFIG_APPINSIGHTS_APP_ID;
-import static com.akto.jobs.executors.AIAgentConnectorConstants.CONFIG_APPINSIGHTS_API_KEY;
-import static com.akto.jobs.executors.AIAgentConnectorConstants.DEFAULT_RECURRING_INTERVAL_SECONDS;
-import static com.akto.jobs.executors.AIAgentConnectorUtils.isValidConnectorType;
+import static com.akto.jobs.executors.AIAgentConnectorConstants.*;
+import static com.akto.jobs.executors.AIAgentConnectorUtils.*;
 
 /**
  * Unified action for importing AI Agent Connector data (N8N, Langchain, Copilot Studio).
@@ -41,7 +30,6 @@ public class AIAgentConnectorImportAction extends UserAction {
     // Action parameters
     private String connectorType;
     private String dataIngestionUrl;
-    private String dataIngestionApiKey;
     private String jobId;
     private Integer recurringIntervalSeconds;
 
@@ -116,11 +104,6 @@ public class AIAgentConnectorImportAction extends UserAction {
     private Map<String, String> buildConfig() {
         Map<String, String> config = new HashMap<>();
         config.put(CONFIG_DATA_INGESTION_SERVICE_URL, dataIngestionUrl);
-
-        // Add API key for data ingestion service authentication (optional)
-        if (dataIngestionApiKey != null && !dataIngestionApiKey.isEmpty()) {
-            config.put(CONFIG_DATA_INGESTION_API_KEY, dataIngestionApiKey);
-        }
 
         switch (connectorType) {
             case CONNECTOR_TYPE_N8N:

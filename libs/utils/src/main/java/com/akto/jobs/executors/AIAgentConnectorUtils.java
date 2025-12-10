@@ -1,8 +1,6 @@
 package com.akto.jobs.executors;
 
-import static com.akto.jobs.executors.AIAgentConnectorConstants.CONNECTOR_TYPE_N8N;
-import static com.akto.jobs.executors.AIAgentConnectorConstants.CONNECTOR_TYPE_LANGCHAIN;
-import static com.akto.jobs.executors.AIAgentConnectorConstants.CONNECTOR_TYPE_COPILOT_STUDIO;
+import static com.akto.jobs.executors.AIAgentConnectorConstants.*;
 
 /**
  * Utility class for AI Agent Connector operations.
