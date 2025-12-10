@@ -6,6 +6,7 @@ import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiAccessType;
+import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
@@ -95,6 +96,22 @@ public class Utils {
             return stringList;
         }
         return stringList;
+    }
+
+    public static String extractHostHeader(HttpResponseParams responseParam) {
+        String host = "";
+        if (responseParam == null || responseParam.getRequestParams() == null) {
+            return host;
+        }
+        Map<String, List<String>> requestHeaders = responseParam.getRequestParams().getHeaders();
+        if (requestHeaders == null) {
+            return host;
+        }
+        List<String> hostValues = requestHeaders.get("host");
+        if (hostValues != null && !hostValues.isEmpty()) {
+            host = hostValues.get(0);
+        }
+        return host;
     }
 
     public static List<String> extractRegex(String payload, String regex) {
