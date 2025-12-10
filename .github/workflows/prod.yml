@@ -8,6 +8,9 @@ on:
       release_version:
         description: 'Release version for the deployment'
         required: true
+      release_version_threat:
+        description: 'Release version for the Threat Detection deployment'
+        required: false
       skipTests:
         description: 'Do you want to skip unit tests?'
         required: true
