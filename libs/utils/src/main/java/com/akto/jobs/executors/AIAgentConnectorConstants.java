@@ -35,6 +35,11 @@ public final class AIAgentConnectorConstants {
     // Common Configuration Keys
     public static final String CONFIG_DATA_INGESTION_SERVICE_URL = "DATA_INGESTION_SERVICE_URL";
 
+    // JWT Token Configuration
+    public static final String CONFIG_JWT_TOKEN = "AKTO_JWT_TOKEN";
+    public static final String JWT_SUBJECT_AI_AGENT_CONNECTOR = "ai-agent-connector";
+    public static final int JWT_EXPIRY_HOURS = 3; // 3 hours for short-lived tokens
+
     // Binary Paths
     public static final String BINARY_BASE_PATH = "apps/dashboard/src/main/java/com/akto/action/";
     public static final int BINARY_TIMEOUT_SECONDS = 300; // 5 minutes

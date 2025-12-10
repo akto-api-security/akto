@@ -9,12 +9,15 @@ import com.azure.storage.blob.BlobClient;
 import com.azure.storage.blob.BlobContainerClient;
 import com.azure.storage.blob.BlobServiceClient;
 import com.azure.storage.blob.BlobServiceClientBuilder;
+import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.attribute.PosixFilePermission;
+import java.util.Calendar;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -107,6 +110,16 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
         // Set common environment variables
         env.put("DATA_INGESTION_SERVICE_URL", dataIngestionUrl);
         env.put("ACCOUNT_ID", String.valueOf(Context.accountId.get()));
+
+        // Generate JWT token for authentication with data-ingestion-service
+        String jwtToken = generateJwtToken(job.getAccountId());
+        if (jwtToken != null) {
+            env.put(CONFIG_JWT_TOKEN, jwtToken);
+            logger.info("JWT token added to environment for connector type: {}", connectorType);
+        } else {
+            logger.warn("JWT token generation failed. Proceeding without authentication token. " +
+                        "Ensure AKTO_DI_AUTHENTICATE=false if authentication is disabled.");
+        }
 
         // Set connector-specific environment variables using strategy
         strategy.setEnvironmentVariables(env, config);
@@ -287,6 +300,36 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
                 throw new Exception("Failed to set executable permissions on binary");
             }
             logger.info("Binary permissions set successfully (setExecutable)");
+        }
+    }
+
+    /**
+     * Generates a JWT token for authenticating with data-ingestion-service.
+     * Token includes accountId claim and is valid for 3 hours.
+     *
+     * @param accountId The account ID to include in JWT claims
+     * @return JWT token string, or null if generation fails
+     */
+    private String generateJwtToken(int accountId) {
+        try {
+            Map<String, Object> claims = new HashMap<>();
+            claims.put("accountId", accountId);
+
+            String jwtToken = JwtAuthenticator.createJWT(
+                claims,
+                "Akto",
+                JWT_SUBJECT_AI_AGENT_CONNECTOR,
+                Calendar.HOUR,
+                JWT_EXPIRY_HOURS
+            );
+
+            logger.info("Successfully generated JWT token for AI Agent Connector authentication");
+            return jwtToken;
+
+        } catch (Exception e) {
+            logger.error("Failed to generate JWT token for AI Agent Connector: {}", e.getMessage());
+            // Return null to allow graceful degradation if AKTO_DI_AUTHENTICATE=false
+            return null;
         }
     }
 }
