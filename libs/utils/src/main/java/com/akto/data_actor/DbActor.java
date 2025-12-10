@@ -677,6 +677,16 @@ public class DbActor extends DataActor {
         DbLayer.storeConversationResults(conversationResults);
     }
 
+    @Override
+    public void bulkWriteAgentTrafficLogs(List<Object> trafficLogs) {
+        ArrayList<AgentTrafficLog> agentTrafficLogs = new ArrayList<>();
+        for (Object obj : trafficLogs) {
+            AgentTrafficLog log = (AgentTrafficLog) obj;
+            agentTrafficLogs.add(log);
+        }
+        DbLayer.bulkWriteAgentTrafficLogs(agentTrafficLogs);
+    }
+    
     public YamlTemplate fetchCommonWordList() {
         return YamlTemplateDao.instance.findOne(Filters.empty());
     }
