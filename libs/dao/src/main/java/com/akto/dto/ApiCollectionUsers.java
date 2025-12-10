@@ -28,6 +28,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.rbac.UsersCollectionsList;
+import com.akto.dto.testing.AuthTypeTestingEndpoints;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.testing.SensitiveDataEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
@@ -47,6 +48,8 @@ public class ApiCollectionUsers {
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     private static final Logger logger = LoggerFactory.getLogger(ApiCollectionUsers.class);
+
+    private static final int MAX_ALLOWED_API_COUNT = 10000;  
 
     public enum CollectionType {
         ApiCollectionId, Id_ApiCollectionId, Id_ApiInfoKey_ApiCollectionId
@@ -76,6 +79,14 @@ public class ApiCollectionUsers {
             return new ArrayList<>();
         }
         List<Bson> filterList = SingleTypeInfoDao.filterForHostHostHeaderRaw();
+        boolean hasAuthFilter = checkAuthTypeFilter(conditions);
+        if (hasAuthFilter) {
+            int apiInfoCount = getApisCountFromConditions(conditions, deactivatedCollections);
+            if (apiInfoCount >= MAX_ALLOWED_API_COUNT) {
+                Bson apiInfoFilter = getFilters(conditions,CollectionType.Id_ApiCollectionId);
+                return findAllAsBasicDBObject(apiInfoFilter, skip, limit, Projections.include("_id"));
+            }
+        }
         Bson singleTypeInfoFilters = getFilters(conditions, CollectionType.ApiCollectionId);
         Bson filters = Filters.and(filterList);
         singleTypeInfoFilters = Filters.and(filters, singleTypeInfoFilters);
@@ -102,6 +113,14 @@ public class ApiCollectionUsers {
     public static int getApisCountFromConditionsWithStis(List<TestingEndpoints> conditions, List<Integer> deactivatedCollections){
         if(conditions == null || conditions.isEmpty()){
             return 0;
+        }
+
+        boolean hasAuthFilter = checkAuthTypeFilter(conditions);
+        if (hasAuthFilter) {
+            int apiInfoCount = getApisCountFromConditions(conditions, deactivatedCollections);
+            if (apiInfoCount >= MAX_ALLOWED_API_COUNT) {
+                return apiInfoCount;
+            }
         }
 
         List<Bson> filterList = SingleTypeInfoDao.filterForHostHostHeaderRaw();
@@ -305,4 +324,22 @@ public class ApiCollectionUsers {
         removeFromCollectionsForCollectionId(Collections.singletonList(ep), apiCollectionId);
     }
 
+    private static boolean checkAuthTypeFilter(List<TestingEndpoints> conditions) {
+        for (TestingEndpoints condition : conditions) {
+            if (condition instanceof AuthTypeTestingEndpoints) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static List<BasicDBObject> findAllAsBasicDBObject(Bson filter,int skip,int limit,Bson projection) {
+        List<BasicDBObject> results = new ArrayList<>();
+        MongoCursor<BasicDBObject> cursor = ApiInfoDao.instance.getMCollection().find(filter, BasicDBObject.class).projection(projection).skip(skip).limit(limit).iterator();
+        while (cursor.hasNext()) {
+            results.add(cursor.next());
+        }
+
+        return results;
+    }
 }
