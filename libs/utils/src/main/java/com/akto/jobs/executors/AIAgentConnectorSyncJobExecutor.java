@@ -24,6 +24,7 @@ import static com.akto.jobs.executors.AIAgentConnectorConstants.BINARY_TIMEOUT_S
 import static com.akto.jobs.executors.AIAgentConnectorConstants.AZURE_CONNECTION_STRING_ENV;
 import static com.akto.jobs.executors.AIAgentConnectorConstants.AZURE_BLOB_URL_ENV;
 import static com.akto.jobs.executors.AIAgentConnectorConstants.AZURE_CONTAINER_NAME;
+import static com.akto.jobs.executors.AIAgentConnectorConstants.CONFIG_DATA_INGESTION_API_KEY;
 import static com.akto.jobs.executors.AIAgentConnectorUtils.isValidConnectorType;
 import static com.akto.jobs.executors.BinarySecurityValidator.validateBinaryPath;
 import com.akto.jobs.executors.strategy.AIAgentConnectorStrategy;
@@ -111,6 +112,12 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
         // Set common environment variables
         env.put("DATA_INGESTION_SERVICE_URL", dataIngestionUrl);
         env.put("ACCOUNT_ID", String.valueOf(Context.accountId.get()));
+
+        // Set API key for data ingestion service authentication if provided
+        String dataIngestionApiKey = config.get(CONFIG_DATA_INGESTION_API_KEY);
+        if (dataIngestionApiKey != null && !dataIngestionApiKey.isEmpty()) {
+            env.put("X_API_KEY", dataIngestionApiKey);
+        }
 
         // Set connector-specific environment variables using strategy
         strategy.setEnvironmentVariables(env, config);

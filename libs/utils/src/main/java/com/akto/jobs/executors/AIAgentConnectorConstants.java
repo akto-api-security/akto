@@ -34,6 +34,7 @@ public final class AIAgentConnectorConstants {
 
     // Common Configuration Keys
     public static final String CONFIG_DATA_INGESTION_SERVICE_URL = "DATA_INGESTION_SERVICE_URL";
+    public static final String CONFIG_DATA_INGESTION_API_KEY = "DATA_INGESTION_API_KEY";
 
     // Binary Paths
     public static final String BINARY_BASE_PATH = "apps/dashboard/src/main/java/com/akto/action/";
