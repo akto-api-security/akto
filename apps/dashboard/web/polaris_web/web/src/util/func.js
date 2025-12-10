@@ -2343,6 +2343,16 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return window?.ACTIVE_ACCOUNT === 1753372418
   },
   /**
+   * Validates if a string is a valid URL with http or https protocol
+   * @param {string} url - The URL string to validate
+   * @returns {boolean} True if valid URL, false otherwise
+   */
+  validateUrl: function(url) {
+    if (!url) return false;
+    const urlPattern = /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/;
+    return urlPattern.test(url);
+  },
+  /**
    * Find all placeholder positions in a text string (e.g., {}, {var}, {variable})
    * Returns an array of objects with start, end, and phrase properties for highlighting
    * @param {string} text - The text to search for placeholders

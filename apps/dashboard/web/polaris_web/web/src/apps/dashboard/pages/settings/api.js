@@ -647,9 +647,9 @@ const settingRequests = {
         })
     },
 
-    fetchDevrevProjects(personalAccessToken) {
+    fetchDevRevParts(personalAccessToken) {
         return request({
-            url: '/api/fetchDevrevProjects',
+            url: '/api/fetchDevRevParts',
             method: 'post',
             data: { personalAccessToken }
         })
