@@ -18,6 +18,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.attribute.FileTime;
@@ -94,6 +95,8 @@ import com.akto.dao.SetupDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.SuspectSampleDataDao;
 import com.akto.dao.UsersDao;
+import com.akto.dao.MaliciousEventDao;
+import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.loaders.LoadersDao;
@@ -171,7 +174,6 @@ import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
-import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
@@ -256,6 +258,8 @@ import com.slack.api.webhook.WebhookResponse;
 
 import okhttp3.OkHttpClient;
 
+import java.io.UnsupportedEncodingException;
+
 public class InitializerListener implements ServletContextListener {
 
     private static final LoggerMaker logger = new LoggerMaker(InitializerListener.class, LogDb.DASHBOARD);
@@ -282,6 +286,7 @@ public class InitializerListener implements ServletContextListener {
 
     private static Map<String, String> piiFileMap;
     Crons crons = new Crons();
+//    TestingAlertsCron testingAlertsCron = new TestingAlertsCron();
 
     public static String getDomain() {
         if (domain == null) {
@@ -331,8 +336,8 @@ public class InitializerListener implements ServletContextListener {
                             trafficUpdates.populate(deactivatedHosts);
 
                             boolean slackWebhookFound = true;
-                            SlackWebhook listWebhook = SlackWebhooksDao.instance.findOne(Filters.empty());
-                            if (listWebhook == null) {
+                            List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
+                            if (listWebhooks == null || listWebhooks.isEmpty()) {
                                 logger.debugAndAddToDb("No slack webhooks found", LogDb.DASHBOARD);
                                 slackWebhookFound = false;
                             }
@@ -366,11 +371,12 @@ public class InitializerListener implements ServletContextListener {
 
                             if (thresholdSeconds > 0) {
                                 Map<AlertType, AlertResult> alertMap = trafficUpdates.createAlerts(thresholdSeconds, deactivatedHosts);
-                                if (slackWebhookFound && listWebhook != null) {
-                                    logger.debugAndAddToDb("Slack Webhook found: " + listWebhook.getWebhook(),
+                                if (slackWebhookFound && listWebhooks != null && !listWebhooks.isEmpty()) {
+                                    SlackWebhook webhook = listWebhooks.get(0);
+                                    logger.debugAndAddToDb("Slack Webhook found: " + webhook.getWebhook(),
                                             LogDb.DASHBOARD);
-                                    trafficUpdates.sendSlackAlerts(listWebhook.getWebhook(),
-                                            getMetricsUrl(listWebhook.getDashboardUrl()), thresholdSeconds,
+                                    trafficUpdates.sendSlackAlerts(webhook.getWebhook(),
+                                            getMetricsUrl(webhook.getDashboardUrl()), thresholdSeconds,
                                             alertMap);
                                 }
 
@@ -384,7 +390,7 @@ public class InitializerListener implements ServletContextListener {
                                 trafficUpdates.updateAlertSentTs(alertMap);
                             }
                         } catch (Exception e) {
-                            logger.errorAndAddToDb(e,"Error while running traffic alerts: " + e.getMessage());
+                            logger.errorAndAddToDb(e,"Error while running traffic alerts: " + e.getMessage(), LogDb.DASHBOARD);
                         }
                     }
                 }, "traffic-alerts-scheduler");
@@ -663,7 +669,7 @@ public class InitializerListener implements ServletContextListener {
         try {
             return convertStreamToString(InitializerListener.class.getResourceAsStream("/" + fileName));
         } catch (Exception e) {
-            logger.errorAndAddToDb(e, "Exception while reading content locally: " + fileUrl);
+            logger.errorAndAddToDb(e, "Exception while reading content locally: " + fileUrl, LogDb.DASHBOARD);
             return null;
         }
     }
@@ -994,15 +1000,17 @@ public class InitializerListener implements ServletContextListener {
                     AccountTask.instance.executeTask(new Consumer<Account>() {
                         @Override
                         public void accept(Account t) {
-                            SlackWebhook slackWebhook = SlackWebhooksDao.instance.findOne(Filters.empty());
-                            if (slackWebhook == null) {
+                            List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
+                            if (listWebhooks == null || listWebhooks.isEmpty()) {
                                 return;
                             }
 
-                            OkHttpClient httpClient = CoreHTTPClient.client.newBuilder().build();
-                            SlackHttpClient slackHttpClient = new SlackHttpClient(httpClient);
-                            Slack slack = Slack.getInstance(slackHttpClient);
-                            int now = Context.now();
+                    OkHttpClient httpClient = CoreHTTPClient.client.newBuilder().build();
+                    SlackHttpClient slackHttpClient = new SlackHttpClient(httpClient);
+                    Slack slack = Slack.getInstance(slackHttpClient);
+
+                    for (SlackWebhook slackWebhook : listWebhooks) {
+                        int now = Context.now();
                         // logger.debug("debugSlack: " + slackWebhook.getLastSentTimestamp() + " " + slackWebhook.getFrequencyInSeconds() + " " +now );
 
                                 if(slackWebhook.getFrequencyInSeconds()==0) {
@@ -1012,7 +1020,7 @@ public class InitializerListener implements ServletContextListener {
                                 boolean shouldSend = ( slackWebhook.getLastSentTimestamp() + slackWebhook.getFrequencyInSeconds() ) <= now ;
 
                                 if(!shouldSend){
-                                    return;
+                                    continue;
                                 }
 
                                 logger.debugAndAddToDb(slackWebhook.toString(), LogDb.DASHBOARD);
@@ -1051,7 +1059,7 @@ public class InitializerListener implements ServletContextListener {
                                     e.printStackTrace();
                                     logger.errorAndAddToDb(e, "Error while sending slack alert: " + e.getMessage(), LogDb.DASHBOARD);
                                 }
-                            
+                            }
                         }
                     }, "setUpDailyScheduler");
                 } catch (Exception ex) {
@@ -1094,18 +1102,21 @@ public class InitializerListener implements ServletContextListener {
         ChangesInfo ci = getChangesInfo(now - webhook.getLastSentTimestamp(), now - webhook.getLastSentTimestamp(), webhook.getNewEndpointCollections(), webhook.getNewSensitiveEndpointCollections(), true);
 
         boolean sendApiThreats = false;
-        List<SuspectSampleData> suspectSampleData = new ArrayList<>();
+        List<MaliciousEventDto> maliciousEvents = new ArrayList<>();
         if (webhook.getSelectedWebhookOptions() != null) {
             for (WebhookOptions option : webhook.getSelectedWebhookOptions()) {
                 if (WebhookOptions.API_THREAT_PAYLOADS.equals(option)) {
                     // Fetch one record to see if data exists
-                    suspectSampleData = SuspectSampleDataDao.instance.findAll(
-                            Filters.and(
-                                    Filters.gte(SuspectSampleData._DISCOVERED, webhook.getLastSentTimestamp()),
-                                    Filters.lt(SuspectSampleData._DISCOVERED, now)),
-                            0, 1, Sorts.descending(SuspectSampleData._DISCOVERED, Constants.ID),
-                            Projections.exclude(SuspectSampleData._SAMPLE));
-                    if (suspectSampleData != null && !suspectSampleData.isEmpty()) {
+                    String accountId = String.valueOf(Context.accountId.get());
+                    maliciousEvents = MaliciousEventDao.instance.getCollection(accountId)
+                            .find(Filters.and(
+                                    Filters.gte("detectedAt", webhook.getLastSentTimestamp()),
+                                    Filters.lt("detectedAt", now),
+                                    Filters.eq("successfulExploit", true)))
+                            .sort(Sorts.descending("detectedAt", Constants.ID))
+                            .limit(1)
+                            .into(new ArrayList<>());
+                    if (maliciousEvents != null && !maliciousEvents.isEmpty()) {
                         sendApiThreats = true;
                     }
                     break;
@@ -1114,13 +1125,16 @@ public class InitializerListener implements ServletContextListener {
         } 
 
         if (webhook.getBody() != null && !sendApiThreats) {
-            suspectSampleData = SuspectSampleDataDao.instance.findAll(
-                    Filters.and(
-                            Filters.gte(SuspectSampleData._DISCOVERED, webhook.getLastSentTimestamp()),
-                            Filters.lt(SuspectSampleData._DISCOVERED, now)),
-                    0, 1, Sorts.descending(SuspectSampleData._DISCOVERED, Constants.ID),
-                    Projections.exclude(SuspectSampleData._SAMPLE));
-            if (suspectSampleData != null && !suspectSampleData.isEmpty()) {
+            String accountId = String.valueOf(Context.accountId.get());
+            maliciousEvents = MaliciousEventDao.instance.getCollection(accountId)
+                    .find(Filters.and(
+                            Filters.gte("detectedAt", webhook.getLastSentTimestamp()),
+                            Filters.lt("detectedAt", now),
+                            Filters.eq("successfulExploit", true)))
+                    .sort(Sorts.descending("detectedAt", Constants.ID))
+                    .limit(1)
+                    .into(new ArrayList<>());
+            if (maliciousEvents != null && !maliciousEvents.isEmpty()) {
                 sendApiThreats = webhook.getBody().contains("AKTO.changes_info.apiThreatPayloads");
             }
         }
@@ -1128,7 +1142,7 @@ public class InitializerListener implements ServletContextListener {
         if ((ci == null ||
                 (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() +
                         ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0)
-                && (suspectSampleData == null || suspectSampleData.isEmpty())) {
+                && (maliciousEvents == null || maliciousEvents.isEmpty())) {
             return;
         }
 
@@ -1149,26 +1163,32 @@ public class InitializerListener implements ServletContextListener {
 
         if(sendApiThreats){
 
-            final int DATA_LIMIT = webhook.getBatchSize() > 0 ? webhook.getBatchSize() : 50;
+            final int DATA_LIMIT = webhook.getBatchSize() > 0 ? Math.min(webhook.getBatchSize(), 20) : 20;
             int skip = 0;
             final int lastSentTimestamp = webhook.getLastSentTimestamp();
+            String accountId = String.valueOf(Context.accountId.get());
 
             do {
                 try {
-                    suspectSampleData = SuspectSampleDataDao.instance.findAll(
-                            Filters.and(
-                                    Filters.gte(SuspectSampleData._DISCOVERED, lastSentTimestamp),
-                                    Filters.lt(SuspectSampleData._DISCOVERED, now)),
-                            skip, DATA_LIMIT, Sorts.descending(SuspectSampleData._DISCOVERED, Constants.ID));
+                    maliciousEvents = MaliciousEventDao.instance.getCollection(accountId)
+                            .find(Filters.and(
+                                    Filters.gte("detectedAt", lastSentTimestamp),
+                                    Filters.lt("detectedAt", now),
+                                    Filters.eq("successfulExploit", true)))
+                            .sort(Sorts.descending("detectedAt", Constants.ID))
+                            .projection(Projections.exclude("latestApiOrig"))
+                            .skip(skip)
+                            .limit(DATA_LIMIT)
+                            .into(new ArrayList<>());
 
-                    if (suspectSampleData != null && !suspectSampleData.isEmpty()) {
-                        valueMap.put("AKTO.changes_info.apiThreatPayloads", suspectSampleData);
+                    if (maliciousEvents != null && !maliciousEvents.isEmpty()) {
+                        valueMap.put("AKTO.changes_info.apiThreatPayloads", maliciousEvents);
                         actuallySendWebhook(webhook, valueMap, now);
                     }
                     skip += DATA_LIMIT;
                     valueMap.clear();
 
-                    if ((suspectSampleData != null && suspectSampleData.size() < DATA_LIMIT) ||
+                    if ((maliciousEvents != null && maliciousEvents.size() < DATA_LIMIT) ||
                     // In case of a dry run / run once, we only want to send data once.
                             webhook.getFrequencyInSeconds() == 0) {
                         break;
@@ -1178,7 +1198,7 @@ public class InitializerListener implements ServletContextListener {
                             LogDb.DASHBOARD);
                 }
 
-            } while(suspectSampleData != null && !suspectSampleData.isEmpty());
+            } while(maliciousEvents != null && !maliciousEvents.isEmpty());
 
         } else {
             actuallySendWebhook(webhook, valueMap, now);
@@ -1187,9 +1207,57 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private static final ObjectMapper mapper = new ObjectMapper();
-    private static String createMicrosoftTeamsWorkflowWebhookPayload(CustomWebhook webhook, Map<String, Object> valueMap){
-        StringBuilder body = new StringBuilder();
-        body.append("{\n" +
+
+    private static String escapeJsonString(String str) {
+        if (str == null) {
+            return "";
+        }
+        return str.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\b", "\\b")
+                .replace("\f", "\\f")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
+    }
+
+    private static String encodeParam(String value) {
+        if (value == null) {
+            return "";
+        }
+        try {
+            return URLEncoder.encode(value, StandardCharsets.UTF_8.toString());
+        } catch (UnsupportedEncodingException e) {
+            return value;
+        }
+    }
+
+    private static String buildThreatActivityUrl(String baseUrl, Map<String, Object> data) {
+        String refId = data.get("refId") != null ? data.get("refId").toString() : "";
+        String eventType = data.get("eventType") != null ? data.get("eventType").toString() : "";
+        String actor = data.get("actor") != null ? data.get("actor").toString() : "";
+        String filterId = data.get("filterId") != null ? data.get("filterId").toString() : "";
+
+        if (StringUtils.isBlank(refId) || StringUtils.isBlank(eventType)
+                || StringUtils.isBlank(actor) || StringUtils.isBlank(filterId)) {
+            return null;
+        }
+
+        StringBuilder urlBuilder = new StringBuilder();
+        urlBuilder.append(baseUrl)
+                .append(THREAT_ACTIVITY_PATH)
+                .append("?refId=")
+                .append(encodeParam(refId))
+                .append("&eventType=")
+                .append(encodeParam(eventType))
+                .append("&actor=")
+                .append(encodeParam(actor))
+                .append("&filterId=")
+                .append(encodeParam(filterId));
+        return urlBuilder.toString();
+    }
+
+    private static String TEAMS_WEBHOOK_OPENING_BODY = "{\n" +
                 "    \"type\": \"message\",\n" +
                 "    \"attachments\": [\n" +
                 "        {\n" +
@@ -1199,7 +1267,31 @@ public class InitializerListener implements ServletContextListener {
                 "                \"$schema\": \"http://adaptivecards.io/schemas/adaptive-card.json\",\n" +
                 "                \"version\": \"1.5\",\n" +
                 "\"msteams\": { \"width\": \"full\" }," +
-                "                \"body\": [");
+                "                \"body\": [";
+
+    private static String TEAMS_WEBHOOK_CLOSING_BODY = "]\n" +
+                "            }\n" +
+                "        }\n" +
+                "    ]\n" +
+                "}\n" +
+                "";
+
+    private static final String THREAT_ACTIVITY_PATH = "/dashboard/protection/threat-activity";
+
+    private static final String TEAMS_ACTION_SET_TEMPLATE = "        {\n" +
+            "            \"type\": \"ActionSet\",\n" +
+            "            \"actions\": [\n" +
+            "                {\n" +
+            "                    \"type\": \"Action.OpenUrl\",\n" +
+            "                    \"title\": \"%s\",\n" +
+            "                    \"url\": \"%s\"\n" +
+            "                }\n" +
+            "            ]\n" +
+            "        },\n";
+
+    private static String createMicrosoftTeamsWorkflowWebhookPayload(CustomWebhook webhook, Map<String, Object> valueMap){
+        StringBuilder body = new StringBuilder();
+        body.append(TEAMS_WEBHOOK_OPENING_BODY);
         
         if (webhook.getSelectedWebhookOptions() != null) {
             for (WebhookOptions webhookOption : webhook.getSelectedWebhookOptions()) {
@@ -1208,109 +1300,179 @@ public class InitializerListener implements ServletContextListener {
                 String name = webhookOption.getOptionName();
     
                 Object value = valueMap.get(replaceString);
-                if (value instanceof List) {
-                    body.append("        {\n" +
-                            "            \"type\": \"TextBlock\",\n" +
-                            "            \"text\": \"" + name + "\",\n" +
-                            "            \"wrap\": true\n" +
-                            "        },");
-                    
-                    List<Object> list = (List<Object>) value;
-                    boolean headerAdded = false;
-    
-                    for (Object obj : list) {
-                        Map<String, Object> data = mapper.convertValue(obj, HashMap.class);
-                        
-                        if (!headerAdded) {
-                            // Add the table headers (first row)
-                            body.append("        {\n" +
-                                    "            \"type\": \"Table\",\n" +
-                                    "            \"columns\": [\n");
-    
-                            for (String key : data.keySet()) {
-                                if(key=="id" || key=="sample"){
-                                    continue;
-                                }
-
-                                body.append("                {\"width\": 1},\n");
-                            }
-    
-                            body.append("            ],\n" +
-                                    "            \"rows\": [\n" +
-                                    "                {\n" +
-                                    "                    \"type\": \"TableRow\",\n" +
-                                    "                    \"cells\": [\n");
-    
-                            // Add header row (keys)
-                            for (String key : data.keySet()) {
-                                if(key=="id" || key=="sample"){
-                                    continue;
-                                }
-                                body.append("                        {\n" +
-                                        "                            \"type\": \"TableCell\",\n" +
-                                        "                            \"items\": [\n" +
-                                        "                                {\n" +
-                                        "                                    \"type\": \"TextBlock\",\n" +
-                                        "                                    \"text\": \"" + key + "\",\n" +
-                                        "                                    \"wrap\": true\n" +
-                                        "                                }\n" +
-                                        "                            ]\n" +
-                                        "                        },\n");
-                            }
-    
-                            body.append("                    ]\n" +
-                                    "                },\n");
-    
-                            headerAdded = true;
-                        }
-    
-                        // Add each data row (values)
-                        body.append("                {\n" +
-                                "                    \"type\": \"TableRow\",\n" +
-                                "                    \"cells\": [\n");
-    
-                        for (Entry<String,Object> entry : data.entrySet()) {
-                            if(entry.getKey()=="id" || entry.getKey()=="sample"){
-                                continue;
-                            }
-                            body.append("                        {\n" +
-                                    "                            \"type\": \"TableCell\",\n" +
-                                    "                            \"items\": [\n" +
-                                    "                                {\n" +
-                                    "                                    \"type\": \"TextBlock\",\n" +
-                                    "                                    \"text\": \"" + entry.getValue() + "\",\n" +
-                                    "                                    \"wrap\": true\n" +
-                                    "                                }\n" +
-                                    "                            ]\n" +
-                                    "                        },\n");
-                        }
-    
-                        body.append("                    ]\n" +
-                                "                },\n");
-                    }
-    
-                    // Close the table structure
-                    body.append("            ]\n" +
-                            "        },\n");
-                    
-                } else {
-                    body.append("        {\n" +
-                            "            \"type\": \"TextBlock\",\n" +
-                            "            \"text\": \"" + name + "\",\n" +
-                            "            \"wrap\": true\n" +
-                            "        },");
+                if(replaceString.equals("AKTO.changes_info.apiThreatPayloads")){
+                    buildApiThreatsTeamsWebhookBody(body, name, value);
+                } else{
+                    buildNormalTeamsWebhookBody(body, name, value);
                 }
             }
         }
-    
-        body.append("]\n" +
-                "            }\n" +
-                "        }\n" +
-                "    ]\n" +
-                "}\n" +
-                "");
-    
+
+        body.append(TEAMS_WEBHOOK_CLOSING_BODY);
+
         return body.toString();
+    }
+
+    private static void buildNormalTeamsWebhookBody(StringBuilder body, String name, Object value) {
+        if (value instanceof List) {
+            body.append("        {\n" +
+                    "            \"type\": \"TextBlock\",\n" +
+                    "            \"text\": \"" + name + "\",\n" +
+                    "            \"wrap\": true\n" +
+                    "        },");
+
+            List<Object> list = (List<Object>) value;
+            boolean headerAdded = false;
+
+            for (Object obj : list) {
+                Map<String, Object> data = mapper.convertValue(obj, HashMap.class);
+
+                if (!headerAdded) {
+                    // Add the table headers (first row)
+                    body.append("        {\n" +
+                            "            \"type\": \"Table\",\n" +
+                            "            \"columns\": [\n");
+
+                    for (String key : data.keySet()) {
+                        if(key=="id" || key=="sample"){
+                            continue;
+                        }
+
+                        body.append("                {\"width\": 1},\n");
+                    }
+
+                    body.append("            ],\n" +
+                            "            \"rows\": [\n" +
+                            "                {\n" +
+                            "                    \"type\": \"TableRow\",\n" +
+                            "                    \"cells\": [\n");
+
+                    // Add header row (keys)
+                    for (String key : data.keySet()) {
+                        if(key=="id" || key=="sample"){
+                            continue;
+                        }
+                        body.append("                        {\n" +
+                                "                            \"type\": \"TableCell\",\n" +
+                                "                            \"items\": [\n" +
+                                "                                {\n" +
+                                "                                    \"type\": \"TextBlock\",\n" +
+                                "                                    \"text\": \"" + key + "\",\n" +
+                                "                                    \"wrap\": true\n" +
+                                "                                }\n" +
+                                "                            ]\n" +
+                                "                        },\n");
+                    }
+
+                    body.append("                    ]\n" +
+                            "                },\n");
+
+                    headerAdded = true;
+                }
+
+                // Add each data row (values)
+                body.append("                {\n" +
+                        "                    \"type\": \"TableRow\",\n" +
+                        "                    \"cells\": [\n");
+
+                for (Entry<String,Object> entry : data.entrySet()) {
+                    if(entry.getKey()=="id" || entry.getKey()=="sample"){
+                        continue;
+                    }
+                    body.append("                        {\n" +
+                            "                            \"type\": \"TableCell\",\n" +
+                            "                            \"items\": [\n" +
+                            "                                {\n" +
+                            "                                    \"type\": \"TextBlock\",\n" +
+                            "                                    \"text\": \"" + entry.getValue() + "\",\n" +
+                            "                                    \"wrap\": true\n" +
+                            "                                }\n" +
+                            "                            ]\n" +
+                            "                        },\n");
+                }
+
+                body.append("                    ]\n" +
+                        "                },\n");
+            }
+
+            // Close the table structure
+            body.append("            ]\n" +
+                    "        },\n");
+
+        } else {
+            body.append("        {\n" +
+                    "            \"type\": \"TextBlock\",\n" +
+                    "            \"text\": \"" + name + "\",\n" +
+                    "            \"wrap\": true\n" +
+                    "        },");
+        }
+    }
+
+
+    private static void buildApiThreatsTeamsWebhookBody(StringBuilder body, String name, Object value) {
+        final String dashboardBaseUrl = getDashboardBaseUrl();
+        if (value instanceof List) {
+            body.append("        {\n" +
+                    "            \"type\": \"TextBlock\",\n" +
+                    "            \"text\": \"" + escapeJsonString(name) + "\",\n" +
+                    "            \"weight\": \"bolder\",\n" +
+                    "            \"wrap\": true\n" +
+                    "        },");
+
+            List<Object> list = (List<Object>) value;
+            boolean isFirstItem = true;
+
+            for (Object obj : list) {
+                Map<String, Object> data = mapper.convertValue(obj, HashMap.class);
+
+                // Create a FactSet for each object (better for key-value pairs)
+                body.append("        {\n" +
+                        "            \"type\": \"FactSet\",\n" +
+                        (isFirstItem ? "" : "            \"separator\": true,\n            \"spacing\": \"extraLarge\",\n") +
+                        "            \"facts\": [\n");
+
+                boolean firstFact = true;
+                for (Entry<String, Object> entry : data.entrySet()) {
+                    String key = entry.getKey();
+                    if ("id".equals(key) || "sample".equals(key) || "metadata".equals(key)) {
+                        continue;
+                    }
+
+                    if (!firstFact) {
+                        body.append(",\n");
+                    }
+
+                    Object val = entry.getValue();
+                    String valueStr = val == null ? "" : val.toString();
+
+                    body.append("                {\n" +
+                            "                    \"title\": \"" + escapeJsonString(key) + ":\",\n" +
+                            "                    \"value\": \"" + escapeJsonString(valueStr) + "\"\n" +
+                            "                }");
+                    firstFact = false;
+                }
+
+                body.append("\n            ]\n" +
+                        "        },\n");
+
+                // Add clickable button if we have all required URL parameters
+                String threatUrl = buildThreatActivityUrl(dashboardBaseUrl, data);
+                if (threatUrl != null) {
+                    body.append(String.format(TEAMS_ACTION_SET_TEMPLATE,
+                            escapeJsonString("View Threat Activity"),
+                            escapeJsonString(threatUrl)));
+                }
+                isFirstItem = false;
+            }
+
+        } else {
+            String valueStr = value == null ? "" : value.toString();
+            body.append("        {\n" +
+                    "            \"type\": \"TextBlock\",\n" +
+                    "            \"text\": \"" + escapeJsonString(name) + ": " + escapeJsonString(valueStr) + "\",\n" +
+                    "            \"wrap\": true\n" +
+                    "        },");
+        }
     }
         
     private static void actuallySendWebhook(CustomWebhook webhook, Map<String, Object> valueMap, int now){
@@ -1911,6 +2073,7 @@ public class InitializerListener implements ServletContextListener {
             aktoDataTypes.add(new AktoDataType("JWT", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER), now, ignoreData, false, true, Arrays.asList("AUTHENTICATION","TOKEN"), Severity.HIGH));
             aktoDataTypes.add(new AktoDataType("EMAIL", true, Collections.emptyList(), now, ignoreData, false, true,  Arrays.asList("PII"), Severity.MEDIUM));
             aktoDataTypes.add(new AktoDataType("CREDIT_CARD", true, Collections.emptyList(), now, ignoreData, false, true, Arrays.asList("FINANCIAL","PII"), Severity.MEDIUM));
+            aktoDataTypes.add(new AktoDataType("VIN", true, Collections.emptyList(), now, ignoreData, false, true, Arrays.asList("PII"), Severity.MEDIUM));
             aktoDataTypes.add(new AktoDataType("SSN", true, Collections.emptyList(), now, ignoreData, false, true,  Arrays.asList("PII"), Severity.HIGH ));
             aktoDataTypes.add(new AktoDataType("ADDRESS", true, Collections.emptyList(), now, ignoreData, false, true,  Arrays.asList("PII"), Severity.LOW));
             aktoDataTypes.add(new AktoDataType("IP_ADDRESS", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER), now, ignoreData, false, true, Arrays.asList("DEVICE IDENTIFIER"), Severity.HIGH));
@@ -2427,19 +2590,12 @@ public class InitializerListener implements ServletContextListener {
                 int now = Context.now();
                 if (runJobFunctions || runJobFunctionsAnyway) {
 
-                    logger.info("Starting init functions and scheduling jobs at " + now);
+                    logger.debug("Starting init functions and scheduling jobs at " + now);
 
                     AccountTask.instance.executeTask(new Consumer<Account>() {
                         @Override
                         public void accept(Account account) {
-                            logger.info("Starting createIndices for " + account.getId() + " at " + now);
-                            DaoInit.createIndices();
-                            BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(Filters.empty());
-                            if (backwardCompatibility == null) {
-                                backwardCompatibility = new BackwardCompatibility();
-                                BackwardCompatibilityDao.instance.insertOne(backwardCompatibility);
-                            }
-                            newSetBackwardCompatibilities(backwardCompatibility);
+                            runInitializerFunctions();
                         }
                     }, "context-initializer-secondary");
                     logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
@@ -2456,18 +2612,20 @@ public class InitializerListener implements ServletContextListener {
                     if (DashboardMode.isMetered()) {
                         setupUsageScheduler();
                     }
+
                     if(runJobFunctionsAnyway) {
                         crons.trafficAlertsScheduler();
-                        // crons.insertHistoricalDataJob();
-                        // if(DashboardMode.isOnPremDeployment()){
-                        //     crons.insertHistoricalDataJobForOnPrem();
-                        // }
+                        crons.insertHistoricalDataJob();
+                        if(DashboardMode.isOnPremDeployment()){
+                            crons.insertHistoricalDataJobForOnPrem();
+                        }
 
                         // trimCappedCollectionsJob();
                         updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
                         syncCronInfo.setUpUpdateCronScheduler();
                         updateApiGroupsForAccounts();
                         setupAutomatedApiGroupsScheduler();
+                        trimCappedCollectionsJob();
                         setUpPiiAndTestSourcesScheduler();
                         cleanInventoryJobRunner();
                         setUpDefaultPayloadRemover();
@@ -2476,9 +2634,9 @@ public class InitializerListener implements ServletContextListener {
                         setUpUpdateCustomCollections();
                         setUpFillCollectionIdArrayJob();
 
-                        CleanInventory.cleanInventoryJobRunner();
+                        // CleanInventory.cleanInventoryJobRunner();
 
-                        MatchingJob.MatchingJobRunner();
+                        // MatchingJob.MatchingJobRunner();
                     }
 
                     int now2 = Context.now();
@@ -2487,6 +2645,11 @@ public class InitializerListener implements ServletContextListener {
                 } else {
                     logger.debug("Skipping init functions and scheduling jobs at " + now);
                 }
+
+//                if(isSaas){
+//                    alertsForTestingNonFunctional();
+//                }
+
                 // setUpAktoMixpanelEndpointsScheduler();
                 //fetchGithubZip();
                 if(isSaas){
@@ -2540,6 +2703,13 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
+//    private void alertsForTestingNonFunctional() {
+        // Hourly cron to update organization cache
+//        testingAlertsCron.setUpOrganizationFeatureCacheScheduler();
+
+        // 5-minute cron to check accounts
+//        testingAlertsCron.setUpTestingAlertsScheduler();
+//    }
 
     private void setUpDependencyFlowScheduler() {
         int minutes = DashboardMode.isOnPremDeployment() ? 60 : 24*60;
@@ -3333,22 +3503,6 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    public static void createVinSupportDataType(BackwardCompatibility backwardCompatibility){
-        if(backwardCompatibility.getCreateVinSupportDataType() == 0){
-            int now = Context.now();
-            IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
-            AktoDataType dataType = new AktoDataType("VIN", true, Collections.emptyList(), now, ignoreData, false, true, Arrays.asList("PII"), Severity.MEDIUM);
-            AktoDataTypeDao.instance.insertOne(dataType);
-            BackwardCompatibilityDao.instance.updateOne(
-                Filters.eq("_id", backwardCompatibility.getId()),
-                Updates.set(BackwardCompatibility.CREATE_VIN_SUPPORT_DATA_TYPE, Context.now())
-            );
-        }
-    }
-
-    public static void newSetBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
-        createVinSupportDataType(backwardCompatibility);
-    }
 
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         if (DashboardMode.isMetered()) {
@@ -3445,10 +3599,10 @@ public class InitializerListener implements ServletContextListener {
 
     private static void setDashboardVersionForAccount(){
         try {
-            logger.debugAndAddToDb("Updating account version for " + Context.accountId.get(), LogDb.DASHBOARD);
+            logger.debugAndAddToDb("Updating account version for " + Context.accountId.get());
             AccountSettingsDao.instance.updateVersion(AccountSettings.DASHBOARD_VERSION);
         } catch (Exception e) {
-            logger.errorAndAddToDb(e,"error while updating dashboard version: " + e.toString(), LogDb.DASHBOARD);
+            logger.errorAndAddToDb(e,"error while updating dashboard version: " + e.toString());
         }
     }
 
@@ -3987,6 +4141,41 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    /**
+     *
+     * @param newContent The new template content from GitHub
+     * @param existingContent The existing template content in the database
+     * @return The merged content with ignore section preserved
+     */
+    private static String mergeIgnoreSectionFromExisting(String newContent, String existingContent) {
+        if (existingContent == null || existingContent.isEmpty()) {
+            return newContent;
+        }
+
+        try {
+            // Parse both YAML contents
+            com.fasterxml.jackson.databind.ObjectMapper yamlMapper =
+                new com.fasterxml.jackson.databind.ObjectMapper(new com.fasterxml.jackson.dataformat.yaml.YAMLFactory());
+
+            Map<String, Object> existingMap = yamlMapper.readValue(existingContent,
+                new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+            Map<String, Object> newMap = yamlMapper.readValue(newContent,
+                new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+
+            // If existing template has an ignore section, preserve it
+            if (existingMap.containsKey("ignore")) {
+                newMap.put("ignore", existingMap.get("ignore"));
+                logger.infoAndAddToDb("Preserving ignore section for template during sync");
+            }
+
+            // Convert back to YAML string
+            return yamlMapper.writeValueAsString(newMap);
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error merging ignore section, using new content as-is: " + e.getMessage());
+            return newContent;
+        }
+    }
+
     public static void processThreatFilterTemplateFilesZip(byte[] zipFile, String author, String source, String repositoryUrl) {
         if (zipFile != null) {
             try (ByteArrayInputStream inputStream = new ByteArrayInputStream(zipFile);
@@ -4035,27 +4224,38 @@ public class InitializerListener implements ServletContextListener {
                             int createdAt = Context.now();
                             int updatedAt = Context.now();
                             int newHashCode = templateContent.hashCode();
-                            List<Bson> updates = new ArrayList<>(
-                                    Arrays.asList(
-                                            Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
-                                            Updates.setOnInsert(YamlTemplate.AUTHOR, author),
-                                            Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
-                                            Updates.set(YamlTemplate.CONTENT, templateContent),
-                                            Updates.set(YamlTemplate.SOURCE, source)
-                                    ));
                             try {
-                                YamlTemplate threatPolicy = FilterYamlTemplateDao.instance.findOne(Filters.eq(Constants.ID, id), Projections.include(YamlTemplate.HASH));
+                                YamlTemplate threatPolicy = FilterYamlTemplateDao.instance.findOne(
+                                    Filters.eq(Constants.ID, id),
+                                    Projections.include(YamlTemplate.HASH, YamlTemplate.CONTENT)
+                                );
+
+                                String finalContent = templateContent;
+                                int finalHashCode = newHashCode;
 
                                 if (threatPolicy == null) {
+                                    // New template - use content as-is
                                     logger.infoAndAddToDb("Adding new threat template=" + id +" for account " + Context.accountId, LogDb.DASHBOARD);
-                                    YamlTemplate insertNew = new YamlTemplate(id, createdAt, author, updatedAt, templateContent, null, null);
+                                    YamlTemplate insertNew = new YamlTemplate(id, createdAt, author, updatedAt, finalContent, null, null);
                                     insertNew.setSource(YamlTemplateSource.AKTO_TEMPLATES);
                                     FilterYamlTemplateDao.instance.insertOne(insertNew);
                                 } else if (threatPolicy.getHash() != newHashCode) {
+                                    // Template exists and has changed - merge ignore section from existing
                                     logger.infoAndAddToDb("Modifying threat template=" + id +" for account " + Context.accountId, LogDb.DASHBOARD);
-                                    updates.add(
-                                        Updates.set(YamlTemplate.HASH, newHashCode)
-                                    );
+
+                                    // Merge: take new fields from repo, preserve ignore from existing
+                                    finalContent = mergeIgnoreSectionFromExisting(templateContent, threatPolicy.getContent());
+                                    finalHashCode = finalContent.hashCode();
+
+                                    // Update all fields with merged content (new fields + preserved ignore)
+                                    List<Bson> updates = new ArrayList<>(
+                                        Arrays.asList(
+                                                Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
+                                                Updates.set(YamlTemplate.CONTENT, finalContent),
+                                                Updates.set(YamlTemplate.SOURCE, source),
+                                                Updates.set(YamlTemplate.HASH, finalHashCode)
+                                        ));
+
                                     FilterYamlTemplateDao.instance.getMCollection().findOneAndUpdate(
                                         Filters.eq(Constants.ID, id),
                                         Updates.combine(updates),
@@ -4319,6 +4519,28 @@ public class InitializerListener implements ServletContextListener {
                 }, "automated-api-groups-scheduler");
             }
         }, 0, 4, TimeUnit.HOURS);
+    }
+
+    private static String getDashboardBaseUrl() {
+        String dashboardUrl = Constants.DEFAULT_AKTO_DASHBOARD_URL;
+        if (DashboardMode.isOnPremDeployment()) {
+            com.akto.dto.Config.AktoHostUrlConfig aktoUrlConfig = (com.akto.dto.Config.AktoHostUrlConfig) ConfigsDao.instance.findOne(
+                Filters.eq(Constants.ID, ConfigType.AKTO_DASHBOARD_HOST_URL.name())
+            );
+            if (aktoUrlConfig != null && StringUtils.isNotBlank(aktoUrlConfig.getHostUrl())) {
+                dashboardUrl = aktoUrlConfig.getHostUrl();
+            }
+        }
+
+        if (StringUtils.isBlank(dashboardUrl)) {
+            dashboardUrl = Constants.DEFAULT_AKTO_DASHBOARD_URL;
+        }
+
+        if (dashboardUrl.endsWith("/")) {
+            dashboardUrl = dashboardUrl.substring(0, dashboardUrl.length() - 1);
+        }
+
+        return dashboardUrl;
     }
 }
 

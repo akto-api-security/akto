@@ -188,7 +188,7 @@ public class InventoryAction extends UserAction {
                     return;
                 }
                 ApiInfoKey apiInfoKey = new ApiInfoKey(
-                        apiCollectionId,
+                        item.getInt(ApiInfoKey.API_COLLECTION_ID),
                         item.getString(ApiInfoKey.URL),
                         Method.fromString(item.getString(ApiInfoKey.METHOD)));
                 listOfEndpointsInCollection.add(apiInfoKey);
@@ -376,10 +376,11 @@ public class InventoryAction extends UserAction {
         }
         List<BasicDBObject> list = new ArrayList<>();
         if((collection.getHostName() == null || collection.getHostName().isEmpty()) && collection.getId() != AllAPIsGroup.ALL_APIS_GROUP_ID){
-            Bson filter = Filters.and(
-                    Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
-                    Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections)
-            );
+            Bson filter = Filters.and(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
+                            Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
+            if (collection.getType() != null && !collection.getType().equals(ApiCollection.Type.API_GROUP)) {
+                filter = Filters.and(SingleTypeInfoDao.filterForHostHeader(0, false), filter);
+            }
             list = ApiCollectionsDao.fetchEndpointsInCollection(filter, 0, -1, Utils.DELTA_PERIOD_VALUE);
         }else{
             list = ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(apiCollectionId, 0, collection.getId() == AllAPIsGroup.ALL_APIS_GROUP_ID);

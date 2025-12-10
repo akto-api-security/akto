@@ -92,6 +92,9 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
             new String[] {ApiInfo.DISCOVERED_TIMESTAMP }, false);
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            new String[] {ApiInfo.PARENT_MCP_TOOL_NAMES }, false);
     }
     
 

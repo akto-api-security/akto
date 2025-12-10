@@ -15,6 +15,7 @@ import {
   ProgressBar,
   Tooltip,
   Banner,
+  Modal,
 } from '@shopify/polaris';
 
 import {
@@ -24,7 +25,6 @@ import {
   ReportMinor,
   RefreshMajor,
   CustomersMinor,
-  CircleAlertMajor,
   PlusMinor,
   SettingsMinor,
   ViewMajor
@@ -53,6 +53,7 @@ import RunTest from '../../observe/api_collections/RunTest';
 import TableStore from '../../../components/tables/TableStore'
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import TestingRunEndpointsModal from './TestingRunEndpointsModal';
+import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 
 let sortOptions = [
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 3 },
@@ -110,14 +111,14 @@ let filterOptions = [
   },
   {
     key: 'collectionIds',
-    label: 'API groups',
-    title: 'API groups',
+    label: mapLabel('API', getDashboardCategory()) + ' groups',
+    title: mapLabel('API', getDashboardCategory()) + ' groups',
     choices: [],
   },
   {
     key: 'apiNameFilter',
-    label: 'API Name',
-    title: 'API name',
+    label: mapLabel('API', getDashboardCategory()) + ' Name',
+    title: mapLabel('API', getDashboardCategory()) + ' name',
     choices: [],
   }
 ]
@@ -163,10 +164,18 @@ function SingleTestRunPage() {
   const [allResultsLength, setAllResultsLength] = useState(undefined)
   const [currentSummary, setCurrentSummary] = useState('')
   const [testResultsStatsCount, setTestResultsStatsCount] = useState(0)
+  const [allTestResultsStats, setAllTestResultsStats] = useState({
+    count429: 0,
+    count500: 0,
+    countCloudflare: 0,
+    totalCount: 0
+  })
+
   const localCategoryMap = LocalStore.getState().categoryMap
   const localSubCategoryMap = LocalStore.getState().subCategoryMap
   const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
   const [copyUpdateTable, setCopyUpdateTable] = useState("");
+  const [confirmationModal, setConfirmationModal] = useState(false);
 
   const tableTabMap = {
     vulnerable: "VULNERABLE",
@@ -226,16 +235,32 @@ function SingleTestRunPage() {
   async function fetchTestResultsStats(testingRunHexId, testingRunResultSummaryHexId) {
     try {
       if (testingRunHexId && testingRunResultSummaryHexId) {
-        const response = await api.fetchTestResultsStatsCount({
-          testingRunHexId: testingRunHexId,
-          testingRunResultSummaryHexId: testingRunResultSummaryHexId
+        const reqBase = { testingRunHexId: testingRunHexId, testingRunResultSummaryHexId: testingRunResultSummaryHexId }
+        
+        const [res429, res5xx, resCf] = await Promise.allSettled([
+          api.fetchTestResultsStatsCount({ ...reqBase, patternType: 'HTTP_429' }),
+          api.fetchTestResultsStatsCount({ ...reqBase, patternType: 'HTTP_5XX' }),
+          api.fetchTestResultsStatsCount({ ...reqBase, patternType: 'CLOUDFLARE' })
+        ]);
+
+        const count429 = res429.status === 'fulfilled' ? (res429.value || 0) : 0;
+        const count500 = res5xx.status === 'fulfilled' ? (res5xx.value || 0) : 0;
+        const countCloudflare = resCf.status === 'fulfilled' ? (resCf.value || 0) : 0;
+
+        setTestResultsStatsCount(count429);
+        setAllTestResultsStats({
+          count429,
+          count500,
+          countCloudflare,
+          totalCount: count429 + count500 + countCloudflare
         });
-        setTestResultsStatsCount(response || 0);
       } else {
         setTestResultsStatsCount(0);
+        setAllTestResultsStats({ count429: 0, count500: 0, countCloudflare: 0, totalCount: 0 });
       }
     } catch (error) {
       setTestResultsStatsCount(0);
+      setAllTestResultsStats({ count429: 0, count500: 0, countCloudflare: 0, totalCount: 0 });
     }
   }
 
@@ -354,7 +379,7 @@ function SingleTestRunPage() {
   }
 
   const getApiEndpointsMap = (endpoints, type) => {
-    if(type == null || type === undefined || type === "COLLECTION_WISE"){
+    if(type === null || type === undefined || type === "COLLECTION_WISE"){
       return endpoints.map(endpoint => ({
         label: endpoint.id.url,
         value: endpoint.id.url
@@ -425,37 +450,62 @@ function SingleTestRunPage() {
     setTestingRunConfigId(testingRun.testingRunConfig?.id || -1)
     setSelectedTestRun(localSelectedTestRun);
     if (localSelectedTestRun.testingRunResultSummaryHexId) {
-      await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId, tableTabMap[selectedTab], sortKey, sortOrder, skip, limit, filters, queryValue).then(({ testingRunResults, errorEnums, issuesDescriptionMap, jiraIssuesMapForResults }) => {
-          testRunResultsRes = transform.prepareTestRunResults(hexId, testingRunResults, localSubCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults)
-          if (selectedTab === 'domain_unreachable' || selectedTab === 'skipped' || selectedTab === 'need_configurations') {
-            errorEnums['UNKNOWN_ERROR_OCCURRED'] = "OOPS! Unknown error occurred."
-            setErrorsObject(errorEnums)
-            setMissingConfigs(transform.getMissingConfigs(testRunResultsRes))
-          }
-      })
-      if (!func.deepComparison(copyFilters, filters) || copyUpdateTable !== updateTable) {
+      // Start both API calls in parallel
+      const shouldFetchCount = !func.deepComparison(copyFilters, filters) || copyUpdateTable !== updateTable;
+      
+      const fetchResultsPromise = api.fetchTestingRunResults(
+        localSelectedTestRun.testingRunResultSummaryHexId, 
+        tableTabMap[selectedTab], 
+        sortKey, 
+        sortOrder, 
+        skip, 
+        limit, 
+        filters, 
+        queryValue
+      ).then(({ testingRunResults, errorEnums, issuesDescriptionMap, jiraIssuesMapForResults }) => {
+        testRunResultsRes = transform.prepareTestRunResults(hexId, testingRunResults, localSubCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults)
+        if (selectedTab === 'domain_unreachable' || selectedTab === 'skipped' || selectedTab === 'need_configurations') {
+          errorEnums['UNKNOWN_ERROR_OCCURRED'] = "OOPS! Unknown error occurred."
+          setErrorsObject(errorEnums)
+          setMissingConfigs(transform.getMissingConfigs(testRunResultsRes))
+        }
+      }).catch((error) => {
+        console.error('Error fetching test run results:', error);
+        // Continue with empty results if this fails
+      });
+
+      const fetchCountPromise = shouldFetchCount ? api.fetchTestRunResultsCount(
+        localSelectedTestRun.testingRunResultSummaryHexId, 
+        filters
+      ).then((testCountMap) => {
         if(copyUpdateTable !== updateTable){
           setCopyUpdateTable(updateTable)
         }else{
           setCopyFilters(filters)
         }
-        await api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId, filters).then((testCountMap) => {
-          if(testCountMap !== null){
-            localCountMap = JSON.parse(JSON.stringify(testCountMap))  
+        if(testCountMap !== null){
+          localCountMap = JSON.parse(JSON.stringify(testCountMap))  
+        }
+        let countOthers = 0;
+        Object.keys(localCountMap).forEach((x) => {
+          if (x !== 'ALL') {
+            countOthers += localCountMap[x]
           }
-          let countOthers = 0;
-          Object.keys(localCountMap).forEach((x) => {
-            if (x !== 'ALL') {
-              countOthers += localCountMap[x]
-            }
-          })
-          localCountMap['SECURED'] = localCountMap['ALL'] >= countOthers ? localCountMap['ALL'] - countOthers : 0
-          localCountMap['VULNERABLE'] = Math.abs(localCountMap['VULNERABLE'] - localCountMap['IGNORED_ISSUES']);
-          const orderedValues = tableTabsOrder.map(key => localCountMap[tableTabMap[key]] || 0)
-          setTestRunResultsCount(orderedValues)
-          setTestRunCountMap(JSON.parse(JSON.stringify(localCountMap)));
         })
-      }
+        localCountMap['SECURED'] = localCountMap['ALL'] >= countOthers ? localCountMap['ALL'] - countOthers : 0
+        localCountMap['VULNERABLE'] = Math.abs(localCountMap['VULNERABLE'] - localCountMap['IGNORED_ISSUES']);
+        const orderedValues = tableTabsOrder.map(key => localCountMap[tableTabMap[key]] || 0)
+        setTestRunResultsCount(orderedValues)
+        setTestRunCountMap(JSON.parse(JSON.stringify(localCountMap)));
+      }).catch((error) => {
+        console.error('Error fetching test run results count:', error);
+        // Continue with existing count map if this fails
+      }) : Promise.resolve();
+
+      // Wait for the results promise (needed for return value), but don't wait for count promise
+      await fetchResultsPromise;
+      // Start count promise in background - it will set state when it completes
+      fetchCountPromise.catch(() => {}); // Suppress unhandled rejection warning
     }
     const key = tableTabMap[selectedTab]
     const total = localCountMap[key]
@@ -494,10 +544,7 @@ function SingleTestRunPage() {
       }
     }
 
-    // Fetch jira integration field metadata
-    if (window.JIRA_INTEGRATED === 'true') {
-      issuesFunctions.fetchCreateIssueFieldMetaData()
-    }
+    issuesFunctions.fetchIntegrationCustomFieldsMetadata();
   }, []);
 
   const promotedBulkActions = () => {
@@ -601,7 +648,7 @@ function SingleTestRunPage() {
     setUpdateTable("")
 
     sortOptions = sortOptions.map(option => {
-      if (selectedIndex === 0 || selectedIndex == 5) {
+      if (selectedIndex === 0 || selectedIndex === 5) {
         if (option.label === 'Severity') {
           return { ...option, columnIndex: 3 }
         } else if (option.label === 'Run time') {
@@ -722,6 +769,25 @@ function SingleTestRunPage() {
         }}
         callFromOutside={updateTable}
       />
+    <Modal
+        open={confirmationModal}
+        onClose={() => setConfirmationModal(false)}
+        title="Re-Calculate issues count"
+        primaryAction={{
+          content: 'Re-Calculate',
+          onAction: () => handleRefreshTableCount(currentSummary.hexId),
+        }}
+        secondaryActions={[
+          {
+            content: 'Cancel',
+            onAction: () => setConfirmationModal(false),
+          },
+        ]}
+      >
+        <Modal.Section>
+          <Text>{"Are you sure you want to re-calculate issues count? This will recalculate the total number of issues based on the latest" + mapLabel('test results', getDashboardCategory()) + " and may affect the FIXED or IGNORED issues in the current testing run"}</Text>
+        </Modal.Section>
+      </Modal>
     </>
   )
 
@@ -815,6 +881,7 @@ function SingleTestRunPage() {
     await api.handleRefreshTableCount(summaryHexId).then((res) => {
       func.setToast(true, false, "Re-calculating issues count")
       setSecondaryPopover(false)
+      setConfirmationModal(false)
     })
   }
 
@@ -896,57 +963,64 @@ function SingleTestRunPage() {
             <Box><Icon color="subdued" source={PriceLookupMinor} /></Box>
             <Text color="subdued" variant="bodyMd">{getHeadingStatus(selectedTestRun)}</Text>
           </HorizontalStack>
-          {testResultsStatsCount > 0 && (
+          {allTestResultsStats.totalCount > 0 && (
             <>
               <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px' />
               <HorizontalStack gap={"1"}>
-                <Box><Icon color="subdued" source={CircleAlertMajor} /></Box>
+                <Box><Icon color="subdued" source={CircleInformationMajor} /></Box>
                 <Tooltip 
                   content={
                     <VerticalStack gap="2">
-                      <Text variant="bodyMd">
-                        The total number of 429 (Too Many Requests) responses received during testing. 
-                        High numbers may indicate rate limiting by the target server or infrastructure.
-                      </Text>
+                      <Text variant="bodyMd">API request error statistics breakdown:</Text>
+                      <VerticalStack gap="1">
+                        <Text variant="bodySm">• 429 errors: {allTestResultsStats.count429}</Text>
+                        <Text variant="bodySm">• 5XX errors: {allTestResultsStats.count500}</Text>
+                        <Text variant="bodySm">• Cloudflare errors: {allTestResultsStats.countCloudflare}</Text>
+                      </VerticalStack>
                       <Box paddingBlockStart="1" borderBlockStartWidth="1" borderColor="border-subdued">
-                        <Text variant="bodySm" color="subdued" fontWeight="medium">
-                          ⚠️ Note: These are approximate numbers based on sampled data, not exact counts.
-                        </Text>
+                        <Text variant="bodySm" color="subdued" fontWeight="medium">Approximate counts based on sampled data.</Text>
                       </Box>
                     </VerticalStack>
                   } 
                   hasUnderline={false}
                 >
                   <HorizontalStack gap="1" align="center">
-                    <Text color="subdued" fontWeight="medium" variant="bodyMd" style={{ cursor: 'pointer' }}>
-                      API request stats:
-                    </Text>
-
+                    <Text color="subdued" fontWeight="medium" variant="bodyMd" style={{ cursor: 'pointer' }}>API error stats:</Text>
                   </HorizontalStack>
                 </Tooltip>
                 {(() => {
-                  const totalRequests = currentSummary?.testResultsCount || 0;
-                  const percentage = totalRequests > 0 ? (testResultsStatsCount / totalRequests) * 100 : 0;
-                  
-                  if (percentage > 70) {
-                    return (
-                      <div className="api-stats-badge api-stats-critical">
-                        ~{testResultsStatsCount} requests returned 429
-                      </div>
-                    );
-                  } else if (percentage >= 40) {
-                    return (
-                      <div className="api-stats-badge api-stats-warning">
-                        ~{testResultsStatsCount} requests returned 429
-                      </div>
-                    );
-                  } else {
-                    return (
-                      <div className="api-stats-badge api-stats-success">
-                        ~{testResultsStatsCount} requests returned 429
-                      </div>
-                    );
+                  const total = currentSummary?.testResultsCount || 0;
+                  const severityFor = (count) => {
+                    const percentage = total > 0 ? (count / total) * 100 : 0;
+                    if (percentage > 70) return 'CRITICAL';
+                    if (percentage >= 40) return 'HIGH';
+                    return 'MEDIUM';
                   }
+                  return (
+                    <HorizontalStack gap="2" align="center">
+                      {allTestResultsStats.count429 > 0 && (() => { const sev = severityFor(allTestResultsStats.count429); return (
+                        <div className={`badge-wrapper-${sev.toUpperCase()}`}>
+                          <Badge>
+                            429: {allTestResultsStats.count429}
+                          </Badge>
+                        </div>
+                      )})()}
+                      {allTestResultsStats.count500 > 0 && (() => { const sev = severityFor(allTestResultsStats.count500); return (
+                        <div className={`badge-wrapper-${sev.toUpperCase()}`}>
+                          <Badge>
+                            5XX: {allTestResultsStats.count500}
+                          </Badge>
+                        </div>
+                      )})()}
+                      {allTestResultsStats.countCloudflare > 0 && (() => { const sev = severityFor(allTestResultsStats.countCloudflare); return (
+                        <div className={`badge-wrapper-${sev.toUpperCase()}`}>
+                          <Badge>
+                          Cloudflare errors: {allTestResultsStats.countCloudflare}
+                          </Badge>
+                        </div>
+                      )})()}
+                    </HorizontalStack>
+                  );
                 })()}
               </HorizontalStack>
             </>
@@ -976,7 +1050,7 @@ function SingleTestRunPage() {
     title: 'Edit',
     items: [
       {
-        content: 'Tests',
+        content: mapLabel("More Tests", getDashboardCategory()),
         icon: PlusMinor,
         onAction: () => { setActiveFromTesting(true) }
       },
@@ -991,14 +1065,14 @@ function SingleTestRunPage() {
     title: 'More',
     items: [
       {
-        content: 'See APIs',
+        content: 'See ' + mapLabel("APIs", getDashboardCategory()),
         icon: ViewMajor,
         onAction: () => { setShowTestingEndpointsModal(true) }
       },
       {
         content: 'Re-Calculate Issues Count',
         icon: RefreshMajor,
-        onAction: () => { handleRefreshTableCount(currentSummary.hexId) }
+        onAction: () => { setConfirmationModal(true) }
       }
     ]
   })

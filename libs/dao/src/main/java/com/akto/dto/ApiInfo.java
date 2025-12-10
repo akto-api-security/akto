@@ -64,12 +64,24 @@ public class ApiInfo {
     public static final String DESCRIPTION = "description";
     private String description;
 
+    public static final String RATELIMITS = "rateLimits";
+    private Map<String, Map<String, Integer>> rateLimits;
+
+    public static final String RATE_LIMIT_CONFIDENCE = "rateLimitConfidence";
+    private float rateLimitConfidence;
+
+    public static final String PARENT_MCP_TOOL_NAMES = "parentMcpToolNames";
+    private List<String> parentMcpToolNames;
+
+    public static final String DETECTED_BASE_PROMPT = "detectedBasePrompt";
+    private String detectedBasePrompt;
+
     public enum ApiType {
         REST, GRAPHQL, GRPC, SOAP
     }
 
     public enum AuthType {
-        UNAUTHENTICATED, BASIC, AUTHORIZATION_HEADER, JWT, API_TOKEN, BEARER, CUSTOM
+        UNAUTHENTICATED, BASIC, AUTHORIZATION_HEADER, JWT, API_TOKEN, BEARER, CUSTOM, API_KEY, MTLS, SESSION_TOKEN
     }
 
     public enum ApiAccessType {
@@ -153,6 +165,21 @@ public class ApiInfo {
     public ApiInfo(ApiInfoKey apiInfoKey) {
         this.id = apiInfoKey;
         this.violations = new HashMap<>();
+
+        // Initialize rate limits with -1 => no limits
+        this.rateLimits = new HashMap<>();
+        // Initialize with default structure for common time windows
+        Map<String, Integer> defaultMetrics = new HashMap<>();
+        defaultMetrics.put("p50", -1);
+        defaultMetrics.put("p75", -1);
+        defaultMetrics.put("p90", -1);
+        defaultMetrics.put("max_requests", -1);
+        
+        // Initialize for 5, 15, and 30 minute windows
+        this.rateLimits.put("5", new HashMap<>(defaultMetrics));
+        this.rateLimits.put("15", new HashMap<>(defaultMetrics));
+        this.rateLimits.put("30", new HashMap<>(defaultMetrics));
+
         this.apiAccessTypes = new HashSet<>();
         this.allAuthTypesFound = new HashSet<>();
         this.lastSeen = Context.now();
@@ -249,6 +276,27 @@ public class ApiInfo {
         this.allAuthTypesFound.addAll(that.allAuthTypesFound);
 
         this.apiAccessTypes.addAll(that.getApiAccessTypes());
+
+        // Merge rateLimits - for each time window, take the maximum value for each metric
+        for (String timeWindow: that.rateLimits.keySet()) {
+            Map<String, Integer> thatMetrics = that.rateLimits.get(timeWindow);
+            Map<String, Integer> thisMetrics = this.rateLimits.get(timeWindow);
+            
+            if (thisMetrics == null) {
+                this.rateLimits.put(timeWindow, new HashMap<>(thatMetrics));
+            } else {
+                for (String metric: thatMetrics.keySet()) {
+                    Integer thatValue = thatMetrics.get(metric);
+                    Integer thisValue = thisMetrics.get(metric);
+                    if (thisValue == null || thatValue > thisValue) {
+                        thisMetrics.put(metric, thatValue);
+                    }
+                }
+            }
+        }
+
+        // Merge rateLimitConfidence - take the maximum confidence
+        this.rateLimitConfidence = Math.max(this.rateLimitConfidence, that.rateLimitConfidence);
 
     }
 
@@ -473,5 +521,37 @@ public class ApiInfo {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public Map<String, Map<String, Integer>> getRateLimits() {
+        return rateLimits;
+    }
+
+    public void setRateLimits(Map<String, Map<String, Integer>> rateLimits) {
+        this.rateLimits = rateLimits;
+    }
+
+    public float getRateLimitConfidence() {
+        return rateLimitConfidence;
+    }
+
+    public void setRateLimitConfidence(float rateLimitConfidence) {
+        this.rateLimitConfidence = rateLimitConfidence;
+    }
+
+    public List<String> getParentMcpToolNames() {
+        return parentMcpToolNames;
+    }
+
+    public void setParentMcpToolNames(List<String> parentMcpToolNames) {
+        this.parentMcpToolNames = parentMcpToolNames;
+    }
+
+    public String getDetectedBasePrompt() {
+        return detectedBasePrompt;
+    }
+
+    public void setDetectedBasePrompt(String detectedBasePrompt) {
+        this.detectedBasePrompt = detectedBasePrompt;
     }
 }

@@ -185,6 +185,60 @@ const api = {
             data: {serverUrl, authKey, authValue, dashboardUrl}
         })
     },
+
+    importFromUrl(url, testRoleId, requestBody) {
+        return request({
+            url: '/api/importFromUrl',
+            method: 'post',
+            data: {url, testRoleId, requestBody}
+        })
+    },
+
+    initiateMCPRecon(ipRange) {
+        return request({
+            url: '/api/initiateMCPRecon',
+            method: 'post',
+            data: {ipRange}
+        })
+    },
+
+    addAwsAccountIdsForApiGatewayLogging(awsAccountIds) {
+        return request({
+            url: '/api/addAwsAccountIdsForApiGatewayLogging',
+            method: 'post',
+            data: { awsAccountIds }
+        })
+    },
+
+    fetchAwsAccountIdsForApiGatewayLogging() {
+        return request({
+            url: '/api/fetchAwsAccountIdsForApiGatewayLogging',
+            method: 'post',
+            data: { }
+        })
+    },
+
+    importImpervaSchema(formData) {
+        return request({
+            url: '/api/importImpervaSchema',
+            method: 'post',
+            data: formData,
+        })
+    },
+
+    initiateAIAgentConnectorImport(connectorType, connectorConfig, dataIngestionUrl, recurringIntervalSeconds) {
+        return request({
+            url: '/api/initiateAIAgentConnectorImport',
+            method: 'post',
+            data: {
+                connectorType,
+                dataIngestionUrl,
+                recurringIntervalSeconds,
+                ...connectorConfig
+            }
+        })
+    },
+
 }
 
 export default api

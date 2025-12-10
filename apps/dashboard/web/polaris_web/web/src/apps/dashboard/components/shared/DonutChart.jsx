@@ -7,7 +7,7 @@ import PersistStore from '../../../main/PersistStore';
 import observeFunc from "../../pages/observe/transform"
 
 
-function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize}) {
+function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, subtitle, navUrlBuilder}) {
     const chartComponentRef = useRef(null)
     const navigate = useNavigate()
     const filtersMap = PersistStore(state => state.filtersMap)
@@ -27,12 +27,59 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize}) {
             height: size + 10,
             width: size,
             className: 'pie-chart',
-            margin: '10'
+            margin: '10',
+            events: subtitle ? {
+                render: function() {
+                    const chart = this;
+                    const centerX = chart.plotLeft + (chart.plotWidth / 2);
+                    const centerY = chart.plotTop + (chart.plotHeight / 2);
+                    
+                    // Remove old labels if they exist
+                    if (chart.titleLabel) {
+                        chart.titleLabel.destroy();
+                    }
+                    if (chart.subtitleLabel) {
+                        chart.subtitleLabel.destroy();
+                    }
+                    
+                    // Add title
+                    chart.titleLabel = chart.renderer.text(
+                        title,
+                        centerX,
+                        centerY - 5
+                    )
+                    .css({
+                        fontSize: '20px',
+                        fontWeight: '400',
+                        textAlign: 'center'
+                    })
+                    .attr({
+                        'text-anchor': 'middle'
+                    })
+                    .add();
+                    
+                    // Add subtitle
+                    chart.subtitleLabel = chart.renderer.text(
+                        subtitle,
+                        centerX,
+                        centerY + 15
+                    )
+                    .css({
+                        fontSize: '12px',
+                        color: '#666',
+                        textAlign: 'center'
+                    })
+                    .attr({
+                        'text-anchor': 'middle'
+                    })
+                    .add();
+                }
+            } : undefined
         },
         credits:{
             enabled: false,
         },
-        title:{
+        title: subtitle ? { text: null } : {
             text: title,
             y: size*0.4,
         },
@@ -65,7 +112,13 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize}) {
 
                         click: (event) => {
                             const { point } = event;
-                            if(navUrl && navUrl ==='/dashboard/observe/sensitive/'){
+                            if (navUrlBuilder) {
+                                const builtUrl = navUrlBuilder(navUrl, point.filterValue)
+                                if (builtUrl) {
+                                    window.open(builtUrl, '_blank', 'noopener,noreferrer')
+                                }
+                            }
+                            else if(navUrl && navUrl ==='/dashboard/observe/sensitive/'){
                                 if(isRequest){
                                     const filterUrl = `${navUrl}${point.name}`
                                     let updatedFiltersMap = { ...filtersMap };
@@ -77,13 +130,23 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize}) {
                                 }
                                 navigate(`${navUrl}${point.name}`);
                             }
-                            else if( navUrl && navUrl==='/dashboard/issues/'){
-                                const filterUrl = '/dashboard/issues'
+                            else if( navUrl && navUrl ==='/dashboard/issues'){
+                                const filterUrl = '/dashboard/issues/#open'
+                                const filterUrl1 = '/dashboard/issues//#open'
                                 let updatedFiltersMap = { ...filtersMap };
                                 updatedFiltersMap[filterUrl] = {}
-                                  
+                                updatedFiltersMap[filterUrl1] = {}
+                                let key = "issueCategory"
+                                if(point.filterKey.toUpperCase() === "CRITICAL")
+                                  key = "severity"
+                                else if(point.filterKey.toUpperCase() === "HIGH")
+                                  key = "severity"
+                                else if(point.filterKey.toUpperCase() === "MEDIUM")
+                                  key = "severity"
+                                else if(point.filterKey.toUpperCase() === "LOW")
+                                  key = "severity"
                                 const filterObj = [{
-                                    key: "issueCategory",
+                                    key: key,
                                     label: point.filterKey,
                                     value: [point.filterKey]
                                 }
@@ -91,6 +154,8 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize}) {
 
                                 updatedFiltersMap[filterUrl]['filters'] = filterObj;
                                 updatedFiltersMap[filterUrl]['sort'] = [];
+                                updatedFiltersMap[filterUrl1]['filters'] = filterObj;
+                                updatedFiltersMap[filterUrl1]['sort'] = [];
                                 setFiltersMap(updatedFiltersMap)
                                 navigate(`${navUrl}`);
                             }

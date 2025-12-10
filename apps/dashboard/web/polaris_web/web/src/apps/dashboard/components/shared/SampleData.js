@@ -17,8 +17,7 @@ function highlightPaths(highlightPathMap, ref){
         try {
           matches = ref.getModel().findMatches(mainKey, false, false, false, null, true);
         } catch (error) {
-          console.error(error)
-          console.log("mainKey: " + mainKey)
+          // Silently handle errors in production
         }
         matches.forEach((match) => {
           let matchDecObj ={
@@ -78,8 +77,7 @@ function highlightHeaders(data, ref, getLineNumbers){
     try {
       matchRanges = ref.getModel().findMatches(header, false, false, true, null, true, 1)
     } catch (error) {
-      console.error(error)
-      console.log("header: " + header)
+      // Silently handle errors in production
     }
     changesArr = [ ...changesArr, ...matchRanges]
     matchRanges.forEach((obj) => {
@@ -144,6 +142,76 @@ function highlightHeaders(data, ref, getLineNumbers){
       }
     }])
   })
+}
+
+function highlightVulnerabilities(vulnerabilitySegments, ref) {
+  if (!ref || !Array.isArray(vulnerabilitySegments) || vulnerabilitySegments.length === 0) {
+    return;
+  }
+
+  const model = ref.getModel();
+  const text = ref.getValue();
+
+  if (!model || !text) {
+    return;
+  }
+
+  const textLength = text.length;
+  const isValidRange = (start, end) => Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end <= textLength && start < end;
+  const resolvePhrase = (segment) => {
+    if (typeof segment?.phrase === 'string' && segment.phrase.length > 0) {
+      return segment.phrase;
+    }
+    if (typeof segment?.message === 'string' && segment.message.length > 0) {
+      return segment.message.replace(/\s*\[chars\s+\d+-\d+\]\s*$/, '');
+    }
+    return undefined;
+  };
+
+  const decorations = [];
+
+  vulnerabilitySegments.forEach((segment) => {
+    try {
+      let start = Number(segment?.start);
+      let end = Number(segment?.end);
+      const phrase = resolvePhrase(segment);
+
+      if (phrase) {
+        const phraseMatchesProvidedRange = isValidRange(start, end) && text.slice(start, end) === phrase;
+        if (!phraseMatchesProvidedRange) {
+          const idx = text.indexOf(phrase);
+          if (idx >= 0) {
+            start = idx;
+            end = idx + phrase.length;
+          }
+        }
+      }
+
+      if (!isValidRange(start, end)) {
+        return;
+      }
+
+      const startPos = model.getPositionAt(start);
+      const endPos = model.getPositionAt(end);
+
+      if (!startPos || !endPos) {
+        return;
+      }
+
+      decorations.push({
+        range: new monaco.Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column),
+        options: {
+          inlineClassName: "vulnerability-highlight"
+        }
+      });
+    } catch (error) {
+      console.error('Error creating vulnerability highlight:', error, segment);
+    }
+  });
+
+  if (decorations.length > 0) {
+    ref._vulnDecorations = ref.createDecorationsCollection(decorations);
+  }
 }
 
 function SampleData(props) {
@@ -230,6 +298,17 @@ function SampleData(props) {
 
     },[currLine])
 
+    // Add effect to re-highlight vulnerabilities if they change
+    useEffect(() => {
+      if (instance && editorData) {
+        // Use backend-provided vulnerabilitySegments if available
+        const segments = Array.isArray(editorData.vulnerabilitySegments) && editorData.vulnerabilitySegments.length > 0
+          ? editorData.vulnerabilitySegments
+          : []
+        highlightVulnerabilities(segments, instance);
+      }
+    }, [instance, editorData?.vulnerabilitySegments]);
+
     function createInstance(){
         const options = {
             language: editorLanguage,
@@ -306,6 +385,9 @@ function SampleData(props) {
         highlightPaths(data?.highlightPaths, instance);
         if(data.headersMap){
           highlightHeaders(data, instance,getLineNumbers)
+        }
+        if(data.vulnerabilitySegments){
+          highlightVulnerabilities(data.vulnerabilitySegments, instance);
         }
       }
     }

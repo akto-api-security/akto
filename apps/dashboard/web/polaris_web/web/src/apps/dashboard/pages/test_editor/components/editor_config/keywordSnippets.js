@@ -39,6 +39,14 @@ const keywordSnippets = {
     delete_query_param: [
         "delete_query_param: <QUERY_KEY>"
     ],
+    attach_file: [
+        "attach_file:",
+        "\t<FIELD_NAME>: <FILE_URL>",
+        "# Multiple files:",
+        "# attach_file:",
+        "#   file1: <FILE_URL_1>",
+        "#   file2: <FILE_URL_2>"
+    ],
     remove_auth_header: [
         "remove_auth_header: true"
     ],

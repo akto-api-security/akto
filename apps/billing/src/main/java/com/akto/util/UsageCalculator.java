@@ -227,7 +227,6 @@ public class UsageCalculator {
             // Calculate account wise usage and consolidated usage
             for (MetricTypes metricType : MetricTypes.values()) {
                 String metricTypeString = metricType.toString();
-                consolidatedUsage.put(metricTypeString, 0);
 
                 for (int account : accounts) {
                     UsageMetric usageMetric = UsageMetricsDao.instance.findLatestOne(
@@ -254,11 +253,16 @@ public class UsageCalculator {
                         }
                     }
 
-                    int currentConsolidateUsage = consolidatedUsage.get(metricTypeString);
+                    int currentConsolidateUsage = consolidatedUsage.getOrDefault(metricTypeString, 0);
                     int updatedConsolidateUsage = currentConsolidateUsage + usage;
 
                     consolidatedUsage.put(metricTypeString, updatedConsolidateUsage);
                 }
+            }
+
+            if (consolidatedUsage.isEmpty()) {
+                String msg = "No usage found for organization: " + organizationId + " (" + organizationName + ") skipping updates... [usageLowerBound=" + usageLowerBound + ", usageUpperBound=" + usageUpperBound + "]";
+                throw new IllegalStateException(msg);
             }
 
             int date = DateUtils.getDateYYYYMMDD(usageLowerBound);
@@ -299,8 +303,6 @@ public class UsageCalculator {
             statusAggregateUsage = false;
         }
     }
-
-
 
     public boolean isStatusDataSinks() {
         return statusDataSinks;

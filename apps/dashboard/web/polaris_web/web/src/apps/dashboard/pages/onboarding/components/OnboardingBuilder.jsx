@@ -10,6 +10,7 @@ import ResultsSummary from './ResultsSummary'
 import { useNavigate } from "react-router-dom"
 import api from '../api'
 import PersistStore from '../../../../main/PersistStore'
+import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper'
 
 function OnboardingBuilder() {
 
@@ -69,14 +70,14 @@ function OnboardingBuilder() {
         {
             title: "Set config",
             subtitle: "We have pre-filled token for you!",
-            buttonText: "Run tests",
+            buttonText: mapLabel("Run tests", getDashboardCategory()),
             cardTitle: "Attacker Token",
             toast: "Please fill the above fields.",
             component: <SetConfig />,
-            actionText: "Run Test",
+            actionText: mapLabel("Run Test", getDashboardCategory()),
         },
         {
-            title: "Test results",
+            title: mapLabel('Test results', getDashboardCategory()),
             subtitle: "Here are the results for the tests you recently ran",
             buttonText: "See all issues",
             component: <ResultsSummary />,

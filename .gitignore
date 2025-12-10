@@ -23,3 +23,7 @@ https:
 **/data-zoo-logs
 **/bin
 .factorypath
+model.onnx
+test_scripts/*
+run-master.sh
+run-threat-consumer.sh

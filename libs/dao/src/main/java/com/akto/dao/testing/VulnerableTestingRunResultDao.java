@@ -53,7 +53,10 @@ public class VulnerableTestingRunResultDao extends TestingRunResultDao {
             try {
                 Bson filter = Filters.and(
                     Filters.eq(Constants.ID, objectId),
-                    Filters.eq(TestingRunResultSummary.IS_NEW_TESTING_RUN_RESULT_SUMMARY, true)
+                    Filters.or(
+                        Filters.eq(TestingRunResultSummary.IS_NEW_TESTING_RUN_RESULT_SUMMARY, true),
+                        Filters.eq(TestingRunResultSummary.IS_NEW_TESTING_RUN_RESULT_SUMMARY_OLD, true)
+                    )
                 );
                 boolean isNew = TestingRunResultSummariesDao.instance.count(filter) > 0;
                 return isNew;
@@ -78,14 +81,17 @@ public class VulnerableTestingRunResultDao extends TestingRunResultDao {
         if(isVulnerable && instance.isStoredInVulnerableCollection(summaryId, true)){
             return instance.fetchLatestTestingRunResultWithCustomAggregations(filters, limit, skip, customSort);
         }else{
+            if (isVulnerable) {
+                filters = Filters.and(filters, Filters.eq(TestingRunResult.VULNERABLE, true));
+            }
             return TestingRunResultDao.instance.fetchLatestTestingRunResultWithCustomAggregations(filters, limit, skip, customSort);
         }
     }
 
     public TestingRunResult findOneWithComparison(Bson q, Bson projection) {
-        TestingRunResult tr = super.findOne(q, projection);
+        TestingRunResult tr = super.findOneNoRbacFilter(q, projection);
         if(tr == null){
-            return TestingRunResultDao.instance.findOne(q, projection);
+            return TestingRunResultDao.instance.findOneNoRbacFilter(q, projection);
         }
         return tr;
     }
