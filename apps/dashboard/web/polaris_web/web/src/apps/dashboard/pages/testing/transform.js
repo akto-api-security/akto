@@ -342,14 +342,14 @@ const transform = {
     })
     return testRuns;
     },
-    prepareTestRunResult : (hexId, data, subCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults) => {
+    prepareTestRunResult : (hexId, data, subCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults, devrevIssuesMapForResults) => {
       let obj = {};
       obj['id'] = data.hexId;
       obj['name'] = func.getRunResultSubCategory(data, subCategoryFromSourceConfigMap, subCategoryMap, "testName")
       obj['detected_time'] = (data['vulnerable'] ? "Detected " : "Tried ") + func.prettifyEpoch(data.endTimestamp)
       obj["endTimestamp"] = data.endTimestamp
       obj['testCategory'] = func.getRunResultCategory(data, subCategoryMap, subCategoryFromSourceConfigMap, "shortName")
-      obj['url'] = (data.apiInfoKey.method._name || data.apiInfoKey.method) + " " + data.apiInfoKey.url 
+      obj['url'] = (data.apiInfoKey.method._name || data.apiInfoKey.method) + " " + data.apiInfoKey.url
       obj['severity'] = data.vulnerable ? [func.toSentenceCase(func.getRunResultSeverity(data, subCategoryMap))] : []
       obj['total_severity'] = getTotalSeverityTestRunResult(obj['severity'])
       obj['severityStatus'] = obj["severity"].length > 0 ? [obj["severity"][0]] : []
@@ -382,12 +382,18 @@ const transform = {
         }
       }
 
+      if (devrevIssuesMapForResults && Object.keys(devrevIssuesMapForResults).length > 0) {
+        if (devrevIssuesMapForResults[testingRunResultHexId]) {
+          obj['devrevWorkUrl'] = devrevIssuesMapForResults[testingRunResultHexId];
+        }
+      }
+
       return obj;
     },
-    prepareTestRunResults : (hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults) => {
+    prepareTestRunResults : (hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults, devrevIssuesMapForResults) => {
       let testRunResults = []
       testingRunResults.forEach((data) => {
-        let obj = transform.prepareTestRunResult(hexId, data, subCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults);
+        let obj = transform.prepareTestRunResult(hexId, data, subCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults, devrevIssuesMapForResults);
         if(obj['name'] && obj['testCategory']){
           testRunResults.push(obj);
         }
@@ -898,6 +904,7 @@ getCollapsibleRow(urls, severity) {
         <td colSpan={8} style={{padding: '0px !important', width: '100%'}}>
           {urls.map((ele,index)=>{
             const jiraKey = ele?.jiraIssueUrl && ele?.jiraIssueUrl?.length > 0 ? ele.jiraIssueUrl?.split('/').pop() : "";
+            const devrevKey = ele?.devrevWorkUrl && ele?.devrevWorkUrl?.length > 0 ? ele.devrevWorkUrl?.split('/').pop() : "";
             const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
             return(
               <Box
@@ -915,6 +922,16 @@ getCollapsibleRow(urls, severity) {
                       {transform.getUrlComp(ele.url)}
                     </Link>
                     {ele.jiraIssueUrl && <JiraTicketDisplay jiraTicketUrl={ele.jiraIssueUrl} jiraKey={jiraKey} />}
+                    {ele.devrevWorkUrl && devrevKey && (
+                      <Tag>
+                        <HorizontalStack gap={1}>
+                          <Avatar size="extraSmall" shape='round' source="/public/devrev-ai.svg" />
+                          <Link url={ele.devrevWorkUrl} target="_blank">
+                            <Text>{devrevKey}</Text>
+                          </Link>
+                        </HorizontalStack>
+                      </Tag>
+                    )}
                     <Box maxWidth="250px" paddingInlineStart="3">
                       <TooltipText
                         text={ele.issueDescription}
@@ -999,7 +1016,7 @@ getPrettifiedTestRunResults(testRunResults){
     if(testRunResultsObj.hasOwnProperty(key)){
       let endTimestamp = Math.max(test.endTimestamp, testRunResultsObj[key].endTimestamp)
       let urls = testRunResultsObj[key].urls
-      urls.push({url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, issueDescription: test.description, jiraIssueUrl: test.jiraIssueUrl})
+      urls.push({url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, issueDescription: test.description, jiraIssueUrl: test.jiraIssueUrl, devrevWorkUrl: test.devrevWorkUrl})
       let obj = {
         ...test,
         urls: urls,
@@ -1011,7 +1028,7 @@ getPrettifiedTestRunResults(testRunResults){
       delete obj["errorsList"]
       testRunResultsObj[key] = obj
     }else{
-      let urls = [{url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, issueDescription: test.description, jiraIssueUrl: test.jiraIssueUrl}]
+      let urls = [{url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, issueDescription: test.description, jiraIssueUrl: test.jiraIssueUrl, devrevWorkUrl: test.devrevWorkUrl}]
       let obj={
         ...test,
         urls:urls,

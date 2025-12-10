@@ -859,6 +859,9 @@ public class StartTestAction extends UserAction {
     @Getter
     private Map<String, String> jiraIssuesMapForResults;
 
+    @Getter
+    private Map<String, String> devrevIssuesMapForResults;
+
     public String fetchTestingRunResults() {
         ObjectId testingRunResultSummaryId;
         try {
@@ -900,6 +903,7 @@ public class StartTestAction extends UserAction {
                 removeTestingRunResultsByIssues(testingRunResults, (Map<String, String>) issueMetaDataMap.get("statuses"));
                 this.issuesDescriptionMap = (Map<String, String>) issueMetaDataMap.get("descriptions");
                 this.jiraIssuesMapForResults = (Map<String, String>) issueMetaDataMap.get("jiraIssues");
+                this.devrevIssuesMapForResults = (Map<String, String>) issueMetaDataMap.get("devrevIssues");
             }
             loggerMaker.debugAndAddToDb("[" + (Context.now() - timeNow) + "] Removed ignored issues from testing run results. Current size of testing run results: " + testingRunResults.size(), LogDb.DASHBOARD);
         } catch (Exception e) {
@@ -929,7 +933,7 @@ public class StartTestAction extends UserAction {
                 Filters.and(
                     Filters.in(Constants.ID, idToResultMap.keySet())
                 ),
-                Projections.include(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.DESCRIPTION, TestingRunIssues.JIRA_ISSUE_URL)
+                Projections.include(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.DESCRIPTION, TestingRunIssues.JIRA_ISSUE_URL, TestingRunIssues.DEVREV_WORK_URL)
             );
 
             return buildIssueMetaDataMap(issues, idToResultMap, ignoreStatuses);
