@@ -98,6 +98,14 @@ public class ClientActor extends DataActor {
     private static final CodecRegistry codecRegistry = DaoInit.createCodecRegistry();
     public static final String CYBORG_URL = "https://cyborg.akto.io";
     private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
+        
+    /**
+     * Dedicated thread pool for agent traffic log HTTP writes.
+     * Separate from general threadPool to isolate agent log writes from other operations.
+     * Low volume (5 threads sufficient), follows same pattern as threadPool.
+     */
+    private static final int maxAgentTrafficLogWrites = 5;
+    private static ExecutorService agentTrafficLogThreadPool = Executors.newFixedThreadPool(maxAgentTrafficLogWrites);
     private static AccountSettings accSettings;
 
     ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false).configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
@@ -4262,6 +4270,35 @@ public class ClientActor extends DataActor {
         }
     }
 
+    @Override
+    public void bulkWriteAgentTrafficLogs(List<Object> trafficLogs) {
+        // Submit async task to dedicated thread pool to avoid blocking caller
+        agentTrafficLogThreadPool.submit(() -> {
+            try {
+                // Convert List<Object> to List<AgentTrafficLog>
+                List<AgentTrafficLog> agentTrafficLogs = new ArrayList<>();
+                for (Object obj : trafficLogs) {
+                    agentTrafficLogs.add((AgentTrafficLog) obj);
+                }
+                
+                BasicDBObject obj = new BasicDBObject();
+                obj.put("agentTrafficLogs", agentTrafficLogs);
+                
+                String objString = gson.toJson(obj);
+                
+                Map<String, List<String>> headers = buildHeaders();
+                OriginalHttpRequest request = new OriginalHttpRequest(url + "/bulkWriteAgentTrafficLogs", "", "POST", objString, headers, "");
+                
+                OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+                if (response.getStatusCode() != 200) {
+                    loggerMaker.errorAndAddToDb("non 2xx response in bulkWriteAgentTrafficLogs", LoggerMaker.LogDb.RUNTIME);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error in bulkWriteAgentTrafficLogs task: " + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        });
+    }
+    
     public YamlTemplate fetchCommonWordList() {
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchCommonWordList", "", "POST", null, headers, "");
