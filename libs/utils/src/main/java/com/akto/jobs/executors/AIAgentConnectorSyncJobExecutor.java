@@ -25,6 +25,7 @@ import static com.akto.jobs.executors.AIAgentConnectorConstants.AZURE_CONNECTION
 import static com.akto.jobs.executors.AIAgentConnectorConstants.AZURE_BLOB_URL_ENV;
 import static com.akto.jobs.executors.AIAgentConnectorConstants.AZURE_CONTAINER_NAME;
 import static com.akto.jobs.executors.AIAgentConnectorUtils.isValidConnectorType;
+import static com.akto.jobs.executors.BinarySecurityValidator.validateBinaryPath;
 import com.akto.jobs.executors.strategy.AIAgentConnectorStrategy;
 import com.akto.jobs.executors.strategy.AIAgentConnectorStrategyFactory;
 
@@ -88,53 +89,9 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
 
         logger.info("Executing Go binary at: {} for connector type: {}", binaryFile.getAbsolutePath(), connectorType);
 
-        // Resolve real (no-follow-symlink) path to prevent symlink-based attacks
-        // toRealPath(NOFOLLOW_LINKS) resolves to absolute canonical path and rejects symlinks
-        String execCanonical;
-        try {
-            execCanonical = binaryFile.toPath().toRealPath(java.nio.file.LinkOption.NOFOLLOW_LINKS).toString();
-        } catch (java.nio.file.NoSuchFileException e) {
-            throw new Exception("Binary file does not exist: " + binaryFile.getAbsolutePath(), e);
-        } catch (Exception e) {
-            throw new Exception("Failed to resolve real path for binary (possible symlink): " + binaryFile.getAbsolutePath(), e);
-        }
-
-        // Enforce exact expected binary path to avoid any injection vector from manipulated paths
-        String expectedBinaryCanonical = new File(BINARY_BASE_PATH, binaryName).getCanonicalPath();
-        if (!execCanonical.equals(expectedBinaryCanonical)) {
-            throw new Exception("Binary real path mismatch. Expected: " + expectedBinaryCanonical + ", Actual: " + execCanonical);
-        }
-
-        // Get canonical base directory for containment validation
+        // Validate binary path with comprehensive security checks
+        String execCanonical = validateBinaryPath(binaryFile, binaryName, BINARY_BASE_PATH);
         String baseCanonical = new File(BINARY_BASE_PATH).getCanonicalPath();
-
-        // Explicit absolute path check (defense-in-depth, though toRealPath already returns absolute)
-        if (!new File(execCanonical).isAbsolute()) {
-            throw new Exception("Binary path is not absolute: " + execCanonical);
-        }
-
-        // Check for shell meta-characters in the path we'll execute (defense-in-depth)
-        // Note: Allow backslashes for Windows paths, but block other shell meta-characters
-        if (execCanonical.matches(".*[;&|<>`$].*")) {
-            throw new Exception("Binary path contains illegal shell meta-characters: " + execCanonical);
-        }
-
-        // Whitelist allowed characters in canonical path to prevent injection
-        // Allows: alphanumeric, slash (/), backslash (\), dot (.), underscore (_), colon (:), hyphen (-)
-        // This prevents any unexpected characters that could enable command injection
-        if (!execCanonical.matches("^[a-zA-Z0-9/\\\\._:\\-]+$")) {
-            throw new Exception("Binary path contains illegal characters (only alphanumeric, /, \\, ., _, :, - allowed): " + execCanonical);
-        }
-
-        // Ensure execCanonical is inside trusted base directory
-        if (!execCanonical.startsWith(baseCanonical + File.separator)) {
-            throw new Exception("Binary path is outside allowed base path: " + execCanonical);
-        }
-
-        // Final check: Ensure the binary exists and is executable
-        if (!binaryFile.exists() || !binaryFile.canExecute()) {
-            throw new Exception("Binary does not exist or is not executable: " + execCanonical);
-        }
 
         // Create ProcessBuilder with unmodifiable explicit command list (discrete tokens, no shell)
         // Uses: (1) execCanonical - fully validated absolute real path (no symlinks) with no user influence
