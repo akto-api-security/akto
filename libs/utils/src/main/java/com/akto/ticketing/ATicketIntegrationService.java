@@ -68,7 +68,6 @@ public abstract class ATicketIntegrationService<T> {
         int successCount = 0;
         int failCount = 0;
         int existingCount = 0;
-        String ticketFieldUrlName = getTicketUrlFieldName();
 
         List<TestingRunIssues> allIssues = TestingRunIssuesDao.instance.findAll(
             Filters.in(Constants.ID, testingIssuesIdList)
