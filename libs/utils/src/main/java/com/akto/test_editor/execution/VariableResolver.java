@@ -70,7 +70,7 @@ public class VariableResolver {
             return (List) keyContext;
         }
 
-        if (VariableResolver.isWordListVariable(key, varMap)) {
+        if (key instanceof String && VariableResolver.isWordListVariable(key, varMap)) {
             varList = (List) VariableResolver.resolveWordListVar(key.toString(), varMap);
             for (int i = 0; i < varList.size(); i++) {
                 List<Object> vals = VariableResolver.resolveExpression(varMap, varList.get(i).toString());
@@ -94,7 +94,7 @@ public class VariableResolver {
             List<Object> keyList = (List) key;
             int index = 0;
             for (Object k: keyList) {
-                List<Object> v = VariableResolver.resolveExpression(varMap, k.toString());
+                List<Object> v = VariableResolver.resolveExpression(varMap, k);
                 if (v != null && v.size() > 0) {
                     keyList.set(index, v.get(0).toString());
                 }

@@ -9,18 +9,23 @@ import com.google.protobuf.TextFormat;
 
 import java.util.*;
 import java.util.function.Supplier;
+import lombok.Getter;
+import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 
 public class HttpResponseParams {
 
     public enum Source {
-        HAR, PCAP, MIRRORING, SDK, OTHER, POSTMAN, OPEN_API, BURP
+        HAR, PCAP, MIRRORING, SDK, OTHER, POSTMAN, OPEN_API, BURP, IMPERVA
     }
 
     public String accountId;
     public String type; // HTTP/1.1
     public int statusCode; // 200
     public String status; // OK
+
+    @Getter
+    @Setter
     public Map<String, List<String>> headers = new HashMap<>();
     private String payload;
     private int time;
@@ -155,6 +160,10 @@ public class HttpResponseParams {
 
     public int getStatusCode() {
         return this.statusCode;
+    }
+
+    public void setStatusCode(int statusCode) {
+        this.statusCode = statusCode;
     }
 
     public Map<String, List<String>> getHeaders() {

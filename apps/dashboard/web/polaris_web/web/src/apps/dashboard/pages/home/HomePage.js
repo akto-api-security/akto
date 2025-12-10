@@ -3,15 +3,17 @@ import Header from "../../components/layouts/header/Headers"
 import LeftNav from "../../components/layouts/leftnav/LeftNav"
 import Store from "../../store";
 import { Outlet } from "react-router-dom";
+import PersistStore from "../../../main/PersistStore";
 
 function HomePage() {
 
   const leftNavCollapsed = Store(state => state.leftNavCollapsed)
+  const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
 
   const logo = {
     width: 78,
     topBarSource:
-      '/public/akto_name_with_logo.svg',
+      dashboardCategory === "Agentic Security" ? '/public/white_logo.svg' : '/public/akto_name_with_logo.svg',
     url: '/dashboard/observe/inventory',
     accessibilityLabel: 'Akto Icon',
   };

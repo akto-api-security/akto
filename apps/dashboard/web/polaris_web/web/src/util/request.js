@@ -15,6 +15,10 @@ const service = axios.create({
 })
 
 const err = async (error) => {
+  if (error?.config?.url && error.config.url.includes('api/fetchTestResultsStatsCount')) {
+    return Promise.reject(error)
+  }
+
   let status
   let data
   if(error.response) {
@@ -106,8 +110,10 @@ service.interceptors.request.use((config) => {
     contextSource = "API";
   } else if (currentCategory === "MCP Security") {
     contextSource = "MCP";
-  } else if (currentCategory === "Gen AI") {
-    contextSource = "GEN_AI";
+  } else if (currentCategory === "Agentic Security") {
+    contextSource = "AGENTIC";
+  } else if (currentCategory === "DAST") {
+    contextSource = "DAST"
   }
   config.headers['x-context-source'] = contextSource;
 

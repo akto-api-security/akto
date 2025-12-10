@@ -130,7 +130,7 @@ public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunR
 
         String dbName = Context.accountId.get()+"";
         createCollectionIfAbsent(dbName, getCollName(), new CreateCollectionOptions());
-        
+
         Bson testingRunIndex = Indexes.ascending(TestingRunResultSummary.TESTING_RUN_ID);
         createIndexIfAbsent(dbName, getCollName(), testingRunIndex, new IndexOptions().name("testingRunId_1"));
 
@@ -139,6 +139,13 @@ public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunR
 
         fieldNames = new String[]{TestingRunResultSummary.END_TIMESTAMP};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
+
+        Bson compoundIndex = Indexes.compoundIndex(
+                Indexes.ascending(TestingRunResultSummary.TESTING_RUN_ID),
+                Indexes.descending(TestingRunResultSummary.START_TIMESTAMP)
+        );
+        createIndexIfAbsent(dbName, getCollName(), compoundIndex,
+                new IndexOptions().name("testingRunId_1_startTimestamp_-1"));
 
         IndexOptions sparseIndex = new IndexOptions().sparse(true);
 
@@ -149,8 +156,29 @@ public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunR
 
     }
 
+    // Constants for time filters
+    public static final int DEFAULT_DELTA_IGNORE_TIME_SECONDS = 2 * 60 * 60; // 2 hours
+    public static final int STUCK_RUNNING_TEST_THRESHOLD_SECONDS = 20 * 60; // 20 minutes
+    public static final int CURRENT_RUNNING_TESTS_FILTER_TIME_SECONDS = 12 * 60 * 60; // 12 hours
+
+    /**
+     * Creates a filter for finding scheduled testing run result summaries that should have started.
+     * This matches filter1 used in Main.findPendingTestingRunResultSummary for scheduled summaries.
+     * 
+     * @param maxStartTimestamp Maximum start timestamp (typically current time or current time - buffer)
+     * @param minStartTimestamp Minimum start timestamp to avoid checking very old summaries (typically now - deltaIgnoreTime)
+     * @return Bson filter for scheduled testing run result summaries
+     */
+    public Bson createScheduledTestingRunResultSummaryFilter(int maxStartTimestamp, int minStartTimestamp) {
+        return Filters.and(
+            Filters.eq(TestingRunResultSummary.STATE, TestingRun.State.SCHEDULED),
+            Filters.lte(TestingRunResultSummary.START_TIMESTAMP, maxStartTimestamp),
+            Filters.gt(TestingRunResultSummary.START_TIMESTAMP, minStartTimestamp)
+        );
+    }
+
     public List<TestingRunResultSummary> getCurrentRunningTestsSummaries(){
-        int filterTime = Context.now() - 12 * 60 * 60;
+        int filterTime = Context.now() - CURRENT_RUNNING_TESTS_FILTER_TIME_SECONDS;
         List<TestingRunResultSummary> trrs = TestingRunResultSummariesDao.instance.findAll(
             Filters.and(
                 Filters.eq(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),

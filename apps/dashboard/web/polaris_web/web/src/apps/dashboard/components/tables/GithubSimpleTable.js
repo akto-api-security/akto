@@ -5,10 +5,20 @@ import tableFunc from "./transform";
 function GithubSimpleTable(props) {
 
     const [filters, setFilters] = useState([])
+
+
+    const tableKey = props.hardCodedKey ? "hardCodedKey" : `table_${props.data?.length || 0}`;
+    
+    const fetchFunction = props.prettifyPageData
+        ? (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) =>
+            tableFunc.fetchDataSyncWithLazyPrettify(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue, setFilters, props)
+        : (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) =>
+            tableFunc.fetchDataSync(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue, setFilters, props);
+
     return <GithubServerTable
-        key={JSON.stringify(props.data ? props.data : "{}")} // passing any value as a "key" re-renders the component when the value is changed.
+        key={tableKey}
         pageLimit={props.pageLimit}
-        fetchData={(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => tableFunc.fetchDataSync(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue, setFilters, props)}
+        fetchData={fetchFunction}
         sortOptions={props.sortOptions} 
         resourceName={props.resourceName} 
         filters={filters}
@@ -18,6 +28,7 @@ function GithubSimpleTable(props) {
         getActions = {props.getActions}
         hasRowActions={props.hasRowActions}
         loading={props.loading}
+        loadingText={props.loadingText}
         selectable = {props.selectable}
         rowClickable={props.rowClickable}
         promotedBulkActions = {props.promotedBulkActions}
@@ -46,6 +57,7 @@ function GithubSimpleTable(props) {
         isMultipleItemsSelected={props?.isMultipleItemsSelected}
         emptyStateMarkup={props?.emptyStateMarkup}
         calendarFilterKeys={props?.calendarFilterKeys}
+        supportsNegationFilter={true}
     />
 
 }

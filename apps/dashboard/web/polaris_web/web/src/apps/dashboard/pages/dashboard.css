@@ -102,6 +102,7 @@
    --color-tool: #49cc90;    /* green — active/action-oriented, like POST */
    --color-resource: #61affe; /* blue — data/info-oriented, like GET */
    --color-prompt: #bc6ff1;   /* purple — creative/conversational */
+   --color-server: #f59b42;   /* red — server/infrastructure-oriented */
 
    --color-disabled: #ebebeb ;
    --color-options: #0d5aa7 ;

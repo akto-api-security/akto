@@ -6,6 +6,7 @@ import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiAccessType;
+import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
@@ -70,6 +71,64 @@ public class Utils {
         return pattern.matcher(text).find();
     }
 
+    // Converts an Object to a list of strings, handling common cases of List or array inputs.
+    public static List<String> convertObjectToListOfString(Object obj) {
+        List<String> stringList = new ArrayList<>();
+        if (obj == null) {
+            return stringList;
+        }
+        try {
+            if (obj instanceof List) {
+                for (Object item : (List<?>) obj) {
+                    stringList.add(item != null ? item.toString() : null);
+                }
+            } else if (obj.getClass().isArray()) {
+                int len = java.lang.reflect.Array.getLength(obj);
+                for (int i = 0; i < len; i++) {
+                    Object item = java.lang.reflect.Array.get(obj, i);
+                    stringList.add(item != null ? item.toString() : null);
+                }
+            } else {
+                // fallback: treat the object as a single element
+                stringList.add(obj.toString());
+            }
+        } catch (Exception e) {
+            return stringList;
+        }
+        return stringList;
+    }
+
+    public static String extractHostHeader(HttpResponseParams responseParam) {
+        String host = "";
+        if (responseParam == null || responseParam.getRequestParams() == null) {
+            return host;
+        }
+        Map<String, List<String>> requestHeaders = responseParam.getRequestParams().getHeaders();
+        if (requestHeaders == null) {
+            return host;
+        }
+        List<String> hostValues = requestHeaders.get("host");
+        if (hostValues != null && !hostValues.isEmpty()) {
+            host = hostValues.get(0);
+        }
+        return host;
+    }
+
+    public static List<String> extractRegex(String payload, String regex) {
+        List<String> matches = new ArrayList<>();
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(payload);
+        while (matcher.find()) {
+            // If the regex has groups, add the first group; otherwise add the whole match
+            if (matcher.groupCount() >= 1) {
+                matches.add(matcher.group(1));
+            } else {
+                matches.add(matcher.group());
+            }
+        }
+        return matches;
+    }
+
     public static boolean deleteKeyFromPayload(Object obj, String parentKey, String queryKey) {
         boolean res = false;
         if (obj instanceof BasicDBObject) {
@@ -122,9 +181,26 @@ public class Utils {
         return data;
     }
 
+    private static Object parseNumericString(Object data) {
+        if (!(data instanceof String)) {
+            return data;
+        }
+        String dataStr = (String) data;
+        try {
+            return Integer.parseInt(dataStr);
+        } catch (NumberFormatException e) {
+            try {
+                return Double.parseDouble(dataStr);
+            } catch (NumberFormatException e2) {
+                return data;
+            }
+        }
+    }
+
     public static Boolean applyIneqalityOperation(Object data, Object querySet, String operator) {
         Boolean result = false;
         try {
+            data = parseNumericString(data);
             if (data instanceof Integer) {
                 List<Integer> queryList = (List) querySet;
                 if (queryList == null || queryList.size() == 0) {
@@ -552,6 +628,31 @@ public class Utils {
         return payload;
     }
 
+    public static ExecutorSingleOperationResp buildNewUrlForMcpRequest(UrlModifierPayload urlModifierPayload, RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey, Object key) {
+        try {
+            // the url in apiInfoKey is the tool name, apply the url modifier payload to the url
+            String originalToolUrl = apiInfoKey.getUrl();
+            if(originalToolUrl.contains("call")){
+                String toolName = originalToolUrl.split("call/")[1];
+                String newToolUrl = key.toString();
+                if(urlModifierPayload != null) {
+                    if (urlModifierPayload.getOperationType().equalsIgnoreCase("regex_replace") && urlModifierPayload.getRegex() != null && !urlModifierPayload.getRegex().equals("")){
+                        newToolUrl = Utils.applyRegexModifier(toolName, urlModifierPayload.getRegex(), urlModifierPayload.getReplaceWith());
+                    }else if(!urlModifierPayload.getOperationType().equalsIgnoreCase("token_replace")){
+                        return new ExecutorSingleOperationResp(false, "can't perform this operation on the url");
+                    }
+                }
+                // since the tool name is the name of the body param, we need to modify the body param
+                return Operations.modifyBodyParam(rawApi, "name", newToolUrl);
+            }else{
+                return new ExecutorSingleOperationResp(true, "");
+            }
+            
+        } catch (Exception e) {
+            return new ExecutorSingleOperationResp(false, e.getMessage());
+        }
+    }
+
     public static String buildNewUrl(UrlModifierPayload urlModifierPayload, String oldUrl) {
         String url = "";
         if (urlModifierPayload.getOperationType().equalsIgnoreCase("regex_replace") || urlModifierPayload.getOperationType().equalsIgnoreCase("token_replace")) {
@@ -856,7 +957,7 @@ public class Utils {
         return escaped.toString();
     }
 
-    public static ExecutorSingleOperationResp modifySampleDataUtil(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, ApiInfo.ApiInfoKey apiInfoKey){
+    public static ExecutorSingleOperationResp modifySampleDataUtil(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, ApiInfo.ApiInfoKey apiInfoKey, boolean isMcpRequest){
         switch (operationType.toLowerCase()) {
             case "add_body_param":
                 Object epochVal = Utils.getEpochTime(value);
@@ -871,12 +972,24 @@ public class Utils {
                 }
                 return Operations.modifyBodyParam(rawApi, key.toString(), value);
             case "delete_graphql_field":
+                if (isMcpRequest) {
+                    return new ExecutorSingleOperationResp(false, "Delete graphql field is not supported for MCP requests");
+                }
                 return Operations.deleteGraphqlField(rawApi, key == null ? "": key.toString());
             case "add_graphql_field":
+                if (isMcpRequest) {
+                    return new ExecutorSingleOperationResp(false, "Delete graphql field is not supported for MCP requests");
+                }
                 return Operations.addGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
             case "add_unique_graphql_field":
+                if (isMcpRequest) {
+                    return new ExecutorSingleOperationResp(false, "Delete graphql field is not supported for MCP requests");
+                }
                 return Operations.addUniqueGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
             case "modify_graphql_field":
+                if (isMcpRequest) {
+                    return new ExecutorSingleOperationResp(false, "Delete graphql field is not supported for MCP requests");
+                }
                 return Operations.modifyGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
             case "delete_body_param":
                 return Operations.deleteBodyParam(rawApi, key.toString());
@@ -940,8 +1053,12 @@ public class Utils {
             case "delete_query_param":
                 return Operations.deleteQueryParam(rawApi, key.toString());
             case "modify_url":
+                
                 String newUrl = null;
                 UrlModifierPayload urlModifierPayload = Utils.fetchUrlModifyPayload(key.toString());
+                if(isMcpRequest) {
+                    return Utils.buildNewUrlForMcpRequest(urlModifierPayload, rawApi, apiInfoKey, key);
+                }
                 if (urlModifierPayload != null) {
                     newUrl = Utils.buildNewUrl(urlModifierPayload, rawApi.getRequest().getUrl());
                 } else {
@@ -949,6 +1066,9 @@ public class Utils {
                 }
                 return Operations.modifyUrl(rawApi, newUrl);
             case "modify_method":
+                if(isMcpRequest) {
+                    return Operations.modifyMethod(rawApi, "POST");
+                }
                 return Operations.modifyMethod(rawApi, key.toString());
             default:
                 return new ExecutorSingleOperationResp(false, "invalid operationType");
@@ -1142,6 +1262,42 @@ public class Utils {
             responseBuilder.append("\n").append(responseBody);
         }
         return responseBuilder.toString();
+    }
+
+    /**
+     * Strips Byte Order Mark (BOM) from the beginning of a string.
+     * Common BOMs include:
+     * - UTF-8 BOM: \uFEFF (EF BB BF in bytes)
+     * - UTF-16 BE BOM: \uFEFF
+     * - UTF-16 LE BOM: \uFFFE
+     *
+     * @param input The input string that may contain a BOM
+     * @return The string with BOM removed if present, otherwise the original string
+     */
+    public static String stripBOM(String input) {
+        if (input == null || input.isEmpty()) {
+            return input;
+        }
+
+        // Check for UTF-8 BOM (most common in SOAP/XML)
+        if (input.charAt(0) == '\uFEFF') {
+            return input.substring(1);
+        }
+
+        // Check for UTF-16 LE BOM
+        if (input.charAt(0) == '\uFFFE') {
+            return input.substring(1);
+        }
+
+        // Check for byte sequence representation (ï»¿ is the display of UTF-8 BOM)
+        if (input.length() >= 3 &&
+            input.charAt(0) == 'ï' &&
+            input.charAt(1) == '»' &&
+            input.charAt(2) == '¿') {
+            return input.substring(3);
+        }
+
+        return input;
     }
 
     public final static String _MAGIC = "$magic";

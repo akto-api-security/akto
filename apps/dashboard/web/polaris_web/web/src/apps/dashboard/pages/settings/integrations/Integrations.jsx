@@ -13,6 +13,7 @@ import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs';
 import { useNavigate} from 'react-router-dom'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards';
 import func from "@/util/func"
+import { isAgenticSecurityCategory, isMCPSecurityCategory } from '../../../../main/labelHelper'
 
 function Integrations() {
 
@@ -80,6 +81,16 @@ function Integrations() {
       name:'Azure Boards',
       source: '/public/azure-boards.svg'
     }
+    let serviceNowObj={
+      id: 'servicenow',
+      name:'ServiceNow',
+      source: '/public/servicenow.svg'
+    }
+    let devRevObj={
+      id: 'devrev',
+      name:'DevRev',
+      source: '/public/devrev-ai.svg'
+    }
     let jenkinsObj={
       id: `jenkins`,
       name: "Jenkins",
@@ -137,6 +148,12 @@ function Integrations() {
       id: 'agents',
       name:'Agents',
       source: '/public/wizard.svg'
+    }
+
+    let mcpRegistryObj ={
+      id: 'mcp_registry',
+      name:'MCP Registry',
+      source: '/public/mcp.svg'
     }
 
     let awsWafObj ={
@@ -217,9 +234,9 @@ function Integrations() {
     const trafficItems = [burpSuiteObj, postmanObj];
     const reportingItems = [githubAppObj];
     const cicdItems = [jenkinsObj, azuredevopsObj, gitlabObj, githubactionsObj, ciCdObj];
-    const aiItems = [aktoGptObj, agentConfigObj];
+    const aiItems = [aktoGptObj, agentConfigObj, mcpRegistryObj];
     const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj, gmailWebhooksObj];
-    const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj];
+    const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj, serviceNowObj, devRevObj];
     const wafItems = [awsWafObj, f5WafObj, cloudflareWafObj];
     const siemItems = [splunkObj];
     switch (tabId) {

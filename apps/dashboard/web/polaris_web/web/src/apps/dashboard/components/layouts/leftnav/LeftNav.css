@@ -18,3 +18,8 @@
     height: calc(100% - 70px);
     overflow-y: hidden !important;
 }
+
+/* Agentic Security left nav */
+body:has(.agentic-security-nav) .Polaris-Navigation {
+    background: #ffffff !important;
+}
