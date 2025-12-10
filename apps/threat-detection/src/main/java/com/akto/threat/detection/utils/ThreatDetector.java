@@ -214,6 +214,10 @@ public class ThreatDetector {
             return false;
         }
 
+        if(!Utils.extractHostHeader(httpResponseParams).equalsIgnoreCase("api.stage.store.ignite.harman.com")){
+            return false;
+        }
+
         // Extract userId from URL
         String url = httpResponseParams.getRequestParams().getURL();
         List<String> matches = Utils.extractRegex(url, USER_ID_URL_REGEX);
