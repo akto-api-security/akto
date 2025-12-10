@@ -167,11 +167,12 @@ public class YamlNodeExecutor extends NodeExecutor {
                         memory.reset(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
                     }
                     tsAfterReq = Context.nowInMillis();
-                    responseTimeArr.add(tsAfterReq - tsBeforeReq);
+                    int responseTime = tsAfterReq - tsBeforeReq;
+                    responseTimeArr.add(responseTime);
                     ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
                     res = executor.validate(attempt, sampleRawApi, varMap, logId, validatorNode, yamlNodeDetails.getApiInfoKey());
                     try {
-                        message.add(convertOriginalReqRespToString(testReq.getRequest(), testResponse));
+                        message.add(convertOriginalReqRespToString(testReq.getRequest(), testResponse, responseTime));
                     } catch (Exception e) {
                         ;
                     }
