@@ -14,9 +14,9 @@ export const CONNECTOR_NAME_LANGCHAIN = 'Langchain';
 export const CONNECTOR_NAME_COPILOT_STUDIO = 'Copilot Studio';
 
 // Documentation URLs
-export const DOCS_URL_N8N = 'https://docs.akto.io/n8n-import';
-export const DOCS_URL_LANGCHAIN = 'https://docs.akto.io/langchain-import';
-export const DOCS_URL_COPILOT_STUDIO = 'https://docs.akto.io/copilot-studio-import';
+export const DOCS_URL_N8N = 'https://docs.akto.io/traffic-connector/workflow-automation/n8n';
+export const DOCS_URL_LANGCHAIN = 'https://docs.akto.io/traffic-connector/workflow-automation/langchain';
+export const DOCS_URL_COPILOT_STUDIO = 'https://docs.akto.io/traffic-connector/workflow-automation/copilot-studio';
 
 // Recurring Interval Seconds (in seconds)
 export const INTERVAL_N8N = 300; // 5 minutes
