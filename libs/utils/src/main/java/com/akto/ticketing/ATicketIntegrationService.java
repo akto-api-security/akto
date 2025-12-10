@@ -186,21 +186,7 @@ public abstract class ATicketIntegrationService<T> {
     }
 
     protected String buildResultMessage(int totalIssues, int successCount, int failCount, int existingCount) {
-        if (successCount == 0 && failCount == 0 && existingCount == totalIssues) {
-            return "All issues already have " + getIntegrationName() + " tickets.";
-        }
-
-        if (successCount == totalIssues && failCount == 0) {
-            return String.format("Successfully created %d %s ticket%s.",
-                successCount, getIntegrationName(), successCount > 1 ? "s" : "");
-        }
-
-        if (successCount == 0 && failCount == totalIssues) {
-            return String.format("Failed to create %d %s ticket%s.",
-                failCount, getIntegrationName(), failCount > 1 ? "s" : "");
-        }
-
-        return String.format("Created %d, failed %d, already existed %d.",
+        return String.format("Successfully created %d tickets. Failed %d. Already existed %d.",
             successCount, failCount, existingCount);
     }
 
