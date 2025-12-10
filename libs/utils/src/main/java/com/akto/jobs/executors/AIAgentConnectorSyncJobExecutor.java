@@ -19,7 +19,12 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import static com.akto.jobs.executors.AIAgentConnectorConstants.*;
+import static com.akto.jobs.executors.AIAgentConnectorConstants.BINARY_BASE_PATH;
+import static com.akto.jobs.executors.AIAgentConnectorConstants.BINARY_TIMEOUT_SECONDS;
+import static com.akto.jobs.executors.AIAgentConnectorConstants.AZURE_CONNECTION_STRING_ENV;
+import static com.akto.jobs.executors.AIAgentConnectorConstants.AZURE_BLOB_URL_ENV;
+import static com.akto.jobs.executors.AIAgentConnectorConstants.AZURE_CONTAINER_NAME;
+import static com.akto.jobs.executors.AIAgentConnectorUtils.isValidConnectorType;
 import com.akto.jobs.executors.strategy.AIAgentConnectorStrategy;
 import com.akto.jobs.executors.strategy.AIAgentConnectorStrategyFactory;
 
@@ -42,9 +47,7 @@ public class AIAgentConnectorSyncJobExecutor extends JobExecutor<AIAgentConnecto
         logger.info("Running AI Agent Connector Sync Job for connector type: {}", connectorType);
 
         // Validate connector type
-        if (!CONNECTOR_TYPE_N8N.equals(connectorType) &&
-            !CONNECTOR_TYPE_LANGCHAIN.equals(connectorType) &&
-            !CONNECTOR_TYPE_COPILOT_STUDIO.equals(connectorType)) {
+        if (!isValidConnectorType(connectorType)) {
             throw new Exception("Unsupported connector type: " + connectorType);
         }
 

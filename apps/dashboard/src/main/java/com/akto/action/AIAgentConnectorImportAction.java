@@ -14,7 +14,18 @@ import lombok.Setter;
 import java.util.HashMap;
 import java.util.Map;
 
-import static com.akto.action.AIAgentConnectorConstants.*;
+import static com.akto.jobs.executors.AIAgentConnectorConstants.CONNECTOR_TYPE_N8N;
+import static com.akto.jobs.executors.AIAgentConnectorConstants.CONNECTOR_TYPE_LANGCHAIN;
+import static com.akto.jobs.executors.AIAgentConnectorConstants.CONNECTOR_TYPE_COPILOT_STUDIO;
+import static com.akto.jobs.executors.AIAgentConnectorConstants.CONFIG_DATA_INGESTION_SERVICE_URL;
+import static com.akto.jobs.executors.AIAgentConnectorConstants.CONFIG_N8N_BASE_URL;
+import static com.akto.jobs.executors.AIAgentConnectorConstants.CONFIG_N8N_API_KEY;
+import static com.akto.jobs.executors.AIAgentConnectorConstants.CONFIG_LANGSMITH_BASE_URL;
+import static com.akto.jobs.executors.AIAgentConnectorConstants.CONFIG_LANGSMITH_API_KEY;
+import static com.akto.jobs.executors.AIAgentConnectorConstants.CONFIG_APPINSIGHTS_APP_ID;
+import static com.akto.jobs.executors.AIAgentConnectorConstants.CONFIG_APPINSIGHTS_API_KEY;
+import static com.akto.jobs.executors.AIAgentConnectorConstants.DEFAULT_RECURRING_INTERVAL_SECONDS;
+import static com.akto.jobs.executors.AIAgentConnectorUtils.isValidConnectorType;
 
 /**
  * Unified action for importing AI Agent Connector data (N8N, Langchain, Copilot Studio).
@@ -95,15 +106,6 @@ public class AIAgentConnectorImportAction extends UserAction {
             loggerMaker.error("Error initiating " + connectorType + " import: " + e.getMessage(), LogDb.DASHBOARD);
             return Action.ERROR.toUpperCase();
         }
-    }
-
-    /**
-     * Validates if the connector type is supported.
-     */
-    private boolean isValidConnectorType(String type) {
-        return CONNECTOR_TYPE_N8N.equals(type) ||
-               CONNECTOR_TYPE_LANGCHAIN.equals(type) ||
-               CONNECTOR_TYPE_COPILOT_STUDIO.equals(type);
     }
 
     /**
