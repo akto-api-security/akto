@@ -1259,8 +1259,10 @@ function ApiEndpoints(props) {
     
     const [showDeleteApiModal, setShowDeleteApiModal] = useState(false)
     const [showApiGroupModal, setShowApiGroupModal] = useState(false)
+    const [showBulkDeMergeModal, setShowBulkDeMergeModal] = useState(false)
     const [apis, setApis] = useState([])
     const [actionOperation, setActionOperation] = useState(Operation.ADD)
+    const [deMergingInProgress, setDeMergingInProgress] = useState(false)
 
     function handleApiGroupAction(selectedResources, operation){
 
@@ -1271,6 +1273,49 @@ function ApiEndpoints(props) {
 
     function toggleApiGroupModal(){
         setShowApiGroupModal(false);
+    }
+
+    function handleBulkDeMerge(selectedResources){
+        // Filter only merged APIs (those containing INTEGER, STRING, OBJECT_ID, or VERSIONED)
+        const mergedApis = selectedResources.filter(resource => {
+            const parts = resource.split('###')
+            const endpoint = parts[1]
+            return endpoint && (endpoint.includes("STRING") || endpoint.includes("INTEGER") || endpoint.includes("FLOAT") || endpoint.includes("OBJECT_ID") || endpoint.includes("VERSIONED"))
+        })
+
+        if (mergedApis.length === 0) {
+            func.setToast(true, true, "No merged APIs selected. Only merged APIs can be de-merged.")
+            return
+        }
+
+        setApis(mergedApis)
+        setShowBulkDeMergeModal(true)
+    }
+
+    function deMergeBulkApisAction(){
+        setShowBulkDeMergeModal(false)
+        setDeMergingInProgress(true)
+
+        const apiObjects = apis.map((x) => {
+            let tmp = x.split("###")
+            return {
+                method: tmp[0],
+                url: tmp[1],
+                apiCollectionId: parseInt(tmp[2])
+            }
+        })
+
+        api.bulkDeMergeApis(apiObjects).then(resp => {
+            setDeMergingInProgress(false)
+            func.setToast(true, false, `Successfully de-merged ${apiObjects.length} API(s). Refresh to see the changes.`)
+            // Optionally refresh the data
+            setTimeout(() => {
+                fetchData()
+            }, 1000)
+        }).catch(err => {
+            setDeMergingInProgress(false)
+            func.setToast(true, true, "There was an error de-merging the APIs. Please try again or contact support@akto.io")
+        })
     }
 
     const promotedBulkActions = (selectedResources) => {
@@ -1294,6 +1339,12 @@ function ApiEndpoints(props) {
                 onAction: () => handleApiGroupAction(selectedResources, Operation.ADD)
             })
         }
+
+        // Add bulk de-merge option
+        ret.push({
+            content: 'De-merge ' + mapLabel('APIs', getDashboardCategory()),
+            onAction: () => handleBulkDeMerge(selectedResources)
+        })
 
         if (window.USER_NAME && window.USER_NAME.endsWith("@akto.io")) {
             ret.push({
@@ -1325,7 +1376,7 @@ function ApiEndpoints(props) {
     let deleteApiModal = (
         <Modal
             open={showDeleteApiModal}
-            onClose={() => setShowApiGroupModal(false)}
+            onClose={() => setShowDeleteApiModal(false)}
             title="Confirm"
             primaryAction={{
                 content: 'Yes',
@@ -1335,6 +1386,39 @@ function ApiEndpoints(props) {
         >
             <Modal.Section>
                 <Text>Are you sure you want to delete {(apis || []).length} API(s)?</Text>
+            </Modal.Section>
+        </Modal>
+    )
+
+    let bulkDeMergeModal = (
+        <Modal
+            open={showBulkDeMergeModal}
+            onClose={() => setShowBulkDeMergeModal(false)}
+            title="Confirm Bulk De-merge"
+            primaryAction={{
+                content: 'De-merge',
+                onAction: deMergeBulkApisAction,
+                loading: deMergingInProgress
+            }}
+            secondaryActions={[
+                {
+                    content: 'Cancel',
+                    onAction: () => setShowBulkDeMergeModal(false)
+                }
+            ]}
+            key="bulk-demerge-modal"
+        >
+            <Modal.Section>
+                <VerticalStack gap="4">
+                    <Text>Are you sure you want to de-merge {(apis || []).length} merged API(s)?</Text>
+                    <Text variant="bodyMd" color="subdued">
+                        This will split the merged endpoints back into their original forms. For example,
+                        <Text as="span" fontWeight="semibold"> /api/products/INTEGER/reviews </Text>
+                        will be split into individual endpoints like
+                        <Text as="span" fontWeight="semibold"> /api/products/24/reviews</Text>,
+                        <Text as="span" fontWeight="semibold"> /api/products/53/reviews</Text>, etc.
+                    </Text>
+                </VerticalStack>
             </Modal.Section>
         </Modal>
     )
@@ -1436,7 +1520,8 @@ function ApiEndpoints(props) {
                       fetchData={fetchData}
                   />,
                   modal,
-                  deleteApiModal
+                  deleteApiModal,
+                  bulkDeMergeModal
             ]
         )
       ]
