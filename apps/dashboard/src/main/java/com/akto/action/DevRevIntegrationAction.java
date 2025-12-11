@@ -2,12 +2,14 @@ package com.akto.action;
 
 import com.akto.devrev.DevRevIntegrationService;
 import com.akto.dto.devrev_integration.DevRevIntegration;
+import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.log.LoggerMaker;
+import com.akto.ticketing.ATicketIntegrationService.TicketCreationResult;
 import com.opensymphony.xwork2.Action;
+import java.util.List;
+import java.util.Map;
 import lombok.Getter;
 import lombok.Setter;
-
-import java.util.Map;
 
 @Getter
 @Setter
@@ -19,6 +21,11 @@ public class DevRevIntegrationAction extends UserAction {
     private String personalAccessToken;
     private DevRevIntegration devrevIntegration;
     private Map<String, String> partsIdToNameMap;
+    private List<TestingIssuesId> testingIssuesIdList;
+    private String partId;
+    private String workItemType;
+    private String errorMessage;
+    private String aktoDashboardHost;
 
     public String addDevRevIntegration() {
         try {
@@ -35,7 +42,7 @@ public class DevRevIntegrationAction extends UserAction {
     public String fetchDevRevIntegration() {
         try {
             DevRevIntegrationService devRevService = new DevRevIntegrationService();
-            devrevIntegration = devRevService.fetchIntegration();
+            devrevIntegration = devRevService.fetchDevRevIntegration();
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             logger.errorAndAddToDb("Error fetching DevRev integration: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
@@ -63,6 +70,21 @@ public class DevRevIntegrationAction extends UserAction {
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             logger.errorAndAddToDb("Error removing DevRev integration: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            addActionError(e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    public String createDevRevTickets() {
+        try {
+            DevRevIntegrationService devRevService = new DevRevIntegrationService();
+            TicketCreationResult result = devRevService.createTickets(testingIssuesIdList, partId, workItemType, aktoDashboardHost);
+
+            this.errorMessage = result.getMessage();
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Error creating DevRev tickets: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             addActionError(e.getMessage());
             return Action.ERROR.toUpperCase();
         }

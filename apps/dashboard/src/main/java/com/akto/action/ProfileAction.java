@@ -138,6 +138,15 @@ public class ProfileAction extends UserAction {
         } catch (Exception e) {
         }
 
+        boolean devrevIntegrated = false;
+        try {
+            long documentCount = DevRevIntegrationDao.instance.estimatedDocumentCount();
+            if (documentCount > 0) {
+                devrevIntegrated = true;
+            }
+        } catch (Exception e) {
+        }
+
         InitializerListener.insertStateInAccountSettings(accountSettings);
 
         Organization organization = OrganizationsDao.instance.findOne(
@@ -178,6 +187,7 @@ public class ProfileAction extends UserAction {
                 .append("jiraIntegrated", jiraIntegrated)
                 .append("azureBoardsIntegrated", azureBoardsIntegrated)
                 .append("servicenowIntegrated", servicenowIntegrated)
+                .append("devrevIntegrated", devrevIntegrated)
                 .append("userRole", userRole.toString().toUpperCase())
                 .append("currentTimeZone", timeZone)
                 .append("organizationName", orgName)
