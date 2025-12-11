@@ -801,7 +801,7 @@ public class DbLayer {
         return serviceName.equals(miniTestingName) ? miniTestingName : null;
     }
 
-    public static TestingRun findPendingTestingRun(int delta, String miniTestingName) {
+    public static TestingRun findPendingTestingRunBase(Bson baseFilter, int delta, String miniTestingName) {
         try {
             Bson filter = Filters.or(
                 Filters.and(
@@ -813,6 +813,10 @@ public class DbLayer {
                     Filters.lte(TestingRun.PICKED_UP_TIMESTAMP, delta)
                 )
             );
+
+            if(baseFilter != null) {
+                filter = Filters.and(filter, baseFilter);
+            }
 
             TestingRun testingRun = TestingRunDao.instance.findOne(
                 filter,
@@ -892,6 +896,27 @@ public class DbLayer {
             );
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error in findPendingTestingRun: " + e.getMessage());
+            return null;
+        }
+    }
+    
+    public static TestingRun findPendingTestingRun(int delta, String miniTestingName) {
+        return findPendingTestingRunBase(null, delta, miniTestingName);
+    }
+
+    public static TestingRun findPendingAgenticTestingRun(int delta, String miniTestingName) {
+        try {
+            List<Integer> apiCollectionIds = ApiCollectionsDao.instance.findAll(
+                    Filters.elemMatch(ApiCollection.TAGS_STRING,
+                            Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG)),
+                    Projections.include(ApiCollection.ID)).stream().map(ApiCollection::getId)
+                    .collect(Collectors.toList());
+            Bson filter = Filters.or(
+                    Filters.in(TestingRun._API_COLLECTION_ID, apiCollectionIds),
+                    Filters.in(TestingRun._API_COLLECTION_ID_IN_LIST, apiCollectionIds));
+            return findPendingTestingRunBase(filter, delta, miniTestingName);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error in findPendingAgenticTestingRun: " + e.getMessage());
             return null;
         }
     }
