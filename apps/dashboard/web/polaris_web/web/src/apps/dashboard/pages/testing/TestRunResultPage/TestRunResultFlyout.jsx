@@ -5,7 +5,8 @@ import transform from '../transform'
 import SampleDataList from '../../../components/shared/SampleDataList'
 import SampleData from '../../../components/shared/SampleData'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
-import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link, Modal, TextField} from '@shopify/polaris'
+import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link} from '@shopify/polaris'
+import CompulsoryDescriptionModal from "../../issues/components/CompulsoryDescriptionModal.jsx"
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
 import testingApi from "../api"
@@ -361,28 +362,28 @@ function TestRunResultFlyout(props) {
         const issuesActions = issueDetails?.testRunIssueStatus === "IGNORED" ? [...issues, ...reopen] : issues
         return(
             issueDetails?.id &&
-        <Popover
-            activator={<Button disclosure onClick={() => setPopoverActive(!popoverActive)}>Triage</Button>}
-            active={popoverActive}
-            onClose={() => setPopoverActive(false)}
-            autofocusTarget="first-node"
-            preferredPosition="below"
-            preferredAlignment="left"
-        >
-            <Popover.Pane fixed>
-                <Popover.Section>
-                    <VerticalStack gap={"4"}>
-                        {issuesActions.map((issue, index) => {
-                            return(
-                                <div style={{cursor: 'pointer'}} onClick={() => {issue.onAction(); setPopoverActive(false)}} key={index}>
-                                    {issue.content}
-                                </div>
-                            )
-                        })}
-                    </VerticalStack>
-                </Popover.Section>
-            </Popover.Pane>
-        </Popover>
+            <Popover
+                activator={<Button disclosure onClick={() => setPopoverActive(!popoverActive)}>Triage</Button>}
+                active={popoverActive}
+                onClose={() => setPopoverActive(false)}
+                autofocusTarget="first-node"
+                preferredPosition="below"
+                preferredAlignment="left"
+            >
+                <Popover.Pane fixed>
+                    <Popover.Section>
+                        <VerticalStack gap={"4"}>
+                            {issuesActions.map((issue, index) => {
+                                return(
+                                    <div style={{cursor: 'pointer'}} onClick={() => {issue.onAction(); setPopoverActive(false)}} key={index}>
+                                        {issue.content}
+                                    </div>
+                                )
+                            })}
+                        </VerticalStack>
+                    </Popover.Section>
+                </Popover.Pane>
+            </Popover>
     )}
     function TitleComponent() {
         const severity = (selectedTestRunResult && selectedTestRunResult.vulnerable) ? issueDetails.severity : ""
@@ -836,50 +837,26 @@ function TestRunResultFlyout(props) {
 
     return (
         <>
-            <FlyLayout
-                title={title}
-                show={showDetails}
-                setShow={setShowDetails}
-                components={currentComponents}
-                loading={loading}
-                showDivider={true}
-                newComp={true}
-                handleClose={handleClose}
-                isHandleClose={true}
-            />
-            <Modal
-                open={compulsoryDescriptionModal}
-                onClose={() => setCompulsoryDescriptionModal(false)}
-                title="Description Required"
-                primaryAction={{
-                    content: modalLoading ? 'Loading...' : 'Confirm',
-                    onAction: handleIgnoreWithDescription,
-                    disabled: mandatoryDescription.trim().length === 0 || modalLoading
-                }}
-                secondaryActions={[
-                    {
-                        content: 'Cancel',
-                        onAction: () => setCompulsoryDescriptionModal(false)
-                    }
-                ]}
-            >
-                <Modal.Section>
-                    <VerticalStack gap="4">
-                        <Text variant="bodyMd">
-                            A description is required for this action based on your account settings. Please provide a reason for marking this issue as "{pendingIgnoreAction?.ignoreReason}".
-                        </Text>
-                        <TextField
-                            label="Description"
-                            value={mandatoryDescription}
-                            onChange={setMandatoryDescription}
-                            multiline={4}
-                            autoComplete="off"
-                            placeholder="Please provide a description for this action..."
-                            disabled={modalLoading}
-                        />
-                    </VerticalStack>
-                </Modal.Section>
-            </Modal>
+        <FlyLayout
+            title={title}
+            show={showDetails}
+            setShow={setShowDetails}
+            components={currentComponents}
+            loading={loading}
+            showDivider={true}
+            newComp={true}
+            handleClose={handleClose}
+            isHandleClose={true}
+        />
+        <CompulsoryDescriptionModal
+            open={compulsoryDescriptionModal}
+            onClose={() => setCompulsoryDescriptionModal(false)}
+            onConfirm={handleIgnoreWithDescription}
+            reasonLabel={pendingIgnoreAction?.ignoreReason}
+            description={mandatoryDescription}
+            onChangeDescription={setMandatoryDescription}
+            loading={modalLoading}
+        />
         </>
     )
 }
