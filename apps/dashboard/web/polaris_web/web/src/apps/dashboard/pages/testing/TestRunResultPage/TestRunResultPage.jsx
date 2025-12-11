@@ -12,6 +12,7 @@ import TestRunResultFlyout from './TestRunResultFlyout';
 import LocalStore from '../../../../main/LocalStorageStore';
 import observeFunc from "../../observe/transform"
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
+import issuesApi from "../../issues/api";
 
 let headerDetails = [
   {
@@ -236,6 +237,21 @@ function TestRunResultPage(props) {
 
   }
 
+  async function createDevRevTicket(issueId, partId, workItemType) {
+    setToast(true, false, "Creating DevRev Ticket")
+
+    await issuesApi.createDevRevTickets([issueId], partId, workItemType, window.location.origin).then(async(res) => {
+      await fetchData();
+      if(res?.errorMessage) {
+        setToast(true, false, res.errorMessage)
+      } else {
+        setToast(true, false, "DevRev Ticket Created, scroll down to view")
+      }
+    }).catch((err) => {
+      setToast(true, true, err?.response?.data?.errorMessage || "Error creating DevRev ticket")
+    })
+  }
+
   async function setData(testingRunResult, runIssues) {
     
     let tmp = testSubCategoryMap ? testSubCategoryMap : subCategoryMap
@@ -289,6 +305,7 @@ function TestRunResultPage(props) {
       getDescriptionText={getDescriptionText}
       infoState={infoState}
       createJiraTicket={createJiraTicket}
+      createDevRevTicket={createDevRevTicket}
       jiraIssueUrl={jiraIssueUrl}
       hexId={hexId}
       source={props?.source}

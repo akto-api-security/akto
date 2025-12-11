@@ -30,7 +30,7 @@ import LegendLabel from './LegendLabel.jsx'
 function TestRunResultFlyout(props) {
 
 
-    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, showForbidden} = props
+    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, showForbidden} = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
@@ -342,22 +342,13 @@ function TestRunResultFlyout(props) {
         setDevRevModalActive(!devrevModalActive)
     }
 
-    const handleDevRevTicketCreation = async() => {
+    const handleDevRevTicketCreation = async(issueId, labels) => {
         if(devrevPartId && devrevPartId.length > 0){
-            func.setToast(true, false, "Please wait while we create your DevRev ticket.")
-            await issuesApi.createDevRevTickets([issueDetails.id], devrevPartId, devrevWorkItemType, window.location.origin).then((res) => {
-                if(res?.errorMessage) {
-                    func.setToast(true, false, res?.errorMessage)
-                } else {
-                    func.setToast(true, false, "DevRev ticket created successfully")
-                }
-            }).catch((err) => {
-                func.setToast(true, true, err?.response?.data?.errorMessage || "Error creating DevRev ticket")
-            })
+            await createDevRevTicket(issueDetails.id, devrevPartId, devrevWorkItemType)
+            setDevRevModalActive(false)
         } else {
             func.setToast(true, true, "Invalid DevRev part")
         }
-        setDevRevModalActive(false)
     }
 
     const issues = [{
