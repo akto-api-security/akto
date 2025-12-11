@@ -6,7 +6,8 @@ import Store from "../../../store";
 import func from "@/util/func";
 import { MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
-import { ActionList, Button, HorizontalGrid, HorizontalStack, IndexFiltersMode, Popover, Modal, TextField, Text, VerticalStack } from "@shopify/polaris";
+import { ActionList, Button, HorizontalGrid, HorizontalStack, IndexFiltersMode, Popover, TextField, Text, VerticalStack } from "@shopify/polaris";
+import CompulsoryDescriptionModal from "../components/CompulsoryDescriptionModal.jsx";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
@@ -1029,39 +1030,15 @@ function IssuesPage() {
                 isDevRevModal={true}
             />
 
-            <Modal
+            <CompulsoryDescriptionModal
                 open={compulsoryDescriptionModal}
                 onClose={() => setCompulsoryDescriptionModal(false)}
-                title="Description Required"
-                primaryAction={{
-                    content: modalLoading ? 'Loading...' : 'Confirm',
-                    onAction: handleIgnoreWithDescription,
-                    disabled: mandatoryDescription.trim().length === 0 || modalLoading
-                }}
-                secondaryActions={[
-                    {
-                        content: 'Cancel',
-                        onAction: () => setCompulsoryDescriptionModal(false)
-                    }
-                ]}
-            >
-                <Modal.Section>
-                    <VerticalStack gap="4">
-                        <Text variant="bodyMd">
-                            A description is required for this action based on your account settings. Please provide a reason for marking these issues as "{pendingIgnoreAction?.reason}".
-                        </Text>
-                        <TextField
-                            label="Description"
-                            value={mandatoryDescription}
-                            onChange={setMandatoryDescription}
-                            multiline={4}
-                            autoComplete="off"
-                            placeholder="Please provide a description for this action..."
-                            disabled={modalLoading}
-                        />
-                    </VerticalStack>
-                </Modal.Section>
-            </Modal>
+                onConfirm={handleIgnoreWithDescription}
+                reasonLabel={pendingIgnoreAction?.reason}
+                description={mandatoryDescription}
+                onChangeDescription={setMandatoryDescription}
+                loading={modalLoading}
+            />
         </>
     )
 }

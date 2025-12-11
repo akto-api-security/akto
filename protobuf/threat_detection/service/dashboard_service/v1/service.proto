@@ -342,6 +342,7 @@ message RatelimitConfig {
 message ThreatConfiguration {
   Actor actor = 1;
   RatelimitConfig ratelimit_config = 2;
+  int32 archival_days = 3;
 }
 
 message ApiDistributionDataRequestPayload {
