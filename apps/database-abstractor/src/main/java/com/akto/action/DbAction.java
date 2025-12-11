@@ -1663,6 +1663,17 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String findPendingAgenticTestingRun() {
+        try {
+            testingRun = DbLayer.findPendingAgenticTestingRun(delta, miniTestingName);
+            updateTestingRunApisList(testingRun);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in findPendingTestingRun " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String findPendingTestingRunResultSummary() {
         try {
             trrs = DbLayer.findPendingTestingRunResultSummary(now, delta, miniTestingName);

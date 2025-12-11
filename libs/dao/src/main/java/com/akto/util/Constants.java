@@ -38,4 +38,5 @@ public class Constants {
     public static final String MERGING_ALLOWED_TAG_KEY = "privatecloud.agoda.com/service";
     public static final List<String> MERGING_ALLOWED_TAG_VALUES = Arrays.asList("agoda-routing");
     public static final List<String> MERGING_ALLOWED_TAG_SUBSTRINGS = Arrays.asList("proxy", "gateway");
+    public static final String AKTO_GEN_AI_TAG = "gen-ai";
 }
