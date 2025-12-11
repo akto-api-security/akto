@@ -282,7 +282,6 @@ function CompliancePage() {
                     setCompulsorySettings(resp.compulsoryDescription);
                 }
             } catch (error) {
-                console.error("Error fetching compulsory settings:", error);
             }
         };
         fetchCompulsorySettings();

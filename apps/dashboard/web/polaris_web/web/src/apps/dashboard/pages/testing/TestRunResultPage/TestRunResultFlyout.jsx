@@ -133,7 +133,6 @@ function TestRunResultFlyout(props) {
                 props.setIssueDetails({ ...issueDetails, description: editDescription });
             }
         } catch (err) {
-            console.error("Failed to save description:", err);
             func.setToast(true, true, "Failed to save description");
         }
     }
@@ -161,7 +160,7 @@ function TestRunResultFlyout(props) {
                     setCompulsorySettings(resp.compulsoryDescription);
                 }
             } catch (error) {
-                console.error("Error fetching compulsory settings:", error);
+                
             }
         };
         fetchCompulsorySettings();
@@ -191,7 +190,6 @@ function TestRunResultFlyout(props) {
                 setPendingIgnoreAction(null);
                 setMandatoryDescription("");
             }).catch((err) => {
-                console.error("Failed to update description:", err);
                 func.setToast(true, true, "Failed to update description");
             });
         }
