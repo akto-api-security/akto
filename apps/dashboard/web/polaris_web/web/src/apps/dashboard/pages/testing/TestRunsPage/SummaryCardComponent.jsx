@@ -8,6 +8,7 @@ import TestRunOverTimeGraph from './TestRunOverTimeGraph';
 import CategoryWiseScoreGraph from './CategoryWiseScoreGraph';
 import { isApiSecurityCategory, isDastCategory } from '../../../../main/labelHelper';
 import func from '@/util/func';
+import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 
 // Memoize only the child components that make API calls to prevent unnecessary re-renders
 const MemoizedApiCollectionCoverageGraph = memo(ApiCollectionCoverageGraph);
@@ -21,7 +22,8 @@ const SummaryCardComponent = ({
   collapsible, 
   setCollapsible, 
   startTimestamp, 
-  endTimestamp 
+  endTimestamp,
+  loading
 }) => {
   const totalVulnerabilities = (severityMap?.CRITICAL?.text || 0) + 
                               (severityMap?.HIGH?.text || 0) + 
@@ -30,12 +32,33 @@ const SummaryCardComponent = ({
   
   const iconSource = collapsible ? ChevronUpMinor : ChevronDownMinor;
   
+  // Convert keys from CAPS_SNAKE_CASE to PascalCase (first letter capitalized)
+  const subCategoryInfoCamel = React.useMemo(() => {
+    if (!subCategoryInfo || Object.keys(subCategoryInfo).length === 0) {
+      return subCategoryInfo;
+    }
+    const converted = {};
+    Object.entries(subCategoryInfo).forEach(([key, value]) => {
+      const camelKey = func.capsSnakeToCamel(key);
+      const pascalKey = camelKey.charAt(0).toUpperCase() + camelKey.slice(1);
+      converted[pascalKey] = value;
+    });
+    return converted;
+  }, [subCategoryInfo]);
+
   return (
     <LegacyCard>
       <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued">Vulnerabilities</Text>}>
         <HorizontalStack align="space-between">
           <Text fontWeight="semibold" variant="bodyMd">Found {totalVulnerabilities} vulnerabilities in total</Text>
-          <Button plain monochrome icon={iconSource} onClick={() => setCollapsible(!collapsible)} />
+          {
+            loading ?
+              <Box key="spinner-box">
+                <SpinnerCentered height="0px" />
+              </Box>
+              :
+              <Button plain monochrome icon={iconSource} onClick={() => setCollapsible(!collapsible)} />
+          }
         </HorizontalStack>
         {totalVulnerabilities > 0 ? 
         <Collapsible open={collapsible} transition={{duration: '500ms', timingFunction: 'ease-in-out'}}>
@@ -43,10 +66,10 @@ const SummaryCardComponent = ({
             <Box paddingBlockStart={3}><Divider/></Box>
             <VerticalStack gap={"5"}>
               <HorizontalGrid columns={2} gap={6}>
-                <ChartypeComponent chartSize={190} navUrl={"/dashboard/issues/"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
+                <ChartypeComponent chartSize={190} navUrl={"/dashboard/issues"} data={subCategoryInfoCamel} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
                 <ChartypeComponent
                     data={severityMap}
-                    navUrl={"/dashboard/issues/"} title={"Severity"} isNormal={true} boxHeight={'250px'} dataTableWidth="250px" boxPadding={8}
+                    navUrl={"/dashboard/issues"} title={"Severity"} isNormal={true} boxHeight={'250px'} dataTableWidth="250px" boxPadding={8}
                     pieInnerSize="50%"
                     chartOnLeft={false}
                     chartSize={190}

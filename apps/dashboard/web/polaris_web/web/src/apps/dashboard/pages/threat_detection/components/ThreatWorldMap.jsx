@@ -6,6 +6,7 @@ import FullScreen from "highcharts/modules/full-screen";
 import InfoCard from "../../dashboard/new_components/InfoCard";
 import { Spinner } from "@shopify/polaris";
 import api from "../api";
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 
 // Initialize modules
 Exporting(Highcharts);
@@ -144,8 +145,8 @@ function ThreatWorldMap({ startTimestamp, endTimestamp,  style}) {
 
   return (
     <InfoCard
-      title={"Threat Actor Map"}
-      titleToolTip={"Threat Actor Map"}
+      title={`${mapLabel("Threat", getDashboardCategory())} Actor Map`}
+      titleToolTip={`${mapLabel("Threat", getDashboardCategory())} Actor Map`}
       component={<div id="threat-world-map-container" style={style}></div>}
     />
   );

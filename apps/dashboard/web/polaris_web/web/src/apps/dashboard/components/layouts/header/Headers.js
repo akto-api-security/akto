@@ -44,6 +44,29 @@ export default function Header() {
     const dashboardCategory = PersistStore.getState().dashboardCategory;
     const setDashboardCategory = PersistStore.getState().setDashboardCategory
 
+useEffect(() => {
+        if (window.beamer_config) {
+            const isOnPrem = window.DASHBOARD_MODE === 'ON_PREM';
+            const isAgentic = dashboardCategory === 'Agentic Security';
+
+            const productId = isAgentic
+                ? (isOnPrem ? 'shUignSe80215' : 'ijUqfdSQ80078')
+                : (isOnPrem ? 'rggteHBr72897' : 'cJtNevEq80216');
+
+            const filterTag = isOnPrem ? 'onprem' : 'saas';
+
+            if (window.beamer_config.product_id !== productId || window.beamer_config.filter !== filterTag) {
+                window.beamer_config.product_id = productId;
+                window.beamer_config.filter = filterTag;
+                if (window.Beamer) {
+                    window.Beamer.destroy();
+                    window.Beamer.init();
+                }
+            }
+        }
+    }, [dashboardCategory]);
+
+
     const logoSrc = dashboardCategory === "Agentic Security" ? "/public/white_logo.svg" : "/public/akto_name_with_logo.svg";
     const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {};
     const agenticSecurityGranted =
@@ -159,8 +182,8 @@ export default function Header() {
         LocalStore.getState().setSubCategoryMap({});
         SessionStore.getState().setThreatFiltersMap({});
         setDashboardCategory(value);
-        window.location.reload();
-        window.location.href("/dashboard/observe/inventory")
+        navigate("/dashboard/observe/inventory");
+        navigate(0);    
     }
 
     function createNewAccount() {
@@ -254,7 +277,9 @@ export default function Header() {
             />
             <TopBar.Menu
                 activatorContent={
-                    <Button plain monochrome icon={SettingsMajor} onClick={() => navigate("/dashboard/settings/about")} />
+                    <span style={{ cursor: 'pointer' }} onClick={() => navigate("/dashboard/settings/about")}>
+                        <Icon source={SettingsMajor} />
+                    </span>
                 }
             />
         </HorizontalStack>

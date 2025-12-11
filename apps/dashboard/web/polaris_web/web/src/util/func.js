@@ -12,7 +12,7 @@ import homeFunctions from '../apps/dashboard/pages/home/module';
 import { tokens } from "@shopify/polaris-tokens" 
 import PersistStore from '../apps/main/PersistStore';
 
-import { circle_cancel, circle_tick_minor } from "@/apps/dashboard/components/icons";
+import { circle_cancel, circle_tick_minor, car_icon } from "@/apps/dashboard/components/icons";
 import quickStartFunc from '../apps/dashboard/pages/quick_start/transform';
 import { Box } from '@shopify/polaris';
 import TooltipText from '../apps/dashboard/components/shared/TooltipText';
@@ -21,8 +21,8 @@ import observeFunc from '../apps/dashboard/pages/observe/transform';
 
 const iconsUsedMap = {
   CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
-  EmailMajor, CreditCardMajor, IdentityCardMajor, LocationsMinor,PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor, 
-  ReceiptMajor, MobileMajor, CalendarTimeMinor,LocationMajor, IdentityCardFilledMajor, CalendarMajor
+  EmailMajor, CreditCardMajor, IdentityCardMajor, LocationsMinor,PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor,
+  ReceiptMajor, MobileMajor, CalendarTimeMinor,LocationMajor, IdentityCardFilledMajor, CalendarMajor, car_icon
 }
 
 const searchResultSections = {
@@ -46,7 +46,30 @@ const searchResultSections = {
   },
 }
 
+const categoryMapping = {
+  "BOLA": { label: "API1:2023 Broken Object Level Authorization", url: "https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/" },
+  "Broken Authentication": { label: "API2:2023 Broken Authentication", url: "https://owasp.org/API-Security/editions/2023/en/0xa2-broken-authentication/" },
+  "Broken User Authentication": { label: "API2:2023 Broken Authentication", url: "https://owasp.org/API-Security/editions/2023/en/0xa2-broken-authentication/" },
+  "BFLA": { label: "API5:2023 Broken Function Level Authorization", url: "https://owasp.org/API-Security/editions/2023/en/0xa5-broken-function-level-authorization/" },
+  "IAM": { label: "API9:2023 Improper Inventory Management", url: "https://owasp.org/API-Security/editions/2023/en/0xa9-improper-inventory-management/" },
+  "EDE": { label: "API6:2023 Unrestricted Access to Sensitive Business Flows", url: "https://owasp.org/API-Security/editions/2023/en/0xa6-unrestricted-access-to-sensitive-business-flows/" },
+  "Lack of Resources & Rate Limiting": { label: "API4:2023 Unrestricted Resource Consumption", url: "https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/" },
+  "Mass Assignment": { label: "API3:2023 Broken Object Property Level Authorization", url: "https://owasp.org/API-Security/editions/2023/en/0xa3-broken-object-property-level-authorization/" },
+  "Injection": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
+  "Security Misconfiguration": { label: "API8:2023 Security Misconfiguration", url: "https://owasp.org/API-Security/editions/2023/en/0xa8-security-misconfiguration/" },
+  "Misconfiguration": { label: "API8:2023 Security Misconfiguration", url: "https://owasp.org/API-Security/editions/2023/en/0xa8-security-misconfiguration/" },
+  "Server Side Request Forgery": { label: "API7:2023 Server Side Request Forgery", url: "https://owasp.org/API-Security/editions/2023/en/0xa7-server-side-request-forgery/" },
+  "CORS Misconfiguration": { label: "API8:2023 Security Misconfiguration", url: "https://owasp.org/API-Security/editions/2023/en/0xa8-security-misconfiguration/" },
+  "Command Injection": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
+  "CRLF Injection": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
+  "Server Side Template Injection": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
+  "Local File Inclusion": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
+  "XXS": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
+  "Improper Inventory Management": { label: "API9:2023 Improper Inventory Management", url: "https://owasp.org/API-Security/editions/2023/en/0xa9-improper-inventory-management/" }
+}
+
 const func = {
+  categoryMapping: categoryMapping,
   setToast (isActive, isError, message) {
     Store.getState().setToastConfig({
           isActive: isActive,
@@ -62,6 +85,17 @@ const func = {
       res = data;
     }
     return res
+  },
+  capsSnakeToCamel(str) {
+    if (!str) return str;
+    if (str.includes("_")) {
+      return str
+        .toLowerCase()
+        .split('_')
+        .map((word, index) => index === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1))
+        .join('');
+    }
+    return str;
   },
   nameValidationFunc(nameVal, initialCond){
     let error = ""
@@ -525,6 +559,11 @@ prettifyEpoch(epoch) {
   },
   timeNow: () => {
     return parseInt(new Date().getTime() / 1000)
+  },
+  // Check if API collections data caching is enabled for current account
+  isApiCollectionsCachingEnabled: () => {
+    const allowedAccounts = [1736798101, 1718042191];
+    return allowedAccounts.includes(window.ACTIVE_ACCOUNT);
   },
   convertKeysToLowercase: function (obj){
     return Object.keys(obj).reduce((acc, k) => {
@@ -1076,6 +1115,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
             discoveredTimestamp = x.startTs
           }
           let description = apiInfoMap[key] ? apiInfoMap[key]['description'] : ""
+          let lastSeenTs = Math.max(apiInfoMap[key] ? apiInfoMap[key]["lastSeen"] : x.startTs, x.startTs)
           ret[key] = {
               id: x.method + "###" + x.url + "###" + x.apiCollectionId + "###" + Math.random(),
               shadow: x.shadow ? x.shadow : false,
@@ -1088,8 +1128,8 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
               method: x.method,
               color: x.sensitive && x.sensitive.size > 0 ? "#f44336" : "#00bfa5",
               apiCollectionId: x.apiCollectionId,
-              last_seen: apiInfoMap[key] ? (this.prettifyEpoch(apiInfoMap[key]["lastSeen"])) : this.prettifyEpoch(x.startTs),
-              lastSeenTs: apiInfoMap[key] ? apiInfoMap[key]["lastSeen"] : x.startTs,
+              last_seen: this.prettifyEpoch(lastSeenTs),
+              lastSeenTs: lastSeenTs,
               detectedTs: discoveredTimestamp === 0 ? x.startTs : discoveredTimestamp,
               changesCount: x.changesCount,
               changes: x.changesCount && x.changesCount > 0 ? (x.changesCount +" new parameter"+(x.changesCount > 1? "s": "")) : 'No new changes',
@@ -1756,7 +1796,9 @@ joinWordsWithUnderscores(input) {
           return CalendarMinor;
         case "BIRTH":
           return CalendarTimeMinor;
-        default: 
+        case "VIN":
+          return car_icon;
+        default:
           return KeyMajor;
     }
   },
@@ -1887,7 +1929,8 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     tableTabs.forEach((tab,ind) => {
       const tabId = this.getKeyFromName(tab)
       const tabKey = baseUrl + tabId
-      const count = currentState[tabKey] || data[tabId]?.length || initialCountArr[ind] || 0
+      // Check _counts first (for accurate counts with memory optimization), then fall back to array length
+      const count = currentState[tabKey] || data._counts?.[tabId] || data[tabId]?.length || initialCountArr[ind] || 0
       finalCountObj[tabId] = count
     })
 
@@ -2237,7 +2280,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return defaultLabel
   },
   formatCollectionType(type) {
-    return (type?.keyName?.replace(/^(userSetEnvType|envType)/, 'env')?.slice(0, 30) ?? '') + '=' + (type?.value?.slice(0, 30) ?? '')
+    return (type?.keyName?.replace(/^(userSetEnvType|envType)/, 'env')?.slice(0, 50) ?? '') + '=' + (type?.value?.slice(0, 50) ?? '')
   },
   getRecurringContext(periodInSeconds) {
     if (periodInSeconds === 86400) return "Daily"
@@ -2298,6 +2341,52 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   },
   isLimitedAccount(){
     return window?.ACTIVE_ACCOUNT === 1753372418
+  },
+  /**
+   * Validates if a string is a valid URL with http or https protocol
+   * @param {string} url - The URL string to validate
+   * @returns {boolean} True if valid URL, false otherwise
+   */
+  validateUrl: function(url) {
+    if (!url) return false;
+    const urlPattern = /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/;
+    return urlPattern.test(url);
+  },
+  /**
+   * Find all placeholder positions in a text string (e.g., {}, {var}, {variable})
+   * Returns an array of objects with start, end, and phrase properties for highlighting
+   * @param {string} text - The text to search for placeholders
+   * @returns {Array} Array of placeholder objects with {start, end, phrase}
+   */
+  findPlaceholders: function(text) {
+    if (!text) return [];
+    const placeholders = [];
+    // Find all individual {} pairs, including overlapping ones like {{}}
+    // We search from each position to find the nearest closing brace
+    for (let i = 0; i < text.length; i++) {
+      if (text[i] === '{') {
+        // Find the nearest matching closing brace
+        let depth = 1;
+        for (let j = i + 1; j < text.length && depth > 0; j++) {
+          if (text[j] === '{') {
+            depth++;
+          } else if (text[j] === '}') {
+            depth--;
+            if (depth === 0) {
+              // Found a complete placeholder
+              const placeholder = text.substring(i, j + 1);
+              placeholders.push({
+                start: i,
+                end: j + 1,
+                phrase: placeholder
+              });
+              break; // Found the match for this opening brace, move on
+            }
+          }
+        }
+      }
+    }
+    return placeholders;
   }
 }
 

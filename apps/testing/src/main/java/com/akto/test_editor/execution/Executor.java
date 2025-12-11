@@ -685,8 +685,7 @@ public class Executor {
                     }
                     calculatedAuthParams.add(new HardcodedAuthParam(authParam.getWhere(), key, value, authParam.getShowHeader()));
                 } catch (Exception e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
+                    loggerMaker.errorAndAddToDb(e, "SAMPLE_DATA: Error executing code for auth param: " + key, LogDb.TESTING);
                 }
                 
             }
@@ -755,13 +754,52 @@ public class Executor {
                 // conversations list will be the variable of wordlists, hence it will come in key after being resolved
                 // we need to use them in AgentClient so just add those in any request headers of raw-api
                 List<String> conversationsList = (List<String>) value;
-                return Operations.addHeader(rawApi, "x-agent-conversations", String.join(",", conversationsList));
+                rawApi.setConversationsList(conversationsList);
+                return Operations.addHeader(rawApi, Constants.AKTO_AGENT_CONVERSATIONS , "0");
                 
             case "attach_file":
                 if (isMcpRequest) {
                     return new ExecutorSingleOperationResp(false, "DDOS is not supported for MCP requests");
                 }
-                return Operations.addHeader(rawApi, Constants.AKTO_ATTACH_FILE , key.toString());
+                
+                String headerValue;
+                
+                if (key instanceof Map) {
+                    Map<String, Object> fileAttachMap = (Map<String, Object>) key;
+                    if (fileAttachMap.isEmpty()) {
+                        return new ExecutorSingleOperationResp(false, "attach_file: Map cannot be empty");
+                    }
+                    
+                    if (fileAttachMap.size() == 1) {
+                        // Single file: use simple format "fieldName::fileUrl"
+                        Map.Entry<String, Object> entry = fileAttachMap.entrySet().iterator().next();
+                        String fieldName = entry.getKey();
+                        String fileUrl = entry.getValue().toString();
+                        headerValue = fieldName + "::" + fileUrl;
+                    } else {
+                        // Multiple files: use JSON array format [{"field":"name","url":"url"},...]
+                        JSONArray filesArray = new JSONArray();
+                        for (Map.Entry<String, Object> entry : fileAttachMap.entrySet()) {
+                            JSONObject fileObj = new JSONObject();
+                            fileObj.put("field", entry.getKey());
+                            fileObj.put("url", entry.getValue().toString());
+                            filesArray.put(fileObj);
+                        }
+                        headerValue = filesArray.toString();
+                    }
+                } else if (key != null && value != null) {
+                    // YAML format: attach_file: {key: fieldName, value: fileUrl}
+                    String fieldName = key.toString();
+                    String fileUrl = value.toString();
+                    headerValue = fieldName + "::" + fileUrl;
+                } else if (key != null) {
+                    // Legacy format: attach_file: fileUrl (key is the URL, no field name)
+                    headerValue = "file::" + key.toString();
+                } else {
+                    return new ExecutorSingleOperationResp(false, "attach_file: Missing file URL");
+                }
+                
+                return Operations.addHeader(rawApi, Constants.AKTO_ATTACH_FILE , headerValue);
 
             case "modify_header":
                 Object epochVal = Utils.getEpochTime(value);

@@ -1,6 +1,5 @@
 package com.akto.testing;
 
-import static com.akto.testing.Utils.isTestingRunForDemoCollection;
 import static com.akto.testing.Utils.readJsonContentFromFile;
 
 import com.akto.DaoInit;
@@ -101,7 +100,7 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
-import org.springframework.util.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 public class Main {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.TESTING);
@@ -126,7 +125,7 @@ public class Main {
     }
 
     public static void sendSlackAlertForFailedTest(int accountId, String customMessage){
-        if(StringUtils.hasLength(AKTO_SLACK_WEBHOOK)){
+        if(StringUtils.isNotBlank(AKTO_SLACK_WEBHOOK)){
             try {
                 String slackMessage = "Test failed for accountId: " + accountId + "\n with reason and details: " + customMessage;
                 CustomTextAlert customTextAlert = new CustomTextAlert(slackMessage);
@@ -203,16 +202,14 @@ public class Main {
         return ret;
     }
     private static final int LAST_TEST_RUN_EXECUTION_DELTA = 10 * 60;
-    private static final int DEFAULT_DELTA_IGNORE_TIME = 2*60*60;
+    private static final int DEFAULT_DELTA_IGNORE_TIME = TestingRunResultSummariesDao.DEFAULT_DELTA_IGNORE_TIME_SECONDS;
     private static final int MAX_RETRIES_FOR_FAILED_SUMMARIES = 3;
 
     private static TestingRun findPendingTestingRun(int userDeltaTime) {
         int deltaPeriod = userDeltaTime == 0 ? DEFAULT_DELTA_IGNORE_TIME : userDeltaTime;
         int delta = Context.now() - deltaPeriod;
 
-        Bson filter1 = Filters.and(Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
-                Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, Context.now())
-        );
+        Bson filter1 = TestingRunDao.instance.createScheduledTestingRunFilter(Context.now());
         Bson filter2 = Filters.and(
                 Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
                 Filters.lte(TestingRun.PICKED_UP_TIMESTAMP, delta)
@@ -240,15 +237,11 @@ public class Main {
         int deltaPeriod = userDeltaTime == 0 ? DEFAULT_DELTA_IGNORE_TIME : userDeltaTime;
         int delta = now - deltaPeriod;
 
-        Bson filter1 = Filters.and(
-            Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
-            Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now),
-            Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)
-        );
+        Bson filter1 = TestingRunResultSummariesDao.instance.createScheduledTestingRunResultSummaryFilter(now, delta);
 
         Bson filter2 = Filters.and(
             Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
-            Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now - 20*60),
+            Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now - TestingRunResultSummariesDao.STUCK_RUNNING_TEST_THRESHOLD_SECONDS),
             Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)
         );
 
@@ -1065,7 +1058,10 @@ public class Main {
 
         // check for webhooks here 
         CustomWebhook customWebhook = CustomWebhooksDao.instance.findOne(
-            Filters.eq(CustomWebhook.WEBHOOK_TYPE, CustomWebhook.WebhookType.GMAIL.toString())
+            Filters.and(
+                Filters.eq(CustomWebhook.WEBHOOK_TYPE, CustomWebhook.WebhookType.GMAIL.toString()),
+                Filters.eq("activeStatus", CustomWebhook.ActiveStatus.ACTIVE.toString())
+            )
         );
 
         if(customWebhook != null && customWebhook.getActiveStatus().equals(CustomWebhook.ActiveStatus.ACTIVE)) {

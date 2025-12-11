@@ -638,6 +638,38 @@ const settingRequests = {
             data: {}
         })
     },
+
+    fetchDevRevIntegration() {
+        return request({
+            url: '/api/fetchDevRevIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchDevRevParts(personalAccessToken) {
+        return request({
+            url: '/api/fetchDevRevParts',
+            method: 'post',
+            data: { personalAccessToken }
+        })
+    },
+
+    addDevRevIntegration(orgUrl, personalAccessToken, partsIdToNameMap) {
+        return request({
+            url: '/api/addDevRevIntegration',
+            method: 'post',
+            data: { orgUrl, personalAccessToken, partsIdToNameMap }
+        })
+    },
+
+    removeDevRevIntegration() {
+        return request({
+            url: '/api/removeDevRevIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
     removeInvitation(email) {
         return request({
             url: '/api/removeInvitation',
@@ -650,6 +682,13 @@ const settingRequests = {
             url: '/api/fetchModuleInfo',
             method: 'post',
             data: { filter }
+        })
+    },
+    async deleteModuleInfo(moduleIds) {
+        return await request({
+            url: '/api/deleteModuleInfo',
+            method: 'post',
+            data: { moduleIds }
         })
     },
     async fetchCloudflareWafIntegration() {

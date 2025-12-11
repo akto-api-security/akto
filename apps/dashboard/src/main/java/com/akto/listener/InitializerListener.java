@@ -18,6 +18,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.attribute.FileTime;
@@ -173,7 +174,6 @@ import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
-import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
@@ -219,7 +219,6 @@ import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.util.tasks.OrganizationTask;
 import com.akto.utils.Auth0;
 import com.akto.utils.AutomatedApiGroupsUtils;
-import com.akto.utils.RSAKeyPairUtils;
 import com.akto.utils.TestTemplateUtils;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.crons.Crons;
@@ -229,10 +228,10 @@ import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
 import com.akto.utils.jobs.CleanInventory;
 import com.akto.utils.jobs.DeactivateCollections;
 import com.akto.utils.jobs.JobUtils;
-import com.akto.utils.jobs.MatchingJob;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
+import com.akto.utils.crons.TestingAlertsCron;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.ReadPreference;
@@ -257,6 +256,8 @@ import com.slack.api.webhook.WebhookResponse;
 
 import io.intercom.api.Intercom;
 import okhttp3.OkHttpClient;
+
+import java.io.UnsupportedEncodingException;
 
 public class InitializerListener implements ServletContextListener {
 
@@ -283,6 +284,7 @@ public class InitializerListener implements ServletContextListener {
 
     private static Map<String, String> piiFileMap;
     Crons crons = new Crons();
+    TestingAlertsCron testingAlertsCron = new TestingAlertsCron();
 
     public static String getDomain() {
         if (domain == null) {
@@ -1217,6 +1219,42 @@ public class InitializerListener implements ServletContextListener {
                 .replace("\t", "\\t");
     }
 
+    private static String encodeParam(String value) {
+        if (value == null) {
+            return "";
+        }
+        try {
+            return URLEncoder.encode(value, StandardCharsets.UTF_8.toString());
+        } catch (UnsupportedEncodingException e) {
+            return value;
+        }
+    }
+
+    private static String buildThreatActivityUrl(String baseUrl, Map<String, Object> data) {
+        String refId = data.get("refId") != null ? data.get("refId").toString() : "";
+        String eventType = data.get("eventType") != null ? data.get("eventType").toString() : "";
+        String actor = data.get("actor") != null ? data.get("actor").toString() : "";
+        String filterId = data.get("filterId") != null ? data.get("filterId").toString() : "";
+
+        if (StringUtils.isBlank(refId) || StringUtils.isBlank(eventType)
+                || StringUtils.isBlank(actor) || StringUtils.isBlank(filterId)) {
+            return null;
+        }
+
+        StringBuilder urlBuilder = new StringBuilder();
+        urlBuilder.append(baseUrl)
+                .append(THREAT_ACTIVITY_PATH)
+                .append("?refId=")
+                .append(encodeParam(refId))
+                .append("&eventType=")
+                .append(encodeParam(eventType))
+                .append("&actor=")
+                .append(encodeParam(actor))
+                .append("&filterId=")
+                .append(encodeParam(filterId));
+        return urlBuilder.toString();
+    }
+
     private static String TEAMS_WEBHOOK_OPENING_BODY = "{\n" +
                 "    \"type\": \"message\",\n" +
                 "    \"attachments\": [\n" +
@@ -1235,6 +1273,19 @@ public class InitializerListener implements ServletContextListener {
                 "    ]\n" +
                 "}\n" +
                 "";
+
+    private static final String THREAT_ACTIVITY_PATH = "/dashboard/protection/threat-activity";
+
+    private static final String TEAMS_ACTION_SET_TEMPLATE = "        {\n" +
+            "            \"type\": \"ActionSet\",\n" +
+            "            \"actions\": [\n" +
+            "                {\n" +
+            "                    \"type\": \"Action.OpenUrl\",\n" +
+            "                    \"title\": \"%s\",\n" +
+            "                    \"url\": \"%s\"\n" +
+            "                }\n" +
+            "            ]\n" +
+            "        },\n";
 
     private static String createMicrosoftTeamsWorkflowWebhookPayload(CustomWebhook webhook, Map<String, Object> valueMap){
         StringBuilder body = new StringBuilder();
@@ -1357,6 +1408,7 @@ public class InitializerListener implements ServletContextListener {
     
 
     private static void buildApiThreatsTeamsWebhookBody(StringBuilder body, String name, Object value) {
+        final String dashboardBaseUrl = getDashboardBaseUrl();
         if (value instanceof List) {
             body.append("        {\n" +
                     "            \"type\": \"TextBlock\",\n" +
@@ -1400,6 +1452,14 @@ public class InitializerListener implements ServletContextListener {
                 
                 body.append("\n            ]\n" +
                         "        },\n");
+
+                // Add clickable button if we have all required URL parameters
+                String threatUrl = buildThreatActivityUrl(dashboardBaseUrl, data);
+                if (threatUrl != null) {
+                    body.append(String.format(TEAMS_ACTION_SET_TEMPLATE,
+                            escapeJsonString("View Threat Activity"),
+                            escapeJsonString(threatUrl)));
+                }
                 isFirstItem = false;
             }
             
@@ -1487,7 +1547,7 @@ public class InitializerListener implements ServletContextListener {
                     }
                 }, "webhook-sender");
             }
-        }, 0, 1, TimeUnit.MINUTES);
+        }, 0, 1, TimeUnit.HOURS);
     }
 
     static class ChangesInfo {
@@ -2011,6 +2071,7 @@ public class InitializerListener implements ServletContextListener {
             aktoDataTypes.add(new AktoDataType("JWT", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER), now, ignoreData, false, true, Arrays.asList("AUTHENTICATION","TOKEN"), Severity.HIGH));
             aktoDataTypes.add(new AktoDataType("EMAIL", true, Collections.emptyList(), now, ignoreData, false, true,  Arrays.asList("PII"), Severity.MEDIUM));
             aktoDataTypes.add(new AktoDataType("CREDIT_CARD", true, Collections.emptyList(), now, ignoreData, false, true, Arrays.asList("FINANCIAL","PII"), Severity.MEDIUM));
+            aktoDataTypes.add(new AktoDataType("VIN", true, Collections.emptyList(), now, ignoreData, false, true, Arrays.asList("PII"), Severity.MEDIUM));
             aktoDataTypes.add(new AktoDataType("SSN", true, Collections.emptyList(), now, ignoreData, false, true,  Arrays.asList("PII"), Severity.HIGH ));
             aktoDataTypes.add(new AktoDataType("ADDRESS", true, Collections.emptyList(), now, ignoreData, false, true,  Arrays.asList("PII"), Severity.LOW));
             aktoDataTypes.add(new AktoDataType("IP_ADDRESS", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER), now, ignoreData, false, true, Arrays.asList("DEVICE IDENTIFIER"), Severity.HIGH));
@@ -2565,6 +2626,7 @@ public class InitializerListener implements ServletContextListener {
                     }
                     updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
                     syncCronInfo.setUpUpdateCronScheduler();
+                    syncCronInfo.setUpMcpMaliciousnessCronScheduler();
                     setUpTestEditorTemplatesScheduler();
                     JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
                     updateApiGroupsForAccounts(); 
@@ -2598,6 +2660,11 @@ public class InitializerListener implements ServletContextListener {
                 } else {
                     logger.debug("Skipping init functions and scheduling jobs at " + now);
                 }
+
+                if(isSaas){
+                    alertsForTestingNonFunctional();
+                }
+
                 // setUpAktoMixpanelEndpointsScheduler();
                 //fetchGithubZip();
                 if(isSaas){
@@ -2651,6 +2718,13 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
+    private void alertsForTestingNonFunctional() {
+        // Hourly cron to update organization cache
+        testingAlertsCron.setUpOrganizationFeatureCacheScheduler();
+        
+        // 5-minute cron to check accounts
+        testingAlertsCron.setUpTestingAlertsScheduler();
+    }
 
     private void setUpDependencyFlowScheduler() {
         int minutes = DashboardMode.isOnPremDeployment() ? 60 : 24*60;
@@ -3540,10 +3614,10 @@ public class InitializerListener implements ServletContextListener {
 
     private static void setDashboardVersionForAccount(){
         try {
-            logger.debugAndAddToDb("Updating account version for " + Context.accountId.get(), LogDb.DASHBOARD);
+            logger.debugAndAddToDb("Updating account version for " + Context.accountId.get());
             AccountSettingsDao.instance.updateVersion(AccountSettings.DASHBOARD_VERSION);
         } catch (Exception e) {
-            logger.errorAndAddToDb(e,"error while updating dashboard version: " + e.toString(), LogDb.DASHBOARD);
+            logger.errorAndAddToDb(e,"error while updating dashboard version: " + e.toString());
         }
     }
 
@@ -4418,6 +4492,28 @@ public class InitializerListener implements ServletContextListener {
                 }, "automated-api-groups-scheduler");
             }
         }, 0, 4, TimeUnit.HOURS);
+    }
+
+    private static String getDashboardBaseUrl() {
+        String dashboardUrl = Constants.DEFAULT_AKTO_DASHBOARD_URL;
+        if (DashboardMode.isOnPremDeployment()) {
+            com.akto.dto.Config.AktoHostUrlConfig aktoUrlConfig = (com.akto.dto.Config.AktoHostUrlConfig) ConfigsDao.instance.findOne(
+                Filters.eq(Constants.ID, ConfigType.AKTO_DASHBOARD_HOST_URL.name())
+            );
+            if (aktoUrlConfig != null && StringUtils.isNotBlank(aktoUrlConfig.getHostUrl())) {
+                dashboardUrl = aktoUrlConfig.getHostUrl();
+            }
+        }
+
+        if (StringUtils.isBlank(dashboardUrl)) {
+            dashboardUrl = Constants.DEFAULT_AKTO_DASHBOARD_URL;
+        }
+
+        if (dashboardUrl.endsWith("/")) {
+            dashboardUrl = dashboardUrl.substring(0, dashboardUrl.length() - 1);
+        }
+
+        return dashboardUrl;
     }
 }
 

@@ -81,8 +81,9 @@ const PageWithMultipleCards = (props) => {
             divider={divider}
         >
             <VerticalStack gap="4">
-                {components?.filter((component) => {
-                    return component
+                {components?.map((component, index) => {
+                    // If component already has a key, return as is, otherwise add index-based key
+                    return component;
                 })}
             </VerticalStack>
         </Page>

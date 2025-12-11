@@ -98,6 +98,7 @@ import AWSWaf from "../dashboard/pages/settings/integrations/AWSWaf";
 import AgentConfig from "../dashboard/pages/settings/integrations/AgentConfig";
 import AzureBoards from "../dashboard/pages/settings/integrations/AzureBoards";
 import ServiceNow from "../dashboard/pages/settings/integrations/ServiceNow";
+import DevRev from "../dashboard/pages/settings/integrations/DevRev";
 import McpRegistry from "../dashboard/pages/settings/integrations/McpRegistry";
 import CloudflareWaf from "../dashboard/pages/settings/integrations/CloudflareWaf";
 import UndoDemergedApis from "../dashboard/pages/settings/undo_demerged_apis/UndoDemergedApis";
@@ -396,6 +397,10 @@ const router = createBrowserRouter([
                         element: <ServiceNow/>,
                     },
                     {
+                        path: "integrations/devrev",
+                        element: <DevRev/>,
+                    },
+                    {
                         path: "integrations/akto_apis",
                         element: <ApiTokens/>,
                     },
@@ -486,14 +491,6 @@ const router = createBrowserRouter([
                     {
                         path: "auth-types/details",
                         element: <AuthTypeDetails/>
-                    },
-                    {
-                        path: "tags",
-                        element: <Tags/>
-                    },
-                    {
-                        path: "tags/details",
-                        element: <TagDetails/>
                     },
                     {
                         path: "test-library",

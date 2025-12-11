@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon, Tooltip } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon } from "@shopify/polaris"
 import TitleWithInfo from "../../../components/shared/TitleWithInfo"
 import api from "../api"
 import { useEffect, useState } from "react"
@@ -416,8 +416,10 @@ function ApiEndpoints(props) {
                 }
             })
         }
-        
-        const prettifyData = transform.prettifyEndpointsData(allEndpoints)
+
+        // MEMORY OPTIMIZATION: Limit rendered items to prevent browser crash with large collections
+        const INITIAL_RENDER_LIMIT = 50;
+        const shouldOptimizeEndpoints = allEndpoints.length > INITIAL_RENDER_LIMIT;
 
         // enrich with collection tags (env types) for API group view
         const collectionTagsMap = {}
@@ -431,46 +433,176 @@ function ApiEndpoints(props) {
             }
         })
 
-        prettifyData.forEach((obj) => {
-            const t = collectionTagsMap[obj.apiCollectionId]
-            if (t) {
-                obj.tagsComp = t.comp
-                obj.tagsString = t.str
-            } else {
-                obj.tagsString = ""
+        // Step 1: Create lightweight objects for ALL endpoints (for filtering & counting only)
+        const allEndpointsLight = allEndpoints.map((obj) => {
+            const t = collectionTagsMap[obj.apiCollectionId];
+            return {
+                ...obj,
+                tagsComp: t?.comp || null,
+                tagsString: t?.str || "",
+                isNew: transform.isNewEndpoint(obj.lastSeenTs),
+                open: obj.auth_type === "UNAUTHENTICATED" || obj.auth_type === undefined,
+            };
+        });
+
+        // Single pass through endpoints for all filtering and checks
+        const result = allEndpointsLight.reduce((acc, obj) => {
+            // Check for OpenAPI sources
+            if (obj.sources) {
+                const hasOpenAPISource = obj.sources.hasOwnProperty("OPEN_API");
+                if (hasOpenAPISource) {
+                    acc.hasOpenAPI = true;
+                }
+                if (!sourcesBackfilled) {
+                    acc.needsBackfill = true;
+                }
+
+                // Zombie endpoints: only OPEN_API source
+                if (Object.keys(obj.sources).length === 1 && hasOpenAPISource) {
+                    acc.zombieEndpoints.push(obj);
+                }
+
+                // Undocumented endpoints: has sources but no OPEN_API
+                if (!hasOpenAPISource) {
+                    acc.undocumentedEndpoints.push(obj);
+                }
             }
-        })
 
-        const zombie = prettifyData.filter(
-            obj => obj.sources && // Check that obj.sources is not null or undefined
-                   Object.keys(obj.sources).length === 1 &&
-                   obj.sources.hasOwnProperty("OPEN_API")
-        );
-
-        var hasOpenAPI = false
-        prettifyData.forEach((obj) => {
-            if (obj.sources && obj.sources.hasOwnProperty("OPEN_API")) {
-                hasOpenAPI = true
+            // Filter for other tabs
+            if (obj.sensitive && obj.sensitive.size > 0) {
+                acc.sensitiveEndpoints.push(obj);
+            }
+            if (obj.riskScore >= 4) {
+                acc.highRiskEndpoints.push(obj);
+            }
+            if (obj.isNew) {
+                acc.newEndpoints.push(obj);
+            }
+            if (obj.open) {
+                acc.noAuthEndpoints.push(obj);
             }
 
-            if (obj.sources && !sourcesBackfilled) {
-                setSourcesBackfilled(true)
-            }
-        })
+            return acc;
+        }, {
+            hasOpenAPI: false,
+            needsBackfill: false,
+            sensitiveEndpoints: [],
+            highRiskEndpoints: [],
+            newEndpoints: [],
+            noAuthEndpoints: [],
+            zombieEndpoints: [],
+            undocumentedEndpoints: []
+        });
 
-        // check if openAPI file has been uploaded or not.. else show there no shadow APIs
-        const undocumented = hasOpenAPI ? prettifyData.filter(
-            obj => obj.sources && !obj.sources.hasOwnProperty("OPEN_API")
-        ) : [];
+        // Set state if backfill is needed
+        if (result.needsBackfill) {
+            setSourcesBackfilled(true);
+        }
 
-        // append shadow endpoints to all endpoints
-        data['all'] = [ ...prettifyData, ...shadowApis ]
-        data['sensitive'] = prettifyData.filter(x => x.sensitive && x.sensitive.size > 0)
-        data['high_risk'] = prettifyData.filter(x=> x.riskScore >= 4)
-        data['new'] = prettifyData.filter(x=> x.isNew)
-        data['no_auth'] = prettifyData.filter(x => x.open)
-        data['shadow'] = [ ...shadowApis, ...undocumented ]
-        data['zombie'] = zombie
+        const sensitiveEndpoints = result.sensitiveEndpoints;
+        const highRiskEndpoints = result.highRiskEndpoints;
+        const newEndpoints = result.newEndpoints;
+        const noAuthEndpoints = result.noAuthEndpoints;
+        const zombieEndpoints = result.zombieEndpoints;
+        const undocumentedEndpoints = result.hasOpenAPI ? result.undocumentedEndpoints : [];
+
+        // Step 2: Store accurate counts (from ALL endpoints)
+        data['_counts'] = {
+            all: allEndpointsLight.length + shadowApis.length,
+            sensitive: sensitiveEndpoints.length,
+            high_risk: highRiskEndpoints.length,
+            new: newEndpoints.length,
+            no_auth: noAuthEndpoints.length,
+            shadow: shadowApis.length + undocumentedEndpoints.length,
+            zombie: zombieEndpoints.length
+        };
+
+        // Step 3: Helper function to prettify a page of data with tags applied
+        const prettifyPageWithTags = (pageData) => {
+            const prettified = transform.prettifyEndpointsData(pageData);
+
+            // Re-apply tags after prettify
+            prettified.forEach((obj) => {
+                const t = collectionTagsMap[obj.apiCollectionId];
+                if (t) {
+                    obj.tagsComp = t.comp;
+                    obj.tagsString = t.str;
+                } else {
+                    obj.tagsString = "";
+                }
+            });
+
+            return prettified;
+        };
+
+        if (shouldOptimizeEndpoints) {
+            // Large collection: use lazy prettification - pass raw data and prettify on demand per page
+
+            // For 'all' tab: mix raw allEndpointsLight + already prettified shadowApis
+            data['all'] = [...allEndpointsLight, ...shadowApis];
+            data['all']._prettifyPageData = (pageData) => {
+                // Determine which items are shadowApis (already prettified) vs raw data
+                return pageData.map((item) => {
+                    // Check if this item is a shadowApi by checking for codeAnalysisEndpoint flag
+                    if (item.codeAnalysisEndpoint === true) {
+                        // Already prettified, return as-is
+                        return item;
+                    } else {
+                        // Raw data, needs prettification
+                        return prettifyPageWithTags([item])[0];
+                    }
+                });
+            };
+
+            data['sensitive'] = sensitiveEndpoints;
+            data['sensitive']._prettifyPageData = prettifyPageWithTags;
+
+            data['high_risk'] = highRiskEndpoints;
+            data['high_risk']._prettifyPageData = prettifyPageWithTags;
+
+            data['new'] = newEndpoints;
+            data['new']._prettifyPageData = prettifyPageWithTags;
+
+            data['no_auth'] = noAuthEndpoints;
+            data['no_auth']._prettifyPageData = prettifyPageWithTags;
+
+            // For 'shadow' tab: mix shadowApis (prettified) + undocumentedEndpoints (raw)
+            data['shadow'] = [...shadowApis, ...undocumentedEndpoints];
+            data['shadow']._prettifyPageData = (pageData) => {
+                return pageData.map(item =>
+                    item.codeAnalysisEndpoint === true ? item : prettifyPageWithTags([item])[0]
+                );
+            };
+
+            data['zombie'] = zombieEndpoints;
+            data['zombie']._prettifyPageData = prettifyPageWithTags;
+        } else {
+            // Small collection: render all normally
+            const prettifyData = transform.prettifyEndpointsData(allEndpointsLight);
+
+            prettifyData.forEach((obj) => {
+                const t = collectionTagsMap[obj.apiCollectionId];
+                if (t) {
+                    obj.tagsComp = t.comp;
+                    obj.tagsString = t.str;
+                } else {
+                    obj.tagsString = "";
+                }
+            });
+
+            data['all'] = [...prettifyData, ...shadowApis];
+            data['sensitive'] = sensitiveEndpoints.filter(x => x.sensitive && x.sensitive.size > 0);
+            data['high_risk'] = prettifyData.filter(x => x.riskScore >= 4);
+            data['new'] = prettifyData.filter(x => x.isNew);
+            data['no_auth'] = prettifyData.filter(x => x.open);
+            // Filter undocumented endpoints from prettified data to ensure all fields are present
+            const undocumentedEndpointsSet = new Set(undocumentedEndpoints.map(u => u.method + " " + u.endpoint + " " + u.apiCollectionId));
+            const prettifiedUndocumentedEndpoints = prettifyData.filter(x => undocumentedEndpointsSet.has(x.method + " " + x.endpoint + " " + x.apiCollectionId));
+            data['shadow'] = [...shadowApis, ...prettifiedUndocumentedEndpoints];
+            // Filter zombie endpoints from prettified data to ensure all fields are present
+            const zombieEndpointsSet = new Set(zombieEndpoints.map(z => z.method + " " + z.endpoint + " " + z.apiCollectionId));
+            data['zombie'] = prettifyData.filter(x => zombieEndpointsSet.has(x.method + " " + x.endpoint + " " + x.apiCollectionId));
+        }
         setEndpointData(data)
         setSelectedTab("all")
         setSelected(0)
@@ -499,6 +631,11 @@ function ApiEndpoints(props) {
                         
                         sensitiveParamsMap[key].add({ name: p.subType, position: position});
                     });
+
+                    // Get current state to check if optimization is enabled
+                    const currentEndpointData = endpointData;
+                    const hasLazyPrettification = currentEndpointData['all']?._prettifyPageData !== undefined;
+
                     let currentPrettyData = [...data['all']];
                     currentPrettyData.forEach(apiEndpoint => {
                         const key = apiEndpoint.method + " " + apiEndpoint.endpoint + " " + apiEndpoint.apiCollectionId;
@@ -516,15 +653,27 @@ function ApiEndpoints(props) {
                             sensitiveTags,
                             sensitiveInReq: [...func.convertSensitiveTags(sensitiveInReq)],
                             sensitiveInResp: [...func.convertSensitiveTags(sensitiveInResp)],
-                            sensitiveTagsComp: transform.prettifySubtypes(sensitiveTags)
+                            // Only create prettified component if NOT using lazy prettification
+                            sensitiveTagsComp: hasLazyPrettification ? undefined : transform.prettifySubtypes(sensitiveTags)
                         });
                     })
 
-                    data['all'] = currentPrettyData
-                    data['sensitive'] = currentPrettyData.filter(x => x.sensitive && x.sensitive.size > 0)
-                    data['high_risk'] = currentPrettyData.filter(x=> x.riskScore >= 4)
-                    data['new'] = currentPrettyData.filter(x=> x.isNew)
-                    data['no_auth'] = currentPrettyData.filter(x => x.open)
+                    // MEMORY OPTIMIZATION: Preserve _actualTotal and _prettifyPageData properties when updating data
+                    const preserveArrayProperties = (oldArray, newArray) => {
+                        if (oldArray._actualTotal !== undefined) {
+                            newArray._actualTotal = oldArray._actualTotal;
+                        }
+                        if (oldArray._prettifyPageData !== undefined) {
+                            newArray._prettifyPageData = oldArray._prettifyPageData;
+                        }
+                        return newArray;
+                    };
+
+                    data['all'] = preserveArrayProperties(data['all'], currentPrettyData);
+                    data['sensitive'] = preserveArrayProperties(data['sensitive'], currentPrettyData.filter(x => x.sensitive && x.sensitive.size > 0));
+                    data['high_risk'] = preserveArrayProperties(data['high_risk'], currentPrettyData.filter(x=> x.riskScore >= 4));
+                    data['new'] = preserveArrayProperties(data['new'], currentPrettyData.filter(x=> x.isNew));
+                    data['no_auth'] = preserveArrayProperties(data['no_auth'], currentPrettyData.filter(x => x.open));
                     setEndpointData(data)
                     setCurrentKey(Date.now()) // force remount InlineEditableText component to reset filters
                 }).catch((err) => {
@@ -828,12 +977,21 @@ function ApiEndpoints(props) {
         const uniqueEndpoints = endpoints.filter((endpoint, index, self) =>
             index === self.findIndex((t) => t.method === endpoint.method && t.endpoint.replace(/^\//, '') === endpoint.endpoint.replace(/^\//, ''))
         )
+
+        // MEMORY OPTIMIZATION: Preserve _actualTotal properties
+        const preserveActualTotal = (oldArray, newArray) => {
+            if (oldArray?._actualTotal !== undefined) {
+                newArray._actualTotal = oldArray._actualTotal;
+            }
+            return newArray;
+        };
+
         const data = {}
-        data['sensitive'] = uniqueEndpoints.filter(x => x.sensitive && x.sensitive.size > 0)
-        data['high_risk'] = uniqueEndpoints.filter(x=> x.riskScore >= 4)
-        data['new'] = uniqueEndpoints.filter(x=> x.isNew)
-        data['no_auth'] = uniqueEndpoints.filter(x => x.open)
-        data['all'] = uniqueEndpoints
+        data['all'] = preserveActualTotal(endpointData['all'], uniqueEndpoints);
+        data['sensitive'] = preserveActualTotal(endpointData['sensitive'], uniqueEndpoints.filter(x => x.sensitive && x.sensitive.size > 0));
+        data['high_risk'] = preserveActualTotal(endpointData['high_risk'], uniqueEndpoints.filter(x=> x.riskScore >= 4));
+        data['new'] = preserveActualTotal(endpointData['new'], uniqueEndpoints.filter(x=> x.isNew));
+        data['no_auth'] = preserveActualTotal(endpointData['no_auth'], uniqueEndpoints.filter(x => x.open));
         setEndpointData(data)
     }
 
@@ -902,7 +1060,7 @@ function ApiEndpoints(props) {
     function getTagsCompactComponent(envTypeList) {
         const list = envTypeList || []
         // Use shared badge renderer to show 1 tag and a +N badge with tooltip inline
-        return transform.getCollectionTypeList(list, 1, false)
+        return transform.getCollectionTypeList(list, 1, true)
     }
 
     function getCollectionTypeListComp(collectionsObj) {
@@ -1101,8 +1259,10 @@ function ApiEndpoints(props) {
     
     const [showDeleteApiModal, setShowDeleteApiModal] = useState(false)
     const [showApiGroupModal, setShowApiGroupModal] = useState(false)
+    const [showBulkDeMergeModal, setShowBulkDeMergeModal] = useState(false)
     const [apis, setApis] = useState([])
     const [actionOperation, setActionOperation] = useState(Operation.ADD)
+    const [deMergingInProgress, setDeMergingInProgress] = useState(false)
 
     function handleApiGroupAction(selectedResources, operation){
 
@@ -1113,6 +1273,49 @@ function ApiEndpoints(props) {
 
     function toggleApiGroupModal(){
         setShowApiGroupModal(false);
+    }
+
+    function handleBulkDeMerge(selectedResources){
+        // Filter only merged APIs (those containing INTEGER, STRING, OBJECT_ID, or VERSIONED)
+        const mergedApis = selectedResources.filter(resource => {
+            const parts = resource.split('###')
+            const endpoint = parts[1]
+            return endpoint && (endpoint.includes("STRING") || endpoint.includes("INTEGER") || endpoint.includes("FLOAT") || endpoint.includes("OBJECT_ID") || endpoint.includes("VERSIONED"))
+        })
+
+        if (mergedApis.length === 0) {
+            func.setToast(true, true, "No merged APIs selected. Only merged APIs can be de-merged.")
+            return
+        }
+
+        setApis(mergedApis)
+        setShowBulkDeMergeModal(true)
+    }
+
+    function deMergeBulkApisAction(){
+        setShowBulkDeMergeModal(false)
+        setDeMergingInProgress(true)
+
+        const apiObjects = apis.map((x) => {
+            let tmp = x.split("###")
+            return {
+                method: tmp[0],
+                url: tmp[1],
+                apiCollectionId: parseInt(tmp[2])
+            }
+        })
+
+        api.bulkDeMergeApis(apiObjects).then(resp => {
+            setDeMergingInProgress(false)
+            func.setToast(true, false, `Successfully de-merged ${apiObjects.length} API(s). Refresh to see the changes.`)
+            // Optionally refresh the data
+            setTimeout(() => {
+                fetchData()
+            }, 1000)
+        }).catch(err => {
+            setDeMergingInProgress(false)
+            func.setToast(true, true, "There was an error de-merging the APIs. Please try again or contact support@akto.io")
+        })
     }
 
     const promotedBulkActions = (selectedResources) => {
@@ -1136,6 +1339,12 @@ function ApiEndpoints(props) {
                 onAction: () => handleApiGroupAction(selectedResources, Operation.ADD)
             })
         }
+
+        // Add bulk de-merge option
+        ret.push({
+            content: 'De-merge ' + mapLabel('APIs', getDashboardCategory()),
+            onAction: () => handleBulkDeMerge(selectedResources)
+        })
 
         if (window.USER_NAME && window.USER_NAME.endsWith("@akto.io")) {
             ret.push({
@@ -1167,16 +1376,49 @@ function ApiEndpoints(props) {
     let deleteApiModal = (
         <Modal
             open={showDeleteApiModal}
-            onClose={() => setShowApiGroupModal(false)}
+            onClose={() => setShowDeleteApiModal(false)}
             title="Confirm"
             primaryAction={{
                 content: 'Yes',
                 onAction: deleteApisAction
             }}
-            key="redact-modal-1"
+            key="delete-api-modal"
         >
             <Modal.Section>
                 <Text>Are you sure you want to delete {(apis || []).length} API(s)?</Text>
+            </Modal.Section>
+        </Modal>
+    )
+
+    let bulkDeMergeModal = (
+        <Modal
+            open={showBulkDeMergeModal}
+            onClose={() => setShowBulkDeMergeModal(false)}
+            title="Confirm Bulk De-merge"
+            primaryAction={{
+                content: 'De-merge',
+                onAction: deMergeBulkApisAction,
+                loading: deMergingInProgress
+            }}
+            secondaryActions={[
+                {
+                    content: 'Cancel',
+                    onAction: () => setShowBulkDeMergeModal(false)
+                }
+            ]}
+            key="bulk-demerge-modal"
+        >
+            <Modal.Section>
+                <VerticalStack gap="4">
+                    <Text>Are you sure you want to de-merge {(apis || []).length} merged API(s)?</Text>
+                    <Text variant="bodyMd" color="subdued">
+                        This will split the merged endpoints back into their original forms. For example,
+                        <Text as="span" fontWeight="semibold"> /api/products/INTEGER/reviews </Text>
+                        will be split into individual endpoints like
+                        <Text as="span" fontWeight="semibold"> /api/products/24/reviews</Text>,
+                        <Text as="span" fontWeight="semibold"> /api/products/53/reviews</Text>, etc.
+                    </Text>
+                </VerticalStack>
             </Modal.Section>
         </Modal>
     )
@@ -1189,6 +1431,7 @@ function ApiEndpoints(props) {
         key={currentKey}
         pageLimit={50}
         data={endpointData[selectedTab]}
+        prettifyPageData={endpointData[selectedTab]?._prettifyPageData}
         sortOptions={sortOptions}
         resourceName={resourceName}
         filters={[]}
@@ -1256,9 +1499,9 @@ function ApiEndpoints(props) {
                 />] : showSequencesFlow ? [
                 <SequencesFlow key="sequences-flow" apiCollectionId={apiCollectionId}  />
             ] : [
-                func.isDemoAccount() ? <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : <></>,
-                (!isCategory(CATEGORY_API_SECURITY)) && <McpToolsGraph key="mcp-tools-graph" apiCollectionId={apiCollectionId} />,
-                (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null),
+                func.isDemoAccount() ? <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : null,
+                (!isCategory(CATEGORY_API_SECURITY)) ? <McpToolsGraph key="mcp-tools-graph" apiCollectionId={apiCollectionId} /> : null,
+                (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId))) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null,
                 <div className="apiEndpointsTable" key="table">
                     {apiEndpointTable}
                       <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
@@ -1277,7 +1520,8 @@ function ApiEndpoints(props) {
                       fetchData={fetchData}
                   />,
                   modal,
-                  deleteApiModal
+                  deleteApiModal,
+                  bulkDeMergeModal
             ]
         )
       ]

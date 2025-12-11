@@ -15,8 +15,8 @@ import threatDetectionRequests from "../api";
 import { LABELS } from "../constants";
 
 const resourceName = {
-  singular: "sample",
-  plural: "samples",
+  singular: "activity",
+  plural: "activities",
 };
 
 const headers = [
@@ -147,8 +147,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     // Check if any other filters are applied (only URL and attack category are allowed)
     const hasOtherFilters = (currentFilters.actor && currentFilters.actor.length > 0) ||
                            (currentFilters.type && currentFilters.type.length > 0) ||
-                           (currentFilters.apiCollectionId && currentFilters.apiCollectionId.length > 0) ||
-                           (currentFilters.latestApiOrigRegex && currentFilters.latestApiOrigRegex !== '');
+                           (currentFilters.apiCollectionId && currentFilters.apiCollectionId.length > 0)
     
     if (hasOtherFilters) {
       const message = 'Only URL and Attack Category filters are allowed for bulk operations. Please remove other filters (Actor, Type, Collection) and try again.';
@@ -389,7 +388,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     _limit,
     filters,
     _filterOperators,
-    _queryValue
+    queryValue
   ) {
     setLoading(true);
     let sourceIpsFilter = [],
@@ -398,13 +397,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       typeFilter = [],
       latestAttack = [],
       hostFilter = [];
-    let latestApiOrigRegex;
+    let latestApiOrigRegex = queryValue.length > 3 ? queryValue : "";
     if (filters?.actor) {
       sourceIpsFilter = filters?.actor;
-    }
-    if (filters?.latestApiOrigRegex) {
-      const regexFilter = filters?.latestApiOrigRegex;
-      latestApiOrigRegex = Array.isArray(regexFilter) ? regexFilter[0] : regexFilter;
     }
     if (filters?.apiCollectionId) {
       apiCollectionIdsFilter = filters?.apiCollectionId;
@@ -430,7 +425,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       type: typeFilter,
       latestAttack: latestAttack,
       host: hostFilter,
-      latestApiOrigRegex: latestApiOrigRegex || '',
       sortKey: sortKey,
       sortOrder: sortOrder
     });
@@ -536,8 +530,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       }
     })
 
-    const isRegexFilterEnabled = typeof window !== 'undefined' && Number(window.ACTIVE_ACCOUNT) === 1758858035;
-
     filters = [
       {
         key: "actor",
@@ -557,14 +549,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         title: "Host",
         choices: hostChoices,
       },
-      ...(isRegexFilterEnabled ? [{
-        key: 'latestApiOrigRegex',
-        label: "API regex",
-        title: "API regex",
-        type: 'text',
-        placeholder: 'Enter regex',
-        choices: []
-      }] : []),
       {
         key: 'type',
         label: "Type",
@@ -629,7 +613,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       selected={selected}
       onSelect={handleSelectedTab}
       mode={IndexFiltersMode.Default}
-      hideQueryField={true}
     />
   );
 }

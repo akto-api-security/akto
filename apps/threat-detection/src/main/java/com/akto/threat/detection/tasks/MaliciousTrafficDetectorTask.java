@@ -3,13 +3,15 @@ package com.akto.threat.detection.tasks;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
@@ -36,6 +38,9 @@ import com.akto.dto.api_protection_parse_layer.Rule;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLTemplate;
+import com.akto.dto.type.APICatalog;
+import com.akto.runtime.RuntimeUtil;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
@@ -109,6 +114,10 @@ public class MaliciousTrafficDetectorTask implements Task {
   private int recordsReadCount = 0;
   private long lastRecordCountLogTime = System.currentTimeMillis();
 
+  // Valid hostname tracking (non-IP, not localhost, no port)
+  private int validHostnameCount = 0;
+  private long lastValidHostnameLogTime = System.currentTimeMillis();
+
     public MaliciousTrafficDetectorTask(
       KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient, DistributionCalculator distributionCalculator, boolean apiDistributionEnabled) throws Exception {
     this.kafkaConfig = trafficConfig;
@@ -180,8 +189,11 @@ public class MaliciousTrafficDetectorTask implements Task {
               }
 
               AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
-              Context.accountId.set(config.getAccountId());
-              Context.isRedactPayload.set(config.isRedacted());
+              if (config == null) {
+                Context.isRedactPayload.set(false);
+              } else {
+                Context.isRedactPayload.set(config.isRedacted());
+              }
 
               for (ConsumerRecord<String, byte[]> record : records) {
                 HttpResponseParam httpResponseParam = HttpResponseParam.parseFrom(record.value());
@@ -227,6 +239,53 @@ public class MaliciousTrafficDetectorTask implements Task {
     return headers != null && headers.get("x-debug-trace") != null;
   }
 
+  private boolean isValidHostname(String hostname) {
+    try {
+      if (hostname == null || hostname.isEmpty()) {
+        return false;
+      }
+
+      // Remove port if present (e.g., "example.com:8080" -> "example.com")
+      String hostnameWithoutPort = hostname.split(":")[0];
+
+      // Check if it's localhost
+      if (hostnameWithoutPort.equalsIgnoreCase("localhost")) {
+        return false;
+      }
+
+      // Simple check: if lowercase != uppercase, it has letters (valid hostname)
+      // This elegantly filters out IP addresses (which are case-insensitive)
+      // Examples:
+      //   "192.168.1.1" -> toLowerCase() == toUpperCase() -> false (IP)
+      //   "example.com" -> toLowerCase() != toUpperCase() -> true (valid hostname)
+      //   "::1" -> toLowerCase() == toUpperCase() -> false (IPv6)
+      return !hostnameWithoutPort.toLowerCase().equals(hostnameWithoutPort.toUpperCase());
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private void trackAndLogValidHostname(HttpResponseParams responseParam) {
+    Map<String, List<String>> headers = responseParam.getRequestParams().getHeaders();
+    String hostname = null;
+    if (headers != null && headers.containsKey("host") && !headers.get("host").isEmpty()) {
+      hostname = headers.get("host").get(0);
+    }
+    if (isValidHostname(hostname)) {
+      validHostnameCount++;
+    }
+
+    // Log valid hostname count every minute
+    long currentTime = System.currentTimeMillis();
+    long validHostnameTimeDiff = currentTime - lastValidHostnameLogTime;
+    if (validHostnameTimeDiff >= 60000) { // 60 seconds = 1 minute
+      logger.warnAndAddToDb("Valid hostnames in last minute: " + validHostnameCount +
+                            " (non-IP, not localhost, no port) in " + String.format("%.2f", validHostnameTimeDiff / 1000.0) + " seconds");
+      validHostnameCount = 0;
+      lastValidHostnameLogTime = currentTime;
+    }
+  }
+
   private Map<String, FilterConfig> getFilters() {
     int now = (int) (System.currentTimeMillis() / 1000);
     if (now - filterLastUpdatedAt < filterUpdateIntervalSec) {
@@ -262,6 +321,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     return apiFilters;
   }
 
+
   private String getApiSchema(int apiCollectionId) {
     String apiSchema = null;
     try {
@@ -289,10 +349,95 @@ public class MaliciousTrafficDetectorTask implements Task {
     return apiSchema;
   }
 
+  public static List<SchemaConformanceError> handleSchemaConformFilter(HttpResponseParams responseParam, ApiInfo.ApiInfoKey apiInfoKey, List<SchemaConformanceError> errors){
+    // Early return if status code not in 200-300
+    if(responseParam.getStatusCode() < 200 || responseParam.getStatusCode() >= 300){
+      return errors;
+    }
+
+    // Get API info data from cache (guaranteed non-null)
+    AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
+    Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods = config.getApiInfoUrlToMethods();
+    Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates = config.getApiCollectionUrlTemplates();
+
+    if(apiInfoUrlToMethods.isEmpty() && apiCollectionUrlTemplates.isEmpty()) {
+      logger.infoAndAddToDb("No api infos found for validating schema");
+      return errors;
+    }
+
+    int apiCollectionId = apiInfoKey.getApiCollectionId();
+    String url = apiInfoKey.getUrl();
+    URLMethods.Method method = apiInfoKey.getMethod();
+
+    // Normalize URL: remove query parameters, fragments, and trailing slashes
+    if (url.contains("?")) {
+      url = url.substring(0, url.indexOf("?"));
+    }
+    if (url.contains("#")) {
+      url = url.substring(0, url.indexOf("#"));
+    }
+    if (url.endsWith("/")) {
+      url = url.substring(0, url.length() - 1);
+    }
+
+    // Check if exact URL + method combination exists
+    String urlKey = apiCollectionId + ":" + url;
+    Set<URLMethods.Method> methods = apiInfoUrlToMethods.get(urlKey);
+
+    // Case 1: Both URL and method found - no error
+    if(methods != null && methods.contains(method)){
+      return errors;
+
+    }else if(methods != null && !methods.contains(method)){
+      // Case 2: URL found but method not found - new method detected
+      RequestValidator.addError("#/paths" + url, method.name(), "method",
+        String.format("Method %s not available for path %s in discovered traffic",
+          method.name(), responseParam.getRequestParams().getURL()));
+          return RequestValidator.getErrors();
+    }
+
+
+    // Case 3: URL not found in static URLs, check in template URLs
+    List<URLTemplate> urlTemplates = apiCollectionUrlTemplates.get(apiCollectionId);
+    if(urlTemplates == null || urlTemplates.isEmpty()){
+      // No templates for this collection - URL not found
+      logger.debugAndAddToDb("Schema conformance error: URL not found in discovered traffic - " +
+                             url + " " + method);
+
+      RequestValidator.addError("#/paths", url, "url",
+        "API not found in discovered traffic: " + method + " " + url);
+      return RequestValidator.getErrors();
+    }
+
+    // Single-pass template matching: check URL pattern and method together
+    for(URLTemplate urlTemplate: urlTemplates){
+      URLTemplate.MatchResult result = urlTemplate.matchTemplate(url, method);
+
+      if(result == URLTemplate.MatchResult.FULL_MATCH) {
+        return errors;  // Perfect match - both URL pattern and method
+      }
+
+      if(result == URLTemplate.MatchResult.URL_MATCH_METHOD_MISMATCH) {
+        // URL pattern matched but method doesn't match - new method detected
+        RequestValidator.addError("#/paths" + url, method.name(), "method",
+          String.format("Method %s not available for path %s template %s in discovered traffic",
+            method.name(), responseParam.getRequestParams().getURL(), urlTemplate.getTemplateString()));
+       
+        return RequestValidator.getErrors();
+      }
+    }
+
+    // No template matched at all - URL pattern not found
+    RequestValidator.addError("#/paths", url, "url",
+        "API not found in discovered traffic: " + method + " " + url);
+    return RequestValidator.getErrors();
+  }
+
+
   private void processRecord(HttpResponseParam record) throws Exception {
     HttpResponseParams responseParam = buildHttpResponseParam(record);
+    Context.accountId.set(Integer.parseInt(responseParam.getAccountId()));
     String actor = this.threatConfigEvaluator.getActorId(responseParam);
-
     if (actor == null || actor.isEmpty()) {
       logger.warnAndAddToDb("Dropping processing of record with no actor IP, account: " + responseParam.getAccountId());
       return;
@@ -309,6 +454,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     int apiCollectionId = httpCallParser.createApiCollectionId(responseParam);
     responseParam.requestParams.setApiCollectionId(apiCollectionId);
+
     String url = responseParam.getRequestParams().getURL();
     URLMethods.Method method =
         URLMethods.Method.fromString(responseParam.getRequestParams().getMethod());
@@ -318,7 +464,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     if (this.apiCountWindowBasedThresholdNotifier != null) {
         this.apiCountWindowBasedThresholdNotifier.incrementApiHitcount(apiHitCountKey, responseParam.getTime(), RedisKeyInfo.API_COUNTER_SORTED_SET);
     }
-    
+
     List<SchemaConformanceError> errors = null; 
 
 
@@ -332,7 +478,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     if (!ignoredEventFilters.isEmpty()) {
       isIgnoredEvent = threatDetector.isIgnoredEvent(ignoredEventFilters, rawApi, apiInfoKey);
     }
-      if (apiDistributionEnabled) {
+    if (apiDistributionEnabled && apiCollectionId != 0) {
       String apiCollectionIdStr = Integer.toString(apiCollectionId);
       String distributionKey = Utils.buildApiDistributionKey(apiCollectionIdStr, url, method.toString());
       String ipApiCmsKey = Utils.buildIpApiCmsDataKey(actor, apiCollectionIdStr, url, method.toString());
@@ -351,8 +497,8 @@ public class MaliciousTrafficDetectorTask implements Task {
         logger.debugAndAddToDb("Ratelimit hit for url " + apiInfoKey.getUrl() + " actor: " + actor + " ratelimitConfig "
             + ratelimitConfig.toString());
 
-          RedactionType redactionType = getRedactionType(responseParam.getRequestParams().getHeaders());
-          // Send event to BE.
+        RedactionType redactionType = getRedactionType(responseParam.getRequestParams().getHeaders());
+        // Send event to BE.
         SampleMaliciousRequest maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam,
             ipApiRateLimitFilter, metadata, errors, successfulExploit, isIgnoredEvent, redactionType);
         generateAndPushMaliciousEventRequest(ipApiRateLimitFilter, actor, responseParam, maliciousReq,
@@ -365,6 +511,8 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     for (FilterConfig apiFilter : apiFilters.values()) {
       boolean hasPassedFilter = false;
+       // Create a fresh vulnerable list for each filter
+      List<SchemaConformanceError> vulnerable = null;
 
       if(isDebugRequest(responseParam)){
         logger.debugAndAddToDb("Evaluating filter condition for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
@@ -376,18 +524,21 @@ public class MaliciousTrafficDetectorTask implements Task {
       }
 
       // Evaluate filter first (ignore and filter are independent conditions)
-      if(apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
+      // SchemaConform check is disabled
+      if(Context.accountId.get() == 1758179941 && apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
         logger.debug("SchemaConform filter found for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
-        String apiSchema = getApiSchema(apiCollectionId);
+        vulnerable = handleSchemaConformFilter(responseParam, apiInfoKey, vulnerable); 
         
-        if (apiSchema == null || apiSchema.isEmpty()) {
+        // String apiSchema = getApiSchema(apiCollectionId);
 
-          continue;
+        // if (apiSchema == null || apiSchema.isEmpty()) {
 
-        }
+        //   continue;
 
-        errors = RequestValidator.validate(responseParam, apiSchema, apiInfoKey.toString());
-        hasPassedFilter = errors != null && !errors.isEmpty();
+        // }
+
+        // vulnerable = RequestValidator.validate(responseParam, apiSchema, apiInfoKey.toString());
+        hasPassedFilter = vulnerable != null && !vulnerable.isEmpty();
 
       }else {
         hasPassedFilter = threatDetector.applyFilter(apiFilter, responseParam, rawApi, apiInfoKey);
@@ -416,9 +567,26 @@ public class MaliciousTrafficDetectorTask implements Task {
       // and so we push it to kafka
       if (hasPassedFilter) {
         logger.debugAndAddToDb("filter condition satisfied for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
-        RedactionType redactionType = getRedactionType(responseParam.getRequestParams().getHeaders());
+        
+        // Capture threat positions for LFI, OS Command Injection, and SSRF filters
+        String filterId = apiFilter.getId();
+        if (filterId.equals(ThreatDetector.LFI_FILTER_ID) || 
+            filterId.equals(ThreatDetector.OS_COMMAND_INJECTION_FILTER_ID) || 
+            filterId.equals(ThreatDetector.SSRF_FILTER_ID)) {
 
-          // Later we will also add aggregation support
+          List<SchemaConformanceError> threatPositions = threatDetector.getThreatPositions(filterId, responseParam);
+
+          if (threatPositions != null && !threatPositions.isEmpty()) {
+            // Initialize vulnerable list if null, or append to existing schema errors
+            if (vulnerable == null) {
+              vulnerable = new ArrayList<>();
+            }
+            vulnerable.addAll(threatPositions);
+          }
+        }
+        
+        // Later we will also add aggregation support
+        RedactionType redactionType = getRedactionType(responseParam.getRequestParams().getHeaders());
         // Eg: 100 4xx requests in last 10 minutes.
         // But regardless of whether request falls in aggregation or not,
         // we still push malicious requests to kafka
@@ -438,7 +606,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
         SampleMaliciousRequest maliciousReq = null;
         if (!isAggFilter || !apiFilter.getInfo().getSubCategory().equalsIgnoreCase("API_LEVEL_RATE_LIMITING")) {
-          maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors, successfulExploit, isIgnoredEvent, redactionType);
+          maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, vulnerable, successfulExploit, isIgnoredEvent, redactionType);
         }
 
         if (!isAggFilter) {
@@ -456,7 +624,7 @@ public class MaliciousTrafficDetectorTask implements Task {
               }
               shouldNotify = this.apiCountWindowBasedThresholdNotifier.calcApiCount(apiHitCountKey, responseParam.getTime(), rule);
               if (shouldNotify) {
-                maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors, successfulExploit, isIgnoredEvent, redactionType);
+                maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, vulnerable, successfulExploit, isIgnoredEvent, redactionType);
               }
           } else {
               shouldNotify = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule);

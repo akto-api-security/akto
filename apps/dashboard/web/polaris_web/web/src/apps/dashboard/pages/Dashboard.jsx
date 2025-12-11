@@ -178,6 +178,9 @@ function Dashboard() {
     }
 
     const refreshFunc = () => {
+        if (window.USER_NAME.includes("akto.io")){
+            return;
+        }
         if(document.visibilityState === 'hidden'){
             PersistStore.getState().resetAll();
             LocalStore.getState().resetStore();

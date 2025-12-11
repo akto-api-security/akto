@@ -47,8 +47,7 @@ public class AgentClient {
 
     public TestResult executeAgenticTest(RawApi rawApi, int apiCollectionId) throws Exception {
         String conversationId = UUID.randomUUID().toString();
-        String prompts = rawApi.getRequest().getHeaders().get("x-agent-conversations").get(0);
-        List<String> promptsList = Arrays.asList(prompts.split(","));
+        List<String> promptsList = rawApi.getConversationsList();
         String testMode = getTestModeFromRole();
         
         try {
@@ -172,8 +171,19 @@ public class AgentClient {
             if (jsonNode.has("validation")) {
                 validation = jsonNode.get("validation").asBoolean() || false;
             }
+            String validationMessage = null;
+            String remediationMessage = null;
+            if(validation) {
+                validationMessage = jsonNode.get("validationMessage").asText();
+                remediationMessage = jsonNode.get("remediationMessage").asText();
+            }
+
+            String finalSentPrompt = null;
+            if(jsonNode.has("finalSentPrompt")) {
+                finalSentPrompt = jsonNode.get("finalSentPrompt").asText();
+            }
             
-            return new AgentConversationResult(conversationId, originalPrompt, response, conversation, timestamp, validation);
+            return new AgentConversationResult(conversationId, originalPrompt, response, conversation, timestamp, validation, validationMessage, finalSentPrompt, remediationMessage);
             
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error parsing agent response: " + e.getMessage() + ", response body: " + responseBody, LogDb.TESTING);
@@ -191,7 +201,8 @@ public class AgentClient {
     }
 
     public static boolean isRawApiValidForAgenticTest(RawApi rawApi) {
-        return rawApi.getRequest().getHeaders().containsKey("x-agent-conversations");
+        List<String> temp = rawApi.getConversationsList();
+        return (temp != null && !temp.isEmpty());
     }
     
     public boolean performHealthCheck() {

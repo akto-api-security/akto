@@ -657,43 +657,84 @@ const transform = {
     }
     return conditions;
   },
-  async getAllSubcategoriesData(fetchActive,type){
-    let finalDataSubCategories = [], promises = [], categories = [];
+  async getAllSubcategoriesData(fetchActive, type, setTestsLoaded) {
+    let finalDataSubCategories = [], categories = [];
     let testSourceConfigs = []
     const limit = 50;
-    for(var i = 0 ; i < 40; i++){
-      promises.push(
-        api.fetchAllSubCategories(fetchActive, type, i * limit, limit)
-      )
-    }
-    const allResults = await Promise.allSettled(promises);
-    for (const result of allResults) {
-      if (result.status === "fulfilled"){
-        if(result?.value?.subCategories && result?.value?.subCategories !== undefined && result?.value?.subCategories.length > 0){
-          finalDataSubCategories.push(...result.value.subCategories);
-        }
+    const maxBatches = 125; // Maximum 6000 entries
+    const batchSize = 10; // Fetch 10 batches at a time for parallel requests
+    
+    let currentBatch = 0;
+    let hasMoreData = true;
+    
+    let totalTestsLoaded = 0;
+    
+    while (currentBatch < maxBatches && hasMoreData) {
+      let promises = [];
+      const batchesToFetch = Math.min(batchSize, maxBatches - currentBatch);
+      
+      // Create parallel requests for current batch range
+      for (let i = 0; i < batchesToFetch; i++) {
+        const skip = (currentBatch + i) * limit;
+        promises.push(
+          api.fetchAllSubCategories(fetchActive, type, skip, limit)
+        );
+      }
+      
+      const allResults = await Promise.allSettled(promises);
+      let foundIncompleteBatch = false;
+      
+      for (const result of allResults) {
+        if (result.status === "fulfilled"){
+          const subCategoriesCount = result?.value?.subCategories?.length || 0;
+          
+          if(subCategoriesCount > 0){
+            finalDataSubCategories.push(...result.value.subCategories);
+            totalTestsLoaded += subCategoriesCount;
+            if(setTestsLoaded){
+              setTestsLoaded(Math.min(totalTestsLoaded, 4000))
+            }
 
-        if(result?.value?.categories && result?.value?.categories !== undefined && result?.value?.categories.length > 0){
-          if(categories.length === 0){
-            categories.push(...result.value.categories);
+            // If a batch returned fewer than limit items, we've reached the end
+            if (subCategoriesCount < limit) {
+              foundIncompleteBatch = true;
+            }
+          }
+
+          if(result?.value?.categories && result?.value?.categories !== undefined && result?.value?.categories.length > 0){
+            if(categories.length === 0){
+              categories.push(...result.value.categories);
+            }
+          }
+
+          if (result?.value?.testSourceConfigs &&
+            result?.value?.testSourceConfigs !== undefined &&
+            result?.value?.testSourceConfigs.length > 0) {
+            testSourceConfigs = result?.value?.testSourceConfigs
           }
         }
-
-        if (result?.value?.testSourceConfigs &&
-          result?.value?.testSourceConfigs !== undefined &&
-          result?.value?.testSourceConfigs.length > 0) {
-          testSourceConfigs = result?.value?.testSourceConfigs
-        }
+      }
+      
+      currentBatch += batchesToFetch;
+      
+      // Stop if we found an incomplete batch (fewer than limit items)
+      if (foundIncompleteBatch) {
+        hasMoreData = false;
       }
     }
+    
     return {
       categories: categories,
       subCategories: finalDataSubCategories,
       testSourceConfigs: testSourceConfigs
     }
   },
-  async setTestMetadata() {
-    const resp = await this.getAllSubcategoriesData(false, "Dashboard")
+  async setTestMetadata(category, setTestsLoaded) {
+    let type = "Dashboard";
+    if(category){
+      type = category;
+    }
+    const resp = await this.getAllSubcategoriesData(false, type, setTestsLoaded)
     let subCategoryMap = {};
     resp.subCategories.forEach((x) => {
       func.trimContentFromSubCategory(x)
@@ -777,7 +818,7 @@ getInfoSectionsHeaders(){
   ]
   return moreInfoSections
   },
-convertSubIntoSubcategory(resp){
+async convertSubIntoSubcategory(resp){
   let obj = {}
   let countObj = {
     CRITICAL: 0,
@@ -785,7 +826,11 @@ convertSubIntoSubcategory(resp){
     MEDIUM: 0,
     LOW: 0,
   }
-  const subCategoryMap = LocalStore.getState().subCategoryMap
+  let subCategoryMap = LocalStore.getState().subCategoryMap
+  if(subCategoryMap==undefined || subCategoryMap==null || Object.keys(subCategoryMap).length === 0){
+    await this.setTestMetadata()
+    subCategoryMap = LocalStore.getState().subCategoryMap
+  }
   Object.keys(resp).forEach((key)=>{
     const objectKey = subCategoryMap[key] ? subCategoryMap[key].superCategory.shortName : key;
     const objectKeyName = subCategoryMap[key] ? subCategoryMap[key].superCategory.name : key;
@@ -1342,6 +1387,8 @@ getMissingConfigs(testResults){
   },
   prepareConversationsList(agentConversationResults){
     let conversationsListCopy = []
+    let extractedRemediationText = ''
+    
     agentConversationResults.forEach(conversation => {
         let commonObj = {
             creationTimestamp: conversation.timestamp,
@@ -1350,17 +1397,42 @@ getMissingConfigs(testResults){
         conversationsListCopy.push({
             ...commonObj,
             _id: "user_" + conversation.prompt,
-            message: conversation.prompt,
+            message: conversation?.finalSentPrompt || conversation.prompt,
             role: "user"
         })
+        
+        // Check if response contains "## ROOT CAUSE ANALYSIS"
+        let systemMessage = conversation.response
+        extractedRemediationText = conversation.remediationMessage || "";
+        
+        if (systemMessage && typeof systemMessage === 'string') {
+            const rootCauseIndex = systemMessage.indexOf('ROOT CAUSE ANALYSIS')
+            if (rootCauseIndex !== -1) {
+                // Extract remediation text (from "## ROOT CAUSE ANALYSIS" to the end)
+                if (!extractedRemediationText) {
+                    extractedRemediationText = systemMessage.substring(rootCauseIndex)
+                }
+                // Keep only the part before "## ROOT CAUSE ANALYSIS" for the conversation
+                systemMessage = systemMessage.substring(0, rootCauseIndex).trim()
+            }
+        }
+
+        if(conversation?.validationMessage !== null && conversation?.validationMessage !== undefined && conversation?.validationMessage?.length > 0){
+          systemMessage += ("\n\n### VALIDATION MESSAGE ###\n" + conversation?.validationMessage);
+        }
+        
         conversationsListCopy.push({
             ...commonObj,
             _id: "system_" + conversation.response,
-            message: conversation.response,
+            message: systemMessage,
             role: "system"
         })
     })
-    return conversationsListCopy;
+    
+    return {
+        conversations: conversationsListCopy,
+        remediationText: extractedRemediationText
+    }
   }
 }
 

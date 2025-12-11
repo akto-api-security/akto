@@ -439,8 +439,8 @@ const transform = {
                 {
                     Object.keys(sortedSeverityInfo).length > 0 ? Object.keys(sortedSeverityInfo).map((key,index)=>{
                         return(
-                            <div className={`badge-wrapper-${key}`}>
-                                <Badge size="small" key={index}>{Math.max(sortedSeverityInfo[key], 0).toString()}</Badge>
+                            <div key={`severity-badge-${key}-${index}`} className={`badge-wrapper-${key}`}>
+                                <Badge size="small">{Math.max(sortedSeverityInfo[key], 0).toString()}</Badge>
                             </div>
                         )
                     }):
@@ -451,16 +451,28 @@ const transform = {
     },
 
     getCollectionTypeList(envType, maxItems, wrap){
-        if(envType == null || envType.length === 0){ 
+        if(envType == null || envType.length === 0){
             return <></>
         }
+
+        // Sort tags to prioritize 'privatecloud.agoda.com/service' first
+        const sortedEnvType = [...envType].sort((a, b) => {
+            const aKey = a.split('=')[0];
+            const bKey = b.split('=')[0];
+
+            if (aKey === 'privatecloud.agoda.com/service') return -1;
+            if (bKey === 'privatecloud.agoda.com/service') return 1;
+            return 0;
+        });
+
         return (
             <ShowListInBadge
-                itemsArr={envType}
+                itemsArr={sortedEnvType}
                 maxItems={maxItems}
                 status={"info"}
                 useTooltip={true}
                 wrap={wrap}
+                allowFullWidth={true}
             />
         )
     },
@@ -482,9 +494,20 @@ const transform = {
             <Box maxWidth="200px">
                 <HorizontalStack gap={1} wrap={false}>
                     {sensitiveTags.map((item,index)=>{
+                        const iconSource = func.getSensitiveIcons(item);
+                        const isSvgString = typeof iconSource === 'string' && iconSource.trim().startsWith('<svg');
+
                         return (index < 4 ? <Tooltip dismissOnMouseOut content={item} key={index + item}><Box>
                             <div className={deactivated ? "icon-deactivated" : ""}>
-                                <Icon color={deactivated ? "" : "subdued"} source={func.getSensitiveIcons(item)} />
+                                {isSvgString ? (
+                                    <img
+                                        src={`data:image/svg+xml;base64,${btoa(iconSource)}`}
+                                        alt={item}
+                                        style={{display: 'flex', alignItems: 'center', width: '20px', height: '20px'}}
+                                    />
+                                ) : (
+                                    <Icon color={deactivated ? "" : "subdued"} source={iconSource} />
+                                )}
                             </div>
                         </Box></Tooltip> : null)
                     })}
@@ -494,10 +517,16 @@ const transform = {
         )
     },
 
-    prettifyCollectionsData(newData, isLoading){
+    prettifyCollectionsData(newData, isLoading, selectedTab){
         const prettifyData = newData.map((c)=>{
+            // Check if we're in the untracked tab
+            const isUntrackedTab = selectedTab === 'untracked';
+
+            // Calculate coverage - for untracked tab, leave it blank
             let calcCoverage = '0%';
-            if(!c.isOutOfTestingScope){
+            if(isUntrackedTab){
+                calcCoverage = '';
+            } else if(!c.isOutOfTestingScope){
                 if(c.urlsCount > 0){
                     if(c.urlsCount < c.testedEndpoints){
                         calcCoverage= '100%'
@@ -508,15 +537,38 @@ const transform = {
             }else{
                 calcCoverage = 'N/A'
             }
+
             const loadingComp = <Text color="subdued" variant="bodyMd">...</Text>
+
+            // Create displayNameComp if it doesn't exist (for lazy-loaded items)
+            const displayNameComp = c.displayNameComp || (
+                <HorizontalStack gap="2" align="start">
+                    <Box maxWidth="30vw"><Text truncate fontWeight="medium">{c.displayName}</Text></Box>
+                    {c.registryStatus === "available" && <Badge>Registry</Badge>}
+                </HorizontalStack>
+            );
+
+            // Create descriptionComp if it doesn't exist
+            const descriptionComp = c.descriptionComp || (<Box maxWidth="350px"><Text>{c.description}</Text></Box>);
+
+            // Create outOfTestingScopeComp if it doesn't exist
+            const outOfTestingScopeComp = c.outOfTestingScopeComp || (c.isOutOfTestingScope ? (<Text>Yes</Text>) : (<Text>No</Text>));
+
+            // Risk score component - for untracked tab, show blank
+            const riskScoreComp = isUntrackedTab
+                ? <Text></Text>
+                : (isLoading ? loadingComp : <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>);
+
             return{
                 ...c,
                 id: c.id,
                 nextUrl: '/dashboard/observe/inventory/' + c.id,
                 displayName: c.displayName,
-                displayNameComp: c.displayNameComp,
-                riskScoreComp: isLoading ? loadingComp : <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
-                coverage: isLoading ? '...' : calcCoverage,
+                displayNameComp: displayNameComp,
+                descriptionComp: descriptionComp,
+                outOfTestingScopeComp: outOfTestingScopeComp,
+                riskScoreComp: riskScoreComp,
+                coverage: calcCoverage,
                 issuesArr: isLoading ? loadingComp : this.getIssuesList(c.severityInfo),
                 issuesArrVal: this.getIssuesListText(c.severityInfo),
                 sensitiveSubTypes: isLoading ? loadingComp : this.prettifySubtypes(c.sensitiveInRespTypes, c.deactivated),
@@ -529,6 +581,47 @@ const transform = {
             }
         })
 
+
+        return prettifyData
+    },
+
+    prettifyUntrackedCollectionsData(newData){
+        const prettifyData = newData.map((c)=>{
+            // Create displayNameComp if it doesn't exist (for lazy-loaded items)
+            const displayNameComp = c.displayNameComp || (
+                <HorizontalStack gap="2" align="start">
+                    <Box maxWidth="30vw"><Text truncate fontWeight="medium">{c.displayName}</Text></Box>
+                    {c.registryStatus === "available" && <Badge>Registry</Badge>}
+                </HorizontalStack>
+            );
+
+            // For untracked tab, show empty/blank values for fields that don't apply
+            return{
+                ...c,
+                id: c.id,
+                name: c.name,
+                nextUrl: null,
+                displayName: c.displayName,
+                displayNameComp: displayNameComp,
+                descriptionComp: <Text></Text>, // Empty for untracked
+                outOfTestingScopeComp: <Text></Text>, // Empty for untracked
+                riskScoreComp: <Text></Text>, // Empty for untracked
+                coverage: '', // Empty for untracked
+                issuesArr: <Text></Text>, // Empty for untracked - no issues data
+                issuesArrVal: '', // Empty for untracked
+                sensitiveSubTypes: <Text></Text>, // Empty for untracked - no sensitive data
+                sensitiveSubTypesVal: '', // Empty for untracked
+                lastTraffic: '', // Empty for untracked
+                discovered: '', // Empty for untracked
+                riskScore: 0,
+                deactivatedRiskScore: 0,
+                activatedRiskScore: 0,
+                envTypeComp: <Text></Text>, // Empty for untracked
+                testedEndpoints: 0,
+                collapsibleRow: c.collapsibleRow,
+                collapsibleRowText: c.collapsibleRowText,
+            }
+        })
 
         return prettifyData
     },
@@ -561,13 +654,20 @@ const transform = {
 
     getTruncatedUrl(url){
         const category = getDashboardCategory();
+        let parsedURL = url;
+        let pathUrl = url;
+        try {
+            parsedURL = new URL(url)
+            pathUrl = parsedURL.pathname.replace(/%7B/g, '{').replace(/%7D/g, '}');
+        } catch (error) {
+            
+        }
         if(category.includes("MCP") || category.includes("Agentic")){
             try {
-                const s = String(url);
-                const [path, tail = ""] = s.split(/(?=[?#])/); // keep ? or # in tail
+                const [path, tail = ""] = pathUrl.split(/(?=[?#])/); // keep ? or # in tail
                 const newPath = path
                   .replace(/^.*?\/calls?(?:\/|$)/i, "/")       // keep only what's after /call or /calls
-                  .replace(/\/{2,}/g, "/");                    // collapse slashes
+                  .replace(/\/{2,}/g, "/");                  // collapse slashes
                 return (newPath.endsWith("/") && newPath !== "/")
                   ? newPath.slice(0, -1) + tail
                   : newPath + tail;
@@ -576,13 +676,7 @@ const transform = {
             }
             
         }
-        try {
-            const parsedURL = new URL(url)
-            const pathUrl = parsedURL.pathname.replace(/%7B/g, '{').replace(/%7D/g, '}');
-            return pathUrl
-        } catch (error) {
-            return url
-        }
+        return pathUrl;
     },
 
     getHostName(url){

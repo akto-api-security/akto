@@ -21,10 +21,12 @@ public class Cluster {
     public static final String TELEMETRY_CRON = "telemetry-cron";
     public static final String MAP_SENSITIVE_IN_INFO = "map-sensitiveInfo-in-ApiInfo";
     public static final String SYNC_CRON_INFO = "sync-cron-info";
+    public static final String MCP_MALICIOUSNESS_CRON_INFO = "mcp-maliciousness-cron-info";
     public static final String TOKEN_GENERATOR_CRON = "token-generator-cron";
     public static final String AUTOMATED_API_GROUPS_CRON = "automated-api-groups-cron";
     public static final String DEPENDENCY_FLOW_CRON= "dependency-flow-cron";
     public static final String DELETE_TESTING_RUN_RESULTS = "delete-testing-run-results";
+    public static final String ALERTS_CRON = "alerts-cron";
 
     public static final String winnerId = UUID.randomUUID().toString();
 
@@ -44,34 +46,48 @@ public class Cluster {
 
         FindOneAndUpdateOptions options = new FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER);
 
-        Dibs dibs;
-        Bson findKeyQ = Filters.and(
+        Dibs dibs = null;
+        
+        // Try to acquire lock if: lock doesn't exist OR lock has expired OR lock is held by us (renewal)
+        Bson acquireLockFilter = Filters.and(
             Filters.eq("_id", prize),
-            Filters.exists("expiryTs", false)
+            Filters.or(
+                Filters.exists("expiryTs", false),  // Lock doesn't exist or is very old format
+                Filters.lte("expiryTs", now),        // Lock has expired
+                Filters.and(                         // Lock is held by us (renewal)
+                    Filters.eq("winner", winnerId),
+                    Filters.gt("expiryTs", now)      // But not expired yet
+                )
+            )
         );
 
         try {    
-            dibs = DibsDao.instance.getMCollection().findOneAndUpdate(findKeyQ, updates, options);
-            logger.info("try" + dibs);
+            dibs = DibsDao.instance.getMCollection().findOneAndUpdate(acquireLockFilter, updates, options);
+            logger.info("Dibs acquired: " + dibs.toString());
         } catch (MongoCommandException e) {
-            // already present
-            Bson findExpiredKeyQ = Filters.and(
-                Filters.eq("_id", prize),
-                Filters.lte("expiryTs", now)
-            );
-    
+            // Update failed - likely because another instance has the lock
+            // Read the current state to check if we already have it
             try {
-                dibs = DibsDao.instance.getMCollection().findOneAndUpdate(findExpiredKeyQ, updates, options);
-                logger.info("catch1" + dibs);
-            } catch (MongoCommandException eInside) {
                 dibs = DibsDao.instance.findOne(Filters.eq("_id", prize));
-                logger.error("catch2" + dibs);
+                if (dibs != null) {
+                    logger.info("Dibs check existing: " + dibs.toString());
+                } else {
+                    logger.warn("Dibs document not found after update failure");
+                }
+            } catch (Exception readException) {
+                logger.error("Error reading dibs after update failure", readException);
             }
         }
 
-        logger.info("final: " + dibs);
-
-        return (dibs == null || (dibs.getWinner().equals(winnerId) && dibs.getExpiryTs() == expiryTs));
+        // Return true only if we successfully acquired/renewed the lock
+        // Check: dibs is not null, winner is us, and expiryTs matches what we set
+        if (dibs == null) {
+            return false;
+        }
+        
+        boolean acquired = dibs.getWinner().equals(winnerId) && dibs.getExpiryTs() == expiryTs;
+        logger.info("Dibs final result: acquired=" + acquired + ", " + dibs.toString());
+        return acquired;
     }
 
 }

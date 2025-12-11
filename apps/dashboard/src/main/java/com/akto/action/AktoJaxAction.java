@@ -11,17 +11,21 @@ import com.akto.dto.CrawlerRun;
 import com.akto.dto.CrawlerUrl;
 import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.testing.*;
+import com.akto.dto.traffic.CollectionTags;
+import com.akto.dto.traffic.CollectionTags.TagSource;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
 import com.akto.util.RecordedLoginFlowUtil;
-import com.akto.util.enums.LoginFlowEnums;
 import com.akto.utils.Utils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
@@ -70,25 +74,34 @@ public class AktoJaxAction extends UserAction {
             collectionsAction.setCollectionName(host);
             String collectionStatus = collectionsAction.createCollection();
             int collectionId = 0;
-
+            ApiCollection apiCollection = null;
             if(collectionStatus.equalsIgnoreCase(Action.SUCCESS)) {
                 List<ApiCollection> apiCollections = collectionsAction.getApiCollections();
                 if (apiCollections != null && !apiCollections.isEmpty()) {
-                    collectionId = apiCollections.get(0).getId();
+                    apiCollection = apiCollections.get(0);
+                    collectionId = apiCollection.getId();
                 } else {
-                    ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.NAME, host));
+                    apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.NAME, host));
                     if (apiCollection != null) {
                         collectionId = apiCollection.getId();
                     }
                 }
             } else {
-                ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.NAME, host));
+                apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.NAME, host));
                 if (apiCollection != null) {
                     collectionId = apiCollection.getId();
                 }
             }
 
             loggerMaker.infoAndAddToDb("Crawler collection id: " + collectionId);
+            if (apiCollection != null && !apiCollection.isDastCollection()) {
+                ApiCollectionsDao.instance.getMCollection().updateOne(
+                        Filters.eq(Constants.ID, collectionId),
+                        Updates.set(ApiCollection.TAGS_STRING, Collections.singletonList(
+                                new CollectionTags(Context.now(), Constants.AKTO_DAST_TAG, "DAST", TagSource.USER))),
+                            new UpdateOptions().upsert(false));
+                loggerMaker.infoAndAddToDb("Updated Collection with tag: " + collectionId);
+            }
 
             String crawlId = UUID.randomUUID().toString();
 
@@ -189,7 +202,12 @@ public class AktoJaxAction extends UserAction {
         loggerMaker.infoAndAddToDb("uploadCrawlerData() - Crawler topic: " + topic);
 
         // fetch collection id
-        ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq("_id", Integer.valueOf(apiCollectionId)));
+        ApiCollection apiCollection = null;
+        MongoCursor<ApiCollection> cursor = ApiCollectionsDao.instance.getMCollection().find(Filters.eq("_id", Integer.valueOf(apiCollectionId))).cursor();
+        while (cursor.hasNext()) {
+            apiCollection = cursor.next();
+            break;
+        }
         if(apiCollection == null) {
             addActionError("API collection not found");
             return Action.ERROR.toUpperCase();

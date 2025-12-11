@@ -18,4 +18,13 @@ export default {
         return resp
     },
 
+    async deleteGuardrailPolicies(policyIds) {
+        const resp = await request({
+            url: '/api/deleteGuardrailPolicies',
+            method: 'post',
+            data: { policyIds }
+        })
+        return resp
+    },
+
 }

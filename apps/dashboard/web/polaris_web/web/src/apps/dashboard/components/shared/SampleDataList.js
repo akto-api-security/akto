@@ -16,7 +16,11 @@ function SchemaValidationError({ sampleData}) {
         return null;
     }
     const schemaErrors = JSON.parse(sampleData?.metadata)?.schemaErrors || [];
-    if (schemaErrors.length === 0) {
+    
+    // Only show actual schema validation errors
+    const schemaValidationErrors = schemaErrors.filter(error => error?.attribute !== 'threat_detected');
+    
+    if (schemaValidationErrors.length === 0) {
         return null;
     }
 
@@ -28,7 +32,7 @@ function SchemaValidationError({ sampleData}) {
                 status="critical"
             >
                 <List type="bullet">
-                    {schemaErrors?.map((error, index) => {
+                    {schemaValidationErrors?.map((error, index) => {
                         return <List.Item key={index}>{error?.message}</List.Item>
                     })}
                 </List>
@@ -50,7 +54,7 @@ function SampleDataList(props) {
   
     return (
       <VerticalStack gap="3">
-        <SchemaValidationError sampleData={sampleData[Math.min(page, sampleData.length - 1)]} />
+         <SchemaValidationError sampleData={sampleData[Math.min(page, sampleData.length - 1)]} />
         <HorizontalStack align='space-between'>
           <HorizontalStack gap="2">
             <Text variant='headingMd'>
@@ -103,6 +107,7 @@ function SampleDataList(props) {
                       showDiff={showDiff}
                       isNewDiff={isNewDiff}
                       metadata={metadata}
+                      readOnly={true}
                     />
                   </LegacyCard>
                 </Box>

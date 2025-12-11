@@ -2,10 +2,13 @@ package com.akto.action;
 
 import com.akto.dao.AzureBoardsIntegrationDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.monitoring.FilterConfigYamlParser;
+import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.azure_boards_integration.AzureBoardsIntegration;
+import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.test_editor.Info;
@@ -162,6 +165,14 @@ public class AzureBoardsIntegrationAction extends UserAction {
     private TestingIssuesId testingIssuesId;
     private String aktoDashboardHostName;
     public List<BasicDBObject> customABWorkItemFieldsPayload;
+    
+    // Fields for general work item creation (for threat events)
+    private String threatEventId;
+    private String templateId;  // filterId from threat policy
+    private String title;
+    private String description;
+    private String endpoint;  // endpoint path for title formatting
+    private String azureBoardsWorkItemUrl;
 
     public String createWorkItem() {
         AzureBoardsIntegration azureBoardsIntegration = AzureBoardsIntegrationDao.instance.findOne(new BasicDBObject());
@@ -436,6 +447,197 @@ public class AzureBoardsIntegrationAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    /**
+     * Creates a general Azure Boards work item (for threat events or other general use cases)
+     * Similar to createGeneralJiraTicket
+     */
+    public String createGeneralAzureBoardsWorkItem() {
+        AzureBoardsIntegration azureBoardsIntegration = AzureBoardsIntegrationDao.instance.findOne(new BasicDBObject());
+        if(azureBoardsIntegration == null) {
+            logger.errorAndAddToDb("Azure Boards Integration not found for account: " + Context.accountId.get(), LoggerMaker.LogDb.DASHBOARD);
+            addActionError("Azure Boards Integration is not integrated.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        try {
+            BasicDBList reqPayload = new BasicDBList();
+            
+            String workItemTitle = this.title;
+            String workItemDescription = this.description;
+            
+            // If templateId is provided, fetch threat policy info and use it
+            if (this.templateId != null && !this.templateId.isEmpty()) {
+                try {
+                    YamlTemplate threatPolicyTemplate = FilterYamlTemplateDao.instance.findOne(
+                        Filters.eq(Constants.ID, this.templateId)
+                    );
+                    
+                    if (threatPolicyTemplate != null && threatPolicyTemplate.getContent() != null) {
+                        FilterConfig filterConfig = FilterConfigYamlParser.parseTemplate(
+                            threatPolicyTemplate.getContent(), false
+                        );
+                        
+                        if (filterConfig != null && filterConfig.getInfo() != null) {
+                            Info policyInfo = filterConfig.getInfo();
+                            
+                            // Format title as "Policy Name - Endpoint"
+                            if (policyInfo.getName() != null && !policyInfo.getName().isEmpty()) {
+                                if (this.endpoint != null && !this.endpoint.isEmpty()) {
+                                    workItemTitle = policyInfo.getName() + " - " + this.endpoint;
+                                } else {
+                                    workItemTitle = policyInfo.getName();
+                                }
+                            }
+                            
+                            // Build description: keep original description and append Description, Details, Impact from threat policy
+                            StringBuilder descriptionBuilder = new StringBuilder();
+                            
+                            // Keep the original description (Template ID, Severity, Attack Count, Host, Endpoint, Reference URL)
+                            if (workItemDescription != null && !workItemDescription.isEmpty()) {
+                                descriptionBuilder.append(workItemDescription);
+                                descriptionBuilder.append("\n\n");
+                            }
+                            
+                            // Append Description, Details, and Impact from threat policy
+                            if (policyInfo.getDescription() != null && !policyInfo.getDescription().isEmpty()) {
+                                descriptionBuilder.append("Description:\n");
+                                descriptionBuilder.append(policyInfo.getDescription());
+                                descriptionBuilder.append("\n\n");
+                            }
+                            
+                            if (policyInfo.getDetails() != null && !policyInfo.getDetails().isEmpty()) {
+                                descriptionBuilder.append("Details:\n");
+                                descriptionBuilder.append(policyInfo.getDetails());
+                                descriptionBuilder.append("\n\n");
+                            }
+                            
+                            if (policyInfo.getImpact() != null && !policyInfo.getImpact().isEmpty()) {
+                                descriptionBuilder.append("Impact:\n");
+                                descriptionBuilder.append(policyInfo.getImpact());
+                            }
+                            
+                            // Update description with combined content
+                            if (descriptionBuilder.length() > 0) {
+                                workItemDescription = descriptionBuilder.toString();
+                            }
+                            
+                            logger.infoAndAddToDb("Using threat policy info for work item: " + this.templateId, LoggerMaker.LogDb.DASHBOARD);
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.errorAndAddToDb("Error fetching threat policy template: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+                    // Continue with original title and description if template fetch fails
+                }
+            }
+            
+            // Add title
+            BasicDBObject titleDBObject = new BasicDBObject();
+            titleDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
+            titleDBObject.put("path", "/fields/System.Title");
+            titleDBObject.put("value", workItemTitle);
+            reqPayload.add(titleDBObject);
+
+            // Add description with HTML formatting
+            String formattedDescription = workItemDescription.replace("\n", "<br>");
+            BasicDBObject descriptionDBObject = new BasicDBObject();
+            descriptionDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
+            descriptionDBObject.put("path", "/fields/System.Description");
+            descriptionDBObject.put("value", formattedDescription);
+            reqPayload.add(descriptionDBObject);
+
+            // Add custom fields if provided
+            if (customABWorkItemFieldsPayload != null) {
+                for (BasicDBObject field: customABWorkItemFieldsPayload) {
+                    try {
+                        String fieldReferenceName = field.getString("referenceName");
+                        String fieldValue = field.getString("value");
+                        String fieldType = field.getString("type");
+
+                        BasicDBObject customFieldDBObject = new BasicDBObject();
+                        customFieldDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
+                        customFieldDBObject.put("path", "/fields/" + fieldReferenceName);
+
+                        switch (fieldType) {
+                            case "integer":
+                                int intValue = Integer.parseInt(fieldValue);
+                                customFieldDBObject.put("value", intValue);
+                                break;
+                            case "double":
+                                double doubleValue = Double.parseDouble(fieldValue);
+                                customFieldDBObject.put("value", doubleValue);
+                                break;
+                            case "boolean":
+                                boolean booleanValue = Boolean.parseBoolean(fieldValue);
+                                customFieldDBObject.put("value", booleanValue);
+                                break;
+                            default:
+                                customFieldDBObject.put("value", fieldValue);
+                        }
+
+                        reqPayload.add(customFieldDBObject);
+                    } catch (Exception e) {
+                        logger.errorAndAddToDb("Error processing custom field: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+                        continue;
+                    }
+                }
+            }
+
+            String url = azureBoardsIntegration.getBaseUrl() + "/" + azureBoardsIntegration.getOrganization() + "/" + projectName + "/_apis/wit/workitems/$" + workItemType + "?api-version=" + version;
+            logger.infoAndAddToDb("Azure board final url: " + url, LoggerMaker.LogDb.DASHBOARD);
+
+            Map<String, List<String>> headers = new HashMap<>();
+            headers.put("Authorization", Collections.singletonList("Basic " + azureBoardsIntegration.getPersonalAuthToken()));
+            headers.put("content-type", Collections.singletonList("application/json-patch+json"));
+            
+            OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", reqPayload.toString(), headers, "");
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+            logger.infoAndAddToDb("Status and Response from the createGeneralAzureBoardsWorkItem API: " + response.getStatusCode() + " | " + response.getBody());
+            
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() > 201 || responsePayload == null) {
+                addActionError("Error while creating Azure Boards work item");
+                return Action.ERROR.toUpperCase();
+            }
+
+            BasicDBObject respPayloadObj = BasicDBObject.parse(responsePayload);
+
+            String workItemUrl;
+            try {
+                Object linksObj = respPayloadObj.get("_links");
+                BasicDBObject links = BasicDBObject.parse(linksObj.toString());
+                Object htmlObj = links.get("html");
+                BasicDBObject html = BasicDBObject.parse(htmlObj.toString());
+                Object href = html.get("href");
+                workItemUrl = href.toString();
+            } catch (Exception e) {
+                workItemUrl = respPayloadObj.get("url").toString();
+            }
+
+            if(workItemUrl == null) {
+                addActionError("Failed to extract work item URL from response");
+                return Action.ERROR.toUpperCase();
+            }
+
+            this.azureBoardsWorkItemUrl = workItemUrl;
+
+            // Update malicious event with Azure Boards work item URL if threatEventId is provided
+            if(threatEventId != null && !threatEventId.isEmpty()) {
+                // TODO: Add support for updating malicious event with Azure Boards work item URL
+                // For now, we'll need to add this functionality similar to updateMaliciousEventJiraUrl
+                // This requires backend changes to support azureBoardsWorkItemUrl in the threat detection service
+                logger.infoAndAddToDb("Threat event ID provided: " + threatEventId + ", but Azure Boards URL update not yet implemented", LoggerMaker.LogDb.DASHBOARD);
+            }
+
+            return Action.SUCCESS.toUpperCase();
+
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Error creating general Azure Boards work item: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            e.printStackTrace();
+            addActionError("Error creating Azure Boards work item: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
     public String getAzureBoardsBaseUrl() {
         return azureBoardsBaseUrl;
     }
@@ -534,5 +736,53 @@ public class AzureBoardsIntegrationAction extends UserAction {
 
     public void setCustomABWorkItemFieldsPayload(List<BasicDBObject> customABWorkItemFieldsPayload) {
         this.customABWorkItemFieldsPayload = customABWorkItemFieldsPayload;
+    }
+
+    public String getThreatEventId() {
+        return threatEventId;
+    }
+
+    public void setThreatEventId(String threatEventId) {
+        this.threatEventId = threatEventId;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public String getAzureBoardsWorkItemUrl() {
+        return azureBoardsWorkItemUrl;
+    }
+
+    public void setAzureBoardsWorkItemUrl(String azureBoardsWorkItemUrl) {
+        this.azureBoardsWorkItemUrl = azureBoardsWorkItemUrl;
+    }
+
+    public String getTemplateId() {
+        return templateId;
+    }
+
+    public void setTemplateId(String templateId) {
+        this.templateId = templateId;
+    }
+
+    public String getEndpoint() {
+        return endpoint;
+    }
+
+    public void setEndpoint(String endpoint) {
+        this.endpoint = endpoint;
     }
 }

@@ -1,6 +1,6 @@
 import CollectionComponent from "../../../components/CollectionComponent"
 import OperatorDropdown from "../../../components/layouts/OperatorDropdown";
-import { VerticalStack, Card, Button, HorizontalStack, Collapsible, Text, Box, Icon, Popover, ActionList } from "@shopify/polaris";
+import { VerticalStack, Card, Button, HorizontalStack, Collapsible, Text, Box, Icon, Popover, ActionList, Checkbox } from "@shopify/polaris";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import React, { useState, useReducer, useCallback, useMemo, useEffect } from 'react'
@@ -14,6 +14,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import PersistStore from "../../../../main/PersistStore";
 import collectionsApi from "./api"
 import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
+import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 
 function APIQuery() {
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), []);
@@ -26,6 +27,11 @@ function APIQuery() {
     const collectionsMap = PersistStore.getState().collectionsMap
     const [isUpdate, setIsUpdate] = useState(false)
     const [moreActions, setMoreActions] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+
+    // Only show checkbox for specific accounts
+    const showSkipTagsMismatch = func.isApiCollectionsCachingEnabled();
+    const [skipTagsMismatch, setSkipTagsMismatch] = useState(showSkipTagsMismatch);
 
     const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
@@ -134,16 +140,19 @@ function APIQuery() {
     }
 
     const handleClearFunction = useCallback(() => {
+        setIsLoading(true);
         dispatchConditions({ type: "clear" });
         setEndpointListFromConditions({});
         setSensitiveParams({});
+        setIsLoading(false);
     }, []);
 
 
     const exploreEndpoints = useCallback(async () => {
+        setIsLoading(true);
         let dt = prepareData();
         if (dt.length > 0) {
-            let endpointListFromConditions = await api.getEndpointsListFromConditions(dt);
+            let endpointListFromConditions = await api.getEndpointsListFromConditions(dt, skipTagsMismatch);
             let sensitiveParams = await api.loadSensitiveParameters(-1);
             if (endpointListFromConditions || sensitiveParams) {
                 setEndpointListFromConditions(endpointListFromConditions);
@@ -154,7 +163,8 @@ function APIQuery() {
             setEndpointListFromConditions({});
             setSensitiveParams({});
         }
-    }, [prepareData]);
+        setIsLoading(false);
+    }, [prepareData, skipTagsMismatch]);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const modalComponent =
@@ -216,7 +226,15 @@ function APIQuery() {
                                     conditions.length > 0 ? <Button plain destructive onClick={handleClearFunction}>Clear all</Button> : null
                                 }
                             </HorizontalStack>
-                            <HorizontalStack gap={4} align="end">
+                            <HorizontalStack gap={4} align="space-between">
+                                {showSkipTagsMismatch && (
+                                    <Checkbox
+                                        label="Hide mismatched collections"
+                                        checked={skipTagsMismatch}
+                                        onChange={setSkipTagsMismatch}
+                                        helpText="Filter out endpoints from collections with tags-mismatch=true"
+                                    />
+                                )}
                                 <Button onClick={exploreEndpoints}>Explore {mapLabel("endpoints", getDashboardCategory())}</Button>
                             </HorizontalStack>
                         </VerticalStack>
@@ -228,13 +246,13 @@ function APIQuery() {
     const components = useMemo(() => [
         modalComponent,
         collapsibleComponent,
-        <ApiEndpoints
+        isLoading ? <SpinnerCentered/> : <ApiEndpoints
             key="endpoint-table"
             endpointListFromConditions={endpointListFromConditions}
             sensitiveParamsForQuery={sensitiveParams}
             isQueryPage={true}
         />
-    ], [modalComponent, collapsibleComponent, endpointListFromConditions, sensitiveParams]);
+    ], [modalComponent, collapsibleComponent, endpointListFromConditions, sensitiveParams, isLoading]);
 
     const handleClick = () => {
         if(isUpdate){

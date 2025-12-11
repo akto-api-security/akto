@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+
 public class GuardrailPoliciesAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(GuardrailPoliciesAction.class, LogDb.DASHBOARD);
 
@@ -37,6 +38,9 @@ public class GuardrailPoliciesAction extends UserAction {
     @Getter
     private long total;
 
+    @Setter
+    private List<String> policyIds;
+
 
     public String fetchGuardrailPolicies() {
         try {
@@ -51,6 +55,7 @@ public class GuardrailPoliciesAction extends UserAction {
             return ERROR.toUpperCase();
         }
     }
+
 
     public String createGuardrailPolicy() {
         try {
@@ -96,6 +101,7 @@ public class GuardrailPoliciesAction extends UserAction {
             updates.add(Updates.set("regexPatternsV2", policy.getRegexPatternsV2()));
             updates.add(Updates.set("contentFiltering", policy.getContentFiltering()));
             updates.add(Updates.set("llmRule", policy.getLlmRule()));
+            updates.add(Updates.set("basePromptRule", policy.getBasePromptRule()));
             updates.add(Updates.set("selectedMcpServers", policy.getSelectedMcpServers()));
             updates.add(Updates.set("selectedAgentServers", policy.getSelectedAgentServers()));
             updates.add(Updates.set("selectedMcpServersV2", policy.getSelectedMcpServersV2()));
@@ -129,6 +135,31 @@ public class GuardrailPoliciesAction extends UserAction {
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error creating guardrail policy: " + e.getMessage(), LogDb.DASHBOARD);
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String deleteGuardrailPolicies() {
+        try {
+            if (policyIds == null || policyIds.isEmpty()) {
+                loggerMaker.errorAndAddToDb("No policy IDs provided for deletion", LogDb.DASHBOARD);
+                return ERROR.toUpperCase();
+            }
+
+            User user = getSUser();
+            List<ObjectId> objectIds = new ArrayList<>();
+            for (String id : policyIds) {
+                objectIds.add(new ObjectId(id));
+            }
+
+            Bson filter = Filters.in(GuardrailPoliciesDao.ID, objectIds);
+            GuardrailPoliciesDao.instance.getMCollection().deleteMany(filter);
+
+            loggerMaker.info("Deleted " + policyIds.size() + " guardrail policies by user: " + user.getLogin());
+
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error deleting guardrail policies: " + e.getMessage(), LogDb.DASHBOARD);
             return ERROR.toUpperCase();
         }
     }
