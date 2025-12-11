@@ -5,7 +5,7 @@ import transform from '../transform'
 import SampleDataList from '../../../components/shared/SampleDataList'
 import SampleData from '../../../components/shared/SampleData'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
-import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link} from '@shopify/polaris'
+import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link, ActionList} from '@shopify/polaris'
 import CompulsoryDescriptionModal from "../../issues/components/CompulsoryDescriptionModal.jsx"
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
@@ -36,6 +36,7 @@ function TestRunResultFlyout(props) {
     const [rowItems, setRowItems] = useState([])
     const [apiInfo, setApiInfo] = useState({})
     const [popoverActive, setPopoverActive] = useState(false)
+    const [ticketPopoverActive, setTicketPopoverActive] = useState(false)
     const [modalActive, setModalActive] = useState(false)
     const [jiraProjectMaps,setJiraProjectMap] = useState({})
     const [issueType, setIssueType] = useState('');
@@ -385,10 +386,16 @@ function TestRunResultFlyout(props) {
 
     function ActionsComp (){
         const issuesActions = issueDetails?.testRunIssueStatus === "IGNORED" ? [...issues, ...reopen] : issues
+
+        const togglePopover = useCallback(() => {
+            setTicketPopoverActive(false); // Close ticket dropdown when opening triage
+            setPopoverActive(prev => !prev);
+        }, []);
+
         return(
             issueDetails?.id &&
         <Popover
-            activator={<Button disclosure onClick={() => setPopoverActive(!popoverActive)}>Triage</Button>}
+            activator={<Button disclosure onClick={togglePopover}>Triage</Button>}
             active={popoverActive}
             onClose={() => setPopoverActive(false)}
             autofocusTarget="first-node"
@@ -410,6 +417,117 @@ function TestRunResultFlyout(props) {
             </Popover.Pane>
         </Popover>
     )}
+
+    function CreateTicketDropdown() {
+        // Check if any integration is available
+        const hasAnyIntegration = window.JIRA_INTEGRATED === 'true' ||
+                                   window.AZURE_BOARDS_INTEGRATED === 'true' ||
+                                   window.SERVICENOW_INTEGRATED === 'true' ||
+                                   window.DEVREV_INTEGRATED === 'true';
+
+        const toggleTicketPopover = useCallback(() => {
+            setPopoverActive(false); // Close triage dropdown when opening ticket dropdown
+            setTicketPopoverActive(prev => !prev);
+        }, []);
+
+        const ticketIntegrations = [];
+
+        if (window.JIRA_INTEGRATED === 'true') {
+            ticketIntegrations.push({
+                content: 'Jira',
+                onAction: () => {
+                    handleJiraClick();
+                    setTicketPopoverActive(false);
+                },
+                disabled: jiraIssueUrl !== ""
+            });
+        }
+
+        if (window.AZURE_BOARDS_INTEGRATED === 'true') {
+            ticketIntegrations.push({
+                content: 'Azure Boards',
+                onAction: () => {
+                    handleAzureBoardClick();
+                    setTicketPopoverActive(false);
+                },
+                disabled: azureBoardsWorkItemUrl !== ""
+            });
+        }
+
+        if (window.SERVICENOW_INTEGRATED === 'true') {
+            ticketIntegrations.push({
+                content: 'ServiceNow',
+                onAction: () => {
+                    handleServiceNowClick();
+                    setTicketPopoverActive(false);
+                },
+                disabled: serviceNowTicketUrl !== ""
+            });
+        }
+
+        if (window.DEVREV_INTEGRATED === 'true') {
+            ticketIntegrations.push({
+                content: 'DevRev',
+                onAction: () => {
+                    handleDevRevClick();
+                    setTicketPopoverActive(false);
+                },
+                disabled: devrevWorkUrl !== ""
+            });
+        }
+
+        if (!hasAnyIntegration) {
+            return null;
+        }
+
+        return (
+            <Popover
+                activator={
+                    <Button
+                        primary
+                        disclosure
+                        onClick={toggleTicketPopover}
+                    >
+                        Create Ticket
+                    </Button>
+                }
+                active={ticketPopoverActive}
+                onClose={() => setTicketPopoverActive(false)}
+                autofocusTarget="first-node"
+                preferredPosition="below"
+                preferredAlignment="left"
+            >
+                <Popover.Pane fixed>
+                    <Popover.Section>
+                        <VerticalStack gap={"4"}>
+                            {ticketIntegrations.map((integration, index) => {
+                                return(
+                                    <div
+                                        style={{
+                                            cursor: integration.disabled ? 'not-allowed' : 'pointer',
+                                            opacity: integration.disabled ? 0.5 : 1,
+                                            padding: '8px 12px',
+                                            borderRadius: '4px',
+                                            transition: 'background-color 0.2s ease'
+                                        }}
+                                        className={integration.disabled ? '' : 'ticket-dropdown-item'}
+                                        onClick={() => {
+                                            if (!integration.disabled) {
+                                                integration.onAction();
+                                            }
+                                        }}
+                                        key={index}
+                                    >
+                                        {integration.content}
+                                    </div>
+                                )
+                            })}
+                        </VerticalStack>
+                    </Popover.Section>
+                </Popover.Pane>
+            </Popover>
+        );
+    }
     function TitleComponent() {
         const severity = (selectedTestRunResult && selectedTestRunResult.vulnerable) ? issueDetails.severity : ""
         return(
@@ -468,9 +586,10 @@ function TestRunResultFlyout(props) {
                     <ActionsComp />
 
                     {selectedTestRunResult && selectedTestRunResult.vulnerable &&
-                        <HorizontalStack gap={2} wrap={false}>
+                        <>
+                            <CreateTicketDropdown />
                             <JiraTicketCreationModal
-                                activator={window.JIRA_INTEGRATED === 'true' ? <Button id={"create-jira-ticket-button"} primary onClick={handleJiraClick} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>Create Jira Ticket</Button> : <></>}
+                                activator={<></>}
                                 modalActive={modalActive}
                                 setModalActive={setModalActive}
                                 handleSaveAction={handleSaveAction}
@@ -484,7 +603,7 @@ function TestRunResultFlyout(props) {
                                 setLabelsText={setLabelsText}
                             />
                             <JiraTicketCreationModal
-                                activator={window.AZURE_BOARDS_INTEGRATED === 'true' ? <Button id={"create-azure-boards-ticket-button"} primary onClick={handleAzureBoardClick} disabled={azureBoardsWorkItemUrl !== "" || window.AZURE_BOARDS_INTEGRATED !== "true"}>Create Work Item</Button> : <></>}
+                                activator={<></>}
                                 modalActive={boardsModalActive}
                                 setModalActive={setBoardsModalActive}
                                 handleSaveAction={handleAzureBoardWorkitemCreation}
@@ -497,7 +616,7 @@ function TestRunResultFlyout(props) {
                                 isAzureModal={true}
                             />
                             <JiraTicketCreationModal
-                                activator={window.SERVICENOW_INTEGRATED === 'true' ? <Button id={"create-servicenow-ticket-button"} primary onClick={handleServiceNowClick} disabled={serviceNowTicketUrl !== "" || window.SERVICENOW_INTEGRATED !== "true"}>Create ServiceNow Ticket</Button> : <></>}
+                                activator={<></>}
                                 modalActive={serviceNowModalActive}
                                 setModalActive={setServiceNowModalActive}
                                 handleSaveAction={handleServiceNowTicketCreation}
@@ -510,7 +629,7 @@ function TestRunResultFlyout(props) {
                                 isServiceNowModal={true}
                             />
                             <JiraTicketCreationModal
-                                activator={window.DEVREV_INTEGRATED === 'true' ? <Button id={"create-devrev-ticket-button"} primary onClick={handleDevRevClick} disabled={devrevWorkUrl !== "" || window.DEVREV_INTEGRATED !== "true"}>Create DevRev Ticket</Button> : <></>}
+                                activator={<></>}
                                 modalActive={devrevModalActive}
                                 setModalActive={setDevRevModalActive}
                                 handleSaveAction={handleDevRevTicketCreation}
@@ -522,7 +641,7 @@ function TestRunResultFlyout(props) {
                                 issueId={issueDetails.id}
                                 isDevRevModal={true}
                             />
-                        </HorizontalStack>
+                        </>
                     }
                 </HorizontalStack>
             </div>

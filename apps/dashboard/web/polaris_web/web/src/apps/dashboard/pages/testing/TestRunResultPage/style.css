@@ -117,3 +117,8 @@
   border-top: 1px solid #e1e4e8 !important;
   margin: 24px 0 !important;
 }
+
+/* Ticket dropdown hover styling */
+.ticket-dropdown-item:hover {
+  background-color: #f6f8fa;
+}
