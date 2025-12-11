@@ -934,6 +934,21 @@ public class DbLayer {
 
     public static TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName) {
         try {
+
+            Bson filter = Filters.or(
+                    Filters.and(
+                            Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
+                            Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, Context.now())));
+
+            TestingRun testingRun = TestingRunDao.instance.findOne(
+                    filter,
+                    Projections.include(TestingRun.MINI_TESTING_SERVICE_NAME, ID));
+
+            // prioritize SCHEDULED testing runs
+            if (testingRun != null) {
+                return null;
+            }
+
             // Combine filters for better query efficiency
             Bson filterScheduled = Filters.and(
                     Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
@@ -954,7 +969,7 @@ public class DbLayer {
 
             if (trrs == null) return null;
 
-            TestingRun testingRun = TestingRunDao.instance.findOne(
+            testingRun = TestingRunDao.instance.findOne(
                 Filters.eq(ID, trrs.getTestingRunId()),
                 Projections.include(ID,TestingRun.MINI_TESTING_SERVICE_NAME)
             );
