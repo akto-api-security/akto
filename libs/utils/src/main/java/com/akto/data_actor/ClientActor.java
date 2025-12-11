@@ -1460,12 +1460,12 @@ public class ClientActor extends DataActor {
         BasicDBObject obj = new BasicDBObject();
         obj.put("delta", delta);
         obj.put("miniTestingName", miniTestingName);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/findPendingTestingRun", "", "POST", obj.toString(), headers, "");
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/findPendingAgenticTestingRun", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in findPendingTestingRun", LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("non 2xx response in findPendingAgenticTestingRun", LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
             try {
@@ -1483,7 +1483,7 @@ public class ClientActor extends DataActor {
                 return null;
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in findPendingTestingRun" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("error in findPendingAgenticTestingRun" + e, LoggerMaker.LogDb.RUNTIME);
             return null;
         }
     }

@@ -491,7 +491,7 @@ public class Main {
             }
 
             TestingConfigurations config = TestingConfigurations.getInstance();
-            TestingRunResultSummary trrs = dataActor.findPendingTestingRunResultSummary(start, delta, customMiniTestingServiceName);
+            TestingRunResultSummary trrs = null;
             boolean isSummaryRunning = trrs != null && trrs.getState().equals(State.RUNNING);
             boolean isTestingRunResultRerunCase = trrs != null && trrs.getOriginalTestingRunResultSummaryId() != null;
             if (isTestingRunResultRerunCase) {
