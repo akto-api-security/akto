@@ -6,6 +6,7 @@ import SampleDataList from '../../../components/shared/SampleDataList'
 import SampleData from '../../../components/shared/SampleData'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
 import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link} from '@shopify/polaris'
+import CompulsoryDescriptionModal from "../../issues/components/CompulsoryDescriptionModal.jsx"
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
 import testingApi from "../api"
@@ -56,6 +57,17 @@ function TestRunResultFlyout(props) {
     const [vulnerabilityAnalysisError, setVulnerabilityAnalysisError] = useState(null)
     const [refreshFlag, setRefreshFlag] = useState(Date.now().toString())
     const [labelsText, setLabelsText] = useState("")
+    
+    // Compulsory description modal states
+    const [compulsoryDescriptionModal, setCompulsoryDescriptionModal] = useState(false)
+    const [pendingIgnoreAction, setPendingIgnoreAction] = useState(null)
+    const [mandatoryDescription, setMandatoryDescription] = useState("")
+    const [modalLoading, setModalLoading] = useState(false)
+    const [compulsorySettings, setCompulsorySettings] = useState({
+        falsePositive: false,
+        noTimeToFix: false,
+        acceptableFix: false
+    })
     
     const fetchRemediationInfo = useCallback (async (testId) => {
         if (testId && testId.length > 0) {
@@ -121,7 +133,6 @@ function TestRunResultFlyout(props) {
                 props.setIssueDetails({ ...issueDetails, description: editDescription });
             }
         } catch (err) {
-            console.error("Failed to save description:", err);
             func.setToast(true, true, "Failed to save description");
         }
     }
@@ -139,16 +150,78 @@ function TestRunResultFlyout(props) {
         }
     }, [selectedTestRunResult.testCategoryId, remediationSrc, conversationRemediationText, fetchRemediationInfo])
 
+    // Fetch compulsory description settings
+    useEffect(() => {
+        const fetchCompulsorySettings = async () => {
+            try {
+                const {resp} = await settingFunctions.fetchAdminInfo();
+                
+                if (resp?.compulsoryDescription) {
+                    setCompulsorySettings(resp.compulsoryDescription);
+                }
+            } catch (error) {
+                
+            }
+        };
+        fetchCompulsorySettings();
+    }, []);
 
-    function ignoreAction(ignoreReason){
+    // Map ignore reason text to key
+    const getIgnoreReasonKey = (ignoreReason) => {
+        const reasonMap = {
+            "False positive": "falsePositive",
+            "Acceptable risk": "acceptableFix",
+            "No time to fix": "noTimeToFix"
+        };
+        return reasonMap[ignoreReason] || ignoreReason;
+    };
+
+    // Use keys directly for reasons and compulsorySettings
+    const requiresDescription = (reasonKey) => {
+        return compulsorySettings[reasonKey] || false;
+    };
+
+    const handleIgnoreWithDescription = () => {
+        if (pendingIgnoreAction && mandatoryDescription.trim()) {
+            // Update description first
+            testingApi.updateIssueDescription(issueDetails.id, mandatoryDescription).then(() => {
+                performIgnoreAction(pendingIgnoreAction.ignoreReason, mandatoryDescription);
+                setCompulsoryDescriptionModal(false);
+                setPendingIgnoreAction(null);
+                setMandatoryDescription("");
+            }).catch((err) => {
+                func.setToast(true, true, "Failed to update description");
+            });
+        }
+    };
+
+    useEffect(() => {
+        if (compulsoryDescriptionModal && pendingIgnoreAction) {
+            setMandatoryDescription("");
+            setModalLoading(false);
+        }
+    }, [compulsoryDescriptionModal, pendingIgnoreAction]);
+
+    const performIgnoreAction = (ignoreReason, description = "") => {
         const severity = (selectedTestRunResult && selectedTestRunResult.vulnerable) ? issueDetails.severity : "";
         let obj = {}
         if(issueDetails?.testRunIssueStatus !== "IGNORED"){
             obj = {[selectedTestRunResult.id]: severity.toUpperCase()}
         }
-        issuesApi.bulkUpdateIssueStatus([issueDetails.id], "IGNORED", ignoreReason, obj ).then((res) => {
-            func.setToast(true, false, `Issue ignored`)
+        issuesApi.bulkUpdateIssueStatus([issueDetails.id], "IGNORED", ignoreReason, { description }).then((res) => {
+            func.setToast(true, false, `Issue ignored${description ? " with description" : ""}`)
         })
+    }
+
+
+    function ignoreAction(ignoreReason){
+        const reasonKey = getIgnoreReasonKey(ignoreReason);
+        if (requiresDescription(reasonKey)) {
+            setPendingIgnoreAction({ ignoreReason });
+            setCompulsoryDescriptionModal(true);
+            return;
+        }
+        performIgnoreAction(ignoreReason);
     }
 
     function reopenAction(){
@@ -761,6 +834,7 @@ function TestRunResultFlyout(props) {
     const title = isIssuePage ? "Issue details" : mapLabel('Test result', getDashboardCategory())
 
     return (
+        <>
         <FlyLayout
             title={title}
             show={showDetails}
@@ -772,6 +846,16 @@ function TestRunResultFlyout(props) {
             handleClose={handleClose}
             isHandleClose={true}
         />
+        <CompulsoryDescriptionModal
+            open={compulsoryDescriptionModal}
+            onClose={() => setCompulsoryDescriptionModal(false)}
+            onConfirm={handleIgnoreWithDescription}
+            reasonLabel={pendingIgnoreAction?.ignoreReason}
+            description={mandatoryDescription}
+            onChangeDescription={setMandatoryDescription}
+            loading={modalLoading}
+        />
+        </>
     )
 }
 
