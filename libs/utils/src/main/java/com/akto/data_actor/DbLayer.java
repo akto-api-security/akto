@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
@@ -836,6 +837,42 @@ public class DbLayer {
                 }
             }
 
+            // Priority 1: Find testing run with matching miniTestingName
+            Bson matchingFilter = Filters.and(
+                filter,
+                Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingName)
+            );
+
+            testingRun = TestingRunDao.instance.findOne(
+                matchingFilter,
+                Projections.include(TestingRun.MINI_TESTING_SERVICE_NAME, ID)
+            );
+
+            // Priority 2: Find testing run without miniTestingName set
+            if (testingRun == null) {
+                Bson unassignedFilter = Filters.and(
+                    filter,
+                    Filters.or(
+                        Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, null),
+                        Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, "")
+                    )
+                );
+                testingRun = TestingRunDao.instance.findOne(
+                    unassignedFilter,
+                    Projections.include(TestingRun.MINI_TESTING_SERVICE_NAME, ID)
+                );
+            }
+
+            // Priority 3: Find testing run with a dead mini-testing service
+            if (testingRun == null) {
+                testingRun = TestingRunDao.instance.findOne(
+                    filter,
+                    Projections.include(TestingRun.MINI_TESTING_SERVICE_NAME, ID)
+                );
+            }
+
+            if (testingRun == null) return null;
+
             String validatedMiniTestingName = validateAndGetMiniTestingService(
                 testingRun.getMiniTestingServiceName(),
                 miniTestingName
@@ -859,6 +896,42 @@ public class DbLayer {
         }
     }
 
+    private static TestingRunResultSummary findPendingTestingRunResultSummaryBasedOnPriority(Bson filter, String miniTestingName) {
+
+        Bson testingRunsProjections = Projections.include(TestingRun.MINI_TESTING_SERVICE_NAME, ID);
+        Bson trrsProjections = Projections.include(TestingRunResultSummary.TESTING_RUN_ID, ID, TestingRunResultSummary.ORIGINAL_TESTING_RUN_SUMMARY_ID);
+        List<TestingRun> testingRuns = TestingRunDao.instance.findAll(
+                Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingName), testingRunsProjections);
+
+        TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance.findOne(
+                Filters.and(filter,
+                        Filters.in(TestingRunResultSummary.TESTING_RUN_ID,
+                                testingRuns.stream().map(TestingRun::getId).collect(Collectors.toList()))),
+                trrsProjections);
+        if (trrs != null)
+            return trrs;
+
+        testingRuns = TestingRunDao.instance.findAll(
+                Filters.or(
+                        Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, null),
+                        Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, "")),
+                testingRunsProjections);
+
+        trrs = TestingRunResultSummariesDao.instance.findOne(
+                Filters.and(filter,
+                        Filters.in(TestingRunResultSummary.TESTING_RUN_ID,
+                                testingRuns.stream().map(TestingRun::getId).collect(Collectors.toList()))),
+                trrsProjections);
+        if (trrs != null)
+            return trrs;
+
+        trrs = TestingRunResultSummariesDao.instance.findOne(
+                filter,
+                trrsProjections);
+
+        return trrs;
+    }
+
     public static TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName) {
         try {
             // Combine filters for better query efficiency
@@ -867,14 +940,7 @@ public class DbLayer {
                     Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now)
             );
 
-            TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance.findOne(
-                    filterScheduled,
-                    Projections.include(
-                            TestingRunResultSummary.TESTING_RUN_ID,
-                            ID,
-                            TestingRunResultSummary.ORIGINAL_TESTING_RUN_SUMMARY_ID
-                    )
-            );
+            TestingRunResultSummary trrs = findPendingTestingRunResultSummaryBasedOnPriority(filterScheduled, miniTestingName);
 
             if (trrs == null) {
                 Bson filterRunning = Filters.and(
@@ -883,14 +949,7 @@ public class DbLayer {
                         Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)
                 );
 
-                trrs = TestingRunResultSummariesDao.instance.findOne(
-                        filterRunning,
-                        Projections.include(
-                                TestingRunResultSummary.TESTING_RUN_ID,
-                                ID,
-                                TestingRunResultSummary.ORIGINAL_TESTING_RUN_SUMMARY_ID
-                        )
-                );
+                trrs = findPendingTestingRunResultSummaryBasedOnPriority(filterRunning, miniTestingName);
             }
 
             if (trrs == null) return null;
