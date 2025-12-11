@@ -193,6 +193,11 @@ function IssuesPage() {
     const [serviceNowTable, setServiceNowTable] = useState('')
     const [labelsText, setLabelsText] = useState('')
 
+    const [devrevModalActive, setDevRevModalActive] = useState(false)
+    const [devrevParts, setDevRevParts] = useState([])
+    const [devrevPartId, setDevRevPartId] = useState('')
+    const [devrevWorkItemType, setDevRevWorkItemType] = useState('issue')
+
     // Compulsory description modal states
     const [compulsoryDescriptionModal, setCompulsoryDescriptionModal] = useState(false)
     const [pendingIgnoreAction, setPendingIgnoreAction] = useState(null)
@@ -386,6 +391,21 @@ function IssuesPage() {
         })
     }
 
+    const handleSaveBulkDevRevTicketsAction = () => {
+        setToast(true, false, "Please wait while we create your DevRev tickets.")
+        setDevRevModalActive(false)
+        api.createDevRevTickets(selectedIssuesItems, devrevPartId, devrevWorkItemType, window.location.origin).then((res) => {
+            if(res?.errorMessage) {
+                setToast(true, false, res?.errorMessage)
+            } else {
+                setToast(true, false, `${selectedIssuesItems.length} DevRev ticket${selectedIssuesItems.length === 1 ? "" : "s"} created.`)
+            }
+            resetResourcesSelected()
+        }).catch((err) => {
+            setToast(true, true, err?.response?.data?.errorMessage || "Error creating DevRev tickets")
+        })
+    }
+
     // Use keys directly for reasons and compulsorySettings
     const requiresDescription = (reasonKey) => {
         return compulsorySettings[reasonKey] || false;
@@ -492,7 +512,20 @@ function IssuesPage() {
                 setServiceNowModalActive(true)
             })
         }
-        
+
+        function createDevRevTicketBulk() {
+            setSelectedIssuesItems(items)
+            settingFunctions.fetchDevRevIntegration().then((devrevIntegration) => {
+                const partsMap = devrevIntegration.partsMap || {}
+                const partsArray = Object.entries(partsMap).map(([id, name]) => ({id, name}))
+                if(partsArray.length > 0){
+                    setDevRevParts(partsArray)
+                    setDevRevPartId(partsArray[0].id)
+                }
+                setDevRevModalActive(true)
+            })
+        }
+
         let issues = [
             {
                 content: 'False positive',
@@ -531,6 +564,11 @@ function IssuesPage() {
                 content: 'Create ServiceNow ticket',
                 onAction: () => { createServiceNowTicketBulk() },
                 disabled: (window.SERVICENOW_INTEGRATED === 'false')
+            },
+            {
+                content: 'Create DevRev ticket',
+                onAction: () => { createDevRevTicketBulk() },
+                disabled: (window.DEVREV_INTEGRATED === 'false')
             }
         ];
         
@@ -715,6 +753,7 @@ function IssuesPage() {
                             id: item?.id ? JSON.stringify(item.id) : '',
                             issueDescription: item?.description,
                             jiraIssueUrl: item?.jiraIssueUrl || "",
+                            devrevWorkUrl: item?.devrevWorkUrl || "",
                         }],
                         numberOfEndpoints: 1
                     })
@@ -731,7 +770,8 @@ function IssuesPage() {
                         url: item?.id?.apiInfoKey?.url,
                         id: item?.id ? JSON.stringify(item.id) : '',
                         issueDescription: item?.description,
-                        jiraIssueUrl: item?.jiraIssueUrl || ""
+                        jiraIssueUrl: item?.jiraIssueUrl || "",
+                        devrevWorkUrl: item?.devrevWorkUrl || ""
                     })
                     existingIssue.numberOfEndpoints = (existingIssue.numberOfEndpoints || 1) + 1
                 }
@@ -976,6 +1016,18 @@ function IssuesPage() {
                 projId={serviceNowTable}
                 issueType=""
                 isServiceNowModal={true}
+            />
+
+            <JiraTicketCreationModal
+                modalActive={devrevModalActive}
+                setModalActive={setDevRevModalActive}
+                handleSaveAction={handleSaveBulkDevRevTicketsAction}
+                jiraProjectMaps={devrevParts}
+                setProjId={setDevRevPartId}
+                setIssueType={setDevRevWorkItemType}
+                projId={devrevPartId}
+                issueType={devrevWorkItemType}
+                isDevRevModal={true}
             />
 
             <CompulsoryDescriptionModal
