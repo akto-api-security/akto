@@ -274,6 +274,32 @@ const settingFunctions = {
       })
       return trafficData
     },
+
+    // Azure DevOps Integration Functions
+    fetchAzureAdoIntegration: async function(){
+      return settingRequests.fetchAzureAdoIntegration().then((res) => {
+        return res;
+      }).catch((resp) => {
+        return null;
+      });
+    },
+
+    testAzureAdoIntegration: async function(organizationUrl, personalAccessToken, projId, workItemType){
+      let statusMapping = {}
+      await settingRequests.testAzureAdoIntegration(organizationUrl, personalAccessToken, projId, workItemType).then((resp)=>{
+        statusMapping = resp
+      })
+      return statusMapping
+    },
+
+    addAzureAdoIntegration: async function(data){
+      let result = {}
+      await settingRequests.addAzureAdoIntegrationV2(data).then((resp)=>{
+        result = resp
+      })
+      return result
+    },
+
     fetchAzureBoardsIntegration: async function(){
       let azureBoardsInteg = {}
       await settingRequests.fetchAzureBoardsIntegration().then((resp)=>{
