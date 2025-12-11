@@ -1,6 +1,7 @@
 package com.akto.threat.backend.service;
 
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.billing.Organization;
 import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.log.LoggerMaker;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
@@ -49,6 +50,9 @@ public class ThreatActorService {
 
   private final MongoClient mongoClient;
   private final MaliciousEventDao maliciousEventDao;
+  private final com.akto.threat.backend.dao.ThreatConfigurationDao threatConfigurationDao = com.akto.threat.backend.dao.ThreatConfigurationDao.instance;
+  private final com.akto.threat.backend.dao.SplunkIntegrationDao splunkIntegrationDao = com.akto.threat.backend.dao.SplunkIntegrationDao.instance;
+  private final com.akto.threat.backend.dao.ActorInfoDao actorInfoDao = com.akto.threat.backend.dao.ActorInfoDao.instance;
   private static final LoggerMaker loggerMaker = new LoggerMaker(ThreatActorService.class, LoggerMaker.LogDb.THREAT_DETECTION);
 
   public ThreatActorService(MongoClient mongoClient, MaliciousEventDao maliciousEventDao) {
@@ -58,9 +62,7 @@ public class ThreatActorService {
 
   public ThreatConfiguration fetchThreatConfiguration(String accountId) {
     ThreatConfiguration.Builder builder = ThreatConfiguration.newBuilder();
-    MongoCollection<Document> coll = this.mongoClient
-        .getDatabase(accountId)
-        .getCollection(MongoDBCollection.ThreatDetection.THREAT_CONFIGURATION, Document.class);
+    MongoCollection<Document> coll = this.threatConfigurationDao.getCollection(accountId);
     Document doc = coll.find().first();
     if (doc != null) {
         // Handle actor configuration
@@ -93,10 +95,7 @@ public class ThreatActorService {
 
   public ThreatConfiguration modifyThreatConfiguration(String accountId, ThreatConfiguration updatedConfig) {
     ThreatConfiguration.Builder builder = ThreatConfiguration.newBuilder();
-    MongoCollection<Document> coll =
-        this.mongoClient
-            .getDatabase(accountId)
-            .getCollection(MongoDBCollection.ThreatDetection.THREAT_CONFIGURATION, Document.class);
+    MongoCollection<Document> coll = this.threatConfigurationDao.getCollection(accountId);
 
     Document newDoc = new Document();
     
@@ -582,10 +581,7 @@ public class ThreatActorService {
       String accountId, SplunkIntegrationRequest req) {
 
         int accId = Integer.parseInt(accountId);
-        MongoCollection<SplunkIntegrationModel> coll =
-            this.mongoClient
-                .getDatabase(accountId)
-                .getCollection(MongoDBCollection.ThreatDetection.SPLUNK_INTEGRATION_CONFIG, SplunkIntegrationModel.class);
+        MongoCollection<SplunkIntegrationModel> coll = this.splunkIntegrationDao.getCollection(accountId);
 
         Bson filters = Filters.eq("accountId", accId);
         long cnt = coll.countDocuments(filters);
@@ -600,10 +596,7 @@ public class ThreatActorService {
             .updateOne(filters, updates);
         } else {
             SplunkIntegrationModel splunkIntegrationModel = SplunkIntegrationModel.newBuilder().setAccountId(accId).setSplunkToken(req.getSplunkToken()).setSplunkUrl(req.getSplunkUrl()).build();
-            this.mongoClient
-            .getDatabase(accountId + "")
-            .getCollection(MongoDBCollection.ThreatDetection.SPLUNK_INTEGRATION_CONFIG, SplunkIntegrationModel.class)
-            .insertOne(splunkIntegrationModel);
+            this.splunkIntegrationDao.getCollection(accountId).insertOne(splunkIntegrationModel);
         }
         
         return SplunkIntegrationRespone.newBuilder().build();
@@ -614,10 +607,7 @@ public class ThreatActorService {
     public ModifyThreatActorStatusResponse modifyThreatActorStatus(
       String accountId, ModifyThreatActorStatusRequest request) {
 
-        MongoCollection<ActorInfoModel> coll =
-            this.mongoClient
-                .getDatabase(accountId)
-                .getCollection(MongoDBCollection.ThreatDetection.ACTOR_INFO, ActorInfoModel.class);
+        MongoCollection<ActorInfoModel> coll = this.actorInfoDao.getCollection(accountId);
         String actorIp = request.getIp();
 
         Bson filters = Filters.eq("ip", actorIp);
@@ -634,10 +624,7 @@ public class ThreatActorService {
         } else {
             ActorInfoModel actorInfoModel = ActorInfoModel.newBuilder().setIp(actorIp).
               setStatus(request.getStatus()).setUpdatedTs(request.getUpdatedTs()).build();
-            this.mongoClient
-              .getDatabase(accountId + "")
-              .getCollection(MongoDBCollection.ThreatDetection.ACTOR_INFO, ActorInfoModel.class)
-              .insertOne(actorInfoModel);
+            this.actorInfoDao.getCollection(accountId).insertOne(actorInfoModel);
         }
 
 
