@@ -362,28 +362,28 @@ function TestRunResultFlyout(props) {
         const issuesActions = issueDetails?.testRunIssueStatus === "IGNORED" ? [...issues, ...reopen] : issues
         return(
             issueDetails?.id &&
-            <Popover
-                activator={<Button disclosure onClick={() => setPopoverActive(!popoverActive)}>Triage</Button>}
-                active={popoverActive}
-                onClose={() => setPopoverActive(false)}
-                autofocusTarget="first-node"
-                preferredPosition="below"
-                preferredAlignment="left"
-            >
-                <Popover.Pane fixed>
-                    <Popover.Section>
-                        <VerticalStack gap={"4"}>
-                            {issuesActions.map((issue, index) => {
-                                return(
-                                    <div style={{cursor: 'pointer'}} onClick={() => {issue.onAction(); setPopoverActive(false)}} key={index}>
-                                        {issue.content}
-                                    </div>
-                                )
-                            })}
-                        </VerticalStack>
-                    </Popover.Section>
-                </Popover.Pane>
-            </Popover>
+        <Popover
+            activator={<Button disclosure onClick={() => setPopoverActive(!popoverActive)}>Triage</Button>}
+            active={popoverActive}
+            onClose={() => setPopoverActive(false)}
+            autofocusTarget="first-node"
+            preferredPosition="below"
+            preferredAlignment="left"
+        >
+            <Popover.Pane fixed>
+                <Popover.Section>
+                    <VerticalStack gap={"4"}>
+                        {issuesActions.map((issue, index) => {
+                            return(
+                                <div style={{cursor: 'pointer'}} onClick={() => {issue.onAction(); setPopoverActive(false)}} key={index}>
+                                    {issue.content}
+                                </div>
+                            )
+                        })}
+                    </VerticalStack>
+                </Popover.Section>
+            </Popover.Pane>
+        </Popover>
     )}
     function TitleComponent() {
         const severity = (selectedTestRunResult && selectedTestRunResult.vulnerable) ? issueDetails.severity : ""
