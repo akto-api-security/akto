@@ -15,8 +15,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source code
 COPY src/ ./src/
-COPY start.sh ./
-RUN chmod +x start.sh
 
 # Create cache directory for HuggingFace models
 RUN mkdir -p /app/.cache/huggingface
@@ -33,5 +31,6 @@ RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTr
 
 EXPOSE 8093
 
-CMD ["./start.sh"]
+# Run uvicorn directly (PORT env var is already set, defaults to 8093)
+CMD ["sh", "-c", "python -m uvicorn src.agent_traffic_analyzer:app --host 0.0.0.0 --port ${PORT:-8093}"]
 
