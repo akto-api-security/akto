@@ -66,6 +66,12 @@ public class Executor {
         Constants.AGENT_BASE_URL
     );
 
+    public static void main(String[] args) {
+        String host = "mdev.ababank.com";
+        int apiCollectionId = host.hashCode();
+        System.out.println(apiCollectionId);
+    }
+
     public static void modifyRawApiUsingTestRole(String logId, TestingRunConfig testingRunConfig, RawApi sampleRawApi, ApiInfo.ApiInfoKey apiInfoKey){
         if (testingRunConfig != null && StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
             TestRoles role = fetchOrFindTestRole(testingRunConfig.getTestRoleId(), true);
@@ -151,7 +157,8 @@ public class Executor {
         boolean allowAllCombinations = executionListBuilder.isAllowAllCombinations();
 
         String executionType = node.getChildNodes().get(0).getValues().toString();
-        if (executionType.equals("multiple") || executionType.equals("graph")) {
+        boolean isParallelExecution = executionType.equals("parallel");
+        if (executionType.equals("multiple") || executionType.equals("graph") || isParallelExecution) {
             if (executionType.equals("graph")) {
                 List<ApiInfo.ApiInfoKey> apiInfoKeys = new ArrayList<>();
                 apiInfoKeys.add(apiInfoKey);
@@ -160,7 +167,7 @@ public class Executor {
                 memory.setLogId(logId);
             }
             workflowTest = buildWorkflowGraph(reqNodes, sampleRawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
-            result.add(triggerMultiExecution(workflowTest, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode, debug, testLogs, memory, allowAllCombinations));
+            result.add(triggerMultiExecution(workflowTest, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode, debug, testLogs, memory, allowAllCombinations, isParallelExecution));
             yamlTestResult = new YamlTestResult(result, workflowTest);
             
             return yamlTestResult;
@@ -329,7 +336,7 @@ public class Executor {
         }
 
     public MultiExecTestResult triggerMultiExecution(WorkflowTest workflowTest, AuthMechanism authMechanism,
-        List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey, Map<String, Object> varMap, FilterNode validatorNode, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, boolean allowAllCombinations) {
+        List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey, Map<String, Object> varMap, FilterNode validatorNode, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, boolean allowAllCombinations, boolean isParallelExecution) {
         
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         Graph graph = new Graph();
@@ -337,7 +344,8 @@ public class Executor {
         int id = Context.now();
         List<String> executionOrder = new ArrayList<>();
         WorkflowTestResult workflowTestResult = new WorkflowTestResult(id, workflowTest.getId(), new HashMap<>(), null, null);
-        GraphExecutorRequest graphExecutorRequest = new GraphExecutorRequest(graph, graph.getNode("x1"), workflowTest, null, null, varMap, "conditional", workflowTestResult, new HashMap<>(), executionOrder);
+        String executionType = isParallelExecution ? "parallel" : "conditional";
+        GraphExecutorRequest graphExecutorRequest = new GraphExecutorRequest(graph, graph.getNode("x1"), workflowTest, null, null, varMap, executionType, workflowTestResult, new HashMap<>(), executionOrder);
         GraphExecutorResult graphExecutorResult = apiWorkflowExecutor.init(graphExecutorRequest, debug, testLogs, memory, allowAllCombinations);
         return new MultiExecTestResult(graphExecutorResult.getWorkflowTestResult().getNodeResultMap(), graphExecutorResult.getVulnerable(), Confidence.HIGH, graphExecutorRequest.getExecutionOrder());
     }
