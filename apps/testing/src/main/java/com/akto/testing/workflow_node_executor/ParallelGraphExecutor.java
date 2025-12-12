@@ -50,134 +50,15 @@ public class ParallelGraphExecutor extends GraphExecutor {
     public GraphExecutorResult executeGraph(GraphExecutorRequest graphExecutorRequest, boolean debug, 
                                            List<TestingRunResult.TestLog> testLogs, Memory memory) {
         
-        Map<String, Boolean> visitedMap = new ConcurrentHashMap<>();
-        List<String> errors = Collections.synchronizedList(new ArrayList<>());
-        WorkflowTestResult workflowTestResult = graphExecutorRequest.getWorkflowTestResult();
-        Map<String, Object> valuesMap = graphExecutorRequest.getValuesMap();
-        
-        // Get all nodes from the graph
         Map<String, Node> allNodes = graphExecutorRequest.getGraph().getNodes();
-        
         if (allNodes == null || allNodes.isEmpty()) {
-            loggerMaker.warnAndAddToDb("No nodes found in graph for parallel execution");
-            return new GraphExecutorResult(workflowTestResult, false, errors);
+            return handleEmptyGraph(graphExecutorRequest.getWorkflowTestResult());
         }
-        
-        loggerMaker.infoAndAddToDb("Starting parallel execution of " + allNodes.size() + " nodes");
-        
-        // Use ConcurrentHashMap for thread-safe operations
-        Map<String, WorkflowTestResult.NodeResult> nodeResultMap = new ConcurrentHashMap<>();
-        List<String> executionOrder = Collections.synchronizedList(new ArrayList<>());
-        AtomicBoolean overallVulnerable = new AtomicBoolean(false);
-        
-        // Create a list of CompletableFutures for all node executions
-        List<CompletableFuture<Void>> futures = new ArrayList<>();
-        
-        // Submit all nodes for parallel execution
-        for (Node node : allNodes.values()) {
-            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
-                try {
-                    // Set API call executor service for this thread - enables queued parallel API calls within nodes
-                    TestingUtilsSingleton.getInstance().setApiCallExecutorService(apiCallExecutorService);
-                    
-                    try {
-                        // Check if node was already visited (thread-safe check)
-                        if (visitedMap.putIfAbsent(node.getId(), true) != null) {
-                            String errorMsg = "Node " + node.getId() + " is being visited multiple times";
-                            loggerMaker.warnAndAddToDb(errorMsg);
-                            errors.add(errorMsg);
-                            return;
-                        }
-                        
-                        // Handle wait time if specified
-                        int waitInSeconds = node.getWaitInSeconds();
-                        if (waitInSeconds > 0) {
-                            if (waitInSeconds > 100) {
-                                waitInSeconds = 100;
-                            }
-                            loggerMaker.infoAndAddToDb("Node " + node.getId() + " sleeping for " + waitInSeconds + " seconds");
-                            Thread.sleep(waitInSeconds * 1000);
-                        }
-                        
-                        // Execute the node
-                        WorkflowTestResult.NodeResult nodeResult = Utils.executeNode(
-                            node, valuesMap, debug, testLogs, memory, this.allowAllCombinations
-                        );
-                        
-                        // Store result (thread-safe)
-                        nodeResultMap.put(node.getId(), nodeResult);
-                        executionOrder.add(node.getId());
-                        
-                        // Update overall vulnerable status
-                        if (nodeResult.isVulnerable()) {
-                            overallVulnerable.set(true);
-                        }
-                        
-                        // Collect errors if any
-                        if (nodeResult.getErrors() != null && !nodeResult.getErrors().isEmpty()) {
-                            errors.addAll(nodeResult.getErrors());
-                        }
-                        
-                        loggerMaker.debugInfoAddToDb("Completed execution of node " + node.getId(), LogDb.TESTING);
-                        
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        String errorMsg = "Node " + node.getId() + " execution was interrupted: " + e.getMessage();
-                        loggerMaker.errorAndAddToDb(errorMsg);
-                        errors.add(errorMsg);
-                    } catch (Exception e) {
-                        String errorMsg = "Error executing node " + node.getId() + ": " + e.getMessage();
-                        loggerMaker.errorAndAddToDb(errorMsg);
-                        errors.add(errorMsg);
-                        
-                        // Create a failure result for this node
-                        List<String> nodeErrors = new ArrayList<>();
-                        nodeErrors.add(errorMsg);
-                        WorkflowTestResult.NodeResult failureResult = new WorkflowTestResult.NodeResult(
-                            "{}", false, nodeErrors
-                        );
-                        nodeResultMap.put(node.getId(), failureResult);
-                    } finally {
-                        // Clear API call executor service for this thread
-                        TestingUtilsSingleton.getInstance().clearApiCallExecutorService();
-                    }
-                } catch (Exception e) {
-                    // Outer catch for any errors in context setup
-                    String errorMsg = "Error setting up execution context for node " + node.getId() + ": " + e.getMessage();
-                    loggerMaker.errorAndAddToDb(e, errorMsg);
-                    errors.add(errorMsg);
-                    TestingUtilsSingleton.getInstance().clearApiCallExecutorService();
-                }
-            }, executorService);
-            
-            futures.add(future);
-        }
-        
-        // Wait for all futures to complete
-        try {
-            CompletableFuture<Void> allFutures = CompletableFuture.allOf(
-                futures.toArray(new CompletableFuture[0])
-            );
-            
-            // Wait with a reasonable timeout (30 minutes)
-            allFutures.get(30, TimeUnit.MINUTES);
-            
-            loggerMaker.infoAndAddToDb("All " + allNodes.size() + " nodes completed parallel execution");
-            
-        } catch (Exception e) {
-            String errorMsg = "Error waiting for parallel execution to complete: " + e.getMessage();
-            loggerMaker.errorAndAddToDb(e, errorMsg);
-            errors.add(errorMsg);
-        }
-        
-        // Update the workflow test result with all node results
-        workflowTestResult.getNodeResultMap().putAll(nodeResultMap);
-        graphExecutorRequest.getExecutionOrder().addAll(executionOrder);
-        
-        // Determine final vulnerable status
-        boolean isVulnerable = overallVulnerable.get();
-        
-        return new GraphExecutorResult(workflowTestResult, isVulnerable, errors);
+
+        ExecutionContext context = initContext(graphExecutorRequest);
+        List<CompletableFuture<Void>> futures = submitAllNodes(allNodes, context, debug, testLogs, memory);
+        waitForCompletion(allNodes.size(), futures, context.errors);
+        return buildResult(graphExecutorRequest, context);
     }
     
     /**
@@ -207,6 +88,124 @@ public class ParallelGraphExecutor extends GraphExecutor {
                 apiCallExecutorService.shutdownNow();
                 Thread.currentThread().interrupt();
             }
+        }
+    }
+
+    private ExecutionContext initContext(GraphExecutorRequest graphExecutorRequest) {
+        return new ExecutionContext(
+            graphExecutorRequest.getWorkflowTestResult(),
+            graphExecutorRequest.getValuesMap()
+        );
+    }
+
+    private List<CompletableFuture<Void>> submitAllNodes(Map<String, Node> allNodes, ExecutionContext context, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
+        for (Node node : allNodes.values()) {
+            futures.add(CompletableFuture.runAsync(
+                () -> executeNode(node, context, debug, testLogs, memory),
+                executorService
+            ));
+        }
+        return futures;
+    }
+
+    private void executeNode(Node node, ExecutionContext context, boolean debug,
+                             List<TestingRunResult.TestLog> testLogs, Memory memory) {
+        try {
+            TestingUtilsSingleton.getInstance().setApiCallExecutorService(apiCallExecutorService);
+            if (context.visitedMap.putIfAbsent(node.getId(), true) != null) {
+                recordError("Node " + node.getId() + " is being visited multiple times", context);
+                return;
+            }
+
+            sleepIfNeeded(node);
+            WorkflowTestResult.NodeResult nodeResult = Utils.executeNode(
+                node, context.valuesMap, debug, testLogs, memory, this.allowAllCombinations
+            );
+
+            context.nodeResultMap.put(node.getId(), nodeResult);
+            context.executionOrder.add(node.getId());
+            if (nodeResult.isVulnerable()) {
+                context.overallVulnerable.set(true);
+            }
+            if (nodeResult.getErrors() != null && !nodeResult.getErrors().isEmpty()) {
+                context.errors.addAll(nodeResult.getErrors());
+            }
+            loggerMaker.debugInfoAddToDb("Completed execution of node " + node.getId(), LogDb.TESTING);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            recordError("Node " + node.getId() + " execution was interrupted: " + ie.getMessage(), context);
+        } catch (Exception e) {
+            recordAndStoreFailure(node, "Error executing node " + node.getId() + ": " + e.getMessage(), context);
+        } finally {
+            TestingUtilsSingleton.getInstance().clearApiCallExecutorService();
+        }
+    }
+
+    private void sleepIfNeeded(Node node) throws InterruptedException {
+        int waitInSeconds = node.getWaitInSeconds();
+        if (waitInSeconds <= 0) {
+            return;
+        }
+        if (waitInSeconds > 100) {
+            waitInSeconds = 100;
+        }
+        loggerMaker.infoAndAddToDb("Node " + node.getId() + " sleeping for " + waitInSeconds + " seconds");
+        Thread.sleep(waitInSeconds * 1000L);
+    }
+
+    private void waitForCompletion(int nodeCount, List<CompletableFuture<Void>> futures, List<String> errors) {
+        try {
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                .get(30, TimeUnit.MINUTES);
+            loggerMaker.infoAndAddToDb("All " + nodeCount + " nodes completed parallel execution");
+        } catch (Exception e) {
+            recordError("Error waiting for parallel execution to complete: " + e.getMessage(), errors);
+        }
+    }
+
+    private GraphExecutorResult buildResult(GraphExecutorRequest request, ExecutionContext context) {
+        request.getWorkflowTestResult().getNodeResultMap().putAll(context.nodeResultMap);
+        request.getExecutionOrder().addAll(context.executionOrder);
+        boolean isVulnerable = context.overallVulnerable.get();
+        return new GraphExecutorResult(request.getWorkflowTestResult(), isVulnerable, context.errors);
+    }
+
+    private GraphExecutorResult handleEmptyGraph(WorkflowTestResult workflowTestResult) {
+        List<String> errors = Collections.synchronizedList(new ArrayList<>());
+        loggerMaker.warnAndAddToDb("No nodes found in graph for parallel execution");
+        return new GraphExecutorResult(workflowTestResult, false, errors);
+    }
+
+    private void recordError(String message, ExecutionContext context) {
+        recordError(message, context.errors);
+    }
+
+    private void recordError(String message, List<String> errors) {
+        loggerMaker.errorAndAddToDb(message);
+        errors.add(message);
+    }
+
+    private void recordAndStoreFailure(Node node, String message, ExecutionContext context) {
+        recordError(message, context);
+        List<String> nodeErrors = new ArrayList<>();
+        nodeErrors.add(message);
+        WorkflowTestResult.NodeResult failureResult = new WorkflowTestResult.NodeResult("{}", false, nodeErrors);
+        context.nodeResultMap.put(node.getId(), failureResult);
+    }
+
+    private static class ExecutionContext {
+        private final Map<String, Boolean> visitedMap = new ConcurrentHashMap<>();
+        private final List<String> errors = Collections.synchronizedList(new ArrayList<>());
+        private final Map<String, WorkflowTestResult.NodeResult> nodeResultMap = new ConcurrentHashMap<>();
+        private final List<String> executionOrder = Collections.synchronizedList(new ArrayList<>());
+        private final AtomicBoolean overallVulnerable = new AtomicBoolean(false);
+        private final WorkflowTestResult workflowTestResult;
+        private final Map<String, Object> valuesMap;
+
+        ExecutionContext(WorkflowTestResult workflowTestResult, Map<String, Object> valuesMap) {
+            this.workflowTestResult = workflowTestResult;
+            this.valuesMap = valuesMap;
         }
     }
 }
