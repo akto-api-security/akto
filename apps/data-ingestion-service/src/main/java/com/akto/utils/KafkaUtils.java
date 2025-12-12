@@ -48,6 +48,17 @@ public class KafkaUtils {
 
         kafkaProducer.send(obj.toString(), topicName);
         IngestionAction.printLogs("Inserted to kafka: " + obj.toString());
+
+        // Publish to guardrails topic if enabled
+        String enableGuardrails = System.getenv("ENABLE_GUARDRAILS");
+        if (enableGuardrails != null && enableGuardrails.equals("true")) {
+            String guardrailsTopic = System.getenv("GUARDRAILS_TOPIC");
+            if (guardrailsTopic == null) {
+                guardrailsTopic = "akto.guardrails";
+            }
+            kafkaProducer.send(obj.toString(), guardrailsTopic);
+            IngestionAction.printLogs("Inserted to guardrails kafka: " + obj.toString());
+        }
     }
 
 }
