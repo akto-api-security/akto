@@ -9,7 +9,7 @@ public class GuardrailsConfig {
     // Default values
     private static final String DEFAULT_GUARDRAILS_TOPIC = "akto.guardrails";
 
-    // Cached configuration (lazy-loaded)
+    // Sinlgeton Instance
     private static volatile GuardrailsConfig instance;
 
     private final boolean enabled;
