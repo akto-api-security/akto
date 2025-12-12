@@ -89,6 +89,13 @@ public class ThreatActorService {
         if (rateLimitConfig != null) {
             builder.setRatelimitConfig(rateLimitConfig);
         }
+        
+        // Handle archivalDays
+        Object archivalDaysObj = doc.get("archivalDays");
+        if (archivalDaysObj instanceof Number) {
+            int archivalDays = ((Number) archivalDaysObj).intValue();
+            builder.setArchivalDays(archivalDays);
+        }
     }
     return builder.build();
 }
@@ -122,6 +129,11 @@ public class ThreatActorService {
         }
     }
     
+    // Handle archivalDays
+    if (updatedConfig.getArchivalDays() > 0) {
+        newDoc.append("archivalDays", updatedConfig.getArchivalDays());
+    }
+    
     Document existingDoc = coll.find().first();
 
     if (existingDoc != null) {
@@ -131,12 +143,21 @@ public class ThreatActorService {
         coll.insertOne(newDoc);
     }
 
-    // Set the actor and ratelimitConfig in the returned proto
+    // Set the actor, ratelimitConfig, and archivalDays in the returned proto
     if (updatedConfig.hasActor()) {
         builder.setActor(updatedConfig.getActor());
     }
     if (updatedConfig.hasRatelimitConfig()) {
         builder.setRatelimitConfig(updatedConfig.getRatelimitConfig());
+    }
+    // Read archivalDays from the saved document to return the current value
+    Document savedDoc = coll.find().first();
+    if (savedDoc != null) {
+        Object archivalDaysObj = savedDoc.get("archivalDays");
+        if (archivalDaysObj instanceof Number) {
+            int archivalDays = ((Number) archivalDaysObj).intValue();
+            builder.setArchivalDays(archivalDays);
+        }
     }
     return builder.build();
 }
