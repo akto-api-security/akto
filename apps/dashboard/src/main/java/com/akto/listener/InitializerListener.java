@@ -2628,7 +2628,7 @@ public class InitializerListener implements ServletContextListener {
                     syncCronInfo.setUpUpdateCronScheduler();
                     syncCronInfo.setUpMcpMaliciousnessCronScheduler();
                     setUpTestEditorTemplatesScheduler();
-                    
+                    JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
                     updateApiGroupsForAccounts(); 
                     setupAutomatedApiGroupsScheduler();
                     if(runJobFunctionsAnyway) {
