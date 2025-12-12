@@ -9,6 +9,8 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import com.akto.test_editor.TestingUtilsSingleton;
@@ -156,6 +158,8 @@ public class YamlNodeExecutor extends NodeExecutor {
         List<Integer> responseTimeArr = new ArrayList<>();
         List<Integer> responseLenArr = new ArrayList<>();
 
+        // Clear to avoid stale ThreadLocal executor leaking across runs
+        TestingUtilsSingleton.getInstance().clearApiCallExecutorService();
         // Check if we have an ExecutorService for parallel API calls (only when executionType == "parallel")
         ExecutorService apiCallExecutor = TestingUtilsSingleton.getInstance().getApiCallExecutorService();
         boolean useParallelApiCalls = (apiCallExecutor != null);
@@ -183,9 +187,9 @@ public class YamlNodeExecutor extends NodeExecutor {
             final AtomicBoolean vulnerableAtomic = new AtomicBoolean(false);
             
             // Use AtomicReference for mutable single values
-            final java.util.concurrent.atomic.AtomicReference<String> savedResponsesRef = new java.util.concurrent.atomic.AtomicReference<>();
-            final java.util.concurrent.atomic.AtomicInteger statusCodeRef = new java.util.concurrent.atomic.AtomicInteger();
-            final java.util.concurrent.atomic.AtomicReference<String> eventStreamResponseRef = new java.util.concurrent.atomic.AtomicReference<>();
+            final AtomicReference<String> savedResponsesRef = new AtomicReference<>();
+            final AtomicInteger statusCodeRef = new AtomicInteger();
+            final AtomicReference<String> eventStreamResponseRef = new AtomicReference<>();
             
             // Queue all API calls
             List<CompletableFuture<ApiCallResult>> futures = new ArrayList<>();

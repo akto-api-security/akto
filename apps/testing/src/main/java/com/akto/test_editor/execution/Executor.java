@@ -66,11 +66,6 @@ public class Executor {
         Constants.AGENT_BASE_URL
     );
 
-    public static void main(String[] args) {
-        String host = "mdev.ababank.com";
-        int apiCollectionId = host.hashCode();
-        System.out.println(apiCollectionId);
-    }
 
     public static void modifyRawApiUsingTestRole(String logId, TestingRunConfig testingRunConfig, RawApi sampleRawApi, ApiInfo.ApiInfoKey apiInfoKey){
         if (testingRunConfig != null && StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
