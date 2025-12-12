@@ -65,7 +65,6 @@ public class IngestionAction extends ActionSupport {
                 }
 
                 if(ACCOUNT_ID_TO_ADD_DEFAULT_DATA == 1745303931 && StringUtils.isEmpty(payload.getPath())) {
-                    payload.setPath("/");
                 }
 
                 KafkaUtils.insertData(payload);

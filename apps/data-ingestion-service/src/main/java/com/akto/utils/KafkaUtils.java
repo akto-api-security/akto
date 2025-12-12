@@ -1,7 +1,6 @@
 package com.akto.utils;
 
 import com.akto.log.LoggerMaker;
-import com.akto.action.IngestionAction;
 import com.akto.dao.context.Context;
 import com.akto.dto.IngestDataBatch;
 import com.akto.kafka.Kafka;
@@ -11,6 +10,7 @@ public class KafkaUtils {
 
     private static final LoggerMaker logger = new LoggerMaker(KafkaUtils.class, LoggerMaker.LogDb.DATA_INGESTION);
     private static Kafka kafkaProducer;
+    private static TopicPublisher topicPublisher;
 
     public void initKafkaProducer() {
         String kafkaBrokerUrl = System.getenv().getOrDefault("AKTO_KAFKA_BROKER_URL", "localhost:29092");
@@ -22,6 +22,17 @@ public class KafkaUtils {
 
     public static void insertData(IngestDataBatch payload) {
         String topicName = "akto.api.logs";
+        BasicDBObject obj = buildMessageObject(payload);
+        topicPublisher.publish(obj.toString(), topicName);
+    }
+
+    /**
+     * Builds a document from the ingestion payload
+     *
+     * @param payload The ingestion data batch
+     * @return BasicDBObject containing all payload fields
+     */
+    private static BasicDBObject buildMessageObject(IngestDataBatch payload) {
         BasicDBObject obj = new BasicDBObject();
         obj.put("path", payload.getPath());
         obj.put("requestHeaders", payload.getRequestHeaders());
@@ -45,20 +56,16 @@ public class KafkaUtils {
         obj.put("daemonset_id", payload.getDaemonset_id());
         obj.put("enabled_graph", payload.getEnabled_graph());
         obj.put("tag", payload.getTag());
+        return obj;
+    }
 
-        kafkaProducer.send(obj.toString(), topicName);
-        IngestionAction.printLogs("Inserted to kafka: " + obj.toString());
+    // Getters and setters for dependency injection
+    public static Kafka getKafkaProducer() {
+        return kafkaProducer;
+    }
 
-        // Publish to guardrails topic if enabled
-        String enableGuardrails = System.getenv("ENABLE_GUARDRAILS");
-        if (enableGuardrails != null && enableGuardrails.equals("true")) {
-            String guardrailsTopic = System.getenv("GUARDRAILS_TOPIC");
-            if (guardrailsTopic == null) {
-                guardrailsTopic = "akto.guardrails";
-            }
-            kafkaProducer.send(obj.toString(), guardrailsTopic);
-            IngestionAction.printLogs("Inserted to guardrails kafka: " + obj.toString());
-        }
+    public static void setTopicPublisher(TopicPublisher publisher) {
+        topicPublisher = publisher;
     }
 
 }
