@@ -2,20 +2,39 @@ package com.akto.listener;
 
 import javax.servlet.ServletContextListener;
 
+import com.akto.config.GuardrailsConfig;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.log.LoggerMaker;
 import com.akto.metrics.ModuleInfoWorker;
 import com.akto.utils.KafkaUtils;
+import com.akto.utils.TopicPublisher;
 
 
 public class InitializerListener implements ServletContextListener {
 
+    private static final LoggerMaker logger = new LoggerMaker(InitializerListener.class, LoggerMaker.LogDb.DATA_INGESTION);
+
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
+        // Initialize Kafka
         KafkaUtils kafkaUtils = new KafkaUtils();
         kafkaUtils.initKafkaProducer();
 
+        // Initialize GuardrailsConfig and TopicPublisher
+        GuardrailsConfig guardrailsConfig = GuardrailsConfig.getInstance();
+        logger.infoAndAddToDb("Guardrails configuration: " + guardrailsConfig,
+            LoggerMaker.LogDb.DATA_INGESTION);
+
+        // Store publisher for use in KafkaUtils
+        TopicPublisher topicPublisher = new TopicPublisher(
+            KafkaUtils.getKafkaProducer(),
+            guardrailsConfig
+        );
+        KafkaUtils.setTopicPublisher(topicPublisher);
+
+        // Initialize DataActor
         DataActor dataActor = DataActorFactory.fetchInstance();
         ModuleInfoWorker.init(ModuleInfo.ModuleType.DATA_INGESTION, dataActor);
     }
