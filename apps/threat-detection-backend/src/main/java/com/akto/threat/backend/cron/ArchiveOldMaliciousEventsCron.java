@@ -90,7 +90,8 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
         return dbName == null || dbName.isEmpty()
                 || "admin".equals(dbName)
                 || "local".equals(dbName)
-                || "config".equals(dbName);
+                || "config".equals(dbName)
+                || "1669322524".equals(dbName);
     }
 
     private void archiveOldMaliciousEvents(String dbName, long nowSeconds) {
