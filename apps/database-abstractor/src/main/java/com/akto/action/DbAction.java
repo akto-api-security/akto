@@ -80,6 +80,7 @@ public class DbAction extends ActionSupport {
     List<BulkUpdates> writesForTestingRunIssues;
     List<BulkUpdates> writesForOverageInfo;
     List<DependencyNode> dependencyNodeList;
+    List<AgentTrafficLog> agentTrafficLogs;
     TestScript testScript;
     @Setter @Getter
     McpAuditInfo auditInfo;
@@ -2691,6 +2692,14 @@ public class DbAction extends ActionSupport {
 
     public void setDependencyNodeList(List<DependencyNode> dependencyNodeList) {
         this.dependencyNodeList = dependencyNodeList;
+    }
+
+    public List<AgentTrafficLog> getAgentTrafficLogs() {
+        return agentTrafficLogs;
+    }
+
+    public void setAgentTrafficLogs(List<AgentTrafficLog> agentTrafficLogs) {
+        this.agentTrafficLogs = agentTrafficLogs;
     }
 
     public int getStartTimestamp() {

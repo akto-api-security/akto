@@ -147,6 +147,16 @@ public class DbActor extends DataActor {
         DbLayer.bulkWriteOverageInfo(writes);
     }
 
+    @Override
+    public void bulkWriteAgentTrafficLogs(List<Object> trafficLogs) {
+        ArrayList<AgentTrafficLog> agentTrafficLogs = new ArrayList<>();
+        for (Object obj : trafficLogs) {
+            AgentTrafficLog log = (AgentTrafficLog) obj;
+            agentTrafficLogs.add(log);
+        }
+        DbLayer.bulkWriteAgentTrafficLogs(agentTrafficLogs);
+    }
+
     public boolean overageApisExists(int apiCollectionId, String urlType, Method method, String url) {
         return com.akto.dao.billing.UningestedApiOverageDao.instance.exists(apiCollectionId, urlType, method, url);
     }
