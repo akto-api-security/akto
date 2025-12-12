@@ -5,7 +5,7 @@ import transform from '../transform'
 import SampleDataList from '../../../components/shared/SampleDataList'
 import SampleData from '../../../components/shared/SampleData'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
-import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link, ActionList} from '@shopify/polaris'
+import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link} from '@shopify/polaris'
 import CompulsoryDescriptionModal from "../../issues/components/CompulsoryDescriptionModal.jsx"
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
@@ -19,6 +19,7 @@ import observeFunc from "../../observe/transform.js"
 import settingFunctions from '../../settings/module.js'
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreationModal.jsx'
+import CreateTicketDropdown from '../../../components/shared/CreateTicketDropdown.jsx'
 import MarkdownViewer from '../../../components/shared/MarkdownViewer.jsx'
 import InlineEditableText from '../../../components/shared/InlineEditableText.jsx'
 import ChatInterface from '../../../components/shared/ChatInterface.jsx'
@@ -36,7 +37,6 @@ function TestRunResultFlyout(props) {
     const [rowItems, setRowItems] = useState([])
     const [apiInfo, setApiInfo] = useState({})
     const [popoverActive, setPopoverActive] = useState(false)
-    const [ticketPopoverActive, setTicketPopoverActive] = useState(false)
     const [modalActive, setModalActive] = useState(false)
     const [jiraProjectMaps,setJiraProjectMap] = useState({})
     const [issueType, setIssueType] = useState('');
@@ -388,7 +388,6 @@ function TestRunResultFlyout(props) {
         const issuesActions = issueDetails?.testRunIssueStatus === "IGNORED" ? [...issues, ...reopen] : issues
 
         const togglePopover = useCallback(() => {
-            setTicketPopoverActive(false); // Close ticket dropdown when opening triage
             setPopoverActive(prev => !prev);
         }, []);
 
@@ -417,117 +416,6 @@ function TestRunResultFlyout(props) {
             </Popover.Pane>
         </Popover>
     )}
-
-    function CreateTicketDropdown() {
-        // Check if any integration is available
-        const hasAnyIntegration = window.JIRA_INTEGRATED === 'true' ||
-                                   window.AZURE_BOARDS_INTEGRATED === 'true' ||
-                                   window.SERVICENOW_INTEGRATED === 'true' ||
-                                   window.DEVREV_INTEGRATED === 'true';
-
-        const toggleTicketPopover = useCallback(() => {
-            setPopoverActive(false); // Close triage dropdown when opening ticket dropdown
-            setTicketPopoverActive(prev => !prev);
-        }, []);
-
-        const ticketIntegrations = [];
-
-        if (window.JIRA_INTEGRATED === 'true') {
-            ticketIntegrations.push({
-                content: 'Jira',
-                onAction: () => {
-                    handleJiraClick();
-                    setTicketPopoverActive(false);
-                },
-                disabled: jiraIssueUrl !== ""
-            });
-        }
-
-        if (window.AZURE_BOARDS_INTEGRATED === 'true') {
-            ticketIntegrations.push({
-                content: 'Azure Boards',
-                onAction: () => {
-                    handleAzureBoardClick();
-                    setTicketPopoverActive(false);
-                },
-                disabled: azureBoardsWorkItemUrl !== ""
-            });
-        }
-
-        if (window.SERVICENOW_INTEGRATED === 'true') {
-            ticketIntegrations.push({
-                content: 'ServiceNow',
-                onAction: () => {
-                    handleServiceNowClick();
-                    setTicketPopoverActive(false);
-                },
-                disabled: serviceNowTicketUrl !== ""
-            });
-        }
-
-        if (window.DEVREV_INTEGRATED === 'true') {
-            ticketIntegrations.push({
-                content: 'DevRev',
-                onAction: () => {
-                    handleDevRevClick();
-                    setTicketPopoverActive(false);
-                },
-                disabled: devrevWorkUrl !== ""
-            });
-        }
-
-        if (!hasAnyIntegration) {
-            return null;
-        }
-
-        return (
-            <Popover
-                activator={
-                    <Button
-                        primary
-                        disclosure
-                        onClick={toggleTicketPopover}
-                    >
-                        Create Ticket
-                    </Button>
-                }
-                active={ticketPopoverActive}
-                onClose={() => setTicketPopoverActive(false)}
-                autofocusTarget="first-node"
-                preferredPosition="below"
-                preferredAlignment="left"
-            >
-                <Popover.Pane fixed>
-                    <Popover.Section>
-                        <VerticalStack gap={"4"}>
-                            {ticketIntegrations.map((integration, index) => {
-                                return(
-                                    <div
-                                        style={{
-                                            cursor: integration.disabled ? 'not-allowed' : 'pointer',
-                                            opacity: integration.disabled ? 0.5 : 1,
-                                            padding: '8px 12px',
-                                            borderRadius: '4px',
-                                            transition: 'background-color 0.2s ease'
-                                        }}
-                                        className={integration.disabled ? '' : 'ticket-dropdown-item'}
-                                        onClick={() => {
-                                            if (!integration.disabled) {
-                                                integration.onAction();
-                                            }
-                                        }}
-                                        key={index}
-                                    >
-                                        {integration.content}
-                                    </div>
-                                )
-                            })}
-                        </VerticalStack>
-                    </Popover.Section>
-                </Popover.Pane>
-            </Popover>
-        );
-    }
     function TitleComponent() {
         const severity = (selectedTestRunResult && selectedTestRunResult.vulnerable) ? issueDetails.severity : ""
         return(
@@ -587,7 +475,17 @@ function TestRunResultFlyout(props) {
 
                     {selectedTestRunResult && selectedTestRunResult.vulnerable &&
                         <>
-                            <CreateTicketDropdown />
+                            <CreateTicketDropdown
+                                onJiraClick={handleJiraClick}
+                                onAzureBoardsClick={handleAzureBoardClick}
+                                onServiceNowClick={handleServiceNowClick}
+                                onDevRevClick={handleDevRevClick}
+                                jiraTicketUrl={jiraIssueUrl}
+                                azureBoardsUrl={azureBoardsWorkItemUrl}
+                                serviceNowTicketUrl={serviceNowTicketUrl}
+                                devrevWorkUrl={devrevWorkUrl}
+                                onOpenPopover={() => setPopoverActive(false)}
+                            />
                             <JiraTicketCreationModal
                                 activator={<></>}
                                 modalActive={modalActive}
