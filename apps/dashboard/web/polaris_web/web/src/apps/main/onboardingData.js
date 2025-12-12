@@ -596,7 +596,21 @@ const learnMoreObject = {
         ],
         videoLink: [
             {
-                content: "Watch Akto demo" , 
+                content: "Watch Akto demo" ,
+                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+            }
+        ]
+    },
+    dashboard_settings_integrations_devrev:{
+        docsLink: [
+            {
+                content:"DevRev Integration guide",
+                value:"https://docs.akto.io/issues/how-to/devrev-integration"
+            }
+        ],
+        videoLink: [
+            {
+                content: "Watch Akto demo" ,
                 value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
             }
         ]
