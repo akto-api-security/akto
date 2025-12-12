@@ -241,7 +241,7 @@ const DevRev = () => {
             title="DevRev"
             cardContent={cardContent}
             component={DevRevCard}
-            docsUrl="https://docs.akto.io/integrations/devrev"
+            docsUrl="https://docs.akto.io/issues/how-to/devrev-integration"
         />
     )
 }
