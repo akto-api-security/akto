@@ -83,9 +83,9 @@ public class Main {
 
     new BackendVerticle(maliciousEventService, threatActorService, threatApiService, apiDistributionDataService).start();
 
-    ArchiveOldMaliciousEventsCron cron = new ArchiveOldMaliciousEventsCron(threatProtectionMongo);
-    cron.runOnce();
-    cron.cron();
+    // ArchiveOldMaliciousEventsCron cron = new ArchiveOldMaliciousEventsCron(threatProtectionMongo);
+    // cron.runOnce();
+    // cron.cron();
   }
 
 }
