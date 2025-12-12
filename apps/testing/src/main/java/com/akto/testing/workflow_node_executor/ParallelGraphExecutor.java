@@ -11,8 +11,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 
 import com.akto.dto.api_workflow.Node;
 import com.akto.dto.testing.GraphExecutorRequest;
@@ -29,11 +29,10 @@ import com.akto.test_editor.TestingUtilsSingleton;
  */
 public class ParallelGraphExecutor extends GraphExecutor {
 
-    private static final Logger logger = LoggerFactory.getLogger(ParallelGraphExecutor.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ParallelGraphExecutor.class, LogDb.TESTING);
     
     // Thread pool size - can be configured based on system resources
     private static final int DEFAULT_THREAD_POOL_SIZE = 10;
-    private static final int MAX_THREAD_POOL_SIZE = 50;
     
     private final boolean allowAllCombinations;
     private final ExecutorService executorService;
@@ -42,10 +41,9 @@ public class ParallelGraphExecutor extends GraphExecutor {
     public ParallelGraphExecutor(boolean allowAllCombinations) {
         this.allowAllCombinations = allowAllCombinations;
         // Create a fixed thread pool with bounded queue for node execution
-        int poolSize = Math.min(DEFAULT_THREAD_POOL_SIZE, MAX_THREAD_POOL_SIZE);
-        this.executorService = Executors.newFixedThreadPool(poolSize);
+        this.executorService = Executors.newFixedThreadPool(DEFAULT_THREAD_POOL_SIZE);
         // Create a separate thread pool for API calls within nodes
-        this.apiCallExecutorService = Executors.newFixedThreadPool(poolSize * 2);
+        this.apiCallExecutorService = Executors.newFixedThreadPool(DEFAULT_THREAD_POOL_SIZE * 2);
     }
 
     @Override
@@ -61,11 +59,11 @@ public class ParallelGraphExecutor extends GraphExecutor {
         Map<String, Node> allNodes = graphExecutorRequest.getGraph().getNodes();
         
         if (allNodes == null || allNodes.isEmpty()) {
-            logger.warn("No nodes found in graph for parallel execution");
+            loggerMaker.warnAndAddToDb("No nodes found in graph for parallel execution");
             return new GraphExecutorResult(workflowTestResult, false, errors);
         }
         
-        logger.info("Starting parallel execution of {} nodes", allNodes.size());
+        loggerMaker.infoAndAddToDb("Starting parallel execution of " + allNodes.size() + " nodes");
         
         // Use ConcurrentHashMap for thread-safe operations
         Map<String, WorkflowTestResult.NodeResult> nodeResultMap = new ConcurrentHashMap<>();
@@ -86,7 +84,7 @@ public class ParallelGraphExecutor extends GraphExecutor {
                         // Check if node was already visited (thread-safe check)
                         if (visitedMap.putIfAbsent(node.getId(), true) != null) {
                             String errorMsg = "Node " + node.getId() + " is being visited multiple times";
-                            logger.warn(errorMsg);
+                            loggerMaker.warnAndAddToDb(errorMsg);
                             errors.add(errorMsg);
                             return;
                         }
@@ -97,7 +95,7 @@ public class ParallelGraphExecutor extends GraphExecutor {
                             if (waitInSeconds > 100) {
                                 waitInSeconds = 100;
                             }
-                            logger.info("Node {} sleeping for {} seconds", node.getId(), waitInSeconds);
+                            loggerMaker.infoAndAddToDb("Node " + node.getId() + " sleeping for " + waitInSeconds + " seconds");
                             Thread.sleep(waitInSeconds * 1000);
                         }
                         
@@ -120,16 +118,16 @@ public class ParallelGraphExecutor extends GraphExecutor {
                             errors.addAll(nodeResult.getErrors());
                         }
                         
-                        logger.debug("Completed execution of node {}", node.getId());
+                        loggerMaker.debugInfoAddToDb("Completed execution of node " + node.getId(), LogDb.TESTING);
                         
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         String errorMsg = "Node " + node.getId() + " execution was interrupted: " + e.getMessage();
-                        logger.error(errorMsg, e);
+                        loggerMaker.errorAndAddToDb(errorMsg);
                         errors.add(errorMsg);
                     } catch (Exception e) {
                         String errorMsg = "Error executing node " + node.getId() + ": " + e.getMessage();
-                        logger.error(errorMsg, e);
+                        loggerMaker.errorAndAddToDb(errorMsg);
                         errors.add(errorMsg);
                         
                         // Create a failure result for this node
@@ -146,7 +144,7 @@ public class ParallelGraphExecutor extends GraphExecutor {
                 } catch (Exception e) {
                     // Outer catch for any errors in context setup
                     String errorMsg = "Error setting up execution context for node " + node.getId() + ": " + e.getMessage();
-                    logger.error(errorMsg, e);
+                    loggerMaker.errorAndAddToDb(e, errorMsg);
                     errors.add(errorMsg);
                     TestingUtilsSingleton.getInstance().clearApiCallExecutorService();
                 }
@@ -164,11 +162,11 @@ public class ParallelGraphExecutor extends GraphExecutor {
             // Wait with a reasonable timeout (30 minutes)
             allFutures.get(30, TimeUnit.MINUTES);
             
-            logger.info("All {} nodes completed parallel execution", allNodes.size());
+            loggerMaker.infoAndAddToDb("All " + allNodes.size() + " nodes completed parallel execution");
             
         } catch (Exception e) {
             String errorMsg = "Error waiting for parallel execution to complete: " + e.getMessage();
-            logger.error(errorMsg, e);
+            loggerMaker.errorAndAddToDb(e, errorMsg);
             errors.add(errorMsg);
         }
         
@@ -177,9 +175,7 @@ public class ParallelGraphExecutor extends GraphExecutor {
         graphExecutorRequest.getExecutionOrder().addAll(executionOrder);
         
         // Determine final vulnerable status
-        boolean isVulnerable = overallVulnerable.get() || 
-                              nodeResultMap.values().stream()
-                                  .anyMatch(WorkflowTestResult.NodeResult::isVulnerable);
+        boolean isVulnerable = overallVulnerable.get();
         
         return new GraphExecutorResult(workflowTestResult, isVulnerable, errors);
     }
