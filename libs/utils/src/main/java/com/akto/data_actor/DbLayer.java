@@ -132,6 +132,11 @@ public class DbLayer {
     private static volatile long routingCollectionIdsCacheTimestamp = 0;
     private static final long CACHE_TTL_MS = 60 * 60 * 1000; // 60 minutes
 
+    // Cache for merged URLs filtering
+    private static volatile Set<MergedUrls> mergedUrlsCache = null;
+    private static volatile long mergedUrlsCacheTimestamp = 0;
+    private static final long MERGED_URLS_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+
     private static int getLastUpdatedTsForAccount(int accountId) {
         return lastUpdatedTsMap.computeIfAbsent(accountId, k -> 0);
     }
@@ -341,9 +346,14 @@ public class DbLayer {
         List<SingleTypeInfo> results = new ArrayList<>();
         ObjectId currentObjectId = objectId;
         Set<Integer> routingCollectionIds = null;
+        Set<MergedUrls> mergedUrlsSet = null;
 
         if (Context.accountId.get() == Constants.ROUTING_SKIP_ACCOUNT_ID) {
             routingCollectionIds = getRoutingCollectionIds();
+        }
+
+        if (Context.accountId.get() == Constants.MERGED_URLS_FILTER_ACCOUNT_ID) {
+            mergedUrlsSet = getMergedUrlsSet();
         }
 
         // Loop and discard template URLs from collections belonging to routing tags
@@ -364,16 +374,32 @@ public class DbLayer {
             currentObjectId = batch.get(batch.size() - 1).getId();
 
             // Filter out STRING template URLs from collections that should skip merging
-            if (routingCollectionIds != null) {
+            // Also filter out STIs belonging to merged URLs for specific account
+            if (routingCollectionIds != null || mergedUrlsSet != null) {
                 for (SingleTypeInfo sti : batch) {
-                    if (!routingCollectionIds.contains(sti.getApiCollectionId())) {
-                        // Not from skip-merging collection - keep everything
-                        results.add(sti);
-                    } else if (!APICatalog.isTemplateUrl(sti.getUrl())) {
-                        // From skip-merging collection but static URL - keep it
-                        results.add(sti);
-                    } else if (!APICatalog.isStringTemplateUrl(sti.getUrl())) {
-                        // From skip-merging collection but non-STRING template URL (INTEGER, LOCALE, etc.) - keep it
+                    boolean shouldKeep = true;
+
+                    // Check routing collection filter
+                    if (routingCollectionIds != null) {
+                        if (routingCollectionIds.contains(sti.getApiCollectionId())) {
+                            // From skip-merging collection
+                            if (APICatalog.isTemplateUrl(sti.getUrl()) && APICatalog.isStringTemplateUrl(sti.getUrl())) {
+                                // STRING template URL from routing collection - discard
+                                shouldKeep = false;
+                            }
+                        }
+                    }
+
+                    // Check merged URLs filter (only if not already filtered)
+                    if (shouldKeep && mergedUrlsSet != null && !mergedUrlsSet.isEmpty()) {
+                        MergedUrls stiAsUrl = new MergedUrls(sti.getUrl(), sti.getMethod(), sti.getApiCollectionId());
+                        if (mergedUrlsSet.contains(stiAsUrl)) {
+                            // STI belongs to merged URL - discard
+                            shouldKeep = false;
+                        }
+                    }
+
+                    if (shouldKeep) {
                         results.add(sti);
                     }
                     // From skip-merging collection AND STRING template URL - discard
@@ -422,6 +448,34 @@ public class DbLayer {
             routingCollectionIdsCacheTimestamp = currentTime;
 
             return routingCollectionIds;
+        }
+    }
+
+    private static Set<MergedUrls> getMergedUrlsSet() {
+        long currentTime = System.currentTimeMillis();
+
+        // Check if cache is valid
+        if (mergedUrlsCache != null &&
+            (currentTime - mergedUrlsCacheTimestamp) < MERGED_URLS_CACHE_TTL_MS) {
+            return mergedUrlsCache;
+        }
+
+        // Cache miss or expired - rebuild cache
+        synchronized (DbLayer.class) {
+            // Double-check after acquiring lock
+            if (mergedUrlsCache != null &&
+                (currentTime - mergedUrlsCacheTimestamp) < MERGED_URLS_CACHE_TTL_MS) {
+                return mergedUrlsCache;
+            }
+
+            // Fetch merged URLs from database
+            Set<MergedUrls> mergedUrls = MergedUrlsDao.instance.getMergedUrls();
+
+            // Update cache
+            mergedUrlsCache = mergedUrls;
+            mergedUrlsCacheTimestamp = currentTime;
+
+            return mergedUrls;
         }
     }
 

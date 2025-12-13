@@ -621,7 +621,7 @@ public class DbAction extends ActionSupport {
                         }
 
                         // Filter for account 1759386565: ignore template URLs
-                        if (accId == 1759386565 && url != null && APICatalog.isTemplateUrl(url)) {
+                        if (accId == Constants.MERGED_URLS_FILTER_ACCOUNT_ID && url != null && APICatalog.isTemplateUrl(url)) {
                             ignore = true;
                         }
 
@@ -717,7 +717,7 @@ public class DbAction extends ActionSupport {
                     }
 
                     // Filter for account 1759386565: ignore template URLs
-                    if (accId == 1759386565 && url != null && APICatalog.isTemplateUrl(url)) {
+                    if (accId == Constants.MERGED_URLS_FILTER_ACCOUNT_ID && url != null && APICatalog.isTemplateUrl(url)) {
                         ignore = true;
                     }
 

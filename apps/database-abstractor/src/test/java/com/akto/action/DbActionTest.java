@@ -1,6 +1,7 @@
 package com.akto.action;
 
 import com.akto.dto.type.APICatalog;
+import com.akto.util.Constants;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
@@ -131,25 +132,25 @@ public class DbActionTest {
      */
     @Test
     public void testAccount1759386565FilteringLogic() {
-        int accountId = 1759386565;
+        int accountId = Constants.MERGED_URLS_FILTER_ACCOUNT_ID;
 
         // Scenario 1: Template URL for account 1759386565 - should be ignored
         String templateUrl = "api/users/INTEGER";
-        boolean shouldIgnore = (accountId == 1759386565 &&
+        boolean shouldIgnore = (accountId == Constants.MERGED_URLS_FILTER_ACCOUNT_ID &&
                                templateUrl != null &&
                                APICatalog.isTemplateUrl(templateUrl));
         assertTrue("Template URL for account 1759386565 should be ignored", shouldIgnore);
 
         // Scenario 2: Non-template URL for account 1759386565 - should NOT be ignored
         String regularUrl = "api/users/12345";
-        shouldIgnore = (accountId == 1759386565 &&
+        shouldIgnore = (accountId == Constants.MERGED_URLS_FILTER_ACCOUNT_ID &&
                        regularUrl != null &&
                        APICatalog.isTemplateUrl(regularUrl));
         assertFalse("Regular URL for account 1759386565 should NOT be ignored", shouldIgnore);
 
         // Scenario 3: Template URL for different account - should NOT be ignored by this rule
-        int differentAccountId = 1000000;
-        shouldIgnore = (differentAccountId == 1759386565 &&
+        int differentAccountId = 1000001;
+        shouldIgnore = (differentAccountId == Constants.MERGED_URLS_FILTER_ACCOUNT_ID &&
                        templateUrl != null &&
                        APICatalog.isTemplateUrl(templateUrl));
         assertFalse("Template URL for different account should NOT be ignored by this rule",
@@ -157,7 +158,7 @@ public class DbActionTest {
 
         // Scenario 4: Null URL for account 1759386565 - should NOT cause errors
         String nullUrl = null;
-        shouldIgnore = (accountId == 1759386565 &&
+        shouldIgnore = (accountId == Constants.MERGED_URLS_FILTER_ACCOUNT_ID &&
                        nullUrl != null &&
                        APICatalog.isTemplateUrl(nullUrl));
         assertFalse("Null URL should be handled gracefully", shouldIgnore);
