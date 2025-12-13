@@ -39,6 +39,7 @@ import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_collector.TrafficCollectorMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.APICatalog;
 import com.akto.notifications.slack.APITestStatusAlert;
 import com.akto.notifications.slack.NewIssuesModel;
 import com.akto.notifications.slack.SlackAlerts;
@@ -619,6 +620,11 @@ public class DbAction extends ActionSupport {
                             }
                         }
 
+                        // Filter for account 1759386565: ignore template URLs
+                        if (accId == 1759386565 && url != null && APICatalog.isTemplateUrl(url)) {
+                            ignore = true;
+                        }
+
                         // Filter for account 1736798101: ignore updates with isHeader=false and specific subTypes
                         if (accId == 1736798101 && !isHeader && subType != null) {
                             if (IGNORED_SUB_TYPES.contains(subType.toUpperCase())) {
@@ -708,6 +714,11 @@ public class DbAction extends ActionSupport {
                         } else {
                             filters.add(Filters.eq(entry.getKey(), entry.getValue()));
                         }
+                    }
+
+                    // Filter for account 1759386565: ignore template URLs
+                    if (accId == 1759386565 && url != null && APICatalog.isTemplateUrl(url)) {
+                        ignore = true;
                     }
 
                     // Filter for account 1736798101: ignore updates with isHeader=false and specific subTypes
