@@ -1,6 +1,7 @@
 package com.akto.action;
 
 import com.akto.dto.filter.MergedUrls;
+import com.akto.util.Constants;
 import org.junit.Test;
 
 import java.util.HashSet;
@@ -129,27 +130,27 @@ public class MergedUrlsFilterTest {
         Set<MergedUrls> mergedUrlsSet = new HashSet<>();
 
         // Add merged template URLs (these would come from the merged_urls collection)
-        mergedUrlsSet.add(new MergedUrls("api/v1/users/INTEGER", "GET", 1759386565));
-        mergedUrlsSet.add(new MergedUrls("api/v1/users/INTEGER/posts", "GET", 1759386565));
-        mergedUrlsSet.add(new MergedUrls("api/v1/products/STRING", "POST", 1759386565));
+        mergedUrlsSet.add(new MergedUrls("api/v1/users/INTEGER", "GET", Constants.MERGED_URLS_FILTER_ACCOUNT_ID));
+        mergedUrlsSet.add(new MergedUrls("api/v1/users/INTEGER/posts", "GET", Constants.MERGED_URLS_FILTER_ACCOUNT_ID));
+        mergedUrlsSet.add(new MergedUrls("api/v1/products/STRING", "POST", Constants.MERGED_URLS_FILTER_ACCOUNT_ID));
 
         // Template URLs matching merged entries should be filtered
         assertTrue("Template URL matching merged entry should be filtered",
-                  mergedUrlsSet.contains(new MergedUrls("api/v1/users/INTEGER", "GET", 1759386565)));
+                  mergedUrlsSet.contains(new MergedUrls("api/v1/users/INTEGER", "GET", Constants.MERGED_URLS_FILTER_ACCOUNT_ID)));
 
         assertTrue("Template URL with path matching merged entry should be filtered",
-                  mergedUrlsSet.contains(new MergedUrls("api/v1/users/INTEGER/posts", "GET", 1759386565)));
+                  mergedUrlsSet.contains(new MergedUrls("api/v1/users/INTEGER/posts", "GET", Constants.MERGED_URLS_FILTER_ACCOUNT_ID)));
 
         // Concrete URLs should NOT be filtered
         assertFalse("Concrete URL should not be filtered",
-                   mergedUrlsSet.contains(new MergedUrls("api/v1/users/123", "GET", 1759386565)));
+                   mergedUrlsSet.contains(new MergedUrls("api/v1/users/123", "GET", Constants.MERGED_URLS_FILTER_ACCOUNT_ID)));
 
         assertFalse("Concrete URL with path should not be filtered",
-                   mergedUrlsSet.contains(new MergedUrls("api/v1/users/123/posts", "GET", 1759386565)));
+                   mergedUrlsSet.contains(new MergedUrls("api/v1/users/123/posts", "GET", Constants.MERGED_URLS_FILTER_ACCOUNT_ID)));
 
         // Same URL with different method should NOT be filtered
         assertFalse("Same URL with different method should not be filtered",
-                   mergedUrlsSet.contains(new MergedUrls("api/v1/users/INTEGER", "POST", 1759386565)));
+                   mergedUrlsSet.contains(new MergedUrls("api/v1/users/INTEGER", "POST", Constants.MERGED_URLS_FILTER_ACCOUNT_ID)));
     }
 
     /**
@@ -180,10 +181,10 @@ public class MergedUrlsFilterTest {
     @Test
     public void testAccountIdConstant() {
         // Verify the expected account ID
-        int expectedAccountId = 1759386565;
+        int expectedAccountId = Constants.MERGED_URLS_FILTER_ACCOUNT_ID;
 
         // This test documents the account ID that triggers merged URLs filtering
         assertEquals("Expected account ID for merged URLs filtering",
-                    1759386565, expectedAccountId);
+                    Constants.MERGED_URLS_FILTER_ACCOUNT_ID, expectedAccountId);
     }
 }
