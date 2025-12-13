@@ -39,4 +39,7 @@ public class Constants {
     public static final List<String> MERGING_ALLOWED_TAG_VALUES = Arrays.asList("agoda-routing");
     public static final List<String> MERGING_ALLOWED_TAG_SUBSTRINGS = Arrays.asList("proxy", "gateway");
     public static final String AKTO_GEN_AI_TAG = "gen-ai";
+
+    // Account ID for filtering merged URLs in STI fetch
+    public static final int MERGED_URLS_FILTER_ACCOUNT_ID = 1759386565;
 }
