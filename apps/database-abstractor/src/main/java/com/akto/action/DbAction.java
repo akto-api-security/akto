@@ -1329,35 +1329,39 @@ public class DbAction extends ActionSupport {
             ObjectId lastTsObjectId = lastStiId != null ? new ObjectId(lastStiId) : null;
             stis = DbLayer.fetchStiBasedOnHostHeaders(lastTsObjectId);
 
-            // Fetch merged URLs and filter out STIs that belong to merged URLs
-            // Use cached merged URLs if available and not expired (15 minutes)
-            Set<MergedUrls> mergedUrlsSet;
-            long currentTime = System.currentTimeMillis();
+            // Filter merged URLs only for account ID 1759386565
+            int accId = Context.accountId.get();
+            if (accId == 1759386565) {
+                // Fetch merged URLs and filter out STIs that belong to merged URLs
+                // Use cached merged URLs if available and not expired (15 minutes)
+                Set<MergedUrls> mergedUrlsSet;
+                long currentTime = System.currentTimeMillis();
 
-            if (mergedUrlsCache == null || (currentTime - lastMergedUrlsFetchTime) > MERGED_URLS_CACHE_DURATION_MS) {
-                // Cache is null or expired, fetch from DB
-                mergedUrlsCache = MergedUrlsDao.instance.getMergedUrls();
-                lastMergedUrlsFetchTime = currentTime;
-                loggerMaker.infoAndAddToDb("Refreshed merged URLs cache. Cache size: " +
-                                          (mergedUrlsCache != null ? mergedUrlsCache.size() : 0));
-            }
-            mergedUrlsSet = mergedUrlsCache;
-
-            if (mergedUrlsSet != null && !mergedUrlsSet.isEmpty()) {
-                int originalSize = stis.size();
-                List<SingleTypeInfo> filteredStis = new ArrayList<>();
-                for (SingleTypeInfo sti : stis) {
-                    // Check if this STI belongs to a merged URL
-                    MergedUrls stiAsUrl = new MergedUrls(sti.getUrl(), sti.getMethod(), sti.getApiCollectionId());
-                    if (!mergedUrlsSet.contains(stiAsUrl)) {
-                        // STI is not in merged URLs, keep it
-                        filteredStis.add(sti);
-                    }
+                if (mergedUrlsCache == null || (currentTime - lastMergedUrlsFetchTime) > MERGED_URLS_CACHE_DURATION_MS) {
+                    // Cache is null or expired, fetch from DB
+                    mergedUrlsCache = MergedUrlsDao.instance.getMergedUrls();
+                    lastMergedUrlsFetchTime = currentTime;
+                    loggerMaker.infoAndAddToDb("Refreshed merged URLs cache for account " + accId + ". Cache size: " +
+                                              (mergedUrlsCache != null ? mergedUrlsCache.size() : 0));
                 }
-                stis = filteredStis;
-                loggerMaker.infoAndAddToDb("Filtered out " + (originalSize - stis.size()) +
-                                          " STIs belonging to merged URLs. Original: " + originalSize +
-                                          ", After filtering: " + stis.size());
+                mergedUrlsSet = mergedUrlsCache;
+
+                if (mergedUrlsSet != null && !mergedUrlsSet.isEmpty()) {
+                    int originalSize = stis.size();
+                    List<SingleTypeInfo> filteredStis = new ArrayList<>();
+                    for (SingleTypeInfo sti : stis) {
+                        // Check if this STI belongs to a merged URL
+                        MergedUrls stiAsUrl = new MergedUrls(sti.getUrl(), sti.getMethod(), sti.getApiCollectionId());
+                        if (!mergedUrlsSet.contains(stiAsUrl)) {
+                            // STI is not in merged URLs, keep it
+                            filteredStis.add(sti);
+                        }
+                    }
+                    stis = filteredStis;
+                    loggerMaker.infoAndAddToDb("Account " + accId + ": Filtered out " + (originalSize - stis.size()) +
+                                              " STIs belonging to merged URLs. Original: " + originalSize +
+                                              ", After filtering: " + stis.size());
+                }
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchStiBasedOnHostHeaders " + e.toString());
