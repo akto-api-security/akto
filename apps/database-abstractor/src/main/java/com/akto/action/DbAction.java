@@ -17,6 +17,7 @@ import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
 import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.filter.MergedUrls;
+import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dto.graph.SvcToSvcGraphEdge;
 import com.akto.dto.graph.SvcToSvcGraphNode;
 import com.akto.dto.metrics.MetricData;
@@ -1317,11 +1318,47 @@ public class DbAction extends ActionSupport {
 //        return SingleTypeInfoDao.instance.findAll(filters, 0, 20000, sort, Projections.exclude(SingleTypeInfo._VALUES));
 //    }
 
+    // Cache for merged URLs to avoid fetching from DB on every call
+    private static Set<MergedUrls> mergedUrlsCache = null;
+    private static long lastMergedUrlsFetchTime = 0;
+    private static final long MERGED_URLS_CACHE_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+
     private String lastStiId = null;
     public String fetchStiBasedOnHostHeaders() {
         try {
             ObjectId lastTsObjectId = lastStiId != null ? new ObjectId(lastStiId) : null;
             stis = DbLayer.fetchStiBasedOnHostHeaders(lastTsObjectId);
+
+            // Fetch merged URLs and filter out STIs that belong to merged URLs
+            // Use cached merged URLs if available and not expired (15 minutes)
+            Set<MergedUrls> mergedUrlsSet;
+            long currentTime = System.currentTimeMillis();
+
+            if (mergedUrlsCache == null || (currentTime - lastMergedUrlsFetchTime) > MERGED_URLS_CACHE_DURATION_MS) {
+                // Cache is null or expired, fetch from DB
+                mergedUrlsCache = MergedUrlsDao.instance.getMergedUrls();
+                lastMergedUrlsFetchTime = currentTime;
+                loggerMaker.infoAndAddToDb("Refreshed merged URLs cache. Cache size: " +
+                                          (mergedUrlsCache != null ? mergedUrlsCache.size() : 0));
+            }
+            mergedUrlsSet = mergedUrlsCache;
+
+            if (mergedUrlsSet != null && !mergedUrlsSet.isEmpty()) {
+                int originalSize = stis.size();
+                List<SingleTypeInfo> filteredStis = new ArrayList<>();
+                for (SingleTypeInfo sti : stis) {
+                    // Check if this STI belongs to a merged URL
+                    MergedUrls stiAsUrl = new MergedUrls(sti.getUrl(), sti.getMethod(), sti.getApiCollectionId());
+                    if (!mergedUrlsSet.contains(stiAsUrl)) {
+                        // STI is not in merged URLs, keep it
+                        filteredStis.add(sti);
+                    }
+                }
+                stis = filteredStis;
+                loggerMaker.infoAndAddToDb("Filtered out " + (originalSize - stis.size()) +
+                                          " STIs belonging to merged URLs. Original: " + originalSize +
+                                          ", After filtering: " + stis.size());
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchStiBasedOnHostHeaders " + e.toString());
             return Action.ERROR.toUpperCase();
