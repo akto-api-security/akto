@@ -31,6 +31,15 @@ public class AccountJob {
     public static final String CREATED_AT = "createdAt";
     public static final String LAST_UPDATED_AT = "lastUpdatedAt";
 
+    // Execution tracking field constants
+    public static final String JOB_STATUS = "jobStatus";
+    public static final String SCHEDULE_TYPE = "scheduleType";
+    public static final String SCHEDULED_AT = "scheduledAt";
+    public static final String STARTED_AT = "startedAt";
+    public static final String FINISHED_AT = "finishedAt";
+    public static final String HEARTBEAT_AT = "heartbeatAt";
+    public static final String ERROR = "error";
+
     // Fields
     private ObjectId id;                        // Primary key
     private int accountId;                      // Account identifier
@@ -40,6 +49,15 @@ public class AccountJob {
     private int recurringIntervalSeconds;       // Recurrence interval (0 for non-recurring)
     private int createdAt;                      // Creation timestamp
     private int lastUpdatedAt;                  // Last update timestamp
+
+    // Execution tracking fields
+    private JobStatus jobStatus;                // Job status (SCHEDULED, RUNNING, COMPLETED, FAILED, STOPPED)
+    private ScheduleType scheduleType;          // Schedule type (RECURRING, RUN_ONCE)
+    private int scheduledAt;                    // When the job should run (epoch seconds)
+    private int startedAt;                      // When job execution started (epoch seconds)
+    private int finishedAt;                     // When job execution finished (epoch seconds)
+    private int heartbeatAt;                    // Last heartbeat timestamp (epoch seconds)
+    private String error;                       // Error message if job failed
 
     /**
      * Constructor without id field (MongoDB will auto-generate the id).

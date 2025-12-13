@@ -35,5 +35,17 @@ public class AccountJobDao extends AccountsContextDao<AccountJob> {
         // Index 2: Filter by job type and sub-type, sort by creation date
         fieldNames = new String[]{AccountJob.JOB_TYPE, AccountJob.SUB_TYPE, AccountJob.CREATED_AT};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
+        // Index 3: For job polling - filter by status, sort by scheduledAt
+        fieldNames = new String[]{AccountJob.JOB_STATUS, AccountJob.SCHEDULED_AT};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
+        // Index 4: For heartbeat monitoring - filter by status and heartbeatAt
+        fieldNames = new String[]{AccountJob.JOB_STATUS, AccountJob.HEARTBEAT_AT};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
+        // Index 5: For account-specific queries - filter by accountId and status
+        fieldNames = new String[]{AccountJob.ACCOUNT_ID, AccountJob.JOB_STATUS};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
 }
