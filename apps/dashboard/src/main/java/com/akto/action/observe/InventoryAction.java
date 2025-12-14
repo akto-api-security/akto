@@ -1049,7 +1049,14 @@ public class InventoryAction extends UserAction {
 
 
         SampleData sampleData = SampleDataDao.instance.fetchSampleDataForApi(apiCollectionId, url, urlMethod);
-        List<String> samples = sampleData.getSamples();
+        List<String> samples;
+        if(sampleData == null) {
+            SensitiveSampleData sensitiveSampleData = SensitiveSampleDataDao.instance.fetchSampleDataForApi(apiCollectionId, url, urlMethod);
+            samples = sensitiveSampleData.getSampleData();
+        } else {
+            samples = sampleData.getSamples();
+        }
+
         loggerMaker.debugAndAddToDb("Found " + samples.size() + " samples for API: " + apiCollectionId + " " + url + method, LogDb.DASHBOARD);
 
         Bson stiFilter = SingleTypeInfoDao.filterForSTIUsingURL(apiCollectionId, url, urlMethod);
