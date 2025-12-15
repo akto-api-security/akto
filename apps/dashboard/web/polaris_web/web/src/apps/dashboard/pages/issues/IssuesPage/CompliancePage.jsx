@@ -7,6 +7,7 @@ import func from "@/util/func";
 import { MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
 import { Button, Popover, Box, Avatar, Text, HorizontalGrid, HorizontalStack, IndexFiltersMode, VerticalStack, ActionList } from "@shopify/polaris";
+import CompulsoryDescriptionModal from "../components/CompulsoryDescriptionModal.jsx";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
@@ -27,9 +28,9 @@ import TableStore from "../../../components/tables/TableStore.js";
 import CriticalFindingsGraph from "./CriticalFindingsGraph.jsx";
 import settingFunctions from "../../settings/module.js";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal.jsx";
-import testingApi from "../../testing/api.js"
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import { isMCPSecurityCategory, isGenAISecurityCategory, isAgenticSecurityCategory, mapLabel, getDashboardCategory  } from "../../../../main/labelHelper";
+import testingApi from "../../testing/api.js"
 
 const sortOptions = [
     { label: 'Severity', value: 'severity asc', directionLabel: 'Highest', sortKey: 'severity', columnIndex: 2 },
@@ -194,6 +195,17 @@ function CompliancePage() {
     const [serviceNowTables, setServiceNowTables] = useState([])
     const [serviceNowTable, setServiceNowTable] = useState('')
 
+    // Compulsory description modal states
+    const [compulsoryDescriptionModal, setCompulsoryDescriptionModal] = useState(false)
+    const [pendingIgnoreAction, setPendingIgnoreAction] = useState(null)
+    const [mandatoryDescription, setMandatoryDescription] = useState("")
+    const [modalLoading, setModalLoading] = useState(false)
+    const [compulsorySettings, setCompulsorySettings] = useState({
+        falsePositive: false,
+        noTimeToFix: false,
+        acceptableFix: false
+    })
+
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
 
@@ -259,6 +271,65 @@ function CompliancePage() {
     useEffect(() => {
         setKey(!key)
     }, [startTimestamp, endTimestamp])
+
+    // Fetch compulsory description settings
+    useEffect(() => {
+        const fetchCompulsorySettings = async () => {
+            try {
+                const {resp} = await settingFunctions.fetchAdminInfo();
+                
+                if (resp?.compulsoryDescription) {
+                    setCompulsorySettings(resp.compulsoryDescription);
+                }
+            } catch (error) {
+            }
+        };
+        fetchCompulsorySettings();
+    }, []);
+
+    // Map ignore reason text to key
+    const getIgnoreReasonKey = (ignoreReason) => {
+        const reasonMap = {
+            "False positive": "falsePositive",
+            "Acceptable risk": "acceptableFix",
+            "No time to fix": "noTimeToFix"
+        };
+        return reasonMap[ignoreReason] || ignoreReason;
+    };
+
+    // Use keys directly for reasons and compulsorySettings
+    const requiresDescription = (reasonKey) => {
+        return compulsorySettings[reasonKey] || false;
+    };
+
+    const handleIgnoreWithDescription = () => {
+        if (pendingIgnoreAction && mandatoryDescription.trim()) {
+            // Update description first for all items
+            const updatePromises = pendingIgnoreAction.items.map(item => 
+                testingApi.updateIssueDescription(item, mandatoryDescription)
+            );
+            Promise.allSettled(updatePromises).then(() => {
+                performBulkIgnoreAction(pendingIgnoreAction.items, pendingIgnoreAction.reason, mandatoryDescription);
+                setCompulsoryDescriptionModal(false);
+                setPendingIgnoreAction(null);
+                setMandatoryDescription("");
+            });
+        }
+    };
+
+    useEffect(() => {
+        if (compulsoryDescriptionModal && pendingIgnoreAction && pendingIgnoreAction.items?.length > 0) {
+            setMandatoryDescription("");
+            setModalLoading(false);
+        }
+    }, [compulsoryDescriptionModal, pendingIgnoreAction]);
+
+    const performBulkIgnoreAction = (items, ignoreReason, description = "") => {
+        api.bulkUpdateIssueStatus(items, "IGNORED", ignoreReason, { description }).then((res) => {
+            setToast(true, false, `Issue${items.length==1 ? "" : "s"} ignored${description ? " with description" : ""}`)
+            resetResourcesSelected()
+        })
+    }
 
     const [searchParams, setSearchParams] = useSearchParams();
     const resultId = searchParams.get("result")
@@ -363,10 +434,13 @@ function CompliancePage() {
         }
         
         function ignoreAction(ignoreReason){
-            api.bulkUpdateIssueStatus(items, "IGNORED", ignoreReason, {} ).then((res) => {
-                setToast(true, false, `Issue${items.length==1 ? "" : "s"} ignored`)
-                resetResourcesSelected()
-            })
+            const reasonKey = getIgnoreReasonKey(ignoreReason);
+            if (requiresDescription(reasonKey)) {
+                setPendingIgnoreAction({ items, reason: ignoreReason });
+                setCompulsoryDescriptionModal(true);
+                return;
+            }
+            performBulkIgnoreAction(items, ignoreReason);
         }
         
         function reopenAction(){
@@ -793,6 +867,16 @@ function CompliancePage() {
                 projId={serviceNowTable}
                 issueType=""
                 isServiceNowModal={true}
+            />
+
+            <CompulsoryDescriptionModal
+                open={compulsoryDescriptionModal}
+                onClose={() => setCompulsoryDescriptionModal(false)}
+                onConfirm={handleIgnoreWithDescription}
+                reasonLabel={pendingIgnoreAction?.reason}
+                description={mandatoryDescription}
+                onChangeDescription={setMandatoryDescription}
+                loading={modalLoading}
             />
         </>
     )

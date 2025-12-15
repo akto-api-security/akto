@@ -10,6 +10,7 @@ public class ThreatConfiguration {
 
     private Actor actor;
     private RatelimitConfig ratelimitConfig;
+    private Integer archivalDays;
     
     @lombok.Getter
     @lombok.Setter

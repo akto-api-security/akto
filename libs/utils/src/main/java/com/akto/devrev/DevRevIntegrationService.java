@@ -2,12 +2,24 @@ package com.akto.devrev;
 
 import com.akto.dao.DevRevIntegrationDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.devrev_integration.DevRevIntegration;
+import com.akto.dto.test_editor.Info;
+import com.akto.dto.test_run_findings.TestingIssuesId;
+import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.GenericTestResult;
+import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.testing.ApiExecutor;
+import com.akto.ticketing.ATicketIntegrationService;
+import com.akto.util.Pair;
+import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.TicketSource;
+import com.akto.utils.CurlUtils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
@@ -18,22 +30,26 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
 @Getter
 @Setter
 @NoArgsConstructor
-@AllArgsConstructor
-public class DevRevIntegrationService {
+public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIntegration> {
 
     private static final LoggerMaker logger = new LoggerMaker(DevRevIntegrationService.class, LoggerMaker.LogDb.DASHBOARD);
 
     private String orgUrl;
     private String personalAccessToken;
+
+    public DevRevIntegrationService(String orgUrl, String personalAccessToken) {
+        this.orgUrl = orgUrl;
+        this.personalAccessToken = personalAccessToken;
+    }
 
     public DevRevIntegration addIntegration(Map<String, String> partsIdToNameMap) throws Exception {
         if (orgUrl == null || orgUrl.isEmpty()) {
@@ -116,7 +132,7 @@ public class DevRevIntegrationService {
         return partsIdToNameMap;
     }
 
-    public DevRevIntegration fetchIntegration() {
+    public DevRevIntegration fetchDevRevIntegration() {
         DevRevIntegration integration = DevRevIntegrationDao.instance.findOne(new BasicDBObject());
         if (integration != null) {
             integration.setPersonalAccessToken(null);
@@ -157,5 +173,250 @@ public class DevRevIntegrationService {
             throw new Exception("Please enter a valid personal access token.");
         }
         return existingIntegration.getPersonalAccessToken();
+    }
+
+    @Override
+    protected String getIntegrationName() {
+        return TicketSource.DEVREV.name();
+    }
+
+    @Override
+    protected String getTicketUrlFieldName() {
+        return TestingRunIssues.DEVREV_WORK_URL;
+    }
+
+    @Override
+    protected GlobalEnums.TicketSource getTicketSource() {
+        return GlobalEnums.TicketSource.DEVREV;
+    }
+
+    @Override
+    protected DevRevIntegration fetchIntegration() {
+        return DevRevIntegrationDao.instance.findOne(new BasicDBObject());
+    }
+
+    @Override
+    protected String validateAndGetProjectIdentifier(DevRevIntegration integration, String partId) throws Exception {
+        if (StringUtils.isBlank(partId)) {
+            throw new Exception("Part ID is required.");
+        }
+
+        Map<String, String> partsMap = integration.getPartsMap();
+        if (partsMap == null || partsMap.isEmpty()) {
+            throw new Exception("No DevRev parts configured.");
+        }
+
+        if (!partsMap.containsKey(partId)) {
+            throw new Exception("Invalid part ID: " + partId);
+        }
+
+        return partId;
+    }
+
+    @Override
+    protected String getAuthenticationToken(DevRevIntegration integration) {
+        return integration.getPersonalAccessToken();
+    }
+
+    @Override
+    protected String getExistingTicketUrl(TestingRunIssues issue) {
+        return issue.getDevrevWorkUrl();
+    }
+
+    @Override
+    protected TicketInfo createTicketForIssue(DevRevIntegration integration, String authToken, TestingIssuesId issueId,
+        Info testInfo, TestingRunResult testingRunResult, GlobalEnums.Severity severity, String partId, String workItemType, String aktoDashboardHost) {
+
+        try {
+            BasicDBObject ticketPayload = buildDevRevTicketPayload(
+                testInfo,
+                testingRunResult,
+                issueId,
+                severity,
+                partId,
+                workItemType,
+                aktoDashboardHost
+            );
+
+            return createDevRevWorkItem(integration, authToken, ticketPayload);
+
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Exception creating DevRev ticket: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            return null;
+        }
+    }
+
+    private BasicDBObject buildDevRevTicketPayload(
+            Info testInfo,
+            TestingRunResult testingRunResult,
+            TestingIssuesId issueId,
+            GlobalEnums.Severity severity,
+            String partId,
+            String workItemType,
+            String aktoDashboardHost) {
+
+        BasicDBObject payload = new BasicDBObject();
+
+        String type = StringUtils.isBlank(workItemType) ? "issue" : workItemType;
+        payload.put("type", type);
+
+        String fullUrl = issueId.getApiInfoKey().getUrl();
+        String method = issueId.getApiInfoKey().getMethod().name();
+
+        Pair<String, String> endpointDetails = getEndpointDetails(fullUrl);
+        String hostname = endpointDetails.getFirst();
+        String endpointPath = endpointDetails.getSecond();
+
+        String truncatedEndpoint = endpointPath.length() > 50 ?
+            endpointPath.substring(0, 25) + "..." + endpointPath.substring(endpointPath.length() - 25) : endpointPath;
+
+        String title = String.format("Security Issue: %s (%s - %s)",
+            testInfo.getName(), method, truncatedEndpoint);
+        payload.put("title", title);
+
+        StringBuilder body = new StringBuilder();
+        body.append("**Test Name:** ").append(testInfo.getName()).append("\n\n");
+        if (StringUtils.isNotEmpty(hostname)) {
+            body.append("**Host - ").append(hostname).append("**\n\n");
+        }
+        body.append("**Endpoint - ").append(endpointPath).append("**\n\n");
+        if (StringUtils.isNotBlank(aktoDashboardHost)) {
+            String issueUrl = aktoDashboardHost + "/dashboard/issues?result=" + testingRunResult.getId().toHexString();
+            body.append("<a href=\"").append(issueUrl).append("\">Issue Link - Akto Dashboard</a>").append("\n\n");
+        }
+        body.append("**Description:** ").append(testInfo.getDescription()).append("\n\n");
+        body.append("**Severity:** ").append(severity.name()).append("\n\n");
+        body.append("**HTTP Method:** ").append(method).append("\n\n");
+
+        if (testingRunResult != null) {
+            body.append("**Test Result ID:** ").append(testingRunResult.getId().toHexString()).append("\n");
+            body.append("\n");
+
+            String requestResponseData = buildRequestResponseData(testingRunResult);
+            if (StringUtils.isNotBlank(requestResponseData)) {
+                body.append("---\n\n");
+                body.append("## Request/Response Details\n\n");
+                body.append(requestResponseData);
+            }
+        }
+
+        payload.put("body", body.toString());
+        payload.put("applies_to_part", partId);
+        return payload;
+    }
+
+    private String buildRequestResponseData(TestingRunResult testingRunResult) {
+        try {
+            if (testingRunResult.getTestResults() == null || testingRunResult.getTestResults().isEmpty()) {
+                return "";
+            }
+
+            GenericTestResult gtr = testingRunResult.getTestResults().get(testingRunResult.getTestResults().size() - 1);
+            if (!(gtr instanceof TestResult)) {
+                return "";
+            }
+
+            TestResult testResult = (TestResult) gtr;
+            String originalMessage = testResult.getOriginalMessage();
+            String message = testResult.getMessage();
+
+            if (StringUtils.isBlank(originalMessage) && StringUtils.isBlank(message)) {
+                return "";
+            }
+
+            String origCurl = "";
+            String origResponse = "";
+            String testCurl = "";
+            String testResponse = "";
+
+            if (StringUtils.isNotBlank(originalMessage)) {
+                origCurl = CurlUtils.getCurl(originalMessage);
+                HttpResponseParams origObj = com.akto.runtime.utils.Utils.parseKafkaMessage(originalMessage);
+                origResponse = origObj.getPayload();
+            }
+
+            if (StringUtils.isNotBlank(message)) {
+                testCurl = CurlUtils.getCurl(message);
+                BasicDBObject testRespObj = BasicDBObject.parse(message);
+                BasicDBObject testPayloadObj = BasicDBObject.parse(testRespObj.getString("response"));
+                testResponse = testPayloadObj.getString("body");
+            }
+
+            StringBuilder data = new StringBuilder();
+
+            if (StringUtils.isNotBlank(origCurl)) {
+                data.append("### Original Curl\n\n");
+                data.append("```\n").append(origCurl).append("\n```\n\n");
+            }
+
+            if (StringUtils.isNotBlank(origResponse)) {
+                data.append("### Original API Response\n\n");
+                data.append("```\n").append(origResponse).append("\n```\n\n");
+            }
+
+            if (StringUtils.isNotBlank(testCurl)) {
+                data.append("### Test Curl\n\n");
+                data.append("```\n").append(testCurl).append("\n```\n\n");
+            }
+
+            if (StringUtils.isNotBlank(testResponse)) {
+                data.append("### Test API Response\n\n");
+                data.append("```\n").append(testResponse).append("\n```\n\n");
+            }
+
+            return data.toString();
+
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Error building request/response data: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            return "";
+        }
+    }
+
+    private TicketInfo createDevRevWorkItem(DevRevIntegration integration, String token, BasicDBObject ticketPayload) {
+
+        try {
+            String url = DevRevIntegration.API_BASE_URL + "/works.create";
+
+            Map<String, List<String>> headers = new HashMap<>();
+            headers.put("Authorization", Collections.singletonList("Bearer " + token));
+            headers.put("Content-Type", Collections.singletonList("application/json"));
+
+            OriginalHttpRequest request = new OriginalHttpRequest(
+                url,
+                "",
+                Method.POST.name(),
+                ticketPayload.toJson(),
+                headers,
+                ""
+            );
+
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+
+            logger.infoAndAddToDb("DevRev work item creation response - Status: " + response.getStatusCode(), LoggerMaker.LogDb.DASHBOARD);
+
+            if (response.getStatusCode() > 201) {
+                logger.errorAndAddToDb("Failed to create DevRev work item - Status: " + response.getStatusCode() +
+                    " | Response: " + response.getBody(), LoggerMaker.LogDb.DASHBOARD);
+                return null;
+            }
+
+            String responsePayload = response.getBody();
+            BasicDBObject respPayloadObj = BasicDBObject.parse(responsePayload);
+            BasicDBObject work = (BasicDBObject) respPayloadObj.get("work");
+
+            if (work != null) {
+                String workId = work.getString("display_id");
+                String workItemUrl = integration.getOrgUrl() + "/works/" + workId;
+                logger.infoAndAddToDb("Created DevRev work item: " + workId, LoggerMaker.LogDb.DASHBOARD);
+                return new TicketInfo(workId, workItemUrl);
+            }
+
+            logger.errorAndAddToDb("No work item returned in DevRev response", LoggerMaker.LogDb.DASHBOARD);
+            return null;
+
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Exception while creating DevRev work item: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            return null;
+        }
     }
 }

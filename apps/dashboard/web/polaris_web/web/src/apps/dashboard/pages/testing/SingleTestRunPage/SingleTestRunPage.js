@@ -454,16 +454,16 @@ function SingleTestRunPage() {
       const shouldFetchCount = !func.deepComparison(copyFilters, filters) || copyUpdateTable !== updateTable;
       
       const fetchResultsPromise = api.fetchTestingRunResults(
-        localSelectedTestRun.testingRunResultSummaryHexId, 
-        tableTabMap[selectedTab], 
-        sortKey, 
-        sortOrder, 
-        skip, 
-        limit, 
-        filters, 
+        localSelectedTestRun.testingRunResultSummaryHexId,
+        tableTabMap[selectedTab],
+        sortKey,
+        sortOrder,
+        skip,
+        limit,
+        filters,
         queryValue
-      ).then(({ testingRunResults, errorEnums, issuesDescriptionMap, jiraIssuesMapForResults }) => {
-        testRunResultsRes = transform.prepareTestRunResults(hexId, testingRunResults, localSubCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults)
+      ).then(({ testingRunResults, errorEnums, issuesDescriptionMap, jiraIssuesMapForResults, devrevIssuesMapForResults }) => {
+        testRunResultsRes = transform.prepareTestRunResults(hexId, testingRunResults, localSubCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults, devrevIssuesMapForResults)
         if (selectedTab === 'domain_unreachable' || selectedTab === 'skipped' || selectedTab === 'need_configurations') {
           errorEnums['UNKNOWN_ERROR_OCCURRED'] = "OOPS! Unknown error occurred."
           setErrorsObject(errorEnums)

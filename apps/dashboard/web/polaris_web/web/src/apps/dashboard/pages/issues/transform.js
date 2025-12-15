@@ -34,6 +34,7 @@ const transform = {
                 {urls.map((ele,index)=>{
                 const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
                 const jiraKey = ele?.jiraIssueUrl && ele.jiraIssueUrl.length > 0 ?  /[^/]*$/.exec(ele.jiraIssueUrl)[0] : ""
+                const devrevKey = ele?.devrevWorkUrl && ele.devrevWorkUrl.length > 0 ?  /[^/]*$/.exec(ele.devrevWorkUrl)[0] : ""
                 return(
                     <Box padding={"2"} paddingInlineEnd={"4"} paddingInlineStart={"3"} key={index}
                     borderColor="border-subdued" {...borderStyle}>
@@ -59,6 +60,18 @@ const transform = {
                                             <Link url={ele?.jiraIssueUrl} target="_blank">
                                                 <Text>
                                                     {jiraKey}
+                                              </Text>
+                                            </Link>
+                                        </HorizontalStack>
+                                    </Tag>
+                                }
+                                {devrevKey &&
+                                    <Tag>
+                                        <HorizontalStack gap={1}>
+                                            <Avatar size="extraSmall" shape='round' source="/public/devrev-ai.svg" />
+                                            <Link url={ele?.devrevWorkUrl} target="_blank">
+                                                <Text>
+                                                    {devrevKey}
                                               </Text>
                                             </Link>
                                         </HorizontalStack>
@@ -111,7 +124,8 @@ const transform = {
                         url: `${urlObj.method} ${urlObj.url}`,
                         id: urlObj.id,
                         issueDescription: urlObj.issueDescription,
-                        jiraIssueUrl: urlObj.jiraIssueUrl || ""
+                        jiraIssueUrl: urlObj.jiraIssueUrl || "",
+                        devrevWorkUrl: urlObj.devrevWorkUrl || ""
                     })), isCompliancePage)
                 }
             }))

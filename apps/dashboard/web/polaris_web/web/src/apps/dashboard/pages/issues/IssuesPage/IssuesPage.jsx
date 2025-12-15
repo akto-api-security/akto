@@ -6,7 +6,8 @@ import Store from "../../../store";
 import func from "@/util/func";
 import { MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
-import { ActionList, Button, HorizontalGrid, HorizontalStack, IndexFiltersMode, Popover, Modal, TextField, Text, VerticalStack } from "@shopify/polaris";
+import { ActionList, Button, HorizontalGrid, HorizontalStack, IndexFiltersMode, Popover, TextField, Text, VerticalStack } from "@shopify/polaris";
+import CompulsoryDescriptionModal from "../components/CompulsoryDescriptionModal.jsx";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
@@ -191,6 +192,11 @@ function IssuesPage() {
     const [serviceNowTables, setServiceNowTables] = useState([])
     const [serviceNowTable, setServiceNowTable] = useState('')
     const [labelsText, setLabelsText] = useState('')
+
+    const [devrevModalActive, setDevRevModalActive] = useState(false)
+    const [devrevParts, setDevRevParts] = useState([])
+    const [devrevPartId, setDevRevPartId] = useState('')
+    const [devrevWorkItemType, setDevRevWorkItemType] = useState('issue')
 
     // Compulsory description modal states
     const [compulsoryDescriptionModal, setCompulsoryDescriptionModal] = useState(false)
@@ -385,6 +391,21 @@ function IssuesPage() {
         })
     }
 
+    const handleSaveBulkDevRevTicketsAction = () => {
+        setToast(true, false, "Please wait while we create your DevRev tickets.")
+        setDevRevModalActive(false)
+        api.createDevRevTickets(selectedIssuesItems, devrevPartId, devrevWorkItemType, window.location.origin).then((res) => {
+            if(res?.errorMessage) {
+                setToast(true, false, res?.errorMessage)
+            } else {
+                setToast(true, false, `${selectedIssuesItems.length} DevRev ticket${selectedIssuesItems.length === 1 ? "" : "s"} created.`)
+            }
+            resetResourcesSelected()
+        }).catch((err) => {
+            setToast(true, true, err?.response?.data?.errorMessage || "Error creating DevRev tickets")
+        })
+    }
+
     // Use keys directly for reasons and compulsorySettings
     const requiresDescription = (reasonKey) => {
         return compulsorySettings[reasonKey] || false;
@@ -491,7 +512,20 @@ function IssuesPage() {
                 setServiceNowModalActive(true)
             })
         }
-        
+
+        function createDevRevTicketBulk() {
+            setSelectedIssuesItems(items)
+            settingFunctions.fetchDevRevIntegration().then((devrevIntegration) => {
+                const partsMap = devrevIntegration.partsMap || {}
+                const partsArray = Object.entries(partsMap).map(([id, name]) => ({id, name}))
+                if(partsArray.length > 0){
+                    setDevRevParts(partsArray)
+                    setDevRevPartId(partsArray[0].id)
+                }
+                setDevRevModalActive(true)
+            })
+        }
+
         let issues = [
             {
                 content: 'False positive',
@@ -530,6 +564,11 @@ function IssuesPage() {
                 content: 'Create ServiceNow ticket',
                 onAction: () => { createServiceNowTicketBulk() },
                 disabled: (window.SERVICENOW_INTEGRATED === 'false')
+            },
+            {
+                content: 'Create DevRev ticket',
+                onAction: () => { createDevRevTicketBulk() },
+                disabled: (window.DEVREV_INTEGRATED === 'false')
             }
         ];
         
@@ -714,6 +753,7 @@ function IssuesPage() {
                             id: item?.id ? JSON.stringify(item.id) : '',
                             issueDescription: item?.description,
                             jiraIssueUrl: item?.jiraIssueUrl || "",
+                            devrevWorkUrl: item?.devrevWorkUrl || "",
                         }],
                         numberOfEndpoints: 1
                     })
@@ -730,7 +770,8 @@ function IssuesPage() {
                         url: item?.id?.apiInfoKey?.url,
                         id: item?.id ? JSON.stringify(item.id) : '',
                         issueDescription: item?.description,
-                        jiraIssueUrl: item?.jiraIssueUrl || ""
+                        jiraIssueUrl: item?.jiraIssueUrl || "",
+                        devrevWorkUrl: item?.devrevWorkUrl || ""
                     })
                     existingIssue.numberOfEndpoints = (existingIssue.numberOfEndpoints || 1) + 1
                 }
@@ -977,39 +1018,27 @@ function IssuesPage() {
                 isServiceNowModal={true}
             />
 
-            <Modal
+            <JiraTicketCreationModal
+                modalActive={devrevModalActive}
+                setModalActive={setDevRevModalActive}
+                handleSaveAction={handleSaveBulkDevRevTicketsAction}
+                jiraProjectMaps={devrevParts}
+                setProjId={setDevRevPartId}
+                setIssueType={setDevRevWorkItemType}
+                projId={devrevPartId}
+                issueType={devrevWorkItemType}
+                isDevRevModal={true}
+            />
+
+            <CompulsoryDescriptionModal
                 open={compulsoryDescriptionModal}
                 onClose={() => setCompulsoryDescriptionModal(false)}
-                title="Description Required"
-                primaryAction={{
-                    content: modalLoading ? 'Loading...' : 'Confirm',
-                    onAction: handleIgnoreWithDescription,
-                    disabled: mandatoryDescription.trim().length === 0 || modalLoading
-                }}
-                secondaryActions={[
-                    {
-                        content: 'Cancel',
-                        onAction: () => setCompulsoryDescriptionModal(false)
-                    }
-                ]}
-            >
-                <Modal.Section>
-                    <VerticalStack gap="4">
-                        <Text variant="bodyMd">
-                            A description is required for this action based on your account settings. Please provide a reason for marking these issues as "{pendingIgnoreAction?.reason}".
-                        </Text>
-                        <TextField
-                            label="Description"
-                            value={mandatoryDescription}
-                            onChange={setMandatoryDescription}
-                            multiline={4}
-                            autoComplete="off"
-                            placeholder="Please provide a description for this action..."
-                            disabled={modalLoading}
-                        />
-                    </VerticalStack>
-                </Modal.Section>
-            </Modal>
+                onConfirm={handleIgnoreWithDescription}
+                reasonLabel={pendingIgnoreAction?.reason}
+                description={mandatoryDescription}
+                onChangeDescription={setMandatoryDescription}
+                loading={modalLoading}
+            />
         </>
     )
 }
