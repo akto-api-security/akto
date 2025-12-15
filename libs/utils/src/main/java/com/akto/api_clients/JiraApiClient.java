@@ -16,7 +16,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import okhttp3.Credentials;
@@ -199,7 +201,7 @@ public class JiraApiClient {
 
     // add pagination if issue size is greater than 1000
     public static Map<Integer, List<String>> getTransitions(JiraIntegration jira, List<String> issueKeys,
-        String targetStatusName) throws Exception {
+        List<String> targetStatusName) throws Exception {
         if (issueKeys.size() > 1000) {
             throw new Exception(
                 "Issue keys list size cannot exceed 1000. Jira transition API supports 1000 issues at a time.");
@@ -230,21 +232,25 @@ public class JiraApiClient {
         }
     }
 
-    private static Map<Integer, List<String>> parseTransitions(JsonNode root, String statusNameFilter) {
+    private static Map<Integer, List<String>> parseTransitions(JsonNode root, List<String> jiraStatusNames) {
+        Set<String> statusWhitelist = jiraStatusNames.stream()
+            .map(String::toLowerCase)
+            .collect(Collectors.toSet());
+
         Map<Integer, List<String>> transitionMap = new HashMap<>();
 
-        JsonNode availableTransitions = root.path("availableTransitions");
-        for (JsonNode block : availableTransitions) {
+        for (JsonNode block : root.path("availableTransitions")) {
             List<String> issues = new ArrayList<>();
             for (JsonNode issueNode : block.path("issues")) {
                 issues.add(issueNode.asText());
             }
 
             for (JsonNode transition : block.path("transitions")) {
-                String statusName = transition.path("to").path("statusName").asText();
-                if (statusName.equalsIgnoreCase(statusNameFilter)) {
+                String statusName = transition.path("to").path("statusName").asText().toLowerCase();
+                if (statusWhitelist.contains(statusName)) {
                     int transitionId = transition.path("transitionId").asInt();
                     transitionMap.computeIfAbsent(transitionId, k -> new ArrayList<>()).addAll(issues);
+                    break;
                 }
             }
         }
