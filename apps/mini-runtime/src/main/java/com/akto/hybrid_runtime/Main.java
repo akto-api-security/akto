@@ -490,7 +490,7 @@ public class Main {
             }
         }, 0, 24, TimeUnit.HOURS);
 
-        // schedule MCP Recon Sync job for 2 mins
+        // schedule MCP Recon Sync job for once in a day
         loggerMaker.info("Scheduling MCP Recon Sync Job");
         APIConfig finalApiConfigRecon = apiConfig;
         scheduler.scheduleAtFixedRate(() -> {

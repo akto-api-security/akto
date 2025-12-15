@@ -453,12 +453,15 @@ public class HttpCallParser {
     }
 
     public static boolean useHostCondition(String hostName, HttpResponseParams.Source source) {
-        List<HttpResponseParams.Source> whiteListSource = Arrays.asList(HttpResponseParams.Source.MIRRORING);
+        List<HttpResponseParams.Source> whiteListSource = Arrays.asList(HttpResponseParams.Source.MIRRORING, HttpResponseParams.Source.MCP_RECON);
         boolean hostNameCondition;
         if (hostName == null) {
             hostNameCondition = false;
-        } else {
-            hostNameCondition = ! ( hostName.toLowerCase().equals(hostName.toUpperCase()) );
+        } else if (source.equals(HttpResponseParams.Source.MCP_RECON)) {
+            hostNameCondition = true;
+        }
+        else {
+             hostNameCondition = ! ( hostName.toLowerCase().equals(hostName.toUpperCase()) );
         }
         return whiteListSource.contains(source) &&  hostNameCondition && ApiCollection.useHost;
     }
@@ -718,7 +721,7 @@ public class HttpCallParser {
         Map<String, List<ExecutorNode>> executorNodesMap = ParseAndExecute.createExecutorNodeMap(apiCatalogSync.advancedFilterMap);
         for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
 
-            if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
+            if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING) || httpResponseParam.getSource().equals(HttpResponseParams.Source.MCP_RECON)) {
                 TrafficMetrics.Key totalRequestsKey = getTrafficMetricsKey(httpResponseParam, TrafficMetrics.Name.TOTAL_REQUESTS_RUNTIME);
                 incTrafficMetrics(totalRequestsKey,1);
             }
@@ -851,7 +854,7 @@ public class HttpCallParser {
                 loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + "new graphql endpoints in inventory");
             }
 
-            if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
+            if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING) || httpResponseParam.getSource().equals(HttpResponseParams.Source.MCP_RECON)) {
                 TrafficMetrics.Key processedRequestsKey = getTrafficMetricsKey(httpResponseParam, TrafficMetrics.Name.FILTERED_REQUESTS_RUNTIME);
                 incTrafficMetrics(processedRequestsKey,1);
             }

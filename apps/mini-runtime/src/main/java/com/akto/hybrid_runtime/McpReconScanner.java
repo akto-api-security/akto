@@ -340,59 +340,26 @@ public class McpReconScanner {
      * Optimized MCP verification using CompletableFuture with timeout management
      */
     private List<McpServer> verifyMcpBatch(List<IpPortPair> openTargets) {
-        // Use CompletableFuture for better control
-        List<CompletableFuture<McpServer>> futures = new ArrayList<>(openTargets.size());
+        logger.info(String.format("Starting MCP verification for %d targets", openTargets.size()));
+        List<McpServer> results = new ArrayList<>();
         
         for (IpPortPair target : openTargets) {
-            CompletableFuture<McpServer> future = CompletableFuture
-                .supplyAsync(() -> {
-                    try {
-                        semaphore.acquire();
-                        try {
-                            return verifySingleMcp(target.ip, target.port);
-                        } finally {
-                            semaphore.release();
-                        }
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        return null;
-                    }
-                }, executorService);
-            
-            // Add timeout using Java 8 compatible approach
-            final CompletableFuture<McpServer> timeoutFuture = new CompletableFuture<>();
-            executorService.submit(() -> {
-                try {
-                    Thread.sleep(timeout * 2);
-                    timeoutFuture.complete(null);
-                } catch (InterruptedException e) {
-                    // Ignore
+            try {
+                logger.debug(String.format("Checking MCP at %s:%d", target.ip, target.port));
+                McpServer result = verifySingleMcp(target.ip, target.port);
+                if (result != null) {
+                    logger.info(String.format("MCP server found at %s:%d", target.ip, target.port));
+                    results.add(result);
+                } else {
+                    logger.debug(String.format("No MCP server at %s:%d", target.ip, target.port));
                 }
-            });
-            
-            CompletableFuture<McpServer> resultFuture = future
-                .applyToEither(timeoutFuture, result -> result)
-                .exceptionally(ex -> {
-                    logger.debug("Verification timeout for " + target.ip + ":" + target.port);
-                    return null;
-                });
-            
-            futures.add(resultFuture);
+            } catch (Exception e) {
+                logger.debug("Verification error for " + target.ip + ":" + target.port + ": " + e.getMessage());
+            }
         }
         
-        // Wait for all completions or timeout
-        try {
-            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-                .get(timeout * 3, TimeUnit.MILLISECONDS);
-        } catch (Exception e) {
-            // Continue with completed futures
-        }
-        
-        // Collect non-null results
-        return futures.stream()
-            .map(future -> future.getNow(null))
-            .filter(Objects::nonNull)
-            .collect(Collectors.toList());
+        logger.info(String.format("MCP verification completed. Found %d servers out of %d targets", results.size(), openTargets.size()));
+        return results;
     }
     
     /**
@@ -443,9 +410,6 @@ public class McpReconScanner {
                 if (response.getStatusCode() == 200) {
                     String contentType = response.getHeaders().getOrDefault("Content-Type", Collections.singletonList("")).get(0);
                     if (contentType != null && contentType.contains("text/event-stream")) {
-                        String content = response.getBody() != null ? response.getBody().toLowerCase() : "";
-                        for (String indicator : McpConstants.MCP_INDICATORS) {
-                            if (content.contains(indicator.toLowerCase())) {
                                 McpServer server = new McpServer();
                                 server.setIp(ip);
                                 server.setPort(port);
@@ -456,8 +420,6 @@ public class McpReconScanner {
                                 server.setType("SSE");
                                 server.setEndpoint(endpoint);
                                 return server;
-                            }
-                        }
                     }
                 }
             } catch (Exception e) {
@@ -539,8 +501,7 @@ public class McpReconScanner {
                 Map<String, List<String>> headers = new HashMap<>();
                 OriginalHttpRequest request = new OriginalHttpRequest(url, "", "GET", null, headers, "");
                 OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-                String content = response.getBody();
-                if (isLikelyMcp(content)) {
+                if(response.getStatusCode() == 200) {
                     McpServer server = new McpServer();
                     server.setIp(ip);
                     server.setPort(port);
@@ -549,7 +510,7 @@ public class McpReconScanner {
                     server.setDetectionMethod("HTTP");
                     server.setTimestamp(new Date().toString());
                     server.setEndpoint(endpoint);
-                    List<String> detectedIndicators = getDetectedIndicators(content);
+                    List<String> detectedIndicators = getDetectedIndicators("HTTP");
                     Map<String, Object> serverInfo = new HashMap<>();
                     serverInfo.put("detectedIndicators", detectedIndicators);
                     server.setServerInfo(serverInfo);
