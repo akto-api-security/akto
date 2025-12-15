@@ -105,7 +105,7 @@ public class ParallelGraphExecutor extends GraphExecutor {
                         
                         // Execute the node
                         WorkflowTestResult.NodeResult nodeResult = Utils.executeNode(
-                            node, valuesMap, debug, testLogs, memory, this.allowAllCombinations
+                            node, valuesMap, debug, testLogs, memory
                         );
                         
                         // Store result (thread-safe)
