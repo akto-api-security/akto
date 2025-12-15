@@ -2,6 +2,7 @@ package com.akto.test_editor;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 
 import com.akto.dto.ApiInfo;
 import com.akto.dto.RawApi;
@@ -12,13 +13,52 @@ public class TestingUtilsSingleton {
     private static final TestingUtilsSingleton instance = new TestingUtilsSingleton();
     private  Map<ApiInfo.ApiInfoKey, Boolean> mcpRequestMap = new HashMap<>();
     private  Map<ApiInfo.ApiInfoKey, String> mcpRequestMethodMap = new HashMap<>();
+    
+    // Thread-local storage for API call executor service
+    private final ThreadLocal<ExecutorService> apiCallExecutorService = new ThreadLocal<>();
 
     public static void init() {
         instance.mcpRequestMap = new HashMap<>();
+        instance.mcpRequestMethodMap = new HashMap<>();
+        instance.apiCallExecutorService.remove();
     }
 
     public static TestingUtilsSingleton getInstance() {
         return instance;
+    }
+    
+    /**
+     * Set the ExecutorService for API calls in the current thread
+     * This is used when executionType == "parallel" to queue API calls
+     */
+    public void setApiCallExecutorService(ExecutorService executorService) {
+        if (executorService != null) {
+            apiCallExecutorService.set(executorService);
+        } else {
+            apiCallExecutorService.remove();
+        }
+    }
+    
+    /**
+     * Get the ExecutorService for API calls in the current thread
+     * Returns null if not in parallel execution mode
+     */
+    public ExecutorService getApiCallExecutorService() {
+        return apiCallExecutorService.get();
+    }
+    
+    /**
+     * Check if the current thread has an API call executor service (i.e., in parallel mode)
+     */
+    public boolean isParallelApiExecution() {
+        return apiCallExecutorService.get() != null;
+    }
+    
+    /**
+     * Clear API call executor service for current thread
+     */
+    public void clearApiCallExecutorService() {
+        apiCallExecutorService.remove();
     }
 
     public boolean isMcpRequest(ApiInfo.ApiInfoKey apiInfoKey, RawApi rawApi) {
