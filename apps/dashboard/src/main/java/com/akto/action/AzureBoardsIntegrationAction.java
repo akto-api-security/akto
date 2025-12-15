@@ -173,6 +173,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
     private String description;
     private String endpoint;  // endpoint path for title formatting
     private String azureBoardsWorkItemUrl;
+    private String originalMessage;  // Request/response message for attachment (for threat activity, contains orig with both request and response)
 
     public String createWorkItem() {
         AzureBoardsIntegration azureBoardsIntegration = AzureBoardsIntegrationDao.instance.findOne(new BasicDBObject());
@@ -254,33 +255,35 @@ public class AzureBoardsIntegrationAction extends UserAction {
         }
 
         addDescriptionField(reqPayload, testDescription);
-
-        if(attachmentUrl != null && !attachmentUrl.isEmpty()) {
-            BasicDBObject attachmentsDBObject = new BasicDBObject();
-            attachmentsDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
-            attachmentsDBObject.put("path", "/relations/-");
-            BasicDBObject valueDBObject = new BasicDBObject();
-            valueDBObject.put("rel", "AttachedFile");
-            valueDBObject.put("url", attachmentUrl);
-            valueDBObject.put("attributes", new BasicDBObject().put("comment", "Request and Response sample data."));
-
-            attachmentsDBObject.put("value", valueDBObject);
-            reqPayload.add(attachmentsDBObject);
-        }
-
+        addAttachment(reqPayload, attachmentUrl);
         addCustomFields(reqPayload, customABWorkItemFieldsPayload);
     }
 
     private String getAttachmentUrl(String originalMessage, String message, AzureBoardsIntegration azureBoardsIntegration) {
-        File requestComparisonFile = createRequestFile(originalMessage, message);
+        return getAttachmentUrl(originalMessage, message, azureBoardsIntegration, false);
+    }
+
+    private String getAttachmentUrl(String originalMessage, String message, AzureBoardsIntegration azureBoardsIntegration, boolean isThreatActivity) {
+        File requestComparisonFile = createRequestFile(originalMessage, message, isThreatActivity);
         if (requestComparisonFile == null) {
             return null;
         }
 
-        try {
-            String uploadUrl = azureBoardsIntegration.getBaseUrl() + "/" + azureBoardsIntegration.getOrganization() + "/" + projectName + "/_apis/wit/attachments?fileName=" + URLEncoder.encode(requestComparisonFile.getName(), "UTF-8") + "&api-version=" + version;
+        return uploadAttachmentFile(requestComparisonFile, azureBoardsIntegration);
+    }
 
-            byte[] fileBytes = Files.readAllBytes(requestComparisonFile.toPath());
+    /**
+     * Uploads an attachment file to Azure DevOps and returns the attachment URL
+     */
+    private String uploadAttachmentFile(File attachmentFile, AzureBoardsIntegration azureBoardsIntegration) {
+        if (attachmentFile == null) {
+            return null;
+        }
+
+        try {
+            String uploadUrl = azureBoardsIntegration.getBaseUrl() + "/" + azureBoardsIntegration.getOrganization() + "/" + projectName + "/_apis/wit/attachments?fileName=" + URLEncoder.encode(attachmentFile.getName(), "UTF-8") + "&api-version=" + version;
+
+            byte[] fileBytes = Files.readAllBytes(attachmentFile.toPath());
 
             Map<String, List<String>> headers = new HashMap<>();
             headers.put("Authorization", Collections.singletonList("Basic " + azureBoardsIntegration.getPersonalAuthToken()));
@@ -299,7 +302,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            requestComparisonFile.delete();
+            attachmentFile.delete();
         }
 
         return null;
@@ -403,7 +406,24 @@ public class AzureBoardsIntegrationAction extends UserAction {
             
             addTitleField(reqPayload, workItemTitle);
             addDescriptionField(reqPayload, workItemDescription);
+            
+            // Add attachment if request/response data is provided
+            // For threat activity, originalMessage contains the orig field with both request and response
+            String attachmentUrl = null;
+            if (this.originalMessage != null && !this.originalMessage.isEmpty()) {
+                // For threat activity: originalMessage contains everything, explicitly mark as threat activity
+                attachmentUrl = getAttachmentUrl(this.originalMessage, this.originalMessage, azureBoardsIntegration, true);
+                if (attachmentUrl != null) {
+                    logger.infoAndAddToDb("Successfully created attachment for threat activity work item", LoggerMaker.LogDb.DASHBOARD);
+                } else {
+                    logger.errorAndAddToDb("Failed to create attachment for threat activity work item", LoggerMaker.LogDb.DASHBOARD);
+                }
+            }
+            
+            addAttachment(reqPayload, attachmentUrl);
             addCustomFields(reqPayload, customABWorkItemFieldsPayload);
+            
+            logger.infoAndAddToDb("Azure Boards work item payload (before sending): " + reqPayload.toString(), LoggerMaker.LogDb.DASHBOARD);
 
             String workItemUrl = createAndSendWorkItemRequest(azureBoardsIntegration, projectName, workItemType, reqPayload);
             if(workItemUrl == null) {
@@ -530,6 +550,26 @@ public class AzureBoardsIntegrationAction extends UserAction {
         descriptionDBObject.put("path", "/fields/System.Description");
         descriptionDBObject.put("value", formattedDescription);
         reqPayload.add(descriptionDBObject);
+    }
+
+    /**
+     * Adds attachment to the request payload if attachment URL is provided
+     */
+    private void addAttachment(BasicDBList reqPayload, String attachmentUrl) {
+        if (attachmentUrl != null && !attachmentUrl.isEmpty()) {
+            BasicDBObject attachmentsDBObject = new BasicDBObject();
+            attachmentsDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
+            attachmentsDBObject.put("path", "/relations/-");
+            BasicDBObject valueDBObject = new BasicDBObject();
+            valueDBObject.put("rel", "AttachedFile");
+            valueDBObject.put("url", attachmentUrl);
+            valueDBObject.put("attributes", new BasicDBObject().put("comment", "Request and Response sample data."));
+            attachmentsDBObject.put("value", valueDBObject);
+            reqPayload.add(attachmentsDBObject);
+            logger.infoAndAddToDb("Added attachment to payload with URL: " + attachmentUrl, LoggerMaker.LogDb.DASHBOARD);
+        } else {
+            logger.infoAndAddToDb("No attachment URL provided, skipping attachment", LoggerMaker.LogDb.DASHBOARD);
+        }
     }
 
     /**
@@ -762,4 +802,13 @@ public class AzureBoardsIntegrationAction extends UserAction {
     public void setEndpoint(String endpoint) {
         this.endpoint = endpoint;
     }
+
+    public String getOriginalMessage() {
+        return originalMessage;
+    }
+
+    public void setOriginalMessage(String originalMessage) {
+        this.originalMessage = originalMessage;
+    }
+
 }
