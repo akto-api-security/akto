@@ -9,21 +9,18 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
+
+import com.akto.test_editor.TestingUtilsSingleton;
+
+import com.akto.dto.*;
+import com.akto.test_editor.execution.Memory;
+import org.json.JSONObject;
 
 import com.akto.agent.AgentClient;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.YamlTemplateDao;
-import com.akto.dto.ApiInfo;
-import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.CustomAuthType;
-import com.akto.dto.testing.GenericTestResult;
-import com.akto.dto.OriginalHttpRequest;
-import com.akto.dto.OriginalHttpResponse;
-import com.akto.dto.RawApi;
 import com.akto.dto.api_workflow.Node;
 import com.akto.dto.test_editor.ConfigParserResult;
 import com.akto.dto.test_editor.ExecuteAlgoObj;
@@ -33,33 +30,29 @@ import com.akto.dto.test_editor.ExecutorSingleRequest;
 import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.WorkflowTestResult;
-import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 import com.akto.dto.testing.YamlNodeDetails;
+import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 import com.akto.store.SampleMessageStore;
-import com.akto.test_editor.TestingUtilsSingleton;
 import com.akto.test_editor.execution.ExecutionListBuilder;
 import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.execution.ExecutorAlgorithm;
-import com.akto.test_editor.execution.Memory;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.TestExecutor;
-import com.akto.testing.Utils;
 import com.akto.util.Constants;
-import com.google.gson.Gson;
-import com.mongodb.client.model.Filters;
-import org.json.JSONObject;
-
 import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
+import com.google.gson.Gson;
 
 public class YamlNodeExecutor extends NodeExecutor {
     
     private static final Gson gson = new Gson();
-    private final AgentClient agentClient = new AgentClient(Constants.AGENT_BASE_URL);
-
+    private final AgentClient agentClient = new AgentClient(
+        Constants.AGENT_BASE_URL
+    );
 
     public NodeResult processNode(Node node, Map<String, Object> varMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
         List<String> testErrors = new ArrayList<>();
@@ -105,9 +98,10 @@ public class YamlNodeExecutor extends NodeExecutor {
         List<RawApi> rawApis = new ArrayList<>();
         rawApis.add(rawApi.copy());
 
+        FilterNode finalValidatorNode = validatorNode;
         for (ExecutorNode execNode: childNodes) {
             if (execNode.getNodeType().equalsIgnoreCase(TestEditorEnums.ValidateExecutorDataOperands.Validate.toString())) {
-                validatorNode = (FilterNode) execNode.getChildNodes().get(0).getValues();
+                finalValidatorNode = (FilterNode) execNode.getChildNodes().get(0).getValues();
             }
         }
 
@@ -130,12 +124,13 @@ public class YamlNodeExecutor extends NodeExecutor {
         //List<RawApi> testRawApis = singleReq.getRawApis();
         TestingRunConfig testingRunConfig = new TestingRunConfig();
         String logId = "";
-
+        
+        // Make final copies for lambda usage
         final TestingRunConfig finalTestingRunConfig = testingRunConfig;
         final String finalLogId = logId;
-        final FilterNode finalValidatorNodeForLambda = validatorNode;
+        final FilterNode finalValidatorNodeForLambda = finalValidatorNode;
         final ExecutorSingleRequest finalSingleReq = singleReq;
-
+        
         boolean vulnerable;
         List<String> message;
         String savedResponses;
@@ -144,19 +139,21 @@ public class YamlNodeExecutor extends NodeExecutor {
         List<Integer> responseTimeArr;
         List<Integer> responseLenArr;
 
-        TestingUtilsSingleton.getInstance().clearApiCallExecutorService();
+        // Prepare test requests and execute
+        // Get the executor service from ThreadLocal (set by ParallelGraphExecutor if parallel mode)
         ExecutorService apiCallExecutor = TestingUtilsSingleton.getInstance().getApiCallExecutorService();
-
+        
         List<RawApi> requestsToProcess = prepareTestRequests(rawApis, sampleRawApi, node, yamlNodeDetails);
-
+        
         ExecutionContext execContext = (apiCallExecutor != null)
-                ? executeParallel(requestsToProcess, node, yamlNodeDetails, sampleRawApi, executor, varMap,
-                finalLogId, finalValidatorNodeForLambda, followRedirect, finalTestingRunConfig,
-                debug, testLogs, apiInfoKey, memory, finalSingleReq, apiCallExecutor)
-                : executeSequential(requestsToProcess, node, yamlNodeDetails, sampleRawApi, executor, varMap,
-                finalLogId, finalValidatorNodeForLambda, followRedirect, finalTestingRunConfig,
-                debug, testLogs, apiInfoKey, memory, finalSingleReq);
-
+            ? executeParallel(requestsToProcess, node, yamlNodeDetails, sampleRawApi, executor, varMap, 
+                             finalLogId, finalValidatorNodeForLambda, followRedirect, finalTestingRunConfig, 
+                             debug, testLogs, apiInfoKey, memory, finalSingleReq, apiCallExecutor)
+            : executeSequential(requestsToProcess, node, yamlNodeDetails, sampleRawApi, executor, varMap, 
+                               finalLogId, finalValidatorNodeForLambda, followRedirect, finalTestingRunConfig, 
+                               debug, testLogs, apiInfoKey, memory, finalSingleReq);
+        
+        // Extract results from context
         vulnerable = execContext.vulnerable;
         message = execContext.messages;
         responseTimeArr = execContext.responseTimes;
@@ -171,6 +168,7 @@ public class YamlNodeExecutor extends NodeExecutor {
             varMap.put(node.getId() + ".response.body", savedResponses);
             varMap.put(node.getId() + ".response.status_code", String.valueOf(statusCode));
         }
+
         if (eventStreamResponse != null) {
             varMap.put(node.getId() + ".response.body.eventStream", eventStreamResponse);
         }
@@ -184,9 +182,10 @@ public class YamlNodeExecutor extends NodeExecutor {
      */
     private List<RawApi> prepareTestRequests(List<RawApi> rawApis, RawApi sampleRawApi, Node node, YamlNodeDetails yamlNodeDetails) {
         List<RawApi> requestsToProcess = rawApis.stream()
-                .filter(testReq -> !testReq.equals(sampleRawApi))
-                .collect(Collectors.toList());
+            .filter(testReq -> !testReq.equals(sampleRawApi))
+            .collect(Collectors.toList());
 
+        // Add node tracking headers if needed
         if (yamlNodeDetails.getApiCollectionId() == 1111111111) {
             for (RawApi testReq : requestsToProcess) {
                 Map<String, List<String>> headers = testReq.fetchReqHeaders();
@@ -194,6 +193,7 @@ public class YamlNodeExecutor extends NodeExecutor {
                 testReq.modifyReqHeaders(headers);
             }
         }
+        
         return requestsToProcess;
     }
 
@@ -201,20 +201,21 @@ public class YamlNodeExecutor extends NodeExecutor {
      * Execute API tests in parallel using CompletableFuture
      */
     private ExecutionContext executeParallel(List<RawApi> requests, Node node, YamlNodeDetails yamlNodeDetails,
-                                             RawApi sampleRawApi, Executor executor, Map<String, Object> varMap,
-                                             String logId, FilterNode validatorNode, boolean followRedirect,
-                                             TestingRunConfig testingRunConfig, boolean debug,
-                                             List<TestingRunResult.TestLog> testLogs, ApiInfo.ApiInfoKey apiInfoKey,
-                                             Memory memory, ExecutorSingleRequest singleReq, ExecutorService apiCallExecutor) {
+                                            RawApi sampleRawApi, Executor executor, Map<String, Object> varMap,
+                                            String logId, FilterNode validatorNode, boolean followRedirect,
+                                            TestingRunConfig testingRunConfig, boolean debug,
+                                            List<TestingRunResult.TestLog> testLogs, ApiInfo.ApiInfoKey apiInfoKey,
+                                            Memory memory, ExecutorSingleRequest singleReq, ExecutorService apiCallExecutor) {
+        
         ExecutionContext context = new ExecutionContext();
         AtomicBoolean vulnerabilityFound = new AtomicBoolean(false);
-
+        
         List<CompletableFuture<ApiCallResult>> futures = submitApiCalls(
-                requests, node, yamlNodeDetails, sampleRawApi, executor, varMap, logId, validatorNode,
-                followRedirect, testingRunConfig, debug, testLogs, apiInfoKey, memory, singleReq,
-                vulnerabilityFound, apiCallExecutor
+            requests, node, yamlNodeDetails, sampleRawApi, executor, varMap, logId, validatorNode,
+            followRedirect, testingRunConfig, debug, testLogs, apiInfoKey, memory, singleReq,
+            vulnerabilityFound, apiCallExecutor
         );
-
+        
         collectParallelResults(futures, context, vulnerabilityFound);
         return context;
     }
@@ -222,66 +223,81 @@ public class YamlNodeExecutor extends NodeExecutor {
     /**
      * Submit all API calls to the executor service
      */
-    private List<CompletableFuture<ApiCallResult>> submitApiCalls(List<RawApi> requests, Node node,
-                                                                  YamlNodeDetails yamlNodeDetails, RawApi sampleRawApi,
-                                                                  Executor executor, Map<String, Object> varMap,
-                                                                  String logId, FilterNode validatorNode,
-                                                                  boolean followRedirect, TestingRunConfig testingRunConfig,
-                                                                  boolean debug, List<TestingRunResult.TestLog> testLogs,
-                                                                  ApiInfo.ApiInfoKey apiInfoKey, Memory memory,
-                                                                  ExecutorSingleRequest singleReq, AtomicBoolean vulnerabilityFound,
-                                                                  ExecutorService apiCallExecutor) {
+    private List<CompletableFuture<ApiCallResult>> submitApiCalls(List<RawApi> requests, Node node, 
+                                                                   YamlNodeDetails yamlNodeDetails, RawApi sampleRawApi,
+                                                                   Executor executor, Map<String, Object> varMap,
+                                                                   String logId, FilterNode validatorNode,
+                                                                   boolean followRedirect, TestingRunConfig testingRunConfig,
+                                                                   boolean debug, List<TestingRunResult.TestLog> testLogs,
+                                                                   ApiInfo.ApiInfoKey apiInfoKey, Memory memory,
+                                                                   ExecutorSingleRequest singleReq, AtomicBoolean vulnerabilityFound,
+                                                                   ExecutorService apiCallExecutor) {
         List<CompletableFuture<ApiCallResult>> futures = new ArrayList<>();
+        
         for (RawApi testReq : requests) {
-            futures.add(CompletableFuture.supplyAsync(() -> {
+            CompletableFuture<ApiCallResult> future = CompletableFuture.supplyAsync(() -> {
                 if (vulnerabilityFound.get()) {
-                    return null;
+                    return null; // Early exit optimization
                 }
                 return processSingleApiCall(testReq, node, yamlNodeDetails, sampleRawApi, executor,
-                        varMap, logId, validatorNode, followRedirect, testingRunConfig, debug, testLogs,
-                        apiInfoKey, memory, singleReq);
-            }, apiCallExecutor));
+                    varMap, logId, validatorNode, followRedirect, testingRunConfig, debug, testLogs,
+                    apiInfoKey, memory, singleReq);
+            }, apiCallExecutor);
+            
+            futures.add(future);
         }
+        
         return futures;
     }
 
     /**
      * Collect results from parallel execution
      */
-    private void collectParallelResults(List<CompletableFuture<ApiCallResult>> futures,
-                                        ExecutionContext context, AtomicBoolean vulnerabilityFound) {
+    private void collectParallelResults(List<CompletableFuture<ApiCallResult>> futures, 
+                                       ExecutionContext context, AtomicBoolean vulnerabilityFound) {
+        // Wait for all futures to complete in parallel (not sequentially!)
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+        
+        // Now collect all results
         for (CompletableFuture<ApiCallResult> future : futures) {
             try {
-                ApiCallResult callResult = future.getNow(null);
+                ApiCallResult callResult = future.getNow(null); // Non-blocking since already completed
                 if (callResult != null) {
                     aggregateResult(callResult, context, vulnerabilityFound);
                 }
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                // Continue processing other results
             }
         }
+        
         context.vulnerable = vulnerabilityFound.get();
     }
 
     /**
-     * Execute API tests sequentially (fallback)
+     * Execute API tests sequentially (original behavior)
      */
     private ExecutionContext executeSequential(List<RawApi> requests, Node node, YamlNodeDetails yamlNodeDetails,
-                                               RawApi sampleRawApi, Executor executor, Map<String, Object> varMap,
-                                               String logId, FilterNode validatorNode, boolean followRedirect,
-                                               TestingRunConfig testingRunConfig, boolean debug,
-                                               List<TestingRunResult.TestLog> testLogs, ApiInfo.ApiInfoKey apiInfoKey,
-                                               Memory memory, ExecutorSingleRequest singleReq) {
+                                              RawApi sampleRawApi, Executor executor, Map<String, Object> varMap,
+                                              String logId, FilterNode validatorNode, boolean followRedirect,
+                                              TestingRunConfig testingRunConfig, boolean debug,
+                                              List<TestingRunResult.TestLog> testLogs, ApiInfo.ApiInfoKey apiInfoKey,
+                                              Memory memory, ExecutorSingleRequest singleReq) {
         ExecutionContext context = new ExecutionContext();
+        
         for (RawApi testReq : requests) {
-            if (context.vulnerable) break;
+            if (context.vulnerable) {
+                break; // Stop if vulnerability found
+            }
+            
             ApiCallResult callResult = processSingleApiCall(testReq, node, yamlNodeDetails, sampleRawApi,
-                    executor, varMap, logId, validatorNode, followRedirect, testingRunConfig, debug,
-                    testLogs, apiInfoKey, memory, singleReq);
+                executor, varMap, logId, validatorNode, followRedirect, testingRunConfig, debug,
+                testLogs, apiInfoKey, memory, singleReq);
+            
             if (callResult != null) {
                 aggregateResult(callResult, context, null);
             }
         }
+        
         return context;
     }
 
@@ -315,7 +331,7 @@ public class YamlNodeExecutor extends NodeExecutor {
     }
 
     /**
-     * Context to hold execution results
+     * Context to hold execution results (similar to ParallelGraphExecutor pattern)
      */
     private static class ExecutionContext {
         List<TestResult> results = Collections.synchronizedList(new ArrayList<>());
@@ -340,9 +356,9 @@ public class YamlNodeExecutor extends NodeExecutor {
         private final int statusCode;
         private final String eventStreamResponse;
 
-        ApiCallResult(TestResult testResult, String message, Integer responseTime,
-                      Integer responseLength, String savedResponses, int statusCode,
-                      String eventStreamResponse) {
+        public ApiCallResult(TestResult testResult, String message, Integer responseTime, 
+                           Integer responseLength, String savedResponses, int statusCode, 
+                           String eventStreamResponse) {
             this.testResult = testResult;
             this.message = message;
             this.responseTime = responseTime;
@@ -362,12 +378,13 @@ public class YamlNodeExecutor extends NodeExecutor {
     }
 
     /**
-     * Process a single API call, shared by parallel and sequential paths.
+     * Abstracted method to process a single API call.
+     * This method contains the common logic used in both sequential and parallel execution paths.
      */
-    private ApiCallResult processSingleApiCall(RawApi testReq, Node node, YamlNodeDetails yamlNodeDetails,
+    private ApiCallResult processSingleApiCall(RawApi testReq, Node node, YamlNodeDetails yamlNodeDetails, 
                                                RawApi sampleRawApi, Executor executor, Map<String, Object> varMap,
                                                String logId, FilterNode validatorNode, boolean followRedirect,
-                                               TestingRunConfig testingRunConfig, boolean debug,
+                                               TestingRunConfig testingRunConfig, boolean debug, 
                                                List<TestingRunResult.TestLog> testLogs, ApiInfo.ApiInfoKey apiInfoKey,
                                                Memory memory, ExecutorSingleRequest singleReq) {
         try {
@@ -380,6 +397,7 @@ public class YamlNodeExecutor extends NodeExecutor {
             String eventStreamResponse = null;
 
             if (AgentClient.isRawApiValidForAgenticTest(testReq)) {
+                // execute agentic test here
                 res = agentClient.executeAgenticTest(testReq, yamlNodeDetails.getApiCollectionId());
             } else {
                 int tsBeforeReq = Context.nowInMillis();
@@ -389,33 +407,37 @@ public class YamlNodeExecutor extends NodeExecutor {
                         URI uri = new URI(url);
                         String newUrl = "https://vulnerable-server.akto.io" + uri.getPath();
                         testReq.getRequest().setUrl(newUrl);
-                    } catch (Exception ignored) {
+                    } catch (Exception e) {
+                        // TODO: handle exception
                     }
                 }
-
+                
+                // This is the key API call that gets parallelized
                 OriginalHttpResponse testResponse = ApiExecutor.sendRequest(
-                        testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs,
-                        com.akto.test_editor.Utils.SKIP_SSRF_CHECK
+                    testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, 
+                    com.akto.test_editor.Utils.SKIP_SSRF_CHECK
                 );
-
+                
                 if (apiInfoKey != null && memory != null) {
-                    memory.fillResponse(testReq.getRequest(), testResponse,
-                            apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
+                    memory.fillResponse(testReq.getRequest(), testResponse, 
+                        apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
                     memory.reset(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
                 }
-
+                
                 int tsAfterReq = Context.nowInMillis();
                 responseTime = tsAfterReq - tsBeforeReq;
-
-                ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(),
-                        testReq.getRequest(), testResponse);
+                
+                ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), 
+                    testReq.getRequest(), testResponse);
                 res = executor.validate(attempt, sampleRawApi, varMap, logId, validatorNode, yamlNodeDetails.getApiInfoKey());
-
+                
                 try {
                     messageStr = convertOriginalReqRespToString(testReq.getRequest(), testResponse, responseTime);
-                } catch (Exception ignored) {
+                } catch (Exception e) {
+                    // ignore
                 }
 
+                // save response in a list
                 savedResponses = testResponse.getBody();
                 statusCode = testResponse.getStatusCode();
                 eventStreamResponse = com.akto.test_editor.Utils.buildEventStreamResponseIHttpFormat(testResponse);
@@ -426,10 +448,11 @@ public class YamlNodeExecutor extends NodeExecutor {
                     responseLength = testResponse.getBody().length();
                 }
             }
-
-            return new ApiCallResult(res, messageStr, responseTime, responseLength,
-                    savedResponses, statusCode, eventStreamResponse);
+            
+            return new ApiCallResult(res, messageStr, responseTime, responseLength, 
+                                   savedResponses, statusCode, eventStreamResponse);
         } catch (Exception e) {
+            // TODO: handle exception
             return null;
         }
     }
@@ -536,8 +559,6 @@ public class YamlNodeExecutor extends NodeExecutor {
         sampleDataMap.put(yamlNodeDetails.getApiInfoKey(), Collections.singletonList(json.toString()));
         SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
         List<CustomAuthType> customAuthTypes = yamlNodeDetails.getCustomAuthTypes();
-        ApiInfoKey infoKey = yamlNodeDetails.getApiInfoKey();
-
         TestExecutor executor = new TestExecutor();
         TestingRunResult testingRunResult = executor.runTestNew(yamlNodeDetails.getApiInfoKey(), null, messageStore, authMechanism, customAuthTypes, null, testConfig, null, debug, testLogs);
 
