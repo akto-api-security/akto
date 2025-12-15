@@ -177,9 +177,12 @@ public class AIAgentConnectorExecutor extends AccountJobExecutor {
 
         logger.info("Executing binary with {} environment variables", envVars.size());
 
-        // Execute binary with timeout
+        // Execute binary with -once flag and timeout
+        // The -once flag tells the binary to run one iteration and exit
+        String[] args = new String[] { "-once" };
         BinaryExecutor.ExecutionResult result = BinaryExecutor.executeBinary(
             binaryFile,
+            args,
             envVars,
             BINARY_TIMEOUT_SECONDS
         );

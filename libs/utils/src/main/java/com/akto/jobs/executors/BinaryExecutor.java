@@ -3,6 +3,8 @@ package com.akto.jobs.executors;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -30,6 +32,20 @@ public final class BinaryExecutor {
      * @throws Exception if execution fails
      */
     public static ExecutionResult executeBinary(File binaryFile, Map<String, String> envVars, int timeoutSeconds) throws Exception {
+        return executeBinary(binaryFile, null, envVars, timeoutSeconds);
+    }
+
+    /**
+     * Executes a binary with command-line arguments, environment variables and timeout.
+     *
+     * @param binaryFile The binary file to execute
+     * @param args Command-line arguments to pass to the binary (can be null)
+     * @param envVars Environment variables to pass to the binary
+     * @param timeoutSeconds Timeout in seconds (0 for no timeout)
+     * @return ExecutionResult containing exit code, stdout, and stderr
+     * @throws Exception if execution fails
+     */
+    public static ExecutionResult executeBinary(File binaryFile, String[] args, Map<String, String> envVars, int timeoutSeconds) throws Exception {
         logger.info("Executing binary: {}", binaryFile.getAbsolutePath());
 
         // Validate binary path for security
@@ -43,8 +59,19 @@ public final class BinaryExecutor {
             throw new Exception("Binary security validation failed: " + e.getMessage(), e);
         }
 
+        // Build command list with binary path and arguments
+        List<String> command = new ArrayList<>();
+        command.add(binaryFile.getAbsolutePath());
+
+        if (args != null && args.length > 0) {
+            for (String arg : args) {
+                command.add(arg);
+            }
+            logger.info("Executing binary with arguments: {}", String.join(" ", args));
+        }
+
         // Build process
-        ProcessBuilder processBuilder = new ProcessBuilder(binaryFile.getAbsolutePath());
+        ProcessBuilder processBuilder = new ProcessBuilder(command);
         processBuilder.redirectErrorStream(true); // Merge stdout and stderr
 
         // Set environment variables
