@@ -49,6 +49,7 @@ function NewConnection() {
         setTasksCompleted(2)
     }
 
+
     const openDocs = (docsUrl) => {
         if(docsUrl && docsUrl.length > 0){
             window.open(docsUrl)
