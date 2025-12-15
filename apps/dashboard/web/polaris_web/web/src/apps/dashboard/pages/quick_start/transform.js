@@ -11,7 +11,6 @@ import OpenApiSource from "./components/OpenApiSource"
 import ApiInventoryFromSourceCode from "./components/ApiInventoryFromSourceCode"
 import func from "@/util/func"
 import AddOnComponenet from "./components/shared/AddOnComponenet"
-import SimpleDocsComponent from "./components/SimpleDocsComponent"
 import BitBucketSource from "./components/BitBucketSource"
 import GithubSource from "./components/GithubSource"
 import AktoJax from "./components/AktoJax"  
@@ -361,9 +360,9 @@ const awsBedrockObj = {
     text: "Import your AWS Bedrock AI agents, seamlessly into AKTO.",
     docsUrl: 'https://docs.akto.io/aws-bedrock-agents',
     key: "AWS_BEDROCK",
-    component : <SimpleDocsComponent 
-        description="Import your AWS Bedrock AI agents, seamlessly in AKTO."
-        docsUrl="https://docs.akto.io/aws-bedrock-agents"
+    component : <BannerComponent 
+        content="Import your AWS Bedrock AI agents, seamlessly in AKTO."
+        docsUrl='https://docs.akto.io/aws-bedrock-agents'
     />
 }
 

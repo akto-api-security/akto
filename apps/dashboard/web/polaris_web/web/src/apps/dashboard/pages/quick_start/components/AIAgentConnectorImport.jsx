@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import api from '../api';
 import func from "@/util/func";
 import PasswordTextField from '../../../components/layouts/PasswordTextField';
-import GoToDocsButton from './shared/GoToDocsButton';
 
 /**
  * Common component for AI Agent Connector imports (N8N, Langchain, Copilot Studio)
@@ -77,6 +76,10 @@ const AIAgentConnectorImport = ({
         return fields.every(field => formData[field.name]?.length > 0);
     };
 
+    const goToDocs = () => {
+        window.open(docsUrl);
+    };
+
     const updateField = (fieldName, value) => {
         setFormData(prev => ({ ...prev, [fieldName]: value }));
     };
@@ -125,7 +128,7 @@ const AIAgentConnectorImport = ({
                     >
                         Import
                     </Button>
-                    <GoToDocsButton docsUrl={docsUrl} />
+                    <Button onClick={goToDocs}>Go to docs</Button>
                 </ButtonGroup>
             </VerticalStack>
         </div>
