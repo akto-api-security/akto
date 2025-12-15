@@ -5,8 +5,9 @@ import { tokens } from "@shopify/polaris-tokens"
 const LogsContainer = ({ logs }) => {
 
     const logsFetchBetween = () => {
-        let d1 = func.epochToDateTime(Math.floor(logs.startTime / 1000))
-        let d2 = func.epochToDateTime(Math.floor(logs.endTime / 1000))
+        // Show range in user's local timezone to match UI selections
+        const d1 = new Date(logs.startTime).toLocaleString()
+        const d2 = new Date(logs.endTime).toLocaleString()
 
         return (
             <span>
