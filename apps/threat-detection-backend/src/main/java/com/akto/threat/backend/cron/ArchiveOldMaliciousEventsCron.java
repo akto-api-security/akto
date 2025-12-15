@@ -97,6 +97,12 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
     private void archiveOldMaliciousEvents(String dbName, long nowSeconds) {
         String accountId = dbName;
 
+        // Check if archival is enabled for this account
+        if (!isArchivalEnabled(accountId)) {
+            logger.infoAndAddToDb("Archival is disabled for account " + accountId + ", skipping", LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+
         long retentionDays = fetchRetentionDays(accountId);
         long threshold = nowSeconds - (retentionDays * 24 * 60 * 60);
 
@@ -159,6 +165,20 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
         } catch (Exception e) {
             logger.errorAndAddToDb("Error trimming collection to cap in db " + dbName + ": " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
         }
+    }
+
+    private boolean isArchivalEnabled(String accountId) {
+        try {
+            Document doc = ThreatConfigurationDao.instance.getCollection(accountId).find().first();
+            if (doc == null) return false; // disabled by default
+            Object val = doc.get("archivalEnabled");
+            if (val instanceof Boolean) {
+                return (Boolean) val;
+            }
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Failed fetching archivalEnabled from threat_configuration for account " + accountId + ": " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+        }
+        return false; // disabled by default
     }
 
     private long fetchRetentionDays(String accountId) {

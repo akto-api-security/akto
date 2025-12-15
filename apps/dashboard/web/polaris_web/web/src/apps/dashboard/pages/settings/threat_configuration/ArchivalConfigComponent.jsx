@@ -1,33 +1,50 @@
 import { useState, useEffect } from "react";
 import func from "@/util/func"
-import { LegacyCard, VerticalStack, Divider, Text, Button, Box } from "@shopify/polaris";
+import { LegacyCard, VerticalStack, Divider, Text, Button, Box, Checkbox } from "@shopify/polaris";
 import api from "../../../pages/threat_detection/api.js";
 import Dropdown from "../../../components/layouts/Dropdown.jsx";
 
 const ArchivalConfigComponent = ({ title, description }) => {
     const [archivalDays, setArchivalDays] = useState(60);
+    const [archivalEnabled, setArchivalEnabled] = useState(false);
     const [isSaveDisabled, setIsSaveDisabled] = useState(true);
+    const [isToggleChanged, setIsToggleChanged] = useState(false);
+    const [isDaysChanged, setIsDaysChanged] = useState(false);
 
     const fetchData = async () => {
         const response = await api.fetchThreatConfiguration();
         const days = response?.threatConfiguration?.archivalDays;
         const value = days === 30 || days === 60 || days === 90 ? days : 60;
         setArchivalDays(value);
+
+        const enabled = response?.threatConfiguration?.archivalEnabled || false;
+        setArchivalEnabled(enabled);
+
         setIsSaveDisabled(true);
+        setIsToggleChanged(false);
+        setIsDaysChanged(false);
     };
 
     const onSave = async () => {
-        const payload = {
-            archivalDays: archivalDays
-        };
-        await api.modifyThreatConfiguration(payload).then(() => {
-            try {
-                func.setToast(true, false, "Archival time saved successfully");
-                fetchData()
-            } catch (error) {
-                func.setToast(true, true, "Error saving archival time");
+        try {
+            // Save archival days if changed
+            if (isDaysChanged) {
+                const payload = {
+                    archivalDays: archivalDays
+                };
+                await api.modifyThreatConfiguration(payload);
             }
-        });
+
+            // Toggle archival enabled if changed
+            if (isToggleChanged) {
+                await api.toggleArchivalEnabled(archivalEnabled);
+            }
+
+            func.setToast(true, false, "Archival configuration saved successfully");
+            fetchData();
+        } catch (error) {
+            func.setToast(true, true, "Error saving archival configuration");
+        }
     };
 
     useEffect(() => {
@@ -53,6 +70,13 @@ const ArchivalConfigComponent = ({ title, description }) => {
 
     const onChange = (val) => {
         setArchivalDays(val);
+        setIsDaysChanged(true);
+        setIsSaveDisabled(false);
+    };
+
+    const onToggleEnabled = (val) => {
+        setArchivalEnabled(val);
+        setIsToggleChanged(true);
         setIsSaveDisabled(false);
     };
 
@@ -68,6 +92,12 @@ const ArchivalConfigComponent = ({ title, description }) => {
             <Divider />
             <LegacyCard.Section>
                 <VerticalStack gap="4">
+                    <Checkbox
+                        label="Enable archival cron"
+                        checked={archivalEnabled}
+                        onChange={onToggleEnabled}
+                        helpText="When enabled, malicious events older than the configured archival time will be automatically archived."
+                    />
                     <Box width="200px">
                         <Dropdown
                             menuItems={options}

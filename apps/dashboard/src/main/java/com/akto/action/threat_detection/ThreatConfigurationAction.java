@@ -18,6 +18,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class ThreatConfigurationAction extends AbstractThreatDetectionAction {
 
 private ThreatConfiguration threatConfiguration;
+private Boolean enabled;
 
 public ThreatConfiguration getThreatConfiguration() {
     return threatConfiguration;
@@ -25,6 +26,14 @@ public ThreatConfiguration getThreatConfiguration() {
 
 public void setThreatConfiguration(ThreatConfiguration threatConfiguration) {
     this.threatConfiguration = threatConfiguration;
+}
+
+public Boolean getEnabled() {
+    return enabled;
+}
+
+public void setEnabled(Boolean enabled) {
+    this.enabled = enabled;
 }
 // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -82,6 +91,32 @@ public void setThreatConfiguration(ThreatConfiguration threatConfiguration) {
     } catch (Exception e) {
       e.printStackTrace();
       loggerMaker.errorAndAddToDb("Error while modifying threat configuration" + e.getStackTrace());
+      return ERROR.toUpperCase();
+    }
+  }
+
+  public String toggleArchivalEnabled() {
+    HttpPost post =
+        new HttpPost(
+            String.format("%s/api/dashboard/toggle_archival_enabled", this.getBackendUrl()));
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
+    try {
+      String json = objectMapper.writeValueAsString(java.util.Collections.singletonMap("enabled", this.enabled));
+      post.setEntity(new StringEntity(json, ContentType.APPLICATION_JSON));
+    } catch (Exception e) {
+      e.printStackTrace();
+      loggerMaker.errorAndAddToDb("Error while toggling archival enabled" + e.getStackTrace());
+      return ERROR.toUpperCase();
+    }
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      String responseBody = EntityUtils.toString(resp.getEntity());
+      java.util.Map<String, Object> response = objectMapper.readValue(responseBody, java.util.Map.class);
+      this.enabled = (Boolean) response.get("enabled");
+      return SUCCESS.toUpperCase();
+    } catch (Exception e) {
+      e.printStackTrace();
+      loggerMaker.errorAndAddToDb("Error while toggling archival enabled" + e.getStackTrace());
       return ERROR.toUpperCase();
     }
   }

@@ -343,6 +343,15 @@ message ThreatConfiguration {
   Actor actor = 1;
   RatelimitConfig ratelimit_config = 2;
   int32 archival_days = 3;
+  bool archival_enabled = 4;
+}
+
+message ToggleArchivalEnabledRequest {
+  bool enabled = 1;
+}
+
+message ToggleArchivalEnabledResponse {
+  bool enabled = 1;
 }
 
 message ApiDistributionDataRequestPayload {
