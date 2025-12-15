@@ -21,7 +21,7 @@ public class AccountJobsCron {
 
     private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private static final ExecutorService executorService = Executors.newFixedThreadPool(2);
-    private static final int MAX_HEARTBEAT_THRESHOLD_SECONDS = 300;
+    private static final int MAX_HEARTBEAT_THRESHOLD_SECONDS = 5;
 
     private static final LoggerMaker logger = new LoggerMaker(AccountJobsCron.class);
 
@@ -39,16 +39,19 @@ public class AccountJobsCron {
         scheduler.scheduleAtFixedRate(() -> {
             try {
                 long now = Context.now();
+                logger.info("Polling for jobs: now={}, threshold={}", now, MAX_HEARTBEAT_THRESHOLD_SECONDS);
 
                 // Fetch and claim one job atomically via Cyborg API
                 // This returns either:
                 // 1. A SCHEDULED job where scheduledAt < now
                 // 2. A RUNNING job where heartbeatAt < now - 300s (stale job)
                 // 3. null if no jobs available
+                logger.info("About to call CyborgApiClient.fetchAndClaimJob()...");
                 AccountJob job = CyborgApiClient.fetchAndClaimJob(now, MAX_HEARTBEAT_THRESHOLD_SECONDS);
+                logger.info("CyborgApiClient.fetchAndClaimJob() returned: {}", job != null ? "job found" : "null");
 
                 if (job == null) {
-                    logger.debug("No jobs to run");
+                    logger.info("No jobs to run at this time");
                     return;
                 }
 
@@ -76,7 +79,13 @@ public class AccountJobsCron {
                 });
 
             } catch (Exception e) {
-                logger.error("Error in AccountJobs scheduler", e);
+                logger.error("!!! EXCEPTION in AccountJobs scheduler !!!", e);
+                e.printStackTrace();
+                System.err.println("EXCEPTION: " + e.getMessage());
+            } catch (Throwable t) {
+                logger.error("!!! THROWABLE in AccountJobs scheduler !!!", t);
+                t.printStackTrace();
+                System.err.println("THROWABLE: " + t.getMessage());
             }
         }, 0, 5, TimeUnit.SECONDS);
 

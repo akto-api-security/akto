@@ -3,6 +3,8 @@ package com.akto.action;
 import com.akto.dao.context.Context;
 import com.akto.dao.jobs.AccountJobDao;
 import com.akto.dto.jobs.AccountJob;
+import com.akto.dto.jobs.JobStatus;
+import com.akto.dto.jobs.ScheduleType;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.opensymphony.xwork2.Action;
@@ -72,19 +74,28 @@ public class AIAgentConnectorImportAction extends UserAction {
             // Convert Map<String, String> config to Map<String, Object> for generic storage
             Map<String, Object> jobConfig = new HashMap<>(config);
 
+            int now = Context.now();
             AccountJob accountJob = new AccountJob(
                 Context.accountId.get(),        // accountId
                 "AI_AGENT_CONNECTOR",          // jobType (generic)
                 connectorType,                  // subType (N8N, LANGCHAIN, COPILOT_STUDIO)
                 jobConfig,                      // flexible config map
                 interval,                       // recurringIntervalSeconds
-                Context.now(),                  // createdAt
-                Context.now()                   // lastUpdatedAt
+                now,                            // createdAt
+                now                             // lastUpdatedAt
             );
+
+            // Set execution tracking fields for job scheduler
+            accountJob.setJobStatus(JobStatus.SCHEDULED);
+            accountJob.setScheduleType(ScheduleType.RECURRING);
+            accountJob.setScheduledAt(now);  // Schedule immediately
+            accountJob.setHeartbeatAt(0);
+            accountJob.setStartedAt(0);
+            accountJob.setFinishedAt(0);
 
             AccountJobDao.instance.insertOne(accountJob);
             this.jobId = accountJob.getId().toHexString();
-            loggerMaker.info("Successfully created account-level job for " + connectorType + " connector with job ID: " + this.jobId + ", interval: " + interval + "s", LogDb.DASHBOARD);
+            loggerMaker.info("Successfully created account-level job for " + connectorType + " connector with job ID: " + this.jobId + ", interval: " + interval + "s, status: SCHEDULED", LogDb.DASHBOARD);
 
             return Action.SUCCESS.toUpperCase();
 
