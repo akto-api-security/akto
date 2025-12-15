@@ -1834,7 +1834,6 @@ public class APICatalogSync {
                     try{
                         String exampleStr = (String) example;
                         String s = RedactSampleData.redactDataTypes(exampleStr);
-                        loggerMaker.infoAndAddToDb("redacted data, updated sample is " + s);
                         updatedSampleData.add(s);
                     } catch (Exception e) {
                         ;
