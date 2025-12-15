@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/akto-api-security/mcp-endpoint-shield/mcp"
-	"github.com/akto-api-security/mcp-endpoint-shield/mcp/types"
 	"github.com/akto-api-security/guardrails-service/models"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
 	"github.com/akto-api-security/guardrails-service/pkg/dbabstractor"
+	"github.com/akto-api-security/mcp-endpoint-shield/mcp"
+	"github.com/akto-api-security/mcp-endpoint-shield/mcp/types"
 	"go.uber.org/zap"
 )
 
@@ -41,8 +41,8 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 		validator,
 		ingestor,
 		sessionMgr,
-		"", // sessionID - empty for our use case
-		"", // projectName - empty for our use case
+		"",    // sessionID - empty for our use case
+		"",    // projectName - empty for our use case
 		false, // skipThreat - false to enable threat reporting
 	)
 
@@ -363,6 +363,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 		shouldReport := false
 		if reqResult != nil && (!reqResult.Allowed || reqResult.Modified) {
 			shouldReport = true
+
 			s.logger.Warn("Request blocked or modified by guardrails",
 				zap.Int("index", i),
 				zap.String("method", data.Method),
@@ -383,11 +384,8 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 				zap.String("reason", result.ResponseReason))
 		}
 
-		// Report to threat backend if threat detected
-		// TODO: Implement threat reporting using new API
 		if shouldReport {
-			// s.reportThreat(ctx, &data, reqResult, respResult)
-			s.logger.Info("Threat detected but reporting not yet implemented",
+			s.logger.Info("Threat detected",
 				zap.String("method", data.Method),
 				zap.String("path", data.Path))
 		}
@@ -395,36 +393,6 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 
 	return results, nil
 }
-
-// reportThreat reports a detected threat to the dashboard
-// TODO: Reimplement using new API when threat reporting is available
-/*
-func (s *Service) reportThreat(ctx context.Context, data *models.IngestDataBatch, reqResult, respResult *mcp.ValidationResult) {
-	// Prepare headers
-	reqHeaders := make(map[string]string)
-	respHeaders := make(map[string]string)
-
-	// Parse status code
-	statusCode := 0
-	if data.StatusCode != "" {
-		// Convert string to int (simplified, add proper error handling in production)
-		fmt.Sscanf(data.StatusCode, "%d", &statusCode)
-	}
-
-	// Determine metadata from validation results
-	metadata := make(map[string]any)
-	if reqResult != nil && reqResult.Metadata != nil {
-		metadata = reqResult.Metadata
-	} else if respResult != nil && respResult.Metadata != nil {
-		metadata = respResult.Metadata
-	}
-
-	// TODO: Implement threat reporting with new API
-	s.logger.Info("Threat reporting not yet implemented",
-		zap.String("method", data.Method),
-		zap.String("path", data.Path))
-}
-*/
 
 // FetchPolicies fetches guardrail policies from database-abstractor
 func (s *Service) FetchPolicies() error {
@@ -446,17 +414,17 @@ func (s *Service) FetchPolicies() error {
 
 // ValidationBatchResult represents the validation result for a single batch item
 type ValidationBatchResult struct {
-	Index                    int    `json:"index"`
-	Method                   string `json:"method"`
-	Path                     string `json:"path"`
-	RequestAllowed           bool   `json:"requestAllowed"`
-	RequestModified          bool   `json:"requestModified"`
-	RequestModifiedPayload   string `json:"requestModifiedPayload,omitempty"`
-	RequestReason            string `json:"requestReason,omitempty"`
-	RequestError             string `json:"requestError,omitempty"`
-	ResponseAllowed          bool   `json:"responseAllowed"`
-	ResponseModified         bool   `json:"responseModified"`
-	ResponseModifiedPayload  string `json:"responseModifiedPayload,omitempty"`
-	ResponseReason           string `json:"responseReason,omitempty"`
-	ResponseError            string `json:"responseError,omitempty"`
+	Index                   int    `json:"index"`
+	Method                  string `json:"method"`
+	Path                    string `json:"path"`
+	RequestAllowed          bool   `json:"requestAllowed"`
+	RequestModified         bool   `json:"requestModified"`
+	RequestModifiedPayload  string `json:"requestModifiedPayload,omitempty"`
+	RequestReason           string `json:"requestReason,omitempty"`
+	RequestError            string `json:"requestError,omitempty"`
+	ResponseAllowed         bool   `json:"responseAllowed"`
+	ResponseModified        bool   `json:"responseModified"`
+	ResponseModifiedPayload string `json:"responseModifiedPayload,omitempty"`
+	ResponseReason          string `json:"responseReason,omitempty"`
+	ResponseError           string `json:"responseError,omitempty"`
 }
