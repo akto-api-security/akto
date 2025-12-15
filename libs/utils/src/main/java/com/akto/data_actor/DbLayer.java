@@ -802,7 +802,7 @@ public class DbLayer {
                 long endDropTime = System.currentTimeMillis();
 
                 String afterDropMsg = String.format(
-                    "Successfully dropped collection=%s, account=%d, timestamp=%d, timeTakenSeconds=%d",
+                    "Successfully dropped collection=%s, account=%d, timestamp=%d, timeTakenMilliseconds=%d",
                     collectionName, accountId, endDropTime, endDropTime - startDropTime
                 );
                 loggerMaker.infoAndAddToDb(afterDropMsg);
