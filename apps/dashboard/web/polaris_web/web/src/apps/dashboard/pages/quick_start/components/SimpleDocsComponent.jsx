@@ -1,4 +1,5 @@
-import { VerticalStack, Button, Text, Divider } from '@shopify/polaris'
+import { VerticalStack, Text, Divider } from '@shopify/polaris'
+import GoToDocsButton from './shared/GoToDocsButton'
 
 function SimpleDocsComponent({description, docsUrl}) {
 
@@ -9,15 +10,7 @@ function SimpleDocsComponent({description, docsUrl}) {
                     {description}
                 </Text>
                 <Divider />
-                <div style={{width: '50%'}}>
-                    <Button outline onClick={
-                        () => {
-                        window.open(docsUrl, "_blank");
-                    }
-                    }>
-                    Go to docs
-                    </Button>
-                </div>
+                <GoToDocsButton docsUrl={docsUrl} width='50%' />
             </VerticalStack>
         </div>
   )

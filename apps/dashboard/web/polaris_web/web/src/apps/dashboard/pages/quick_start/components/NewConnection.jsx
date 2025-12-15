@@ -5,6 +5,7 @@ import DropdownSearch from '../../../components/shared/DropdownSearch'
 import SearchField from "../../../components/shared/SearchField"
 import "../QuickStart.css"
 import PersistStore from '../../../../main/PersistStore'
+import GoToDocsButton from './shared/GoToDocsButton'
 
 function NewConnection() {
 
@@ -49,11 +50,6 @@ function NewConnection() {
         setTasksCompleted(2)
     }
 
-    const openDocs = (docsUrl) => {
-        if(docsUrl && docsUrl.length > 0){
-            window.open(docsUrl)
-        }
-    }
 
     const setConnector = (label) => {
         let obj = connectorsList.find(element => element.label === label)
@@ -75,13 +71,9 @@ function NewConnection() {
                         {badge && badge.length > 0 ? <Badge size='small' status='info'>{badge}</Badge> : null}
                     </Text>
                     <div className='see-docs'>
-                    <Button plain onClick={(event) => { 
-                            event.stopPropagation(); 
-                            openDocs(docsUrl); 
-                        }}    
-                    >
-                        Go to docs
-                    </Button>
+                        <div onClick={(event) => event.stopPropagation()}>
+                            <GoToDocsButton docsUrl={docsUrl} variant='plain' />
+                        </div>
                     </div>
                 </div>
                 <Text variant='bodySm' color="subdued">{text}</Text>
