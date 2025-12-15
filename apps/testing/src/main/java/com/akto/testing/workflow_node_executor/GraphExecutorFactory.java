@@ -7,13 +7,7 @@ public class GraphExecutorFactory {
 
     public static GraphExecutor fetchExecutor(GraphExecutorRequest graphExecutorRequest) {
 
-        String executionType = graphExecutorRequest.getExecutionType();
-
-        if (executionType != null && executionType.equalsIgnoreCase("parallel")) {
-            return new ParallelGraphExecutor();
-        }
-
-        if (executionType != null && executionType.equalsIgnoreCase("conditional")) {
+        if (graphExecutorRequest.getExecutionType().equalsIgnoreCase("conditional")) {
             return new ConditionalGraphExecutor();
         }
 

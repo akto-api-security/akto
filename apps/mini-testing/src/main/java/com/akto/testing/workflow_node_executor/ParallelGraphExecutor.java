@@ -19,35 +19,30 @@ import com.akto.dto.testing.GraphExecutorRequest;
 import com.akto.dto.testing.GraphExecutorResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.WorkflowTestResult;
-import com.akto.test_editor.execution.Memory;
 import com.akto.test_editor.TestingUtilsSingleton;
+import com.akto.test_editor.execution.Memory;
 
 /**
- * ParallelGraphExecutor executes all nodes in the workflow graph in parallel
- * using a thread pool with a fixed-size queue. This executor is designed for
- * scenarios where nodes can be executed independently without strict ordering requirements.
+ * Executes graph nodes in parallel. Also propagates a thread-local API executor
+ * to enable parallel API calls inside YamlNodeExecutor.
  */
 public class ParallelGraphExecutor extends GraphExecutor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(ParallelGraphExecutor.class, LogDb.TESTING);
-    
-    // Thread pool size - can be configured based on system resources
     private static final int DEFAULT_THREAD_POOL_SIZE = 10;
-    
+
     private final ExecutorService executorService;
     private final ExecutorService apiCallExecutorService;
-    
+
     public ParallelGraphExecutor() {
-        // Create a fixed thread pool with bounded queue for node execution
         this.executorService = Executors.newFixedThreadPool(DEFAULT_THREAD_POOL_SIZE);
-        // Create a separate thread pool for API calls within nodes
         this.apiCallExecutorService = Executors.newFixedThreadPool(DEFAULT_THREAD_POOL_SIZE * 2);
     }
 
     @Override
-    public GraphExecutorResult executeGraph(GraphExecutorRequest graphExecutorRequest, boolean debug, 
-                                           List<TestingRunResult.TestLog> testLogs, Memory memory) {
-        
+    public GraphExecutorResult executeGraph(GraphExecutorRequest graphExecutorRequest, boolean debug,
+                                            List<TestingRunResult.TestLog> testLogs, Memory memory) {
+
         Map<String, Node> allNodes = graphExecutorRequest.getGraph().getNodes();
         if (allNodes == null || allNodes.isEmpty()) {
             return handleEmptyGraph(graphExecutorRequest.getWorkflowTestResult());
@@ -58,11 +53,7 @@ public class ParallelGraphExecutor extends GraphExecutor {
         waitForCompletion(allNodes.size(), futures, context.errors);
         return buildResult(graphExecutorRequest, context);
     }
-    
-    /**
-     * Shutdown the executor services gracefully.
-     * This should be called when the executor is no longer needed.
-     */
+
     public void shutdown() {
         if (executorService != null && !executorService.isShutdown()) {
             executorService.shutdown();
@@ -75,7 +66,7 @@ public class ParallelGraphExecutor extends GraphExecutor {
                 Thread.currentThread().interrupt();
             }
         }
-        
+
         if (apiCallExecutorService != null && !apiCallExecutorService.isShutdown()) {
             apiCallExecutorService.shutdown();
             try {
@@ -91,8 +82,8 @@ public class ParallelGraphExecutor extends GraphExecutor {
 
     private ExecutionContext initContext(GraphExecutorRequest graphExecutorRequest) {
         return new ExecutionContext(
-            graphExecutorRequest.getWorkflowTestResult(),
-            graphExecutorRequest.getValuesMap()
+                graphExecutorRequest.getWorkflowTestResult(),
+                graphExecutorRequest.getValuesMap()
         );
     }
 
@@ -100,8 +91,8 @@ public class ParallelGraphExecutor extends GraphExecutor {
         List<CompletableFuture<Void>> futures = new ArrayList<>();
         for (Node node : allNodes.values()) {
             futures.add(CompletableFuture.runAsync(
-                () -> executeNode(node, context, debug, testLogs, memory),
-                executorService
+                    () -> executeNode(node, context, debug, testLogs, memory),
+                    executorService
             ));
         }
         return futures;
@@ -118,7 +109,7 @@ public class ParallelGraphExecutor extends GraphExecutor {
 
             sleepIfNeeded(node);
             WorkflowTestResult.NodeResult nodeResult = Utils.executeNode(
-                node, context.valuesMap, debug, testLogs, memory
+                    node, context.valuesMap, debug, testLogs, memory
             );
 
             context.nodeResultMap.put(node.getId(), nodeResult);
@@ -155,7 +146,7 @@ public class ParallelGraphExecutor extends GraphExecutor {
     private void waitForCompletion(int nodeCount, List<CompletableFuture<Void>> futures, List<String> errors) {
         try {
             CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-                .get(30, TimeUnit.MINUTES);
+                    .get(30, TimeUnit.MINUTES);
             loggerMaker.infoAndAddToDb("All " + nodeCount + " nodes completed parallel execution");
         } catch (Exception e) {
             recordError("Error waiting for parallel execution to complete: " + e.getMessage(), errors);
