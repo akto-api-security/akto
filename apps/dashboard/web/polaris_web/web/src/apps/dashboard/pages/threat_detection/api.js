@@ -101,6 +101,13 @@ const threatDetectionRequests = {
             data: { threatConfiguration: data}
         })
     },
+    toggleArchivalEnabled(enabled) {
+        return request({
+            url: '/api/toggleArchivalEnabled',
+            method: 'post',
+            data: { enabled: enabled }
+        })
+    },
     fetchThreatCategoryCount(startTs, endTs) {
         return request({
             url: '/api/fetchThreatCategoryCount',

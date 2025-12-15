@@ -96,6 +96,13 @@ public class ThreatActorService {
             int archivalDays = ((Number) archivalDaysObj).intValue();
             builder.setArchivalDays(archivalDays);
         }
+
+        // Handle archivalEnabled
+        Object archivalEnabledObj = doc.get("archivalEnabled");
+        if (archivalEnabledObj instanceof Boolean) {
+            boolean archivalEnabled = (Boolean) archivalEnabledObj;
+            builder.setArchivalEnabled(archivalEnabled);
+        }
     }
     return builder.build();
 }
@@ -105,7 +112,7 @@ public class ThreatActorService {
     MongoCollection<Document> coll = this.threatConfigurationDao.getCollection(accountId);
 
     Document newDoc = new Document();
-    
+
     // Prepare a list of actorId documents
     if (updatedConfig.hasActor()) {
         List<Document> actorIdDocs = new ArrayList<>();
@@ -120,7 +127,7 @@ public class ThreatActorService {
         }
         newDoc.append("actor", actorIdDocs);
     }
-    
+
     // Prepare rate limit config documents using DTO
     if (updatedConfig.hasRatelimitConfig()) {
         Document ratelimitConfigDoc = RateLimitConfigDTO.toDocument(updatedConfig.getRatelimitConfig());
@@ -128,12 +135,15 @@ public class ThreatActorService {
             newDoc.append("ratelimitConfig", ratelimitConfigDoc.get("ratelimitConfig"));
         }
     }
-    
-    // Handle archivalDays
+
+    // Handle archivalDays - only update if explicitly set (> 0)
     if (updatedConfig.getArchivalDays() > 0) {
         newDoc.append("archivalDays", updatedConfig.getArchivalDays());
     }
-    
+
+    // Note: archivalEnabled is now handled by separate endpoint /toggle_archival_enabled
+    // This prevents other config updates from accidentally resetting it
+
     Document existingDoc = coll.find().first();
 
     if (existingDoc != null) {
@@ -158,9 +168,38 @@ public class ThreatActorService {
             int archivalDays = ((Number) archivalDaysObj).intValue();
             builder.setArchivalDays(archivalDays);
         }
+        // archivalEnabled is handled by separate endpoint, but include in response for frontend
+        Object archivalEnabledObj = savedDoc.get("archivalEnabled");
+        if (archivalEnabledObj instanceof Boolean) {
+            boolean archivalEnabled = (Boolean) archivalEnabledObj;
+            builder.setArchivalEnabled(archivalEnabled);
+        }
     }
     return builder.build();
 }
+
+  public com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ToggleArchivalEnabledResponse toggleArchivalEnabled(
+      String accountId,
+      com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ToggleArchivalEnabledRequest request) {
+
+    MongoCollection<Document> coll = this.threatConfigurationDao.getCollection(accountId);
+    boolean enabled = request.getEnabled();
+
+    Document existingDoc = coll.find().first();
+    Document updateDoc = new Document("$set", new Document("archivalEnabled", enabled));
+
+    if (existingDoc != null) {
+        coll.updateOne(new Document("_id", existingDoc.getObjectId("_id")), updateDoc);
+    } else {
+        // Create new document with just archivalEnabled
+        Document newDoc = new Document("archivalEnabled", enabled);
+        coll.insertOne(newDoc);
+    }
+
+    return com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ToggleArchivalEnabledResponse.newBuilder()
+        .setEnabled(enabled)
+        .build();
+  }
 
     public void deleteAllMaliciousEvents(String accountId) {
         loggerMaker.infoAndAddToDb("Deleting all malicious events for accountId: " + accountId);
