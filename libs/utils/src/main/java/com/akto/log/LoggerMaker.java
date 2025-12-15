@@ -164,6 +164,19 @@ public class LoggerMaker  {
         sendToSlack(slackCyborgWebhookUrl, err);
     }
 
+    public void sendCyborgSlackAsync(String message) {
+        if (LogDb.DB_ABS != this.db) {
+            return;
+        }
+        service.submit(() -> {
+            try {
+                sendToCyborgSlack(message);
+            } catch (Exception e){
+                internalLogger.error("Error in sending cyborg logs to Slack: " + e.getMessage());
+            }
+        });
+    }
+
     private String formatWithAccountId(String msg) {
         Integer accountId = Context.accountId.get();
         if (accountId != null) {
@@ -205,13 +218,7 @@ public class LoggerMaker  {
             if (db.equals(LogDb.BILLING) || db.equals(LogDb.DASHBOARD)) {
                 sendToSlack(finalError);
             } else if(LogDb.DB_ABS.equals(db)){
-                service.submit(() -> {
-                    try {
-                        sendToCyborgSlack(finalError);
-                    } catch (Exception e){
-                        internalLogger.error("Error in sending cyborg error logs %s" , e.getMessage());
-                    }
-                });
+                sendCyborgSlackAsync(finalError);
             }
         } catch (Exception e) {
             e.printStackTrace();

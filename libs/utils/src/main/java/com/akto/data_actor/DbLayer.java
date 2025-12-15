@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
+import com.akto.dao.AccountsContextDao;
 import com.akto.dao.AgentTrafficLogDao;
 import com.akto.dao.CyborgLogsDao;
 import com.akto.dao.filter.MergedUrlsDao;
@@ -136,6 +137,12 @@ public class DbLayer {
     private static volatile Set<MergedUrls> mergedUrlsCache = null;
     private static volatile long mergedUrlsCacheTimestamp = 0;
     private static final long MERGED_URLS_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+
+    // Collection cleanup configuration
+    private static final ConcurrentHashMap<String, Long> collectionCleanupCache = new ConcurrentHashMap<>();
+    private static final long CLEANUP_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+    private static final long CLEANUP_JITTER_MS = 3 * 60 * 1000; // 3 minutes max jitter
+    private static final long COLLECTION_SIZE_THRESHOLD = 100_000;
 
     private static int getLastUpdatedTsForAccount(int accountId) {
         return lastUpdatedTsMap.computeIfAbsent(accountId, k -> 0);
@@ -764,8 +771,61 @@ public class DbLayer {
         RuntimeLogsDao.instance.insertOne(log);
     }
 
+    private static void cleanupCollectionIfNeeded(String collectionName, AccountsContextDao<?> dao) {
+        try {
+            int accountId = Context.accountId.get();
+            String cacheKey = accountId + "_" + collectionName;
+
+            long currentTime = System.currentTimeMillis();
+            Long nextCleanupTime = collectionCleanupCache.get(cacheKey);
+
+            if (nextCleanupTime != null && currentTime < nextCleanupTime) {
+                return;
+            }
+
+            long estimatedCount = dao.getMCollection().estimatedDocumentCount();
+
+            if (estimatedCount >= COLLECTION_SIZE_THRESHOLD) {
+                List<String> slackMessages = new ArrayList<>();
+
+                String beforeDropMsg = String.format(
+                    "Dropping collection - collection=%s, account=%d, estimatedCount=%d, threshold=%d, timestamp=%d",
+                    collectionName, accountId, estimatedCount, COLLECTION_SIZE_THRESHOLD, Context.now()
+                );
+                loggerMaker.infoAndAddToDb(beforeDropMsg);
+                slackMessages.add(beforeDropMsg);
+
+                dao.getMCollection().drop();
+
+                String afterDropMsg = String.format(
+                    "Successfully dropped collection=%s, account=%d, timestamp=%d",
+                    collectionName, accountId, Context.now()
+                );
+                loggerMaker.infoAndAddToDb(afterDropMsg);
+                slackMessages.add(afterDropMsg);
+
+                // Send combined message to Slack
+                String combinedMessage = String.join("\n", slackMessages);
+                loggerMaker.sendCyborgSlackAsync(combinedMessage);
+            }
+
+            // Calculate next cleanup time with jitter (0 to 3 minutes)
+            long jitter = (long) (Math.random() * CLEANUP_JITTER_MS);
+            long nextScheduledCleanup = currentTime + CLEANUP_INTERVAL_MS + jitter;
+            collectionCleanupCache.put(cacheKey, nextScheduledCleanup);
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e,
+                String.format("Error during cleanup of collection %s, accountId: %s: %s", collectionName,
+                    Context.accountId.get(), e)
+            );
+        }
+    }
+
     public static void insertPersistentRuntimeLog(Log log) {
-        RuntimePersistentLogsDao.instance.insertOne(log);
+        RuntimePersistentLogsDao runtimeLogsDao = RuntimePersistentLogsDao.instance;
+        cleanupCollectionIfNeeded(runtimeLogsDao.getCollName(), runtimeLogsDao);
+        runtimeLogsDao.insertOne(log);
     }
 
     public static void insertAnalyserLog(Log log) {
