@@ -8,6 +8,8 @@ import (
 	"errors"
 	"os"
 	"os/signal"
+	"regexp"
+	"strings"
 	"syscall"
 	"time"
 
@@ -19,6 +21,8 @@ import (
 	"go.uber.org/zap"
 )
 
+const regexPrefix = "regex:"
+
 // Consumer represents a Kafka consumer for processing API traffic
 type Consumer struct {
 	reader           *kafka.Reader
@@ -26,19 +30,92 @@ type Consumer struct {
 	logger           *zap.Logger
 	config           *config.Config
 	batchSize        int
+	// Pre-parsed filter values for performance
+	filterHosts     []string
+	filterHostRegex *regexp.Regexp
+	filterPaths     []string
+	filterPathRegex *regexp.Regexp
 }
 
 // NewConsumer creates a new Kafka consumer
 func NewConsumer(cfg *config.Config, validatorService *validator.Service, logger *zap.Logger) (*Consumer, error) {
 	reader := createKafkaReader(cfg, logger)
 
-	return &Consumer{
+	consumer := &Consumer{
 		reader:           reader,
 		validatorService: validatorService,
 		logger:           logger,
 		config:           cfg,
 		batchSize:        cfg.KafkaBatchSize,
-	}, nil
+	}
+
+	// Parse filter configurations
+	consumer.parseFilterConfig(logger)
+
+	return consumer, nil
+}
+
+// parseFilterConfig parses the filter configuration from config
+func (c *Consumer) parseFilterConfig(logger *zap.Logger) {
+	// Parse host filter
+	if c.config.FilterHost != "" {
+		if strings.HasPrefix(c.config.FilterHost, regexPrefix) {
+			pattern := strings.TrimPrefix(c.config.FilterHost, regexPrefix)
+			compiled, err := regexp.Compile(pattern)
+			if err != nil {
+				logger.Error("Failed to compile host filter regex, filter disabled",
+					zap.String("pattern", pattern),
+					zap.Error(err))
+			} else {
+				c.filterHostRegex = compiled
+				logger.Info("Host filter configured with regex",
+					zap.String("pattern", pattern))
+			}
+		} else {
+			// Comma-separated values
+			hosts := strings.Split(c.config.FilterHost, ",")
+			for _, host := range hosts {
+				trimmed := strings.TrimSpace(host)
+				if trimmed != "" {
+					c.filterHosts = append(c.filterHosts, trimmed)
+				}
+			}
+			if len(c.filterHosts) > 0 {
+				logger.Info("Host filter configured with values",
+					zap.Strings("hosts", c.filterHosts))
+			}
+		}
+	}
+
+	// Parse path filter
+	if c.config.FilterPath != "" {
+		if strings.HasPrefix(c.config.FilterPath, regexPrefix) {
+			pattern := strings.TrimPrefix(c.config.FilterPath, regexPrefix)
+			compiled, err := regexp.Compile(pattern)
+			if err != nil {
+				logger.Error("Failed to compile path filter regex, filter disabled",
+					zap.String("pattern", pattern),
+					zap.Error(err))
+			} else {
+				c.filterPathRegex = compiled
+				logger.Info("Path filter configured with regex",
+					zap.String("pattern", pattern))
+			}
+		} else {
+			// Comma-separated values
+			paths := strings.Split(c.config.FilterPath, ",")
+			for _, path := range paths {
+				trimmed := strings.TrimSpace(path)
+				if trimmed != "" {
+					c.filterPaths = append(c.filterPaths, trimmed)
+				}
+			}
+			if len(c.filterPaths) > 0 {
+				logger.Info("Path filter configured with values",
+					zap.Strings("paths", c.filterPaths))
+			}
+		}
+	}
 }
 
 // createKafkaReader creates and configures a Kafka reader
@@ -126,6 +203,15 @@ func (c *Consumer) Start(ctx context.Context) error {
 		zap.Int("batchSize", c.batchSize),
 		zap.Int("batchLingerSec", c.config.KafkaBatchLingerSec))
 
+	// Log filter configuration
+	if c.filterHostRegex != nil || len(c.filterHosts) > 0 {
+		c.logger.Info("Traffic filter active: filtering by host")
+	} else if c.filterPathRegex != nil || len(c.filterPaths) > 0 {
+		c.logger.Info("Traffic filter active: filtering by path")
+	} else {
+		c.logger.Info("No traffic filters configured, all traffic will be processed")
+	}
+
 	// Setup signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -189,6 +275,11 @@ func (c *Consumer) Start(ctx context.Context) error {
 				continue
 			}
 
+			// Apply traffic filter
+			if !c.filterTraffic(data) {
+				continue
+			}
+
 			batch = append(batch, *data)
 
 			// Process batch if full
@@ -208,6 +299,122 @@ func (c *Consumer) parseMessage(value []byte) (*models.IngestDataBatch, error) {
 		return nil, err
 	}
 	return &data, nil
+}
+
+// filterTraffic checks if the traffic should pass through based on host or path filters.
+// Returns true if traffic should be processed, false if it should be filtered out.
+// If no filters are configured, all traffic passes through.
+// Host and path filters are mutually exclusive - only one is applied at a time.
+// Supports comma-separated values (uses contains matching) and regex patterns (prefixed with "regex:").
+func (c *Consumer) filterTraffic(data *models.IngestDataBatch) bool {
+	// If no filters configured, allow all traffic
+	hasHostFilter := c.filterHostRegex != nil || len(c.filterHosts) > 0
+	hasPathFilter := c.filterPathRegex != nil || len(c.filterPaths) > 0
+
+	if !hasHostFilter && !hasPathFilter {
+		return true
+	}
+
+	// Host filter takes precedence (mutually exclusive)
+	if hasHostFilter {
+		host := c.extractHost(data)
+		if host == "" {
+			c.logger.Debug("No host found in traffic, filtering out",
+				zap.String("path", data.Path))
+			return false
+		}
+		matches := c.matchHost(host)
+		if !matches {
+			c.logger.Debug("Host does not match filter, filtering out",
+				zap.String("host", host))
+		}
+		return matches
+	}
+
+	// Path filter
+	if hasPathFilter {
+		matches := c.matchPath(data.Path)
+		if !matches {
+			c.logger.Debug("Path does not match filter, filtering out",
+				zap.String("path", data.Path))
+		}
+		return matches
+	}
+
+	return true
+}
+
+// matchHost checks if the host matches the configured filter (regex or comma-separated values)
+// Uses case-insensitive contains check for comma-separated values
+func (c *Consumer) matchHost(host string) bool {
+	if c.filterHostRegex != nil {
+		return c.filterHostRegex.MatchString(host)
+	}
+	hostLower := strings.ToLower(host)
+	for _, filterHost := range c.filterHosts {
+		if strings.Contains(hostLower, strings.ToLower(filterHost)) {
+			return true
+		}
+	}
+	return false
+}
+
+// matchPath checks if the path matches the configured filter (regex or comma-separated values)
+// Uses contains check for comma-separated values
+func (c *Consumer) matchPath(path string) bool {
+	if c.filterPathRegex != nil {
+		return c.filterPathRegex.MatchString(path)
+	}
+	for _, filterPath := range c.filterPaths {
+		if strings.Contains(path, filterPath) {
+			return true
+		}
+	}
+	return false
+}
+
+// extractHost extracts the host from request headers or path
+func (c *Consumer) extractHost(data *models.IngestDataBatch) string {
+	// Try to get host from request headers
+	if data.RequestHeaders != "" {
+		var headers map[string]interface{}
+		if err := json.Unmarshal([]byte(data.RequestHeaders), &headers); err == nil {
+			// Check for Host header (case-insensitive)
+			for key, value := range headers {
+				if strings.EqualFold(key, "host") {
+					switch v := value.(type) {
+					case string:
+						return v
+					case []interface{}:
+						if len(v) > 0 {
+							if s, ok := v[0].(string); ok {
+								return s
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Try to extract host from path if it's a full URL
+	if strings.HasPrefix(data.Path, "http://") || strings.HasPrefix(data.Path, "https://") {
+		// Parse URL to extract host
+		path := data.Path
+		// Remove protocol
+		if strings.HasPrefix(path, "https://") {
+			path = strings.TrimPrefix(path, "https://")
+		} else {
+			path = strings.TrimPrefix(path, "http://")
+		}
+		// Extract host (before first slash)
+		if idx := strings.Index(path, "/"); idx > 0 {
+			return path[:idx]
+		}
+		return path
+	}
+
+	return ""
 }
 
 // processBatch processes a batch of messages through the validator

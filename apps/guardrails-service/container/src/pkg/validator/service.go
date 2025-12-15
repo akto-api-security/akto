@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"sync"
+	"time"
 
 	"github.com/akto-api-security/guardrails-service/models"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
@@ -14,12 +16,23 @@ import (
 	"go.uber.org/zap"
 )
 
+// policyCache holds cached policies and their metadata
+type policyCache struct {
+	policies      []types.Policy
+	auditPolicies map[string]*types.AuditPolicy
+	compiledRules map[string]*regexp.Regexp
+	hasAuditRules bool
+	lastFetched   time.Time
+	mu            sync.RWMutex
+}
+
 // Service handles payload validation using akto-gateway library
 type Service struct {
 	config    *config.Config
 	dbClient  *dbabstractor.Client
 	processor mcp.RequestProcessor
 	logger    *zap.Logger
+	cache     *policyCache
 }
 
 // NewService creates a new validator service
@@ -51,7 +64,65 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 		dbClient:  dbClient,
 		processor: processor,
 		logger:    logger,
+		cache:     &policyCache{},
 	}, nil
+}
+
+// getCachedPolicies returns cached policies if still valid, otherwise fetches fresh policies
+func (s *Service) getCachedPolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, error) {
+	refreshInterval := time.Duration(s.config.PolicyRefreshIntervalMin) * time.Minute
+
+	// Check if cache is valid
+	s.cache.mu.RLock()
+	if !s.cache.lastFetched.IsZero() && time.Since(s.cache.lastFetched) < refreshInterval {
+		policies := s.cache.policies
+		auditPolicies := s.cache.auditPolicies
+		compiledRules := s.cache.compiledRules
+		hasAuditRules := s.cache.hasAuditRules
+		s.cache.mu.RUnlock()
+		s.logger.Debug("Using cached policies",
+			zap.Time("lastFetched", s.cache.lastFetched),
+			zap.Int("policiesCount", len(policies)))
+		return policies, auditPolicies, compiledRules, hasAuditRules, nil
+	}
+	s.cache.mu.RUnlock()
+
+	// Cache is stale or empty, fetch fresh policies
+	return s.refreshPolicies()
+}
+
+// refreshPolicies fetches fresh policies from database and updates the cache
+func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, error) {
+	s.cache.mu.Lock()
+	defer s.cache.mu.Unlock()
+
+	// Double-check: another goroutine might have refreshed while we waited for the lock
+	refreshInterval := time.Duration(s.config.PolicyRefreshIntervalMin) * time.Minute
+	if !s.cache.lastFetched.IsZero() && time.Since(s.cache.lastFetched) < refreshInterval {
+		s.logger.Debug("Cache was refreshed by another goroutine, using cached policies")
+		return s.cache.policies, s.cache.auditPolicies, s.cache.compiledRules, s.cache.hasAuditRules, nil
+	}
+
+	s.logger.Info("Refreshing policies cache")
+
+	policies, auditPolicies, compiledRules, hasAuditRules, err := s.fetchAndParsePolicies()
+	if err != nil {
+		return nil, nil, nil, false, err
+	}
+
+	// Update cache
+	s.cache.policies = policies
+	s.cache.auditPolicies = auditPolicies
+	s.cache.compiledRules = compiledRules
+	s.cache.hasAuditRules = hasAuditRules
+	s.cache.lastFetched = time.Now()
+
+	s.logger.Info("Policy cache refreshed",
+		zap.Int("policiesCount", len(policies)),
+		zap.Int("auditPoliciesCount", len(auditPolicies)),
+		zap.Time("lastFetched", s.cache.lastFetched))
+
+	return policies, auditPolicies, compiledRules, hasAuditRules, nil
 }
 
 // fetchAndParsePolicies fetches policies from database abstractor and parses them
@@ -166,8 +237,8 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 func (s *Service) ValidateRequest(ctx context.Context, payload string) (*mcp.ValidationResult, error) {
 	s.logger.Info("Validating request payload")
 
-	// Fetch and parse policies from database abstractor
-	policies, auditPolicies, compiledRules, hasAuditRules, err := s.fetchAndParsePolicies()
+	// Get cached policies (refreshes if stale)
+	policies, auditPolicies, compiledRules, hasAuditRules, err := s.getCachedPolicies()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
@@ -219,8 +290,8 @@ func (s *Service) ValidateRequest(ctx context.Context, payload string) (*mcp.Val
 func (s *Service) ValidateResponse(ctx context.Context, payload string) (*mcp.ValidationResult, error) {
 	s.logger.Info("Validating response payload")
 
-	// Fetch and parse policies from database abstractor
-	policies, _, _, _, err := s.fetchAndParsePolicies()
+	// Get cached policies (refreshes if stale)
+	policies, _, _, _, err := s.getCachedPolicies()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
@@ -257,8 +328,8 @@ func (s *Service) ValidateResponse(ctx context.Context, payload string) (*mcp.Va
 func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDataBatch) ([]ValidationBatchResult, error) {
 	s.logger.Info("Validating batch data", zap.Int("count", len(batchData)))
 
-	// Fetch policies once for the entire batch to improve performance
-	policies, auditPolicies, _, hasAuditRules, err := s.fetchAndParsePolicies()
+	// Get cached policies (refreshes if stale)
+	policies, auditPolicies, _, hasAuditRules, err := s.getCachedPolicies()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
