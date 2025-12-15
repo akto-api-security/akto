@@ -17,15 +17,10 @@ public class TestingUtilsSingleton {
 
     private static final TestingUtilsSingleton instance = new TestingUtilsSingleton();
 
-    private Map<ApiInfo.ApiInfoKey, Boolean> mcpRequestMap = new HashMap<>();
-    private Map<ApiInfo.ApiInfoKey, String> mcpRequestMethodMap = new HashMap<>();
-
     // Thread-local storage for API call executor service
     private final ThreadLocal<ExecutorService> apiCallExecutorService = new ThreadLocal<>();
 
     public static void init() {
-        instance.mcpRequestMap = new HashMap<>();
-        instance.mcpRequestMethodMap = new HashMap<>();
         instance.apiCallExecutorService.remove();
     }
 
@@ -55,26 +50,6 @@ public class TestingUtilsSingleton {
     /** Clear API call executor service for current thread. */
     public void clearApiCallExecutorService() {
         apiCallExecutorService.remove();
-    }
-
-    public boolean isMcpRequest(ApiInfo.ApiInfoKey apiInfoKey, RawApi rawApi) {
-        if (apiInfoKey == null) return false;
-        if (instance.mcpRequestMap.containsKey(apiInfoKey)) {
-            return instance.mcpRequestMap.get(apiInfoKey);
-        }
-        boolean isMcpRequest = McpRequestResponseUtils.isMcpRequest(rawApi);
-        instance.mcpRequestMap.put(apiInfoKey, isMcpRequest);
-        return isMcpRequest;
-    }
-
-    public String getMcpRequestMethod(ApiInfo.ApiInfoKey apiInfoKey, RawApi rawApi) {
-        if (apiInfoKey == null) return "POST";
-        if (instance.mcpRequestMethodMap.containsKey(apiInfoKey)) {
-            return instance.mcpRequestMethodMap.get(apiInfoKey);
-        }
-        String method = McpRequestResponseUtils.analyzeMcpRequestMethod(apiInfoKey, rawApi.getRequest().getBody());
-        instance.mcpRequestMethodMap.put(apiInfoKey, method);
-        return method;
     }
 
     public static String escapeJsonString(String input) {

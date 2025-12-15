@@ -56,12 +56,6 @@ public class Executor {
         Constants.AGENT_BASE_URL
     );
 
-    public static void main(String[] args) {
-        String host = "mdev.ababank.com";
-        int apiCollectionId = host.hashCode();  
-        System.out.println(apiCollectionId);
-    }
-
     public final String _HOST = "host";
 
     public YamlTestResult execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId,
@@ -142,7 +136,7 @@ public class Executor {
         boolean requestSent = false;
 
         String executionType = node.getChildNodes().get(0).getValues().toString();
-        boolean isParallelExecution = executionType.equals("parallel");
+        boolean isParallelExecution = executionType.equalsIgnoreCase("parallel");
         if (executionType.equals("multiple") || executionType.equals("graph") || isParallelExecution) {
             if (executionType.equals("graph")) {
                 List<ApiInfo.ApiInfoKey> apiInfoKeys = new ArrayList<>();
@@ -303,7 +297,7 @@ public class Executor {
         }
 
     public MultiExecTestResult triggerMultiExecution(WorkflowTest workflowTest, ExecutorNode reqNodes, RawApi rawApi, AuthMechanism authMechanism,
-        List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey, Map<String, Object> varMap, FilterNode validatorNode, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, String isParallelExecution) {
+        List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey, Map<String, Object> varMap, FilterNode validatorNode, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, boolean isParallelExecution) {
         
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         Graph graph = new Graph();
