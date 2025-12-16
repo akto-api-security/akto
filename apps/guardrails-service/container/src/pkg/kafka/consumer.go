@@ -181,21 +181,6 @@ func newTLSConfig() (*tls.Config, error) {
 			MinVersion:         tls.VersionTLS12,
 		}, nil
 	}
-	// sanitize KAFKA_TLS_CA_CERT_PATH to prevent path traversal: keep only the base filename
-	if strings.Contains(tlsCACertPath, "..") || strings.Contains(tlsCACertPath, "/") || strings.Contains(tlsCACertPath, `\`) {
-		parts := strings.Split(tlsCACertPath, "/")
-		tlsCACertPath = parts[len(parts)-1]
-		if idx := strings.LastIndex(tlsCACertPath, `\\`); idx != -1 {
-			tlsCACertPath = tlsCACertPath[idx+1:]
-		}
-		tlsCACertPath = "./" + tlsCACertPath
-baseDir := "./"; filename := filepath.Base(tlsCACertPath); resolvedPath := filepath.Join(baseDir, filename)
-if absBase, err := filepath.Abs(baseDir); err == nil {
-    if absResolved, err2 := filepath.Abs(resolvedPath); err2 == nil && !strings.HasPrefix(absResolved, absBase) {
-        return nil, errors.New("tls CA cert path resolves outside base directory")
-    }
-}
-tlsCACertPath = resolvedPath
 	caCert, err := os.ReadFile(tlsCACertPath)
 	if err != nil {
 		return nil, err
