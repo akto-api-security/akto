@@ -819,10 +819,11 @@ public class DbLayer {
             collectionCleanupCache.put(cacheKey, nextScheduledCleanup);
 
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e,
-                String.format("Error during cleanup of collection %s, accountId: %s: %s", collectionName,
-                    Context.accountId.get(), e)
-            );
+            String errorMessage = String.format(
+                "Error during cleanup of collection=%s, accountId=%d, errorMessage=%s",
+                collectionName, Context.accountId.get(), e.getMessage());
+            loggerMaker.sendCyborgSlackAsync(errorMessage);
+            loggerMaker.errorAndAddToDb(e, errorMessage);
         }
     }
 
