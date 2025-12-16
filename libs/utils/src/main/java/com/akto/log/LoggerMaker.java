@@ -165,9 +165,6 @@ public class LoggerMaker  {
     }
 
     public void sendCyborgSlackAsync(String message) {
-        if (LogDb.DB_ABS != this.db) {
-            return;
-        }
         service.submit(() -> {
             try {
                 sendToCyborgSlack(message);
