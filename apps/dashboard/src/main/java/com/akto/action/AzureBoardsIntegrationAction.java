@@ -173,6 +173,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
     private String description;
     private String endpoint;  // endpoint path for title formatting
     private String azureBoardsWorkItemUrl;
+    private String originalMessage;  // Request/response message for attachment (for threat activity, contains orig with both request and response)
 
     public String createWorkItem() {
         AzureBoardsIntegration azureBoardsIntegration = AzureBoardsIntegrationDao.instance.findOne(new BasicDBObject());
@@ -215,36 +216,8 @@ public class AzureBoardsIntegrationAction extends UserAction {
         azureBoardsPayloadCreator(testingRunResult, testName, testDescription, attachmentUrl, customABWorkItemFieldsPayload, reqPayload);
         logger.infoAndAddToDb("Azure board payload: " + reqPayload.toString(), LoggerMaker.LogDb.DASHBOARD);
 
-        String url = azureBoardsIntegration.getBaseUrl() + "/" + azureBoardsIntegration.getOrganization() + "/" + projectName + "/_apis/wit/workitems/$" + workItemType + "?api-version=" + version;
-        logger.infoAndAddToDb("Azure board final url: " + url, LoggerMaker.LogDb.DASHBOARD);
-
-        Map<String, List<String>> headers = new HashMap<>();
-        headers.put("Authorization", Collections.singletonList("Basic " + azureBoardsIntegration.getPersonalAuthToken()));
-        headers.put("content-type", Collections.singletonList("application/json-patch+json"));
-        logger.infoAndAddToDb("Azure board headers: " + headers.toString(), LoggerMaker.LogDb.DASHBOARD);
-        OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", reqPayload.toString(), headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-            logger.infoAndAddToDb("Status and Response from the createWorkItem API: " + response.getStatusCode() + " | " + response.getBody());
-            String responsePayload = response.getBody();
-            if (response.getStatusCode() > 201 || responsePayload == null) {
-                return Action.ERROR.toUpperCase();
-            }
-
-            BasicDBObject respPayloadObj = BasicDBObject.parse(responsePayload);
-
-            String workItemUrl;
-            try {
-                Object linksObj = respPayloadObj.get("_links");
-                BasicDBObject links = BasicDBObject.parse(linksObj.toString());
-                Object htmlObj = links.get("html");
-                BasicDBObject html = BasicDBObject.parse(htmlObj.toString());
-                Object href = html.get("href");
-                workItemUrl = href.toString();
-            } catch (Exception e) {
-                workItemUrl = respPayloadObj.get("url").toString();
-            }
-
+            String workItemUrl = createAndSendWorkItemRequest(azureBoardsIntegration, projectName, workItemType, reqPayload);
             if(workItemUrl == null) {
                 return Action.ERROR.toUpperCase();
             }
@@ -268,12 +241,9 @@ public class AzureBoardsIntegrationAction extends UserAction {
         String endpointPath = getEndpointPath(fullUrl);
         String title = "Akto Report - " + testName + " (" + method + " - " + endpointPath + ")";
 
-        BasicDBObject titleDBObject = new BasicDBObject();
-        titleDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
-        titleDBObject.put("path", "/fields/System.Title");
-        titleDBObject.put("value", title);
-        reqPayload.add(titleDBObject);
+        addTitleField(reqPayload, title);
 
+        // Format description with host, endpoint, and dashboard link
         try {
             URL url = new URL(fullUrl);
             String hostname = url.getHost();
@@ -284,74 +254,36 @@ public class AzureBoardsIntegrationAction extends UserAction {
             e.printStackTrace();
         }
 
-
-        BasicDBObject descriptionDBObject = new BasicDBObject();
-        descriptionDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
-        descriptionDBObject.put("path", "/fields/System.Description");
-        descriptionDBObject.put("value", testDescription);
-        reqPayload.add(descriptionDBObject);
-
-        if(attachmentUrl != null && !attachmentUrl.isEmpty()) {
-            BasicDBObject attachmentsDBObject = new BasicDBObject();
-            attachmentsDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
-            attachmentsDBObject.put("path", "/relations/-");
-            BasicDBObject valueDBObject = new BasicDBObject();
-            valueDBObject.put("rel", "AttachedFile");
-            valueDBObject.put("url", attachmentUrl);
-            valueDBObject.put("attributes", new BasicDBObject().put("comment", "Request and Response sample data."));
-
-            attachmentsDBObject.put("value", valueDBObject);
-            reqPayload.add(attachmentsDBObject);
-        }
-
-        // Adding custom fields data
-        if (customABWorkItemFieldsPayload != null) {
-            for (BasicDBObject field: customABWorkItemFieldsPayload) {
-                try {
-                    String fieldReferenceName = field.getString("referenceName");
-                    String fieldValue = field.getString("value");
-                    String fieldType = field.getString("type");
-
-                    BasicDBObject customFieldDBObject = new BasicDBObject();
-                    customFieldDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
-                    customFieldDBObject.put("path", "/fields/" + fieldReferenceName);
-
-                    switch (fieldType) {
-                        case "integer":
-                            int intValue = Integer.parseInt(fieldValue);
-                            customFieldDBObject.put("value", intValue);
-                            break;
-                        case "double":
-                            double doubleValue = Double.parseDouble(fieldValue);
-                            customFieldDBObject.put("value", doubleValue);
-                            break;
-                        case "boolean":
-                            boolean booleanValue = Boolean.parseBoolean(fieldValue);
-                            customFieldDBObject.put("value", booleanValue);
-                            break;
-                        default:
-                            customFieldDBObject.put("value", fieldValue);
-                    }
-
-                    reqPayload.add(customFieldDBObject);
-                } catch (Exception e) {
-                    continue;
-                }
-            }
-        }
-
+        addDescriptionField(reqPayload, testDescription);
+        addAttachment(reqPayload, attachmentUrl);
+        addCustomFields(reqPayload, customABWorkItemFieldsPayload);
     }
 
     private String getAttachmentUrl(String originalMessage, String message, AzureBoardsIntegration azureBoardsIntegration) {
-        File requestComparisonFile = createRequestFile(originalMessage, message);
+        return getAttachmentUrl(originalMessage, message, azureBoardsIntegration, false);
+    }
+
+    private String getAttachmentUrl(String originalMessage, String message, AzureBoardsIntegration azureBoardsIntegration, boolean isThreatActivity) {
+        File requestComparisonFile = createRequestFile(originalMessage, message, isThreatActivity);
         if (requestComparisonFile == null) {
             return null;
         }
 
-        try {
-            String uploadUrl = azureBoardsIntegration.getBaseUrl() + "/" + azureBoardsIntegration.getOrganization() + "/" + projectName + "/_apis/wit/attachments?fileName=" + URLEncoder.encode(requestComparisonFile.getName(), "UTF-8") + "&api-version=" + version;
+        return uploadAttachmentFile(requestComparisonFile, azureBoardsIntegration);
+    }
 
-            byte[] fileBytes = Files.readAllBytes(requestComparisonFile.toPath());
+    /**
+     * Uploads an attachment file to Azure DevOps and returns the attachment URL
+     */
+    private String uploadAttachmentFile(File attachmentFile, AzureBoardsIntegration azureBoardsIntegration) {
+        if (attachmentFile == null) {
+            return null;
+        }
+
+        try {
+            String uploadUrl = azureBoardsIntegration.getBaseUrl() + "/" + azureBoardsIntegration.getOrganization() + "/" + projectName + "/_apis/wit/attachments?fileName=" + URLEncoder.encode(attachmentFile.getName(), "UTF-8") + "&api-version=" + version;
+
+            byte[] fileBytes = Files.readAllBytes(attachmentFile.toPath());
 
             Map<String, List<String>> headers = new HashMap<>();
             headers.put("Authorization", Collections.singletonList("Basic " + azureBoardsIntegration.getPersonalAuthToken()));
@@ -370,7 +302,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            requestComparisonFile.delete();
+            attachmentFile.delete();
         }
 
         return null;
@@ -465,156 +397,37 @@ public class AzureBoardsIntegrationAction extends UserAction {
             String workItemTitle = this.title;
             String workItemDescription = this.description;
             
-            // If templateId is provided, fetch threat policy info and use it
+            // Enrich with threat policy info if templateId is provided
             if (this.templateId != null && !this.templateId.isEmpty()) {
-                try {
-                    YamlTemplate threatPolicyTemplate = FilterYamlTemplateDao.instance.findOne(
-                        Filters.eq(Constants.ID, this.templateId)
-                    );
-                    
-                    if (threatPolicyTemplate != null && threatPolicyTemplate.getContent() != null) {
-                        FilterConfig filterConfig = FilterConfigYamlParser.parseTemplate(
-                            threatPolicyTemplate.getContent(), false
-                        );
-                        
-                        if (filterConfig != null && filterConfig.getInfo() != null) {
-                            Info policyInfo = filterConfig.getInfo();
-                            
-                            // Format title as "Policy Name - Endpoint"
-                            if (policyInfo.getName() != null && !policyInfo.getName().isEmpty()) {
-                                if (this.endpoint != null && !this.endpoint.isEmpty()) {
-                                    workItemTitle = policyInfo.getName() + " - " + this.endpoint;
-                                } else {
-                                    workItemTitle = policyInfo.getName();
-                                }
-                            }
-                            
-                            // Build description: keep original description and append Description, Details, Impact from threat policy
-                            StringBuilder descriptionBuilder = new StringBuilder();
-                            
-                            // Keep the original description (Template ID, Severity, Attack Count, Host, Endpoint, Reference URL)
-                            if (workItemDescription != null && !workItemDescription.isEmpty()) {
-                                descriptionBuilder.append(workItemDescription);
-                                descriptionBuilder.append("\n\n");
-                            }
-                            
-                            // Append Description, Details, and Impact from threat policy
-                            if (policyInfo.getDescription() != null && !policyInfo.getDescription().isEmpty()) {
-                                descriptionBuilder.append("Description:\n");
-                                descriptionBuilder.append(policyInfo.getDescription());
-                                descriptionBuilder.append("\n\n");
-                            }
-                            
-                            if (policyInfo.getDetails() != null && !policyInfo.getDetails().isEmpty()) {
-                                descriptionBuilder.append("Details:\n");
-                                descriptionBuilder.append(policyInfo.getDetails());
-                                descriptionBuilder.append("\n\n");
-                            }
-                            
-                            if (policyInfo.getImpact() != null && !policyInfo.getImpact().isEmpty()) {
-                                descriptionBuilder.append("Impact:\n");
-                                descriptionBuilder.append(policyInfo.getImpact());
-                            }
-                            
-                            // Update description with combined content
-                            if (descriptionBuilder.length() > 0) {
-                                workItemDescription = descriptionBuilder.toString();
-                            }
-                            
-                            logger.infoAndAddToDb("Using threat policy info for work item: " + this.templateId, LoggerMaker.LogDb.DASHBOARD);
-                        }
-                    }
-                } catch (Exception e) {
-                    logger.errorAndAddToDb("Error fetching threat policy template: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
-                    // Continue with original title and description if template fetch fails
+                ThreatPolicyInfo enriched = enrichWithThreatPolicyInfo(this.templateId, workItemTitle, workItemDescription, this.endpoint);
+                workItemTitle = enriched.title;
+                workItemDescription = enriched.description;
+            }
+            
+            addTitleField(reqPayload, workItemTitle);
+            addDescriptionField(reqPayload, workItemDescription);
+            
+            // Add attachment if request/response data is provided
+            // For threat activity, originalMessage contains the orig field with both request and response
+            String attachmentUrl = null;
+            if (this.originalMessage != null && !this.originalMessage.isEmpty()) {
+                // For threat activity: originalMessage contains everything, explicitly mark as threat activity
+                attachmentUrl = getAttachmentUrl(this.originalMessage, this.originalMessage, azureBoardsIntegration, true);
+                if (attachmentUrl != null) {
+                    logger.infoAndAddToDb("Successfully created attachment for threat activity work item", LoggerMaker.LogDb.DASHBOARD);
+                } else {
+                    logger.errorAndAddToDb("Failed to create attachment for threat activity work item", LoggerMaker.LogDb.DASHBOARD);
                 }
             }
             
-            // Add title
-            BasicDBObject titleDBObject = new BasicDBObject();
-            titleDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
-            titleDBObject.put("path", "/fields/System.Title");
-            titleDBObject.put("value", workItemTitle);
-            reqPayload.add(titleDBObject);
-
-            // Add description with HTML formatting
-            String formattedDescription = workItemDescription.replace("\n", "<br>");
-            BasicDBObject descriptionDBObject = new BasicDBObject();
-            descriptionDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
-            descriptionDBObject.put("path", "/fields/System.Description");
-            descriptionDBObject.put("value", formattedDescription);
-            reqPayload.add(descriptionDBObject);
-
-            // Add custom fields if provided
-            if (customABWorkItemFieldsPayload != null) {
-                for (BasicDBObject field: customABWorkItemFieldsPayload) {
-                    try {
-                        String fieldReferenceName = field.getString("referenceName");
-                        String fieldValue = field.getString("value");
-                        String fieldType = field.getString("type");
-
-                        BasicDBObject customFieldDBObject = new BasicDBObject();
-                        customFieldDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
-                        customFieldDBObject.put("path", "/fields/" + fieldReferenceName);
-
-                        switch (fieldType) {
-                            case "integer":
-                                int intValue = Integer.parseInt(fieldValue);
-                                customFieldDBObject.put("value", intValue);
-                                break;
-                            case "double":
-                                double doubleValue = Double.parseDouble(fieldValue);
-                                customFieldDBObject.put("value", doubleValue);
-                                break;
-                            case "boolean":
-                                boolean booleanValue = Boolean.parseBoolean(fieldValue);
-                                customFieldDBObject.put("value", booleanValue);
-                                break;
-                            default:
-                                customFieldDBObject.put("value", fieldValue);
-                        }
-
-                        reqPayload.add(customFieldDBObject);
-                    } catch (Exception e) {
-                        logger.errorAndAddToDb("Error processing custom field: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
-                        continue;
-                    }
-                }
-            }
-
-            String url = azureBoardsIntegration.getBaseUrl() + "/" + azureBoardsIntegration.getOrganization() + "/" + projectName + "/_apis/wit/workitems/$" + workItemType + "?api-version=" + version;
-            logger.infoAndAddToDb("Azure board final url: " + url, LoggerMaker.LogDb.DASHBOARD);
-
-            Map<String, List<String>> headers = new HashMap<>();
-            headers.put("Authorization", Collections.singletonList("Basic " + azureBoardsIntegration.getPersonalAuthToken()));
-            headers.put("content-type", Collections.singletonList("application/json-patch+json"));
+            addAttachment(reqPayload, attachmentUrl);
+            addCustomFields(reqPayload, customABWorkItemFieldsPayload);
             
-            OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", reqPayload.toString(), headers, "");
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-            logger.infoAndAddToDb("Status and Response from the createGeneralAzureBoardsWorkItem API: " + response.getStatusCode() + " | " + response.getBody());
-            
-            String responsePayload = response.getBody();
-            if (response.getStatusCode() > 201 || responsePayload == null) {
-                addActionError("Error while creating Azure Boards work item");
-                return Action.ERROR.toUpperCase();
-            }
+            logger.infoAndAddToDb("Azure Boards work item payload (before sending): " + reqPayload.toString(), LoggerMaker.LogDb.DASHBOARD);
 
-            BasicDBObject respPayloadObj = BasicDBObject.parse(responsePayload);
-
-            String workItemUrl;
-            try {
-                Object linksObj = respPayloadObj.get("_links");
-                BasicDBObject links = BasicDBObject.parse(linksObj.toString());
-                Object htmlObj = links.get("html");
-                BasicDBObject html = BasicDBObject.parse(htmlObj.toString());
-                Object href = html.get("href");
-                workItemUrl = href.toString();
-            } catch (Exception e) {
-                workItemUrl = respPayloadObj.get("url").toString();
-            }
-
+            String workItemUrl = createAndSendWorkItemRequest(azureBoardsIntegration, projectName, workItemType, reqPayload);
             if(workItemUrl == null) {
-                addActionError("Failed to extract work item URL from response");
+                addActionError("Failed to create Azure Boards work item");
                 return Action.ERROR.toUpperCase();
             }
 
@@ -635,6 +448,210 @@ public class AzureBoardsIntegrationAction extends UserAction {
             e.printStackTrace();
             addActionError("Error creating Azure Boards work item: " + e.getMessage());
             return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Helper class to hold enriched threat policy information
+     */
+    private static class ThreatPolicyInfo {
+        String title;
+        String description;
+        
+        ThreatPolicyInfo(String title, String description) {
+            this.title = title;
+            this.description = description;
+        }
+    }
+
+    /**
+     * Enriches title and description with threat policy information
+     */
+    private ThreatPolicyInfo enrichWithThreatPolicyInfo(String templateId, String originalTitle, String originalDescription, String endpoint) {
+        try {
+            YamlTemplate threatPolicyTemplate = FilterYamlTemplateDao.instance.findOne(
+                Filters.eq(Constants.ID, templateId)
+            );
+            
+            if (threatPolicyTemplate == null || threatPolicyTemplate.getContent() == null) {
+                return new ThreatPolicyInfo(originalTitle, originalDescription);
+            }
+            
+            FilterConfig filterConfig = FilterConfigYamlParser.parseTemplate(
+                threatPolicyTemplate.getContent(), false
+            );
+            
+            if (filterConfig == null || filterConfig.getInfo() == null) {
+                return new ThreatPolicyInfo(originalTitle, originalDescription);
+            }
+            
+            Info policyInfo = filterConfig.getInfo();
+            String enrichedTitle = originalTitle;
+            String enrichedDescription = originalDescription;
+            
+            // Format title as "Policy Name - Endpoint"
+            if (policyInfo.getName() != null && !policyInfo.getName().isEmpty()) {
+                if (endpoint != null && !endpoint.isEmpty()) {
+                    enrichedTitle = policyInfo.getName() + " - " + endpoint;
+                } else {
+                    enrichedTitle = policyInfo.getName();
+                }
+            }
+            
+            // Build description: append Description, Details, Impact from threat policy
+            StringBuilder descriptionBuilder = new StringBuilder();
+            if (originalDescription != null && !originalDescription.isEmpty()) {
+                descriptionBuilder.append(originalDescription).append("\n\n");
+            }
+            
+            if (policyInfo.getDescription() != null && !policyInfo.getDescription().isEmpty()) {
+                descriptionBuilder.append("Description:\n").append(policyInfo.getDescription()).append("\n\n");
+            }
+            
+            if (policyInfo.getDetails() != null && !policyInfo.getDetails().isEmpty()) {
+                descriptionBuilder.append("Details:\n").append(policyInfo.getDetails()).append("\n\n");
+            }
+            
+            if (policyInfo.getImpact() != null && !policyInfo.getImpact().isEmpty()) {
+                descriptionBuilder.append("Impact:\n").append(policyInfo.getImpact());
+            }
+            
+            if (descriptionBuilder.length() > 0) {
+                enrichedDescription = descriptionBuilder.toString();
+            }
+            
+            logger.infoAndAddToDb("Using threat policy info for work item: " + templateId, LoggerMaker.LogDb.DASHBOARD);
+            return new ThreatPolicyInfo(enrichedTitle, enrichedDescription);
+            
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Error fetching threat policy template: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            return new ThreatPolicyInfo(originalTitle, originalDescription);
+        }
+    }
+
+    /**
+     * Adds title field to the request payload
+     */
+    private void addTitleField(BasicDBList reqPayload, String title) {
+        BasicDBObject titleDBObject = new BasicDBObject();
+        titleDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
+        titleDBObject.put("path", "/fields/System.Title");
+        titleDBObject.put("value", title);
+        reqPayload.add(titleDBObject);
+    }
+
+    /**
+     * Adds description field to the request payload with HTML formatting
+     */
+    private void addDescriptionField(BasicDBList reqPayload, String description) {
+        String formattedDescription = description != null ? description.replace("\n", "<br>") : "";
+        BasicDBObject descriptionDBObject = new BasicDBObject();
+        descriptionDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
+        descriptionDBObject.put("path", "/fields/System.Description");
+        descriptionDBObject.put("value", formattedDescription);
+        reqPayload.add(descriptionDBObject);
+    }
+
+    /**
+     * Adds attachment to the request payload if attachment URL is provided
+     */
+    private void addAttachment(BasicDBList reqPayload, String attachmentUrl) {
+        if (attachmentUrl != null && !attachmentUrl.isEmpty()) {
+            BasicDBObject attachmentsDBObject = new BasicDBObject();
+            attachmentsDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
+            attachmentsDBObject.put("path", "/relations/-");
+            BasicDBObject valueDBObject = new BasicDBObject();
+            valueDBObject.put("rel", "AttachedFile");
+            valueDBObject.put("url", attachmentUrl);
+            valueDBObject.put("attributes", new BasicDBObject().put("comment", "Request and Response sample data."));
+            attachmentsDBObject.put("value", valueDBObject);
+            reqPayload.add(attachmentsDBObject);
+            logger.infoAndAddToDb("Added attachment to payload with URL: " + attachmentUrl, LoggerMaker.LogDb.DASHBOARD);
+        } else {
+            logger.infoAndAddToDb("No attachment URL provided, skipping attachment", LoggerMaker.LogDb.DASHBOARD);
+        }
+    }
+
+    /**
+     * Adds custom fields to the request payload
+     */
+    private void addCustomFields(BasicDBList reqPayload, List<BasicDBObject> customFields) {
+        if (customFields == null) {
+            return;
+        }
+        
+        for (BasicDBObject field : customFields) {
+            try {
+                String fieldReferenceName = field.getString("referenceName");
+                String fieldValue = field.getString("value");
+                String fieldType = field.getString("type");
+
+                BasicDBObject customFieldDBObject = new BasicDBObject();
+                customFieldDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
+                customFieldDBObject.put("path", "/fields/" + fieldReferenceName);
+
+                switch (fieldType) {
+                    case "integer":
+                        customFieldDBObject.put("value", Integer.parseInt(fieldValue));
+                        break;
+                    case "double":
+                        customFieldDBObject.put("value", Double.parseDouble(fieldValue));
+                        break;
+                    case "boolean":
+                        customFieldDBObject.put("value", Boolean.parseBoolean(fieldValue));
+                        break;
+                    default:
+                        customFieldDBObject.put("value", fieldValue);
+                }
+
+                reqPayload.add(customFieldDBObject);
+            } catch (Exception e) {
+                logger.errorAndAddToDb("Error processing custom field: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            }
+        }
+    }
+
+    /**
+     * Creates and sends work item request, returns work item URL or null on error
+     */
+    private String createAndSendWorkItemRequest(AzureBoardsIntegration azureBoardsIntegration, String projectName, String workItemType, BasicDBList reqPayload) {
+        String url = azureBoardsIntegration.getBaseUrl() + "/" + azureBoardsIntegration.getOrganization() + "/" + projectName + "/_apis/wit/workitems/$" + workItemType + "?api-version=" + version;
+        logger.infoAndAddToDb("Azure board final url: " + url, LoggerMaker.LogDb.DASHBOARD);
+
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("Authorization", Collections.singletonList("Basic " + azureBoardsIntegration.getPersonalAuthToken()));
+        headers.put("content-type", Collections.singletonList("application/json-patch+json"));
+        
+        OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", reqPayload.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+            logger.infoAndAddToDb("Status and Response from Azure Boards work item API: " + response.getStatusCode() + " | " + response.getBody());
+            
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() > 201 || responsePayload == null) {
+                return null;
+            }
+
+            try {
+                BasicDBObject respPayloadObj = BasicDBObject.parse(responsePayload);
+                try {
+                    Object linksObj = respPayloadObj.get("_links");
+                    BasicDBObject links = BasicDBObject.parse(linksObj.toString());
+                    Object htmlObj = links.get("html");
+                    BasicDBObject html = BasicDBObject.parse(htmlObj.toString());
+                    Object href = html.get("href");
+                    return href.toString();
+                } catch (Exception e) {
+                    Object urlObj = respPayloadObj.get("url");
+                    return urlObj != null ? urlObj.toString() : null;
+                }
+            } catch (Exception e) {
+                logger.errorAndAddToDb("Error parsing work item response: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+                return null;
+            }
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Error sending work item request: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            return null;
         }
     }
 
@@ -785,4 +802,13 @@ public class AzureBoardsIntegrationAction extends UserAction {
     public void setEndpoint(String endpoint) {
         this.endpoint = endpoint;
     }
+
+    public String getOriginalMessage() {
+        return originalMessage;
+    }
+
+    public void setOriginalMessage(String originalMessage) {
+        this.originalMessage = originalMessage;
+    }
+
 }

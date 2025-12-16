@@ -670,14 +670,27 @@ public class Utils {
     }
 
     public static File createRequestFile(String originalMessage, String message) {
-        if (originalMessage == null || message == null) {
+        return createRequestFile(originalMessage, message, false);
+    }
+
+    public static File createRequestFile(String originalMessage, String message, boolean isThreatActivity) {
+        if (originalMessage == null) {
             return null;
         }
         try {
+            // If explicitly marked as threat activity, use threat activity format
+            if (isThreatActivity) {
+                LoggerMaker logger = new LoggerMaker(Utils.class, LogDb.DASHBOARD);
+                logger.infoAndAddToDb("Creating request file for threat activity", LogDb.DASHBOARD);
+                return createThreatActivityRequestFile(originalMessage);
+            }
+            
+            // Original format for testing scenarios - requires both parameters with different structures
+            
             String origCurl = CurlUtils.getCurl(originalMessage);
             String testCurl = CurlUtils.getCurl(message);
 
-            HttpResponseParams origObj = HttpCallParser.parseKafkaMessage(originalMessage);
+            HttpResponseParams origObjParsed = HttpCallParser.parseKafkaMessage(originalMessage);
             BasicDBObject testRespObj = BasicDBObject.parse(message);
             BasicDBObject testPayloadObj = BasicDBObject.parse(testRespObj.getString("response"));
             String testResp = testPayloadObj.getString("body");
@@ -687,7 +700,7 @@ public class Utils {
             FileUtils.writeStringToFile(tmpOutputFile, "Original Curl ----- \n\n", (String) null);
             FileUtils.writeStringToFile(tmpOutputFile, origCurl + "\n\n", (String) null, true);
             FileUtils.writeStringToFile(tmpOutputFile, "Original Api Response ----- \n\n", (String) null, true);
-            FileUtils.writeStringToFile(tmpOutputFile, origObj.getPayload() + "\n\n", (String) null, true);
+            FileUtils.writeStringToFile(tmpOutputFile, origObjParsed.getPayload() + "\n\n", (String) null, true);
 
             FileUtils.writeStringToFile(tmpOutputFile, "Test Curl ----- \n\n", (String) null, true);
             FileUtils.writeStringToFile(tmpOutputFile, testCurl + "\n\n", (String) null, true);
@@ -698,6 +711,107 @@ public class Utils {
         } catch (Exception e) {
             e.printStackTrace();
             return null;
+        }
+    }
+
+    /**
+     * Creates a request file for threat activity data format
+     * Uses parseKafkaMessage to parse the orig field which contains the same format as Kafka messages
+     */
+    private static File createThreatActivityRequestFile(String origJson) {
+        LoggerMaker logger = new LoggerMaker(Utils.class, LogDb.DASHBOARD);
+        try {
+            logger.infoAndAddToDb("Creating threat activity request file from orig data", LogDb.DASHBOARD);
+            
+            // Parse using parseKafkaMessage since threat activity format matches Kafka message format
+            HttpResponseParams responseParams = HttpCallParser.parseKafkaMessage(origJson);
+            HttpRequestParams requestParams = responseParams.getRequestParams();
+            
+            File tmpOutputFile = File.createTempFile("threat_activity", ".txt");
+            
+            // Write Request section
+            FileUtils.writeStringToFile(tmpOutputFile, "Request ----- \n\n", (String) null);
+            
+            // Write request line: METHOD PATH HTTP/1.1
+            String method = requestParams.getMethod() != null ? requestParams.getMethod() : "GET";
+            String path = requestParams.getURL() != null ? requestParams.getURL() : "/";
+            String type = requestParams.type != null ? requestParams.type : "HTTP/1.1";
+            String requestLine = method + " " + path + " " + type;
+            FileUtils.writeStringToFile(tmpOutputFile, requestLine + "\n", (String) null, true);
+            
+            // Write request headers
+            Map<String, List<String>> requestHeaders = requestParams.getHeaders();
+            if (requestHeaders != null) {
+                for (Map.Entry<String, List<String>> header : requestHeaders.entrySet()) {
+                    String headerValue = String.join(", ", header.getValue());
+                    FileUtils.writeStringToFile(tmpOutputFile, header.getKey() + ": " + headerValue + "\n", (String) null, true);
+                }
+            }
+            
+            // Write request body if present
+            String requestPayload = requestParams.getPayload();
+            if (requestPayload != null && !requestPayload.trim().isEmpty()) {
+                FileUtils.writeStringToFile(tmpOutputFile, "\n" + requestPayload + "\n\n", (String) null, true);
+            } else {
+                FileUtils.writeStringToFile(tmpOutputFile, "\n", (String) null, true);
+            }
+            
+            // Write Response section
+            FileUtils.writeStringToFile(tmpOutputFile, "Response ----- \n\n", (String) null, true);
+            
+            // Write status line: HTTP/1.1 STATUS_CODE STATUS_TEXT
+            int statusCode = responseParams.getStatusCode();
+            String statusText = getStatusText(String.valueOf(statusCode));
+            String responseType = responseParams.type != null ? responseParams.type : "HTTP/1.1";
+            FileUtils.writeStringToFile(tmpOutputFile, responseType + " " + statusCode + " " + statusText + "\n", (String) null, true);
+            
+            // Write response headers
+            Map<String, List<String>> responseHeaders = responseParams.getHeaders();
+            if (responseHeaders != null) {
+                for (Map.Entry<String, List<String>> header : responseHeaders.entrySet()) {
+                    String headerValue = String.join(", ", header.getValue());
+                    FileUtils.writeStringToFile(tmpOutputFile, header.getKey() + ": " + headerValue + "\n", (String) null, true);
+                }
+            }
+            
+            // Write response body if present
+            String responsePayload = responseParams.getPayload();
+            if (responsePayload != null && !responsePayload.trim().isEmpty()) {
+                FileUtils.writeStringToFile(tmpOutputFile, "\n" + responsePayload + "\n", (String) null, true);
+            } else {
+                FileUtils.writeStringToFile(tmpOutputFile, "\n", (String) null, true);
+            }
+            
+            logger.infoAndAddToDb("Successfully created threat activity request file: " + tmpOutputFile.getName(), LogDb.DASHBOARD);
+            return tmpOutputFile;
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Error creating threat activity request file: " + e.getMessage(), LogDb.DASHBOARD);
+            e.printStackTrace();
+            return null;
+        }
+    }
+    
+    private static String getStatusText(String statusCode) {
+        if (statusCode == null) return "OK";
+        int code = 200;
+        try {
+            code = Integer.parseInt(statusCode);
+        } catch (NumberFormatException e) {
+            return "OK";
+        }
+        
+        switch (code) {
+            case 200: return "OK";
+            case 201: return "Created";
+            case 204: return "No Content";
+            case 400: return "Bad Request";
+            case 401: return "Unauthorized";
+            case 403: return "Forbidden";
+            case 404: return "Not Found";
+            case 500: return "Internal Server Error";
+            case 502: return "Bad Gateway";
+            case 503: return "Service Unavailable";
+            default: return "OK";
         }
     }
 
