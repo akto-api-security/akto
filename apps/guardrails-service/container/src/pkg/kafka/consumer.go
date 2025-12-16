@@ -181,7 +181,13 @@ func newTLSConfig() (*tls.Config, error) {
 			MinVersion:         tls.VersionTLS12,
 		}, nil
 	}
-
+// sanitize KAFKA_TLS_CA_CERT_PATH to prevent path traversal: keep only the base filename
+if strings.Contains(tlsCACertPath, "..") || strings.Contains(tlsCACertPath, "/") || strings.Contains(tlsCACertPath, `\`) {
+	parts := strings.Split(tlsCACertPath, "/")
+	tlsCACertPath = parts[len(parts)-1]
+	if idx := strings.LastIndex(tlsCACertPath, `\\`); idx != -1 { tlsCACertPath = tlsCACertPath[idx+1:] }
+	tlsCACertPath = "./" + tlsCACertPath
+}
 	caCert, err := os.ReadFile(tlsCACertPath)
 	if err != nil {
 		return nil, err
