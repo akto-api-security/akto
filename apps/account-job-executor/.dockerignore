@@ -1,0 +1,22 @@
+# Maven
+target/
+!target/*.jar
+pom.xml
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# Git
+.git/
+.gitignore
+
+# Logs
+*.log
+
+# Documentation
+README.md
