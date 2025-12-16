@@ -118,6 +118,9 @@ public class CategoryWiseStatsUtils {
             case "Gen AI":
                 contextSource = CONTEXT_SOURCE.GEN_AI;
                 break;
+            case "Endpoint Security":
+                contextSource = CONTEXT_SOURCE.ENDPOINT;
+                break;
             case "API Security":
             default:
                 contextSource = CONTEXT_SOURCE.API;
