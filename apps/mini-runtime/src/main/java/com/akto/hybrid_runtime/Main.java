@@ -580,7 +580,7 @@ public class Main {
                 printL(r.value());
                 if(LOG_DEBUG_RECORDS > 0){
                     LOG_DEBUG_RECORDS--;
-                    loggerMaker.infoAndAddToDb("Kafka record received" + r.value());
+                    loggerMaker.infoAndAddToDb("Kafka record recieved" + r.value());
                 }
                 AllMetrics.instance.setRuntimeKafkaRecordCount(1);
                 AllMetrics.instance.setRuntimeKafkaRecordSize(r.value().length());
@@ -604,7 +604,7 @@ public class Main {
                 
                 httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
                 if (httpResponseParams == null) {
-                    loggerMaker.error("HttpResponse params was skipped due to invalid json requestBody");
+                    loggerMaker.error("httpresponse params was skipped due to invalid json requestBody");
                     continue;
                 }
 
@@ -768,6 +768,8 @@ public class Main {
         }
     }
 
+
+
     private static AccountInfo refreshAccountInfo(Map<Integer, AccountInfo> accountInfoMap, int accountIdInt) {
         AccountInfo accountInfo = accountInfoMap.computeIfAbsent(accountIdInt, k -> new AccountInfo());
 
@@ -824,8 +826,8 @@ public class Main {
                 accWiseResponse = accWiseResponseFiltered;
             }
 
-            Map<String, Map<Pattern, String>> apiCollectionNameMapper = accountSettings.convertApiCollectionNameMapperToRegex();
-            changeTargetCollection(apiCollectionNameMapper, accWiseResponse);
+            Map<String, Map<Pattern, String>> apiCollectioNameMapper = accountSettings.convertApiCollectionNameMapperToRegex();
+            changeTargetCollection(apiCollectioNameMapper, accWiseResponse);
         }
 
         return accWiseResponse;
