@@ -729,7 +729,7 @@ public class Main {
 
                 // Save raw agent traffic logs to MongoDB for future training (boolean feature flag)
                 try {
-                    Organization organization = OrgUtils.getOrganizationCached(accountIdInt);
+                    Organization organization = OrgUtils.getOrganizationCached(DataActor.actualAccountId);
                     if (organization != null && organization.getFeatureWiseAllowed() != null) {
                         FeatureAccess featureAccess = organization.getFeatureWiseAllowed().get("AGENT_TRAFFIC_LOGS");
                         if (featureAccess != null && featureAccess.getIsGranted()) {
