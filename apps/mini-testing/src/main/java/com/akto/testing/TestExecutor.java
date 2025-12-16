@@ -477,7 +477,7 @@ public class TestExecutor {
                     Thread.sleep(20000); // wait for 20 seconds to ensure all messages are sent
 
                     int unsentRecords = throttleNumber.get();
-                    loggerMaker.infoAndAddToDb("Finished inserting records in kafka, Total records: " + totalRecords.get() + " Unsent records: " + unsentRecords);
+                    loggerMaker.insertImportantTestingLog("Finished inserting records in kafka, Total records: " + totalRecords.get() + " Unsent records: " + unsentRecords);
 
                     // Add detailed logging for unsent records analysis
                     if (unsentRecords == totalRecords.get()) {
@@ -944,10 +944,13 @@ public class TestExecutor {
                 Producer.pushMessagesToKafka(Arrays.asList(singleTestPayload), totalRecords, throttleNumber);
             } catch (Exception e) {
                 loggerMaker.insertImportantTestingLog("Kafka push failed. Error: " + e.getMessage());
+                executeLegacyTesting(apiInfoKey, summaryId, messages, testConfig, testLogs, isApiInfoTested);
+                throttleNumber.decrementAndGet();
             }
         }else{ 
             // Use legacy testing approach (either IS_NEW_TESTING_ENABLED is false OR kafkaFallbackMode is true)
             executeLegacyTesting(apiInfoKey, summaryId, messages, testConfig, testLogs, isApiInfoTested);
+            throttleNumber.decrementAndGet();
         }
         totalTestsCount.decrementAndGet();
         return null;
