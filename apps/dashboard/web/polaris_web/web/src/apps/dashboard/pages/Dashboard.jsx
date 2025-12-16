@@ -6,6 +6,7 @@ import { useEffect, useState, useRef} from "react";
 import { Frame, Toast, VerticalStack, Banner, Button, Text } from "@shopify/polaris";
 import "./dashboard.css"
 import func from "@/util/func"
+import values from "@/util/values";
 import transform from "./testing/transform";
 import PersistStore from "../../main/PersistStore";
 import LocalStore, { localStorePersistSync } from "../../main/LocalStorageStore";
@@ -178,7 +179,7 @@ function Dashboard() {
     }
 
     const refreshFunc = () => {
-        if (window.USER_NAME.includes("akto.io")){
+        if (values.DISABLED_AUTO_ACCOUNT_REFRESH.includes(window.ACTIVE_ACCOUNT)){
             return;
         }
         if(document.visibilityState === 'hidden'){

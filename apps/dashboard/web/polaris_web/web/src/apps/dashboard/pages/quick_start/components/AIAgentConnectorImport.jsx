@@ -21,9 +21,6 @@ const AIAgentConnectorImport = ({
         fields.reduce((acc, field) => ({ ...acc, [field.name]: '' }), {})
     );
 
-    const goToDocs = () => {
-        window.open(docsUrl);
-    };
 
     const validateForm = () => {
         for (const field of fields) {
@@ -77,6 +74,10 @@ const AIAgentConnectorImport = ({
 
     const isFormValid = () => {
         return fields.every(field => formData[field.name]?.length > 0);
+    };
+
+    const goToDocs = () => {
+        window.open(docsUrl);
     };
 
     const updateField = (fieldName, value) => {
