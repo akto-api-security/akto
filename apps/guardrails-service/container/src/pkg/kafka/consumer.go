@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"os/signal"
 	"regexp"
@@ -255,11 +256,21 @@ func (c *Consumer) Start(ctx context.Context) error {
 			readCancel()
 
 			if err != nil {
+				// Check if parent context was cancelled first
+				if ctx.Err() != nil {
+					return nil
+				}
+				// Timeout is expected when no messages available, continue silently
 				if errors.Is(err, context.DeadlineExceeded) {
 					// Timeout is expected when no messages available, continue silently
 					continue
 				}
 				if errors.Is(err, context.Canceled) {
+					// Context was cancelled, exit gracefully
+					return nil
+				}
+				// kafka-go returns io.EOF when reader is closed or partition is exhausted
+				if errors.Is(err, io.EOF) {
 					return nil
 				}
 				c.logger.Error("Failed to read message from Kafka", zap.Error(err))

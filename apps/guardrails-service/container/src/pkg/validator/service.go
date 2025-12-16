@@ -79,6 +79,7 @@ func (s *Service) getCachedPolicies() ([]types.Policy, map[string]*types.AuditPo
 		auditPolicies := s.cache.auditPolicies
 		compiledRules := s.cache.compiledRules
 		hasAuditRules := s.cache.hasAuditRules
+		// RUnlock so that multiple goroutines can read the cached policies
 		s.cache.mu.RUnlock()
 		s.logger.Debug("Using cached policies",
 			zap.Time("lastFetched", s.cache.lastFetched),
