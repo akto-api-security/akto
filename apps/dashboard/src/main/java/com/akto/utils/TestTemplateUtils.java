@@ -127,10 +127,11 @@ public class TestTemplateUtils {
 
             case GEN_AI:
                 return llmCategories;
-            
+
             case AGENTIC:
+            case ENDPOINT:
                 return allCategories;
-            
+
             // for DAST and API security
             case DAST:
             case API:
