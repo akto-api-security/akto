@@ -1,5 +1,5 @@
-# Use Eclipse Temurin JRE 8 (Debian-based)
-FROM eclipse-temurin:8-jre
+# Use Amazon Corretto JRE 8
+FROM amazoncorretto:8
 
 WORKDIR /app
 

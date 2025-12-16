@@ -22,8 +22,5 @@ echo "=========================================="
 
 # Run the JAR
 exec java \
-    -Xms512m \
-    -Xmx1024m \
-    -XX:+UseG1GC \
-    -XX:MaxGCPauseMillis=200 \
+    -XX:+ExitOnOutOfMemoryError \
     -jar /app/account-job-executor.jar
