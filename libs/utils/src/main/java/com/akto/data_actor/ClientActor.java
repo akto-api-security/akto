@@ -98,8 +98,20 @@ public class ClientActor extends DataActor {
     private static final CodecRegistry codecRegistry = DaoInit.createCodecRegistry();
     public static final String CYBORG_URL = "https://cyborg.akto.io";
     private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
-    private static final int maxConcurrentLogWrites = 50;
+    private static final int maxConcurrentLogWrites = getMaxConcurrentLogWrites();
     final private static ExecutorService logThreadPool = Executors.newFixedThreadPool(maxConcurrentLogWrites);
+
+    private static int getMaxConcurrentLogWrites() {
+        String envValue = System.getenv("MAX_CONCURRENT_LOG_WRITES");
+        if (envValue != null) {
+            try {
+                return Integer.parseInt(envValue);
+            } catch (NumberFormatException e) {
+                // fall through to default
+            }
+        }
+        return 50;
+    }
         
     /**
      * Dedicated thread pool for agent traffic log HTTP writes.
