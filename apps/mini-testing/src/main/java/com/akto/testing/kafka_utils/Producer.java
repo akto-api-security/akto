@@ -41,17 +41,12 @@ public class Producer {
             String messageString = singleTestPayload.toString();
             try {
                 int waitStart = Context.now();
-                if (throttleNumber.get() > 10000) {
-                    loggerMaker.infoAndAddToDb("Throttling: Waiting due to high throttleNumber: " + throttleNumber.get());
-                }
                 while (throttleNumber.get() > 10000 && (Context.now() - waitStart) < Constants.MAX_WAIT_FOR_SLEEP) {
-                    Thread.sleep(1000);
-                }
-                if (throttleNumber.get() > 10000) {
-                    loggerMaker.infoAndAddToDb("Throttling timeout reached. Still have high throttleNumber: " + throttleNumber.get() + ". Proceeding anyway.");
+                    loggerMaker.insertImportantTestingLog("Total records: " + totalRecords.get() + " Throttle number: " + throttleNumber.get());
+                    Thread.sleep(1500);
                 }
             } catch (Exception e) {
-                loggerMaker.infoAndAddToDb("Error during throttling wait: " + e.getMessage());
+                loggerMaker.insertImportantTestingLog("Error during throttling wait: " + e.getMessage());
                 e.printStackTrace();
             }
             totalRecords.incrementAndGet();
