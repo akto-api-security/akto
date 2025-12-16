@@ -28,24 +28,13 @@ public class AccountJobDao extends AccountsContextDao<AccountJob> {
         String dbName = Context.accountId.get() + "";
         createCollectionIfAbsent(dbName, getCollName(), new CreateCollectionOptions());
 
-        // Index 1: Filter by job type, sort by creation date
-        String[] fieldNames = {AccountJob.JOB_TYPE, AccountJob.CREATED_AT};
+        // Index 1: Critical for job polling - covers both SCHEDULED and stale RUNNING jobs
+        // Query: {jobStatus: {$in: [SCHEDULED, RUNNING]}, scheduledAt/heartbeatAt: {$lt: now}}
+        String[] fieldNames = {AccountJob.JOB_STATUS, AccountJob.SCHEDULED_AT, AccountJob.HEARTBEAT_AT};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
-        // Index 2: Filter by job type and sub-type, sort by creation date
-        fieldNames = new String[]{AccountJob.JOB_TYPE, AccountJob.SUB_TYPE, AccountJob.CREATED_AT};
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
-
-        // Index 3: For job polling - filter by status, sort by scheduledAt
-        fieldNames = new String[]{AccountJob.JOB_STATUS, AccountJob.SCHEDULED_AT};
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
-
-        // Index 4: For heartbeat monitoring - filter by status and heartbeatAt
-        fieldNames = new String[]{AccountJob.JOB_STATUS, AccountJob.HEARTBEAT_AT};
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
-
-        // Index 5: For account-specific queries - filter by accountId and status
-        fieldNames = new String[]{AccountJob.ACCOUNT_ID, AccountJob.JOB_STATUS};
+        // Index 2: For querying jobs by type and subtype (useful for dashboard/admin queries)
+        fieldNames = new String[]{AccountJob.JOB_TYPE, AccountJob.SUB_TYPE, AccountJob.JOB_STATUS};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
 }
