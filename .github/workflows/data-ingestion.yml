@@ -67,7 +67,7 @@ jobs:
         env:
           ECR_REGISTRY: aktosecurity
           ECR_REPOSITORY: akto-api-security
-          IMAGE_TAG_DATA_INGESTION: latest
+          IMAGE_TAG_DATA_INGESTION: latest_testing
           IMAGE_TAG_DATA_INGESTION_2: ${{github.event.inputs.release_version_data_ingestion}}
         run: |
           docker buildx create --use
