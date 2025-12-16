@@ -357,21 +357,12 @@ const customAIObj = {
 const awsBedrockObj = {
     icon: '/public/aws_bedrock.svg',
     label: "AWS Bedrock",
-    text: "Import AWS Bedrock AI agents seamlessly into AKTO.",
-    docsUrl: 'https://docs.akto.io/ai-agent-security',
+    text: "Import your AWS Bedrock AI agents, seamlessly into AKTO.",
+    docsUrl: 'https://docs.akto.io/aws-bedrock-agents',
     key: "AWS_BEDROCK",
-    component : <AiAgentScan
-        description="Import your AWS Bedrock AI agents, seamlessly in AKTO."
-        defaultRequestBody={{
-            "modelId": "anthropic.claude-v2",
-            "contentType": "application/json",
-            "accept": "application/json",
-            "body": {
-                "prompt": "\n\nHuman: Why is the sky blue?\n\nAssistant:",
-                "max_tokens_to_sample": 300
-            }
-        }}
-        docsLink='https://docs.akto.io/ai-agent-security'
+    component : <BannerComponent 
+        content="Import your AWS Bedrock AI agents, seamlessly in AKTO."
+        docsUrl='https://docs.akto.io/aws-bedrock-agents'
     />
 }
 
@@ -1528,7 +1519,8 @@ const quickStartFunc = {
         ]
 
         const aiAgentConnectors = [
-            awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj, n8nImportObj
+            awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
+            n8nImportObj, langchainImportObj, copilotStudioImportObj
         ]
 
         // MCP Scan
@@ -1617,7 +1609,8 @@ const quickStartFunc = {
         if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj,
-                awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj
+                awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
+                n8nImportObj, langchainImportObj, copilotStudioImportObj
             ])
         }
 
