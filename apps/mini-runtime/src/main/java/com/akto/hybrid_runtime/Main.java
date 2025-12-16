@@ -12,6 +12,9 @@ import com.akto.dao.*;
 import com.akto.dao.AgentTrafficLogDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
+import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.billing.Organization;
+import com.akto.usage.OrgUtils;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.kafka.Kafka;
@@ -724,9 +727,15 @@ public class Main {
                 parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI, accountInfo.accountSettings);
                 loggerMaker.infoAndAddToDb("Sync function completed for account: " + accountId);
 
-                // Save raw agent traffic logs to MongoDB for future training
+                // Save raw agent traffic logs to MongoDB for future training (boolean feature flag)
                 try {
-                    saveAgentTrafficLogs(accWiseResponse);
+                    Organization organization = OrgUtils.getOrganizationCached(DataActor.actualAccountId);
+                    if (organization != null && organization.getFeatureWiseAllowed() != null) {
+                        FeatureAccess featureAccess = organization.getFeatureWiseAllowed().get("AGENT_TRAFFIC_LOGS");
+                        if (featureAccess != null && featureAccess.getIsGranted()) {
+                            saveAgentTrafficLogs(accWiseResponse);
+                        }
+                    }
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Error saving agent traffic logs: " + e.getMessage());
                 }
@@ -1007,7 +1016,7 @@ public class Main {
             // Use DataActor to save to MongoDB via cyborg
             if (!trafficLogs.isEmpty()) {
                 List<Object> writesForAgentTrafficLogs = new ArrayList<>(trafficLogs);
-                //dataActor.bulkWriteAgentTrafficLogs(writesForAgentTrafficLogs);
+                dataActor.bulkWriteAgentTrafficLogs(writesForAgentTrafficLogs);
                 loggerMaker.infoAndAddToDb("Saved " + trafficLogs.size() + " agent traffic logs to MongoDB");
             }
             
