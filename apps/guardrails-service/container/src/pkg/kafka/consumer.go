@@ -189,7 +189,13 @@ func newTLSConfig() (*tls.Config, error) {
 			tlsCACertPath = tlsCACertPath[idx+1:]
 		}
 		tlsCACertPath = "./" + tlsCACertPath
-	}
+baseDir := "./"; filename := filepath.Base(tlsCACertPath); resolvedPath := filepath.Join(baseDir, filename)
+if absBase, err := filepath.Abs(baseDir); err == nil {
+    if absResolved, err2 := filepath.Abs(resolvedPath); err2 == nil && !strings.HasPrefix(absResolved, absBase) {
+        return nil, errors.New("tls CA cert path resolves outside base directory")
+    }
+}
+tlsCACertPath = resolvedPath
 	caCert, err := os.ReadFile(tlsCACertPath)
 	if err != nil {
 		return nil, err
