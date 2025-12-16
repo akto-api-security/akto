@@ -16,6 +16,7 @@ export const CATEGORY_GEN_AI = 'Gen AI';
 export const CATEGORY_API_SECURITY = 'API Security';
 export const CATEGORY_AGENTIC_SECURITY = 'Agentic Security';
 export const CATEGORY_DAST = 'DAST';
+export const CATEGORY_ENDPOINT_SECURITY = 'Endpoint Security';
 
 export function getDashboardCategory() {
   try {
@@ -48,4 +49,8 @@ export function isAgenticSecurityCategory() {
 
 export function isDastCategory() {
   return isCategory(CATEGORY_DAST);
+}
+
+export function isEndpointSecurityCategory() {
+  return isCategory(CATEGORY_ENDPOINT_SECURITY);
 }

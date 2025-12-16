@@ -171,7 +171,7 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_dast_progress"
                     }] : []),
-                    ...((dashboardCategory === "MCP Security" || dashboardCategory === "Agentic Security") ? [{
+                    ...((dashboardCategory === "MCP Security" || dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") ? [{
                         label: "Audit Data",
                         onClick: () => {
                             navigate("/dashboard/observe/audit");
@@ -180,7 +180,7 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_audit",
                     }] : []),
-                    ...((dashboardCategory === "MCP Security" || dashboardCategory === "Agentic Security") ? [{
+                    ...(dashboardCategory === "Endpoint Security" ? [{
                         label: "Endpoint Shield",
                         onClick: () => {
                             navigate("/dashboard/observe/endpoint-shield");
@@ -192,7 +192,7 @@ export default function LeftNav() {
                 ],
                 key: "3",
             },
-            {
+            ...(dashboardCategory !== "Endpoint Security" ? [{
                 url: "#",
                 label: (
                     <Text
@@ -255,8 +255,8 @@ export default function LeftNav() {
                     }
                 ],
                 key: "4",
-            },
-            {
+            }] : []),
+            ...(dashboardCategory !== "Endpoint Security" ? [{
                 url: "#",
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
@@ -291,7 +291,7 @@ export default function LeftNav() {
                     },
                 ],
                 key: "5",
-            },
+            }] : []),
             ...(dashboardCategory === "Agentic Security" && func.isDemoAccount() ? [{
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
@@ -307,7 +307,7 @@ export default function LeftNav() {
                 selected: leftNavSelected === "dashboard_prompt_hardening",
                 key: "prompt_hardening",
             }] : []),
-            {
+            ...(dashboardCategory !== "Endpoint Security" ? [{
                 url: "#",
                 label: (
                     <Text
@@ -333,7 +333,7 @@ export default function LeftNav() {
                 selected: leftNavSelected.includes("_reports"),
                 subNavigationItems: reportsSubNavigationItems,
                 key: "6",
-            },
+            }] : []),
             ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted && dashboardCategory !== CATEGORY_DAST  ?  [{
                     label: (
                         <Text variant="bodyMd" fontWeight="medium">
@@ -388,7 +388,7 @@ export default function LeftNav() {
                             selected:
                                 leftNavSelected === "dashboard_threat_api",
                         },
-                        ...(dashboardCategory === "Agentic Security" ? [{
+                        ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") ? [{
                             label: "Guardrail Policies",
                             onClick: () => {
                                 navigate("/dashboard/guardrails/policies");

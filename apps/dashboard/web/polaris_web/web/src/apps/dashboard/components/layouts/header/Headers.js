@@ -74,6 +74,7 @@ useEffect(() => {
     const mcpSecurityGranted =
         stiggFeatures?.MCP_SECURITY?.isGranted || true;
     const dastGranted = func.checkForFeatureSaas("AKTO_DAST")
+    const endpointSecurityGranted = stiggFeatures?.ENDPOINT_SECURITY?.isGranted || true
 
     const disabledDashboardCategories = useMemo(() => {
         const disabled = [];
@@ -86,8 +87,11 @@ useEffect(() => {
         if (dastGranted === false) {
             disabled.push("DAST")
         }
+        if (endpointSecurityGranted === false) {
+            disabled.push("Endpoint Security")
+        }
         return disabled;
-    }, [mcpSecurityGranted, agenticSecurityGranted]);
+    }, [mcpSecurityGranted, agenticSecurityGranted, dastGranted, endpointSecurityGranted]);
 
     const dropdownInitial = disabledDashboardCategories.includes(dashboardCategory)
         ? "API Security"
@@ -303,6 +307,7 @@ useEffect(() => {
                                         { value: "API Security", label: "API Security", id: "api-security" },
                                         { value: "Agentic Security", label: "Agentic Security", id: "agentic-security" },
                                         { value: "DAST", label: "DAST", id: "dast" },
+                                        { value: "Endpoint Security", label: "Endpoint Security", id: "endpoint-security" },
                                     ]}
                                     initial={dropdownInitial}
                                     selected={(val) => handleDashboardChange(val)}
