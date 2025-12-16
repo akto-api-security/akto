@@ -98,20 +98,6 @@ public class ClientActor extends DataActor {
     private static final CodecRegistry codecRegistry = DaoInit.createCodecRegistry();
     public static final String CYBORG_URL = "https://cyborg.akto.io";
     private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
-    private static final int maxConcurrentLogWrites = getMaxConcurrentLogWrites();
-    final private static ExecutorService logThreadPool = Executors.newFixedThreadPool(maxConcurrentLogWrites);
-
-    private static int getMaxConcurrentLogWrites() {
-        String envValue = System.getenv("MAX_CONCURRENT_LOG_WRITES");
-        if (envValue != null) {
-            try {
-                return Integer.parseInt(envValue);
-            } catch (NumberFormatException e) {
-                // fall through to default
-            }
-        }
-        return 50;
-    }
         
     /**
      * Dedicated thread pool for agent traffic log HTTP writes.
@@ -1271,37 +1257,44 @@ public class ClientActor extends DataActor {
         }
     }
 
-    private void insertLogAsync(Log log, String endpoint) {
-        logThreadPool.submit(() -> {
-            try {
-                Map<String, List<String>> headers = buildHeaders();
-                BasicDBObject obj = new BasicDBObject();
-                    BasicDBObject logObj = new BasicDBObject();
-                    logObj.put("key", log.getKey());
-                    logObj.put("log", log.getLog());
-                    logObj.put("timestamp", log.getTimestamp());
-                    obj.put("log", logObj);
-                OriginalHttpRequest request = new OriginalHttpRequest(url + endpoint, "", "POST", obj.toString(), headers, "");
-                OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
-                if (response.getStatusCode() != 200 || response.getBody() == null) {
-                    loggerMaker.info("non 2xx response in " + endpoint);
-                }
-            } catch (Exception e) {
-                loggerMaker.error("error in " + endpoint + ": " + e);
-            }
-        });
-    }
-
     public void insertRuntimeLog(Log log) {
-        insertLogAsync(log, "/insertRuntimeLog");
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        BasicDBObject logObj = new BasicDBObject();
+        logObj.put("key", log.getKey());
+        logObj.put("log", log.getLog());
+        logObj.put("timestamp", log.getTimestamp());
+        obj.put("log", logObj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertRuntimeLog", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.info("non 2xx response in insertRuntimeLog");
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.error("error in insertRuntimeLog" + e);
+            return;
+        }
     }
 
     public void insertAnalyserLog(Log log) {
-        insertLogAsync(log, "/insertAnalyserLog");
-    }
-
-    public void insertTestingLog(Log log) {
-        insertLogAsync(log, "/insertTestingLog");
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("log", log);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertAnalyserLog", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in insertAnalyserLog", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in insertAnalyserLog" + e, LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
     }
 
     public void modifyHybridSaasSetting(boolean isHybridSaas) {
@@ -3316,6 +3309,28 @@ public class ClientActor extends DataActor {
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in modifyTestingSetting" + e, LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+    }
+
+    public void insertTestingLog(Log log) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        BasicDBObject logObj = new BasicDBObject();
+        logObj.put("key", log.getKey());
+        logObj.put("log", log.getLog());
+        logObj.put("timestamp", log.getTimestamp());
+        obj.put("log", logObj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertTestingLog", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.info("non 2xx response in insertTestingLog");
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.error("error in insertTestingLog" + e);
             return;
         }
     }
