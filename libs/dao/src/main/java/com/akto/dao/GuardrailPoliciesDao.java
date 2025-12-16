@@ -2,10 +2,11 @@ package com.akto.dao;
 
 import com.akto.dto.GuardrailPolicies;
 import com.akto.dao.context.Context;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import org.bson.conversions.Bson;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class GuardrailPoliciesDao extends AccountsContextDao<GuardrailPolicies> {
@@ -49,12 +50,34 @@ public class GuardrailPoliciesDao extends AccountsContextDao<GuardrailPolicies> 
     }
 
     public List<GuardrailPolicies> findAllSortedByCreatedTimestamp(int skip, int limit) {
+        Bson filter = getContextSourceFilter();
         BasicDBObject sort = new BasicDBObject();
         sort.put("createdTimestamp", -1); // descending order (newest first)
-        return instance.findAll(Filters.empty(), skip, limit, sort);
+        return instance.findAll(filter, skip, limit, sort);
     }
 
     public long getTotalCount() {
-        return this.getMCollection().countDocuments();
+        Bson filter = getContextSourceFilter();
+        return this.getMCollection().countDocuments(filter);
+    }
+
+    private Bson getContextSourceFilter() {
+        // Get current context source, default to ENDPOINT if not set
+        CONTEXT_SOURCE contextSource = Context.contextSource.get();
+        if (contextSource == null) {
+            contextSource = CONTEXT_SOURCE.ENDPOINT;
+        }
+
+        // Build filter: contextSource matches OR contextSource doesn't exist (defaults to ENDPOINT)
+        if (contextSource == CONTEXT_SOURCE.ENDPOINT) {
+            // For ENDPOINT, include records where contextSource is ENDPOINT OR doesn't exist
+            return Filters.or(
+                Filters.eq("contextSource", contextSource),
+                Filters.exists("contextSource", false)
+            );
+        } else {
+            // For other contexts, only include records with exact contextSource match
+            return Filters.eq("contextSource", contextSource);
+        }
     }
 }

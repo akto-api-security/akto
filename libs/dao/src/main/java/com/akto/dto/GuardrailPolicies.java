@@ -6,6 +6,8 @@ import java.util.Map;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+
 import lombok.NoArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
@@ -70,6 +72,9 @@ public class GuardrailPolicies {
     // Step 8: Review and Finish
     private boolean active;
 
+    // Context source - to identify which dashboard created this guardrail
+    private CONTEXT_SOURCE contextSource;
+
     public String getHexId() {
         if (this.id != null) {
             return this.id.toHexString();
@@ -124,7 +129,8 @@ public class GuardrailPolicies {
                            LLMRule llmRule, BasePromptRule basePromptRule,
                            List<String> selectedMcpServers, List<String> selectedAgentServers,
                            List<SelectedServer> selectedMcpServersV2, List<SelectedServer> selectedAgentServersV2,
-                           boolean applyOnResponse, boolean applyOnRequest, String url, double confidenceScore, boolean active) {
+                           boolean applyOnResponse, boolean applyOnRequest, String url, double confidenceScore, boolean active,
+                           CONTEXT_SOURCE contextSource) {
         this.name = name;
         this.description = description;
         this.blockedMessage = blockedMessage;
@@ -151,6 +157,7 @@ public class GuardrailPolicies {
         this.url = url;
         this.confidenceScore = confidenceScore;
         this.active = active;
+        this.contextSource = contextSource;
     }
 
     @Getter
