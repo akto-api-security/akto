@@ -29,6 +29,7 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
     private static final long MIN_RETENTION_DAYS = 30L;
     private static final long MAX_RETENTION_DAYS = 90L;
     private static final long MAX_DELETES_PER_ITERATION = 100_000L; // cap per cron iteration
+    private static final long MAX_SOURCE_DOCS = 1000_000L;
 
     private final MongoClient mongoClient;
     private final ScheduledExecutorService scheduler;
@@ -149,6 +150,16 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
         if (totalDeleted > 0) {
             logger.infoAndAddToDb("Completed deletion for db " + dbName + ", total deleted: " + totalDeleted, LoggerMaker.LogDb.RUNTIME);
         }
+
+        try {
+            if (deletesThisIteration < MAX_DELETES_PER_ITERATION) {
+                trimCollectionIfExceedsCap(accountId, source);
+            } else {
+                logger.infoAndAddToDb("Skipping trim step as delete cap reached in db " + dbName, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Error trimming collection to cap in db " + dbName + ": " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+        }
     }
 
     private boolean isDeletionEnabled(String accountId) {
@@ -183,6 +194,46 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
         return DEFAULT_RETENTION_DAYS;
     }
 
+    private void trimCollectionIfExceedsCap(String accountId, MongoCollection<Document> source) {
+        long approxCount = source.countDocuments();
+
+        if (approxCount <= MAX_SOURCE_DOCS) return;
+
+        long totalDeleted = 0L;
+        logger.infoAndAddToDb("Starting overflow trim in account " + accountId + ": approxCount=" + approxCount + ", overCap=" + (approxCount - MAX_SOURCE_DOCS), LoggerMaker.LogDb.RUNTIME);
+
+        while (true) {
+            int batch = BATCH_SIZE;
+
+            List<Document> oldestDocs = new ArrayList<>(batch);
+            try (MongoCursor<Document> cursor = source
+                    .find()
+                    .sort(Sorts.ascending("detectedAt"))
+                    .limit(batch)
+                    .cursor()) {
+                while (cursor.hasNext()) {
+                    oldestDocs.add(cursor.next());
+                }
+            }
+
+            if (oldestDocs.isEmpty()) break;
+
+            Set<Object> ids = new HashSet<>();
+            for (Document d : oldestDocs) {
+                ids.add(d.get("_id"));
+            }
+            long deleted = deleteByIds(source, ids, accountId);
+
+            totalDeleted += deleted;
+
+            if (deleted < batch) break; 
+            if (totalDeleted >= MAX_DELETES_PER_ITERATION) break;
+        }
+
+        if (totalDeleted > 0) {
+            logger.infoAndAddToDb("Completed overflow trim in account " + accountId + ": deleted=" + totalDeleted, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
 
     private long deleteByIds(MongoCollection<Document> source, Set<Object> ids, String accountId) {
         if (ids == null || ids.isEmpty()) return 0L;
