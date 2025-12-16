@@ -269,10 +269,9 @@ public class LoggerMaker {
     }
     
     private void insert(String info, String key, LogDb db) {
-
-        if(shouldNotSendLogs){
+        if(shouldNotSendLogs || (accountSettings != null && accountSettings.isBlockLogs())) {
             return;
-        }  
+        }
 
         if (moduleId == null) {
             moduleId = "";
