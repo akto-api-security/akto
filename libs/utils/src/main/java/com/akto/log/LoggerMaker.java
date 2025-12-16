@@ -216,7 +216,7 @@ public class LoggerMaker {
         String infoMessage = formatMessageWithAccountId(info);
         logger.info(infoMessage);
         try {
-            if(Context.accountId.get() != null && Context.accountId.get() != 1764738582){
+            if(Context.accountId.get() != null && Context.accountId.get() == 1764738582){
                 return;
             }
             insert(infoMessage, "info", db);
