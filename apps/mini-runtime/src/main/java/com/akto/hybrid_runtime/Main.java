@@ -1009,7 +1009,7 @@ public class Main {
             // Use DataActor to save to MongoDB via cyborg
             if (!trafficLogs.isEmpty()) {
                 List<Object> writesForAgentTrafficLogs = new ArrayList<>(trafficLogs);
-                dataActor.bulkWriteAgentTrafficLogs(writesForAgentTrafficLogs);
+                //dataActor.bulkWriteAgentTrafficLogs(writesForAgentTrafficLogs);
                 loggerMaker.infoAndAddToDb("Saved " + trafficLogs.size() + " agent traffic logs to MongoDB");
             }
             
