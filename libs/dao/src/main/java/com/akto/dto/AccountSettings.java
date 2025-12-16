@@ -107,6 +107,11 @@ public class AccountSettings {
     @Setter
     private boolean allowMergingOnVersions;
 
+    @Getter
+    @Setter
+    private boolean blockLogs;
+    public static final String BLOCK_LOGS = "blockLogs";
+
     public AccountSettings() {
     }
 

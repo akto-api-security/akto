@@ -50,7 +50,6 @@ public class LoggerMaker {
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     protected static final Logger internalLogger = LoggerFactory.getLogger(LoggerMaker.class);
-    private static final boolean shouldNotSendLogs = System.getenv("BLOCK_LOGS") != null && System.getenv("BLOCK_LOGS").equals("true");
 
     private static String moduleId = "";
 
@@ -269,10 +268,9 @@ public class LoggerMaker {
     }
     
     private void insert(String info, String key, LogDb db) {
-
-        if(shouldNotSendLogs){
+        if(accountSettings != null && accountSettings.isBlockLogs()){
             return;
-        }  
+        }
 
         if (moduleId == null) {
             moduleId = "";
