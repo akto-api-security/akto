@@ -17,9 +17,9 @@ function ThreatConfiguration() {
             key={"ratelimitConfig"}
         />,
         <ArchivalConfigComponent
-            title={"Archival Configuration"}
-            description={"Choose how long to retain malicious events before archival."}
-            key={"archivalConfig"}
+            title={"Deletion Configuration"}
+            description={"Choose how long to retain malicious events before deletion."}
+            key={"deletionConfig"}
         />
     ];
 

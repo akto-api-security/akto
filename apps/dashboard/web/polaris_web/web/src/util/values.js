@@ -80,5 +80,6 @@ const ranges = [
 ];
 
 const skipList = ["GENERIC", "TRUE", "FALSE","INTEGER_32", "INTEGER_64", "NULL", "OTHER", "DICT", "FLOAT"]
+const DISABLED_AUTO_ACCOUNT_REFRESH = [1747820267,1731351930,1736798101]
 
-export default { today, yesterday, ranges, yesterdayDayEnd, todayDayEnd , skipList};
+export default { today, yesterday, ranges, yesterdayDayEnd, todayDayEnd , skipList, DISABLED_AUTO_ACCOUNT_REFRESH};
