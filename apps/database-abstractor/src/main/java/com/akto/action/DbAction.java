@@ -3079,79 +3079,15 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    private LogDb logDb;
-    private String logMsg;
-    public String insertLogsInDb() {
-        if (logDb == null) {
-            addActionError("Invalid log collection");
-            return ERROR.toUpperCase();
-        }
-
-        if (logMsg == null || logMsg.isEmpty()) {
-            addActionError("Log message is required");
-            return ERROR.toUpperCase();
-        }
-
+    public String insertPuppeteerLog() {
         try {
-            DataActor dataActor = DataActorFactory.fetchInstance();
-            int timestamp = Context.now();
-            Log log = new Log(logMsg, key, timestamp);
-
-            switch(logDb){
-                case TESTING:
-                    dataActor.insertTestingLog(log);
-                    break;
-                case RUNTIME:
-                    dataActor.insertRuntimeLog(log);
-                    break;
-                case DASHBOARD:
-                    DashboardLogsDao.instance.insertOne(log);
-                    break;
-                case PUPPETEER:
-                    PupeteerLogsDao.instance.insertOne(log);
-                    break;
-                case DATA_INGESTION:
-                    dataActor.insertDataIngestionLog(log);
-                    break;
-                case ANALYSER:
-                    dataActor.insertAnalyserLog(log);
-                    break;
-                case BILLING:
-                    BillingLogsDao.instance.insertOne(log);
-                    break;
-                // Add db for db-abs
-                case THREAT_DETECTION:
-                    dataActor.insertProtectionLog(log);
-                    break;
-                case CYBORG:
-                    dataActor.insertCyborgLog(log);
-                    break;
-                default:
-                    break;
-            }
-
-            return SUCCESS.toUpperCase();
+            Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+            PupeteerLogsDao.instance.insertOne(dbLog);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error inserting log: " + e.getMessage());
-            addActionError("Failed to insert log: " + e.getMessage());
-            return ERROR.toUpperCase();
+            loggerMaker.errorAndAddToDb(e, "Error in insertPuppeteerLog " + e.toString());
+            return Action.ERROR.toUpperCase();
         }
-    }
-
-    public String getLogMsg() {
-        return logMsg;
-    }
-
-    public void setLogMsg(String logMsg) {
-        this.logMsg = logMsg;
-    }
-
-    public LogDb getLogDb() {
-        return logDb;
-    }
-
-    public void setLogDb(LogDb logDb) {
-        this.logDb = logDb;
+        return Action.SUCCESS.toUpperCase();
     }
 
     public List<CustomDataTypeMapper> getCustomDataTypes() {
