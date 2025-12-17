@@ -3,6 +3,7 @@ package com.akto;
 import com.akto.dao.*;
 import com.akto.dao.audit_logs.ApiAuditLogsDao;
 import com.akto.dao.billing.OrganizationsDao;
+import com.akto.dao.jobs.AccountJobDao;
 import com.akto.dao.jobs.JobsDao;
 import com.akto.dao.loaders.LoadersDao;
 import com.akto.dao.metrics.MetricDataDao;
@@ -479,6 +480,7 @@ public class DaoInit {
         PupeteerLogsDao.instance.createIndicesIfAbsent();
         SourceCodeVulnerabilitiesDao.instance.createIndicesIfAbsent();
         JobsDao.instance.createIndicesIfAbsent();
+        AccountJobDao.instance.createIndicesIfAbsent();
         BidirectionalSyncSettingsDao.instance.createIndicesIfAbsent();
         MetricDataDao.instance.createIndicesIfAbsent();
         SensitiveSampleDataDao.instance.createIndicesIfAbsent();

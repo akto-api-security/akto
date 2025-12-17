@@ -1,10 +1,10 @@
 package com.akto.action;
 
 import com.akto.dao.context.Context;
-import com.akto.dto.jobs.AIAgentConnectorSyncJobParams;
-import com.akto.dto.jobs.Job;
-import com.akto.dto.jobs.JobExecutorType;
-import com.akto.jobs.JobScheduler;
+import com.akto.dao.jobs.AccountJobDao;
+import com.akto.dto.jobs.AccountJob;
+import com.akto.dto.jobs.JobStatus;
+import com.akto.dto.jobs.ScheduleType;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.opensymphony.xwork2.Action;
@@ -70,30 +70,37 @@ public class AIAgentConnectorImportAction extends UserAction {
                 ? recurringIntervalSeconds
                 : DEFAULT_RECURRING_INTERVAL_SECONDS;
 
-            // Schedule recurring job using JobScheduler
-            Job job = JobScheduler.scheduleRecurringJob(
-                Context.accountId.get(),
-                new AIAgentConnectorSyncJobParams(
-                    connectorType,
-                    config,
-                    Context.now()
-                ),
-                JobExecutorType.DASHBOARD,
-                interval
+            // Create entry in per-account jobs collection
+            // Convert Map<String, String> config to Map<String, Object> for generic storage
+            Map<String, Object> jobConfig = new HashMap<>(config);
+
+            int now = Context.now();
+            AccountJob accountJob = new AccountJob(
+                Context.accountId.get(),        // accountId
+                "AI_AGENT_CONNECTOR",          // jobType (generic)
+                connectorType,                  // subType (N8N, LANGCHAIN, COPILOT_STUDIO)
+                jobConfig,                      // flexible config map
+                interval,                       // recurringIntervalSeconds
+                now,                            // createdAt
+                now                             // lastUpdatedAt
             );
 
-            if (job == null) {
-                loggerMaker.error("Failed to schedule recurring job for " + connectorType + " connector", LogDb.DASHBOARD);
-                return Action.ERROR.toUpperCase();
-            }
+            // Set execution tracking fields for job scheduler
+            accountJob.setJobStatus(JobStatus.SCHEDULED);
+            accountJob.setScheduleType(ScheduleType.RECURRING);
+            accountJob.setScheduledAt(now);  // Schedule immediately
+            accountJob.setHeartbeatAt(0);
+            accountJob.setStartedAt(0);
+            accountJob.setFinishedAt(0);
 
-            this.jobId = job.getId().toHexString();
-            loggerMaker.info("Successfully scheduled recurring job for " + connectorType + " connector with job ID: " + this.jobId + ", interval: " + interval + "s", LogDb.DASHBOARD);
+            AccountJobDao.instance.insertOne(accountJob);
+            this.jobId = accountJob.getId().toHexString();
+            loggerMaker.info("Successfully created account-level job for " + connectorType + " connector with job ID: " + this.jobId + ", interval: " + interval + "s, status: SCHEDULED", LogDb.DASHBOARD);
 
             return Action.SUCCESS.toUpperCase();
 
         } catch (Exception e) {
-            loggerMaker.error("Error initiating " + connectorType + " import: " + e.getMessage(), LogDb.DASHBOARD);
+            loggerMaker.error("Error creating account-level job for " + connectorType + " connector: " + e.getMessage(), LogDb.DASHBOARD);
             return Action.ERROR.toUpperCase();
         }
     }

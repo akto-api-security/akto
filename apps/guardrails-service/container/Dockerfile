@@ -1,5 +1,9 @@
-# Build stage
-FROM golang:1.24-alpine AS builder
+# Build stage - use native platform for building (avoids QEMU emulation issues)
+FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
+
+# Build arguments for cross-compilation (automatically set by BuildKit)
+ARG TARGETOS
+ARG TARGETARCH
 
 # Install build dependencies
 RUN apk add --no-cache git make
@@ -27,8 +31,8 @@ RUN rm -f /root/.netrc
 # Copy source code from src directory
 COPY src/ .
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o guardrails-service .
+# Build the application with cross-compilation
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -a -installsuffix cgo -ldflags="-w -s" -o guardrails-service .
 
 # Final stage - use distroless for smaller image and better security
 FROM gcr.io/distroless/static-debian11:nonroot

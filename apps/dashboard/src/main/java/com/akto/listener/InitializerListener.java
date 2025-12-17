@@ -2524,11 +2524,6 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    private static void checkMongoConnection() throws Exception {
-        AccountsDao.instance.getStats();
-        connectedToMongo = true;
-    }
-
     public static void setSubdomain(){
         if (System.getenv("AKTO_SUBDOMAIN") != null) {
             subdomain = System.getenv("AKTO_SUBDOMAIN");
