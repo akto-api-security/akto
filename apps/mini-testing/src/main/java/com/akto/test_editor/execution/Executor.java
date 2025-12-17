@@ -178,8 +178,13 @@ public class Executor {
         }
 
         boolean vulnerable = false;
+        boolean requestAttempted = false;
+        boolean allRequestsSkippedDueToMatch = false;
+        int skippedCount = 0;
+
         for (RawApi testReq: testRawApis) {
             if (executorNodes.size() > 0 && testReq.equals(origRawApi)) {
+                skippedCount++;
                 continue;
             }
             if (vulnerable) { //todo: introduce a flag stopAtFirstMatch
@@ -190,6 +195,7 @@ public class Executor {
                 TestResult res = null;
                 if (AgentClient.isRawApiValidForAgenticTest(testReq)) {
                     // execute agentic test here
+                    requestAttempted = true;
                     res = agentClient.executeAgenticTest(testReq, apiInfoKey.getApiCollectionId());
                 }else{
                     List<String> contentType = origRawApi.getRequest().getHeaders().getOrDefault("content-type", new ArrayList<>());
@@ -207,6 +213,7 @@ public class Executor {
                     // Add SSE endpoint header for MCP collections
                     McpSseEndpointHelper.addSseEndpointHeader(testReq.getRequest(), apiInfoKey.getApiCollectionId());
 
+                    requestAttempted = true;
                     testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
                     requestSent = true;
                     ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
@@ -222,14 +229,37 @@ public class Executor {
                 loggerMaker.errorAndAddToDb("Error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
             }
         }
-        
+
+        // Check if all requests were skipped due to matching payload
+        if (skippedCount > 0 && skippedCount == testRawApis.size()) {
+            allRequestsSkippedDueToMatch = true;
+        }
+
         if(result.isEmpty()){
+            String message = rawApi.getOriginalMessage();
             if(requestSent){
+                // Request was sent but failed
                 error_messages.add(TestError.API_REQUEST_FAILED.getMessage());
+            } else if (requestAttempted && !requestSent) {
+                // Request was attempted but failed before sending
+                error_messages.add(TestError.API_REQUEST_FAILED.getMessage());
+            } else if (allRequestsSkippedDueToMatch) {
+                // All requests were skipped because test payload matches original
+                error_messages.add(TestError.NO_REQUEST_ATTEMPTED.getMessage());
+                message = "";
             } else {
-                error_messages.add(TestError.NO_API_REQUEST.getMessage());
+                // No request was attempted (could be due to execution algorithm failure or other reasons)
+                // If error_messages already has specific errors (e.g., from singleReq.getErrMsg()), keep them
+                if (error_messages.isEmpty()) {
+                    error_messages.add(TestError.NO_API_REQUEST.getMessage());
+                }
+                /*
+                 * In case no API requests are created,
+                 * do not store the original message
+                 */
+                message = "";
             }
-            result.add(new TestResult(null, rawApi.getOriginalMessage(), error_messages, 0, false, TestResult.Confidence.HIGH, null));
+            result.add(new TestResult(null, message, error_messages, 0, false, TestResult.Confidence.HIGH, null));
         }
 
         yamlTestResult = new YamlTestResult(result, workflowTest);
