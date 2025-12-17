@@ -412,6 +412,7 @@ public class DaoInit {
         McpReconRequestDao.instance.createIndicesIfAbsent();
         McpReconResultDao.instance.createIndicesIfAbsent();
         LogsEndpointShieldDao.instance.createIndicesIfAbsent();
+        AgentTrafficLogDao.instance.createIndicesIfAbsent();
     }
 
 }
