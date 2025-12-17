@@ -277,8 +277,12 @@ public class ThreatActorService {
             String actorId = doc.getString("_id");
             List<ActivityData> activityDataList = new ArrayList<>();
 
+            // Build activity query with context-aware filtering
+            Document activityQuery = new Document("actor", actorId);
+            activityQuery = ThreatUtils.mergeContextFilter(activityQuery, contextSource, latestAttackList);
+
             try (MongoCursor<MaliciousEventDto> cursor2 = maliciousEventDao.getCollection(accountId)
-                    .find(Filters.eq("actor", actorId))
+                    .find(activityQuery)
                     .sort(Sorts.descending("detectedAt"))
                     .limit(40)
                     .cursor()) {
