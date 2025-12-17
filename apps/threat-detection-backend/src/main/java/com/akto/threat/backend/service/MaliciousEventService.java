@@ -212,10 +212,6 @@ public class MaliciousEventService {
     Map<String, Integer> sort = request.getSortMap();
     ListMaliciousRequestsRequest.Filter filter = request.getFilter();
 
-    if(filter.getLatestAttackList() == null || filter.getLatestAttackList().isEmpty()) {
-      return ListMaliciousRequestsResponse.newBuilder().build();
-    }
-
     Document query = new Document();
     if (!filter.getActorsList().isEmpty()) {
       query.append("actor", new Document("$in", filter.getActorsList()));

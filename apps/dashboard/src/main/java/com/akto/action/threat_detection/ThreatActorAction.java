@@ -44,8 +44,6 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.bson.conversions.Bson;
 
-import static com.akto.action.threat_detection.utils.ThreatsUtils.getTemplates;
-
 public class ThreatActorAction extends AbstractThreatDetectionAction {
 
   List<DashboardThreatActor> actors;
@@ -90,19 +88,18 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_actors_count_per_country", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
+    post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
 
     if(endTs <= 0){
         endTs = Context.now();
     }
     startTs = Math.max(startTs, 0);
 
-    List<String> templatesContext = getTemplates(this.latestAttack);
-
     Map<String, Object> body = new HashMap<String, Object>() {
       {
         put("start_ts", startTs);
         put("end_ts", endTs);
-        put("latestAttack", templatesContext);
+        put("latestAttack", latestAttack);
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -165,10 +162,10 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         new HttpPost(String.format("%s/api/dashboard/list_threat_actors", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
+    post.addHeader("x-context-source", Context.contextSource.get().toString());
     Map<String, Object> filter = new HashMap<>();
 
-    List<String> templates = getTemplates(latestAttack);
-    filter.put("latestAttack", templates);
+    filter.put("latestAttack", latestAttack);
 
     if(this.country != null && !this.country.isEmpty()){
       filter.put("country", this.country);
