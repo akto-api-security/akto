@@ -1,5 +1,0 @@
----
-alwaysApply: true
----
-- Do not repeat code.
-- Do not add libraries which are not being used.
