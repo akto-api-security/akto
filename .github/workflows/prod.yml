@@ -47,6 +47,10 @@ on:
         type: boolean
         default: false
         description: Agent Traffic Analyzer
+      guardrails_service:
+        type: boolean
+        default: false
+        description: Guardrails Service
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -270,6 +274,71 @@ jobs:
           payload: |
             {
               "text": "Agent Traffic Analyzer v${{ github.event.inputs.release_version }} released!"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+  build-guardrails-service:
+    runs-on: ubuntu-22.04
+    if: ${{ github.event.inputs.guardrails_service == 'true' }}
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: DockerHub login
+        env:
+          DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
+          DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
+        run: |
+          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+
+      - name: Build, tag, and push the image to DockerHub
+        id: build-image-dockerhub
+        env:
+          ECR_REGISTRY: aktosecurity
+          IMAGE_VERSION: ${{ github.event.inputs.release_version }}
+        run: |
+          docker buildx create --use
+          cd apps/guardrails-service/container
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/guardrails-service:local -t $ECR_REGISTRY/guardrails-service:$IMAGE_VERSION . --push
+          echo "::set-output name=image::$ECR_REGISTRY/guardrails-service:$IMAGE_VERSION"
+
+      - name: Configure AWS Credentials for ECR
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
+          aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
+          aws-region: us-east-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          mask-password: "true"
+          registry-type: public
+
+      - name: Push git tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          custom_tag: guardrails-service-${{ github.event.inputs.release_version }}
+
+      - name: Create a GitHub release
+        uses: ncipollo/release-action@v1.12.0
+        with:
+          tag: ${{ steps.tag_version.outputs.new_tag }}
+          name: Release ${{ steps.tag_version.outputs.new_tag }}
+          omitBody: true
+
+      - name: Send Github release notification to Slack
+        id: slack
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "Guardrails Service v${{ github.event.inputs.release_version }} released!"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

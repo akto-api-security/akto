@@ -42,9 +42,7 @@ func buildDatabaseAbstractorURL() string {
 		dbAbsHost = "https://cyborg.akto.io"
 	}
 
-	if strings.HasSuffix(dbAbsHost, "/") {
-		dbAbsHost = strings.TrimSuffix(dbAbsHost, "/")
-	}
+	dbAbsHost = strings.TrimSuffix(dbAbsHost, "/")
 
 	return dbAbsHost + "/api"
 }
