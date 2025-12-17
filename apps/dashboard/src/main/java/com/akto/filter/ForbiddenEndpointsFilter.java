@@ -1,9 +1,6 @@
 package com.akto.filter;
 
-import com.akto.listener.InitializerListener;
 import com.akto.util.DashboardMode;
-import io.github.bucket4j.Bucket;
-
 import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -17,15 +14,11 @@ public class ForbiddenEndpointsFilter implements Filter {
     private static final Set<String> forbiddenUrls = new HashSet<>(Arrays.asList(
             "api/fetchAdminSettings",
             "api/checkStackCreationProgress",
-            "api/fetchDataFromWorksheet",
             "api/fetchLoadBalancers",
             "api/fetchLogs",
             "api/fetchLogsFromDb",
             "api/fetchTrafficMetrics",
             "api/fetchTrafficMetricsDesciptions",
-            "api/fetchWorksheetsFromSheet",
-            "api/getDriveNames",
-            "api/getSpreadsheets",
             "api/googleConfig",
             "api/inventory/*/openapi",
             "api/saveLoadBalancers",

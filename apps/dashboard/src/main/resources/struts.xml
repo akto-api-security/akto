@@ -250,81 +250,6 @@
             </result>
         </action>
 
-        <action name="api/getDriveNames" class="com.akto.action.tpi.GoogleAuthAction" method="fetchDriveNames">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS" type="json"/>
-                <param name="root">driveNamesToThirdPartyId</param>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
-            </result>
-        </action>
-
-        <action name="api/getSpreadsheets" class="com.akto.action.tpi.GoogleAuthAction" method="fetchSpreadsheets">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS" type="json"/>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
-            </result>
-        </action>
-
-        <action name="api/fetchWorksheetsFromSheet" class="com.akto.action.tpi.GoogleAuthAction" method="fetchWorksheetsFromSheet">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS" type="json"/>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
-            </result>
-        </action>
-
-        <action name="api/fetchDataFromWorksheet" class="com.akto.action.tpi.GoogleAuthAction" method="fetchDataFromWorksheet">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS" type="json"/>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
-            </result>
-        </action>
-
-
-
         <action name="api/getTeamData" class="com.akto.action.TeamAction" method="fetchTeamData">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -611,7 +536,6 @@
                 <param name="root">code</param>
             </result>
         </action>
-
 
         <action name="signup-github" class="com.akto.action.SignupAction" method="registerViaGithub">
             <interceptor-ref name="json"/>
