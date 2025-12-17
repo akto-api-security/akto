@@ -8,6 +8,7 @@ import com.akto.dto.jobs.Job;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -2223,6 +2224,22 @@ public class DbLayer {
     }
 
     public static void bulkWriteAgentTrafficLogs(List<AgentTrafficLog> agentTrafficLogs) {
+        if (agentTrafficLogs == null || agentTrafficLogs.isEmpty()) {
+            return;
+        }
+        
+        // Convert expireAtEpoch to expiresAt Date before inserting
+        Date defaultExpiry = new Date(System.currentTimeMillis() + (7L * 24 * 60 * 60 * 1000));
+        for (AgentTrafficLog log : agentTrafficLogs) {
+            if (log.getExpiresAtEpoch() != null && log.getExpiresAtEpoch() > 0) {
+                // Convert epoch seconds to Date
+                log.setExpiresAt(new Date(log.getExpiresAtEpoch() * 1000));
+            } else {
+                // Default 7 days expiry
+                log.setExpiresAt(defaultExpiry);
+            }
+        }
+        
         AgentTrafficLogDao.instance.insertMany(agentTrafficLogs);
     }
 }
