@@ -105,6 +105,7 @@ jobs:
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-account-job-executor:$IMAGE_TAG . --push
           cd ../guardrails-service/container
           chmod +x setup-netrc.sh
+          // token expires in 1 year [2026-12-17]
           GITHUB_TOKEN=${{ secrets.AKTO_GITHUB_TOKEN }} ./setup-netrc.sh
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/guardrails-service:$IMAGE_TAG . --push
 
