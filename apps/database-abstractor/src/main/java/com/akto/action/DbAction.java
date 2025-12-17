@@ -6,6 +6,8 @@ import com.akto.dao.test_editor.CommonTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.traffic_collector.TrafficCollectorInfoDao;
 import com.akto.dao.traffic_collector.TrafficCollectorMetricsDao;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -3075,6 +3077,81 @@ public class DbAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
+    }
+
+    private LogDb logDb;
+    private String logMsg;
+    public String insertLogsInDb() {
+        if (logDb == null) {
+            addActionError("Invalid log collection");
+            return ERROR.toUpperCase();
+        }
+
+        if (logMsg == null || logMsg.isEmpty()) {
+            addActionError("Log message is required");
+            return ERROR.toUpperCase();
+        }
+
+        try {
+            DataActor dataActor = DataActorFactory.fetchInstance();
+            int timestamp = Context.now();
+            Log log = new Log(logMsg, key, timestamp);
+
+            switch(logDb){
+                case TESTING:
+                    dataActor.insertTestingLog(log);
+                    break;
+                case RUNTIME:
+                    dataActor.insertRuntimeLog(log);
+                    break;
+                case DASHBOARD:
+                    DashboardLogsDao.instance.insertOne(log);
+                    break;
+                case PUPPETEER:
+                    PupeteerLogsDao.instance.insertOne(log);
+                    break;
+                case DATA_INGESTION:
+                    dataActor.insertDataIngestionLog(log);
+                    break;
+                case ANALYSER:
+                    dataActor.insertAnalyserLog(log);
+                    break;
+                case BILLING:
+                    BillingLogsDao.instance.insertOne(log);
+                    break;
+                // Add db for db-abs
+                case THREAT_DETECTION:
+                    dataActor.insertProtectionLog(log);
+                    break;
+                case CYBORG:
+                    dataActor.insertCyborgLog(log);
+                    break;
+                default:
+                    break;
+            }
+
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error inserting log: " + e.getMessage());
+            addActionError("Failed to insert log: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String getLogMsg() {
+        return logMsg;
+    }
+
+    public void setLogMsg(String logMsg) {
+        this.logMsg = logMsg;
+    }
+
+    public LogDb getLogDb() {
+        return logDb;
+    }
+
+    public void setLogDb(LogDb logDb) {
+        this.logDb = logDb;
     }
 
     public List<CustomDataTypeMapper> getCustomDataTypes() {
