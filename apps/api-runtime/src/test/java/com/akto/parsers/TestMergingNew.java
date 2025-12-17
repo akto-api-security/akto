@@ -18,7 +18,7 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.runtime.APICatalogSync;
 import com.akto.types.CappedSet;
 import com.akto.util.filter.DictionaryFilter;
-import com.google.api.client.util.Charsets;
+import com.google.common.base.Charsets;
 import com.google.common.hash.BloomFilter;
 import com.google.common.hash.Funnels;
 import com.mongodb.BasicDBObject;

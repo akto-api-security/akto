@@ -49,12 +49,6 @@ import com.auth0.jwk.UrlJwkProvider;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.auth0.jwt.interfaces.JWTVerifier;
-import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeTokenRequest;
-import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
-import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
-import com.google.api.client.googleapis.auth.oauth2.GoogleTokenResponse;
-import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.jackson2.JacksonFactory;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.onelogin.saml2.Auth;
@@ -312,58 +306,9 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
     public String registerViaGoogle() {
         if (!DashboardMode.isOnPremDeployment()) return Action.ERROR.toUpperCase();
-        logger.debug(code + " " + state);
-
-        String codeFromGoogle = code;
-        code = "err";
-
-        Config.GoogleConfig aktoGoogleConfig = (Config.GoogleConfig) ConfigsDao.instance.findOne("_id", "GOOGLE-ankush");
-        if (aktoGoogleConfig == null) {
-            Config.GoogleConfig newConfig = new Config.GoogleConfig();
-            //Inserting blank config won't work, need to fill in Config manually in db
-            ConfigsDao.instance.insertOne(newConfig);
-            aktoGoogleConfig = (Config.GoogleConfig) ConfigsDao.instance.findOne("_id", "GOOGLE-ankush");
-        }
-
-
-        GoogleClientSecrets clientSecrets = new GoogleClientSecrets();
-        GoogleClientSecrets.Details details = new GoogleClientSecrets.Details();
-        details.setAuthUri(aktoGoogleConfig.getAuthURI());
-        details.setClientId(aktoGoogleConfig.getClientId());
-        details.setClientSecret(aktoGoogleConfig.getClientSecret());
-        details.setTokenUri(aktoGoogleConfig.getTokenURI());
-        clientSecrets.setWeb(details);
-
-        GoogleTokenResponse tokenResponse;
-        try {
-            tokenResponse = new GoogleAuthorizationCodeTokenRequest(
-                    new NetHttpTransport(),
-                    JacksonFactory.getDefaultInstance(),
-                    clientSecrets.getDetails().getTokenUri(),
-                    clientSecrets.getDetails().getClientId(),
-                    clientSecrets.getDetails().getClientSecret(),
-                    codeFromGoogle,
-                    InitializerListener.subdomain)
-                    .execute();
-
-            String accessToken = tokenResponse.getAccessToken();
-            String refreshToken = tokenResponse.getRefreshToken();
-            GoogleIdToken.Payload payload = tokenResponse.parseIdToken().getPayload();
-
-            String username = (String) payload.get("name");
-            String userEmail = payload.getEmail();
-
-            SignupInfo.GoogleSignupInfo signupInfo = new SignupInfo.GoogleSignupInfo(aktoGoogleConfig.getId(), accessToken, refreshToken, tokenResponse.getExpiresInSeconds());
-            shouldLogin = "true";
-            createUserAndRedirect(userEmail, username, signupInfo, 0, Config.ConfigType.GOOGLE.toString());
-            code = "";
-        } catch (IOException e) {
-            code = "Please login again";
-            return ERROR.toUpperCase();
-
-        }
+        // Implementation deleted.
+        // Not present in the new workflows.
         return SUCCESS.toUpperCase();
-
     };
 
     String password;

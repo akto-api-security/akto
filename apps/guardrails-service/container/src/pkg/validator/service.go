@@ -5,14 +5,26 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"sync"
+	"time"
 
-	"github.com/akto-api-security/mcp-endpoint-shield/mcp"
-	"github.com/akto-api-security/mcp-endpoint-shield/mcp/types"
 	"github.com/akto-api-security/guardrails-service/models"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
 	"github.com/akto-api-security/guardrails-service/pkg/dbabstractor"
+	"github.com/akto-api-security/mcp-endpoint-shield/mcp"
+	"github.com/akto-api-security/mcp-endpoint-shield/mcp/types"
 	"go.uber.org/zap"
 )
+
+// policyCache holds cached policies and their metadata
+type policyCache struct {
+	policies      []types.Policy
+	auditPolicies map[string]*types.AuditPolicy
+	compiledRules map[string]*regexp.Regexp
+	hasAuditRules bool
+	lastFetched   time.Time
+	mu            sync.RWMutex
+}
 
 // Service handles payload validation using akto-gateway library
 type Service struct {
@@ -20,6 +32,7 @@ type Service struct {
 	dbClient  *dbabstractor.Client
 	processor mcp.RequestProcessor
 	logger    *zap.Logger
+	cache     *policyCache
 }
 
 // NewService creates a new validator service
@@ -41,8 +54,8 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 		validator,
 		ingestor,
 		sessionMgr,
-		"", // sessionID - empty for our use case
-		"", // projectName - empty for our use case
+		"",    // sessionID - empty for our use case
+		"",    // projectName - empty for our use case
 		false, // skipThreat - false to enable threat reporting
 	)
 
@@ -51,7 +64,66 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 		dbClient:  dbClient,
 		processor: processor,
 		logger:    logger,
+		cache:     &policyCache{},
 	}, nil
+}
+
+// getCachedPolicies returns cached policies if still valid, otherwise fetches fresh policies
+func (s *Service) getCachedPolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, error) {
+	refreshInterval := time.Duration(s.config.PolicyRefreshIntervalMin) * time.Minute
+
+	// Check if cache is valid
+	s.cache.mu.RLock()
+	if !s.cache.lastFetched.IsZero() && time.Since(s.cache.lastFetched) < refreshInterval {
+		policies := s.cache.policies
+		auditPolicies := s.cache.auditPolicies
+		compiledRules := s.cache.compiledRules
+		hasAuditRules := s.cache.hasAuditRules
+		// RUnlock so that multiple goroutines can read the cached policies
+		s.cache.mu.RUnlock()
+		s.logger.Debug("Using cached policies",
+			zap.Time("lastFetched", s.cache.lastFetched),
+			zap.Int("policiesCount", len(policies)))
+		return policies, auditPolicies, compiledRules, hasAuditRules, nil
+	}
+	s.cache.mu.RUnlock()
+
+	// Cache is stale or empty, fetch fresh policies
+	return s.refreshPolicies()
+}
+
+// refreshPolicies fetches fresh policies from database and updates the cache
+func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, error) {
+	s.cache.mu.Lock()
+	defer s.cache.mu.Unlock()
+
+	// Double-check: another goroutine might have refreshed while we waited for the lock
+	refreshInterval := time.Duration(s.config.PolicyRefreshIntervalMin) * time.Minute
+	if !s.cache.lastFetched.IsZero() && time.Since(s.cache.lastFetched) < refreshInterval {
+		s.logger.Debug("Cache was refreshed by another goroutine, using cached policies")
+		return s.cache.policies, s.cache.auditPolicies, s.cache.compiledRules, s.cache.hasAuditRules, nil
+	}
+
+	s.logger.Info("Refreshing policies cache")
+
+	policies, auditPolicies, compiledRules, hasAuditRules, err := s.fetchAndParsePolicies()
+	if err != nil {
+		return nil, nil, nil, false, err
+	}
+
+	// Update cache
+	s.cache.policies = policies
+	s.cache.auditPolicies = auditPolicies
+	s.cache.compiledRules = compiledRules
+	s.cache.hasAuditRules = hasAuditRules
+	s.cache.lastFetched = time.Now()
+
+	s.logger.Info("Policy cache refreshed",
+		zap.Int("policiesCount", len(policies)),
+		zap.Int("auditPoliciesCount", len(auditPolicies)),
+		zap.Time("lastFetched", s.cache.lastFetched))
+
+	return policies, auditPolicies, compiledRules, hasAuditRules, nil
 }
 
 // fetchAndParsePolicies fetches policies from database abstractor and parses them
@@ -166,8 +238,8 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 func (s *Service) ValidateRequest(ctx context.Context, payload string) (*mcp.ValidationResult, error) {
 	s.logger.Info("Validating request payload")
 
-	// Fetch and parse policies from database abstractor
-	policies, auditPolicies, compiledRules, hasAuditRules, err := s.fetchAndParsePolicies()
+	// Get cached policies (refreshes if stale)
+	policies, auditPolicies, compiledRules, hasAuditRules, err := s.getCachedPolicies()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
@@ -219,8 +291,8 @@ func (s *Service) ValidateRequest(ctx context.Context, payload string) (*mcp.Val
 func (s *Service) ValidateResponse(ctx context.Context, payload string) (*mcp.ValidationResult, error) {
 	s.logger.Info("Validating response payload")
 
-	// Fetch and parse policies from database abstractor
-	policies, _, _, _, err := s.fetchAndParsePolicies()
+	// Get cached policies (refreshes if stale)
+	policies, _, _, _, err := s.getCachedPolicies()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
@@ -257,8 +329,8 @@ func (s *Service) ValidateResponse(ctx context.Context, payload string) (*mcp.Va
 func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDataBatch) ([]ValidationBatchResult, error) {
 	s.logger.Info("Validating batch data", zap.Int("count", len(batchData)))
 
-	// Fetch policies once for the entire batch to improve performance
-	policies, auditPolicies, _, hasAuditRules, err := s.fetchAndParsePolicies()
+	// Get cached policies (refreshes if stale)
+	policies, auditPolicies, _, hasAuditRules, err := s.getCachedPolicies()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
@@ -363,6 +435,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 		shouldReport := false
 		if reqResult != nil && (!reqResult.Allowed || reqResult.Modified) {
 			shouldReport = true
+
 			s.logger.Warn("Request blocked or modified by guardrails",
 				zap.Int("index", i),
 				zap.String("method", data.Method),
@@ -383,11 +456,8 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 				zap.String("reason", result.ResponseReason))
 		}
 
-		// Report to threat backend if threat detected
-		// TODO: Implement threat reporting using new API
 		if shouldReport {
-			// s.reportThreat(ctx, &data, reqResult, respResult)
-			s.logger.Info("Threat detected but reporting not yet implemented",
+			s.logger.Info("Threat detected",
 				zap.String("method", data.Method),
 				zap.String("path", data.Path))
 		}
@@ -395,36 +465,6 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 
 	return results, nil
 }
-
-// reportThreat reports a detected threat to the dashboard
-// TODO: Reimplement using new API when threat reporting is available
-/*
-func (s *Service) reportThreat(ctx context.Context, data *models.IngestDataBatch, reqResult, respResult *mcp.ValidationResult) {
-	// Prepare headers
-	reqHeaders := make(map[string]string)
-	respHeaders := make(map[string]string)
-
-	// Parse status code
-	statusCode := 0
-	if data.StatusCode != "" {
-		// Convert string to int (simplified, add proper error handling in production)
-		fmt.Sscanf(data.StatusCode, "%d", &statusCode)
-	}
-
-	// Determine metadata from validation results
-	metadata := make(map[string]any)
-	if reqResult != nil && reqResult.Metadata != nil {
-		metadata = reqResult.Metadata
-	} else if respResult != nil && respResult.Metadata != nil {
-		metadata = respResult.Metadata
-	}
-
-	// TODO: Implement threat reporting with new API
-	s.logger.Info("Threat reporting not yet implemented",
-		zap.String("method", data.Method),
-		zap.String("path", data.Path))
-}
-*/
 
 // FetchPolicies fetches guardrail policies from database-abstractor
 func (s *Service) FetchPolicies() error {
@@ -446,17 +486,17 @@ func (s *Service) FetchPolicies() error {
 
 // ValidationBatchResult represents the validation result for a single batch item
 type ValidationBatchResult struct {
-	Index                    int    `json:"index"`
-	Method                   string `json:"method"`
-	Path                     string `json:"path"`
-	RequestAllowed           bool   `json:"requestAllowed"`
-	RequestModified          bool   `json:"requestModified"`
-	RequestModifiedPayload   string `json:"requestModifiedPayload,omitempty"`
-	RequestReason            string `json:"requestReason,omitempty"`
-	RequestError             string `json:"requestError,omitempty"`
-	ResponseAllowed          bool   `json:"responseAllowed"`
-	ResponseModified         bool   `json:"responseModified"`
-	ResponseModifiedPayload  string `json:"responseModifiedPayload,omitempty"`
-	ResponseReason           string `json:"responseReason,omitempty"`
-	ResponseError            string `json:"responseError,omitempty"`
+	Index                   int    `json:"index"`
+	Method                  string `json:"method"`
+	Path                    string `json:"path"`
+	RequestAllowed          bool   `json:"requestAllowed"`
+	RequestModified         bool   `json:"requestModified"`
+	RequestModifiedPayload  string `json:"requestModifiedPayload,omitempty"`
+	RequestReason           string `json:"requestReason,omitempty"`
+	RequestError            string `json:"requestError,omitempty"`
+	ResponseAllowed         bool   `json:"responseAllowed"`
+	ResponseModified        bool   `json:"responseModified"`
+	ResponseModifiedPayload string `json:"responseModifiedPayload,omitempty"`
+	ResponseReason          string `json:"responseReason,omitempty"`
+	ResponseError           string `json:"responseError,omitempty"`
 }
