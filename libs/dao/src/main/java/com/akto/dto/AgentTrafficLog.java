@@ -8,6 +8,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
+import org.bson.codecs.pojo.annotations.BsonIgnore;
+
 /**
  * DTO for storing raw agent traffic logs from Cloudflare queue.
  * Used for future training on prompts and request payloads.
@@ -65,6 +67,10 @@ public class AgentTrafficLog {
     public static final String EXPIRES_AT = "expiresAt";
     private Date expiresAt;
 
+    // Epoch seconds from incoming request - converted to Date before DB insert
+    public static final String EXPIRES_AT_EPOCH = "expiresAtEpoch";
+    @BsonIgnore
+    private Long expiresAtEpoch;
     /**
      * Factory method to create AgentTrafficLog from HttpResponseParams
      * @param httpResponseParams The HTTP response parameters
@@ -105,8 +111,10 @@ public class AgentTrafficLog {
         log.setParentMcpToolNames(null);
 
         // TTL for auto-cleanup (default 7 days)
+        // Set expiresAtEpoch for transmission, expiresAt will be set at DB write
         long expiryMillis = System.currentTimeMillis() + (7L * 24 * 60 * 60 * 1000);
-        log.setExpiresAt(new Date(expiryMillis));
+        log.setExpiresAtEpoch(expiryMillis);
+        log.setExpiresAt(null);  
 
         return log;
     }

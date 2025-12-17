@@ -225,6 +225,7 @@ import com.akto.utils.crons.Crons;
 import com.akto.utils.crons.SyncCron;
 import com.akto.utils.crons.TokenGeneratorCron;
 import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
+import com.akto.utils.crons.AgentBasePromptDetectionCron;
 import com.akto.utils.jobs.CleanInventory;
 import com.akto.utils.jobs.DeactivateCollections;
 import com.akto.utils.jobs.JobUtils;
@@ -278,6 +279,7 @@ public class InitializerListener implements ServletContextListener {
     SyncCron syncCronInfo = new SyncCron();
     TokenGeneratorCron tokenGeneratorCron = new TokenGeneratorCron();
     UpdateSensitiveInfoInApiInfo updateSensitiveInfoInApiInfo = new UpdateSensitiveInfoInApiInfo();
+    AgentBasePromptDetectionCron agentBasePromptDetectionCron = new AgentBasePromptDetectionCron();
 
     private static String domain = null;
     public static String subdomain = "https://app.akto.io";
@@ -2522,11 +2524,6 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    private static void checkMongoConnection() throws Exception {
-        AccountsDao.instance.getStats();
-        connectedToMongo = true;
-    }
-
     public static void setSubdomain(){
         if (System.getenv("AKTO_SUBDOMAIN") != null) {
             subdomain = System.getenv("AKTO_SUBDOMAIN");
@@ -2627,6 +2624,7 @@ public class InitializerListener implements ServletContextListener {
                     updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
                     syncCronInfo.setUpUpdateCronScheduler();
                     syncCronInfo.setUpMcpMaliciousnessCronScheduler();
+                    agentBasePromptDetectionCron.setUpAgentBasePromptDetectionScheduler();
                     setUpTestEditorTemplatesScheduler();
                     JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
                     updateApiGroupsForAccounts(); 

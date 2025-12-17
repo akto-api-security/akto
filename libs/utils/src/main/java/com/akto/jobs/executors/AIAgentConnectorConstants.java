@@ -50,5 +50,5 @@ public final class AIAgentConnectorConstants {
     public static final String AZURE_CONTAINER_NAME = "binaries";
 
     // Default Job Settings
-    public static final int DEFAULT_RECURRING_INTERVAL_SECONDS = 300; // 5 minutes
+    public static final int DEFAULT_RECURRING_INTERVAL_SECONDS = 5; // 5 seconds
 }

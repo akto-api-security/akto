@@ -368,6 +368,12 @@ Reference URL: ${window.location.href}`.trim();
 
             func.setToast(true, false, "Creating Azure Boards Work Item");
 
+            // Extract originalMessage from first attempt data for attachment
+            // For threat activity, orig contains both request and response
+            const originalMessage = data && data.length > 0 && data[0]?.orig 
+                ? (typeof data[0].orig === 'string' ? data[0].orig : JSON.stringify(data[0].orig))
+                : null;
+
             // Call createGeneralAzureBoardsWorkItem API
             const response = await issuesApi.createGeneralAzureBoardsWorkItem({
                 title: workItemTitle,
@@ -378,7 +384,8 @@ Reference URL: ${window.location.href}`.trim();
                 templateId: moreInfoData?.templateId,  // Pass templateId (filterId) from threat policy
                 endpoint: endPointStr,  // Pass endpoint for title formatting
                 aktoDashboardHostName: window.location.origin,
-                customABWorkItemFieldsPayload
+                customABWorkItemFieldsPayload,
+                originalMessage: originalMessage  // Pass request/response data for attachment
             });
 
             if (response?.errorMessage) {
