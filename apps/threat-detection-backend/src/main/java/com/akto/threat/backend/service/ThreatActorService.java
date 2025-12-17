@@ -26,6 +26,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Fe
 import com.akto.ProtoMessageUtils;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.dao.MaliciousEventDao;
+import com.akto.threat.backend.utils.ThreatUtils;
 import com.akto.threat.backend.db.ActorInfoModel;
 import com.akto.threat.backend.dto.RateLimitConfigDTO;
 import com.akto.util.ThreatDetectionConstants;
@@ -209,7 +210,7 @@ public class ThreatActorService {
     }
 
 
-    public ListThreatActorResponse listThreatActors(String accountId, ListThreatActorsRequest request) {
+    public ListThreatActorResponse listThreatActors(String accountId, ListThreatActorsRequest request, String contextSource) {
         int skip = request.hasSkip() ? request.getSkip() : 0;
         int limit = request.getLimit();
         Map<String, Integer> sort = request.getSortMap();
@@ -217,14 +218,10 @@ public class ThreatActorService {
         ListThreatActorsRequest.Filter filter = request.getFilter();
         Document match = new Document();
 
-//        if(filter.getLatestAttackList() == null || filter.getLatestAttackList().isEmpty()) {
-//            return ListThreatActorResponse.newBuilder().build();
-//        }
-
         // Apply filters
         if (!filter.getActorsList().isEmpty()) match.append("actor", new Document("$in", filter.getActorsList()));
         if (!filter.getLatestIpsList().isEmpty()) match.append("latestApiIp", new Document("$in", filter.getLatestIpsList()));
-        if (!filter.getLatestAttackList().isEmpty()) match.append("filterId", new Document("$in", filter.getLatestAttackList()));
+        // NOTE: filterId filter will be handled by context-aware filtering below
         if (!filter.getCountryList().isEmpty()) match.append("country", new Document("$in", filter.getCountryList()));
         if (filter.hasDetectedAtTimeRange()) {
             match.append("detectedAt", new Document("$gte", filter.getDetectedAtTimeRange().getStart()).append("$lte", filter.getDetectedAtTimeRange().getEnd()));
@@ -232,6 +229,10 @@ public class ThreatActorService {
         if (request.getStartTs() != 0 && request.getEndTs() != 0) {
             match.append("detectedAt", new Document("$gte", request.getStartTs()).append("$lte", request.getEndTs()));
         }
+
+        // Apply context-aware filtering
+        List<String> latestAttackList = filter.getLatestAttackList().isEmpty() ? null : filter.getLatestAttackList();
+        match = ThreatUtils.mergeContextFilter(match, contextSource, latestAttackList);
 
         List<Document> pipeline = new ArrayList<>();
         if (!match.isEmpty()) pipeline.add(new Document("$match", match));
@@ -310,22 +311,21 @@ public class ThreatActorService {
         return ListThreatActorResponse.newBuilder().addAllActors(actors).setTotal(total).build();
     }
 
-  public DailyActorsCountResponse getDailyActorCounts(String accountId, long startTs, long endTs, List<String> latestAttackList) {
+  public DailyActorsCountResponse getDailyActorCounts(String accountId, long startTs, long endTs, List<String> latestAttackList, String contextSource) {
 
     List<DailyActorsCountResponse.ActorsCount> actors = new ArrayList<>();
         List<Document> pipeline = new ArrayList<>();
 
-
       Document matchConditions = new Document();
-
-    if(latestAttackList != null && !latestAttackList.isEmpty()) {
-        matchConditions.append("filterId", new Document("$in", latestAttackList));
-    }
 
       matchConditions.append("detectedAt", new Document("$lte", endTs));
         if (startTs > 0) {
             matchConditions.get("detectedAt", Document.class).append("$gte", startTs);
         }
+
+    // Apply context-aware filtering
+    matchConditions = ThreatUtils.mergeContextFilter(matchConditions, contextSource, latestAttackList);
+
         pipeline.add(new Document("$match", matchConditions));
     
         pipeline.add(new Document("$project", 
@@ -439,22 +439,17 @@ public class ThreatActorService {
             .build();
   }
 
-  public ThreatActivityTimelineResponse getThreatActivityTimeline(String accountId, long startTs, long endTs, List<String> latestAttackList) {
+  public ThreatActivityTimelineResponse getThreatActivityTimeline(String accountId, long startTs, long endTs, List<String> latestAttackList, String contextSource) {
 
         List<ThreatActivityTimelineResponse.ActivityTimeline> timeline = new ArrayList<>();
-        // long sevenDaysInSeconds = TimeUnit.DAYS.toSeconds(7);
-        // if (startTs < endTs - sevenDaysInSeconds) {
-        //     startTs = endTs - sevenDaysInSeconds;
-        // }
 
       Document match = new Document();
 
-    if(latestAttackList != null && !latestAttackList.isEmpty()) {
-        match.append("filterId", new Document("$in", latestAttackList));
-    }
-
       // Stage 1: Match documents within the startTs and endTs range
       match.append("detectedAt", new Document("$gte", startTs).append("$lte", endTs));
+
+    // Apply context-aware filtering
+    match = ThreatUtils.mergeContextFilter(match, contextSource, latestAttackList);
 
       List<Document> pipeline = Arrays.asList(
         new Document("$match", match),
@@ -577,23 +572,23 @@ public class ThreatActorService {
   }
 
   public ThreatActorByCountryResponse getThreatActorByCountry(
-      String accountId, ThreatActorByCountryRequest request) {
+      String accountId, ThreatActorByCountryRequest request, String contextSource) {
 
     List<Document> pipeline = new ArrayList<>();
 
     Document match = new Document();
 
-      if(request.getLatestAttackList() != null && !request.getLatestAttackList().isEmpty()) {
-          match.append("filterId", new Document("$in", request.getLatestAttackList()));
-      }
-
     // 1. Match on time range
     if (request.getStartTs() != 0 || request.getEndTs() != 0) {
-
           match.append("detectedAt",
               new Document("$gte", request.getStartTs())
                   .append("$lte", request.getEndTs()));
     }
+
+    // Apply context-aware filtering
+    List<String> latestAttackList = (request.getLatestAttackList() == null || request.getLatestAttackList().isEmpty()) ?
+        null : request.getLatestAttackList();
+    match = ThreatUtils.mergeContextFilter(match, contextSource, latestAttackList);
 
   pipeline.add(new Document("$match", match));
 
@@ -680,16 +675,12 @@ public class ThreatActorService {
       }
 
   public FetchTopNDataResponse fetchTopNData(
-      String accountId, long startTs, long endTs, List<String> latestAttackList, int limit) {
+      String accountId, long startTs, long endTs, List<String> latestAttackList, int limit, String contextSource) {
 
     List<Document> pipeline = new ArrayList<>();
 
-        // Match stage (only apply time range filter; ignore latestAttackList)
+        // Match stage with time range filter
         Document match = new Document();
-        
-        if (latestAttackList != null && !latestAttackList.isEmpty()) {
-            match.append("filterId", new Document("$in", latestAttackList));
-        }
 
         if (startTs > 0 || endTs > 0) {
             Document tsRange = new Document();
@@ -697,6 +688,10 @@ public class ThreatActorService {
             if (endTs > 0) tsRange.append("$lte", endTs);
             match.append("detectedAt", tsRange);
         }
+
+        // Apply context-aware filtering
+        match = ThreatUtils.mergeContextFilter(match, contextSource, latestAttackList);
+
         if (!match.isEmpty()) {
             pipeline.add(new Document("$match", match));
         }
