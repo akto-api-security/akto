@@ -82,6 +82,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
         String.format("%s/api/dashboard/list_malicious_requests", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
+    post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
 
     Map<String, Object> filter = new HashMap<>();
     if (this.ips != null && !this.ips.isEmpty()) {
@@ -120,8 +121,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       filter.put("latestApiOrigRegex", this.latestApiOrigRegex);
     }
 
-    List<String> templates = getTemplates(latestAttack);
-    filter.put("latestAttack", templates);
+    filter.put("latestAttack", getTemplates(latestAttack));
 
     if (this.statusFilter != null) {
       filter.put("statusFilter", this.statusFilter);
@@ -261,7 +261,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     }
     // Always populate latestAttack with available templates, even if empty
     List<String> templates = getTemplates(latestAttack);
-    if (!templates.isEmpty()) {
+    if (templates != null && !templates.isEmpty()) {
       filterBuilder.addAllLatestAttack(templates);
     }
     if (this.statusFilter != null) {

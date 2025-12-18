@@ -9,6 +9,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountResponse;
 import com.akto.threat.backend.dao.MaliciousEventDao;
+import com.akto.threat.backend.utils.ThreatUtils;
 import com.mongodb.client.MongoCursor;
 
 
@@ -30,7 +31,7 @@ public class ThreatApiService {
     this.maliciousEventDao = maliciousEventDao;
   }
 
-  public ListThreatApiResponse listThreatApis(String accountId, ListThreatApiRequest request) {
+  public ListThreatApiResponse listThreatApis(String accountId, ListThreatApiRequest request, String contextSource) {
 
     loggerMaker.info("listThreatApis start ts " + Context.now());
 
@@ -62,6 +63,12 @@ public class ThreatApiService {
       long start = filter.getDetectedAtTimeRange().getStart();
       long end = filter.getDetectedAtTimeRange().getEnd();
       match.append("detectedAt", new Document("$gte", start).append("$lte", end));
+    }
+
+    // Apply simple context filter (only for ENDPOINT and AGENTIC)
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    if (!contextFilter.isEmpty()) {
+      match.putAll(contextFilter);
     }
 
     if (!match.isEmpty()) {
@@ -127,7 +134,7 @@ public class ThreatApiService {
   }
 
   public ThreatCategoryWiseCountResponse getSubCategoryWiseCount(
-    String accountId, ThreatCategoryWiseCountRequest req) {
+    String accountId, ThreatCategoryWiseCountRequest req, String contextSource) {
 
     if(req.getLatestAttackList() == null || req.getLatestAttackList().isEmpty()) {
       return ThreatCategoryWiseCountResponse.newBuilder().build();
@@ -145,6 +152,12 @@ public class ThreatApiService {
     // 1. Match on time range
     if (req.getStartTs() != 0 || req.getEndTs() != 0) {
       match.append("detectedAt", new Document("$gte", req.getStartTs()).append("$lte", req.getEndTs()));
+    }
+
+    // Apply simple context filter (only for ENDPOINT and AGENTIC)
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    if (!contextFilter.isEmpty()) {
+      match.putAll(contextFilter);
     }
 
     pipeline.add(new Document("$match", match));
@@ -184,7 +197,7 @@ public class ThreatApiService {
   }
 
   public ThreatSeverityWiseCountResponse getSeverityWiseCount(
-    String accountId, ThreatSeverityWiseCountRequest req) {
+    String accountId, ThreatSeverityWiseCountRequest req, String contextSource) {
 
     if(req.getLatestAttackList() == null || req.getLatestAttackList().isEmpty()) {
       return ThreatSeverityWiseCountResponse.newBuilder().build();
@@ -196,14 +209,23 @@ public class ThreatApiService {
 
     String[] severities = { "CRITICAL", "HIGH", "MEDIUM", "LOW" };
 
-    List<Document> pipeline = new ArrayList<>();
-    pipeline.add(new Document("$match", new Document()
+    // Build match document
+    Document match = new Document()
         .append("detectedAt", new Document("$gte", req.getStartTs())
             .append("$lte", req.getEndTs()))
         .append("filterId", new Document("$in", req.getLatestAttackList()))
-        .append("severity", new Document("$in", Arrays.asList(severities)))));
-    pipeline.add(new Document("$group", new Document("_id", "$severity")
-        .append("count", new Document("$sum", 1))));
+        .append("severity", new Document("$in", Arrays.asList(severities)));
+
+      // Apply simple context filter (only for ENDPOINT and AGENTIC)
+      Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+      if (!contextFilter.isEmpty()) {
+          match.putAll(contextFilter);
+      }
+
+      List<Document> pipeline = new ArrayList<>();
+      pipeline.add(new Document("$match", match));
+      pipeline.add(new Document("$group", new Document("_id", "$severity")
+          .append("count", new Document("$sum", 1))));
 
     Map<String, Integer> severityToCount = new HashMap<>();
     try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {
