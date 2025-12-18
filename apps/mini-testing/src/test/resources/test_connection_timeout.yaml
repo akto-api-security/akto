@@ -1,0 +1,20 @@
+id: TEST_CONNECTION_TIMEOUT
+info:
+  name: Test Connection Timeout Error Categorization
+  description: Tests that connection timeout errors are properly categorized
+  category:
+    name: TEST
+    shortName: test
+    displayName: Test Category
+  severity: LOW
+  tags: []
+
+execute:
+  type: single
+  requests:
+    - req:
+        - modify_url: "http://192.0.2.1:9999/api/nonexistent"
+
+validate:
+  response_code:
+    gte: 200
