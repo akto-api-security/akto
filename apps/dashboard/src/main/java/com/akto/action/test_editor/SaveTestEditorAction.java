@@ -140,6 +140,7 @@ public class SaveTestEditorAction extends UserAction {
             ObjectMapper mapper = new ObjectMapper(YAMLFactory.builder()
             .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
             .disable(YAMLGenerator.Feature.SPLIT_LINES)
+            .enable(YAMLGenerator.Feature.ALWAYS_QUOTE_NUMBERS_AS_STRINGS)
             .build());
             mapper.findAndRegisterModules();
             Map<String, Object> config = mapper.readValue(content, Map.class);
