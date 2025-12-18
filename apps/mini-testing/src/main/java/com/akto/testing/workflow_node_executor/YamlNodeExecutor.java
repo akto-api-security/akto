@@ -35,6 +35,7 @@ import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.WorkflowTestResult;
@@ -163,6 +164,13 @@ public class YamlNodeExecutor extends NodeExecutor {
         savedResponses = execContext.lastResponseBody;
         statusCode = execContext.lastStatusCode;
         eventStreamResponse = execContext.lastEventStream;
+
+        // Extract error messages from TestResults in execContext.results
+        for (TestResult result : execContext.results) {
+            if (result.getErrors() != null && !result.getErrors().isEmpty()) {
+                testErrors.addAll(result.getErrors());
+            }
+        }
 
         calcTimeAndLenStats(node.getId(), responseTimeArr, responseLenArr, varMap);
 
@@ -426,7 +434,25 @@ public class YamlNodeExecutor extends NodeExecutor {
             return new ApiCallResult(res, messageStr, responseTime, responseLength,
                     savedResponses, statusCode, eventStreamResponse);
         } catch (Exception e) {
-            return null;
+            // Categorize the error similar to single execution mode
+            String errorMessage = "Error executing test request: " + e.getMessage();
+            testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, errorMessage));
+
+            TestError categorizedError = Executor.categorizeError(errorMessage);
+            List<String> errorMessages = new ArrayList<>();
+            errorMessages.add(categorizedError.getMessage());
+
+            TestResult errorResult = new TestResult(
+                null,
+                yamlNodeDetails.getOriginalMessage(),
+                errorMessages,
+                0,
+                false,
+                TestResult.Confidence.HIGH,
+                null
+            );
+
+            return new ApiCallResult(errorResult, null, null, null, null, 0, null);
         }
     }
 
