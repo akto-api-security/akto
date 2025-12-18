@@ -420,7 +420,8 @@ public class Main {
 
         int accountId = accountSettings.getId();
         Context.accountId.set(accountId);
-        DataActor.actualAccountId = accountId;
+        Context.setActualAccountId(accountId);
+        loggerMaker.infoAndAddToDb("Fetched account settings for account " + Context.getActualAccountId());
         GetRunningTestsStatus.getRunningTests().getStatusOfRunningTests();
 
           BasicDBObject currentTestInfo = null;

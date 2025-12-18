@@ -153,9 +153,7 @@ public class LoggerMaker {
     }
 
     protected String basicError(String err, LogDb db) {
-        if(Context.accountId.get() != null){
-            err = String.format("%s\nAccount id: %d", err, Context.accountId.get());
-        }
+        err = String.format("%s\nAccount id: %d", err, Context.getActualAccountId());
         logger.error(err);
         try{
             insert(err, "error", db);
@@ -207,8 +205,7 @@ public class LoggerMaker {
     }
 
     private String formatMessageWithAccountId(String info) {
-        String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
-        return "acc: " + accountId + ", " + info;
+        return "acc: " + Context.getActualAccountId() + ", " + info;
     }
 
     @Deprecated
@@ -216,7 +213,7 @@ public class LoggerMaker {
         String infoMessage = formatMessageWithAccountId(info);
         logger.info(infoMessage);
         try {
-            if(Context.accountId.get() != null && Context.accountId.get() == 1764738582){
+            if(Context.getActualAccountId() == 1764738582){
                 return;
             }
             insert(infoMessage, "info", db);

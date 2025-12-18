@@ -112,13 +112,13 @@ public class KeyTypes {
     }
 
     private static boolean aktoDataTypeChanged(String name) {
-        Map<String, AktoDataType> aktoDataTypeMap = SingleTypeInfo.getAktoDataTypeMap(Context.accountId.get());
+        Map<String, AktoDataType> aktoDataTypeMap = SingleTypeInfo.getAktoDataTypeMap(Context.getActualAccountId());
         AktoDataType aktoDataType = aktoDataTypeMap.get(name);
         return aktoDataType != null && (aktoDataType.getKeyConditions() != null || aktoDataType.getValueConditions() != null);
     }
 
     private static boolean matchesAktoDataType(String name, Object key, Object value) {
-        Map<String, AktoDataType> aktoDataTypeMap = SingleTypeInfo.getAktoDataTypeMap(Context.accountId.get());
+        Map<String, AktoDataType> aktoDataTypeMap = SingleTypeInfo.getAktoDataTypeMap(Context.getActualAccountId());
         AktoDataType aktoDataType = aktoDataTypeMap.get(name);
         return aktoDataType != null && aktoDataType.validate(value, key);
     }
@@ -166,7 +166,7 @@ public class KeyTypes {
         }
 
         if(checkForSubtypes){
-            for (CustomDataType customDataType: SingleTypeInfo.getCustomDataTypesSortedBySensitivity(Context.accountId.get())) {
+            for (CustomDataType customDataType: SingleTypeInfo.getCustomDataTypesSortedBySensitivity(Context.getActualAccountId())) { // Fix.
                 if (!customDataType.isActive()) continue;
                 boolean result = customDataType.validate(o,key);
                 if (result) return customDataType.toSubType();
@@ -256,7 +256,7 @@ public class KeyTypes {
 
     public static SubType findSubType(Object o,String key, ParamId paramId) {
         
-        int accountId = Context.accountId.get();
+        int accountId = Context.getActualAccountId();
         boolean checkForSubtypes = true ;
         for (String keyType : SingleTypeInfo.getCustomDataTypeMap(accountId).keySet()) {
             IgnoreData ignoreData = SingleTypeInfo.getCustomDataTypeMap(accountId).get(keyType).getIgnoreData();

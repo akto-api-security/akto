@@ -64,6 +64,7 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         SingleTypeInfoDao.instance.getMCollection().drop();
         CustomDataTypeDao.instance.getMCollection().drop();
         Context.accountId.set(1_000_000);
+        Context.setActualAccountId(1_000_000);
         IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
         Conditions keyConditions = new Conditions(Arrays.asList(new StartsWithPredicate("we"), new RegexPredicate("reg")), Conditions.Operator.AND);
         Conditions valueConditions = new Conditions(Collections.singletonList(new EndsWithPredicate("something")), Conditions.Operator.OR);

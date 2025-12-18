@@ -18,6 +18,7 @@ public class TestKeyTypes {
 
     public void testInitializer() {
         Context.accountId.set(ACCOUNT_ID);
+        Context.setActualAccountId(ACCOUNT_ID);
         Map<String, AktoDataType> aktoDataTypeMap = new HashMap<>();
         aktoDataTypeMap.put("JWT", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));
         aktoDataTypeMap.put("PHONE_NUMBER", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>()), false, true));

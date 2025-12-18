@@ -16,13 +16,11 @@ import com.akto.dto.type.*;
 import com.akto.runtime.APICatalogSync;
 import com.akto.types.CappedSet;
 import com.akto.util.filter.DictionaryFilter;
-import com.akto.utils.RedactSampleData;
 import com.google.api.client.util.Charsets;
 import com.google.common.hash.BloomFilter;
 import com.google.common.hash.Funnels;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.junit.Before;
@@ -32,7 +30,6 @@ import java.util.*;
 
 import static com.akto.parsers.TestDump2.createList;
 import static com.akto.runtime.APICatalogSync.mergeUrlsAndSave;
-import static com.akto.runtime.APICatalogSync.tryMergeURLsInCollection;
 import static org.junit.Assert.*;
 
 public class TestMergingNew extends MongoBasedTest {
