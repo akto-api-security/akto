@@ -12,6 +12,7 @@ import TooltipText from "../../../components/shared/TooltipText";
 import ActivityTracker from "../../dashboard/components/ActivityTracker";
 import settingFunctions from "../../settings/module";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal";
+import CreateTicketDropdown from "../../../components/shared/CreateTicketDropdown";
 import transform from "../../testing/transform";
 import issuesFunctions from "../../issues/module";
 
@@ -493,61 +494,53 @@ Reference URL: ${window.location.href}`.trim();
                                 </Text>
                             </Modal.Section>
                         </Modal>
-                        {jiraTicketUrl ? (
-                            transform.getJiraComponent(jiraTicketUrl)
-                        ) : (
-                            <JiraTicketCreationModal
-                                activator={
+                        {(jiraTicketUrl || azureBoardsWorkItemUrl) ? (
+                            <HorizontalStack gap={"2"}>
+                                {jiraTicketUrl && transform.getJiraComponent(jiraTicketUrl)}
+                                {azureBoardsWorkItemUrl && (
                                     <Button
                                         size="slim"
-                                        onClick={handleJiraClick}
-                                        disabled={window.JIRA_INTEGRATED !== "true"}
+                                        onClick={() => window.open(azureBoardsWorkItemUrl, '_blank')}
                                     >
-                                        Create Jira Ticket
+                                        View Work Item
                                     </Button>
-                                }
-                                modalActive={modalActive}
-                                setModalActive={setModalActive}
-                                handleSaveAction={handleSaveAction}
-                                jiraProjectMaps={jiraProjectMaps}
-                                projId={projId}
-                                setProjId={setProjId}
-                                issueType={issueType}
-                                setIssueType={setIssueType}
-                                issueId={eventId}
-                            />
-                        )}
-                        {azureBoardsWorkItemUrl ? (
-                            <Box>
-                                <Button
-                                    size="slim"
-                                    onClick={() => window.open(azureBoardsWorkItemUrl, '_blank')}
-                                >
-                                    View Work Item
-                                </Button>
-                            </Box>
+                                )}
+                            </HorizontalStack>
                         ) : (
-                            <JiraTicketCreationModal
-                                activator={
-                                    <Button
-                                        size="slim"
-                                        onClick={handleAzureBoardClick}
-                                        disabled={window.AZURE_BOARDS_INTEGRATED !== "true"}
-                                    >
-                                        Create Work Item
-                                    </Button>
-                                }
-                                modalActive={boardsModalActive}
-                                setModalActive={setBoardsModalActive}
-                                handleSaveAction={handleAzureBoardSaveAction}
-                                jiraProjectMaps={projectToWorkItemsMap}
-                                projId={projectId}
-                                setProjId={setProjectId}
-                                issueType={workItemType}
-                                setIssueType={setWorkItemType}
-                                issueId={eventId}
-                                isAzureModal={true}
-                            />
+                            <>
+                                <CreateTicketDropdown
+                                    onJiraClick={handleJiraClick}
+                                    onAzureBoardsClick={handleAzureBoardClick}
+                                    jiraTicketUrl={jiraTicketUrl}
+                                    azureBoardsUrl={azureBoardsWorkItemUrl}
+                                    onOpenPopover={() => setActionPopoverActive(false)}
+                                />
+                                <JiraTicketCreationModal
+                                    activator={<></>}
+                                    modalActive={modalActive}
+                                    setModalActive={setModalActive}
+                                    handleSaveAction={handleSaveAction}
+                                    jiraProjectMaps={jiraProjectMaps}
+                                    projId={projId}
+                                    setProjId={setProjId}
+                                    issueType={issueType}
+                                    setIssueType={setIssueType}
+                                    issueId={eventId}
+                                />
+                                <JiraTicketCreationModal
+                                    activator={<></>}
+                                    modalActive={boardsModalActive}
+                                    setModalActive={setBoardsModalActive}
+                                    handleSaveAction={handleAzureBoardSaveAction}
+                                    jiraProjectMaps={projectToWorkItemsMap}
+                                    projId={projectId}
+                                    setProjId={setProjectId}
+                                    issueType={workItemType}
+                                    setIssueType={setWorkItemType}
+                                    issueId={eventId}
+                                    isAzureModal={true}
+                                />
+                            </>
                         )}
                     </HorizontalStack>
                 </HorizontalStack>
