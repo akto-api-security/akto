@@ -147,7 +147,7 @@ public class Main {
     }
     
     private static boolean isProtoKafkaEnabled() {
-        if (DataActor.actualAccountId == 1752208054 || DataActor.actualAccountId == 1753806619 || DataActor.actualAccountId == 1757403870 || DataActor.actualAccountId == 1758787662 || isSendToThreatEnabled) {
+        if (Context.getActualAccountId() == 1752208054 || Context.getActualAccountId() == 1753806619 || Context.getActualAccountId() == 1757403870 || Context.getActualAccountId() == 1758787662 || isSendToThreatEnabled) {
             return true;
         }
         return false;
@@ -288,11 +288,13 @@ public class Main {
         if (aSettings == null) {
             loggerMaker.errorAndAddToDb("error fetch account settings, exiting process");
             System.exit(0);
+            return;
         }
-        DataActor.actualAccountId = aSettings.getId();
-        loggerMaker.infoAndAddToDb("Fetched account settings for account ");
+        int accountId = aSettings.getId();
+        Context.setActualAccountId(accountId);
+        loggerMaker.infoAndAddToDb("Fetched account settings for account " + Context.getActualAccountId());
 
-        if (DataActor.actualAccountId == 1759692400) {
+        if (Context.getActualAccountId() == 1759692400) {
             maxPollRecordsConfigTemp = 5000;
         }
 
@@ -330,7 +332,7 @@ public class Main {
 
         final boolean checkPg = aSettings != null && aSettings.isRedactPayload();
 
-        AllMetrics.instance.init(LogDb.RUNTIME, checkPg, dataActor, DataActor.actualAccountId);
+        AllMetrics.instance.init(LogDb.RUNTIME, checkPg, dataActor, Context.getActualAccountId());
         loggerMaker.infoAndAddToDb("All metrics initialized");
 
         dataActor.modifyHybridSaasSetting(RuntimeMode.isHybridDeployment());
@@ -416,8 +418,6 @@ public class Main {
         // KafkaHealthMetricSyncTask task = new KafkaHealthMetricSyncTask(main.consumer);
         // executor.scheduleAtFixedRate(task, 2, 60, TimeUnit.SECONDS);
 
-        long lastSyncOffset = 0;
-
         String kafkaUrl = kafkaBrokerUrl;
         executorService.schedule(new Runnable() {
             public void run() {
@@ -479,39 +479,46 @@ public class Main {
             }
         }, 0, TimeUnit.SECONDS);
 
-        // schedule MCP sync job for 24 hours
-        loggerMaker.info("Scheduling MCP Sync Job");
-        APIConfig finalApiConfig = apiConfig;
-        scheduler.scheduleAtFixedRate(() -> {
-            Context.accountId.set(DataActor.actualAccountId);
-            try {
-                loggerMaker.infoAndAddToDb("Executing MCP Tools Sync job");
-                McpToolsSyncJobExecutor.INSTANCE.runJob(finalApiConfig);
-                loggerMaker.infoAndAddToDb("Finished executing MCP Tools Sync job");
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error while executing MCP Tools Sync Job");
-            }
-        }, 0, 24, TimeUnit.HOURS);
+        String runMcpJobs = System.getenv("AKTO_RUN_MCP_JOBS");
+        boolean shouldRunMcpJobs = true;
+        if (runMcpJobs != null && runMcpJobs.equalsIgnoreCase("false")) {
+            shouldRunMcpJobs = false;
+        }
+        if (shouldRunMcpJobs) {
+            // schedule MCP sync job for 24 hours
+            loggerMaker.info("Scheduling MCP Sync Job");
+            APIConfig finalApiConfig = apiConfig;
+            scheduler.scheduleAtFixedRate(() -> {
+                Context.accountId.set(Context.getActualAccountId());
+                try {
+                    loggerMaker.infoAndAddToDb("Executing MCP Tools Sync job");
+                    McpToolsSyncJobExecutor.INSTANCE.runJob(finalApiConfig);
+                    loggerMaker.infoAndAddToDb("Finished executing MCP Tools Sync job");
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error while executing MCP Tools Sync Job");
+                }
+            }, 0, 24, TimeUnit.HOURS);
 
-        // schedule MCP Recon Sync job for 2 mins
-        loggerMaker.info("Scheduling MCP Recon Sync Job");
-        APIConfig finalApiConfigRecon = apiConfig;
-        scheduler.scheduleAtFixedRate(() -> {
-            Context.accountId.set(DataActor.actualAccountId);
-            try {
-                loggerMaker.infoAndAddToDb("Executing MCP Recon Sync job");
-                McpReconSyncJobExecutor.INSTANCE.runJob(finalApiConfigRecon);
-                loggerMaker.infoAndAddToDb("Finished executing MCP Recon Sync job");
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error while executing MCP Recon Sync Job");
-            }
-        }, 0, 24, TimeUnit.HOURS);
+            // schedule MCP Recon Sync job for 2 mins
+            loggerMaker.info("Scheduling MCP Recon Sync Job");
+            APIConfig finalApiConfigRecon = apiConfig;
+            scheduler.scheduleAtFixedRate(() -> {
+                Context.accountId.set(Context.getActualAccountId());
+                try {
+                    loggerMaker.infoAndAddToDb("Executing MCP Recon Sync job");
+                    McpReconSyncJobExecutor.INSTANCE.runJob(finalApiConfigRecon);
+                    loggerMaker.infoAndAddToDb("Finished executing MCP Recon Sync job");
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error while executing MCP Recon Sync Job");
+                }
+            }, 0, 24, TimeUnit.HOURS);
+        }
 
         if(isDbMergingModeEnabled()){
             runDBMaintenanceJob(apiConfig);
         }else{
             kafkaSubscribeAndProcess(topicName, syncImmediately, fetchAllSTI, accountInfoMap, isDashboardInstance, centralKafkaTopicName,
-                    apiConfig, main, exceptionOnCommitSync, httpCallParserMap, lastSyncOffset);
+                    apiConfig, main, exceptionOnCommitSync, httpCallParserMap);
         }
     }
 
@@ -525,7 +532,8 @@ public class Main {
     private static void kafkaSubscribeAndProcess(String topicName, boolean syncImmediately, boolean fetchAllSTI,
             Map<Integer, AccountInfo> accountInfoMap, boolean isDashboardInstance, String centralKafkaTopicName,
             APIConfig apiConfig, final Main main, final AtomicBoolean exceptionOnCommitSync,
-            Map<String, HttpCallParser> httpCallParserMap, long lastSyncOffset) {
+            Map<String, HttpCallParser> httpCallParserMap) {
+        long lastSyncOffset = 0;
         try {
             main.consumer.subscribe(Arrays.asList(topicName));
             loggerMaker.infoAndAddToDb("Consumer subscribed to topic: " + topicName);
@@ -540,7 +548,7 @@ public class Main {
                 long start = System.currentTimeMillis();
                 // TODO: what happens if exception
                 Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
-                bulkParseTrafficToResponseParams(lastSyncOffset, records, responseParamsToAccountMap);
+                lastSyncOffset = bulkParseTrafficToResponseParams(lastSyncOffset, records, responseParamsToAccountMap);
 
                 handleResponseParams(responseParamsToAccountMap,
                     accountInfoMap,
@@ -550,9 +558,9 @@ public class Main {
                     fetchAllSTI,
                     syncImmediately,
                     centralKafkaTopicName);
-                AllMetrics.instance.setRuntimeProcessLatency(System.currentTimeMillis()-start);
+                long deltaTime = System.currentTimeMillis() - start;
+                AllMetrics.instance.setRuntimeProcessLatency(deltaTime);
                 AllMetrics.instance.setRuntimeApiReceivedCount((float) records.count());
-                loggerMaker.infoAndAddToDb("Processed " + responseParamsToAccountMap.size() + " total records " + records.count() + " accounts in " + (System.currentTimeMillis()-start) + " ms");
             }
 
         } catch (WakeupException ignored) {
@@ -571,7 +579,7 @@ public class Main {
     }
 
     private static int LOG_DEBUG_RECORDS = 100; 
-    private static void bulkParseTrafficToResponseParams(long lastSyncOffset, ConsumerRecords<String, String> records,
+    private static long bulkParseTrafficToResponseParams(long lastSyncOffset, ConsumerRecords<String, String> records,
             Map<String, List<HttpResponseParams>> responseParamsToAccountMap) {
         for (ConsumerRecord<String,String> r: records) {
             HttpResponseParams httpResponseParams;
@@ -580,7 +588,7 @@ public class Main {
                 printL(r.value());
                 if(LOG_DEBUG_RECORDS > 0){
                     LOG_DEBUG_RECORDS--;
-                    loggerMaker.infoAndAddToDb("Kafka record recieved" + r.value());
+                    loggerMaker.infoAndAddToDb("Kafka record received" + r.value());
                 }
                 AllMetrics.instance.setRuntimeKafkaRecordCount(1);
                 AllMetrics.instance.setRuntimeKafkaRecordSize(r.value().length());
@@ -590,21 +598,21 @@ public class Main {
                     continue;
                 }
 
-                if (DataActor.actualAccountId != 1759692400 && lastSyncOffset % 100 == 0) {
+                if (Context.getActualAccountId() != 1759692400 && lastSyncOffset % 100 == 0) {
                     loggerMaker.infoAndAddToDb("Committing offset at position: " + lastSyncOffset);
                 }
 
-                if (DataActor.actualAccountId == 1759692400 && lastSyncOffset % 1000 == 0) {
+                if (Context.getActualAccountId() == 1759692400 && lastSyncOffset % 1000 == 0) {
                     loggerMaker.infoAndAddToDb("Committing offset at position: " + lastSyncOffset);
                 }
 
-                if (DataActor.actualAccountId != 1759692400 && tryForCollectionName(r.value())) {
+                if (Context.getActualAccountId() != 1759692400 && tryForCollectionName(r.value())) {
                     continue;
                 }
                 
                 httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
                 if (httpResponseParams == null) {
-                    loggerMaker.error("httpresponse params was skipped due to invalid json requestBody");
+                    loggerMaker.error("HttpResponse params was skipped due to invalid json requestBody");
                     continue;
                 }
 
@@ -612,7 +620,7 @@ public class Main {
                     continue;
                 }
 
-                if (DataActor.actualAccountId == 1759692400) {
+                if (Context.getActualAccountId() == 1759692400) {
                     String debugHeader = HttpCallParser.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "x-debug-trace");
                     if (debugHeader != null && !debugHeader.isEmpty()) {
                         String host = HttpCallParser.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "host");
@@ -640,6 +648,7 @@ public class Main {
             }
             responseParamsToAccountMap.get(accountId).add(httpResponseParams);
         }
+    return lastSyncOffset;
     }
 
     /**
@@ -729,7 +738,7 @@ public class Main {
 
                 // Save raw agent traffic logs to MongoDB for future training (boolean feature flag)
                 try {
-                    Organization organization = OrgUtils.getOrganizationCached(DataActor.actualAccountId);
+                    Organization organization = OrgUtils.getOrganizationCached(Context.getActualAccountId());
                     if (organization != null && organization.getFeatureWiseAllowed() != null) {
                         FeatureAccess featureAccess = organization.getFeatureWiseAllowed().get("AGENT_TRAFFIC_LOGS");
                         if (featureAccess != null && featureAccess.getIsGranted()) {
@@ -767,8 +776,6 @@ public class Main {
             loggerMaker.error("Kafka producer is null");
         }
     }
-
-
 
     private static AccountInfo refreshAccountInfo(Map<Integer, AccountInfo> accountInfoMap, int accountIdInt) {
         AccountInfo accountInfo = accountInfoMap.computeIfAbsent(accountIdInt, k -> new AccountInfo());
@@ -870,7 +877,9 @@ public class Main {
     public static void initializeRuntime(){
 
         Account account = dataActor.fetchActiveAccount();
-        Context.accountId.set(account.getId());
+        int accountId = account.getId();
+        Context.accountId.set(accountId);
+        Context.setActualAccountId(accountId);
 
         Setup setup = dataActor.fetchSetup();
 
@@ -888,8 +897,7 @@ public class Main {
             loggerMaker.errorAndAddToDb(e, "error while updating dashboard version: " + e.getMessage());
         }
 
-        initFromRuntime(account.getId());
-        
+        initFromRuntime(accountId);
     }
 
     public static void initFromRuntime(int accountId) {
@@ -903,18 +911,6 @@ public class Main {
                 SingleTypeInfo.fetchCustomAuthTypes(accountId, customAuthTypes);
             }
         }, 0, 5, TimeUnit.MINUTES);
-
-    }
-
-    public static void initializeRuntimeHelper() {
-        SingleTypeInfo.init();
-        try {
-            RuntimeVersion runtimeVersion = new RuntimeVersion();
-            runtimeVersion.updateVersion(AccountSettings.API_RUNTIME_VERSION, dataActor);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "error while updating dashboard version: " + e.getMessage());
-        }
-        createIndices();
     }
     
     /**
@@ -1046,7 +1042,7 @@ public class Main {
         properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
 
-        if(DataActor.actualAccountId == 1759692400){
+        if(Context.getActualAccountId() == 1759692400){
             properties.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, 50 * 1024 * 1024); // 50MB per partition
             properties.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, 100 * 1024 * 1024); // 100MB total
         }

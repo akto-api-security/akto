@@ -16,7 +16,7 @@ public class TestExecutorModifierTest {
 
     @Test
     public void testProcessResponseWithValidJsonString() {
-        String rawResponse = "{\"model\":\"llama3:8b\",\"response\":\"{\\\"add_header\\\":\\\"Authorization\\\"}\"}";
+        String rawResponse = "{\"add_header\":\"Authorization\"}";
         BasicDBObject result = modifier.processResponse(rawResponse);
         assertTrue(result.containsKey("add_header"));
         assertEquals("Authorization", result.get("add_header"));
@@ -24,7 +24,7 @@ public class TestExecutorModifierTest {
 
     @Test
     public void testProcessResponseWithValidJsonObject() {
-        String rawResponse = "{\"model\":\"llama3:8b\",\"response\":\"{\\\"modify_header\\\":{\\\"header1\\\":\\\"value1\\\"}}\"}";
+        String rawResponse = "{\"modify_header\":{\"header1\":\"value1\"}}";
         BasicDBObject result = modifier.processResponse(rawResponse);
         assertTrue(result.containsKey("modify_header"));
         Object val = result.get("modify_header");
@@ -33,7 +33,7 @@ public class TestExecutorModifierTest {
 
     @Test
     public void testProcessResponseWithValidJsonArray() {
-        String rawResponse = "{\"model\":\"llama3:8b\",\"response\":\"{\\\"add_header\\\":[{\\\"Authorization\\\":\\\"\\\"}]}\"}";
+        String rawResponse = "{\"add_header\":[{\"Authorization\":\"\"}]}";
         BasicDBObject result = modifier.processResponse(rawResponse);
         assertTrue(result.containsKey("add_header"));
         Object val = result.get("add_header");
@@ -42,26 +42,21 @@ public class TestExecutorModifierTest {
 
     @Test
     public void testProcessResponseWithNotFound() {
-        String rawResponse = "{\"model\":\"llama3:8b\",\"response\":\"not_found\"}";
+        String rawResponse = "not_found";
         BasicDBObject result = modifier.processResponse(rawResponse);
         assertTrue(result.isEmpty());
     }
 
     @Test
     public void testProcessResponseWithMalformedJson() {
-        String rawResponse = "{\"model\":\"llama3:8b\",\"response\":\"{invalid_json}\"}";
+        String rawResponse = "{invalid_json}";
         BasicDBObject result = modifier.processResponse(rawResponse);
         assertTrue(result.isEmpty());
     }
 
     @Test
     public void testProcessResponseWithAddHeaderObject() {
-        String rawResponse = "{" +
-                "\"model\":\"llama3:8b\"," +
-                "\"created_at\":\"2025-06-03T07:43:04.117353591Z\"," +
-                "\"response\":\"{ \\\"add_header\\\": {\\\"Authorization\\\": \\\"Bearer <your_token>\\\" } }\\n\\nNote: You would need to replace \\\"<your_token>\\\" with a valid API token for this operation to be successful.\"," +
-                "\"done\":true," +
-                "\"done_reason\":\"stop\",\n\"context\":[128006,882,128007,271],\n\"total_duration\":5084313861}";
+        String rawResponse = "{ \"add_header\": {\"Authorization\": \"Bearer <your_token>\" } }\n\nNote: You would need to replace \"<your_token>\" with a valid API token for this operation to be successful.";
         BasicDBObject result = modifier.processResponse(rawResponse);
         assertTrue(result.containsKey("add_header"));
         Object addHeaderObj = result.get("add_header");

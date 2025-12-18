@@ -48,8 +48,6 @@ import org.json.JSONObject;
 
 public abstract class DataActor {
 
-    public static int actualAccountId;
-
     public abstract AccountSettings fetchAccountSettings();
 
     public abstract long fetchEstimatedDocCount();

@@ -454,7 +454,7 @@ public class Executor {
         ApiInfo.ApiInfoKey apiInfoKey) {
         List<BasicDBObject> generatedOperationKeyValuePairs = new ArrayList<>();
         try {
-            int accountId = DataActor.actualAccountId;
+            int accountId = Context.getActualAccountId();
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
             if (featureAccess.getIsGranted()) {
 
