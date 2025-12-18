@@ -178,7 +178,7 @@ public class Filter {
         boolean querySetUpdated = false;
         String operationPrompt = "";
         try {
-            int accountId = DataActor.actualAccountId;
+            int accountId = Context.getActualAccountId();
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
             if (featureAccess.getIsGranted()) {
 

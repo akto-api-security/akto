@@ -50,7 +50,7 @@ public class AktoPolicyNew {
         fetchFilters();
 
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
-        int accountId = Context.accountId.get();
+        int accountId = Context.getActualAccountId();
         redact = accountId == 1718042191;
         if (accountSettings != null) {
             List<String> cidrList = accountSettings.getPrivateCidrList();
