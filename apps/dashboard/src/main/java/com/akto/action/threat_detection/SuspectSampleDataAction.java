@@ -345,6 +345,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
             String.format("%s/api/dashboard/delete_malicious_events", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
+    post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
 
     DeleteMaliciousEventsRequest.Builder requestBuilder = DeleteMaliciousEventsRequest.newBuilder();
 

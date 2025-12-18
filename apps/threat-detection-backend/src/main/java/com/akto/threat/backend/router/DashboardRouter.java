@@ -476,6 +476,8 @@ public class DashboardRouter implements ARouter {
             .post("/update_malicious_event_status")
             .blockingHandler(ctx -> {
                 RequestBody reqBody = ctx.body();
+                String contextSource = getContextSourceHeader(ctx);
+
                 UpdateMaliciousEventStatusRequest req = ProtoMessageUtils.<
                     UpdateMaliciousEventStatusRequest
                 >toProtoMessage(
@@ -510,7 +512,8 @@ public class DashboardRouter implements ARouter {
                     eventIds,
                     filterMap,
                     req.getStatus(),
-                    req.getJiraTicketUrl()
+                    req.getJiraTicketUrl(),
+                    contextSource
                 );
 
                 UpdateMaliciousEventStatusResponse resp = UpdateMaliciousEventStatusResponse.newBuilder()
@@ -529,6 +532,8 @@ public class DashboardRouter implements ARouter {
             .post("/delete_malicious_events")
             .blockingHandler(ctx -> {
                 RequestBody reqBody = ctx.body();
+                String contextSource = getContextSourceHeader(ctx);
+
                 DeleteMaliciousEventsRequest req = ProtoMessageUtils.<
                     DeleteMaliciousEventsRequest
                 >toProtoMessage(
@@ -559,7 +564,8 @@ public class DashboardRouter implements ARouter {
                 int deletedCount = dsService.deleteMaliciousEvents(
                     ctx.get("accountId"),
                     eventIds,
-                    filterMap
+                    filterMap,
+                    contextSource
                 );
 
                 DeleteMaliciousEventsResponse resp = DeleteMaliciousEventsResponse.newBuilder()

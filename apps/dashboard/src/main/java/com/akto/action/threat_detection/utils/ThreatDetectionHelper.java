@@ -1,6 +1,7 @@
 package com.akto.action.threat_detection.utils;
 
 import com.akto.ProtoMessageUtils;
+import com.akto.dao.context.Context;
 import com.akto.log.LoggerMaker;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsRequest.Filter;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.UpdateMaliciousEventStatusRequest;
@@ -83,6 +84,7 @@ public class ThreatDetectionHelper {
                     String.format("%s/api/dashboard/update_malicious_event_status", backendUrl));
             post.addHeader("Authorization", "Bearer " + apiToken);
             post.addHeader("Content-Type", "application/json");
+            post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
 
             UpdateMaliciousEventStatusRequest.Builder requestBuilder = UpdateMaliciousEventStatusRequest.newBuilder();
 

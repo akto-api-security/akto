@@ -354,7 +354,7 @@ public class MaliciousEventService {
     shouldNotCreateIndexes.put(accountId, true);
   }
 
-  public int updateMaliciousEventStatus(String accountId, List<String> eventIds, Map<String, Object> filterMap, String status, String jiraTicketUrl) {
+  public int updateMaliciousEventStatus(String accountId, List<String> eventIds, Map<String, Object> filterMap, String status, String jiraTicketUrl, String contextSource) {
     try {
       Bson update = null;
 
@@ -366,7 +366,7 @@ public class MaliciousEventService {
         update = Updates.set("jiraTicketUrl", jiraTicketUrl);
       }
 
-      Document query = buildQuery(eventIds, filterMap, "update");
+      Document query = buildQuery(eventIds, filterMap, "update", contextSource);
       if (query == null) {
         return 0;
       }
@@ -383,9 +383,9 @@ public class MaliciousEventService {
     }
   }
 
-  public int deleteMaliciousEvents(String accountId, List<String> eventIds, Map<String, Object> filterMap) {
+  public int deleteMaliciousEvents(String accountId, List<String> eventIds, Map<String, Object> filterMap, String contextSource) {
     try {
-      Document query = buildQuery(eventIds, filterMap, "delete");
+      Document query = buildQuery(eventIds, filterMap, "delete", contextSource);
       if (query == null) {
         return 0;
       }
@@ -403,13 +403,13 @@ public class MaliciousEventService {
     }
   }
 
-  private Document buildQuery(List<String> eventIds, Map<String, Object> filterMap, String operation) {
+  private Document buildQuery(List<String> eventIds, Map<String, Object> filterMap, String operation, String contextSource) {
     if (eventIds != null && !eventIds.isEmpty()) {
       // Query by event IDs
       return new Document("_id", new Document("$in", eventIds));
     } else if (filterMap != null && !filterMap.isEmpty()) {
       // Query by filter criteria
-      return buildQueryFromFilter(filterMap);
+      return buildQueryFromFilter(filterMap, contextSource);
     } else {
       logger.warn("Neither eventIds nor filterMap provided for " + operation);
       return null;
@@ -420,7 +420,7 @@ public class MaliciousEventService {
     if (eventIds != null && !eventIds.isEmpty()) {
       return "by IDs: " + eventIds;
     } else if (filterMap != null && !filterMap.isEmpty()) {
-      Document query = buildQueryFromFilter(filterMap);
+      Document query = buildQueryFromFilter(filterMap, null);
       return "by filter: " + query.toJson();
     }
     return "";
@@ -448,7 +448,7 @@ public class MaliciousEventService {
     }
   }
 
-  private Document buildQueryFromFilter(Map<String, Object> filter) {
+  private Document buildQueryFromFilter(Map<String, Object> filter, String contextSource) {
     Document query = new Document();
 
     // Handle ips/actors filter
@@ -506,6 +506,12 @@ public class MaliciousEventService {
     String latestApiOrigRegex = (String) filter.get("latestApiOrigRegex");
     if (latestApiOrigRegex != null && !latestApiOrigRegex.isEmpty()) {
       query.append("latestApiOrig", new Document("$regex", latestApiOrigRegex));
+    }
+
+    // Apply simple context filter (only for ENDPOINT and AGENTIC)
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    if (!contextFilter.isEmpty()) {
+      query.putAll(contextFilter);
     }
 
     return query;
