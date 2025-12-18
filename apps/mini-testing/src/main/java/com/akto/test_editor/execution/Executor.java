@@ -237,11 +237,20 @@ public class Executor {
 
         if(result.isEmpty()){
             if(requestSent){
-                // Request was sent but failed
+                // Request was sent but failed - likely response processing issues
                 error_messages.add(TestError.API_REQUEST_FAILED.getMessage());
             } else if (requestAttempted && !requestSent) {
-                // Request was attempted but failed before sending
-                error_messages.add(TestError.API_REQUEST_FAILED.getMessage());
+                // Request was attempted but failed before sending - analyze error to categorize
+                // Check if we already have a detailed error message in error_messages from the catch block
+                if (!error_messages.isEmpty()) {
+                    String lastError = error_messages.get(error_messages.size() - 1);
+                    TestError specificError = categorizeError(lastError);
+                    // Replace the generic error message with the specific one
+                    error_messages.set(error_messages.size() - 1, specificError.getMessage());
+                } else {
+                    // Fallback if no error message was captured
+                    error_messages.add(TestError.API_REQUEST_FAILED_BEFORE_SENDING.getMessage());
+                }
             } else if (allRequestsSkippedDueToMatch) {
                 // All requests were skipped because test payload matches original
                 error_messages.add(TestError.NO_REQUEST_ATTEMPTED.getMessage());
@@ -535,6 +544,54 @@ public class Executor {
             // For other types, add the key-value pair directly
             result.add(new BasicDBObject(parentKey, obj.toString()));
         }
+    }
+
+    /**
+     * Categorizes error based on exception message to provide more specific error feedback
+     */
+    static TestError categorizeError(String errorMessage) {
+        if (errorMessage == null) {
+            return TestError.API_REQUEST_FAILED;
+        }
+
+        String lowerErrorMsg = errorMessage.toLowerCase();
+
+        // Check for timeout errors
+        if (lowerErrorMsg.contains("timeout") || lowerErrorMsg.contains("timed out")) {
+            return TestError.API_CONNECTION_TIMEOUT;
+        }
+
+        // Check for connection refused
+        if (lowerErrorMsg.contains("connection refused") || lowerErrorMsg.contains("econnrefused")) {
+            return TestError.API_CONNECTION_REFUSED;
+        }
+
+        // Check for host unreachable / network errors / DNS failures
+        if (lowerErrorMsg.contains("unreachable") || lowerErrorMsg.contains("no route to host")
+            || lowerErrorMsg.contains("network is unreachable") || lowerErrorMsg.contains("unknownhost")
+            || lowerErrorMsg.contains("nodename") || lowerErrorMsg.contains("name or service not known")
+            || lowerErrorMsg.contains("unknown host") || lowerErrorMsg.contains("servname")) {
+            return TestError.API_HOST_UNREACHABLE;
+        }
+
+        // Check for SSL/TLS errors
+        if (lowerErrorMsg.contains("ssl") || lowerErrorMsg.contains("tls")
+            || lowerErrorMsg.contains("certificate") || lowerErrorMsg.contains("handshake")) {
+            return TestError.API_SSL_HANDSHAKE_FAILED;
+        }
+
+        // Check for response body issues
+        if (lowerErrorMsg.contains("couldn't read response body") || lowerErrorMsg.contains("response body is null")) {
+            return TestError.API_RESPONSE_BODY_NULL;
+        }
+
+        // Check for parsing errors
+        if (lowerErrorMsg.contains("parse") || lowerErrorMsg.contains("parsing")) {
+            return TestError.API_RESPONSE_PARSE_FAILED;
+        }
+
+        // Default to generic failure
+        return TestError.API_REQUEST_FAILED_BEFORE_SENDING;
     }
 
     private static boolean removeAuthIfNotChanged(RawApi originalRawApi, RawApi testRawApi, String authMechanismHeaderKey, List<CustomAuthType> customAuthTypes) {

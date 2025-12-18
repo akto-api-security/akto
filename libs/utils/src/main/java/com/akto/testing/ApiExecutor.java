@@ -148,7 +148,7 @@ public class ApiExecutor {
             } else {
                 loggerMaker.error("Error while executing request " + request.url() + ": " + e);
             }
-            throw new Exception("Api Call failed");
+            throw new Exception("Api Call failed: " + e.getMessage(), e);
         } finally {
             if (response != null) {
                 response.close();
