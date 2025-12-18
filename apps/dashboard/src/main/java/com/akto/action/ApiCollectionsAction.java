@@ -59,6 +59,9 @@ import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
 import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.dto.type.URLMethods;
 
+import org.apache.struts2.json.annotations.JSON;
+
+
 public class ApiCollectionsAction extends UserAction {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiCollectionsAction.class, LogDb.DASHBOARD);
@@ -1046,6 +1049,11 @@ public class ApiCollectionsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    @JSON(serialize = false)
+    public Map<String, List<Integer>> getUserCollectionMap() {
+        return userCollectionMap;
+    }
+
     public void setUserCollectionMap(Map<String, List<Integer>> userCollectionMap) {
         this.userCollectionMap = userCollectionMap;
     }
@@ -1500,6 +1508,11 @@ public class ApiCollectionsAction extends UserAction {
         this.apiCollections = apiCollections;
     }
 
+    @JSON(serialize = false)
+    public String getCollectionName() {
+        return this.collectionName;
+    }
+
     public void setCollectionName(String collectionName) {
         this.collectionName = collectionName;
     }
@@ -1580,6 +1593,11 @@ public class ApiCollectionsAction extends UserAction {
         this.envType = envType;
     }
 
+    @JSON(serialize = false)
+    public List<Integer> getApiCollectionIds() {
+        return apiCollectionIds;
+    }
+
     public void setApiCollectionIds(List<Integer> apiCollectionIds) {
         this.apiCollectionIds = apiCollectionIds;
     }
@@ -1628,8 +1646,17 @@ public class ApiCollectionsAction extends UserAction {
         this.description = description;
     }
 
+    @JSON(serialize = false)
+    public boolean getResetEnvTypes() {
+        return resetEnvTypes;
+    }
+
     public void setResetEnvTypes(boolean resetEnvTypes) {
         this.resetEnvTypes = resetEnvTypes;
     }
 
+    @JSON(serialize = false)
+    public boolean getCurrentIsOutOfTestingScopeVal() {
+        return currentIsOutOfTestingScopeVal;
+    }
 }
