@@ -29,6 +29,7 @@ public class ThreatUtils {
                 new Document("contextSource", new Document("$ne", "ENDPOINT"))
             ));
         }
+        // No logic for API
         return new Document();
     }
 
