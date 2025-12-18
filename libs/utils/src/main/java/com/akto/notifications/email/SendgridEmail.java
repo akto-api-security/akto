@@ -1,5 +1,6 @@
 package com.akto.notifications.email;
 
+import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.notifications.data.TestingAlertData;
 import com.akto.onprem.Constants;
 import com.sendgrid.Method;
@@ -16,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
+import java.util.Map;
 
 public class SendgridEmail {
 
@@ -92,7 +94,100 @@ public class SendgridEmail {
         return mail;
     }
 
-    public Mail buildTestingRunResultsEmail(TestingAlertData data, String email, String aktoUrl, String userName) {
+    private void buildTemplateWithYamlTemplates(Personalization personalization, Map<String, YamlTemplate> yamlTemplates, Map<String, Integer> apisAffectedCount) {
+        if (yamlTemplates == null || apisAffectedCount == null || yamlTemplates.isEmpty() || apisAffectedCount.isEmpty()) {
+            personalization.addDynamicTemplateData("findingsTable", "");
+            return;
+        }
+
+        StringBuilder tableHtml = new StringBuilder();
+        tableHtml.append("<table style=\"width: 100%; border-collapse: collapse; margin: 20px 0; font-family: Arial, sans-serif;\">");
+        
+        // Table header
+        tableHtml.append("<thead>");
+        tableHtml.append("<tr style=\"background-color: #f5f5f5; border-bottom: 2px solid #ddd;\">");
+        tableHtml.append("<th style=\"padding: 12px; text-align: left; border: 1px solid #ddd; font-weight: bold;\">S.No.</th>");
+        tableHtml.append("<th style=\"padding: 12px; text-align: left; border: 1px solid #ddd; font-weight: bold;\">Issue</th>");
+        tableHtml.append("<th style=\"padding: 12px; text-align: left; border: 1px solid #ddd; font-weight: bold;\">Issue description</th>");
+        tableHtml.append("<th style=\"padding: 12px; text-align: left; border: 1px solid #ddd; font-weight: bold;\">APIs affected</th>");
+        tableHtml.append("<th style=\"padding: 12px; text-align: left; border: 1px solid #ddd; font-weight: bold;\">Issue Category</th>");
+        tableHtml.append("<th style=\"padding: 12px; text-align: left; border: 1px solid #ddd; font-weight: bold;\">Impact</th>");
+        tableHtml.append("</tr>");
+        tableHtml.append("</thead>");
+        
+        // Table body
+        tableHtml.append("<tbody>");
+        int serialNumber = 1;
+        
+        for(Map.Entry<String, Integer> entry : apisAffectedCount.entrySet()) {
+            String template = entry.getKey();
+            int apisAffected = entry.getValue();
+            YamlTemplate yamlTemplate = yamlTemplates.get(template);
+            
+            if (yamlTemplate == null || yamlTemplate.getInfo() == null) {
+                continue;
+            }
+            
+            String issueName = yamlTemplate.getInfo().getName();
+            if (StringUtils.isBlank(issueName)) {
+                issueName = template;
+            }
+            
+            String description = yamlTemplate.getInfo().getDescription();
+            if (StringUtils.isBlank(description)) {
+                description = "-";
+            }
+            
+            String severity = yamlTemplate.getInfo().getSeverity();
+            if (StringUtils.isBlank(severity)) {
+                severity = "-";
+            }
+            
+            String categoryName = "-";
+            if (yamlTemplate.getInfo().getCategory() != null) {
+                String displayName = yamlTemplate.getInfo().getCategory().getDisplayName();
+                String shortName = yamlTemplate.getInfo().getCategory().getShortName();
+                if (StringUtils.isNotBlank(displayName)) {
+                    categoryName = displayName;
+                    if (StringUtils.isNotBlank(shortName)) {
+                        categoryName += " (" + shortName + ")";
+                    }
+                } else if (StringUtils.isNotBlank(yamlTemplate.getInfo().getCategory().getName())) {
+                    categoryName = yamlTemplate.getInfo().getCategory().getName();
+                }
+            }
+            
+            // Build table row
+            tableHtml.append("<tr style=\"border-bottom: 1px solid #ddd;\">");
+            tableHtml.append("<td style=\"padding: 12px; border: 1px solid #ddd;\">").append(serialNumber).append("</td>");
+            tableHtml.append("<td style=\"padding: 12px; border: 1px solid #ddd;\">").append(escapeHtml(issueName)).append("</td>");
+            tableHtml.append("<td style=\"padding: 12px; border: 1px solid #ddd;\">").append(escapeHtml(description)).append("</td>");
+            tableHtml.append("<td style=\"padding: 12px; border: 1px solid #ddd;\">").append(apisAffected).append("</td>");
+            tableHtml.append("<td style=\"padding: 12px; border: 1px solid #ddd;\">").append(escapeHtml(categoryName)).append("</td>");
+            tableHtml.append("<td style=\"padding: 12px; border: 1px solid #ddd;\">").append(escapeHtml(severity)).append("</td>");
+            tableHtml.append("</tr>");
+            
+            serialNumber++;
+        }
+        
+        tableHtml.append("</tbody>");
+        tableHtml.append("</table>");
+        
+        personalization.addDynamicTemplateData("findingsTable", tableHtml.toString());
+    }
+    
+    private String escapeHtml(String text) {
+        if (text == null) {
+            return "";
+        }
+        return text.replace("&", "&amp;")
+                   .replace("<", "&lt;")
+                   .replace(">", "&gt;")
+                   .replace("\"", "&quot;")
+                   .replace("'", "&#39;");
+    }
+
+    public Mail buildTestingRunResultsEmail(TestingAlertData data, String email, String aktoUrl, String userName, Map<String, Integer> apisAffectedCount, Map<String, YamlTemplate> yamlTemplates) {
         Mail mail = new Mail(); 
         Personalization personalization = new Personalization();
         String templateId = "d-e6ec36c175564acf844c95a704a3051e";
@@ -109,6 +204,10 @@ public class SendgridEmail {
         personalization.addDynamicTemplateData("collection", data.getCollection());
         personalization.addDynamicTemplateData("scanTimeInSeconds", String.valueOf(data.getScanTimeInSeconds()));
         personalization.addDynamicTemplateData("viewOnAktoURL", aktoUrl);
+        
+        // Build and add findings table
+        buildTemplateWithYamlTemplates(personalization, yamlTemplates, apisAffectedCount);
+        
         return mail;
     }
 
