@@ -236,7 +236,6 @@ public class Executor {
         }
 
         if(result.isEmpty()){
-            String message = rawApi.getOriginalMessage();
             if(requestSent){
                 // Request was sent but failed
                 error_messages.add(TestError.API_REQUEST_FAILED.getMessage());
@@ -246,20 +245,10 @@ public class Executor {
             } else if (allRequestsSkippedDueToMatch) {
                 // All requests were skipped because test payload matches original
                 error_messages.add(TestError.NO_REQUEST_ATTEMPTED.getMessage());
-                message = "";
             } else {
-                // No request was attempted (could be due to execution algorithm failure or other reasons)
-                // If error_messages already has specific errors (e.g., from singleReq.getErrMsg()), keep them
-                if (error_messages.isEmpty()) {
-                    error_messages.add(TestError.NO_API_REQUEST.getMessage());
-                }
-                /*
-                 * In case no API requests are created,
-                 * do not store the original message
-                 */
-                message = "";
+                error_messages.add(TestError.NO_API_REQUEST.getMessage());
             }
-            result.add(new TestResult(null, message, error_messages, 0, false, TestResult.Confidence.HIGH, null));
+            result.add(new TestResult(null, rawApi.getOriginalMessage(), error_messages, 0, false, TestResult.Confidence.HIGH, null));
         }
 
         yamlTestResult = new YamlTestResult(result, workflowTest);
