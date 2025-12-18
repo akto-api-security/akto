@@ -25,6 +25,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.To
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import io.vertx.core.Vertx;
 import io.vertx.ext.web.RequestBody;
 import io.vertx.ext.web.Router;
@@ -32,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.ArrayList;
+import org.apache.commons.lang3.StringUtils;
 
 public class DashboardRouter implements ARouter {
 
@@ -47,6 +49,13 @@ public class DashboardRouter implements ARouter {
         this.dsService = dsService;
         this.threatActorService = threatActorService;
         this.threatApiService = threatApiService;
+    }
+
+    private String getContextSourceHeader(io.vertx.ext.web.RoutingContext ctx) {
+        return StringUtils.defaultIfBlank(
+            ctx.request().getHeader("x-context-source"),
+            CONTEXT_SOURCE.API.name()
+        );
     }
 
     private Map<String, Object> convertProtoFilterToMap(ListMaliciousRequestsRequest.Filter protoFilter) {
@@ -106,11 +115,7 @@ public class DashboardRouter implements ARouter {
         router
             .post("/list_malicious_requests")
             .blockingHandler(ctx -> {
-                String contextSource = ctx.request().getHeader("x-context-source");
-                if (contextSource == null || contextSource.isEmpty()) {
-                    ctx.response().setStatusCode(400).end("Missing required header: x-context-source");
-                    return;
-                }
+                String contextSource = getContextSourceHeader(ctx);
 
                 RequestBody reqBody = ctx.body();
                 ListMaliciousRequestsRequest req = ProtoMessageUtils.<
@@ -142,11 +147,7 @@ public class DashboardRouter implements ARouter {
         router
             .post("/list_threat_actors")
             .blockingHandler(ctx -> {
-                String contextSource = ctx.request().getHeader("x-context-source");
-                if (contextSource == null || contextSource.isEmpty()) {
-                    ctx.response().setStatusCode(400).end("Missing required header: x-context-source");
-                    return;
-                }
+                String contextSource = getContextSourceHeader(ctx);
 
                 RequestBody reqBody = ctx.body();
                 ListThreatActorsRequest req = ProtoMessageUtils.<
@@ -173,11 +174,7 @@ public class DashboardRouter implements ARouter {
         router
             .post("/list_threat_apis")
             .blockingHandler(ctx -> {
-                String contextSource = ctx.request().getHeader("x-context-source");
-                if (contextSource == null || contextSource.isEmpty()) {
-                    ctx.response().setStatusCode(400).end("Missing required header: x-context-source");
-                    return;
-                }
+                String contextSource = getContextSourceHeader(ctx);
 
                 RequestBody reqBody = ctx.body();
                 ListThreatApiRequest req = ProtoMessageUtils.<
@@ -200,11 +197,7 @@ public class DashboardRouter implements ARouter {
         router
             .post("/get_actors_count_per_country")
             .blockingHandler(ctx -> {
-                String contextSource = ctx.request().getHeader("x-context-source");
-                if (contextSource == null || contextSource.isEmpty()) {
-                    ctx.response().setStatusCode(400).end("Missing required header: x-context-source");
-                    return;
-                }
+                String contextSource = getContextSourceHeader(ctx);
 
                 RequestBody reqBody = ctx.body();
                 ThreatActorByCountryRequest req = ProtoMessageUtils.<
@@ -298,11 +291,7 @@ public class DashboardRouter implements ARouter {
         router
         .post("/get_subcategory_wise_count")
             .blockingHandler(ctx -> {
-                String contextSource = ctx.request().getHeader("x-context-source");
-                if (contextSource == null || contextSource.isEmpty()) {
-                    ctx.response().setStatusCode(400).end("Missing required header: x-context-source");
-                    return;
-                }
+                String contextSource = getContextSourceHeader(ctx);
 
                 RequestBody reqBody = ctx.body();
                 ThreatCategoryWiseCountRequest req = ProtoMessageUtils.<
@@ -329,11 +318,7 @@ public class DashboardRouter implements ARouter {
             router
             .post("/get_severity_wise_count")
             .blockingHandler(ctx -> {
-                String contextSource = ctx.request().getHeader("x-context-source");
-                if (contextSource == null || contextSource.isEmpty()) {
-                    ctx.response().setStatusCode(400).end("Missing required header: x-context-source");
-                    return;
-                }
+                String contextSource = getContextSourceHeader(ctx);
 
                 RequestBody reqBody = ctx.body();
                 ThreatSeverityWiseCountRequest req = ProtoMessageUtils.<
@@ -432,11 +417,7 @@ public class DashboardRouter implements ARouter {
         router
             .post("/get_daily_actor_count")
             .blockingHandler(ctx -> {
-                String contextSource = ctx.request().getHeader("x-context-source");
-                if (contextSource == null || contextSource.isEmpty()) {
-                    ctx.response().setStatusCode(400).end("Missing required header: x-context-source");
-                    return;
-                }
+                String contextSource = getContextSourceHeader(ctx);
 
                 RequestBody reqBody = ctx.body();
                 DailyActorsCountRequest req = ProtoMessageUtils.<
@@ -465,11 +446,7 @@ public class DashboardRouter implements ARouter {
         router
             .post("/get_threat_activity_timeline")
             .blockingHandler(ctx -> {
-                String contextSource = ctx.request().getHeader("x-context-source");
-                if (contextSource == null || contextSource.isEmpty()) {
-                    ctx.response().setStatusCode(400).end("Missing required header: x-context-source");
-                    return;
-                }
+                String contextSource = getContextSourceHeader(ctx);
 
                 RequestBody reqBody = ctx.body();
                 ThreatActivityTimelineRequest req = ProtoMessageUtils.<
@@ -600,11 +577,7 @@ public class DashboardRouter implements ARouter {
         router
             .post("/get_top_n_data")
             .blockingHandler(ctx -> {
-                String contextSource = ctx.request().getHeader("x-context-source");
-                if (contextSource == null || contextSource.isEmpty()) {
-                    ctx.response().setStatusCode(400).end("Missing required header: x-context-source");
-                    return;
-                }
+                String contextSource = getContextSourceHeader(ctx);
 
                 RequestBody reqBody = ctx.body();
                 FetchTopNDataRequest req = ProtoMessageUtils.<

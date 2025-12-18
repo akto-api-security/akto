@@ -224,6 +224,10 @@ public class MaliciousEventService {
     Map<String, Integer> sort = request.getSortMap();
     ListMaliciousRequestsRequest.Filter filter = request.getFilter();
 
+    if(filter.getLatestAttackList() == null || filter.getLatestAttackList().isEmpty()) {
+      return ListMaliciousRequestsResponse.newBuilder().build();
+    }
+
     Document query = new Document();
     if (!filter.getActorsList().isEmpty()) {
       query.append("actor", new Document("$in", filter.getActorsList()));
@@ -253,7 +257,10 @@ public class MaliciousEventService {
       query.append("latestApiOrig", new Document("$regex", filter.getLatestApiOrigRegex()));
     }
 
-    // NOTE: Do NOT add filterId filter here - it will be handled by context-aware filtering below
+
+    if (!filter.getLatestAttackList().isEmpty()) {
+      query.append("filterId", new Document("$in", filter.getLatestAttackList()));
+    }
 
     // Handle status filter
     if (filter.hasStatusFilter()) {
@@ -290,9 +297,11 @@ public class MaliciousEventService {
       applyLabelFilter(query, labelEnum);
     }
 
-    // Apply context-aware filtering
-    List<String> latestAttackList = filter.getLatestAttackList().isEmpty() ? null : filter.getLatestAttackList();
-    query = ThreatUtils.mergeContextFilter(query, contextSource, latestAttackList);
+    // Apply simple context filter (only for ENDPOINT and AGENTIC)
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    if (!contextFilter.isEmpty()) {
+      query.putAll(contextFilter);
+    }
 
     long total = maliciousEventDao.countDocuments(accountId, query);
     try (MongoCursor<MaliciousEventDto> cursor =

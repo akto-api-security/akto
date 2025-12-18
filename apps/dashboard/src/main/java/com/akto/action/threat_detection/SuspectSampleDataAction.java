@@ -28,6 +28,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 
+import static com.akto.action.threat_detection.utils.ThreatsUtils.getTemplates;
 import com.akto.action.threat_detection.utils.ThreatDetectionHelper;
 import lombok.Getter;
 import lombok.Setter;
@@ -120,7 +121,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       filter.put("latestApiOrigRegex", this.latestApiOrigRegex);
     }
 
-    filter.put("latestAttack", latestAttack);
+    filter.put("latestAttack", getTemplates(latestAttack));
 
     if (this.statusFilter != null) {
       filter.put("statusFilter", this.statusFilter);
@@ -259,8 +260,9 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       filterBuilder.addAllTypes(this.types);
     }
     // Always populate latestAttack with available templates, even if empty
-    if (latestAttack != null && !latestAttack.isEmpty()) {
-      filterBuilder.addAllLatestAttack(latestAttack);
+    List<String> templates = getTemplates(latestAttack);
+    if (templates != null && !templates.isEmpty()) {
+      filterBuilder.addAllLatestAttack(templates);
     }
     if (this.statusFilter != null) {
       filterBuilder.setStatusFilter(this.statusFilter);

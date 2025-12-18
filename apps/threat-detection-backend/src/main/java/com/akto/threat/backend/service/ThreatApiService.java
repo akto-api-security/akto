@@ -42,6 +42,10 @@ public class ThreatApiService {
     List<Document> base = new ArrayList<>();
     ListThreatApiRequest.Filter filter = request.getFilter();
 
+    if(filter.getLatestAttackList() == null || filter.getLatestAttackList().isEmpty()) {
+      return ListThreatApiResponse.newBuilder().build();
+    }
+
     Document match = new Document();
     if (!filter.getMethodsList().isEmpty()) {
       match.append("latestApiMethod", new Document("$in", filter.getMethodsList()));
@@ -51,7 +55,9 @@ public class ThreatApiService {
       match.append("latestApiEndpoint", new Document("$in", filter.getUrlsList()));
     }
 
-    // NOTE: filterId filter will be handled by context-aware filtering below
+    if (!filter.getLatestAttackList().isEmpty()) {
+      match.append("filterId", new Document("$in", filter.getLatestAttackList()));
+    }
 
     if (filter.hasDetectedAtTimeRange()) {
       long start = filter.getDetectedAtTimeRange().getStart();
@@ -59,9 +65,11 @@ public class ThreatApiService {
       match.append("detectedAt", new Document("$gte", start).append("$lte", end));
     }
 
-    // Apply context-aware filtering
-    List<String> latestAttackList = filter.getLatestAttackList().isEmpty() ? null : filter.getLatestAttackList();
-    match = ThreatUtils.mergeContextFilter(match, contextSource, latestAttackList);
+    // Apply simple context filter (only for ENDPOINT and AGENTIC)
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    if (!contextFilter.isEmpty()) {
+      match.putAll(contextFilter);
+    }
 
     if (!match.isEmpty()) {
       base.add(new Document("$match", match));
@@ -128,22 +136,29 @@ public class ThreatApiService {
   public ThreatCategoryWiseCountResponse getSubCategoryWiseCount(
     String accountId, ThreatCategoryWiseCountRequest req, String contextSource) {
 
+    if(req.getLatestAttackList() == null || req.getLatestAttackList().isEmpty()) {
+      return ThreatCategoryWiseCountResponse.newBuilder().build();
+    }
+
     loggerMaker.info("getSubCategoryWiseCount start ts " + Context.now());
 
     List<Document> pipeline = new ArrayList<>();
     Document match = new Document();
 
-    // NOTE: filterId filter will be handled by context-aware filtering below
+    if(req.getLatestAttackList() != null && !req.getLatestAttackList().isEmpty()) {
+      match.append("filterId", new Document("$in", req.getLatestAttackList()));
+    }
 
     // 1. Match on time range
     if (req.getStartTs() != 0 || req.getEndTs() != 0) {
       match.append("detectedAt", new Document("$gte", req.getStartTs()).append("$lte", req.getEndTs()));
     }
 
-    // Apply context-aware filtering
-    List<String> latestAttackList = (req.getLatestAttackList() == null || req.getLatestAttackList().isEmpty()) ?
-        null : req.getLatestAttackList();
-    match = ThreatUtils.mergeContextFilter(match, contextSource, latestAttackList);
+    // Apply simple context filter (only for ENDPOINT and AGENTIC)
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    if (!contextFilter.isEmpty()) {
+      match.putAll(contextFilter);
+    }
 
     pipeline.add(new Document("$match", match));
 
@@ -184,6 +199,10 @@ public class ThreatApiService {
   public ThreatSeverityWiseCountResponse getSeverityWiseCount(
     String accountId, ThreatSeverityWiseCountRequest req, String contextSource) {
 
+    if(req.getLatestAttackList() == null || req.getLatestAttackList().isEmpty()) {
+      return ThreatSeverityWiseCountResponse.newBuilder().build();
+    }
+
     loggerMaker.info("getSeverityWiseCount start ts " + Context.now());
 
     List<ThreatSeverityWiseCountResponse.SeverityCount> categoryWiseCounts = new ArrayList<>();
@@ -194,17 +213,19 @@ public class ThreatApiService {
     Document match = new Document()
         .append("detectedAt", new Document("$gte", req.getStartTs())
             .append("$lte", req.getEndTs()))
+        .append("filterId", new Document("$in", req.getLatestAttackList()))
         .append("severity", new Document("$in", Arrays.asList(severities)));
 
-    // Apply context-aware filtering
-    List<String> latestAttackList = (req.getLatestAttackList() == null || req.getLatestAttackList().isEmpty()) ?
-        null : req.getLatestAttackList();
-    match = ThreatUtils.mergeContextFilter(match, contextSource, latestAttackList);
+      // Apply simple context filter (only for ENDPOINT and AGENTIC)
+      Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+      if (!contextFilter.isEmpty()) {
+          match.putAll(contextFilter);
+      }
 
-    List<Document> pipeline = new ArrayList<>();
-    pipeline.add(new Document("$match", match));
-    pipeline.add(new Document("$group", new Document("_id", "$severity")
-        .append("count", new Document("$sum", 1))));
+      List<Document> pipeline = new ArrayList<>();
+      pipeline.add(new Document("$match", match));
+      pipeline.add(new Document("$group", new Document("_id", "$severity")
+          .append("count", new Document("$sum", 1))));
 
     Map<String, Integer> severityToCount = new HashMap<>();
     try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {

@@ -31,6 +31,8 @@ import org.apache.http.util.EntityUtils;
 import org.bson.Document;
 import lombok.Getter;
 
+import static com.akto.action.threat_detection.utils.ThreatsUtils.getTemplates;
+
 public class ThreatApiAction extends AbstractThreatDetectionAction {
 
   List<DashboardThreatApi> apis;
@@ -108,7 +110,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
       {
         put("start_ts", startTs);
         put("end_ts", endTs);
-        put("latestAttack", latestAttack);
+        put("latestAttack", getTemplates(latestAttack));
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -153,7 +155,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
       {
         put("start_ts", startTs);
         put("end_ts", endTs);
-        put("latestAttack", latestAttack);
+        put("latestAttack", getTemplates(latestAttack));
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -192,7 +194,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
       {
         put("start_ts", startTs);
         put("end_ts", endTs);
-        put("latestAttack", latestAttack);
+        put("latestAttack", getTemplates(latestAttack));
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -240,7 +242,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
       {
         put("start_ts", startTs);
         put("end_ts", endTs);
-        put("latestAttack", latestAttack);
+        put("latestAttack", getTemplates(latestAttack));
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -283,7 +285,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
 
     Map<String, Object> filters = new HashMap<>();
 
-    filters.put("latestAttack", latestAttack);
+    filters.put("latestAttack", getTemplates(latestAttack));
 
     Map<String, Object> body = new HashMap<String, Object>() {
       {
@@ -338,7 +340,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
       {
         put("start_ts", startTs);
         put("end_ts", endTs);
-        put("latestAttack", latestAttack);
+        put("latestAttack", getTemplates(latestAttack));
         put("limit", 5);
       }
     };
