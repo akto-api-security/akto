@@ -1,0 +1,20 @@
+id: TEST_DNS_FAILURE
+info:
+  name: Test DNS Failure Error Categorization
+  description: Tests that DNS resolution failures are properly categorized
+  category:
+    name: TEST
+    shortName: test
+    displayName: Test Category
+  severity: LOW
+  tags: []
+
+execute:
+  type: single
+  requests:
+    - req:
+        - modify_url: "http://this-will-never-exist-akto-12345.invalid/api"
+
+validate:
+  response_code:
+    gte: 200
