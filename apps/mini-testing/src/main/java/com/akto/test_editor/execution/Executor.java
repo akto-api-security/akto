@@ -178,8 +178,13 @@ public class Executor {
         }
 
         boolean vulnerable = false;
+        boolean requestAttempted = false;
+        boolean allRequestsSkippedDueToMatch = false;
+        int skippedCount = 0;
+
         for (RawApi testReq: testRawApis) {
             if (executorNodes.size() > 0 && testReq.equals(origRawApi)) {
+                skippedCount++;
                 continue;
             }
             if (vulnerable) { //todo: introduce a flag stopAtFirstMatch
@@ -190,6 +195,7 @@ public class Executor {
                 TestResult res = null;
                 if (AgentClient.isRawApiValidForAgenticTest(testReq)) {
                     // execute agentic test here
+                    requestAttempted = true;
                     res = agentClient.executeAgenticTest(testReq, apiInfoKey.getApiCollectionId());
                 }else{
                     List<String> contentType = origRawApi.getRequest().getHeaders().getOrDefault("content-type", new ArrayList<>());
@@ -207,6 +213,7 @@ public class Executor {
                     // Add SSE endpoint header for MCP collections
                     McpSseEndpointHelper.addSseEndpointHeader(testReq.getRequest(), apiInfoKey.getApiCollectionId());
 
+                    requestAttempted = true;
                     testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
                     requestSent = true;
                     ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
@@ -222,10 +229,34 @@ public class Executor {
                 loggerMaker.errorAndAddToDb("Error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
             }
         }
-        
+
+        // Check if all requests were skipped due to matching payload
+        if (skippedCount > 0 && skippedCount == testRawApis.size()) {
+            allRequestsSkippedDueToMatch = true;
+        }
+
         if(result.isEmpty()){
             if(requestSent){
+                // Request was sent but failed - likely response processing issues
                 error_messages.add(TestError.API_REQUEST_FAILED.getMessage());
+            } else if (requestAttempted && !requestSent) {
+                // Request was attempted but failed before sending - analyze error to categorize
+                // Check if we already have a detailed error message in error_messages from the catch block
+                if (!error_messages.isEmpty()) {
+                    String lastError = error_messages.get(error_messages.size() - 1);
+                    TestError specificError = categorizeError(lastError);
+                    try {
+                        error_messages.set(error_messages.size() - 1, specificError.getMessage());                        
+                    } catch (Exception e) {
+                        // TODO: handle exception
+                    }
+                } else {
+                    // Fallback if no error message was captured
+                    error_messages.add(TestError.API_REQUEST_FAILED_BEFORE_SENDING.getMessage());
+                }
+            } else if (allRequestsSkippedDueToMatch) {
+                // All requests were skipped because test payload matches original
+                error_messages.add(TestError.NO_REQUEST_ATTEMPTED.getMessage());
             } else {
                 error_messages.add(TestError.NO_API_REQUEST.getMessage());
             }
@@ -516,6 +547,54 @@ public class Executor {
             // For other types, add the key-value pair directly
             result.add(new BasicDBObject(parentKey, obj.toString()));
         }
+    }
+
+    /**
+     * Categorizes error based on exception message to provide more specific error feedback
+     */
+    static TestError categorizeError(String errorMessage) {
+        if (errorMessage == null) {
+            return TestError.API_REQUEST_FAILED;
+        }
+
+        String lowerErrorMsg = errorMessage.toLowerCase();
+
+        // Check for timeout errors
+        if (lowerErrorMsg.contains("timeout") || lowerErrorMsg.contains("timed out")) {
+            return TestError.API_CONNECTION_TIMEOUT;
+        }
+
+        // Check for connection refused
+        if (lowerErrorMsg.contains("connection refused") || lowerErrorMsg.contains("econnrefused")) {
+            return TestError.API_CONNECTION_REFUSED;
+        }
+
+        // Check for host unreachable / network errors / DNS failures
+        if (lowerErrorMsg.contains("unreachable") || lowerErrorMsg.contains("no route to host")
+            || lowerErrorMsg.contains("network is unreachable") || lowerErrorMsg.contains("unknownhost")
+            || lowerErrorMsg.contains("nodename") || lowerErrorMsg.contains("name or service not known")
+            || lowerErrorMsg.contains("unknown host") || lowerErrorMsg.contains("servname")) {
+            return TestError.API_HOST_UNREACHABLE;
+        }
+
+        // Check for SSL/TLS errors
+        if (lowerErrorMsg.contains("ssl") || lowerErrorMsg.contains("tls")
+            || lowerErrorMsg.contains("certificate") || lowerErrorMsg.contains("handshake")) {
+            return TestError.API_SSL_HANDSHAKE_FAILED;
+        }
+
+        // Check for response body issues
+        if (lowerErrorMsg.contains("couldn't read response body") || lowerErrorMsg.contains("response body is null")) {
+            return TestError.API_RESPONSE_BODY_NULL;
+        }
+
+        // Check for parsing errors
+        if (lowerErrorMsg.contains("parse") || lowerErrorMsg.contains("parsing")) {
+            return TestError.API_RESPONSE_PARSE_FAILED;
+        }
+
+        // Default to generic failure
+        return TestError.API_REQUEST_FAILED_BEFORE_SENDING;
     }
 
     private static boolean removeAuthIfNotChanged(RawApi originalRawApi, RawApi testRawApi, String authMechanismHeaderKey, List<CustomAuthType> customAuthTypes) {
