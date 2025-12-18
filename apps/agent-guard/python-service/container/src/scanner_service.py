@@ -107,7 +107,7 @@ def get_scanner(scanner_type: str, scanner_name: str, config: Dict[str, Any]):
     
     try:
         onnx_scanners = ["Toxicity", "PromptInjection", "Bias", "Relevance", 
-                        "NoRefusal", "MaliciousURLs", "Sensitive"]
+                        "NoRefusal", "MaliciousURLs", "Sensitive", "Gibberish"]
         
         config = config or {}
         
@@ -122,6 +122,18 @@ def get_scanner(scanner_type: str, scanner_name: str, config: Dict[str, Any]):
                 config["match_type"] = "full"
             # Note: Library defaults to TangoBeeAkto/deberta-prompt-injection model
             # Enable ONNX for 27x faster performance (60-120ms vs 1500ms)
+            if "use_onnx" not in config:
+                config["use_onnx"] = True
+        elif scanner_name == "Gibberish":
+            # Use optimal threshold for gibberish detection
+            # Higher threshold means more strict detection (less false positives)
+            if "threshold" not in config:
+                config["threshold"] = 0.7
+            # Use FULL match type to scan entire input
+            if "match_type" not in config:
+                config["match_type"] = "full"
+            # Note: Library defaults to TangoBeeAkto/gibberish-detector model
+            # ONNX enabled for 5-10x faster performance
             if "use_onnx" not in config:
                 config["use_onnx"] = True
         elif scanner_name in onnx_scanners:
