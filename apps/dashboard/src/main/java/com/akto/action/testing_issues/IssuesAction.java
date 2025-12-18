@@ -60,8 +60,6 @@ import java.util.concurrent.TimeUnit;
 
 import static com.akto.util.Constants.ID;
 import static com.akto.util.Constants.ONE_DAY_TIMESTAMP;
-import com.akto.dao.ApiInfoDao;
-import com.akto.dto.ApiInfo.ApiInfoKey;
 
 public class IssuesAction extends UserAction {
 
@@ -309,25 +307,11 @@ public class IssuesAction extends UserAction {
 
         Bson notIncludedCollections = UsageMetricCalculator.excludeDemosAndDeactivated(HistoricalData.API_COLLECTION_ID);
 
-        List<Integer> collectionIds = null;
-        Bson collectionFilter = null;
-        try {
-            collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if(collectionIds != null) {
-                collectionFilter = Filters.in(HistoricalData.API_COLLECTION_ID, collectionIds);
-            }
-        } catch(Exception e){
-        }
-
         Bson filter = Filters.and(
                 notIncludedCollections,
                 Filters.gte("time", startEpoch),
                 Filters.lte("time", endTimeStamp)
         );
-
-        if (collectionFilter != null) {
-            filter = Filters.and(filter, collectionFilter);
-        }
 
         pipeline.add(Aggregates.match(filter));
 
