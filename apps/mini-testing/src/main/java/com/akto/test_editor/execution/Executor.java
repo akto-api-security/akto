@@ -245,8 +245,11 @@ public class Executor {
                 if (!error_messages.isEmpty()) {
                     String lastError = error_messages.get(error_messages.size() - 1);
                     TestError specificError = categorizeError(lastError);
-                    // Replace the generic error message with the specific one
-                    error_messages.set(error_messages.size() - 1, specificError.getMessage());
+                    try {
+                        error_messages.set(error_messages.size() - 1, specificError.getMessage());                        
+                    } catch (Exception e) {
+                        // TODO: handle exception
+                    }
                 } else {
                     // Fallback if no error message was captured
                     error_messages.add(TestError.API_REQUEST_FAILED_BEFORE_SENDING.getMessage());
