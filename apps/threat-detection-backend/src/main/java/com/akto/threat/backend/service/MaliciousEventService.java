@@ -1,6 +1,7 @@
 package com.akto.threat.backend.service;
 
 import com.akto.dto.threat_detection_backend.MaliciousEventDto;
+import com.akto.threat.backend.utils.ThreatUtils;
 import com.akto.dto.type.URLMethods;
 import com.akto.kafka.Kafka;
 import com.akto.kafka.KafkaConfig;
@@ -126,8 +127,13 @@ public class MaliciousEventService {
 
     String status = (evt.getStatus() != null && !evt.getStatus().isEmpty()) ? evt.getStatus() : ThreatDetectionConstants.ACTIVE;
 
-    MaliciousEventDto maliciousEventModel =
-        MaliciousEventDto.newBuilder()
+    // Extract contextSource from the event message
+    String contextSource = null;
+    if (evt.getContextSource() != null && !evt.getContextSource().isEmpty()) {
+        contextSource = evt.getContextSource();
+    }
+
+    MaliciousEventDto.Builder builder = MaliciousEventDto.newBuilder()
             .setDetectedAt(evt.getDetectedAt())
             .setActor(actor)
             .setFilterId(filterId)
@@ -147,8 +153,14 @@ public class MaliciousEventService {
             .setSuccessfulExploit(evt.getSuccessfulExploit())
             .setStatus(MaliciousEventDto.Status.valueOf(status.toUpperCase()))
             .setLabel(label)
-            .setHost(evt.getHost() != null ? evt.getHost() : "")
-            .build();
+            .setHost(evt.getHost() != null ? evt.getHost() : "");
+
+    // Set contextSource if available
+    if (contextSource != null && !contextSource.isEmpty()) {
+        builder.setContextSource(contextSource);
+    }
+
+    MaliciousEventDto maliciousEventModel = builder.build();
 
     this.kafka.send(
         KafkaUtils.generateMsg(
@@ -201,7 +213,7 @@ public class MaliciousEventService {
   }
 
   public ListMaliciousRequestsResponse listMaliciousRequests(
-      String accountId, ListMaliciousRequestsRequest request) {
+      String accountId, ListMaliciousRequestsRequest request, String contextSource) {
 
     if(!shouldNotCreateIndexes.getOrDefault(accountId, false)) {
       createIndexIfAbsent(accountId);
@@ -283,6 +295,12 @@ public class MaliciousEventService {
       String labelString = filter.getLabel();
       MaliciousEventDto.Label labelEnum = convertStringLabelToModelLabel(labelString);
       applyLabelFilter(query, labelEnum);
+    }
+
+    // Apply simple context filter (only for ENDPOINT and AGENTIC)
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    if (!contextFilter.isEmpty()) {
+      query.putAll(contextFilter);
     }
 
     long total = maliciousEventDao.countDocuments(accountId, query);

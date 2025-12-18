@@ -1,6 +1,7 @@
 package com.akto.threat.backend.utils;
 
 import com.akto.threat.backend.dao.MaliciousEventDao;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.IndexOptions;
@@ -11,6 +12,25 @@ import org.bson.conversions.Bson;
 import java.util.*;
 
 public class ThreatUtils {
+
+    public static Document buildSimpleContextFilter(String contextSource) {
+        if (contextSource == null || contextSource.isEmpty()) {
+            return new Document();
+        }
+        String contextSourceUpper = contextSource.toUpperCase();
+
+        if (CONTEXT_SOURCE.ENDPOINT.name().equals(contextSourceUpper)) {
+            return new Document("contextSource", CONTEXT_SOURCE.ENDPOINT.name());
+        } else if (CONTEXT_SOURCE.AGENTIC.name().equals(contextSourceUpper)) {
+            // AGENTIC: show records where contextSource is null/doesn't exist OR contextSource != "ENDPOINT"
+            return new Document("$or", Arrays.asList(
+                new Document("contextSource", null),
+                new Document("contextSource", new Document("$exists", false)),
+                new Document("contextSource", new Document("$ne", "ENDPOINT"))
+            ));
+        }
+        return new Document();
+    }
 
     public static void createIndexIfAbsent(String accountId, MaliciousEventDao maliciousEventDao) {
         // Get the collection from DAO - this will create the collection if it doesn't exist
