@@ -98,7 +98,7 @@ public class HttpCallParser {
         for (ApiCollection apiCollection: apiCollections) {
             apiCollectionsMap.put(apiCollection.getId(), apiCollection);
         }
-        if (DataActor.actualAccountId == 1745303931 || DataActor.actualAccountId == 1741069294 || DataActor.actualAccountId == 1749515934 || DataActor.actualAccountId == 1753864648) {
+        if (Context.getActualAccountId() == 1745303931 || Context.getActualAccountId() == 1741069294 || Context.getActualAccountId() == 1749515934 || Context.getActualAccountId() == 1753864648) {
             this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, Main.isOnprem, RuntimeMode.isHybridDeployment(), apiCollectionsMap);
         }
     }
@@ -172,7 +172,7 @@ public class HttpCallParser {
                 return;
             }
 
-            int accountId = DataActor.actualAccountId;
+            int accountId = Context.getActualAccountId();
             // to:do check for on-prem air gapped deployments
             Organization organization = OrgUtils.getOrganizationCached(accountId);
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.ACTIVE_ENDPOINTS);
@@ -317,7 +317,7 @@ public class HttpCallParser {
         if (filterMap != null && !filterMap.isEmpty()) {
             FILTER_TYPE filterType = FILTER_TYPE.UNCHANGED; 
 
-            if (INPROCESS_ADVANCED_FILTERS_ACCOUNTS.contains(DataActor.actualAccountId)) {
+            if (INPROCESS_ADVANCED_FILTERS_ACCOUNTS.contains(Context.getActualAccountId())) {
 
                 filterType = applyTrafficFilterInProcess(responseParams);
             }else{
@@ -349,7 +349,7 @@ public class HttpCallParser {
             apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
         }
 
-        if (DataActor.actualAccountId == 1745303931 || DataActor.actualAccountId == 1741069294 || DataActor.actualAccountId == 1749515934 || DataActor.actualAccountId == 1753864648) {
+        if (Context.getActualAccountId() == 1745303931 || Context.getActualAccountId() == 1741069294 || Context.getActualAccountId() == 1749515934 || Context.getActualAccountId() == 1753864648) {
             for (HttpResponseParams responseParam: filteredResponseParams) {
                 dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
             }
@@ -372,7 +372,7 @@ public class HttpCallParser {
             }
             fetchSyncLimit();
             apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit, mcpAssetSyncLimit, aiAssetSyncLimit);
-            if (DataActor.actualAccountId == 1745303931 || DataActor.actualAccountId == 1741069294 || DataActor.actualAccountId == 1749515934 || DataActor.actualAccountId == 1753864648) {
+            if (Context.getActualAccountId() == 1745303931 || Context.getActualAccountId() == 1741069294 || Context.getActualAccountId() == 1749515934 || Context.getActualAccountId() == 1753864648) {
                 dependencyAnalyser.dbState = apiCatalogSync.dbState;
                 dependencyAnalyser.syncWithDb();
             }
@@ -417,7 +417,7 @@ public class HttpCallParser {
     public void syncTrafficMetricsWithDBHelper() {
         List<BulkUpdates> bulkUpdates = new ArrayList<>();
         BasicDBObject metricsData = new BasicDBObject();
-        int accountId = DataActor.actualAccountId;
+        int accountId = Context.getActualAccountId();
         Organization organization = OrgUtils.getOrganizationCached(accountId);
         for (TrafficMetrics trafficMetrics: trafficMetricsMap.values()) {
             TrafficMetrics.Key key = trafficMetrics.getId();
@@ -831,7 +831,7 @@ public class HttpCallParser {
             List<HttpResponseParams> responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
             if (responseParamsList.isEmpty()) {
                 // Check for REST method payload structure (only for account 1758525547)
-                if (DataActor.actualAccountId == 1758525547 || DataActor.actualAccountId == 1667235738) {
+                if (Context.getActualAccountId() == 1758525547 || Context.getActualAccountId() == 1667235738) {
                     List<HttpResponseParams> restMethodResponseParams = RestMethodUtils.getUtils().parseRestMethodResponseParam(httpResponseParam);
                     if (!restMethodResponseParams.isEmpty()) {
                         filteredResponseParams.addAll(restMethodResponseParams);

@@ -77,18 +77,6 @@ public class SingleTypeInfo {
                 }, "populate-data-types-info");
             }
         }, 0, 5, TimeUnit.MINUTES);
-
-    }
-
-    public static void initFromRuntime(List<CustomDataType> customDataTypes, List<AktoDataType> aktoDataTypes,
-                                       List<CustomAuthType> customAuthTypes, int accountId) {
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            public void run() {
-                fetchCustomDataTypes(accountId, customDataTypes, aktoDataTypes);
-                fetchCustomAuthTypes(accountId, customAuthTypes);
-            }
-        }, 0, 5, TimeUnit.MINUTES);
-
     }
 
     public static String findLastKeyFromParam(String param) {
@@ -180,8 +168,8 @@ public class SingleTypeInfo {
     }
 
     public static boolean isRedacted(String dataTypeName){
-        if (accountToDataTypesInfo.containsKey(Context.accountId.get())) {
-            return accountToDataTypesInfo.get(Context.accountId.get()).getRedactedDataTypes().contains(dataTypeName);
+        if (accountToDataTypesInfo.containsKey(Context.getActualAccountId())) {
+            return accountToDataTypesInfo.get(Context.getActualAccountId()).getRedactedDataTypes().contains(dataTypeName);
         } else {
             return false;
         }
@@ -444,7 +432,7 @@ public class SingleTypeInfo {
             this.subTypeString = subTypeString;
             this.subType = subTypeMap.get(subTypeString);
             if (this.subType == null) {
-                CustomDataType customDataType = getCustomDataTypeMap(Context.accountId.get()).get(subTypeString);
+                CustomDataType customDataType = getCustomDataTypeMap(Context.getActualAccountId()).get(subTypeString);
                 if (customDataType != null) {
                     this.subType = customDataType.toSubType();
                 } else {
@@ -822,7 +810,7 @@ public String composeKeyWithCustomSubType(SubType s) {
         this.subTypeString = subTypeString;
         this.subType = subTypeMap.get(subTypeString);
         if (this.subType == null) {
-            CustomDataType customDataType = getCustomDataTypeMap(Context.accountId.get()).get(subTypeString);
+            CustomDataType customDataType = getCustomDataTypeMap(Context.getActualAccountId()).get(subTypeString);
             if (customDataType != null) {
                 this.subType = customDataType.toSubType();
             } else {

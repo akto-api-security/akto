@@ -34,7 +34,7 @@ public class ApiExecutorUtil {
             return originalHttpRequest.getBody();
         }
         try {
-            int accountId = DataActor.actualAccountId;
+            int accountId = Context.getActualAccountId();
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, "TEST_PRE_SCRIPT");
             if (!featureAccess.getIsGranted()) {
                 return originalHttpRequest.getBody();

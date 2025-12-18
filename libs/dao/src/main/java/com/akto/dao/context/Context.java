@@ -2,27 +2,27 @@ package com.akto.dao.context;
 
 import com.akto.dao.AccountsDao;
 import com.akto.dto.Account;
-
 import java.math.BigDecimal;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class Context {
-public static ThreadLocal<Integer> accountId = new ThreadLocal<Integer>();
+    public static ThreadLocal<Integer> accountId = new ThreadLocal<Integer>();
+
+    private static final Logger logger = LoggerFactory.getLogger(Context.class);
 
     public static void resetContextThreadLocals() {
         accountId.remove();
     }
 
     public static int getId() {
-        return (int) (System.currentTimeMillis()/1000l);
+        return (int) (System.currentTimeMillis() / 1000l);
     }
+
     private static final DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyyMMddHH");
-
-
-    public static void dummy() {
-        
-    }
 
     public static int today() {
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyyMMdd");
@@ -46,11 +46,10 @@ public static ThreadLocal<Integer> accountId = new ThreadLocal<Integer>();
 
     public static long convertDateIntToEpoch(int dateInt, String accountTz) {
         LocalDate localDate = LocalDate.parse(
-                Integer.toString(dateInt),DateTimeFormatter.ofPattern("yyyyMMdd")
-        );
+                Integer.toString(dateInt), DateTimeFormatter.ofPattern("yyyyMMdd"));
         LocalTime localTime = LocalTime.MIDNIGHT;
-        LocalDateTime localDateTime = LocalDateTime.of(localDate,localTime);
-        ZonedDateTime zonedDateTime = ZonedDateTime.of(localDateTime,ZoneId.of(accountTz));
+        LocalDateTime localDateTime = LocalDateTime.of(localDate, localTime);
+        ZonedDateTime zonedDateTime = ZonedDateTime.of(localDateTime, ZoneId.of(accountTz));
         return zonedDateTime.toInstant().getEpochSecond();
     }
 
@@ -73,7 +72,7 @@ public static ThreadLocal<Integer> accountId = new ThreadLocal<Integer>();
     }
 
     public static int now() {
-        return (int) (System.currentTimeMillis()/1000l);
+        return (int) (System.currentTimeMillis() / 1000l);
     }
 
     public static int nowInMillis() {
@@ -84,9 +83,8 @@ public static ThreadLocal<Integer> accountId = new ThreadLocal<Integer>();
         return (Long) (System.currentTimeMillis());
     }
 
-
     public static long dateFromLotusNotation(BigDecimal serial_number, String sourceTz) {
-        long numSecondsFromSheetEpoch = (long) (serial_number.doubleValue()*24*60*60);
+        long numSecondsFromSheetEpoch = (long) (serial_number.doubleValue() * 24 * 60 * 60);
 
         // Google sheets stores datetime in days from Dec 30 1899
         LocalDateTime start = LocalDateTime.of(1899, 12, 30, 0, 0, 0);
@@ -94,5 +92,23 @@ public static ThreadLocal<Integer> accountId = new ThreadLocal<Integer>();
         ZonedDateTime zonedDateTime = end.atZone(ZoneId.of(sourceTz));
         return zonedDateTime.toInstant().getEpochSecond();
 
+    }
+
+    private static int actualAccountId;
+    private static boolean actualAccountIdInitialized = false;
+
+    public static synchronized void setActualAccountId(int accountId) {
+        if (actualAccountIdInitialized) {
+            logger.warn("Attempted to modify actualAccountId after initialization. Current value: " + actualAccountId
+                    + ", attempted value: " + accountId);
+            return;
+        }
+        actualAccountId = accountId;
+        actualAccountIdInitialized = true;
+        logger.info("actualAccountId initialized to: " + actualAccountId);
+    }
+
+    public static int getActualAccountId() {
+        return actualAccountId;
     }
 }
