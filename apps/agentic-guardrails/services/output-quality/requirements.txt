@@ -5,3 +5,4 @@ pydantic==2.5.0
 numpy<2
 torch>=2.4.0
 optimum[onnxruntime]>=1.16.0
+https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
