@@ -552,7 +552,7 @@ public class Executor {
     /**
      * Categorizes error based on exception message to provide more specific error feedback
      */
-    static TestError categorizeError(String errorMessage) {
+    public static TestError categorizeError(String errorMessage) {
         if (errorMessage == null) {
             return TestError.API_REQUEST_FAILED;
         }
