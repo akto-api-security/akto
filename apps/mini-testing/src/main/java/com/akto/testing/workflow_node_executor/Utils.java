@@ -220,9 +220,15 @@ public class Utils {
         try {
             nodeResult = Utils.processNode(node, valuesMap, true, debug, testLogs, memory);
         } catch (Exception e) {
-            ;
+            // Categorize the error similar to single execution mode
+            String errorMessage = "Error executing test request: " + e.getMessage();
+            if (testLogs != null) {
+                testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, errorMessage));
+            }
+
+            TestResult.TestError categorizedError = com.akto.test_editor.execution.Executor.categorizeError(errorMessage);
             List<String> testErrors = new ArrayList<>();
-            testErrors.add("Something went wrong");
+            testErrors.add(categorizedError.getMessage());
             nodeResult = new WorkflowTestResult.NodeResult("{}", false, testErrors);
         }
 
