@@ -7,6 +7,9 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import com.akto.dao.ApiCollectionsDao;
+import com.akto.dto.ApiCollection;
+
 public class ActionAuditGeneratorUtils {
     
     /**
@@ -59,5 +62,16 @@ public class ActionAuditGeneratorUtils {
             E enumValue = propertyMapper.apply(item);
             return enumValue != null ? enumValue.name() : null; // Convert enum to its name string
         });     
+    }
+
+    /**
+     * Retrieves the display name of an API collection given its ID.
+     * 
+     * @param apiCollectionId the ID of the API collection
+     * @return the display name of the API collection, or an empty string if not found
+     */
+    public static String getApiCollectionDisplayName(int apiCollectionId) {
+        ApiCollection apiCollection = ApiCollectionsDao.instance.getMetaForId(apiCollectionId);
+        return apiCollection != null ? apiCollection.getDisplayName() : "";
     }
 }
