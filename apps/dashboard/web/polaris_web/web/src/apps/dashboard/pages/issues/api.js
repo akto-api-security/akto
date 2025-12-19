@@ -120,5 +120,12 @@ export default {
             method: 'post',
             data: {testingIssuesIdList, tableName}
         })
+    },
+    createDevRevTickets(testingIssuesIdList, partId, workItemType, aktoDashboardHost) {
+        return request({
+            url: 'api/createDevRevTickets',
+            method: 'post',
+            data: {testingIssuesIdList, partId, workItemType, aktoDashboardHost}
+        })
     }
 }

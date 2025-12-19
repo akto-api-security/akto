@@ -237,7 +237,7 @@ function ThreatDetectionPage() {
     
     const [eventState, setEventState] = useState(initialEventState);
     const [triggerTableRefresh, setTriggerTableRefresh] = useState(0)
-    const initialVal = values.ranges[3]
+    const initialVal = values.ranges[2]
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
     const [showDetails, setShowDetails] = useState(false);
     const [sampleData, setSampleData] = useState([])

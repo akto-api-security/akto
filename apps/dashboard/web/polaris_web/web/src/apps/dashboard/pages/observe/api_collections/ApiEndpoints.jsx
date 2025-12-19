@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon, Tooltip } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon } from "@shopify/polaris"
 import TitleWithInfo from "../../../components/shared/TitleWithInfo"
 import api from "../api"
 import { useEffect, useState } from "react"
@@ -595,8 +595,13 @@ function ApiEndpoints(props) {
             data['high_risk'] = prettifyData.filter(x => x.riskScore >= 4);
             data['new'] = prettifyData.filter(x => x.isNew);
             data['no_auth'] = prettifyData.filter(x => x.open);
-            data['shadow'] = [...shadowApis, ...undocumentedEndpoints];
-            data['zombie'] = zombieEndpoints;
+            // Filter undocumented endpoints from prettified data to ensure all fields are present
+            const undocumentedEndpointsSet = new Set(undocumentedEndpoints.map(u => u.method + " " + u.endpoint + " " + u.apiCollectionId));
+            const prettifiedUndocumentedEndpoints = prettifyData.filter(x => undocumentedEndpointsSet.has(x.method + " " + x.endpoint + " " + x.apiCollectionId));
+            data['shadow'] = [...shadowApis, ...prettifiedUndocumentedEndpoints];
+            // Filter zombie endpoints from prettified data to ensure all fields are present
+            const zombieEndpointsSet = new Set(zombieEndpoints.map(z => z.method + " " + z.endpoint + " " + z.apiCollectionId));
+            data['zombie'] = prettifyData.filter(x => zombieEndpointsSet.has(x.method + " " + x.endpoint + " " + x.apiCollectionId));
         }
         setEndpointData(data)
         setSelectedTab("all")
@@ -1055,7 +1060,7 @@ function ApiEndpoints(props) {
     function getTagsCompactComponent(envTypeList) {
         const list = envTypeList || []
         // Use shared badge renderer to show 1 tag and a +N badge with tooltip inline
-        return transform.getCollectionTypeList(list, 1, false)
+        return transform.getCollectionTypeList(list, 1, true)
     }
 
     function getCollectionTypeListComp(collectionsObj) {
@@ -1254,8 +1259,10 @@ function ApiEndpoints(props) {
     
     const [showDeleteApiModal, setShowDeleteApiModal] = useState(false)
     const [showApiGroupModal, setShowApiGroupModal] = useState(false)
+    const [showBulkDeMergeModal, setShowBulkDeMergeModal] = useState(false)
     const [apis, setApis] = useState([])
     const [actionOperation, setActionOperation] = useState(Operation.ADD)
+    const [deMergingInProgress, setDeMergingInProgress] = useState(false)
 
     function handleApiGroupAction(selectedResources, operation){
 
@@ -1266,6 +1273,49 @@ function ApiEndpoints(props) {
 
     function toggleApiGroupModal(){
         setShowApiGroupModal(false);
+    }
+
+    function handleBulkDeMerge(selectedResources){
+        // Filter only merged APIs (those containing INTEGER, STRING, OBJECT_ID, or VERSIONED)
+        const mergedApis = selectedResources.filter(resource => {
+            const parts = resource.split('###')
+            const endpoint = parts[1]
+            return endpoint && (endpoint.includes("STRING") || endpoint.includes("INTEGER") || endpoint.includes("FLOAT") || endpoint.includes("OBJECT_ID") || endpoint.includes("VERSIONED"))
+        })
+
+        if (mergedApis.length === 0) {
+            func.setToast(true, true, "No merged APIs selected. Only merged APIs can be de-merged.")
+            return
+        }
+
+        setApis(mergedApis)
+        setShowBulkDeMergeModal(true)
+    }
+
+    function deMergeBulkApisAction(){
+        setShowBulkDeMergeModal(false)
+        setDeMergingInProgress(true)
+
+        const apiObjects = apis.map((x) => {
+            let tmp = x.split("###")
+            return {
+                method: tmp[0],
+                url: tmp[1],
+                apiCollectionId: parseInt(tmp[2])
+            }
+        })
+
+        api.bulkDeMergeApis(apiObjects).then(resp => {
+            setDeMergingInProgress(false)
+            func.setToast(true, false, `Successfully de-merged ${apiObjects.length} API(s). Refresh to see the changes.`)
+            // Optionally refresh the data
+            setTimeout(() => {
+                fetchData()
+            }, 1000)
+        }).catch(err => {
+            setDeMergingInProgress(false)
+            func.setToast(true, true, "There was an error de-merging the APIs. Please try again or contact support@akto.io")
+        })
     }
 
     const promotedBulkActions = (selectedResources) => {
@@ -1289,6 +1339,12 @@ function ApiEndpoints(props) {
                 onAction: () => handleApiGroupAction(selectedResources, Operation.ADD)
             })
         }
+
+        // Add bulk de-merge option
+        ret.push({
+            content: 'De-merge ' + mapLabel('APIs', getDashboardCategory()),
+            onAction: () => handleBulkDeMerge(selectedResources)
+        })
 
         if (window.USER_NAME && window.USER_NAME.endsWith("@akto.io")) {
             ret.push({
@@ -1320,16 +1376,49 @@ function ApiEndpoints(props) {
     let deleteApiModal = (
         <Modal
             open={showDeleteApiModal}
-            onClose={() => setShowApiGroupModal(false)}
+            onClose={() => setShowDeleteApiModal(false)}
             title="Confirm"
             primaryAction={{
                 content: 'Yes',
                 onAction: deleteApisAction
             }}
-            key="redact-modal-1"
+            key="delete-api-modal"
         >
             <Modal.Section>
                 <Text>Are you sure you want to delete {(apis || []).length} API(s)?</Text>
+            </Modal.Section>
+        </Modal>
+    )
+
+    let bulkDeMergeModal = (
+        <Modal
+            open={showBulkDeMergeModal}
+            onClose={() => setShowBulkDeMergeModal(false)}
+            title="Confirm Bulk De-merge"
+            primaryAction={{
+                content: 'De-merge',
+                onAction: deMergeBulkApisAction,
+                loading: deMergingInProgress
+            }}
+            secondaryActions={[
+                {
+                    content: 'Cancel',
+                    onAction: () => setShowBulkDeMergeModal(false)
+                }
+            ]}
+            key="bulk-demerge-modal"
+        >
+            <Modal.Section>
+                <VerticalStack gap="4">
+                    <Text>Are you sure you want to de-merge {(apis || []).length} merged API(s)?</Text>
+                    <Text variant="bodyMd" color="subdued">
+                        This will split the merged endpoints back into their original forms. For example,
+                        <Text as="span" fontWeight="semibold"> /api/products/INTEGER/reviews </Text>
+                        will be split into individual endpoints like
+                        <Text as="span" fontWeight="semibold"> /api/products/24/reviews</Text>,
+                        <Text as="span" fontWeight="semibold"> /api/products/53/reviews</Text>, etc.
+                    </Text>
+                </VerticalStack>
             </Modal.Section>
         </Modal>
     )
@@ -1410,9 +1499,9 @@ function ApiEndpoints(props) {
                 />] : showSequencesFlow ? [
                 <SequencesFlow key="sequences-flow" apiCollectionId={apiCollectionId}  />
             ] : [
-                func.isDemoAccount() ? <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : <></>,
-                (!isCategory(CATEGORY_API_SECURITY)) && <McpToolsGraph key="mcp-tools-graph" apiCollectionId={apiCollectionId} />,
-                (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null),
+                func.isDemoAccount() ? <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : null,
+                (!isCategory(CATEGORY_API_SECURITY)) ? <McpToolsGraph key="mcp-tools-graph" apiCollectionId={apiCollectionId} /> : null,
+                (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId))) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null,
                 <div className="apiEndpointsTable" key="table">
                     {apiEndpointTable}
                       <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
@@ -1431,7 +1520,8 @@ function ApiEndpoints(props) {
                       fetchData={fetchData}
                   />,
                   modal,
-                  deleteApiModal
+                  deleteApiModal,
+                  bulkDeMergeModal
             ]
         )
       ]

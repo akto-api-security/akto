@@ -13,7 +13,7 @@ function HomePage() {
   const logo = {
     width: 78,
     topBarSource:
-      dashboardCategory === "Agentic Security" ? 'White%20logo.svg' : 'akto_name_with_logo.svg',
+      dashboardCategory === "Agentic Security" ? '/public/white_logo.svg' : '/public/akto_name_with_logo.svg',
     url: '/dashboard/observe/inventory',
     accessibilityLabel: 'Akto Icon',
   };

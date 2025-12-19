@@ -27,6 +27,8 @@ import {
     SensitiveInfoConfig,
     LlmPromptStep,
     LlmPromptConfig,
+    BasePromptStep,
+    BasePromptConfig,
     ExternalModelStep,
     ExternalModelConfig,
     ServerSettingsStep,
@@ -76,24 +78,28 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [llmPrompt, setLlmPrompt] = useState("");
     const [llmConfidenceScore, setLlmConfidenceScore] = useState(0.5);
 
-    // Step 7: External model based evaluation
+    // Step 7: Base Prompt Based Validation (AI Agents)
+    const [enableBasePromptRule, setEnableBasePromptRule] = useState(false);
+    const [basePromptConfidenceScore, setBasePromptConfidenceScore] = useState(0.5);
+
+    // Step 8: External model based evaluation
     const [url, setUrl] = useState("");
     const [confidenceScore, setConfidenceScore] = useState(25); // Start with 25 (first checkpoint)
 
-    // Step 8: Server settings
+    // Step 9: Server settings
     const [selectedMcpServers, setSelectedMcpServers] = useState([]);
     const [selectedAgentServers, setSelectedAgentServers] = useState([]);
     const [applyOnResponse, setApplyOnResponse] = useState(false);
     const [applyOnRequest, setApplyOnRequest] = useState(false);
-
+    
     // Collections data
     const [mcpServers, setMcpServers] = useState([]);
     const [agentServers, setAgentServers] = useState([]);
     const [collectionsLoading, setCollectionsLoading] = useState(false);
-
+    
     // Get collections from PersistStore
     const allCollections = PersistStore(state => state.allCollections);
-
+    
     // Create validation state object
     const getStoredStateData = () => ({
         // Step 1
@@ -113,9 +119,12 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         llmPrompt,
         llmConfidenceScore,
         // Step 7
+        enableBasePromptRule,
+        basePromptConfidenceScore,
+        // Step 8
         url,
         confidenceScore,
-        // Step 8
+        // Step 9
         selectedMcpServers,
         selectedAgentServers,
         mcpServers,
@@ -163,6 +172,12 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 title: LlmPromptConfig.title,
                 summary: LlmPromptConfig.getSummary(storedStateData),
                 ...LlmPromptConfig.validate(storedStateData)
+            },
+            {
+                number: BasePromptConfig.number,
+                title: BasePromptConfig.title,
+                summary: BasePromptConfig.getSummary(storedStateData),
+                ...BasePromptConfig.validate(storedStateData)
             },
             {
                 number: ExternalModelConfig.number,
@@ -269,6 +284,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setNewRegexPattern("");
         setLlmPrompt("");
         setLlmConfidenceScore(0.5);
+        setEnableBasePromptRule(false);
+        setBasePromptConfidenceScore(0.5);
         setUrl("");
         setConfidenceScore(25);
         setSelectedMcpServers([]);
@@ -282,7 +299,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setDescription(policy.description || "");
         setBlockedMessage(policy.blockedMessage || "");
         setApplyToResponses(policy.applyToResponses || false);
-
+        
         // Content filters
         if (policy.contentFiltering) {
             if (policy.contentFiltering.harmfulCategories) {
@@ -301,19 +318,19 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 setPromptAttackLevel(policy.contentFiltering.promptAttacks.level || "HIGH");
             }
         }
-
+        
         // Denied topics
         setDeniedTopics(policy.deniedTopics || []);
-
+        
         // Word filters
         setWordFilters({
             profanity: policy.wordFilters?.profanity || false,
             custom: policy.wordFilters?.custom || []
         });
-
+        
         // PII filters
         setPiiTypes(policy.piiTypes || []);
-
+        
         // Regex patterns - prefer V2 format with behavior, fallback to old format
         if (policy.regexPatternsV2 && policy.regexPatternsV2.length > 0) {
             setRegexPatterns(policy.regexPatternsV2);
@@ -335,6 +352,15 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         } else {
             setLlmPrompt("");
             setLlmConfidenceScore(0.5);
+        }
+
+        // Base Prompt Based Validation (AI Agents)
+        if (policy.basePromptRule) {
+            setEnableBasePromptRule(policy.basePromptRule.enabled || false);
+            setBasePromptConfidenceScore(policy.basePromptRule.confidenceScore !== undefined ? policy.basePromptRule.confidenceScore : 0.5);
+        } else {
+            setEnableBasePromptRule(false);
+            setBasePromptConfidenceScore(0.5);
         }
 
         // External model based evaluation
@@ -433,6 +459,12 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         enabled: true,
                         userPrompt: llmPrompt.trim(),
                         confidenceScore: llmConfidenceScore
+                    }
+                } : {}),
+                ...(enableBasePromptRule ? {
+                    basePromptRule: {
+                        enabled: true,
+                        confidenceScore: basePromptConfidenceScore
                     }
                 } : {}),
                 url: url || null,
@@ -630,6 +662,15 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 );
             case 7:
                 return (
+                    <BasePromptStep
+                        enableBasePromptRule={enableBasePromptRule}
+                        setEnableBasePromptRule={setEnableBasePromptRule}
+                        basePromptConfidenceScore={basePromptConfidenceScore}
+                        setBasePromptConfidenceScore={setBasePromptConfidenceScore}
+                    />
+                );
+            case 8:
+                return (
                     <ExternalModelStep
                         url={url}
                         setUrl={setUrl}
@@ -637,7 +678,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         setConfidenceScore={setConfidenceScore}
                     />
                 );
-            case 8:
+            case 9:
                 return (
                     <ServerSettingsStep
                         selectedMcpServers={selectedMcpServers}
@@ -669,7 +710,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             });
         }
 
-        if (currentStep < 8) {
+        if (currentStep < steps.length) {
             actions.push({
                 content: "Next",
                 onAction: handleNext
@@ -683,10 +724,10 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         // Check if all steps are valid
         const allStepsValid = steps.every(step => step.isValid);
 
-        return {
-            content: isEditMode ? "Update Guardrail" : "Create Guardrail",
-            onAction: handleSave,
-            loading: loading,
+            return {
+                content: isEditMode ? "Update Guardrail" : "Create Guardrail",
+                onAction: handleSave,
+                loading: loading,
             disabled: !allStepsValid
         };
     };
@@ -710,7 +751,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 <Modal.Section>
                     <Scrollable style={{ height: "600px" }}>
                         {renderAllSteps()}
-                    </Scrollable>
+                            </Scrollable>
                 </Modal.Section>
             </Modal>
         </>

@@ -1,6 +1,7 @@
 package com.akto.threat.backend.service;
 
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.billing.Organization;
 import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.log.LoggerMaker;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
@@ -49,6 +50,9 @@ public class ThreatActorService {
 
   private final MongoClient mongoClient;
   private final MaliciousEventDao maliciousEventDao;
+  private final com.akto.threat.backend.dao.ThreatConfigurationDao threatConfigurationDao = com.akto.threat.backend.dao.ThreatConfigurationDao.instance;
+  private final com.akto.threat.backend.dao.SplunkIntegrationDao splunkIntegrationDao = com.akto.threat.backend.dao.SplunkIntegrationDao.instance;
+  private final com.akto.threat.backend.dao.ActorInfoDao actorInfoDao = com.akto.threat.backend.dao.ActorInfoDao.instance;
   private static final LoggerMaker loggerMaker = new LoggerMaker(ThreatActorService.class, LoggerMaker.LogDb.THREAT_DETECTION);
 
   public ThreatActorService(MongoClient mongoClient, MaliciousEventDao maliciousEventDao) {
@@ -58,9 +62,7 @@ public class ThreatActorService {
 
   public ThreatConfiguration fetchThreatConfiguration(String accountId) {
     ThreatConfiguration.Builder builder = ThreatConfiguration.newBuilder();
-    MongoCollection<Document> coll = this.mongoClient
-        .getDatabase(accountId)
-        .getCollection(MongoDBCollection.ThreatDetection.THREAT_CONFIGURATION, Document.class);
+    MongoCollection<Document> coll = this.threatConfigurationDao.getCollection(accountId);
     Document doc = coll.find().first();
     if (doc != null) {
         // Handle actor configuration
@@ -87,19 +89,30 @@ public class ThreatActorService {
         if (rateLimitConfig != null) {
             builder.setRatelimitConfig(rateLimitConfig);
         }
+        
+        // Handle archivalDays
+        Object archivalDaysObj = doc.get("archivalDays");
+        if (archivalDaysObj instanceof Number) {
+            int archivalDays = ((Number) archivalDaysObj).intValue();
+            builder.setArchivalDays(archivalDays);
+        }
+
+        // Handle archivalEnabled
+        Object archivalEnabledObj = doc.get("archivalEnabled");
+        if (archivalEnabledObj instanceof Boolean) {
+            boolean archivalEnabled = (Boolean) archivalEnabledObj;
+            builder.setArchivalEnabled(archivalEnabled);
+        }
     }
     return builder.build();
 }
 
   public ThreatConfiguration modifyThreatConfiguration(String accountId, ThreatConfiguration updatedConfig) {
     ThreatConfiguration.Builder builder = ThreatConfiguration.newBuilder();
-    MongoCollection<Document> coll =
-        this.mongoClient
-            .getDatabase(accountId)
-            .getCollection(MongoDBCollection.ThreatDetection.THREAT_CONFIGURATION, Document.class);
+    MongoCollection<Document> coll = this.threatConfigurationDao.getCollection(accountId);
 
     Document newDoc = new Document();
-    
+
     // Prepare a list of actorId documents
     if (updatedConfig.hasActor()) {
         List<Document> actorIdDocs = new ArrayList<>();
@@ -114,7 +127,7 @@ public class ThreatActorService {
         }
         newDoc.append("actor", actorIdDocs);
     }
-    
+
     // Prepare rate limit config documents using DTO
     if (updatedConfig.hasRatelimitConfig()) {
         Document ratelimitConfigDoc = RateLimitConfigDTO.toDocument(updatedConfig.getRatelimitConfig());
@@ -122,7 +135,15 @@ public class ThreatActorService {
             newDoc.append("ratelimitConfig", ratelimitConfigDoc.get("ratelimitConfig"));
         }
     }
-    
+
+    // Handle archivalDays - only update if explicitly set (> 0)
+    if (updatedConfig.getArchivalDays() > 0) {
+        newDoc.append("archivalDays", updatedConfig.getArchivalDays());
+    }
+
+    // Note: archivalEnabled is now handled by separate endpoint /toggle_archival_enabled
+    // This prevents other config updates from accidentally resetting it
+
     Document existingDoc = coll.find().first();
 
     if (existingDoc != null) {
@@ -132,15 +153,53 @@ public class ThreatActorService {
         coll.insertOne(newDoc);
     }
 
-    // Set the actor and ratelimitConfig in the returned proto
+    // Set the actor, ratelimitConfig, and archivalDays in the returned proto
     if (updatedConfig.hasActor()) {
         builder.setActor(updatedConfig.getActor());
     }
     if (updatedConfig.hasRatelimitConfig()) {
         builder.setRatelimitConfig(updatedConfig.getRatelimitConfig());
     }
+    // Read archivalDays from the saved document to return the current value
+    Document savedDoc = coll.find().first();
+    if (savedDoc != null) {
+        Object archivalDaysObj = savedDoc.get("archivalDays");
+        if (archivalDaysObj instanceof Number) {
+            int archivalDays = ((Number) archivalDaysObj).intValue();
+            builder.setArchivalDays(archivalDays);
+        }
+        // archivalEnabled is handled by separate endpoint, but include in response for frontend
+        Object archivalEnabledObj = savedDoc.get("archivalEnabled");
+        if (archivalEnabledObj instanceof Boolean) {
+            boolean archivalEnabled = (Boolean) archivalEnabledObj;
+            builder.setArchivalEnabled(archivalEnabled);
+        }
+    }
     return builder.build();
 }
+
+  public com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ToggleArchivalEnabledResponse toggleArchivalEnabled(
+      String accountId,
+      com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ToggleArchivalEnabledRequest request) {
+
+    MongoCollection<Document> coll = this.threatConfigurationDao.getCollection(accountId);
+    boolean enabled = request.getEnabled();
+
+    Document existingDoc = coll.find().first();
+    Document updateDoc = new Document("$set", new Document("archivalEnabled", enabled));
+
+    if (existingDoc != null) {
+        coll.updateOne(new Document("_id", existingDoc.getObjectId("_id")), updateDoc);
+    } else {
+        // Create new document with just archivalEnabled
+        Document newDoc = new Document("archivalEnabled", enabled);
+        coll.insertOne(newDoc);
+    }
+
+    return com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ToggleArchivalEnabledResponse.newBuilder()
+        .setEnabled(enabled)
+        .build();
+  }
 
     public void deleteAllMaliciousEvents(String accountId) {
         loggerMaker.infoAndAddToDb("Deleting all malicious events for accountId: " + accountId);
@@ -582,10 +641,7 @@ public class ThreatActorService {
       String accountId, SplunkIntegrationRequest req) {
 
         int accId = Integer.parseInt(accountId);
-        MongoCollection<SplunkIntegrationModel> coll =
-            this.mongoClient
-                .getDatabase(accountId)
-                .getCollection(MongoDBCollection.ThreatDetection.SPLUNK_INTEGRATION_CONFIG, SplunkIntegrationModel.class);
+        MongoCollection<SplunkIntegrationModel> coll = this.splunkIntegrationDao.getCollection(accountId);
 
         Bson filters = Filters.eq("accountId", accId);
         long cnt = coll.countDocuments(filters);
@@ -600,10 +656,7 @@ public class ThreatActorService {
             .updateOne(filters, updates);
         } else {
             SplunkIntegrationModel splunkIntegrationModel = SplunkIntegrationModel.newBuilder().setAccountId(accId).setSplunkToken(req.getSplunkToken()).setSplunkUrl(req.getSplunkUrl()).build();
-            this.mongoClient
-            .getDatabase(accountId + "")
-            .getCollection(MongoDBCollection.ThreatDetection.SPLUNK_INTEGRATION_CONFIG, SplunkIntegrationModel.class)
-            .insertOne(splunkIntegrationModel);
+            this.splunkIntegrationDao.getCollection(accountId).insertOne(splunkIntegrationModel);
         }
         
         return SplunkIntegrationRespone.newBuilder().build();
@@ -614,10 +667,7 @@ public class ThreatActorService {
     public ModifyThreatActorStatusResponse modifyThreatActorStatus(
       String accountId, ModifyThreatActorStatusRequest request) {
 
-        MongoCollection<ActorInfoModel> coll =
-            this.mongoClient
-                .getDatabase(accountId)
-                .getCollection(MongoDBCollection.ThreatDetection.ACTOR_INFO, ActorInfoModel.class);
+        MongoCollection<ActorInfoModel> coll = this.actorInfoDao.getCollection(accountId);
         String actorIp = request.getIp();
 
         Bson filters = Filters.eq("ip", actorIp);
@@ -634,10 +684,7 @@ public class ThreatActorService {
         } else {
             ActorInfoModel actorInfoModel = ActorInfoModel.newBuilder().setIp(actorIp).
               setStatus(request.getStatus()).setUpdatedTs(request.getUpdatedTs()).build();
-            this.mongoClient
-              .getDatabase(accountId + "")
-              .getCollection(MongoDBCollection.ThreatDetection.ACTOR_INFO, ActorInfoModel.class)
-              .insertOne(actorInfoModel);
+            this.actorInfoDao.getCollection(accountId).insertOne(actorInfoModel);
         }
 
 

@@ -24,6 +24,27 @@ import McpGateway from "./McpGateway"
 import AIAgentsGateway from "./AIAgentsGateway"
 import ImpervaImport from "./components/ImpervaImport"
 import BrowserExtension from "./components/BrowserExtension"
+import AIAgentConnectorImport from "./components/AIAgentConnectorImport"
+import {
+    CONNECTOR_TYPE_N8N,
+    CONNECTOR_NAME_N8N,
+    DESCRIPTION_N8N,
+    DOCS_URL_N8N,
+    INTERVAL_N8N,
+    N8N_FIELDS,
+    CONNECTOR_TYPE_LANGCHAIN,
+    CONNECTOR_NAME_LANGCHAIN,
+    DESCRIPTION_LANGCHAIN,
+    DOCS_URL_LANGCHAIN,
+    INTERVAL_LANGCHAIN,
+    LANGCHAIN_FIELDS,
+    CONNECTOR_TYPE_COPILOT_STUDIO,
+    CONNECTOR_NAME_COPILOT_STUDIO,
+    DESCRIPTION_COPILOT_STUDIO,
+    DOCS_URL_COPILOT_STUDIO,
+    INTERVAL_COPILOT_STUDIO,
+    COPILOT_STUDIO_FIELDS
+} from "./constants/aiAgentConnectorConstants"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -336,21 +357,12 @@ const customAIObj = {
 const awsBedrockObj = {
     icon: '/public/aws_bedrock.svg',
     label: "AWS Bedrock",
-    text: "Import AWS Bedrock AI agents seamlessly into AKTO.",
-    docsUrl: 'https://docs.akto.io/ai-agent-security',
+    text: "Import your AWS Bedrock AI agents, seamlessly into AKTO.",
+    docsUrl: 'https://docs.akto.io/aws-bedrock-agents',
     key: "AWS_BEDROCK",
-    component : <AiAgentScan
-        description="Import your AWS Bedrock AI agents, seamlessly in AKTO."
-        defaultRequestBody={{
-            "modelId": "anthropic.claude-v2",
-            "contentType": "application/json",
-            "accept": "application/json",
-            "body": {
-                "prompt": "\n\nHuman: Why is the sky blue?\n\nAssistant:",
-                "max_tokens_to_sample": 300
-            }
-        }}
-        docsLink='https://docs.akto.io/ai-agent-security'
+    component : <BannerComponent 
+        content="Import your AWS Bedrock AI agents, seamlessly in AKTO."
+        docsUrl='https://docs.akto.io/aws-bedrock-agents'
     />
 }
 
@@ -857,6 +869,54 @@ const safariExtensionObj = {
     docsUrl: 'https://docs.akto.io/browser-extension',
     component: <BrowserExtension browserName="Safari"/>,
     key: "SAFARI_BROWSER_EXTENSION",
+}
+
+const n8nImportObj = {
+    icon: '/public/n8n.svg',
+    label: "N8N Import",
+    text: "Use our N8N Import feature to capture traffic and instantly send it to your dashboard for real-time insights.",
+    docsUrl: 'https://docs.akto.io/n8n-import',
+    key: "N8N_IMPORT",
+    component: <AIAgentConnectorImport
+        connectorType={CONNECTOR_TYPE_N8N}
+        connectorName={CONNECTOR_NAME_N8N}
+        description={DESCRIPTION_N8N}
+        fields={N8N_FIELDS}
+        docsUrl={DOCS_URL_N8N}
+        recurringIntervalSeconds={INTERVAL_N8N}
+    />
+}
+
+const langchainImportObj = {
+    icon: '/public/langchain.svg',
+    label: "Langchain Import",
+    text: "Use our Langchain Import feature to capture traffic from LangSmith and instantly send it to your dashboard for real-time insights.",
+    docsUrl: 'https://docs.akto.io/langchain-import',
+    key: "LANGCHAIN_IMPORT",
+    component: <AIAgentConnectorImport
+        connectorType={CONNECTOR_TYPE_LANGCHAIN}
+        connectorName={CONNECTOR_NAME_LANGCHAIN}
+        description={DESCRIPTION_LANGCHAIN}
+        fields={LANGCHAIN_FIELDS}
+        docsUrl={DOCS_URL_LANGCHAIN}
+        recurringIntervalSeconds={INTERVAL_LANGCHAIN}
+    />
+}
+
+const copilotStudioImportObj = {
+    icon: '/public/copilot-studio.svg',
+    label: "Copilot Studio Import",
+    text: "Use our Copilot Studio Import feature to capture traffic from Azure Application Insights and instantly send it to your dashboard for real-time insights.",
+    docsUrl: 'https://docs.akto.io/copilot-studio-import',
+    key: "COPILOT_STUDIO_IMPORT",
+    component: <AIAgentConnectorImport
+        connectorType={CONNECTOR_TYPE_COPILOT_STUDIO}
+        connectorName={CONNECTOR_NAME_COPILOT_STUDIO}
+        description={DESCRIPTION_COPILOT_STUDIO}
+        fields={COPILOT_STUDIO_FIELDS}
+        docsUrl={DOCS_URL_COPILOT_STUDIO}
+        recurringIntervalSeconds={INTERVAL_COPILOT_STUDIO}
+    />
 }
 
 
@@ -1459,7 +1519,8 @@ const quickStartFunc = {
         ]
 
         const aiAgentConnectors = [
-            awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj
+            awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
+            n8nImportObj, langchainImportObj, copilotStudioImportObj
         ]
 
         // MCP Scan
@@ -1532,13 +1593,13 @@ const quickStartFunc = {
     getConnectorsList: function () {
 
         if(func.checkLocal() || func.isLimitedAccount()){
-            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj]
+            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj]
         }
 
         // Combine all categories into connectorsList
         let connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj,
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,
@@ -1548,7 +1609,8 @@ const quickStartFunc = {
         if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj,
-                awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj
+                awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
+                n8nImportObj, langchainImportObj, copilotStudioImportObj
             ])
         }
 

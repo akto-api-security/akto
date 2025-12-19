@@ -786,7 +786,12 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         nonHostApiCollectionIds.addAll(deactivatedCollections);
 
         Bson hostFilterQ = SingleTypeInfoDao.filterForHostHeader(0, false);
+        List<ApiCollection> existingCollections = ApiCollectionsDao.instance.findAll(Filters.ne(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.name()), Projections.include(Constants.ID));
+        List<Integer> existingCollectionIds = existingCollections.stream()
+                .map(ApiCollection::getId)
+                .collect(Collectors.toList());
         Bson userCollectionFilter = Filters.empty();
+        Bson collectionFilter = Filters.in(SingleTypeInfo._API_COLLECTION_ID, existingCollectionIds);
         if (useRbacUserCollections) {
             try {
                 List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
@@ -806,7 +811,8 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
                 hostFilterQ,
                 Filters.gte(SingleTypeInfo._TIMESTAMP, startTimestamp),
                 Filters.lte(SingleTypeInfo._TIMESTAMP, endTimestamp),
-                userCollectionFilter
+                userCollectionFilter,
+                collectionFilter
         );
 
         long totalCount = 0;

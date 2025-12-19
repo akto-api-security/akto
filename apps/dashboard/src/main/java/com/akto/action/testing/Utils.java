@@ -87,6 +87,7 @@ public class Utils {
         BasicDBObject issueMetaDataMap = new BasicDBObject();
         Map<String, String> descriptionMap = new HashMap<>();
         Map<String, String> jiraIssueMap = new HashMap<>();
+        Map<String, String> devrevIssueMap = new HashMap<>();
         Map<String, String> statusMap = new HashMap<>();
         for (TestingRunIssues issue : issues) {
             TestingRunResult result = idToResultMap.get(issue.getId());
@@ -96,13 +97,17 @@ public class Utils {
             if (StringUtils.isNotBlank(issue.getJiraIssueUrl())) {
                 jiraIssueMap.put(result.getHexId(), issue.getJiraIssueUrl());
             }
+            if (StringUtils.isNotBlank(issue.getDevrevWorkUrl())) {
+                devrevIssueMap.put(result.getHexId(), issue.getDevrevWorkUrl());
+            }
             if(issue.getTestRunIssueStatus() != null && (statusList == null || statusList.contains(issue.getTestRunIssueStatus()))) {
                 statusMap.put(result.getHexId(), issue.getTestRunIssueStatus().name());
             }
-            
+
         }
         issueMetaDataMap.put("descriptions", descriptionMap);
         issueMetaDataMap.put("jiraIssues", jiraIssueMap);
+        issueMetaDataMap.put("devrevIssues", devrevIssueMap);
         issueMetaDataMap.put("statuses", statusMap);
         return issueMetaDataMap;
     }

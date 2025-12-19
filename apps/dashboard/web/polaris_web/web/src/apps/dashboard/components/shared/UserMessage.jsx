@@ -9,9 +9,10 @@ function UserMessage({ message }) {
                     color: 'white',
                     padding: '12px 16px',
                     borderRadius: '18px',
-                    maxWidth: '70%'
+                    maxWidth: '70%',
+                    wordBreak: 'break-word'
                 }}>
-                    <Text variant="bodyMd" as="span" color="base">
+                    <Text variant="bodyMd" as="span" color="base" >
                         <span style={{ color: 'white' }}>{message}</span>
                     </Text>
                 </Box>

@@ -6,6 +6,7 @@ import SampleDataList from '../../../components/shared/SampleDataList'
 import SampleData from '../../../components/shared/SampleData'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
 import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link} from '@shopify/polaris'
+import CompulsoryDescriptionModal from "../../issues/components/CompulsoryDescriptionModal.jsx"
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
 import testingApi from "../api"
@@ -29,7 +30,7 @@ import LegendLabel from './LegendLabel.jsx'
 function TestRunResultFlyout(props) {
 
 
-    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, conversations, showForbidden} = props
+    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, showForbidden} = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
@@ -49,6 +50,11 @@ function TestRunResultFlyout(props) {
     const [serviceNowTables, setServiceNowTables] = useState([])
     const [serviceNowTable, setServiceNowTable] = useState('')
 
+    const [devrevModalActive, setDevRevModalActive] = useState(false)
+    const [devrevParts, setDevRevParts] = useState([])
+    const [devrevPartId, setDevRevPartId] = useState('')
+    const [devrevWorkItemType, setDevRevWorkItemType] = useState('issue')
+
     const [description, setDescription] = useState("")
     const [editDescription, setEditDescription] = useState("")
     const [isEditingDescription, setIsEditingDescription] = useState(false)
@@ -56,6 +62,17 @@ function TestRunResultFlyout(props) {
     const [vulnerabilityAnalysisError, setVulnerabilityAnalysisError] = useState(null)
     const [refreshFlag, setRefreshFlag] = useState(Date.now().toString())
     const [labelsText, setLabelsText] = useState("")
+    
+    // Compulsory description modal states
+    const [compulsoryDescriptionModal, setCompulsoryDescriptionModal] = useState(false)
+    const [pendingIgnoreAction, setPendingIgnoreAction] = useState(null)
+    const [mandatoryDescription, setMandatoryDescription] = useState("")
+    const [modalLoading, setModalLoading] = useState(false)
+    const [compulsorySettings, setCompulsorySettings] = useState({
+        falsePositive: false,
+        noTimeToFix: false,
+        acceptableFix: false
+    })
     
     const fetchRemediationInfo = useCallback (async (testId) => {
         if (testId && testId.length > 0) {
@@ -91,7 +108,7 @@ function TestRunResultFlyout(props) {
                 })
             })
 
-            setRowItems(transform.getRowInfo(issueDetails.severity,apiInfoData,issueDetails.jiraIssueUrl,sensitiveParam,issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl, issueDetails.servicenowIssueUrl, issueDetails.ticketId))
+            setRowItems(transform.getRowInfo(issueDetails.severity,apiInfoData,issueDetails.jiraIssueUrl,sensitiveParam,issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl, issueDetails.servicenowIssueUrl, issueDetails.ticketId, issueDetails.devrevWorkUrl))
         }
     },[issueDetails])
 
@@ -121,29 +138,95 @@ function TestRunResultFlyout(props) {
                 props.setIssueDetails({ ...issueDetails, description: editDescription });
             }
         } catch (err) {
-            console.error("Failed to save description:", err);
             func.setToast(true, true, "Failed to save description");
         }
     }
 
     useEffect(() => {
-        if (!remediationSrc) {
-            fetchRemediationInfo("tests-library-master/remediation/"+selectedTestRunResult.testCategoryId+".md")
-        } else {
+        if (remediationSrc) {
+            // Priority 1: Use remediation from backend/subCategoryMap
             setRemediationText(remediationSrc)
+        } else if (conversationRemediationText) {
+            // Priority 2: Use remediation text extracted from conversations
+            setRemediationText(conversationRemediationText)
+        } else {
+            // Priority 3: Fall back to fetching from file
+            fetchRemediationInfo("tests-library-master/remediation/"+selectedTestRunResult.testCategoryId+".md")
         }
-    }, [selectedTestRunResult.testCategoryId, remediationSrc])
+    }, [selectedTestRunResult.testCategoryId, remediationSrc, conversationRemediationText, fetchRemediationInfo])
 
+    // Fetch compulsory description settings
+    useEffect(() => {
+        const fetchCompulsorySettings = async () => {
+            try {
+                const {resp} = await settingFunctions.fetchAdminInfo();
+                
+                if (resp?.compulsoryDescription) {
+                    setCompulsorySettings(resp.compulsoryDescription);
+                }
+            } catch (error) {
+                
+            }
+        };
+        fetchCompulsorySettings();
+    }, []);
 
-    function ignoreAction(ignoreReason){
+    // Map ignore reason text to key
+    const getIgnoreReasonKey = (ignoreReason) => {
+        const reasonMap = {
+            "False positive": "falsePositive",
+            "Acceptable risk": "acceptableFix",
+            "No time to fix": "noTimeToFix"
+        };
+        return reasonMap[ignoreReason] || ignoreReason;
+    };
+
+    // Use keys directly for reasons and compulsorySettings
+    const requiresDescription = (reasonKey) => {
+        return compulsorySettings[reasonKey] || false;
+    };
+
+    const handleIgnoreWithDescription = () => {
+        if (pendingIgnoreAction && mandatoryDescription.trim()) {
+            // Update description first
+            testingApi.updateIssueDescription(issueDetails.id, mandatoryDescription).then(() => {
+                performIgnoreAction(pendingIgnoreAction.ignoreReason, mandatoryDescription);
+                setCompulsoryDescriptionModal(false);
+                setPendingIgnoreAction(null);
+                setMandatoryDescription("");
+            }).catch((err) => {
+                func.setToast(true, true, "Failed to update description");
+            });
+        }
+    };
+
+    useEffect(() => {
+        if (compulsoryDescriptionModal && pendingIgnoreAction) {
+            setMandatoryDescription("");
+            setModalLoading(false);
+        }
+    }, [compulsoryDescriptionModal, pendingIgnoreAction]);
+
+    const performIgnoreAction = (ignoreReason, description = "") => {
         const severity = (selectedTestRunResult && selectedTestRunResult.vulnerable) ? issueDetails.severity : "";
         let obj = {}
         if(issueDetails?.testRunIssueStatus !== "IGNORED"){
             obj = {[selectedTestRunResult.id]: severity.toUpperCase()}
         }
-        issuesApi.bulkUpdateIssueStatus([issueDetails.id], "IGNORED", ignoreReason, obj ).then((res) => {
-            func.setToast(true, false, `Issue ignored`)
+        issuesApi.bulkUpdateIssueStatus([issueDetails.id], "IGNORED", ignoreReason, { description }).then((res) => {
+            func.setToast(true, false, `Issue ignored${description ? " with description" : ""}`)
         })
+    }
+
+
+    function ignoreAction(ignoreReason){
+        const reasonKey = getIgnoreReasonKey(ignoreReason);
+        if (requiresDescription(reasonKey)) {
+            setPendingIgnoreAction({ ignoreReason });
+            setCompulsoryDescriptionModal(true);
+            return;
+        }
+        performIgnoreAction(ignoreReason);
     }
 
     function reopenAction(){
@@ -202,7 +285,7 @@ function TestRunResultFlyout(props) {
             try {
                 customABWorkItemFieldsPayload = issuesFunctions.prepareCustomABWorkItemFieldsPayload(projectId, workItemType);
             } catch (error) {
-                setToast(true, true, "Please fill all required fields before creating a Azure boards work item.");
+                func.setToast(true, true, "Please fill all required fields before creating a Azure boards work item.");
                 return;
             }
             
@@ -245,7 +328,29 @@ function TestRunResultFlyout(props) {
         }
         setServiceNowModalActive(false)
     }
-    
+
+    const handleDevRevClick = async() => {
+        if(!devrevModalActive){
+            const devrevIntegration = await settingFunctions.fetchDevRevIntegration()
+            const partsMap = devrevIntegration.partsMap || {}
+            const partsArray = Object.entries(partsMap).map(([id, name]) => ({id, name}))
+            if(partsArray.length > 0){
+                setDevRevParts(partsArray)
+                setDevRevPartId(partsArray[0].id)
+            }
+        }
+        setDevRevModalActive(!devrevModalActive)
+    }
+
+    const handleDevRevTicketCreation = async(issueId, labels) => {
+        if(devrevPartId && devrevPartId.length > 0){
+            await createDevRevTicket(issueDetails.id, devrevPartId, devrevWorkItemType)
+            setDevRevModalActive(false)
+        } else {
+            func.setToast(true, true, "Invalid DevRev part")
+        }
+    }
+
     const issues = [{
         content: 'False positive',
         onAction: () => { ignoreAction("False positive") }
@@ -273,6 +378,10 @@ function TestRunResultFlyout(props) {
         const navUrl = window.location.origin + "/dashboard/test-editor/" + selectedTestRunResult.testCategoryId
         window.open(navUrl, "_blank")
     }
+
+    const owaspData = func.categoryMapping[selectedTestRunResult?.testCategory] || {};
+    const owaspMapping = owaspData.label || "";
+    const owaspUrl = owaspData.url || "";
 
     function ActionsComp (){
         const issuesActions = issueDetails?.testRunIssueStatus === "IGNORED" ? [...issues, ...reopen] : issues
@@ -308,12 +417,20 @@ function TestRunResultFlyout(props) {
                 <VerticalStack gap={"2"}>
                     <Box width="100%">
                         <div style={{display: 'flex', gap: '4px', marginBottom: '4px'}} className='test-title'>
-                            <Button removeUnderline plain monochrome onClick={() => openTest()}>
-                                <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
-                            </Button>
-                            {(severity && severity?.length > 0) ? (issueDetails?.testRunIssueStatus === 'IGNORED' ? <Badge size='small'>Ignored</Badge> : <Box className={`badge-wrapper-${severity.toUpperCase()}`}><Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge></Box>) : null}
+                        <VerticalStack gap={1}>
+                            <HorizontalStack gap={1}>
+                                <Button removeUnderline plain monochrome onClick={() => openTest()}>
+                                    <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
+                                </Button>
+                                {(severity && severity?.length > 0) ? (issueDetails?.testRunIssueStatus === 'IGNORED' ? <Badge size='small'>Ignored</Badge> : <Box className={`badge-wrapper-${severity.toUpperCase()}`}><Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge></Box>) : null}
+                            </HorizontalStack>      
+                                {owaspMapping.length > 0 ? (
+                                    <Link onClick={() => owaspUrl && window.open(owaspUrl, '_blank')}>
+                                        <Badge size="small">OWASP Top 10 | {owaspMapping}</Badge>
+                                    </Link>
+                                ): null}  
+                        </VerticalStack> 
                         </div>
-
                         {
                             isEditingDescription ? (
                                 <InlineEditableText
@@ -326,11 +443,11 @@ function TestRunResultFlyout(props) {
                                 />
                             ) : (
                                 !description ? (
-                                    <Button plain removeUnderline onClick={() => setIsEditingDescription(true)}>
+                                    <Button plain removeUnderline textAlign="left" onClick={() => setIsEditingDescription(true)}>
                                         Add description
                                     </Button>
                                 ) : (
-                                    <Button plain removeUnderline onClick={() => setIsEditingDescription(true)}>
+                                    <Button plain removeUnderline textAlign="left" onClick={() => setIsEditingDescription(true)}>
                                         <Text as="span" variant="bodyMd" color="subdued" alignment="start">
                                             {description}
                                         </Text>
@@ -344,6 +461,7 @@ function TestRunResultFlyout(props) {
                         <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
                         <Text color="subdued" variant="bodySm">{selectedTestRunResult?.testCategory}</Text>
                     </HorizontalStack>
+                        
                     <ApiGroups collectionIds={apiInfo?.collectionIds} />
                 </VerticalStack>
                 <HorizontalStack gap={2} wrap={false}>
@@ -390,6 +508,19 @@ function TestRunResultFlyout(props) {
                                 issueType=""
                                 issueId={issueDetails.id}
                                 isServiceNowModal={true}
+                            />
+                            <JiraTicketCreationModal
+                                activator={window.DEVREV_INTEGRATED === 'true' ? <Button id={"create-devrev-ticket-button"} primary onClick={handleDevRevClick} disabled={devrevWorkUrl !== "" || window.DEVREV_INTEGRATED !== "true"}>Create DevRev Ticket</Button> : <></>}
+                                modalActive={devrevModalActive}
+                                setModalActive={setDevRevModalActive}
+                                handleSaveAction={handleDevRevTicketCreation}
+                                jiraProjectMaps={devrevParts}
+                                setProjId={setDevRevPartId}
+                                setIssueType={setDevRevWorkItemType}
+                                projId={devrevPartId}
+                                issueType={devrevWorkItemType}
+                                issueId={issueDetails.id}
+                                isDevRevModal={true}
                             />
                         </HorizontalStack>
                     }
@@ -743,6 +874,7 @@ function TestRunResultFlyout(props) {
     const title = isIssuePage ? "Issue details" : mapLabel('Test result', getDashboardCategory())
 
     return (
+        <>
         <FlyLayout
             title={title}
             show={showDetails}
@@ -754,6 +886,16 @@ function TestRunResultFlyout(props) {
             handleClose={handleClose}
             isHandleClose={true}
         />
+        <CompulsoryDescriptionModal
+            open={compulsoryDescriptionModal}
+            onClose={() => setCompulsoryDescriptionModal(false)}
+            onConfirm={handleIgnoreWithDescription}
+            reasonLabel={pendingIgnoreAction?.ignoreReason}
+            description={mandatoryDescription}
+            onChangeDescription={setMandatoryDescription}
+            loading={modalLoading}
+        />
+        </>
     )
 }
 

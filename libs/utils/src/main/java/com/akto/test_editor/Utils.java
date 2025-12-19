@@ -6,6 +6,7 @@ import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiAccessType;
+import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
@@ -70,6 +71,64 @@ public class Utils {
         return pattern.matcher(text).find();
     }
 
+    // Converts an Object to a list of strings, handling common cases of List or array inputs.
+    public static List<String> convertObjectToListOfString(Object obj) {
+        List<String> stringList = new ArrayList<>();
+        if (obj == null) {
+            return stringList;
+        }
+        try {
+            if (obj instanceof List) {
+                for (Object item : (List<?>) obj) {
+                    stringList.add(item != null ? item.toString() : null);
+                }
+            } else if (obj.getClass().isArray()) {
+                int len = java.lang.reflect.Array.getLength(obj);
+                for (int i = 0; i < len; i++) {
+                    Object item = java.lang.reflect.Array.get(obj, i);
+                    stringList.add(item != null ? item.toString() : null);
+                }
+            } else {
+                // fallback: treat the object as a single element
+                stringList.add(obj.toString());
+            }
+        } catch (Exception e) {
+            return stringList;
+        }
+        return stringList;
+    }
+
+    public static String extractHostHeader(HttpResponseParams responseParam) {
+        String host = "";
+        if (responseParam == null || responseParam.getRequestParams() == null) {
+            return host;
+        }
+        Map<String, List<String>> requestHeaders = responseParam.getRequestParams().getHeaders();
+        if (requestHeaders == null) {
+            return host;
+        }
+        List<String> hostValues = requestHeaders.get("host");
+        if (hostValues != null && !hostValues.isEmpty()) {
+            host = hostValues.get(0);
+        }
+        return host;
+    }
+
+    public static List<String> extractRegex(String payload, String regex) {
+        List<String> matches = new ArrayList<>();
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(payload);
+        while (matcher.find()) {
+            // If the regex has groups, add the first group; otherwise add the whole match
+            if (matcher.groupCount() >= 1) {
+                matches.add(matcher.group(1));
+            } else {
+                matches.add(matcher.group());
+            }
+        }
+        return matches;
+    }
+
     public static boolean deleteKeyFromPayload(Object obj, String parentKey, String queryKey) {
         boolean res = false;
         if (obj instanceof BasicDBObject) {
@@ -122,9 +181,26 @@ public class Utils {
         return data;
     }
 
+    private static Object parseNumericString(Object data) {
+        if (!(data instanceof String)) {
+            return data;
+        }
+        String dataStr = (String) data;
+        try {
+            return Integer.parseInt(dataStr);
+        } catch (NumberFormatException e) {
+            try {
+                return Double.parseDouble(dataStr);
+            } catch (NumberFormatException e2) {
+                return data;
+            }
+        }
+    }
+
     public static Boolean applyIneqalityOperation(Object data, Object querySet, String operator) {
         Boolean result = false;
         try {
+            data = parseNumericString(data);
             if (data instanceof Integer) {
                 List<Integer> queryList = (List) querySet;
                 if (queryList == null || queryList.size() == 0) {

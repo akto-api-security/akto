@@ -39,7 +39,7 @@ import com.akto.util.JSONUtils;
 import com.akto.utils.RedactSampleData;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.google.api.client.util.Charsets;
+import com.google.common.base.Charsets;
 import com.google.common.hash.BloomFilter;
 import com.google.common.hash.Funnels;
 import com.mongodb.BasicDBObject;
@@ -67,7 +67,7 @@ public class APICatalogSync {
     public int thresh;
     public String userIdentifier;
     private static final Logger logger = LoggerFactory.getLogger(APICatalogSync.class);
-    private static final LoggerMaker loggerMaker = new LoggerMaker(APICatalogSync.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(APICatalogSync.class, LogDb.RUNTIME);
     public Map<Integer, APICatalog> dbState;
     public Map<Integer, APICatalog> delta;
     public AktoPolicyNew aktoPolicyNew;

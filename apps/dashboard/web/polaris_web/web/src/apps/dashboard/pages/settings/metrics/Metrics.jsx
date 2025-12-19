@@ -126,6 +126,7 @@ function Metrics() {
         'RT_KAFKA_RECORD_COUNT',
         'RT_KAFKA_RECORD_SIZE',
         'RT_KAFKA_LATENCY',
+        'RT_API_RECEIVED_COUNT',
         'KAFKA_RECORDS_LAG_MAX',
         'KAFKA_RECORDS_CONSUMED_RATE',
         'KAFKA_FETCH_AVG_LATENCY',
@@ -275,11 +276,11 @@ function Metrics() {
         return options
     }
 
-    const runtimeMetricsKeys = newMetrics.slice(0, 12);
-    const postgresqlMetricsKeys = newMetrics.slice(12, 21);
-    const testingMetricsKeys = newMetrics.slice(21, 25);
-    const cyborgMetricsKeys = newMetrics.slice(25, 28);
-    const dataIngestionMetricsKeys = newMetrics.slice(28);
+    const runtimeMetricsKeys = newMetrics.slice(0, 13);
+    const postgresqlMetricsKeys = newMetrics.slice(13, 22);
+    const testingMetricsKeys = newMetrics.slice(22, 26);
+    const cyborgMetricsKeys = newMetrics.slice(26, 29);
+    const dataIngestionMetricsKeys = newMetrics.slice(29);
 
     const graphContainer = (
         <>

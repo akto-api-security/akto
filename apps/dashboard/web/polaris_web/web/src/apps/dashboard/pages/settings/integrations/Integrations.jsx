@@ -86,6 +86,11 @@ function Integrations() {
       name:'ServiceNow',
       source: '/public/servicenow.svg'
     }
+    let devRevObj={
+      id: 'devrev',
+      name:'DevRev',
+      source: '/public/devrev-ai.svg'
+    }
     let jenkinsObj={
       id: `jenkins`,
       name: "Jenkins",
@@ -231,7 +236,7 @@ function Integrations() {
     const cicdItems = [jenkinsObj, azuredevopsObj, gitlabObj, githubactionsObj, ciCdObj];
     const aiItems = [aktoGptObj, agentConfigObj, mcpRegistryObj];
     const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj, gmailWebhooksObj];
-    const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj, serviceNowObj];
+    const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj, serviceNowObj, devRevObj];
     const wafItems = [awsWafObj, f5WafObj, cloudflareWafObj];
     const siemItems = [splunkObj];
     switch (tabId) {

@@ -39,7 +39,7 @@ const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl
                 });
             })
         } else {
-            tempResultSubCategoryMap = testingFunc.convertSubIntoSubcategory(subcategoryDataResp).subCategoryMap
+            tempResultSubCategoryMap = await testingFunc.convertSubIntoSubcategory(subcategoryDataResp).subCategoryMap
         }
         convertSubCategoryInfo(tempResultSubCategoryMap)
         setShowTestingComponents(true)

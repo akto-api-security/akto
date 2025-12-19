@@ -18,7 +18,7 @@ import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+
 
 public class GuardrailPoliciesAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(GuardrailPoliciesAction.class, LogDb.DASHBOARD);
@@ -54,6 +54,7 @@ public class GuardrailPoliciesAction extends UserAction {
             return ERROR.toUpperCase();
         }
     }
+
 
     public String createGuardrailPolicy() {
         try {
@@ -99,6 +100,7 @@ public class GuardrailPoliciesAction extends UserAction {
             updates.add(Updates.set("regexPatternsV2", policy.getRegexPatternsV2()));
             updates.add(Updates.set("contentFiltering", policy.getContentFiltering()));
             updates.add(Updates.set("llmRule", policy.getLlmRule()));
+            updates.add(Updates.set("basePromptRule", policy.getBasePromptRule()));
             updates.add(Updates.set("selectedMcpServers", policy.getSelectedMcpServers()));
             updates.add(Updates.set("selectedAgentServers", policy.getSelectedAgentServers()));
             updates.add(Updates.set("selectedMcpServersV2", policy.getSelectedMcpServersV2()));

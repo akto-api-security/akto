@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import org.springframework.util.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
@@ -637,9 +637,9 @@ public class Utils {
         List<GenericTestResult> testResults = new ArrayList<>();
         String failMessage = errorMessage;
 
-        if(!StringUtils.hasLength(errorMessage) && deactivatedCollections.contains(apiInfoKey.getApiCollectionId())){
+        if(!StringUtils.isNotEmpty(errorMessage) && deactivatedCollections.contains(apiInfoKey.getApiCollectionId())){
             failMessage = TestError.DEACTIVATED_ENDPOINT.getMessage();
-        }else if(!StringUtils.hasLength(errorMessage) && (messages == null || messages.isEmpty())){
+        }else if(!StringUtils.isNotEmpty(errorMessage) && (messages == null || messages.isEmpty())){
             failMessage = TestError.NO_PATH.getMessage();
         }
             

@@ -150,9 +150,18 @@ const learnMoreObject = {
             {
                 content:"How to create Swagger File using Akto",
                 value:"https://docs.akto.io/api-inventory/how-to/create-swagger-file-using-akto"
-            }, {
+            }, 
+            {
                 content: 'What is risk score',
                 value: 'https://docs.akto.io/api-discovery/concepts/risk-score'
+            },
+            {
+                content: `How Akto detects Shadow APIs`,
+                value: `https://docs.akto.io/api-inventory/concepts/shadow-apis`
+            },
+            {
+                content: `How Akto detects Zombie APIs`,
+                value: `https://docs.akto.io/api-inventory/concepts/zombie-apis`
             }
         ],
         videoLink: [
@@ -587,7 +596,21 @@ const learnMoreObject = {
         ],
         videoLink: [
             {
-                content: "Watch Akto demo" , 
+                content: "Watch Akto demo" ,
+                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+            }
+        ]
+    },
+    dashboard_settings_integrations_devrev:{
+        docsLink: [
+            {
+                content:"DevRev Integration guide",
+                value:"https://docs.akto.io/issues/how-to/devrev-integration"
+            }
+        ],
+        videoLink: [
+            {
+                content: "Watch Akto demo" ,
                 value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
             }
         ]

@@ -9,6 +9,7 @@ import com.akto.dto.data_types.Predicate;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
@@ -663,18 +664,23 @@ public class CustomDataTypeAction extends UserAction{
                         try {
                             HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
                             boolean skip1=false, skip2=false, skip3=false, skip4=false;
+                            boolean skip5 = false;
                             try {
-                                skip1 = forHeaders(httpResponseParams.getHeaders(), customDataType, apiKey);
-                                skip2 = forHeaders(httpResponseParams.requestParams.getHeaders(), customDataType, apiKey);
+                                skip1 = forHeaders(httpResponseParams.getHeaders(), customDataType, apiKey, aktoDataType);
+                                skip2 = forHeaders(httpResponseParams.requestParams.getHeaders(), customDataType, apiKey, aktoDataType);
                             } catch (Exception e) {
                             }
                             try {
-                                skip3 = forPayload(httpResponseParams.getPayload(), customDataType, apiKey);
-                                skip4 = forPayload(httpResponseParams.requestParams.getPayload(), customDataType, apiKey);
+                                skip3 = forPayload(httpResponseParams.getPayload(), customDataType, apiKey, aktoDataType);
+                                skip4 = forPayload(httpResponseParams.requestParams.getPayload(), customDataType, apiKey, aktoDataType);
                             } catch (Exception e) {
                             }
-                            String key = skip1 + " " + skip2 + " " + skip3 + " " + skip4 + " " + sampleData.getId().toString();
-                            if ((skip1 || skip2 || skip3 || skip4) && !foundSet.contains(key)) {
+                            try {
+                                skip5 = forQueryParams(httpResponseParams.requestParams.getURL(), customDataType, apiKey, aktoDataType);
+                            } catch (Exception e) {
+                            }
+                            String key = skip1 + " " + skip2 + " " + skip3 + " " + skip4 + " " + skip5 + " " + sampleData.getId().toString();
+                            if ((skip1 || skip2 || skip3 || skip4 || skip5) && !foundSet.contains(key)) {
                                 foundSet.add(key);
                                 responses.add(httpResponseParams);
                             }
@@ -755,11 +761,12 @@ public class CustomDataTypeAction extends UserAction{
                 Key apiKey = sampleData.getId();
                 try {
                     HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
-                    boolean skip1 = ( customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_HEADER) ) ? forHeaders(httpResponseParams.getHeaders(), customDataType, apiKey) : false;
-                    boolean skip2 = ( customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_HEADER) ) ? forHeaders(httpResponseParams.requestParams.getHeaders(), customDataType, apiKey) : false;
-                    boolean skip3 = ( customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_PAYLOAD) ) ? forPayload(httpResponseParams.getPayload(), customDataType, apiKey) : false;
-                    boolean skip4 = ( customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_PAYLOAD) ) ? forPayload(httpResponseParams.requestParams.getPayload(), customDataType, apiKey) : false;
-                    skip = skip1 || skip2 || skip3 || skip4;
+                    boolean skip1 = ( customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_HEADER) ) ? forHeaders(httpResponseParams.getHeaders(), customDataType, apiKey, aktoDataType) : false;
+                    boolean skip2 = ( customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_HEADER) ) ? forHeaders(httpResponseParams.requestParams.getHeaders(), customDataType, apiKey, aktoDataType) : false;
+                    boolean skip3 = ( customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_PAYLOAD) ) ? forPayload(httpResponseParams.getPayload(), customDataType, apiKey, aktoDataType) : false;
+                    boolean skip4 = ( customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_PAYLOAD) ) ? forPayload(httpResponseParams.requestParams.getPayload(), customDataType, apiKey, aktoDataType) : false;
+                    boolean skip5 = ( customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_PAYLOAD) ) ? forQueryParams(httpResponseParams.requestParams.getURL(), customDataType, apiKey, aktoDataType) : false;
+                    skip = skip1 || skip2 || skip3 || skip4 || skip5;
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -773,12 +780,18 @@ public class CustomDataTypeAction extends UserAction{
         return SUCCESS.toUpperCase();
     }
 
-    public boolean forHeaders(Map<String, List<String>> headers, CustomDataType customDataType, Key apiKey) {
+    public boolean forHeaders(Map<String, List<String>> headers, CustomDataType customDataType, Key apiKey, AktoDataType aktoDataType) {
         boolean matchFound = false;
         for (String headerName: headers.keySet()) {
             List<String> headerValues = headers.get(headerName);
             for (String value: headerValues) {
-                boolean result = customDataType.validate(value,headerName);
+                boolean result = false;
+                if(aktoDataType != null){
+                    SingleTypeInfo.SubType subType = aktoDataType.toSubType();
+                    result = KeyTypes.matchesSubType(subType, headerName, value) != null;
+                }else{
+                    result = customDataType.validate(value,headerName);
+                }
                 if (result) {
                     matchFound = true;
                     CustomSubTypeMatch customSubTypeMatch = new CustomSubTypeMatch(
@@ -787,6 +800,45 @@ public class CustomDataTypeAction extends UserAction{
                     this.customSubTypeMatches.add(customSubTypeMatch);
                 }
             }
+        }
+        return matchFound;
+    }
+
+    public boolean forQueryParams(String url, CustomDataType customDataType, Key apiKey, AktoDataType aktoDataType) {
+        if (url == null || url.isEmpty()) {
+            return false;
+        }
+        boolean matchFound = false;
+        try {
+            String[] split = url.split("\\?");
+            if (split.length == 2) {
+                String[] urlParams = split[1].split("&");
+                for (String urlParam : urlParams) {
+                    String[] param = urlParam.split("=", 2);
+                    if (param.length == 2) {
+                        String paramName = param[0];
+                        String paramValue = param[1];
+
+                        boolean result = false;
+                        if(aktoDataType != null){
+                            SingleTypeInfo.SubType subType = aktoDataType.toSubType();
+                            result = KeyTypes.matchesSubType(subType, paramName, paramValue) != null;
+                        }else{
+                            result = customDataType.validate(paramValue, paramName);
+                        }
+
+                        if (result) {
+                            matchFound = true;
+                            CustomSubTypeMatch customSubTypeMatch = new CustomSubTypeMatch(
+                                    apiKey.getApiCollectionId(), apiKey.url, apiKey.method.name(), paramName, paramValue
+                            );
+                            this.customSubTypeMatches.add(customSubTypeMatch);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error processing query params in custom data type check");
         }
         return matchFound;
     }
@@ -801,35 +853,42 @@ public class CustomDataTypeAction extends UserAction{
         }
     }
 
-    public static void extractAllValuesFromPayload(JsonNode node, String key, CustomDataType customDataType, List<MatchResult> matches) {
+    public static void extractAllValuesFromPayload(JsonNode node, String key, CustomDataType customDataType, List<MatchResult> matches, AktoDataType aktoDataType) {
         if (node == null) return;
         if (node.isValueNode()) {
             Object value = mapper.convertValue(node, Object.class);
-            boolean result = customDataType.validate(value, key);
+            if(value == null) return;
+            boolean result = false;
+            if(aktoDataType != null){
+                SingleTypeInfo.SubType subType = aktoDataType.toSubType();
+                result = KeyTypes.matchesSubType(subType, key, value) != null;
+            }else{
+                result = customDataType.validate(value, key);
+            }
             if (result) matches.add(new MatchResult(key, value));
         } else if (node.isArray()) {
             ArrayNode arrayNode = (ArrayNode) node;
             for(int i = 0; i < arrayNode.size(); i++) {
                 JsonNode arrayElement = arrayNode.get(i);
-                extractAllValuesFromPayload(arrayElement, null, customDataType, matches);
+                extractAllValuesFromPayload(arrayElement, null, customDataType, matches, aktoDataType);
             }
         } else {
             Iterator<String> fieldNames = node.fieldNames();
             while(fieldNames.hasNext()) {
                 String fieldName = fieldNames.next();
                 JsonNode fieldValue = node.get(fieldName);
-                extractAllValuesFromPayload(fieldValue, fieldName, customDataType, matches);
+                extractAllValuesFromPayload(fieldValue, fieldName, customDataType, matches, aktoDataType);
             }
         }
 
     }
 
-    public boolean forPayload(String payload, CustomDataType customDataType, Key apiKey) throws IOException {
+    public boolean forPayload(String payload, CustomDataType customDataType, Key apiKey, AktoDataType aktoDataType) throws IOException {
         JsonParser jp = factory.createParser(payload);
         JsonNode node = mapper.readTree(jp);
 
         List<MatchResult> matchResults = new ArrayList<>();
-        extractAllValuesFromPayload(node,null, customDataType, matchResults);
+        extractAllValuesFromPayload(node,null, customDataType, matchResults, aktoDataType);
 
         for (MatchResult matchResult: matchResults) {
             CustomSubTypeMatch customSubTypeMatch = new CustomSubTypeMatch(

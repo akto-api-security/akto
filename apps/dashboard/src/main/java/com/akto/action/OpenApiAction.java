@@ -36,6 +36,7 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.InsertManyOptions;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.InsertOneResult;
@@ -255,11 +256,19 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
                         title += Context.now();
                     }
                     boolean useHost = false;
+                    List<String> urlsList = new ArrayList<>();
                     if (Source.OPEN_API.equals(source)) {
                         useHost = true;
+                    } else {
+                        // TODO: check if pagination is needed here.
+                        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(
+                                Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId),
+                                Projections.include(ApiInfo.ID_URL));
+                        urlsList = apiInfos.stream().map(ApiInfo::getId).map(ApiInfo.ApiInfoKey::getUrl)
+                                .collect(Collectors.toList());
                     }
 
-                    ParserResult parsedSwagger = Parser.convertOpenApiToAkto(openAPI, fileUploadId, useHost);
+                    ParserResult parsedSwagger = Parser.convertOpenApiToAkto(openAPI, fileUploadId, useHost, urlsList);
                     List<FileUploadError> fileErrors = parsedSwagger.getFileErrors();
 
                     List<SwaggerUploadLog> messages = parsedSwagger.getUploadLogs();

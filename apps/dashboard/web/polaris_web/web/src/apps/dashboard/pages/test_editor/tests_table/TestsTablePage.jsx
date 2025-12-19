@@ -14,6 +14,7 @@ import TooltipText from "../../../components/shared/TooltipText";
 import LocalStore from "../../../../main/LocalStorageStore";
 import ShowListInBadge from "../../../components/shared/ShowListInBadge";
 import { getDashboardCategory } from "../../../../main/labelHelper";
+import {getCategoriesBasedOnDashboardCategory, filterSubCategoriesBasedOnCategories} from "./categoryUtil";
 
 const sortOptions = [
     { label: 'Severity', value: 'severity asc', directionLabel: 'Highest', sortKey: 'severityVal', columnIndex: 2 },
@@ -21,40 +22,6 @@ const sortOptions = [
     { label: 'Test', value: 'test asc', directionLabel: 'A-Z', sortKey: 'name', columnIndex: 1 },
     { label: 'Test', value: 'test desc', directionLabel: 'Z-A', sortKey: 'name', columnIndex: 1 },
 ];
-
-const llmCategories = [
-    "LLM",
-    "LLM01",
-    "PROMPT_INJECTION",
-    "SENSITIVE_INFORMATION_DISCLOSURE",
-    "SUPPLY_CHAIN",
-    "DATA_AND_MODEL_POISONING",
-    "IMPROPER_OUTPUT_HANDLING",
-    "EXCESSIVE_AGENCY",
-    "SYSTEM_PROMPT_LEAKAGE",
-    "VECTOR_AND_EMBEDDING_WEAKNESSES",
-    "MISINFORMATION",
-    "UNBOUNDED_CONSUMPTION",
-    "AGENTIC_BUSINESS_ALIGNMENT",
-    "AGENTIC_HALLUCINATION_AND_TRUSTWORTHINESS",
-    "AGENTIC_SAFETY",
-    "AGENTIC_SECURITY",
-]
-
-const mcpCategories = [
-    "MCP_AUTH",
-    "MCP_INPUT_VALIDATION",
-    "MCP_DOS",
-    "MCP_SENSITIVE_DATA_LEAKAGE",
-    "MCP_TOOL_POISONING",
-    "MCP_PROMPT_INJECTION",
-    "MCP_PRIVILEGE_ABUSE",
-    "MCP_INDIRECT_PROMPT_INJECTION",
-    "MCP_MALICIOUS_CODE_EXECUTION",
-    "MCP_FUNCTION_MANIPULATION",
-    "MCP_SECURITY",
-    "MCP"
-]
 
 const severityObj = {
     "Critical": "Immediate action; exploitable with severe impact",
@@ -137,9 +104,11 @@ let headers = JSON.parse(JSON.stringify(headings))
 function TestsTablePage() {
     const [selectedTest, setSelectedTest] = useState({})
     const [data, setData] = useState({ 'all': [], 'by_akto': [], 'custom': [], 'inactive': [] })
-    const localSubCategoryMap = LocalStore.getState().subCategoryMap
+    let localSubCategoryMap = LocalStore.getState().subCategoryMap
     const categoryMap = LocalStore.getState().categoryMap;
     const dashboardCategory = getDashboardCategory();
+    const [loading, setLoading] = useState(false)
+    const [testsLoaded, setTestsLoaded] = useState(0);
 
     const severityOrder = { CRITICAL: 5, HIGH: 4, MEDIUM: 3, LOW: 2, dynamic_severity: 1 };
 
@@ -192,18 +161,15 @@ function TestsTablePage() {
 
     const fetchAllTests = async () => {
         try {
-            let categoriesName = Object.keys(categoryMap);
-            if(dashboardCategory === "MCP Security"){
-                categoriesName = mcpCategories;
-            } else if (dashboardCategory === "Agentic Security") {
-                categoriesName = [...llmCategories, ...mcpCategories];
-            }
-             else {
-                categoriesName = Object.keys(categoryMap);
-            }
+            let categoriesName = getCategoriesBasedOnDashboardCategory(dashboardCategory, categoryMap);
             let metaDataObj = {
                 subCategories: [],
                 categories: []
+            }
+
+            if (localSubCategoryMap == undefined || localSubCategoryMap == null || Object.keys(localSubCategoryMap).length === 0) {
+                await transform.setTestMetadata("testEditor", setTestsLoaded)
+                localSubCategoryMap = LocalStore.getState().subCategoryMap
             }
 
             if ((localSubCategoryMap && Object.keys(localSubCategoryMap).length > 0 ) && categoriesName.length > 0) {
@@ -212,16 +178,15 @@ function TestsTablePage() {
                     categories: Object.keys(categoryMap)
                 }
             } else { 
-                metaDataObj = await transform.getAllSubcategoriesData(false, "testEditor")
+                metaDataObj = await transform.getAllSubcategoriesData(false, "testEditor", setTestsLoaded)
                 categoriesName = metaDataObj?.categories.map(x => x.name)
             }
             if (!metaDataObj?.subCategories?.length) return;
             try {
-                metaDataObj.subCategories = metaDataObj.subCategories.filter(
-                    (subCategory) => categoriesName.includes(subCategory.superCategory.name)
-                )
+                metaDataObj.subCategories = filterSubCategoriesBasedOnCategories(metaDataObj.subCategories, categoriesName);
             } catch (error) {
             }
+
 
             const obj = convertFunc.mapCategoryToSubcategory(metaDataObj.subCategories);
             const [allData, aktoData, customData, deactivatedData] = mapTestData(obj);
@@ -237,7 +202,12 @@ function TestsTablePage() {
     };
 
     useEffect(() => {
-        fetchAllTests()
+        async function fetchData() {
+            setLoading(true)
+            await fetchAllTests()
+            setLoading(false)
+        }
+        fetchData()
     }, [dashboardCategory])
 
 
@@ -286,6 +256,8 @@ function TestsTablePage() {
             headings={headings}
             data={data[selectedTab]}
             filters={[]}
+            loading={loading}
+            loadingText={`Loading tests... ${testsLoaded} tests loaded`}
         />,
         <TestsFlyLayout data={selectedTest} setShowDetails={setShowDetails} showDetails={showDetails} ></TestsFlyLayout>
     ]

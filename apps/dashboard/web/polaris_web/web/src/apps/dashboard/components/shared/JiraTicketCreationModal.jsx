@@ -39,7 +39,7 @@ const DisplayABCreateWorkItemFields = ({ displayABWorkItemFieldMetadata }) => {
         )
     }
 
-const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handleSaveAction, jiraProjectMaps, setProjId, setIssueType, projId, issueType, issueId, isAzureModal, isServiceNowModal, labelsText, setLabelsText }) => {
+const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handleSaveAction, jiraProjectMaps, setProjId, setIssueType, projId, issueType, issueId, isAzureModal, isServiceNowModal, isDevRevModal, labelsText, setLabelsText }) => {
     const [isCreatingTicket, setIsCreatingTicket] = useState(false)
     const [displayJiraIssueFieldMetadata, setDisplayJiraIssueFieldMetadata] = useState([])
     const [localLabelsText, setLocalLabelsText] = useState(labelsText || "")
@@ -58,7 +58,7 @@ const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handl
     }
 
     useEffect(() => {
-        if (!isAzureModal && !isServiceNowModal && projId && issueType) {
+        if (!isAzureModal && !isServiceNowModal && !isDevRevModal && projId && issueType) {
             const initialFieldMetaData = createJiraIssueFieldMetaData?.[projId]?.[issueType] || [];
 
             const filteredFieldMetaData = initialFieldMetaData.filter(field => {
@@ -75,7 +75,7 @@ const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handl
             }, {});
             setDisplayJiraIssueFieldValues(initialValues);
         }
-    }, [isAzureModal, isServiceNowModal, projId, issueType, createJiraIssueFieldMetaData])
+    }, [isAzureModal, isServiceNowModal, isDevRevModal, projId, issueType, createJiraIssueFieldMetaData, setDisplayJiraIssueFieldValues])
 
     // Reset local state when modal opens
     useEffect(() => {
@@ -97,12 +97,22 @@ const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handl
         if (isAzureModal && projId && issueType) {
             const initialFieldMetaData = createABWorkItemFieldMetaData?.[projId]?.[issueType] || [];
 
-            const filteredFieldMetaData = initialFieldMetaData.filter(field => {
-                const fieldReferenceName = field?.organizationFieldDetails?.referenceName;
-                const isCustomField = (typeof fieldReferenceName === "string") && (fieldReferenceName.startsWith("Custom."));
-                return isCustomField;
+            // filter out fields that are not custom fields or allowed system fields
+            let tagSystemField = null, areaPathSystemField = null, customFields = [];
+            initialFieldMetaData.forEach(field => {
+                const fieldReferenceName = field?.fieldReferenceName;
+                if (typeof fieldReferenceName !== "string") return;
+
+                if (fieldReferenceName === "System.Tags") tagSystemField = field;
+                if (fieldReferenceName === "System.AreaPath") areaPathSystemField = field;
+                if (fieldReferenceName.startsWith("Custom.")) customFields.push(field);
             });
 
+            const filteredFieldMetaData = [];
+            if (tagSystemField) filteredFieldMetaData.push(tagSystemField);
+            if (areaPathSystemField) filteredFieldMetaData.push(areaPathSystemField);
+            filteredFieldMetaData.push(...customFields);
+            
             setDisplayABWorkItemFieldMetadata(filteredFieldMetaData);
 
             const initialValues = filteredFieldMetaData.reduce((acc, field) => {
@@ -125,7 +135,7 @@ const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handl
             open={modalActive}
             onClose={() => setModalActive(false)}
             size="small"
-            title={<Text variant="headingMd">{isServiceNowModal ? "Configure ServiceNow ticket details" : isAzureModal ? "Configure Azure Boards Work Item" : "Configure jira ticket details"}</Text>}
+            title={<Text variant="headingMd">{isServiceNowModal ? "Configure ServiceNow ticket details" : isDevRevModal ? "Configure DevRev ticket details" : isAzureModal ? "Configure Azure Boards Work Item" : "Configure jira ticket details"}</Text>}
             primaryAction={{
                 content: (isAzureModal ? 'Create work item' : 'Create ticket'),
                 onAction: () => {
@@ -139,20 +149,34 @@ const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handl
                     setIsCreatingTicket(false)
                     setModalActive(false)
                 },
-                disabled: (isServiceNowModal ? (!projId || isCreatingTicket) : (!projId || !issueType || isCreatingTicket))
+                disabled: ((isServiceNowModal || isDevRevModal) ? (!projId || isCreatingTicket) : (!projId || !issueType || isCreatingTicket))
             }}
         >
             <Modal.Section>
                 <VerticalStack gap={"3"}>
-                    {isServiceNowModal ? (
-                        <DropdownSearch
-                            disabled={!jiraProjectMaps || jiraProjectMaps.length === 0}
-                            placeholder="Select ServiceNow table"
-                            optionsList={jiraProjectMaps ? jiraProjectMaps.map((x) => {return{label: x, value: x}}): []}
-                            setSelected={setProjId}
-                            preSelected={projId}
-                            value={projId}
-                        />
+                    {(isServiceNowModal || isDevRevModal) ? (
+                        <>
+                            <DropdownSearch
+                                disabled={!jiraProjectMaps || jiraProjectMaps.length === 0}
+                                placeholder={isDevRevModal ? "Select DevRev part" : "Select ServiceNow table"}
+                                optionsList={jiraProjectMaps ? jiraProjectMaps.map((x) => {return{label: isDevRevModal ? x.name : x, value: isDevRevModal ? x.id : x}}): []}
+                                setSelected={setProjId}
+                                preSelected={projId}
+                                value={isDevRevModal && jiraProjectMaps ? (jiraProjectMaps.find(x => x.id === projId)?.name || projId) : projId}
+                            />
+                            {isDevRevModal && (
+                                <DropdownSearch
+                                    placeholder="Select work item type"
+                                    optionsList={[
+                                        {label: 'Issue', value: 'issue'},
+                                        {label: 'Ticket', value: 'ticket'}
+                                    ]}
+                                    setSelected={setIssueType}
+                                    preSelected={issueType}
+                                    value={issueType === 'issue' ? 'Issue' : issueType === 'ticket' ? 'Ticket' : issueType}
+                                />
+                            )}
+                        </>
                     ) : (
                         <>
                             <DropdownSearch

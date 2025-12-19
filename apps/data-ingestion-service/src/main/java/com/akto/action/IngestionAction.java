@@ -3,16 +3,16 @@ package com.akto.action;
 import java.util.Base64;
 import java.util.List;
 
+import com.akto.dto.IngestDataBatch;
 import com.akto.log.LoggerMaker;
+import com.akto.utils.KafkaUtils;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.mongodb.BasicDBObject;
-import org.apache.commons.lang3.StringUtils;
-
-import com.akto.dto.IngestDataBatch;
-import com.akto.utils.KafkaUtils;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
+
+import org.apache.commons.lang3.StringUtils;
 
 @lombok.Getter
 @lombok.Setter

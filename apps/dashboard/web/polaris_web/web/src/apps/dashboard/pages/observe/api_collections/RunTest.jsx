@@ -17,6 +17,7 @@ import RunTestSuites from "./RunTestSuites";
 import RunTestConfiguration from "./RunTestConfiguration";
 import {createTestName,convertToLowerCaseWithUnderscores} from "./Utils"
 import settingsApi from "../../settings/api";
+import {getCategoriesBasedOnDashboardCategory, filterSubCategoriesBasedOnCategories } from "../../test_editor/tests_table/categoryUtil";
 
 const initialAutoTicketingDetails = {
     shouldCreateTickets: false,
@@ -50,6 +51,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         sendSlackAlert: false,
         sendMsTeamsAlert: false,
         cleanUpTestingResources: false,
+        doNotMarkIssuesAsFixed: false,
         autoTicketingDetails: initialAutoTicketingDetails,
         miniTestingServiceName: "",
         slackChannel: ""
@@ -91,6 +93,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), []);
 
     const localCategoryMap = LocalStore.getState().categoryMap
+    const dashboardCategory = getDashboardCategory();
     const localSubCategoryMap = LocalStore.getState().subCategoryMap
     const [testMode, setTestMode] = useState(true)
     const [shouldRuntestConfig, setShouldRuntestConfig] = useState(false)
@@ -158,6 +161,10 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
         } else {
             metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
+        }
+        if (func.isDemoAccount()) {
+            let categoriesName = getCategoriesBasedOnDashboardCategory(dashboardCategory, localCategoryMap);
+            metaDataObj.subCategories = filterSubCategoriesBasedOnCategories(metaDataObj.subCategories, categoriesName);
         }
         let categories = metaDataObj.categories
         categories = func.sortByCategoryPriority(categories, 'name')
