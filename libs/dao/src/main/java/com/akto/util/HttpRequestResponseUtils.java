@@ -164,12 +164,20 @@ public class HttpRequestResponseUtils {
     }
     
     public static String convertFormUrlEncodedToJson(String rawRequest) {
+        // Check if the input looks like form-encoded data
+        // Form-encoded data should contain '=' and typically contains '&' or at least one key-value pair
+        if (rawRequest == null || rawRequest.trim().isEmpty() || !rawRequest.contains("=")) {
+            return rawRequest;
+        }
+
         String myStringDecoded = null;
         try {
             myStringDecoded = URLDecoder.decode(rawRequest, "UTF-8");
         } catch (Exception e) {
-            return null;
+            // If decoding fails, return the original string
+            return rawRequest;
         }
+
         String[] parts = myStringDecoded.split("&");
         Map<String,String> valueMap = new HashMap<>();
 
@@ -179,10 +187,17 @@ public class HttpRequestResponseUtils {
                 valueMap.put(keyVal[0], keyVal[1]);
             }
         }
+
+        // If no valid key-value pairs were found, return the original string
+        if (valueMap.isEmpty()) {
+            return rawRequest;
+        }
+
         try {
             return mapper.writeValueAsString(valueMap);
         } catch (Exception e) {
-            return null;
+            // If JSON serialization fails, return the original string
+            return rawRequest;
         }
     }
 
