@@ -38,9 +38,9 @@ export const FIELD_TYPE_URL = 'url';
 export const FIELD_TYPE_PASSWORD = 'password';
 
 // Descriptions
-export const DESCRIPTION_N8N = 'Use our N8N Import feature to capture traffic and instantly send it to your dashboard for real-time insights.';
-export const DESCRIPTION_LANGCHAIN = 'Use our Langchain Import feature to capture traffic from LangSmith and instantly send it to your dashboard for real-time insights.';
-export const DESCRIPTION_COPILOT_STUDIO = 'Use our Copilot Studio Import feature to capture traffic from Azure Application Insights and instantly send it to your dashboard for real-time insights.';
+export const DESCRIPTION_N8N = 'Use our N8N feature to capture traffic and instantly send it to your dashboard for real-time insights.';
+export const DESCRIPTION_LANGCHAIN = 'Use our Langchain feature to capture traffic from LangSmith and instantly send it to your dashboard for real-time insights.';
+export const DESCRIPTION_COPILOT_STUDIO = 'Use our Copilot Studio feature to capture traffic from Azure Application Insights and instantly send it to your dashboard for real-time insights.';
 
 // N8N Field Configuration
 export const N8N_FIELDS = [
