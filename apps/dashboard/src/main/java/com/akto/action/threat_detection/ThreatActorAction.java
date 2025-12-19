@@ -44,8 +44,6 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.bson.conversions.Bson;
 
-import static com.akto.action.threat_detection.utils.ThreatsUtils.getTemplates;
-
 public class ThreatActorAction extends AbstractThreatDetectionAction {
 
   List<DashboardThreatActor> actors;
@@ -101,7 +99,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
       {
         put("start_ts", startTs);
         put("end_ts", endTs);
-        put("latestAttack", getTemplates(latestAttack));
+        put("latestAttack", latestAttack);
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -167,7 +165,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     post.addHeader("x-context-source", Context.contextSource.get().toString());
     Map<String, Object> filter = new HashMap<>();
 
-    filter.put("latestAttack", getTemplates(latestAttack));
+    filter.put("latestAttack", latestAttack);
 
     if(this.country != null && !this.country.isEmpty()){
       filter.put("country", this.country);

@@ -13,24 +13,43 @@ import java.util.*;
 
 public class ThreatUtils {
 
+    private static final List<String> ENDPOINT_POLICY_FILTER_IDS = Arrays.asList(
+        "MCPGuardrails", "AuditPolicy", "MCPMaliciousComponent"
+    );
+
     public static Document buildSimpleContextFilter(String contextSource) {
         if (contextSource == null || contextSource.isEmpty()) {
-            return new Document();
+            contextSource = CONTEXT_SOURCE.API.name();
         }
-        String contextSourceUpper = contextSource.toUpperCase();
 
-        if (CONTEXT_SOURCE.ENDPOINT.name().equals(contextSourceUpper)) {
-            return new Document("contextSource", CONTEXT_SOURCE.ENDPOINT.name());
-        } else if (CONTEXT_SOURCE.AGENTIC.name().equals(contextSourceUpper)) {
-            // AGENTIC: show records where contextSource is null/doesn't exist OR contextSource != "ENDPOINT"
-            return new Document("$or", Arrays.asList(
-                new Document("contextSource", null),
-                new Document("contextSource", new Document("$exists", false)),
-                new Document("contextSource", new Document("$ne", "ENDPOINT"))
-            ));
+        Document contextSourceFilter = new Document("contextSource", contextSource);
+
+        Document legacyFilter = buildLegacyContextFilter(contextSource);
+
+        return new Document("$or", Arrays.asList(contextSourceFilter, legacyFilter));
+    }
+
+    private static Document buildLegacyContextFilter(String contextSource) {
+        Document nullOrNotExistsCondition = new Document("$or", Arrays.asList(
+            new Document("contextSource", null),
+            new Document("contextSource", new Document("$exists", false))
+        ));
+
+        String contextSourceUpper = contextSource.toUpperCase();
+        Document filterIdCondition;
+
+        switch (contextSourceUpper) {
+            case "AGENTIC":
+            case "ENDPOINT":
+                filterIdCondition = new Document("filterId", new Document("$in", ENDPOINT_POLICY_FILTER_IDS));
+                break;
+
+            default:
+                filterIdCondition = new Document("filterId", new Document("$nin", ENDPOINT_POLICY_FILTER_IDS));
+                break;
         }
-        // No logic for API
-        return new Document();
+
+        return new Document("$and", Arrays.asList(nullOrNotExistsCondition, filterIdCondition));
     }
 
     public static void createIndexIfAbsent(String accountId, MaliciousEventDao maliciousEventDao) {

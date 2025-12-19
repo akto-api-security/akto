@@ -218,10 +218,6 @@ public class ThreatActorService {
         ListThreatActorsRequest.Filter filter = request.getFilter();
         Document match = new Document();
 
-        if(filter.getLatestAttackList() == null || filter.getLatestAttackList().isEmpty()) {
-            return ListThreatActorResponse.newBuilder().build();
-        }
-
         // Apply filters
         if (!filter.getActorsList().isEmpty()) match.append("actor", new Document("$in", filter.getActorsList()));
         if (!filter.getLatestIpsList().isEmpty()) match.append("latestApiIp", new Document("$in", filter.getLatestIpsList()));
@@ -325,10 +321,6 @@ public class ThreatActorService {
     }
 
   public DailyActorsCountResponse getDailyActorCounts(String accountId, long startTs, long endTs, List<String> latestAttackList, String contextSource) {
-
-    if(latestAttackList == null || latestAttackList.isEmpty()) {
-        return DailyActorsCountResponse.newBuilder().build();
-    }
 
     List<DailyActorsCountResponse.ActorsCount> actors = new ArrayList<>();
         List<Document> pipeline = new ArrayList<>();
@@ -465,10 +457,6 @@ public class ThreatActorService {
   }
 
   public ThreatActivityTimelineResponse getThreatActivityTimeline(String accountId, long startTs, long endTs, List<String> latestAttackList, String contextSource) {
-
-    if(latestAttackList == null || latestAttackList.isEmpty()) {
-        return ThreatActivityTimelineResponse.newBuilder().build();
-    }
 
         List<ThreatActivityTimelineResponse.ActivityTimeline> timeline = new ArrayList<>();
         // long sevenDaysInSeconds = TimeUnit.DAYS.toSeconds(7);
@@ -614,15 +602,11 @@ public class ThreatActorService {
   public ThreatActorByCountryResponse getThreatActorByCountry(
       String accountId, ThreatActorByCountryRequest request, String contextSource) {
 
-      if(request.getLatestAttackList() == null || request.getLatestAttackList().isEmpty()) {
-          return ThreatActorByCountryResponse.newBuilder().build();
-      }
+      List<Document> pipeline = new ArrayList<>();
 
-    List<Document> pipeline = new ArrayList<>();
+      Document match = new Document();
 
-    Document match = new Document();
-
-      if(request.getLatestAttackList() != null && !request.getLatestAttackList().isEmpty()) {
+      if (!request.getLatestAttackList().isEmpty()) {
           match.append("filterId", new Document("$in", request.getLatestAttackList()));
       }
 
