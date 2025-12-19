@@ -36,7 +36,7 @@ public class ApiAuditLogsUtils {
         }
     }
 
-    /* Registers an action audit generator for a specific action.
+    /** Registers an action audit generator for a specific action.
      *
      * @param actionName The unique name of the action (e.g., API endpoint).
      * @param actionClass The class type of the action.

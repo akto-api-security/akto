@@ -204,7 +204,7 @@ public class InventoryAuditGenerators {
         String collectionName = action.getCollectionName();
         List<ApiInfoKey> apisList = action.getApiList();
 
-        return String.format("User removed %d APIs to custom API collection: %s", 
+        return String.format("User removed %d APIs from custom API collection: %s", 
             ActionAuditGeneratorUtils.getItemsCount(apisList),
             collectionName);
     }
