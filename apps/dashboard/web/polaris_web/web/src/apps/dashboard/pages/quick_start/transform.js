@@ -873,8 +873,8 @@ const safariExtensionObj = {
 
 const n8nImportObj = {
     icon: '/public/n8n.svg',
-    label: "N8N Import",
-    text: "Use our N8N Import feature to capture traffic and instantly send it to your dashboard for real-time insights.",
+    label: "N8N",
+    text: "Use our N8N feature to capture traffic and instantly send it to your dashboard for real-time insights.",
     docsUrl: 'https://docs.akto.io/n8n-import',
     key: "N8N_IMPORT",
     component: <AIAgentConnectorImport
@@ -889,8 +889,8 @@ const n8nImportObj = {
 
 const langchainImportObj = {
     icon: '/public/langchain.svg',
-    label: "Langchain Import",
-    text: "Use our Langchain Import feature to capture traffic from LangSmith and instantly send it to your dashboard for real-time insights.",
+    label: "Langchain",
+    text: "Use our Langchain feature to capture traffic from LangSmith and instantly send it to your dashboard for real-time insights.",
     docsUrl: 'https://docs.akto.io/langchain-import',
     key: "LANGCHAIN_IMPORT",
     component: <AIAgentConnectorImport
@@ -904,9 +904,9 @@ const langchainImportObj = {
 }
 
 const copilotStudioImportObj = {
-    icon: '/public/copilot-studio.svg',
-    label: "Copilot Studio Import",
-    text: "Use our Copilot Studio Import feature to capture traffic from Azure Application Insights and instantly send it to your dashboard for real-time insights.",
+    icon: '/public/copilot.svg',
+    label: "Copilot Studio",
+    text: "Use our Copilot Studio feature to capture traffic from Azure Application Insights and instantly send it to your dashboard for real-time insights.",
     docsUrl: 'https://docs.akto.io/copilot-studio-import',
     key: "COPILOT_STUDIO_IMPORT",
     component: <AIAgentConnectorImport
