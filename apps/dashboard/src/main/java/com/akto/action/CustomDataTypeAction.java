@@ -666,17 +666,28 @@ public class CustomDataTypeAction extends UserAction{
                             boolean skip5 = false;
                             try {
                                 skip1 = forHeaders(httpResponseParams.getHeaders(), customDataType, apiKey, aktoDataType);
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb(e, "Error in recalculating data type for response headers for " + apiKey.toString());
+                            }
+                            try {
                                 skip2 = forHeaders(httpResponseParams.requestParams.getHeaders(), customDataType, apiKey, aktoDataType);
                             } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb(e, "Error in recalculating data type for request headers for " + apiKey.toString());
                             }
                             try {
                                 skip3 = forPayload(httpResponseParams.getPayload(), customDataType, apiKey, aktoDataType);
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb(e, "Error in recalculating data type for response payload for " + apiKey.toString());
+                            }
+                            try {
                                 skip4 = forPayload(httpResponseParams.requestParams.getPayload(), customDataType, apiKey, aktoDataType);
                             } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb(e, "Error in recalculating data type for request payload for " + apiKey.toString());
                             }
                             try {
                                 skip5 = forQueryParams(httpResponseParams.requestParams.getURL(), customDataType, apiKey, aktoDataType);
                             } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb(e, "Error in recalculating data type for request query params for " + apiKey.toString());
                             }
                             String key = skip1 + " " + skip2 + " " + skip3 + " " + skip4 + " " + skip5 + " " + sampleData.getId().toString();
                             if ((skip1 || skip2 || skip3 || skip4 || skip5) && !foundSet.contains(key)) {
