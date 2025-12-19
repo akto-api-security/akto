@@ -271,11 +271,19 @@ func (s *Service) ValidateRequest(ctx context.Context, payload string) (*mcp.Val
 		zap.Any("parsedData", processResult.ParsedData))
 
 	// Convert ProcessResult to ValidationResult for backward compatibility
+	// Extract reason from BlockedResponse
+	reason := ""
+	if processResult.BlockedResponse != nil {
+		if reasonStr, ok := processResult.BlockedResponse["reason"].(string); ok {
+			reason = reasonStr
+		}
+	}
+
 	result := &mcp.ValidationResult{
 		Allowed:         !processResult.IsBlocked,
 		Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != payload,
 		ModifiedPayload: processResult.ModifiedPayload,
-		Reason:          "", // Extract from BlockedResponse if needed
+		Reason:          reason,
 		Metadata:        processResult.ParsedData,
 	}
 
@@ -309,11 +317,19 @@ func (s *Service) ValidateResponse(ctx context.Context, payload string) (*mcp.Va
 	}
 
 	// Convert ProcessResult to ValidationResult for backward compatibility
+	// Extract reason from BlockedResponse
+	reason := ""
+	if processResult.BlockedResponse != nil {
+		if reasonStr, ok := processResult.BlockedResponse["reason"].(string); ok {
+			reason = reasonStr
+		}
+	}
+
 	result := &mcp.ValidationResult{
 		Allowed:         !processResult.IsBlocked,
 		Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != payload,
 		ModifiedPayload: processResult.ModifiedPayload,
-		Reason:          "", // Extract from BlockedResponse if needed
+		Reason:          reason,
 		Metadata:        processResult.ParsedData,
 	}
 
