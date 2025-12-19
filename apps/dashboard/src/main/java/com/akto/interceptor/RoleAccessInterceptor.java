@@ -1,6 +1,5 @@
 package com.akto.interceptor;
 
-import com.akto.audit_logs_util.AuditLogsUtil;
 import com.akto.dao.RBACDao;
 import com.akto.dao.audit_logs.ApiAuditLogsDao;
 import com.akto.dao.context.Context;
@@ -16,6 +15,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.policies.UserAgentTypePolicy;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.DashboardMode;
+import com.akto.utils.api_audit_logs.ApiAuditLogsUtils;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionInvocation;
 import com.opensymphony.xwork2.ActionSupport;
@@ -139,7 +139,7 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                     String userEmail = user.getLogin();
                     String userAgent = request.getHeader("User-Agent") == null ? "Unknown User-Agent" : request.getHeader("User-Agent");
                     UserAgentTypePolicy.ClientType userAgentType = UserAgentTypePolicy.findUserAgentType(userAgent);
-                    List<String> userProxyIpAddresses = AuditLogsUtil.getClientIpAddresses(request);
+                    List<String> userProxyIpAddresses = ApiAuditLogsUtils.getClientIpAddresses(request);
                     String userIpAddress = userProxyIpAddresses.get(0);
 
                     apiAuditLogs = new ApiAuditLogs(timestamp, apiEndpoint, actionDescription, userEmail, userAgentType.name(), userIpAddress, userProxyIpAddresses);
@@ -157,6 +157,12 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
         String result = invocation.invoke();
 
         if (apiAuditLogs != null && result.equalsIgnoreCase(Action.SUCCESS.toUpperCase())) {
+            // Populate action description using action audit generator registered for this action if available
+            String actionAuditDescription = ApiAuditLogsUtils.createActionAuditDescription(invocation);
+            if (actionAuditDescription != null) {
+                apiAuditLogs.setActionDescription(actionAuditDescription);
+            }
+            
             ApiAuditLogsDao.instance.insertOne(apiAuditLogs);
         }
 
