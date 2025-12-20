@@ -206,11 +206,72 @@ public class ApiExecutor {
         return responseHeaders;
     }
 
-    public static String replaceHostFromConfig(String url, TestingRunConfig testingRunConfig) {
+    /**
+     * Reverses agent connector hostname transformation.
+     * Uses the original hostname from custom header for N8N/Langchain/Copilot APIs.
+     */
+    public static String reverseAgentConnectorHostname(OriginalHttpRequest request) {
+        if (request == null) {
+            return request.getUrl();
+        }
+
+        String connectorSource = request.findHeaderValue("x-akto-agent-connector-source");
+        if (connectorSource == null || connectorSource.isEmpty()) {
+            return request.getUrl();
+        }
+
+        if (!connectorSource.equalsIgnoreCase("n8n") &&
+            !connectorSource.equalsIgnoreCase("langchain") &&
+            !connectorSource.equalsIgnoreCase("copilot")) {
+            return request.getUrl();
+        }
+
+        String originalHostname = request.findHeaderValue("x-akto-agent-connector-source-hostname");
+        if (originalHostname == null || originalHostname.isEmpty()) {
+            return request.getUrl();
+        }
+
+        try {
+            String url = request.getUrl();
+            URI uri = new URI(url);
+
+            String modifiedUrl = uri.getScheme() + "://" + originalHostname;
+            if (uri.getPort() != -1) {
+                modifiedUrl += ":" + uri.getPort();
+            }
+            if (uri.getPath() != null && !uri.getPath().isEmpty()) {
+                modifiedUrl += uri.getPath();
+            }
+            if (uri.getQuery() != null) {
+                modifiedUrl += "?" + uri.getQuery();
+            }
+            if (uri.getFragment() != null) {
+                modifiedUrl += "#" + uri.getFragment();
+            }
+
+            loggerMaker.infoAndAddToDb(String.format(
+                "Using original hostname from header for %s: %s", connectorSource, originalHostname));
+
+            return modifiedUrl;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error using agent connector original hostname: " + e.getMessage());
+            return request.getUrl();
+        }
+    }
+
+    public static String replaceHostFromConfig(String url, TestingRunConfig testingRunConfig, OriginalHttpRequest request) {
+        String modifiedUrl = url;
+
+        // STEP 1: Apply agent connector hostname reversal
+        if (request != null) {
+            modifiedUrl = reverseAgentConnectorHostname(request);
+        }
+
+        // STEP 2: Apply overriddenTestAppUrl
         if (testingRunConfig != null && !StringUtils.isEmpty(testingRunConfig.getOverriddenTestAppUrl())) {
             URI typedUrl = null;
             try {
-                typedUrl = new URI(url);
+                typedUrl = new URI(modifiedUrl);
 
             } catch (URISyntaxException e) {
                 throw new RuntimeException(e);
@@ -223,19 +284,19 @@ public class ApiExecutor {
             try {
                 newHostURI = new URI(newHost);
             } catch (URISyntaxException e) {
-                return url;
+                return modifiedUrl;
             }
 
             try {
                 String newScheme = newHostURI.getScheme() == null ? typedUrl.getScheme() : newHostURI.getScheme();
                 int newPort = newHostURI.getPort() == -1 ? typedUrl.getPort() : newHostURI.getPort();
 
-                url = new URI(newScheme, null, newHostURI.getHost(), newPort, typedUrl.getPath(), typedUrl.getQuery(), typedUrl.getFragment()).toString();
+                modifiedUrl = new URI(newScheme, null, newHostURI.getHost(), newPort, typedUrl.getPath(), typedUrl.getQuery(), typedUrl.getFragment()).toString();
             } catch (URISyntaxException e) {
-                return url;
+                return modifiedUrl;
             }
         }
-        return url;
+        return modifiedUrl;
     }
 
     public static String replacePathFromConfig(String url, TestingRunConfig testingRunConfig) {
@@ -296,7 +357,7 @@ public class ApiExecutor {
             loggerMaker.errorAndAddToDb(e, "error converting req url to absolute " + url);
         }
 
-        return replaceHostFromConfig(url, testingRunConfig);
+        return replaceHostFromConfig(url, testingRunConfig, request);
     }
 
     public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean useTestingRunConfig) throws Exception {
