@@ -14,6 +14,7 @@ import LocalStore from '../../../../main/LocalStorageStore';
 import SessionStore from '../../../../main/SessionStore';
 import IssuesStore from '../../../pages/issues/issuesStore';
 import Dropdown from '../Dropdown';
+import AktoAISearchMock from '../../shared/AktoAISearchMock';
 
 function ContentWithIcon({icon,text, isAvatar= false}) {
     return(
@@ -140,12 +141,11 @@ useEffect(() => {
     );
 
     const searchFieldMarkup = (
-        <TopBar.SearchField
-            placeholder="Search collections, tests and connectors"
-            showFocusBorder
-            onChange={handleSearchChange}
-            value={searchValue}
-        />
+        <Box width="100%">
+            <AktoAISearchMock
+                placeholder="Ask Akto AI for help with APIs, security, testing..."
+            />
+        </Box>
     );
     /* Search bar */
 
@@ -313,9 +313,6 @@ useEffect(() => {
                     </Box>
                 }
                 searchField={searchFieldMarkup}
-                searchResultsVisible={searchValue.length > 0}
-                searchResults={searchResultsMarkup}
-                onSearchResultsDismiss={() =>handleSearchChange('')}
                 secondaryMenu={secondaryMenuMarkup}
             />
             <Modal

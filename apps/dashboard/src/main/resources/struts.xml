@@ -7142,6 +7142,27 @@
             </result>
         </action>
 
+        <action name="api/ai/chat" class="com.akto.action.gpt.AIChatAction" method="chat">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ASK_GPT</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User interacted with AI search</param>
+            </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AKTO_GPT_AI</param>
+            </interceptor-ref>
+            <result name="SUCCESS" type="stream">
+                <param name="contentType">text/plain</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">500</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/analyze_vulnerability" class="com.akto.action.gpt.VulnerabilityAnalysisAction" method="analyzeVulnerability">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

@@ -1,0 +1,362 @@
+/* Akto AI Search - Minimal Design */
+
+.akto-ai-search {
+    position: relative;
+    width: 100%;
+}
+
+.akto-ai-search__input-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.akto-ai-search__input-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: white;
+    border: 1px solid #c4cdd5;
+    border-radius: 8px;
+    padding: 0 12px;
+    transition: all 0.2s;
+}
+
+.akto-ai-search__input-container:focus-within {
+    border-color: #6747ED;
+    box-shadow: 0 0 0 3px rgba(103, 71, 237, 0.1);
+}
+
+.akto-ai-search__icon {
+    display: flex;
+    align-items: center;
+    margin-right: 8px;
+    color: #637381;
+}
+
+.akto-ai-search__input {
+    flex: 1;
+    border: none;
+    outline: none;
+    padding: 10px 0;
+    font-size: 14px;
+    color: #212b36;
+    background: transparent;
+}
+
+.akto-ai-search__input::placeholder {
+    color: #919eab;
+}
+
+.akto-ai-search__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.akto-ai-search__loading {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.akto-ai-search__clear {
+    display: flex;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    color: #637381;
+}
+
+.akto-ai-search__clear:hover {
+    background-color: #f4f6f8;
+}
+
+.akto-ai-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #e1e3e5;
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    max-height: 500px;
+    overflow-y: auto;
+    z-index: 1000;
+    animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.akto-ai-loading-state {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 24px;
+}
+
+.akto-ai-thinking {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 24px;
+    background: #f9fafb;
+    border-left: 3px solid #6747ED;
+}
+
+.akto-ai-thinking-icon {
+    flex-shrink: 0;
+}
+
+.akto-ai-thinking-text {
+    font-style: italic;
+    color: #637381;
+}
+
+.akto-ai-content {
+    padding: 24px;
+}
+
+.akto-ai-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.akto-ai-answer {
+    line-height: 1.6;
+    color: #202223;
+}
+
+.akto-ai-answer p {
+    margin: 0 0 12px 0;
+}
+
+.akto-ai-answer p:last-child {
+    margin-bottom: 0;
+}
+
+.akto-ai-answer strong {
+    font-weight: 600;
+    color: #202223;
+}
+
+.akto-ai-answer-line {
+    margin: 0 0 8px 0;
+}
+
+.akto-ai-bullet {
+    list-style: none;
+    margin: 4px 0 4px 16px;
+    color: #202223;
+}
+
+.akto-ai-spacer {
+    height: 12px;
+}
+
+/* Metrics Cards */
+.akto-ai-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin: 16px 0 20px 0;
+}
+
+.akto-ai-metric {
+    padding: 12px 16px;
+    border-radius: 8px;
+    border: 1px solid #e1e3e5;
+    background: #fafbfc;
+    text-align: center;
+}
+
+.akto-ai-metric--critical {
+    border-color: #d72c0d;
+    background: #fef3f2;
+}
+
+.akto-ai-metric--warning {
+    border-color: #f49342;
+    background: #fff8f1;
+}
+
+.akto-ai-metric--info {
+    border-color: #6747ED;
+    background: #f6f4ff;
+}
+
+.akto-ai-metric-value {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.akto-ai-metric--critical .akto-ai-metric-value {
+    color: #d72c0d;
+}
+
+.akto-ai-metric--warning .akto-ai-metric-value {
+    color: #f49342;
+}
+
+.akto-ai-metric--info .akto-ai-metric-value {
+    color: #6747ED;
+}
+
+.akto-ai-metric-label {
+    font-size: 13px;
+    color: #637381;
+    line-height: 1.4;
+}
+
+/* Actions / Next Steps Section */
+.akto-ai-actions {
+    margin-top: 20px;
+    padding: 16px;
+    border: 1px solid #6747ED;
+    border-radius: 8px;
+    background: #f6f4ff;
+}
+
+.akto-ai-actions-header {
+    font-weight: 600;
+    font-size: 15px;
+    color: #202223;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.akto-ai-actions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.akto-ai-action-item {
+    display: inline-block;
+    font-size: 14px;
+    color: #6747ED;
+    line-height: 1.5;
+    text-decoration: underline;
+    cursor: pointer;
+    transition: color 0.2s ease;
+    margin-bottom: 8px;
+}
+
+.akto-ai-action-item:hover {
+    color: #5639c7;
+}
+
+.akto-ai-followups {
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid #e1e3e5;
+}
+
+.akto-ai-followups h4 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #202223;
+    margin-bottom: 16px;
+}
+
+.akto-ai-followups-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.akto-ai-followup {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 0;
+    background: none;
+    border: none;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    color: #202223;
+    font-size: 15px;
+    line-height: 1.5;
+    transition: color 0.2s ease;
+}
+
+.akto-ai-followup:last-child {
+    border-bottom: none;
+}
+
+.akto-ai-followup:hover {
+    color: #6747ED;
+}
+
+.akto-ai-followup-icon {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.akto-ai-sources {
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid #e1e3e5;
+}
+
+.akto-ai-sources h4 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #202223;
+    margin-bottom: 16px;
+}
+
+.akto-ai-sources-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.akto-ai-source {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: transparent;
+    border: 1px solid #e1e3e5;
+    border-radius: 6px;
+    color: #637381;
+    text-decoration: none;
+    font-size: 13px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.akto-ai-source:hover {
+    background: #f6f6f7;
+    border-color: #c4c4c4;
+    color: #202223;
+}
+
+.akto-ai-source svg {
+    flex-shrink: 0;
+    width: 12px;
+    height: 12px;
+}
+
+.akto-ai-dropdown::-webkit-scrollbar {
+    width: 6px;
+}
+
+.akto-ai-dropdown::-webkit-scrollbar-thumb {
+    background: #e1e3e5;
+    border-radius: 3px;
+}
