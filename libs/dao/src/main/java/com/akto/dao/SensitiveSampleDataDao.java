@@ -6,6 +6,7 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
 import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
@@ -57,6 +58,19 @@ public class SensitiveSampleDataDao extends AccountsContextDaoWithRbac<Sensitive
         filterMap.put("_id.subType", singleTypeInfo.getSubType().getName());
         filterMap.put("_id.apiCollectionId", singleTypeInfo.getApiCollectionId());
         return filterMap;
+    }
+
+    public SensitiveSampleData fetchSampleDataForApi(int apiCollectionId, String url, URLMethods.Method method) {
+        Bson filterQSampleData = filterForSampleData(apiCollectionId, url, method);
+        return SensitiveSampleDataDao.instance.findOne(filterQSampleData);
+    }
+
+    public static Bson filterForSampleData(int apiCollectionId, String url, URLMethods.Method method) {
+        return Filters.and(
+                Filters.eq("_id.apiCollectionId", apiCollectionId),
+                Filters.eq("_id.url", url),
+                Filters.eq("_id.method", method.name())
+        );
     }
 
     public void createIndicesIfAbsent() {
