@@ -208,34 +208,66 @@ public class ApiExecutor {
 
     /**
      * Reverses agent connector hostname transformation.
-     * Uses the original hostname from custom header for N8N/Langchain/Copilot APIs.
+     * Detects connector type from domain name keywords and strips first subdomain.
      */
     public static String reverseAgentConnectorHostname(OriginalHttpRequest request) {
         if (request == null) {
             return request.getUrl();
         }
 
-        String connectorSource = request.findHeaderValue("x-akto-agent-connector-source");
-        if (connectorSource == null || connectorSource.isEmpty()) {
-            return request.getUrl();
-        }
-
-        if (!connectorSource.equalsIgnoreCase("n8n") &&
-            !connectorSource.equalsIgnoreCase("langchain") &&
-            !connectorSource.equalsIgnoreCase("copilot")) {
-            return request.getUrl();
-        }
-
-        String originalHostname = request.findHeaderValue("x-akto-agent-connector-source-hostname");
-        if (originalHostname == null || originalHostname.isEmpty()) {
-            return request.getUrl();
-        }
-
         try {
             String url = request.getUrl();
             URI uri = new URI(url);
+            String hostname = uri.getHost();
 
-            String modifiedUrl = uri.getScheme() + "://" + originalHostname;
+            if (hostname == null || hostname.isEmpty()) {
+                return url;
+            }
+
+            // Convert to lowercase for case-insensitive matching
+            String hostnameLower = hostname.toLowerCase();
+
+            // Detect connector type from domain name keywords
+            String connectorType = null;
+            if (hostnameLower.contains("n8n")) {
+                connectorType = "n8n";
+            } else if (hostnameLower.contains("copilot")) {
+                connectorType = "copilot";
+            } else if (hostnameLower.contains("langsmith")) {
+                connectorType = "langchain";
+            }
+
+            // If no connector detected, return original URL
+            if (connectorType == null) {
+                return url;
+            }
+
+            // Strip first subdomain (agentId/workflowId/botId)
+            String[] parts = hostname.split("\\.");
+
+            // Need at least 3 parts to strip subdomain (e.g., wf123.n8n.example.com)
+            if (parts.length < 3) {
+                loggerMaker.infoAndAddToDb(String.format(
+                    "Detected %s connector but hostname has insufficient parts to strip subdomain: %s",
+                    connectorType, hostname));
+                return url;
+            }
+
+            // Validate first part looks like an ID (alphanumeric, hyphens allowed)
+            String firstPart = parts[0];
+            if (!firstPart.matches("^[a-zA-Z0-9-]+$")) {
+                loggerMaker.infoAndAddToDb(String.format(
+                    "Detected %s connector but first subdomain doesn't look like an ID: %s",
+                    connectorType, firstPart));
+                return url;
+            }
+
+            // Remove first subdomain
+            String[] remainingParts = Arrays.copyOfRange(parts, 1, parts.length);
+            String cleanedHostname = String.join(".", remainingParts);
+
+            // Rebuild URL with cleaned hostname
+            String modifiedUrl = uri.getScheme() + "://" + cleanedHostname;
             if (uri.getPort() != -1) {
                 modifiedUrl += ":" + uri.getPort();
             }
@@ -250,11 +282,12 @@ public class ApiExecutor {
             }
 
             loggerMaker.infoAndAddToDb(String.format(
-                "Using original hostname from header for %s: %s", connectorSource, originalHostname));
+                "Reversed %s hostname: %s -> %s", connectorType, hostname, cleanedHostname));
 
             return modifiedUrl;
+
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error using agent connector original hostname: " + e.getMessage());
+            loggerMaker.errorAndAddToDb("Error reversing agent connector hostname: " + e.getMessage());
             return request.getUrl();
         }
     }
