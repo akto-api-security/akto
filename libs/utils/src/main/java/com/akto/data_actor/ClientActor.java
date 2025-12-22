@@ -227,7 +227,7 @@ public class ClientActor extends DataActor {
     }
 
     @Override
-    public void updateModuleInfo(ModuleInfo moduleInfo) {
+    public boolean updateModuleInfo(ModuleInfo moduleInfo) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("moduleInfo", moduleInfo);
@@ -235,13 +235,24 @@ public class ClientActor extends DataActor {
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateModuleInfoForHeartbeat", "", "POST", gson.toJson(obj), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
-            if (response.getStatusCode() != 200) {
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in updateModuleInfoForHeartbeat", LoggerMaker.LogDb.RUNTIME);
-                return;
+                return false;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBObject moduleInfoObj = (BasicDBObject) payloadObj.get("moduleInfo");
+                ModuleInfo moduleInfoResp = objectMapper.readValue(moduleInfoObj.toJson(), ModuleInfo.class);
+                return moduleInfoResp.isReboot();
+            } catch(Exception e) {
+                return false;
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error updating heartbeat for :" + moduleInfo.getModuleType().name(), LoggerMaker.LogDb.RUNTIME);
         }
+        return false;
     }
 
     public APIConfig fetchApiConfig(String configName) {
