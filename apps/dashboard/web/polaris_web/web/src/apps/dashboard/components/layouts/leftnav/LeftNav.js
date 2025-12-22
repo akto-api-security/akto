@@ -397,7 +397,7 @@ export default function LeftNav() {
                             },
                             selected: leftNavSelected === "dashboard_guardrails_policies",
                             }] : []),
-                        {
+                        ...(dashboardCategory !== "Endpoint Security" ? [{
                             label: "Threat Policies",
                             onClick: () => {
                                 navigate("/dashboard/protection/threat-policy");
@@ -406,7 +406,7 @@ export default function LeftNav() {
                             },
                             selected:
                                 leftNavSelected === "dashboard_threat_policy",
-                        }
+                        }] : [])
                     ],
                 }] : []),
             // ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AI_AGENTS?.isGranted && dashboardCategory === "API Security" ? [{

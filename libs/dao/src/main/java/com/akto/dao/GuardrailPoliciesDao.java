@@ -47,6 +47,9 @@ public class GuardrailPoliciesDao extends AccountsContextDao<GuardrailPolicies> 
 
         fieldNames = new String[]{"isActive"};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
+        fieldNames = new String[]{"contextSource", "updatedTimestamp"};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
 
     public List<GuardrailPolicies> findAllSortedByCreatedTimestamp(int skip, int limit) {
@@ -62,21 +65,14 @@ public class GuardrailPoliciesDao extends AccountsContextDao<GuardrailPolicies> 
     }
 
     private Bson getContextSourceFilter() {
-        // Get current context source, default to ENDPOINT if not set
         CONTEXT_SOURCE contextSource = Context.contextSource.get();
-        if (contextSource == null) {
-            contextSource = CONTEXT_SOURCE.ENDPOINT;
-        }
 
-        // Build filter: contextSource matches OR contextSource doesn't exist (defaults to ENDPOINT)
-        if (contextSource == CONTEXT_SOURCE.ENDPOINT) {
-            // For ENDPOINT, include records where contextSource is ENDPOINT OR doesn't exist
+        if (contextSource == null || contextSource == CONTEXT_SOURCE.AGENTIC) {
             return Filters.or(
-                Filters.eq("contextSource", contextSource),
+                Filters.eq("contextSource", CONTEXT_SOURCE.AGENTIC),
                 Filters.exists("contextSource", false)
             );
         } else {
-            // For other contexts, only include records with exact contextSource match
             return Filters.eq("contextSource", contextSource);
         }
     }

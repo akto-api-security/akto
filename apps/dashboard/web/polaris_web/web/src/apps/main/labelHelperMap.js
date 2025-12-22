@@ -417,6 +417,7 @@ export const labelMap = {
     "tests selected": "tests selected",
     "testing": "testing",
     "Test library":"Test library",
-    "Endpoint Shield": "Endpoint Shield"
+    "Endpoint Shield": "Endpoint Shield",
+    "API Threat Activity": "Endpoint Guardrail Activity",
   },
 }
