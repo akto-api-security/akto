@@ -36,9 +36,54 @@ curl -N -X POST http://localhost:8091/scan/stream \
 
 ---
 
-## 📥 INPUT/PROMPT SCANNERS (13)
+## 📥 INPUT/PROMPT SCANNERS (14)
 
-### 1. BanCode - Detect Code Snippets
+### 1. BadCode - Detect Malicious Code Patterns
+```bash
+curl -N -X POST http://localhost:8091/scan/stream \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "import os; os.system(\"rm -rf /\")",
+    "scanners": [
+      {
+        "scanner_type": "prompt",
+        "scanner_name": "BadCode",
+        "config": {"threshold": 0.5, "strict_mode": true}
+      }
+    ]
+  }'
+```
+**Text:** Contains destructive system command
+**Expected:** Flagged as malicious code
+
+**More examples:**
+```bash
+# SQL Injection
+curl -N -X POST http://localhost:8091/scan/stream \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "SELECT * FROM users WHERE id = 1 OR 1=1; DROP TABLE users;",
+    "scanners": [{"scanner_type": "prompt", "scanner_name": "BadCode"}]
+  }'
+
+# Code Injection
+curl -N -X POST http://localhost:8091/scan/stream \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "eval(base64_decode(\"ZGVsZXRlIGFsbA==\"))",
+    "scanners": [{"scanner_type": "prompt", "scanner_name": "BadCode"}]
+  }'
+
+# Safe code (should pass)
+curl -N -X POST http://localhost:8091/scan/stream \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "def hello(): print(\"Hello World\")",
+    "scanners": [{"scanner_type": "prompt", "scanner_name": "BadCode"}]
+  }'
+```
+
+### 2. BanCode - Detect Code Snippets
 ```bash
 curl -N -X POST http://localhost:8091/scan/stream \
   -H "Content-Type: application/json" \
@@ -244,7 +289,7 @@ curl -N -X POST http://localhost:8091/scan/stream \
 **Text:** Toxic and offensive
 **Expected:** Flagged as toxic
 
-### 13. VALID TEXT Example (Should Pass)
+### 14. VALID TEXT Example (Should Pass)
 ```bash
 curl -N -X POST http://localhost:8091/scan/stream \
   -H "Content-Type: application/json" \
@@ -262,9 +307,27 @@ curl -N -X POST http://localhost:8091/scan/stream \
 
 ---
 
-## 📤 OUTPUT SCANNERS (14)
+## 📤 OUTPUT SCANNERS (15)
 
-### 1. BanCode - Detect Code in Output
+### 1. BadCode - Detect Malicious Code in Output
+```bash
+curl -N -X POST http://localhost:8091/scan/stream \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Here is the solution: eval(\"__import__(\"os\").system(\"rm -rf /\")\")",
+    "scanners": [
+      {
+        "scanner_type": "output",
+        "scanner_name": "BadCode",
+        "config": {"threshold": 0.5}
+      }
+    ]
+  }'
+```
+**Text:** LLM output contains malicious code
+**Expected:** Flagged as containing bad code
+
+### 2. BanCode - Detect Code in Output
 ```bash
 curl -N -X POST http://localhost:8091/scan/stream \
   -H "Content-Type: application/json" \
@@ -477,7 +540,7 @@ curl -N -X POST http://localhost:8091/scan/stream \
 **Text:** Toxic and insulting
 **Expected:** Flagged as toxic
 
-### 13. VALID OUTPUT Example (Should Pass)
+### 14. VALID OUTPUT Example (Should Pass)
 ```bash
 curl -N -X POST http://localhost:8091/scan/stream \
   -H "Content-Type: application/json" \

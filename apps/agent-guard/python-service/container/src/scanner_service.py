@@ -27,6 +27,7 @@ except:
 
 from llm_guard import input_scanners, output_scanners
 from intent_analyzer import IntentAnalysisScanner
+from bad_code_scanner import BadCodeScanner
 
 logging.basicConfig(
     level=logging.INFO,
@@ -56,6 +57,7 @@ class ScanResponse(BaseModel):
 
 PROMPT_SCANNERS = {
     "Anonymize": input_scanners.Anonymize,
+    "BadCode": BadCodeScanner,
     "BanCode": input_scanners.BanCode,
     "BanCompetitors": input_scanners.BanCompetitors,
     "BanSubstrings": input_scanners.BanSubstrings,
@@ -72,6 +74,7 @@ PROMPT_SCANNERS = {
 }
 
 OUTPUT_SCANNERS = {
+    "BadCode": BadCodeScanner,
     "BanCode": output_scanners.BanCode,
     "BanCompetitors": output_scanners.BanCompetitors,
     "BanSubstrings": output_scanners.BanSubstrings,
