@@ -13,13 +13,13 @@ Guardrail Service (Go) - Port 9091
          ↓
 Model Router Service (Python) - Port 8090
          ↓
-    ┌────┴────┬─────────┬──────────┬──────────┬──────────┬
-    ↓         ↓         ↓          ↓          ↓          ↓         
-Prompt      Toxic     Ban Words  Intent    Output    Gibberish
-Injection   Speech    & Content  Analysis  Quality   Detection
-Service     Service   Service    Service   Service   Service
-8091        8092      8093       8094      8095      8096
-~1.5-2GB    ~2-2.5GB  ~1.5-2GB   ~2-3GB    ~2-2.5GB  ~2GB
+    ┌────┴────┬─────────┬──────────┬──────────
+    ↓         ↓         ↓          ↓          ↓               
+Prompt      Toxic     Ban Words  Intent    Output    
+Injection   Speech    & Content  Analysis  Quality  
+Service     Service   Service    Service   Service   
+8091        8092      8093       8094      8095      
+~1.5-2GB    ~2-2.5GB  ~1.5-2GB   ~2-3GB    ~2-2.5GB  
 ```
 
 ## Services
@@ -113,17 +113,6 @@ Service     Service   Service    Service   Service   Service
 
 **Performance:** 60-120ms per scan
 
-### 7. Gibberish Detection Service (Port 8096)
-**Image Size:** ~2GB
-**Purpose:** Detect meaningless, nonsensical, or random text input
-
-**Models:**
-- Gibberish: TangoBeeAkto/gibberish-detector (ONNX optimized)
-
-**Scanners:**
-- Gibberish
-
-**Performance:** 50-100ms per scan (ONNX optimization provides 5-10x speedup)
 
 ## Deployment
 
@@ -198,7 +187,6 @@ The Model Router maintains 100% backward compatibility with the existing `/scan`
 | Anonymize, Deanonymize | Ban Words & Content Filter | 8093 |
 | Secrets, Code, Language, Gibberish, TokenLimit | Ban Words & Content Filter | 8093 |
 | Relevance, NoRefusal, MaliciousURLs, Sensitive | Output Quality & Safety | 8095 |
-| Gibberish | Gibberish Detection | 8096 |
 
 ## Configuration
 
@@ -211,7 +199,6 @@ The Model Router maintains 100% backward compatibility with the existing `/scan`
 - `BAN_WORDS_URL` - Ban words service URL
 - `INTENT_ANALYSIS_URL` - Intent analysis service URL
 - `OUTPUT_QUALITY_URL` - Output quality service URL
-- `GIBBERISH_DETECTION_URL` - Gibberish detection service URL
 - `REQUEST_TIMEOUT` - Timeout for service requests (default: 30s)
 - `MAX_RETRIES` - Max retry attempts (default: 2)
 - `HEALTH_CHECK_INTERVAL` - Health check interval (default: 30s)
@@ -236,7 +223,6 @@ curl http://localhost:8092/health  # Toxic speech
 curl http://localhost:8093/health  # Ban words
 curl http://localhost:8094/health  # Intent analysis
 curl http://localhost:8095/health  # Output quality
-curl http://localhost:8096/health  # Gibberish detection
 ```
 
 ## Testing

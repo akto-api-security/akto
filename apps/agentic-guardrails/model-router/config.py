@@ -11,7 +11,7 @@ SCANNER_SERVICE_MAP: Dict[str, str] = {
     "PromptInjection": "PROMPT_INJECTION",
 
     # Gibberish Detection Service  
-    "Gibberish": "GIBBERISH_DETECTION",
+    "Gibberish": "BAN_WORDS",
 
     # Toxic Speech Detection Service
     "Toxicity": "TOXIC_SPEECH",
@@ -49,8 +49,7 @@ def get_service_url(service_name: str) -> str:
         "TOXIC_SPEECH": "http://toxic-speech:8092",
         "BAN_WORDS": "http://ban-words-content:8093",
         "INTENT_ANALYSIS": "http://intent-analysis:8094",
-        "OUTPUT_QUALITY": "http://output-quality:8095",
-        "GIBBERISH_DETECTION": "http://gibberish-detection:8096",
+        "OUTPUT_QUALITY": "http://output-quality:8095"
     }
     return os.getenv(env_var, default_ports.get(service_name, ""))
 
@@ -60,8 +59,7 @@ SERVICE_URLS: Dict[str, str] = {
     "TOXIC_SPEECH": get_service_url("TOXIC_SPEECH"),
     "BAN_WORDS": get_service_url("BAN_WORDS"),
     "INTENT_ANALYSIS": get_service_url("INTENT_ANALYSIS"),
-    "OUTPUT_QUALITY": get_service_url("OUTPUT_QUALITY"),
-    "GIBBERISH_DETECTION": get_service_url("GIBBERISH_DETECTION"),
+    "OUTPUT_QUALITY": get_service_url("OUTPUT_QUALITY")
 }
 
 # Health check configuration

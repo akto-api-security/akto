@@ -16,7 +16,6 @@ services:
       - BAN_WORDS_URL=http://ban-words-content:8093
       - INTENT_ANALYSIS_URL=http://intent-analysis:8094
       - OUTPUT_QUALITY_URL=http://output-quality:8095
-      - GIBBERISH_DETECTION_URL=http://gibberish-detection:8096
       - REQUEST_TIMEOUT=30
       - MAX_RETRIES=2
       - HEALTH_CHECK_INTERVAL=30
@@ -26,7 +25,6 @@ services:
       - ban-words-content
       - intent-analysis
       - output-quality
-      - gibberish-detection
     networks:
       - agent-guard-net
     restart: unless-stopped
@@ -181,36 +179,6 @@ services:
       timeout: 10s
       retries: 3
 
-  # Gibberish Detection Service
-  gibberish-detection:
-    build:
-      context: ./services/gibberish-detection
-      dockerfile: Dockerfile
-    container_name: agent-guard-gibberish-detection
-    ports:
-      - "8096:8096"
-    environment:
-      - PORT=8096
-      - HF_HOME=/app/.cache/huggingface
-      - TRANSFORMERS_VERBOSITY=error
-      - HF_HUB_VERBOSITY=error
-    volumes:
-      - model-cache-gibberish:/app/.cache
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-        reservations:
-          memory: 1G
-    networks:
-      - agent-guard-net
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8096/health')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
 volumes:
   model-cache-prompt:
     driver: local
@@ -219,8 +187,6 @@ volumes:
   model-cache-intent:
     driver: local
   model-cache-output:
-    driver: local
-  model-cache-gibberish:
     driver: local
 
 networks:
