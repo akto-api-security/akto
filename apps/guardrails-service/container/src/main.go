@@ -99,6 +99,7 @@ func setupRouter(validationHandler *handlers.ValidationHandler, logger *zap.Logg
 	// Middleware
 	router.Use(gin.Recovery())
 	router.Use(loggingMiddleware(logger))
+	router.Use(corsMiddleware())
 
 	// Health check endpoint
 	router.GET("/health", validationHandler.HealthCheck)
@@ -156,5 +157,22 @@ func loggingMiddleware(logger *zap.Logger) gin.HandlerFunc {
 			zap.String("method", c.Request.Method),
 			zap.String("path", c.Request.URL.Path),
 			zap.Int("status", c.Writer.Status()))
+	}
+}
+
+func corsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+		c.Writer.Header().Set("Access-Control-Max-Age", "86400")
+
+		// Handle preflight requests
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+
+		c.Next()
 	}
 }
