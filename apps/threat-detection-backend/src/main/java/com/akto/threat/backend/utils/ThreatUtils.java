@@ -1,6 +1,7 @@
 package com.akto.threat.backend.utils;
 
 import com.akto.threat.backend.dao.MaliciousEventDao;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.IndexOptions;
@@ -11,6 +12,45 @@ import org.bson.conversions.Bson;
 import java.util.*;
 
 public class ThreatUtils {
+
+    private static final List<String> ENDPOINT_POLICY_FILTER_IDS = Arrays.asList(
+        "MCPGuardrails", "AuditPolicy", "MCPMaliciousComponent"
+    );
+
+    public static Document buildSimpleContextFilter(String contextSource) {
+        if (contextSource == null || contextSource.isEmpty()) {
+            contextSource = CONTEXT_SOURCE.API.name();
+        }
+
+        Document contextSourceFilter = new Document("contextSource", contextSource);
+
+        Document legacyFilter = buildLegacyContextFilter(contextSource);
+
+        return new Document("$or", Arrays.asList(contextSourceFilter, legacyFilter));
+    }
+
+    private static Document buildLegacyContextFilter(String contextSource) {
+        Document nullOrNotExistsCondition = new Document("$or", Arrays.asList(
+            new Document("contextSource", null),
+            new Document("contextSource", new Document("$exists", false))
+        ));
+
+        String contextSourceUpper = contextSource.toUpperCase();
+        Document filterIdCondition;
+
+        switch (contextSourceUpper) {
+            case "AGENTIC":
+            case "ENDPOINT":
+                filterIdCondition = new Document("filterId", new Document("$in", ENDPOINT_POLICY_FILTER_IDS));
+                break;
+
+            default:
+                filterIdCondition = new Document("filterId", new Document("$nin", ENDPOINT_POLICY_FILTER_IDS));
+                break;
+        }
+
+        return new Document("$and", Arrays.asList(nullOrNotExistsCondition, filterIdCondition));
+    }
 
     public static void createIndexIfAbsent(String accountId, MaliciousEventDao maliciousEventDao) {
         // Get the collection from DAO - this will create the collection if it doesn't exist
