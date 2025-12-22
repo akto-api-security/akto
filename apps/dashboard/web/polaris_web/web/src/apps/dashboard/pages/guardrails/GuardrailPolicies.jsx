@@ -448,6 +448,10 @@ function GuardrailPolicies() {
                 ...(guardrailData.llmRule ? { llmRule: guardrailData.llmRule } : {}),
                 // Add Base Prompt Rule if present
                 ...(guardrailData.basePromptRule ? { basePromptRule: guardrailData.basePromptRule } : {}),
+                // Add Gibberish Detection if present (same pattern as llmRule)
+                ...(guardrailData.gibberishDetection ? { gibberishDetection: guardrailData.gibberishDetection } : {}),
+                // Add Token Limit if present (same pattern as gibberishDetection)
+                ...(guardrailData.tokenLimit ? { tokenLimit: guardrailData.tokenLimit } : {}),
                 applyOnResponse: guardrailData.applyOnResponse || false,
                 applyOnRequest: guardrailData.applyOnRequest || false,
                 url: guardrailData.url || '',
@@ -462,17 +466,20 @@ function GuardrailPolicies() {
             };
 
             let response;
-            if (isEditMode && guardrailData.hexId) {
-                // Update existing policy
-                response = await api.createGuardrailPolicy(requestPayload);
-                if (response) {
-                    func.setToast(true, false, "Guardrail updated successfully");
-                }
-            } else {
-                // Create new policy
-                response = await api.createGuardrailPolicy(requestPayload);
-                if (response) {
-                    func.setToast(true, false, "Guardrail created successfully");
+            try {
+                if (isEditMode && guardrailData.hexId) {
+                    // Update existing policy
+                    response = await api.createGuardrailPolicy(requestPayload);
+                    if (response) {
+                        func.setToast(true, false, "Guardrail updated successfully");
+                    }
+                } else {
+                    // Create new policy
+
+                    response = await api.createGuardrailPolicy(requestPayload);
+                    if (response) {
+                        func.setToast(true, false, "Guardrail created successfully");
+                    }
                 }
             }
             

@@ -29,6 +29,10 @@ import {
     LlmPromptConfig,
     BasePromptStep,
     BasePromptConfig,
+    GibberishDetectionStep,
+    GibberishDetectionConfig,
+    TokenLimitStep,
+    TokenLimitConfig,
     ExternalModelStep,
     ExternalModelConfig,
     ServerSettingsStep,
@@ -82,11 +86,18 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [enableBasePromptRule, setEnableBasePromptRule] = useState(false);
     const [basePromptConfidenceScore, setBasePromptConfidenceScore] = useState(0.5);
 
-    // Step 8: External model based evaluation
+    // Step 8: Gibberish Detection
+    const [enableGibberishDetection, setEnableGibberishDetection] = useState(false);
+    const [gibberishConfidenceScore, setGibberishConfidenceScore] = useState(0.7);
+
+    // Step 9: Token Limit
+    const [enableTokenLimit, setEnableTokenLimit] = useState(false);
+    const [tokenLimitThreshold, setTokenLimitThreshold] = useState(2000);
+    // Step 10: External model based evaluation
     const [url, setUrl] = useState("");
     const [confidenceScore, setConfidenceScore] = useState(25); // Start with 25 (first checkpoint)
 
-    // Step 9: Server settings
+    // Step 11: Server settings
     const [selectedMcpServers, setSelectedMcpServers] = useState([]);
     const [selectedAgentServers, setSelectedAgentServers] = useState([]);
     const [applyOnResponse, setApplyOnResponse] = useState(false);
@@ -122,9 +133,15 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         enableBasePromptRule,
         basePromptConfidenceScore,
         // Step 8
+        enableGibberishDetection,
+        gibberishConfidenceScore,
+        // Step 9
+        enableTokenLimit,
+        tokenLimitThreshold,
+        // Step 10
         url,
         confidenceScore,
-        // Step 9
+        // Step 11
         selectedMcpServers,
         selectedAgentServers,
         mcpServers,
@@ -178,6 +195,18 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 title: BasePromptConfig.title,
                 summary: BasePromptConfig.getSummary(storedStateData),
                 ...BasePromptConfig.validate(storedStateData)
+            },
+            {
+                number: GibberishDetectionConfig.number,
+                title: GibberishDetectionConfig.title,
+                summary: GibberishDetectionConfig.getSummary(storedStateData),
+                ...GibberishDetectionConfig.validate(storedStateData)
+            },
+            {
+                number: TokenLimitConfig.number,
+                title: TokenLimitConfig.title,
+                summary: TokenLimitConfig.getSummary(storedStateData),
+                ...TokenLimitConfig.validate(storedStateData)
             },
             {
                 number: ExternalModelConfig.number,
@@ -286,6 +315,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setLlmConfidenceScore(0.5);
         setEnableBasePromptRule(false);
         setBasePromptConfidenceScore(0.5);
+        setEnableGibberishDetection(false);
+        setGibberishConfidenceScore(0.7);
         setUrl("");
         setConfidenceScore(25);
         setSelectedMcpServers([]);
@@ -361,6 +392,24 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         } else {
             setEnableBasePromptRule(false);
             setBasePromptConfidenceScore(0.5);
+        }
+
+        // Gibberish Detection
+        if (policy.gibberishDetection) {
+            setEnableGibberishDetection(policy.gibberishDetection.enabled || false);
+            setGibberishConfidenceScore(policy.gibberishDetection.confidenceScore !== undefined ? policy.gibberishDetection.confidenceScore : 0.7);
+        } else {
+            setEnableGibberishDetection(false);
+            setGibberishConfidenceScore(0.7);
+        }
+
+        // Token Limit
+        if (policy.tokenLimit) {
+            setEnableTokenLimit(policy.tokenLimit.enabled || false);
+            setTokenLimitThreshold(policy.tokenLimit.threshold !== undefined ? policy.tokenLimit.threshold : 2000);
+        } else {
+            setEnableTokenLimit(false);
+            setTokenLimitThreshold(2000);
         }
 
         // External model based evaluation
@@ -467,6 +516,10 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         confidenceScore: basePromptConfidenceScore
                     }
                 } : {}),
+                gibberishDetection: {
+                    enabled: enableGibberishDetection,
+                    confidenceScore: gibberishConfidenceScore
+                },
                 url: url || null,
                 confidenceScore: confidenceScore,
                 selectedMcpServers: selectedMcpServers, // Old format (just IDs)
@@ -479,8 +532,17 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
             };
             
-            await onSave(guardrailData);
-            handleClose();
+            // Debug: Confirmed modal data is correct, focus on parent component
+            console.log("About to call onSave...");
+            
+            try {
+                await onSave(guardrailData);
+                console.log("onSave completed successfully");
+                handleClose();
+            } catch (saveError) {
+                console.error("Error in onSave:", saveError);
+                throw saveError; // Re-throw to be caught by outer try-catch
+            }
         } catch (error) {
             console.error("Error creating guardrail:", error);
         } finally {
@@ -671,6 +733,24 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 );
             case 8:
                 return (
+                    <GibberishDetectionStep
+                        enableGibberishDetection={enableGibberishDetection}
+                        setEnableGibberishDetection={setEnableGibberishDetection}
+                        gibberishConfidenceScore={gibberishConfidenceScore}
+                        setGibberishConfidenceScore={setGibberishConfidenceScore}
+                    />
+                );
+            case 9:
+                return (
+                    <TokenLimitStep
+                        enableTokenLimit={enableTokenLimit}
+                        setEnableTokenLimit={setEnableTokenLimit}
+                        tokenLimitThreshold={tokenLimitThreshold}
+                        setTokenLimitThreshold={setTokenLimitThreshold}
+                    />
+                );
+            case 10:
+                return (
                     <ExternalModelStep
                         url={url}
                         setUrl={setUrl}
@@ -678,7 +758,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         setConfidenceScore={setConfidenceScore}
                     />
                 );
-            case 9:
+            case 11:
                 return (
                     <ServerSettingsStep
                         selectedMcpServers={selectedMcpServers}
