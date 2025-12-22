@@ -33,6 +33,8 @@ public class AuthFilter implements Filter {
             httpServletResponse.sendError(401);
             return;
         }
+
+        
         chain.doFilter(servletRequest, servletResponse);
 
     }
