@@ -14,7 +14,7 @@ public class FilterUpdates {
     private static int TOTAL_FILTERS = 5;
     private static int lastUpdateTs = 0;
     private final static int FILTER_UPDATE_DURATION = 5 * 60;
-    public final static int FULL_RESET_DURATION_MINUTES = 5;
+    public final static int FULL_RESET_DURATION_MINUTES = 30;
     private static boolean currentlyCleaning = false;
 
     private static List<BloomFilter<CharSequence>> filters = new ArrayList<BloomFilter<CharSequence>>() {
