@@ -7,12 +7,12 @@ import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
-import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.TestExecutor;
+import com.akto.testing.kafka_utils.TestingConfigurations;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
@@ -218,18 +218,8 @@ public class TestingIssuesHandler {
 
         loggerMaker.infoAndAddToDb(String.format("Total list of issues from db : %s", testingRunIssuesList.size()), LogDb.TESTING);
         List<Object> writeModelList = new ArrayList<>();
-        boolean doNotMarkIssuesAsFixedFlag = false;
-        if (testingRunResultList != null && !testingRunResultList.isEmpty()) {
-            TestingRunResult firstResult = testingRunResultList.get(0);
-            if (firstResult != null && firstResult.getTestRunId() != null) {
-                TestingRun testingRun = dataActor.findTestingRun(firstResult.getTestRunId().toHexString());
-                if (testingRun != null) {
-                    doNotMarkIssuesAsFixedFlag = testingRun.getDoNotMarkIssuesAsFixed();
-                }
-            }
-        }
 
-        writeUpdateQueryIntoWriteModel(writeModelList, testingIssuesIdsMap, testingRunIssuesList, doNotMarkIssuesAsFixedFlag);
+        writeUpdateQueryIntoWriteModel(writeModelList, testingIssuesIdsMap, testingRunIssuesList, TestingConfigurations.getInstance().getDoNotMarkIssuesAsFixed());
         loggerMaker.infoAndAddToDb(String.format("Total write queries after the update iterations: %s", writeModelList.size()), LogDb.TESTING);
         insertVulnerableTestsIntoIssuesCollection(writeModelList, testingIssuesIdsMap, testingRunIssuesList);
         loggerMaker.infoAndAddToDb(String.format("Total write queries after the insertion iterations: %s", writeModelList.size()), LogDb.TESTING);
