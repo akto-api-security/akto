@@ -33,16 +33,7 @@ public class AuthFilter implements Filter {
             httpServletResponse.sendError(401);
             return;
         }
-        
-        // Bypass parsing and business logic for bulkWriteAgentTrafficLogs endpoint
-        String requestURI = httpServletRequest.getRequestURI();
-        if (requestURI != null && requestURI.contains("/api/bulkWriteAgentTrafficLogs")) {
-            httpServletResponse.setStatus(200);
-            httpServletResponse.setContentType("application/json");
-            // Match Struts2 JSON result format - returns {} for SUCCESS with no fields
-            httpServletResponse.getWriter().write("{}");
-            return;
-        }
+
         
         chain.doFilter(servletRequest, servletResponse);
 

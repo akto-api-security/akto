@@ -3045,26 +3045,7 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    List<AgentTrafficLog> agentTrafficLogs;
-
-    public List<AgentTrafficLog> getAgentTrafficLogs() {
-        return agentTrafficLogs;
-    }
-
-    public void setAgentTrafficLogs(List<AgentTrafficLog> agentTrafficLogs) {
-        this.agentTrafficLogs = agentTrafficLogs;
-    }
-
     public String bulkWriteAgentTrafficLogs() {
-        try {
-            if (agentTrafficLogs != null && !agentTrafficLogs.isEmpty()) {
-                loggerMaker.infoAndAddToDb("bulkWriteAgentTrafficLogs called with " + agentTrafficLogs.size() + " logs");
-                DbLayer.bulkWriteAgentTrafficLogs(agentTrafficLogs);
-            }
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in bulkWriteAgentTrafficLogs " + e.toString());
-            return Action.ERROR.toUpperCase();
-        }
         return Action.SUCCESS.toUpperCase();
     }
     
