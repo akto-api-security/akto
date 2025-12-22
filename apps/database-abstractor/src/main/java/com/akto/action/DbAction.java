@@ -6,12 +6,9 @@ import com.akto.dao.test_editor.CommonTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.traffic_collector.TrafficCollectorInfoDao;
 import com.akto.dao.traffic_collector.TrafficCollectorMetricsDao;
-import com.akto.data_actor.DataActor;
-import com.akto.data_actor.DataActorFactory;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.McpReconRequest;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.billing.UningestedApiOverage;
@@ -623,7 +620,8 @@ public class DbAction extends ActionSupport {
                         }
 
                         // Filter for account 1759386565: ignore template URLs
-                        if (accId == Constants.MERGED_URLS_FILTER_ACCOUNT_ID && url != null && APICatalog.isTemplateUrl(url)) {
+                        if (accId == Constants.MERGED_URLS_FILTER_ACCOUNT_ID && url != null && APICatalog.isStringTemplateUrl(url)) {
+                            loggerMaker.infoAndAddToDb("skipping for 1759386565 " + url);
                             ignore = true;
                         }
 
@@ -719,7 +717,8 @@ public class DbAction extends ActionSupport {
                     }
 
                     // Filter for account 1759386565: ignore template URLs
-                    if (accId == Constants.MERGED_URLS_FILTER_ACCOUNT_ID && url != null && APICatalog.isTemplateUrl(url)) {
+                    if (accId == Constants.MERGED_URLS_FILTER_ACCOUNT_ID && url != null && APICatalog.isStringTemplateUrl(url)) {
+                        loggerMaker.infoAndAddToDb("skipping for 1759386565 " + url);
                         ignore = true;
                     }
 
