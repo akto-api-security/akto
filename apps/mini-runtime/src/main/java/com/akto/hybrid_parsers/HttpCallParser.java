@@ -233,6 +233,63 @@ public class HttpCallParser {
         return locationHeader != null && locationHeader.contains("pagenotfound");
     }
 
+    /**
+     * Gets the hostname to use for collection creation. For AI agent traffic (N8N, LangChain, Copilot),
+     * reconstructs the full hostname by prepending bot/workflow name to the base hostname.
+     * For regular traffic, returns the hostname from headers as-is.
+     *
+     * @param responseParam The HTTP response parameters
+     * @return The hostname to use for collection creation
+     */
+    private static String getHostnameForCollection(HttpResponseParams responseParam) {
+        // Get base hostname from headers
+        String baseHostname = getHeaderValue(responseParam.getRequestParams().getHeaders(), "host");
+        if (baseHostname == null || baseHostname.isEmpty()) {
+            return baseHostname;
+        }
+
+        // Check if this is AI agent traffic
+        String tagsJson = responseParam.getTags();
+        if (tagsJson == null || tagsJson.isEmpty()) {
+            return baseHostname;
+        }
+
+        try {
+            // Parse tags JSON
+            com.google.gson.Gson gson = new com.google.gson.Gson();
+            @SuppressWarnings("unchecked")
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+
+            // Check if this is an AI agent source
+            String source = tagsMap.get("source");
+            if (source == null || (!source.equals("N8N") && !source.equals("LANGCHAIN") && !source.equals("COPILOT_STUDIO"))) {
+                // Not AI agent traffic, return base hostname
+                return baseHostname;
+            }
+
+            // Extract bot name from tags
+            String botName = tagsMap.get("bot-name");
+            if (botName == null || botName.isEmpty()) {
+                // No bot name provided, log warning and use base hostname as-is
+                loggerMaker.infoAndAddToDb("AI agent traffic from " + source + " missing bot-name in tags. Using base hostname: " + baseHostname, LogDb.RUNTIME);
+                return baseHostname;
+            }
+
+            // Reconstruct full hostname: bot-name.base-hostname
+            String reconstructedHostname = botName + "." + baseHostname;
+
+            loggerMaker.infoAndAddToDb("Using reconstructed hostname for collection: " + reconstructedHostname +
+                       " (source: " + source + ", bot-name: " + botName + ", base: " + baseHostname + ")", LogDb.RUNTIME);
+
+            return reconstructedHostname;
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Failed to reconstruct AI agent hostname, using base hostname: " + e.getMessage(), LogDb.RUNTIME);
+            e.printStackTrace();
+            return baseHostname;
+        }
+    }
+
     public static FILTER_TYPE applyTrafficFilterInProcess(HttpResponseParams responseParam){
 
         FILTER_TYPE filterType = FILTER_TYPE.ALLOWED;
@@ -604,7 +661,8 @@ public class HttpCallParser {
 
     public int createApiCollectionId(HttpResponseParams httpResponseParam){
         int apiCollectionId;
-        String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
+        // Use getHostnameForCollection to get reconstructed hostname for AI agents
+        String hostName = getHostnameForCollection(httpResponseParam);
 
         if (hostName != null && !hostNameToIdMap.containsKey(hostName) && RuntimeUtil.hasSpecialCharacters(hostName)) {
             hostName = "Special_Char_Host";
