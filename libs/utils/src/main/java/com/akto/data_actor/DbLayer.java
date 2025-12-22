@@ -805,7 +805,7 @@ public class DbLayer {
 
                 String afterDropMsg = String.format(
                     "Successfully dropped collection=%s, account=%d, timestamp=%d, timeTakenMilliseconds=%d",
-                    collectionName, accountId, endDropTime, endDropTime - startDropTime
+                    collectionName, accountId, Context.now(), endDropTime - startDropTime
                 );
                 loggerMaker.infoAndAddToDb(afterDropMsg);
                 slackMessages.add(afterDropMsg);
