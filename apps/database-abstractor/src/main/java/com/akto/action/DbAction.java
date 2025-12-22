@@ -1322,9 +1322,17 @@ public class DbAction extends ActionSupport {
 
     private String lastStiId = null;
     public String fetchStiBasedOnHostHeaders() {
+        long startTime = System.currentTimeMillis();
         try {
             ObjectId lastTsObjectId = lastStiId != null ? new ObjectId(lastStiId) : null;
             stis = DbLayer.fetchStiBasedOnHostHeaders(lastTsObjectId);
+
+            long duration = System.currentTimeMillis() - startTime;
+            if (duration > 5000) {
+                Integer accountId = Context.accountId.get();
+                String message = "fetchStiBasedOnHostHeaders took " + duration + "ms (threshold: 5000ms) - AccountId: " + accountId;
+                loggerMaker.sendCyborgSlackAsync(message);
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchStiBasedOnHostHeaders " + e.toString());
             return Action.ERROR.toUpperCase();
