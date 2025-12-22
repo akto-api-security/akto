@@ -1,7 +1,6 @@
 package com.akto.util.enums;
 
 public class GlobalEnums {
-    /* * * * * * * *  Enums for Testing run issues * * * * * * * * * * * *  */
 
     public enum TestErrorSource { // Whether issue came from runtime or automated testing via dashboard
         AUTOMATED_TESTING("testing"),
@@ -121,6 +120,7 @@ public class GlobalEnums {
         SLOW, FAST
     }
 
-
-    /* ********************************************************************** */
+    public enum CONTEXT_SOURCE {
+        API, MCP, GEN_AI, AGENTIC, DAST, ENDPOINT
+    }
 }

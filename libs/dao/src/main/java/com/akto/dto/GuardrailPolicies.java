@@ -6,6 +6,8 @@ import java.util.Map;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+
 import lombok.NoArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
@@ -69,6 +71,8 @@ public class GuardrailPolicies {
     
     // Step 8: Review and Finish
     private boolean active;
+
+    private CONTEXT_SOURCE contextSource;
 
     public String getHexId() {
         if (this.id != null) {

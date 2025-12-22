@@ -78,6 +78,7 @@ import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.files.File;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
@@ -804,7 +805,7 @@ public class DbLayer {
 
                 String afterDropMsg = String.format(
                     "Successfully dropped collection=%s, account=%d, timestamp=%d, timeTakenMilliseconds=%d",
-                    collectionName, accountId, endDropTime, endDropTime - startDropTime
+                    collectionName, accountId, Context.now(), endDropTime - startDropTime
                 );
                 loggerMaker.infoAndAddToDb(afterDropMsg);
                 slackMessages.add(afterDropMsg);
@@ -2203,15 +2204,26 @@ public class DbLayer {
         }
     }
 
-    public static List<GuardrailPolicies> fetchGuardrailPolicies(Integer updatedAfter) {
+    public static List<GuardrailPolicies> fetchGuardrailPolicies(Integer updatedAfter, CONTEXT_SOURCE contextSource) {
         try {
-            List<GuardrailPolicies> policies;
+            List<Bson> filters = new ArrayList<>();
+
             if (updatedAfter != null && updatedAfter > 0) {
-                policies = GuardrailPoliciesDao.instance.findAll(Filters.gt("updatedTimestamp", updatedAfter));
-            } else {
-                policies = GuardrailPoliciesDao.instance.findAll();
+                filters.add(Filters.gt("updatedTimestamp", updatedAfter));
             }
-            
+
+            if (contextSource == null || contextSource == CONTEXT_SOURCE.AGENTIC) {
+                filters.add(Filters.or(
+                    Filters.eq("contextSource", CONTEXT_SOURCE.AGENTIC.name()),
+                    Filters.exists("contextSource", false)
+                ));
+            } else {
+                filters.add(Filters.eq("contextSource", contextSource.name()));
+            }
+
+            Bson finalFilter = Filters.and(filters);
+
+            List<GuardrailPolicies> policies = GuardrailPoliciesDao.instance.findAll(finalFilter);
             return policies;
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchGuardrailPolicies: " + e.getMessage());
