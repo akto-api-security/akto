@@ -43,6 +43,9 @@ public class GuardrailPoliciesDao extends AccountsContextDao<GuardrailPolicies> 
 
         fieldNames = new String[]{"isActive"};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
+        fieldNames = new String[]{"contextSource", "updatedTimestamp"};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
 
     public List<GuardrailPolicies> findAll() {
