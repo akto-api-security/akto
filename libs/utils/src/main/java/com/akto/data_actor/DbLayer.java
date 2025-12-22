@@ -188,10 +188,11 @@ public class DbLayer {
         );
     }
 
-    public static void updateModuleInfo(ModuleInfo moduleInfo) {
+    public static ModuleInfo updateModuleInfo(ModuleInfo moduleInfo) {
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
-        ModuleInfoDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
+        updateOptions.returnDocument(ReturnDocument.AFTER);
+        return ModuleInfoDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
                 Updates.combine(
                         //putting class name because findOneAndUpdate doesn't put class name by default
                         Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
@@ -203,7 +204,6 @@ public class DbLayer {
                         Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived())
                 ), updateOptions);
     }
-
 
     public static void updateCidrList(List<String> cidrList) {
         AccountSettingsDao.instance.getMCollection().updateOne(

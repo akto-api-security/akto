@@ -3,6 +3,9 @@ package com.akto.dto.monitoring;
 import java.util.Map;
 import java.util.UUID;
 
+import lombok.Getter;
+import lombok.Setter;
+
 public class ModuleInfo {
 
     public static final String MODULE_TYPE = "moduleType";
@@ -18,6 +21,10 @@ public class ModuleInfo {
     private String name;
     public static final String ADDITIONAL_DATA = "additionalData";
     private Map<String, Object> additionalData;
+
+    @Getter @Setter
+    private boolean reboot;
+    public static final String _REBOOT = "reboot";
 
     public ModuleType getModuleType() {
         return moduleType;
