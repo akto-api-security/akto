@@ -13,7 +13,9 @@ public class FilterUpdates {
     private static int filterId = -1;
     private static int TOTAL_FILTERS = 5;
     private static int lastUpdateTs = 0;
-    private static int FILTER_UPDATE_DURATION = 5 * 60;
+    private final static int FILTER_UPDATE_DURATION = 5 * 60;
+    public final static int FULL_RESET_DURATION_MINUTES = 30;
+    private static boolean currentlyCleaning = false;
 
     private static List<BloomFilter<CharSequence>> filters = new ArrayList<BloomFilter<CharSequence>>() {
         {
@@ -32,25 +34,35 @@ public class FilterUpdates {
                     0.001);
             lastUpdateTs = now;
             filterId = (filterId + 1) % TOTAL_FILTERS;
-            if (filterId < filters.size()) {
-                filters.set(filterId, newFilter);
-            } else {
-                filters.add(newFilter);
+            if(!currentlyCleaning){
+                if (filterId < filters.size()) {
+                    filters.set(filterId, newFilter);
+                } else {
+                    filters.add(newFilter);
+                }
             }
         }
     }
 
     public static boolean isEligibleForUpdate(int apiCollectionId, String url, String method, String param, int responseCode, String operation) {
+        // If reset is in progress, allow the update to proceed (conservative approach)
+        if (currentlyCleaning) {
+            return true;
+        }
+
         BloomFilter<CharSequence> filter;
         int checkIdx;
         boolean found = false;
         // assigns correct filter. Creates a new filter if filter at that index is not present
         assignFilterForOperation();
         String key = buildKey(apiCollectionId, url, method, param, responseCode, operation);
+        if(key == null) {
+            return true;
+        }
         for (int i = 0; i < TOTAL_FILTERS; i++) {
             checkIdx = (filterId + i) % TOTAL_FILTERS;
             filter = filters.get(checkIdx);
-            if (filter.mightContain(key)) {
+            if (!currentlyCleaning && filter != null && filter.mightContain(key)) {
                 found = true;
                 break;
             }
@@ -61,6 +73,10 @@ public class FilterUpdates {
     }
 
     public static void addKeyToFilter(String key) {
+        // Skip adding to filter if reset is in progress
+        if (filters.get(filterId) == null || currentlyCleaning || key == null) {
+            return;
+        }
         filters.get(filterId).put(key);
     }
 
@@ -68,4 +84,20 @@ public class FilterUpdates {
         return apiCollectionId + "$" + url + "$" + method + "$" + param +  "$" + responseCode + "$" + operation;
     }
 
+    public static synchronized void resetAllFilters() {
+        try {
+            currentlyCleaning = true;
+            filters.clear();
+            for (int i = 0; i < TOTAL_FILTERS; i++) {
+                filters.add(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 5_000_000, 0.001));
+            }
+            filterId = -1;
+            currentlyCleaning = false;
+        } catch (Exception e) {
+            e.printStackTrace();
+            currentlyCleaning = false;
+        } finally {
+            currentlyCleaning = false;
+        }
+    }
 }
