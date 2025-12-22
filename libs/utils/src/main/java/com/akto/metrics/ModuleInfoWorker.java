@@ -45,8 +45,13 @@ public class ModuleInfoWorker {
         scheduler.scheduleWithFixedDelay(() -> {
             moduleInfo.setLastHeartbeatReceived(Context.now());
             assert _this.dataActor != null;
-            _this.dataActor.updateModuleInfo(moduleInfo);
-            loggerMaker.info("Sending heartbeat at : " + moduleInfo.getLastHeartbeatReceived() + " for module: " + moduleInfo.getModuleType().name());
+            boolean reboot = _this.dataActor.updateModuleInfo(moduleInfo);
+            loggerMaker.info("Sent heartbeat at : " + moduleInfo.getLastHeartbeatReceived() + " for module: " + moduleInfo.getModuleType().name());
+            if (reboot) {
+                loggerMaker.warnAndAddToDb("Rebooting module: " + moduleInfo.getModuleType().name() + " id: " + moduleInfo.getId());
+                System.exit(0);
+                return;
+            }
         }, 0, 30, TimeUnit.SECONDS);
     }
 

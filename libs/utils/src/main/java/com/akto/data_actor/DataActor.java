@@ -295,7 +295,7 @@ public abstract class DataActor {
     public abstract List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId);
 
     public abstract TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter);
-    public abstract void updateModuleInfo(ModuleInfo moduleInfo);
+    public abstract boolean updateModuleInfo(ModuleInfo moduleInfo);
 
     public abstract TestingRunPlayground getCurrentTestingRunDetailsFromEditor(int timestamp);
 
