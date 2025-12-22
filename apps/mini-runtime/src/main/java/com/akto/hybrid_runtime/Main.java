@@ -22,6 +22,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
 import com.akto.hybrid_parsers.HttpCallParser;
+import com.akto.hybrid_runtime.filter_updates.FilterUpdates;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.metrics.ModuleInfoWorker;
@@ -512,6 +513,20 @@ public class Main {
                     loggerMaker.errorAndAddToDb(e, "Error while executing MCP Recon Sync Job");
                 }
             }, 0, 24, TimeUnit.HOURS);
+        }
+
+        if(Context.getActualAccountId() == 1759386565 ){
+            // Schedule bloom filter reset job every 30 minutes
+            loggerMaker.infoAndAddToDb("Scheduling Bloom Filter Reset Job");
+            scheduler.scheduleAtFixedRate(() -> {
+                try {
+                    loggerMaker.infoAndAddToDb("Resetting all bloom filters");
+                    FilterUpdates.resetAllFilters();
+                    loggerMaker.infoAndAddToDb("Finished resetting bloom filters");
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error while resetting bloom filters");
+                }
+            }, FilterUpdates.FULL_RESET_DURATION_MINUTES, FilterUpdates.FULL_RESET_DURATION_MINUTES, TimeUnit.MINUTES);
         }
 
         if(isDbMergingModeEnabled()){
