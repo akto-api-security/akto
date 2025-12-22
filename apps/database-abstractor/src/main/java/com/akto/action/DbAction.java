@@ -141,6 +141,7 @@ public class DbAction extends ActionSupport {
     @Getter @Setter
     private List<McpReconResult> serverDataList;
 
+    @Getter @Setter
     private ModuleInfo moduleInfo;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbAction.class, LogDb.DB_ABS);
@@ -417,9 +418,10 @@ public class DbAction extends ActionSupport {
 
     public String updateModuleInfo() {
         try {
-            DbLayer.updateModuleInfo(moduleInfo);
+            moduleInfo = DbLayer.updateModuleInfo(moduleInfo);
+            // TODO: in case of modules with fixed names, reset reboot value, if reboot true;
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "error in updateApiCollectionNameForVxlan " + e.toString());
+            loggerMaker.errorAndAddToDb(e, "error in updateModuleInfo " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -4148,14 +4150,6 @@ public class DbAction extends ActionSupport {
 
     public void setTestingRunPlaygroundId(String testingRunPlaygroundId) {
         this.testingRunPlaygroundId = testingRunPlaygroundId;
-    }
-
-    public ModuleInfo getModuleInfo() {
-        return moduleInfo;
-    }
-
-    public void setModuleInfo(ModuleInfo moduleInfo) {
-        this.moduleInfo = moduleInfo;
     }
 
     public List<BasicDBObject> getApiHitCountInfoList() {
