@@ -362,7 +362,7 @@ public class TestExecutor {
         Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();
 
         // init the singleton class here
-        TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests());
+        TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests(), testingRun.getDoNotMarkIssuesAsFixed());
         //Clear the cache for sample data
         VariableResolver.clearSampleDataCache();
         totalTestsCount.set(
