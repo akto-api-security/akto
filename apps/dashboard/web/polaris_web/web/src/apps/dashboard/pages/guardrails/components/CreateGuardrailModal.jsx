@@ -29,6 +29,8 @@ import {
     LlmPromptConfig,
     BasePromptStep,
     BasePromptConfig,
+    GibberishDetectionStep,
+    GibberishDetectionConfig,
     ExternalModelStep,
     ExternalModelConfig,
     ServerSettingsStep,
@@ -82,11 +84,16 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [enableBasePromptRule, setEnableBasePromptRule] = useState(false);
     const [basePromptConfidenceScore, setBasePromptConfidenceScore] = useState(0.5);
 
-    // Step 8: External model based evaluation
+    // Step 8: Gibberish Detection
+    const [enableGibberishDetection, setEnableGibberishDetection] = useState(false);
+    const [gibberishConfidenceScore, setGibberishConfidenceScore] = useState(0.7);
+
+
+    // Step 9: External model based evaluation
     const [url, setUrl] = useState("");
     const [confidenceScore, setConfidenceScore] = useState(25); // Start with 25 (first checkpoint)
 
-    // Step 9: Server settings
+    // Step 10: Server settings
     const [selectedMcpServers, setSelectedMcpServers] = useState([]);
     const [selectedAgentServers, setSelectedAgentServers] = useState([]);
     const [applyOnResponse, setApplyOnResponse] = useState(false);
@@ -122,9 +129,13 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         enableBasePromptRule,
         basePromptConfidenceScore,
         // Step 8
+        enableGibberishDetection,
+        gibberishConfidenceScore,
+
+        // Step 9
         url,
         confidenceScore,
-        // Step 9
+        // Step 10
         selectedMcpServers,
         selectedAgentServers,
         mcpServers,
@@ -178,6 +189,12 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 title: BasePromptConfig.title,
                 summary: BasePromptConfig.getSummary(storedStateData),
                 ...BasePromptConfig.validate(storedStateData)
+            },
+            {
+                number: GibberishDetectionConfig.number,
+                title: GibberishDetectionConfig.title,
+                summary: GibberishDetectionConfig.getSummary(storedStateData),
+                ...GibberishDetectionConfig.validate(storedStateData)
             },
             {
                 number: ExternalModelConfig.number,
@@ -286,6 +303,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setLlmConfidenceScore(0.5);
         setEnableBasePromptRule(false);
         setBasePromptConfidenceScore(0.5);
+        setEnableGibberishDetection(false);
+        setGibberishConfidenceScore(0.7);
         setUrl("");
         setConfidenceScore(25);
         setSelectedMcpServers([]);
@@ -362,6 +381,16 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             setEnableBasePromptRule(false);
             setBasePromptConfidenceScore(0.5);
         }
+
+        // Gibberish Detection
+        if (policy.gibberishDetection) {
+            setEnableGibberishDetection(policy.gibberishDetection.enabled || false);
+            setGibberishConfidenceScore(policy.gibberishDetection.confidenceScore !== undefined ? policy.gibberishDetection.confidenceScore : 0.7);
+        } else {
+            setEnableGibberishDetection(false);
+            setGibberishConfidenceScore(0.7);
+        }
+
 
         // External model based evaluation
         setUrl(policy.url || "");
@@ -467,6 +496,10 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         confidenceScore: basePromptConfidenceScore
                     }
                 } : {}),
+                gibberishDetection: {
+                    enabled: enableGibberishDetection,
+                    confidenceScore: gibberishConfidenceScore
+                },
                 url: url || null,
                 confidenceScore: confidenceScore,
                 selectedMcpServers: selectedMcpServers, // Old format (just IDs)
@@ -478,6 +511,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 // Add edit mode information
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
             };
+
             
             await onSave(guardrailData);
             handleClose();
@@ -671,6 +705,15 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 );
             case 8:
                 return (
+                    <GibberishDetectionStep
+                        enableGibberishDetection={enableGibberishDetection}
+                        setEnableGibberishDetection={setEnableGibberishDetection}
+                        gibberishConfidenceScore={gibberishConfidenceScore}
+                        setGibberishConfidenceScore={setGibberishConfidenceScore}
+                    />
+                );
+            case 9:
+                return (
                     <ExternalModelStep
                         url={url}
                         setUrl={setUrl}
@@ -678,7 +721,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         setConfidenceScore={setConfidenceScore}
                     />
                 );
-            case 9:
+            case 10:
                 return (
                     <ServerSettingsStep
                         selectedMcpServers={selectedMcpServers}

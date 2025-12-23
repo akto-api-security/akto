@@ -53,6 +53,10 @@ public class GuardrailPolicies {
     // Step 6.5: Base Prompt Rule - for checking intent of user input in agent base prompts with placeholders
     private BasePromptRule basePromptRule;
 
+    // Step 7.5: Gibberish Detection - ML-based detection of nonsensical text
+    private GibberishDetection gibberishDetection;
+
+
     // Step 7: Server and application settings (old format - backward compatibility)
     private List<String> selectedMcpServers;
     private List<String> selectedAgentServers;
@@ -121,7 +125,7 @@ public class GuardrailPolicies {
                            int updatedTimestamp, String createdBy, String updatedBy, String selectedCollection,
                            String selectedModel, List<DeniedTopic> deniedTopics, List<PiiType> piiTypes,
                            List<String> regexPatterns, List<RegexPattern> regexPatternsV2, Map<String, Object> contentFiltering,
-                           LLMRule llmRule, BasePromptRule basePromptRule,
+                           LLMRule llmRule, BasePromptRule basePromptRule, GibberishDetection gibberishDetection,
                            List<String> selectedMcpServers, List<String> selectedAgentServers,
                            List<SelectedServer> selectedMcpServersV2, List<SelectedServer> selectedAgentServersV2,
                            boolean applyOnResponse, boolean applyOnRequest, String url, double confidenceScore, boolean active) {
@@ -142,6 +146,7 @@ public class GuardrailPolicies {
         this.contentFiltering = contentFiltering;
         this.llmRule = llmRule;
         this.basePromptRule = basePromptRule;
+        this.gibberishDetection = gibberishDetection;
         this.selectedMcpServers = selectedMcpServers;
         this.selectedAgentServers = selectedAgentServers;
         this.selectedMcpServersV2 = selectedMcpServersV2;
@@ -230,6 +235,19 @@ public class GuardrailPolicies {
         private double confidenceScore;
 
         public BasePromptRule(boolean enabled, double confidenceScore) {
+            this.enabled = enabled;
+            this.confidenceScore = confidenceScore;
+        }
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class GibberishDetection {
+        private boolean enabled;
+        private double confidenceScore;
+
+        public GibberishDetection(boolean enabled, double confidenceScore) {
             this.enabled = enabled;
             this.confidenceScore = confidenceScore;
         }

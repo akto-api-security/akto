@@ -1115,7 +1115,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
             discoveredTimestamp = x.startTs
           }
           let description = apiInfoMap[key] ? apiInfoMap[key]['description'] : ""
-          let lastSeenTs = Math.max(apiInfoMap[key] ? apiInfoMap[key]["lastSeen"] : x.startTs, x.startTs)
+          let lastSeenTs = Math.max(apiInfoMap[key] ? apiInfoMap[key]["lastSeen"] : (x.startTs > 0 ? x.startTs : 0), (x.startTs > 0 ? x.startTs : 0))
           ret[key] = {
               id: x.method + "###" + x.url + "###" + x.apiCollectionId + "###" + Math.random(),
               shadow: x.shadow ? x.shadow : false,
