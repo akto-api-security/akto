@@ -226,6 +226,10 @@ public class LoggerMaker  {
         errorAndAddToDb(e, err, this.db);
     }
 
+    public void debugInfoAddToDb(String info) {
+        debugInfoAddToDb(info, this.db);
+    }
+
     public void debugInfoAddToDb(String info, LogDb db) {
         if (accountSettings == null || !accountSettings.isEnableDebugLogs()) return;
         infoAndAddToDb(info, db);
@@ -238,7 +242,9 @@ public class LoggerMaker  {
                 err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
             } else {
                 err = String.format("Err msg: %s\nStackTrace not available", err);
-                e.printStackTrace();
+                if (e != null) {
+                    e.printStackTrace();
+                }
             }
             errorAndAddToDb(err, db);
         } catch (Exception e1) {
