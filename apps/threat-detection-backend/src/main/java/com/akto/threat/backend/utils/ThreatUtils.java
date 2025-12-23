@@ -40,8 +40,10 @@ public class ThreatUtils {
 
         switch (contextSourceUpper) {
             case "AGENTIC":
-            case "ENDPOINT":
                 filterIdCondition = new Document("filterId", new Document("$in", ENDPOINT_POLICY_FILTER_IDS));
+                break;
+            case "ENDPOINT":
+                filterIdCondition = new Document("filterId", new Document("$in", Collections.emptyList()));
                 break;
 
             default:
