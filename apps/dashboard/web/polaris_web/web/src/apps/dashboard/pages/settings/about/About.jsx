@@ -57,6 +57,8 @@ function About() {
         noTimeToFix: false,
         acceptableFix: false
     })
+    const [blockLogs, setBlockLogs] = useState(false)
+    const [filterLogPolicy, setFilterLogPolicy] = useState('')
 
     const setupOptions = settingFunctions.getSetupOptions()
 
@@ -90,6 +92,8 @@ function About() {
         if(resp?.compulsoryDescription && Object.keys(resp?.compulsoryDescription).length > 0) {
             setCompulsoryDescription(resp.compulsoryDescription)
         }
+        setBlockLogs(resp.blockLogs || false)
+        setFilterLogPolicy(resp.filterLogPolicy || '')
     }
 
     useEffect(()=>{
@@ -396,6 +400,17 @@ function About() {
         }
     }
 
+    const handleBlockLogsToggle = async (val) => {
+        setBlockLogs(val);
+        await settingRequests.updateBlockLogs(val);
+        func.setToast(true, false, "Block logs setting updated successfully.");
+    }
+
+    const handleFilterLogPolicySave = async () => {
+        await settingRequests.updateFilterLogPolicy(filterLogPolicy);
+        func.setToast(true, false, "Filter log policy updated successfully.");
+    }
+
     const compulsoryDescriptionComponent = (
         <VerticalStack gap={4}>
             <Text variant="headingSm">Compulsory Description Settings</Text>
@@ -421,6 +436,41 @@ function About() {
                     onChange={(checked) => handleCompulsoryToggle('acceptableFix', checked)}
                     disabled={window.USER_ROLE !== 'ADMIN'}
                 />
+            </VerticalStack>
+        </VerticalStack>
+    )
+
+    const logSettingsComponent = (
+        <VerticalStack gap={4}>
+            <Text variant="headingSm">Log Settings</Text>
+            <Text variant="bodyMd" color="subdued">
+                Configure logging behavior and filtering policies for hybrid modules.
+            </Text>
+            <VerticalStack gap={3}>
+                <ToggleComponent
+                    text="Block logs"
+                    onToggle={handleBlockLogsToggle}
+                    initial={blockLogs}
+                    disabled={window.USER_ROLE !== 'ADMIN'}
+                />
+                <VerticalStack gap={2}>
+                    <Text color="subdued">Filter Log Policy</Text>
+                    <HorizontalStack gap={2} align="start">
+                        <Box width="400px">
+                            <TextField
+                                value={filterLogPolicy}
+                                onChange={setFilterLogPolicy}
+                                placeholder="Enter filter log policy"
+                                disabled={window.USER_ROLE !== 'ADMIN'}
+                            />
+                        </Box>
+                        {window.USER_ROLE === 'ADMIN' && (
+                            <Button onClick={handleFilterLogPolicySave}>
+                                Save
+                            </Button>
+                        )}
+                    </HorizontalStack>
+                </VerticalStack>
             </VerticalStack>
         </VerticalStack>
     )
@@ -605,6 +655,7 @@ function About() {
                                   <ToggleComponent text={"Enable telemetry"} initial={enableTelemetry} onToggle={toggleTelemetry} />
                                   {redundantUrlComp}
                                   {compulsoryDescriptionComponent}
+                                  {logSettingsComponent}
                                   <VerticalStack gap={1}>
                                       <Text color="subdued">Traffic alert threshold</Text>
                                       <Box width='120px'>
@@ -625,8 +676,11 @@ function About() {
                       </div>
                   </LegacyCard.Section>
                   :<LegacyCard.Section title={<Text variant="headingMd">More settings</Text>}>
+                    <VerticalStack gap={5}>
                     {redundantUrlComp}
                     {compulsoryDescriptionComponent}
+                    {logSettingsComponent}
+                    </VerticalStack>
                   </LegacyCard.Section>
               }
             <LegacyCard.Section subdued>

@@ -1,4 +1,4 @@
-import { Button, ButtonGroup, LegacyCard, Text, DataTable, VerticalStack } from "@shopify/polaris"
+import { Button, ButtonGroup, LegacyCard, Text, VerticalStack, DataTable, Checkbox } from "@shopify/polaris"
 import { useEffect, useState } from "react";
 import settingRequests from "../api";
 import func from "@/util/func";
@@ -17,6 +17,7 @@ const Logs = () => {
     })
     const [ loading, setLoading ] = useState(false)
     const [ moduleInfos, setModuleInfos ] = useState([])
+    const [ selectedModules, setSelectedModules ] = useState([])
     const logGroupSelected = logs.logGroup !== ''
     const hasAccess = func.checkUserValidForIntegrations()
 
@@ -97,14 +98,59 @@ const Logs = () => {
         }
     }
 
+    const handleRebootModules = async () => {
+        if (selectedModules.length === 0) {
+            func.setToast(true, true, "Please select at least one module to reboot");
+            return;
+        }
+        try {
+            await settingRequests.rebootModules(selectedModules);
+            func.setToast(true, false, "Reboot flag set for eligible modules");
+            setSelectedModules([]);
+            await fetchModuleInfo(); // Refresh the module list
+        } catch (error) {
+            func.setToast(true, true, "Failed to set reboot flag for modules");
+        }
+    }
+
+    const toggleModuleSelection = (moduleId) => {
+        setSelectedModules(prev => {
+            if (prev.includes(moduleId)) {
+                return prev.filter(id => id !== moduleId);
+            } else {
+                return [...prev, moduleId];
+            }
+        });
+    }
+
+    const canRebootModule = (module) => {
+        const oneMinuteAgo = Math.floor(Date.now() / 1000) - 60;
+        return module.lastHeartbeatReceived >= oneMinuteAgo &&
+               module.name &&
+               module.name.startsWith('Default_');
+    }
+
     // Sort moduleInfos by lastHeartbeatReceived in descending order
     const sortedModuleInfos = [...moduleInfos].sort((a, b) => (b.lastHeartbeatReceived || 0) - (a.lastHeartbeatReceived || 0));
-    const moduleInfoRows = sortedModuleInfos.map(module => [
-        module.moduleType || '-',
-        module.currentVersion || '-',
-        func.epochToDateTime(module.startedTs),
-        func.epochToDateTime(module.lastHeartbeatReceived)
-    ]);
+
+    const moduleInfoRows = sortedModuleInfos.map(module => {
+        const isEligible = canRebootModule(module);
+        const isSelected = selectedModules.includes(module.id);
+
+        return [
+            module.moduleType || '-',
+            module.name || '-',
+            module.currentVersion || '-',
+            func.epochToDateTime(module.startedTs),
+            func.epochToDateTime(module.lastHeartbeatReceived),
+            isEligible ? 'Yes' : 'No',
+            <Checkbox
+                checked={isSelected}
+                onChange={() => toggleModuleSelection(module.id)}
+                disabled={!isEligible}
+            />,
+        ];
+    });
 
     return (
         <VerticalStack>
@@ -143,12 +189,23 @@ const Logs = () => {
                 }
             </LegacyCard>
 
-            
-                {moduleInfos && moduleInfos.length > 0 ? (
-                    <LegacyCard sectioned title="Module Information">
-
+            {moduleInfos && moduleInfos.length > 0 ? (
+                <LegacyCard
+                    sectioned
+                    title="Module Information"
+                    actions={[
+                        {
+                            content: 'Reboot Selected',
+                            onAction: handleRebootModules,
+                            disabled: selectedModules.length === 0
+                        }
+                    ]}
+                >
                     <DataTable
                         columnContentTypes={[
+                            'text',
+                            'text',
+                            'text',
                             'text',
                             'text',
                             'text',
@@ -156,15 +213,17 @@ const Logs = () => {
                         ]}
                         headings={[
                             'Type',
+                            'Name',
                             'Version',
                             'Started At',
-                            'Last Heartbeat'
+                            'Last Heartbeat',
+                            'Reboot Eligible',
+                            'Select'
                         ]}
                         rows={moduleInfoRows}
                     />
-                                </LegacyCard>
-
-                ) : <></>}
+                </LegacyCard>
+            ) : <></>}
         </VerticalStack>
     )
 }

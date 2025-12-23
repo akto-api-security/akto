@@ -3,17 +3,28 @@ package com.akto.dto.monitoring;
 import java.util.Map;
 import java.util.UUID;
 
+import lombok.Getter;
+import lombok.Setter;
+
 public class ModuleInfo {
+
     public static final String MODULE_TYPE = "moduleType";
     private ModuleType moduleType;
+    public static final String CURRENT_VERSION = "currentVersion";
     private String currentVersion;
     private String id;//UUID
+    public static final String STARTED_TS = "startedTs";
     private int startedTs;
     public static final String LAST_HEARTBEAT_RECEIVED = "lastHeartbeatReceived";
     private int lastHeartbeatReceived;
+    public static final String NAME = "name";
     private String name;
     public static final String ADDITIONAL_DATA = "additionalData";
     private Map<String, Object> additionalData;
+
+    @Getter @Setter
+    private boolean reboot;
+    public static final String _REBOOT = "reboot";
 
     public ModuleType getModuleType() {
         return moduleType;
