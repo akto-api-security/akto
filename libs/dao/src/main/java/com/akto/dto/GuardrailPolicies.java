@@ -55,8 +55,7 @@ public class GuardrailPolicies {
 
     // Step 7.5: Gibberish Detection - ML-based detection of nonsensical text
     private GibberishDetection gibberishDetection;
-    // Step 8.5: Token Limit - enforce token limits on user inputs
-    private TokenLimit tokenLimit;
+
 
     // Step 7: Server and application settings (old format - backward compatibility)
     private List<String> selectedMcpServers;
@@ -126,7 +125,7 @@ public class GuardrailPolicies {
                            int updatedTimestamp, String createdBy, String updatedBy, String selectedCollection,
                            String selectedModel, List<DeniedTopic> deniedTopics, List<PiiType> piiTypes,
                            List<String> regexPatterns, List<RegexPattern> regexPatternsV2, Map<String, Object> contentFiltering,
-                           LLMRule llmRule, BasePromptRule basePromptRule, GibberishDetection gibberishDetection, TokenLimit tokenLimit,
+                           LLMRule llmRule, BasePromptRule basePromptRule, GibberishDetection gibberishDetection,
                            List<String> selectedMcpServers, List<String> selectedAgentServers,
                            List<SelectedServer> selectedMcpServersV2, List<SelectedServer> selectedAgentServersV2,
                            boolean applyOnResponse, boolean applyOnRequest, String url, double confidenceScore, boolean active) {
@@ -148,7 +147,6 @@ public class GuardrailPolicies {
         this.llmRule = llmRule;
         this.basePromptRule = basePromptRule;
         this.gibberishDetection = gibberishDetection;
-        this.tokenLimit = tokenLimit;
         this.selectedMcpServers = selectedMcpServers;
         this.selectedAgentServers = selectedAgentServers;
         this.selectedMcpServersV2 = selectedMcpServersV2;
@@ -252,19 +250,6 @@ public class GuardrailPolicies {
         public GibberishDetection(boolean enabled, double confidenceScore) {
             this.enabled = enabled;
             this.confidenceScore = confidenceScore;
-        }
-    }
-
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    public static class TokenLimit {
-        private boolean enabled;
-        private int threshold;
-
-        public TokenLimit(boolean enabled, int threshold) {
-            this.enabled = enabled;
-            this.threshold = threshold;
         }
     }
 }

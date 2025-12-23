@@ -7,6 +7,5 @@ export { default as SensitiveInfoStep, SensitiveInfoConfig } from './SensitiveIn
 export { default as LlmPromptStep, LlmPromptConfig } from './LlmPromptStep';
 export { default as BasePromptStep, BasePromptConfig } from './BasePromptStep';
 export { default as GibberishDetectionStep, GibberishDetectionConfig } from './GibberishDetectionStep';
-export { default as TokenLimitStep, TokenLimitConfig } from './TokenLimitStep';
 export { default as ExternalModelStep, ExternalModelConfig } from './ExternalModelStep';
 export { default as ServerSettingsStep, ServerSettingsConfig } from './ServerSettingsStep';

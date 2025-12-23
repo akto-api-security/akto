@@ -31,8 +31,6 @@ import {
     BasePromptConfig,
     GibberishDetectionStep,
     GibberishDetectionConfig,
-    TokenLimitStep,
-    TokenLimitConfig,
     ExternalModelStep,
     ExternalModelConfig,
     ServerSettingsStep,
@@ -90,14 +88,12 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [enableGibberishDetection, setEnableGibberishDetection] = useState(false);
     const [gibberishConfidenceScore, setGibberishConfidenceScore] = useState(0.7);
 
-    // Step 9: Token Limit
-    const [enableTokenLimit, setEnableTokenLimit] = useState(false);
-    const [tokenLimitThreshold, setTokenLimitThreshold] = useState(2000);
-    // Step 10: External model based evaluation
+
+    // Step 9: External model based evaluation
     const [url, setUrl] = useState("");
     const [confidenceScore, setConfidenceScore] = useState(25); // Start with 25 (first checkpoint)
 
-    // Step 11: Server settings
+    // Step 10: Server settings
     const [selectedMcpServers, setSelectedMcpServers] = useState([]);
     const [selectedAgentServers, setSelectedAgentServers] = useState([]);
     const [applyOnResponse, setApplyOnResponse] = useState(false);
@@ -135,13 +131,11 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         // Step 8
         enableGibberishDetection,
         gibberishConfidenceScore,
+
         // Step 9
-        enableTokenLimit,
-        tokenLimitThreshold,
-        // Step 10
         url,
         confidenceScore,
-        // Step 11
+        // Step 10
         selectedMcpServers,
         selectedAgentServers,
         mcpServers,
@@ -201,12 +195,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 title: GibberishDetectionConfig.title,
                 summary: GibberishDetectionConfig.getSummary(storedStateData),
                 ...GibberishDetectionConfig.validate(storedStateData)
-            },
-            {
-                number: TokenLimitConfig.number,
-                title: TokenLimitConfig.title,
-                summary: TokenLimitConfig.getSummary(storedStateData),
-                ...TokenLimitConfig.validate(storedStateData)
             },
             {
                 number: ExternalModelConfig.number,
@@ -403,14 +391,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             setGibberishConfidenceScore(0.7);
         }
 
-        // Token Limit
-        if (policy.tokenLimit) {
-            setEnableTokenLimit(policy.tokenLimit.enabled || false);
-            setTokenLimitThreshold(policy.tokenLimit.threshold !== undefined ? policy.tokenLimit.threshold : 2000);
-        } else {
-            setEnableTokenLimit(false);
-            setTokenLimitThreshold(2000);
-        }
 
         // External model based evaluation
         setUrl(policy.url || "");
@@ -734,15 +714,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 );
             case 9:
                 return (
-                    <TokenLimitStep
-                        enableTokenLimit={enableTokenLimit}
-                        setEnableTokenLimit={setEnableTokenLimit}
-                        tokenLimitThreshold={tokenLimitThreshold}
-                        setTokenLimitThreshold={setTokenLimitThreshold}
-                    />
-                );
-            case 10:
-                return (
                     <ExternalModelStep
                         url={url}
                         setUrl={setUrl}
@@ -750,7 +721,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         setConfidenceScore={setConfidenceScore}
                     />
                 );
-            case 11:
+            case 10:
                 return (
                     <ServerSettingsStep
                         selectedMcpServers={selectedMcpServers}

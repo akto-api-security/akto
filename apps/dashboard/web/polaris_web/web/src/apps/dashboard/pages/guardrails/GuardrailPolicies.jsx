@@ -450,8 +450,6 @@ function GuardrailPolicies() {
                 ...(guardrailData.basePromptRule ? { basePromptRule: guardrailData.basePromptRule } : {}),
                 // Add Gibberish Detection if present (same pattern as llmRule)
                 ...(guardrailData.gibberishDetection ? { gibberishDetection: guardrailData.gibberishDetection } : {}),
-                // Add Token Limit if present (same pattern as gibberishDetection)
-                ...(guardrailData.tokenLimit ? { tokenLimit: guardrailData.tokenLimit } : {}),
                 applyOnResponse: guardrailData.applyOnResponse || false,
                 applyOnRequest: guardrailData.applyOnRequest || false,
                 url: guardrailData.url || '',

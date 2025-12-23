@@ -8,7 +8,7 @@ const validateUrl = (url) => {
 };
 
 export const ExternalModelConfig = {
-    number: 10,
+    number: 9,
     title: "External model based evaluation",
 
     validate: ({ url }) => {
