@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Divider, Frame, HorizontalStack, LegacyTabs, Modal, Text, Tooltip, VerticalStack} from "@shopify/polaris"
+import { Badge, Box, Button, Divider, Frame, HorizontalStack, LegacyTabs, Modal, Text, Tooltip, VerticalStack, Popover } from "@shopify/polaris"
 import {ChevronUpMinor } from "@shopify/polaris-icons"
 
 import { useEffect, useRef, useState } from "react";
@@ -47,6 +47,8 @@ const SampleApi = () => {
     const defaultRequest = TestEditorStore(state => state.defaultRequest)
     const selectedSampleApi = PersistStore(state => state.selectedSampleApi)
     const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
+    const selectedRole = TestEditorStore(state => state.selectedRole)
+    const setSelectedRole = TestEditorStore(state => state.setSelectedRole)
 
     const tabs = [{ id: 'request', content: 'Request' }, { id: 'response', content: 'Response'}];
     const mapCollectionIdToName = func.mapCollectionIdToName(allCollections)
@@ -55,6 +57,29 @@ const SampleApi = () => {
     const [isChatBotOpen, setIsChatBotOpen] = useState(false)
     const [chatBotModal, setChatBotModal] = useState(false)
     const subCategoryMap = LocalStore(state => state.subCategoryMap)
+    const [testRoles, setTestRoles] = useState([])
+    const [testRolesOptions, setTestRolesOptions] = useState([])
+    const [rolePopoverActive, setRolePopoverActive] = useState(false)
+
+    useEffect(() => {
+        const fetchRoles = async () => {
+            try {
+                const response = await api.fetchTestRoles()
+                if (response && response.testRoles) {
+                    setTestRoles(response.testRoles)
+                    // use hexId as value (consistent with RunTestConfiguration) and name as label
+                    const options = response.testRoles.map(role => ({
+                        label: role.name,
+                        value: role.hexId || role.name
+                    }))
+                    setTestRolesOptions(options)
+                }
+            } catch (error) {
+                console.error('Error fetching test roles:', error)
+            }
+        }
+        fetchRoles()
+    }, [])
 
     useEffect(()=>{
         if(showEmptyLayout) return
@@ -264,7 +289,7 @@ const SampleApi = () => {
 
 
         try {
-            let resp = await testEditorRequests.runTestForTemplate(currentContent,apiKeyInfo,sampleDataList)
+            let resp = await testEditorRequests.runTestForTemplate(currentContent,apiKeyInfo,sampleDataList,selectedRole)
             if(resp.testingRunPlaygroundHexId !== null && resp?.testingRunPlaygroundHexId !== undefined) {
                 await new Promise((resolve) => {
                     let maxAttempts = 100;
@@ -391,6 +416,20 @@ const SampleApi = () => {
                             </Tooltip>
                         </Box>
                     </Button>
+                    <Box minWidth="150px">
+                        <DropdownSearch
+                            id="role-search"
+                            placeholder="Search roles"
+                            optionsList={testRolesOptions}
+                            setSelected={(val) => setSelectedRole(val)}
+                            value={(() => {
+                            const found = testRolesOptions.find(r => r.value === selectedRole);
+                            return found ? found.label : '';
+                            })()}
+                            preSelected={selectedRole ? [selectedRole] : []}
+                        />
+                    </Box>
+
                     <Button id={"run-test"} disabled={showEmptyLayout || editorData?.message?.length === 0} loading={loading} primary onClick={runTest} size="slim">{isChatBotOpen ? "Chat" : mapLabel('Run test', getDashboardCategory())}</Button>
                 </HorizontalStack>
             </div>
