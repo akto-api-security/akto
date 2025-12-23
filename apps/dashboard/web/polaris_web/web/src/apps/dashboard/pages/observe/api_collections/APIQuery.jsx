@@ -136,7 +136,6 @@ function APIQuery() {
                 setActive(false);
                 func.setToast(true, false, <div data-testid="collection_creation_message">{"API collection created successfully"}</div>);
             } catch (error) {
-                console.error("Error creating collection:", error);
                 const errorMessage = error?.response?.data?.actionErrors?.[0] || 
                                     error?.message || 
                                     "Failed to create collection";
@@ -290,7 +289,6 @@ function APIQuery() {
             api.updateCustomCollection(collectionId, dt).then((res) => {
                 func.setToast(true, false, "Conditions updated successfully")
             }).catch((error) => {
-                console.error("Error updating conditions:", error);
                 const errorMessage = error?.response?.data?.actionErrors?.[0] || 
                                     error?.message || 
                                     "Error in updating conditions";
