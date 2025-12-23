@@ -44,6 +44,7 @@ import io.swagger.v3.oas.models.OpenAPI;
 import okhttp3.OkHttpClient;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.struts2.json.annotations.JSON;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
@@ -170,6 +171,11 @@ public class PostmanAction extends UserAction {
         executorService.submit(r);
 
         return SUCCESS.toUpperCase();
+    }
+
+    @JSON(serialize = false)
+    public int getApiCollectionId() {
+        return apiCollectionId;
     }
 
     public void setApiCollectionId(int apiCollectionId) {
