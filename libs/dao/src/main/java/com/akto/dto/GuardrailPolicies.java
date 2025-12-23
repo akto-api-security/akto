@@ -260,9 +260,9 @@ public class GuardrailPolicies {
     @NoArgsConstructor
     public static class TokenLimit {
         private boolean enabled;
-        private double threshold;
+        private int threshold;
 
-        public TokenLimit(boolean enabled, double threshold) {
+        public TokenLimit(boolean enabled, int threshold) {
             this.enabled = enabled;
             this.threshold = threshold;
         }

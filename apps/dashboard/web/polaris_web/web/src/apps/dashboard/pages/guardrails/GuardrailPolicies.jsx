@@ -466,7 +466,7 @@ function GuardrailPolicies() {
             };
 
             let response;
-            try {
+
                 if (isEditMode && guardrailData.hexId) {
                     // Update existing policy
                     response = await api.createGuardrailPolicy(requestPayload);
@@ -481,7 +481,7 @@ function GuardrailPolicies() {
                         func.setToast(true, false, "Guardrail created successfully");
                     }
                 }
-            }
+
             
             if (response) {
                 setShowCreateModal(false);

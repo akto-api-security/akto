@@ -531,18 +531,10 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 // Add edit mode information
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
             };
+
             
-            // Debug: Confirmed modal data is correct, focus on parent component
-            console.log("About to call onSave...");
-            
-            try {
-                await onSave(guardrailData);
-                console.log("onSave completed successfully");
-                handleClose();
-            } catch (saveError) {
-                console.error("Error in onSave:", saveError);
-                throw saveError; // Re-throw to be caught by outer try-catch
-            }
+            await onSave(guardrailData);
+            handleClose();
         } catch (error) {
             console.error("Error creating guardrail:", error);
         } finally {
