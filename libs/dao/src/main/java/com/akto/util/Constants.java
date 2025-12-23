@@ -50,6 +50,14 @@ public class Constants {
     public static final String AKTO_MCP_TOOLS_TAG = "mcp-tool";
     public static final String AKTO_MCP_RESOURCES_TAG = "mcp-resource";
     public static final String AKTO_MCP_PROMPTS_TAG = "mcp-prompt";
+
+    // AI Agent source type constants
+    public static final String AI_AGENT_SOURCE_N8N = "N8N";
+    public static final String AI_AGENT_SOURCE_LANGCHAIN = "LANGCHAIN";
+    public static final String AI_AGENT_SOURCE_COPILOT_STUDIO = "COPILOT_STUDIO";
+    public static final String AI_AGENT_TAG_BOT_NAME = "bot-name";
+    public static final String AI_AGENT_TAG_SOURCE = "source";
+
     public static final String STATUS_PENDING = "Pending";
     public static final String STATUS_IN_PROGRESS = "In Progress";
     public static final String STATUS_COMPLETED = "Completed";
