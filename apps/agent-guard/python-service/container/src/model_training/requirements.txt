@@ -1,0 +1,8 @@
+torch>=2.0.0
+transformers>=4.30.0
+optimum[onnxruntime]>=1.14.0
+datasets>=2.14.0
+pymongo>=4.6.0
+accelerate>=0.20.0
+onnxruntime>=1.16.0
+
