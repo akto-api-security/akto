@@ -1,4 +1,4 @@
-import { Button, ButtonGroup, LegacyCard, Text, VerticalStack, DataTable, Checkbox } from "@shopify/polaris"
+import { Button, ButtonGroup, LegacyCard, Text, VerticalStack, DataTable, Checkbox, HorizontalStack, RadioButton } from "@shopify/polaris"
 import { useEffect, useState } from "react";
 import settingRequests from "../api";
 import func from "@/util/func";
@@ -98,14 +98,15 @@ const Logs = () => {
         }
     }
 
-    const handleRebootModules = async () => {
+    const handleRebootModules = async (rebootContainer) => {
         if (selectedModules.length === 0) {
             func.setToast(true, true, "Please select at least one module to reboot");
             return;
         }
         try {
-            await settingRequests.rebootModules(selectedModules);
-            func.setToast(true, false, "Reboot flag set for eligible modules");
+            await settingRequests.rebootModules(selectedModules, rebootContainer);
+            const rebootType = rebootContainer ? "Container reboot" : "Restart process";
+            func.setToast(true, false, `${rebootType} flag set for eligible modules`);
             setSelectedModules([]);
             await fetchModuleInfo(); // Refresh the module list
         } catch (error) {
@@ -195,8 +196,13 @@ const Logs = () => {
                     title="Module Information"
                     actions={[
                         {
-                            content: 'Reboot Selected',
-                            onAction: handleRebootModules,
+                            content: 'Restart process',
+                            onAction: () => handleRebootModules(false),
+                            disabled: selectedModules.length === 0
+                        },
+                        {
+                            content: 'Reboot container',
+                            onAction: () => handleRebootModules(true),
                             disabled: selectedModules.length === 0
                         }
                     ]}
