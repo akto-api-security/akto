@@ -26,6 +26,7 @@ public class TestingConfigurations {
     private TestingRunResultSummary rerunTestingRunResultSummary;
     Map<String, TestConfig> testConfigMap;
     private  Map<ApiInfoKey, RawApi> rawApiMap = new HashMap<>();
+    private boolean doNotMarkIssuesAsFixed;
 
     private TestingConfigurations() {
     }
@@ -34,12 +35,13 @@ public class TestingConfigurations {
         return instance;
     }
 
-    public synchronized void init(TestingUtil testingUtil, TestingRunConfig testingRunConfig, boolean debug, Map<String, TestConfig> testConfigMap, int maxConcurrentRequests) {
+    public synchronized void init(TestingUtil testingUtil, TestingRunConfig testingRunConfig, boolean debug, Map<String, TestConfig> testConfigMap, int maxConcurrentRequests, boolean doNotMarkIssuesAsFixed) {
         this.testingUtil = testingUtil;
         this.testingRunConfig = testingRunConfig;
         this.debug = debug;
         this.testConfigMap = testConfigMap;
         this.maxConcurrentRequest = maxConcurrentRequests == -1 ? 10 : maxConcurrentRequests;
+        this.doNotMarkIssuesAsFixed = doNotMarkIssuesAsFixed;
     }
 
     public boolean isDebug() {
@@ -101,5 +103,13 @@ public class TestingConfigurations {
     public RawApi getRawApi(ApiInfoKey apiInfoKey) {
         if (apiInfoKey == null) return null;
         return instance.rawApiMap.get(apiInfoKey);
+    }
+
+    public boolean getDoNotMarkIssuesAsFixed() {
+        return doNotMarkIssuesAsFixed;
+    }
+
+    public void setDoNotMarkIssuesAsFixed(boolean doNotMarkIssuesAsFixed) {
+        this.doNotMarkIssuesAsFixed = doNotMarkIssuesAsFixed;
     }
 }
