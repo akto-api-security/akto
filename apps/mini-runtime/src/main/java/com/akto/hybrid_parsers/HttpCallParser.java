@@ -279,12 +279,7 @@ public class HttpCallParser {
             }
 
             // Reconstruct full hostname: bot-name.base-hostname
-            String reconstructedHostname = botName + "." + baseHostname;
-
-            loggerMaker.infoAndAddToDb("Using reconstructed hostname for collection: " + reconstructedHostname +
-                       " (source: " + source + ", bot-name: " + botName + ", base: " + baseHostname + ")", LogDb.RUNTIME);
-
-            return reconstructedHostname;
+            return botName + "." + baseHostname;
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Failed to reconstruct AI agent hostname, using base hostname");
