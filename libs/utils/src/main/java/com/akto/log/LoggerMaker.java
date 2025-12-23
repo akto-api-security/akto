@@ -98,6 +98,7 @@ public class LoggerMaker {
     }
 
     private static AccountSettings accountSettings = null;
+    private static String[] filterKeywords = null;
 
     private static final ScheduledExecutorService scheduler2 = Executors.newScheduledThreadPool(1);
 
@@ -114,6 +115,13 @@ public class LoggerMaker {
         try {
             internalLogger.info("Running updateAccountSettings....................................");
             accountSettings = dataActor.fetchAccountSettings();
+            if (accountSettings != null &&
+                    accountSettings.getFilterLogPolicy() != null &&
+                    !accountSettings.getFilterLogPolicy().trim().isEmpty()) {
+                filterKeywords = accountSettings.getFilterLogPolicy().split(",");
+            } else {
+                filterKeywords = null;
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -196,7 +204,9 @@ public class LoggerMaker {
                 err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
             } else {
                 err = String.format("Err msg: %s\nStackTrace not available", err);
-                e.printStackTrace();
+                if(e!=null){
+                    e.printStackTrace();
+                }
             }
             errorAndAddToDb(err, db);
         } catch (Exception e1) {
@@ -253,9 +263,9 @@ public class LoggerMaker {
         warnAndAddToDb(info, this.db);
     }
 
-    private Boolean checkUpdate(){
-        if(logCount>=1000){
-            if((logCountResetTimestamp + oneMinute) >= Context.now()){
+    private Boolean checkUpdate() {
+        if (logCount >= 1000) {
+            if ((logCountResetTimestamp + oneMinute) >= Context.now()) {
                 return false;
             } else {
                 logCount = 0;
@@ -274,7 +284,25 @@ public class LoggerMaker {
             moduleId = "";
         }
 
-        String text = aClass + " : " + " [" + moduleId + " ] " + info;
+        final String text = aClass + " : " + " [" + moduleId + " ] " + info;
+
+        // Filter logs based on filterLogPolicy if defined
+        if (filterKeywords != null && filterKeywords.length > 0) {
+            boolean matchesFilter = false;
+            for (String keyword : filterKeywords) {
+                keyword = keyword.trim();
+                if (!keyword.isEmpty() && text.contains(keyword)) {
+                    matchesFilter = true;
+                    break;
+                }
+            }
+
+            // If filterLogPolicy is defined but log doesn't match any keyword, skip it
+            if (!matchesFilter) {
+                return;
+            }
+        }
+
         Log log = new Log(text, key, Context.now());
         
         if(checkUpdate() && db!=null){
