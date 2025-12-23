@@ -26,6 +26,10 @@ public class ModuleInfo {
     private boolean reboot;
     public static final String _REBOOT = "reboot";
 
+    @Getter @Setter
+    private boolean rebootContainer;
+    public static final String _REBOOT_CONTAINER = "rebootContainer";
+
     public ModuleType getModuleType() {
         return moduleType;
     }

@@ -45,10 +45,15 @@ public class ModuleInfoWorker {
         scheduler.scheduleWithFixedDelay(() -> {
             moduleInfo.setLastHeartbeatReceived(Context.now());
             assert _this.dataActor != null;
-            boolean reboot = _this.dataActor.updateModuleInfo(moduleInfo);
-            loggerMaker.info("Sent heartbeat at : " + moduleInfo.getLastHeartbeatReceived() + " for module: " + moduleInfo.getModuleType().name());
-            if (reboot) {
-                loggerMaker.warnAndAddToDb("Rebooting module: " + moduleInfo.getModuleType().name() + " id: " + moduleInfo.getId());
+            ModuleInfo moduleInfoFromService = _this.dataActor.updateModuleInfo(moduleInfo);
+            loggerMaker.info("Sent heartbeat at : " + moduleInfoFromService.getLastHeartbeatReceived() + " for module: " + moduleInfoFromService.getModuleType().name());
+            if (moduleInfoFromService.isRebootContainer()) {
+                loggerMaker.warnAndAddToDb("Restarting pod for module: " + moduleInfoFromService.getModuleType().name() + " id: " + moduleInfoFromService.getId());
+                System.exit(137); // Exit code 137 signals container should terminate
+                return;
+            }
+            if (moduleInfoFromService.isReboot()) {
+                loggerMaker.warnAndAddToDb("Rebooting module: " + moduleInfoFromService.getModuleType().name() + " id: " + moduleInfoFromService.getId());
                 System.exit(0);
                 return;
             }
