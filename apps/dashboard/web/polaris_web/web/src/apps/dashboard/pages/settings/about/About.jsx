@@ -58,7 +58,8 @@ function About() {
         acceptableFix: false
     })
     const [blockLogs, setBlockLogs] = useState(false)
-    const [filterLogPolicy, setFilterLogPolicy] = useState('')
+    const [filterLogPolicy, setFilterLogPolicy] = useState([])
+    const [filterLogPolicyText, setFilterLogPolicyText] = useState('')
 
     const setupOptions = settingFunctions.getSetupOptions()
 
@@ -93,7 +94,9 @@ function About() {
             setCompulsoryDescription(resp.compulsoryDescription)
         }
         setBlockLogs(resp.blockLogs || false)
-        setFilterLogPolicy(resp.filterLogPolicy || '')
+        const policyList = resp.filterLogPolicy || []
+        setFilterLogPolicy(policyList)
+        setFilterLogPolicyText(policyList.join('\n'))
     }
 
     useEffect(()=>{
@@ -407,8 +410,16 @@ function About() {
     }
 
     const handleFilterLogPolicySave = async () => {
-        await settingRequests.updateFilterLogPolicy(filterLogPolicy);
-        func.setToast(true, false, "Filter log policy updated successfully.");
+        try {
+            // Convert text to array by splitting on newlines and filtering empty strings
+            const policyList = filterLogPolicyText.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+            const response = await settingRequests.updateFilterLogPolicy(policyList);
+            setFilterLogPolicy(response);
+            setFilterLogPolicyText(response.join('\n'));
+            func.setToast(true, false, "Filter log policy updated successfully.");
+        } catch (error) {
+            func.setToast(true, true, "Failed to update filter log policy.");
+        }
     }
 
     const compulsoryDescriptionComponent = (
@@ -455,13 +466,17 @@ function About() {
                 />
                 <VerticalStack gap={2}>
                     <Text color="subdued">Filter Log Policy</Text>
+                    <Text variant="bodySm" color="subdued">
+                        Enter one filter pattern per line. Each pattern will be used to filter logs.
+                    </Text>
                     <HorizontalStack gap={2} align="start">
                         <Box width="400px">
                             <TextField
-                                value={filterLogPolicy}
-                                onChange={setFilterLogPolicy}
-                                placeholder="Enter filter log policy"
+                                value={filterLogPolicyText}
+                                onChange={setFilterLogPolicyText}
+                                placeholder="Enter filter log policy (one per line)"
                                 disabled={window.USER_ROLE !== 'ADMIN'}
+                                multiline={4}
                             />
                         </Box>
                         {window.USER_ROLE === 'ADMIN' && (

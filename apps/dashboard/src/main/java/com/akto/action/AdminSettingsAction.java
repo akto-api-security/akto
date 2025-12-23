@@ -100,7 +100,7 @@ public class AdminSettingsAction extends UserAction {
     private boolean blockLogs;
     @Setter
     @Getter
-    private String filterLogPolicy;
+    private List<String> filterLogPolicy;
 
     public String updateSetupType() {
         AccountSettingsDao.instance.getMCollection().updateOne(
