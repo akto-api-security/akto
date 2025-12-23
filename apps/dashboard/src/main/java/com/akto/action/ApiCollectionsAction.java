@@ -63,6 +63,12 @@ import com.akto.dto.type.URLMethods;
 public class ApiCollectionsAction extends UserAction {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiCollectionsAction.class, LogDb.DASHBOARD);
+    
+    // Error codes
+    private static final int MONGO_INVALID_REGEX_ERROR_CODE = 51091;
+    private static final String ERROR_TYPE_INVALID_REGEX = "INVALID_REGEX";
+    private static final String ERROR_TYPE_DATABASE = "DATABASE_ERROR";
+    private static final String ERROR_TYPE_GENERAL = "GENERAL_ERROR";
 
     List<ApiCollection> apiCollections = new ArrayList<>();
     Map<Integer,Integer> testedEndpointsMaps = new HashMap<>();
@@ -512,16 +518,9 @@ public class ApiCollectionsAction extends UserAction {
 
             return SUCCESS.toUpperCase();
         } catch (MongoCommandException e) {
-            // MongoDB error code 51091 = invalid regex
-            if (e.getCode() == 51091) {
-                addActionError("Invalid regex pattern. Please check your filter conditions.");
-            } else {
-                addActionError("Database error: " + e.getMessage());
-            }
-            return ERROR.toUpperCase();
+            return handleMongoException(e);
         } catch (Exception e) {
-            addActionError("Error creating collection: " + e.getMessage());
-            return ERROR.toUpperCase();
+            return handleGeneralException(e, "Error creating collection");
         }
     }
 
@@ -538,16 +537,9 @@ public class ApiCollectionsAction extends UserAction {
             ApiCollectionUsers.computeCollectionsForCollectionId(conditions, collection.getId());
             return SUCCESS.toUpperCase();
         } catch (MongoCommandException e) {
-            // MongoDB error code 51091 = invalid regex
-            if (e.getCode() == 51091) {
-                addActionError("Invalid regex pattern. Please check your filter conditions.");
-            } else {
-                addActionError("Database error: " + e.getMessage());
-            }
-            return ERROR.toUpperCase();
+            return handleMongoException(e);
         } catch (Exception e) {
-            addActionError("Error updating collection: " + e.getMessage());
-            return ERROR.toUpperCase();
+            return handleGeneralException(e, "Error updating collection");
         }
     }
 
@@ -630,16 +622,9 @@ public class ApiCollectionsAction extends UserAction {
             
             return SUCCESS.toUpperCase();
         } catch (MongoCommandException e) {
-            // MongoDB error code 51091 = invalid regex
-            if (e.getCode() == 51091) {
-                addActionError("Invalid regex pattern. Please check your filter conditions.");
-            } else {
-                addActionError("Database error: " + e.getMessage());
-            }
-            return ERROR.toUpperCase();
+            return handleMongoException(e);
         } catch (Exception e) {
-            addActionError("Error processing conditions: " + e.getMessage());
-            return ERROR.toUpperCase();
+            return handleGeneralException(e, "Error processing conditions");
         }
     }
 
@@ -651,17 +636,24 @@ public class ApiCollectionsAction extends UserAction {
 
             return SUCCESS.toUpperCase();
         } catch (MongoCommandException e) {
-            // MongoDB error code 51091 = invalid regex
-            if (e.getCode() == 51091) {
-                addActionError("Invalid regex pattern. Please check your filter conditions.");
-            } else {
-                addActionError("Database error: " + e.getMessage());
-            }
-            return ERROR.toUpperCase();
+            return handleMongoException(e);
         } catch (Exception e) {
-            addActionError("Error processing conditions: " + e.getMessage());
-            return ERROR.toUpperCase();
+            return handleGeneralException(e, "Error processing conditions");
         }
+    }
+    
+    private String handleMongoException(MongoCommandException e) {
+        if (e.getCode() == MONGO_INVALID_REGEX_ERROR_CODE) {
+            addActionError(ERROR_TYPE_INVALID_REGEX + ": Invalid regex pattern. Please check your filter conditions.");
+        } else {
+            addActionError(ERROR_TYPE_DATABASE + ": " + e.getMessage());
+        }
+        return ERROR.toUpperCase();
+    }
+    
+    private String handleGeneralException(Exception e, String context) {
+        addActionError(ERROR_TYPE_GENERAL + ": " + context + ": " + e.getMessage());
+        return ERROR.toUpperCase();
     }
 
     public String computeCustomCollections(){

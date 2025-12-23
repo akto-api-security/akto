@@ -139,13 +139,7 @@ function APIQuery() {
                 const errorMessage = error?.response?.data?.actionErrors?.[0] || 
                                     error?.message || 
                                     "Failed to create collection";
-                
-                // Check if it's a regex error
-                if (errorMessage.includes("regex") || errorMessage.includes("Regular expression")) {
-                    func.setToast(true, true, "Invalid regex pattern. Please check your filter conditions.");
-                } else {
-                    func.setToast(true, true, errorMessage);
-                }
+                func.setToast(true, true, errorMessage);
             }
         } else {
             func.setToast(true, true, <div data-testid="collection_creation_message">{"No endpoints selected"}</div>);
@@ -181,13 +175,7 @@ function APIQuery() {
             const errorMessage = error?.response?.data?.actionErrors?.[0] || 
                                 error?.message || 
                                 "An error occurred while exploring endpoints";
-            
-            // Check if it's a regex error
-            if (errorMessage.includes("regex") || errorMessage.includes("Regular expression")) {
-                func.setToast(true, true, "Invalid regex pattern. Please check your filter conditions.");
-            } else {
-                func.setToast(true, true, errorMessage);
-            }
+            func.setToast(true, true, errorMessage);
             setEndpointListFromConditions({});
             setSensitiveParams({});
         } finally {
@@ -292,13 +280,7 @@ function APIQuery() {
                 const errorMessage = error?.response?.data?.actionErrors?.[0] || 
                                     error?.message || 
                                     "Error in updating conditions";
-                
-                // Check if it's a regex error
-                if (errorMessage.includes("regex") || errorMessage.includes("Regular expression")) {
-                    func.setToast(true, true, "Invalid regex pattern. Please check your filter conditions.");
-                } else {
-                    func.setToast(true, true, errorMessage);
-                }
+                func.setToast(true, true, errorMessage);
             })
         }else{
             openModal()
