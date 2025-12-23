@@ -790,6 +790,27 @@ const settingRequests = {
             method: 'post',
             data: {registries}
         })
+    },
+    updateBlockLogs(blockLogs) {
+        return request({
+            url: '/api/updateBlockLogs',
+            method: 'post',
+            data: {blockLogs}
+        })
+    },
+    updateFilterLogPolicy(filterLogPolicy) {
+        return request({
+            url: '/api/updateFilterLogPolicy',
+            method: 'post',
+            data: {filterLogPolicy}
+        })
+    },
+    rebootModules(moduleIds) {
+        return request({
+            url: '/api/rebootModules',
+            method: 'post',
+            data: {moduleIds}
+        })
     }
 }
 
