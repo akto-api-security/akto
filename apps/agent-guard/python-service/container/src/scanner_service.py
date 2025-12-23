@@ -27,6 +27,8 @@ except:
 
 from llm_guard import input_scanners, output_scanners
 from intent_analyzer import IntentAnalysisScanner
+from model_registry import get_model_path_for_scanner, model_registry
+from custom_prompt_injection import get_prompt_injection_scanner
 
 logging.basicConfig(
     level=logging.INFO,
@@ -40,6 +42,19 @@ logger.setLevel(logging.INFO)
 
 app = FastAPI(title="Agent Guard Scanner Service", version="1.0.0")
 scanner_cache = {}
+
+def clear_scanner_cache(scanner_name: str = None):
+    """Clear scanner cache to force reload with new models."""
+    if scanner_name:
+        # Clear specific scanner
+        keys_to_remove = [k for k in scanner_cache.keys() if scanner_name in k]
+        for key in keys_to_remove:
+            del scanner_cache[key]
+        logger.info(f"Cleared cache for {scanner_name}")
+    else:
+        # Clear all
+        scanner_cache.clear()
+        logger.info("Cleared all scanner cache")
 
 class ScanRequest(BaseModel):
     scanner_type: str
@@ -64,7 +79,7 @@ PROMPT_SCANNERS = {
     "Gibberish": input_scanners.Gibberish,
     "IntentAnalysis": IntentAnalysisScanner,
     "Language": input_scanners.Language,
-    "PromptInjection": input_scanners.PromptInjection,
+    "PromptInjection": None,  # Will use custom wrapper
     "Secrets": input_scanners.Secrets,
     "Sentiment": input_scanners.Sentiment,
     "TokenLimit": input_scanners.TokenLimit,
@@ -102,7 +117,7 @@ def get_scanner(scanner_type: str, scanner_name: str, config: Dict[str, Any]):
     else:
         raise ValueError(f"Invalid scanner type: {scanner_type}")
     
-    if not scanner_class:
+    if scanner_class is None and scanner_name != "PromptInjection":
         raise ValueError(f"Scanner {scanner_name} not found")
     
     try:
@@ -111,7 +126,7 @@ def get_scanner(scanner_type: str, scanner_name: str, config: Dict[str, Any]):
         
         config = config or {}
         
-        # Apply optimized configurations for best attack coverage
+        # Special handling for PromptInjection (supports dynamic models)
         if scanner_name == "PromptInjection":
             # Use lower threshold (0.5) for better coverage of sophisticated attacks
             # Testing showed 0.5 provides best detection without false negatives
@@ -124,10 +139,27 @@ def get_scanner(scanner_type: str, scanner_name: str, config: Dict[str, Any]):
             # Enable ONNX for 27x faster performance (60-120ms vs 1500ms)
             if "use_onnx" not in config:
                 config["use_onnx"] = True
+            
+            # Check for custom fine-tuned model path
+            custom_model_path = get_model_path_for_scanner(scanner_name, config)
+            if custom_model_path:
+                config["model_path"] = custom_model_path
+                logger.info(f"Using custom model for {scanner_name}: {custom_model_path}")
+            
+            # Use custom wrapper that supports dynamic models
+            scanner = get_prompt_injection_scanner(config)
         elif scanner_name in onnx_scanners:
             config["use_onnx"] = True
+            # Check for custom model for other scanners too
+            custom_model_path = get_model_path_for_scanner(scanner_name, config)
+            if custom_model_path:
+                config["model_path"] = custom_model_path
+                logger.info(f"Using custom model for {scanner_name}: {custom_model_path}")
+            
+            scanner = scanner_class(**config)
+        else:
+            scanner = scanner_class(**config)
         
-        scanner = scanner_class(**config)
         scanner_cache[cache_key] = scanner
         
         logger.info(f"Initialized scanner: {scanner_name} with config: {config}")
@@ -146,6 +178,12 @@ async def list_scanners():
         "prompt_scanners": list(PROMPT_SCANNERS.keys()),
         "output_scanners": list(OUTPUT_SCANNERS.keys()),
     }
+
+@app.post("/scanners/cache/clear")
+async def clear_cache(scanner_name: str = None):
+    """Clear scanner cache (useful after model updates)."""
+    clear_scanner_cache(scanner_name)
+    return {"status": "success", "message": f"Cache cleared for {scanner_name or 'all scanners'}"}
 
 @app.post("/scan", response_model=ScanResponse)
 async def scan_text(request: ScanRequest):
