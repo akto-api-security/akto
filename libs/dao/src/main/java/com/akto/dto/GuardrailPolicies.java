@@ -55,6 +55,11 @@ public class GuardrailPolicies {
     // Step 7: Base Prompt Rule
     private BasePromptRule basePromptRule;
 
+    // Step 7.5: Gibberish Detection - ML-based detection of nonsensical text
+    private GibberishDetection gibberishDetection;
+    // Step 8.5: Token Limit - enforce token limits on user inputs
+    private TokenLimit tokenLimit;
+
     // Step 7: Server and application settings (old format - backward compatibility)
     private List<String> selectedMcpServers;
     private List<String> selectedAgentServers;
@@ -125,7 +130,7 @@ public class GuardrailPolicies {
                            int updatedTimestamp, String createdBy, String updatedBy, String selectedCollection,
                            String selectedModel, List<DeniedTopic> deniedTopics, List<PiiType> piiTypes,
                            List<String> regexPatterns, List<RegexPattern> regexPatternsV2, Map<String, Object> contentFiltering,
-                           LLMRule llmRule,
+                           LLMRule llmRule, GibberishDetection gibberishDetection, TokenLimit tokenLimit,
                            List<String> selectedMcpServers, List<String> selectedAgentServers,
                            List<SelectedServer> selectedMcpServersV2, List<SelectedServer> selectedAgentServersV2,
                            boolean applyOnResponse, boolean applyOnRequest, String url, double confidenceScore, boolean active) {
@@ -145,6 +150,8 @@ public class GuardrailPolicies {
         this.regexPatternsV2 = regexPatternsV2;
         this.contentFiltering = contentFiltering;
         this.llmRule = llmRule;
+        this.gibberishDetection = gibberishDetection;
+        this.tokenLimit = tokenLimit;
         this.selectedMcpServers = selectedMcpServers;
         this.selectedAgentServers = selectedAgentServers;
         this.selectedMcpServersV2 = selectedMcpServersV2;
@@ -235,6 +242,33 @@ public class GuardrailPolicies {
         public BasePromptRule(boolean enabled, double confidenceScore) {
             this.enabled = enabled;
             this.confidenceScore = confidenceScore;
+        }
+    }
+
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class GibberishDetection {
+        private boolean enabled;
+        private double confidenceScore;
+
+        public GibberishDetection(boolean enabled, double confidenceScore) {
+            this.enabled = enabled;
+            this.confidenceScore = confidenceScore;
+        }
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class TokenLimit {
+        private boolean enabled;
+        private int threshold;
+
+        public TokenLimit(boolean enabled, int threshold) {
+            this.enabled = enabled;
+            this.threshold = threshold;
         }
     }
 }
