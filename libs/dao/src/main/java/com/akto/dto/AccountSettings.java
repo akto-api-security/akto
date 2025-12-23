@@ -122,7 +122,7 @@ public class AccountSettings {
 
     @Getter
     @Setter
-    private String filterLogPolicy;
+    private List<String> filterLogPolicy;
     public static final String FILTER_LOG_POLICY = "filterLogPolicy";
 
     public AccountSettings() {
