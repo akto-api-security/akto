@@ -44,6 +44,7 @@ import com.akto.util.Pair;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
+import com.google.gson.Gson;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.Executors;
@@ -64,6 +65,7 @@ public class HttpCallParser {
     private Map<Integer, Integer> apiCollectionIdTagsSyncTimestampMap = new HashMap<>();
     private int last_synced;
     private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class, LogDb.RUNTIME);
+    private static final Gson gson = new Gson();
     public APICatalogSync apiCatalogSync;
     public DependencyAnalyser dependencyAnalyser;
     private Map<String, Integer> hostNameToIdMap = new HashMap<>();
@@ -256,19 +258,20 @@ public class HttpCallParser {
 
         try {
             // Parse tags JSON
-            com.google.gson.Gson gson = new com.google.gson.Gson();
             @SuppressWarnings("unchecked")
             Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
 
             // Check if this is an AI agent source
-            String source = tagsMap.get("source");
-            if (source == null || (!source.equals("N8N") && !source.equals("LANGCHAIN") && !source.equals("COPILOT_STUDIO"))) {
+            String source = tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
+            if (source == null || (!source.equals(Constants.AI_AGENT_SOURCE_N8N)
+                    && !source.equals(Constants.AI_AGENT_SOURCE_LANGCHAIN)
+                    && !source.equals(Constants.AI_AGENT_SOURCE_COPILOT_STUDIO))) {
                 // Not AI agent traffic, return base hostname
                 return baseHostname;
             }
 
             // Extract bot name from tags
-            String botName = tagsMap.get("bot-name");
+            String botName = tagsMap.get(Constants.AI_AGENT_TAG_BOT_NAME);
             if (botName == null || botName.isEmpty()) {
                 // No bot name provided, log warning and use base hostname as-is
                 loggerMaker.infoAndAddToDb("AI agent traffic from " + source + " missing bot-name in tags. Using base hostname: " + baseHostname, LogDb.RUNTIME);
@@ -284,8 +287,7 @@ public class HttpCallParser {
             return reconstructedHostname;
 
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Failed to reconstruct AI agent hostname, using base hostname: " + e.getMessage(), LogDb.RUNTIME);
-            e.printStackTrace();
+            loggerMaker.errorAndAddToDb(e, "Failed to reconstruct AI agent hostname, using base hostname");
             return baseHostname;
         }
     }
