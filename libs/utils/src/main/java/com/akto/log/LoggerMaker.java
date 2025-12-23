@@ -98,7 +98,7 @@ public class LoggerMaker {
     }
 
     private static AccountSettings accountSettings = null;
-    private static String[] filterKeywords = null;
+    private static List<String> filterKeywords = null;
 
     private static final ScheduledExecutorService scheduler2 = Executors.newScheduledThreadPool(1);
 
@@ -117,8 +117,8 @@ public class LoggerMaker {
             accountSettings = dataActor.fetchAccountSettings();
             if (accountSettings != null &&
                     accountSettings.getFilterLogPolicy() != null &&
-                    !accountSettings.getFilterLogPolicy().trim().isEmpty()) {
-                filterKeywords = accountSettings.getFilterLogPolicy().split(",");
+                    !accountSettings.getFilterLogPolicy().isEmpty()) {
+                filterKeywords = accountSettings.getFilterLogPolicy();
             } else {
                 filterKeywords = null;
             }
@@ -287,15 +287,11 @@ public class LoggerMaker {
         final String text = aClass + " : " + " [" + moduleId + " ] " + info;
 
         // Filter logs based on filterLogPolicy if defined
-        if (filterKeywords != null && filterKeywords.length > 0) {
-            boolean matchesFilter = false;
-            for (String keyword : filterKeywords) {
-                keyword = keyword.trim();
-                if (!keyword.isEmpty() && text.contains(keyword)) {
-                    matchesFilter = true;
-                    break;
-                }
-            }
+        if (filterKeywords != null && !filterKeywords.isEmpty()) {
+            boolean matchesFilter = filterKeywords.stream()
+                .map(String::trim)
+                .filter(keyword -> !keyword.isEmpty())
+                .anyMatch(text::contains);
 
             // If filterLogPolicy is defined but log doesn't match any keyword, skip it
             if (!matchesFilter) {
