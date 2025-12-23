@@ -120,6 +120,11 @@ public class AccountSettings {
     private boolean blockLogs;
     public static final String BLOCK_LOGS = "blockLogs";
 
+    @Getter
+    @Setter
+    private List<String> filterLogPolicy;
+    public static final String FILTER_LOG_POLICY = "filterLogPolicy";
+
     public AccountSettings() {
     }
 
