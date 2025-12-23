@@ -32,6 +32,7 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
 import com.akto.dto.rbac.UsersCollectionsList;
+import com.mongodb.MongoCommandException;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
@@ -498,17 +499,30 @@ public class ApiCollectionsAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        List<TestingEndpoints> conditions = generateConditions(this.conditions);
+        try {
+            List<TestingEndpoints> conditions = generateConditions(this.conditions);
 
-        ApiCollection apiCollection = new ApiCollection(Context.now(), collectionName, conditions);
-        ApiCollectionsDao.instance.insertOne(apiCollection);
+            ApiCollection apiCollection = new ApiCollection(Context.now(), collectionName, conditions);
+            ApiCollectionsDao.instance.insertOne(apiCollection);
 
-        ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
+            ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
 
-        this.apiCollections = new ArrayList<>();
-        this.apiCollections.add(apiCollection);
+            this.apiCollections = new ArrayList<>();
+            this.apiCollections.add(apiCollection);
 
-        return SUCCESS.toUpperCase();
+            return SUCCESS.toUpperCase();
+        } catch (MongoCommandException e) {
+            // MongoDB error code 51091 = invalid regex
+            if (e.getCode() == 51091) {
+                addActionError("Invalid regex pattern. Please check your filter conditions.");
+            } else {
+                addActionError("Database error: " + e.getMessage());
+            }
+            return ERROR.toUpperCase();
+        } catch (Exception e) {
+            addActionError("Error creating collection: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
     }
 
     public String updateCustomCollection(){
@@ -518,10 +532,23 @@ public class ApiCollectionsAction extends UserAction {
             addActionError("No collection with id exists.");
             return ERROR.toUpperCase();
         }
-        List<TestingEndpoints> conditions = generateConditions(this.conditions);
-        ApiCollectionsDao.instance.updateOneNoUpsert(filter, Updates.set(ApiCollection.CONDITIONS_STRING, conditions));
-        ApiCollectionUsers.computeCollectionsForCollectionId(conditions, collection.getId());
-        return SUCCESS.toUpperCase();
+        try {
+            List<TestingEndpoints> conditions = generateConditions(this.conditions);
+            ApiCollectionsDao.instance.updateOneNoUpsert(filter, Updates.set(ApiCollection.CONDITIONS_STRING, conditions));
+            ApiCollectionUsers.computeCollectionsForCollectionId(conditions, collection.getId());
+            return SUCCESS.toUpperCase();
+        } catch (MongoCommandException e) {
+            // MongoDB error code 51091 = invalid regex
+            if (e.getCode() == 51091) {
+                addActionError("Invalid regex pattern. Please check your filter conditions.");
+            } else {
+                addActionError("Database error: " + e.getMessage());
+            }
+            return ERROR.toUpperCase();
+        } catch (Exception e) {
+            addActionError("Error updating collection: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
     }
 
     int apiCount;
@@ -580,35 +607,61 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String getEndpointsListFromConditions() {
-        List<TestingEndpoints> conditions = generateConditions(this.conditions);
-        List<BasicDBObject> list = ApiCollectionUsers.getSingleTypeInfoListFromConditions(conditions, 0, 200, Utils.DELTA_PERIOD_VALUE,  new ArrayList<>(deactivatedCollections));
-        
-        int initialCount = list.size();
-        
-        // Get accurate count with the same filter
-        int totalCount = ApiCollectionUsers.getApisCountFromConditionsWithStis(
-            conditions, new ArrayList<>(deactivatedCollections));
+        try {
+            List<TestingEndpoints> conditions = generateConditions(this.conditions);
+            List<BasicDBObject> list = ApiCollectionUsers.getSingleTypeInfoListFromConditions(conditions, 0, 200, Utils.DELTA_PERIOD_VALUE,  new ArrayList<>(deactivatedCollections));
+            
+            int initialCount = list.size();
+            
+            // Get accurate count with the same filter
+            int totalCount = ApiCollectionUsers.getApisCountFromConditionsWithStis(
+                conditions, new ArrayList<>(deactivatedCollections));
 
-        list = removeMismatchedCollections(list);
-        // removes from paginated results only
-        int removedCount = initialCount - list.size();
+            list = removeMismatchedCollections(list);
+            // removes from paginated results only
+            int removedCount = initialCount - list.size();
 
-        totalCount = totalCount - removedCount;
-        
-        InventoryAction inventoryAction = new InventoryAction();
-        inventoryAction.attachAPIInfoListInResponse(list,-1);
-        this.setResponse(inventoryAction.getResponse());
-        response.put("apiCount", totalCount);
-        
-        return SUCCESS.toUpperCase();
+            totalCount = totalCount - removedCount;
+            
+            InventoryAction inventoryAction = new InventoryAction();
+            inventoryAction.attachAPIInfoListInResponse(list,-1);
+            this.setResponse(inventoryAction.getResponse());
+            response.put("apiCount", totalCount);
+            
+            return SUCCESS.toUpperCase();
+        } catch (MongoCommandException e) {
+            // MongoDB error code 51091 = invalid regex
+            if (e.getCode() == 51091) {
+                addActionError("Invalid regex pattern. Please check your filter conditions.");
+            } else {
+                addActionError("Database error: " + e.getMessage());
+            }
+            return ERROR.toUpperCase();
+        } catch (Exception e) {
+            addActionError("Error processing conditions: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
     }
 
     public String getEndpointsFromConditions(){
-        List<TestingEndpoints> conditions = generateConditions(this.conditions);
+        try {
+            List<TestingEndpoints> conditions = generateConditions(this.conditions);
 
-        apiCount = ApiCollectionUsers.getApisCountFromConditions(conditions, new ArrayList<>(deactivatedCollections));
+            apiCount = ApiCollectionUsers.getApisCountFromConditions(conditions, new ArrayList<>(deactivatedCollections));
 
-        return SUCCESS.toUpperCase();
+            return SUCCESS.toUpperCase();
+        } catch (MongoCommandException e) {
+            // MongoDB error code 51091 = invalid regex
+            if (e.getCode() == 51091) {
+                addActionError("Invalid regex pattern. Please check your filter conditions.");
+            } else {
+                addActionError("Database error: " + e.getMessage());
+            }
+            return ERROR.toUpperCase();
+        } catch (Exception e) {
+            addActionError("Error processing conditions: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
     }
 
     public String computeCustomCollections(){
