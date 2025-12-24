@@ -1,7 +1,7 @@
 version: '3.3'
 
 services:
-
+  
   mongo:
     container_name: mongo
     image: mongo:6.0.1
@@ -12,120 +12,26 @@ services:
       - "27017:27017"
 
   akto-api-security-dashboard:
-    image: aktosecurity/akto-api-security-dashboard
+    image: aktosecurity/akto-api-security-dashboard:local
     env_file: ./docker.env
     restart: always
     ports: 
-      - "8080:8080"
+      - "9090:8080"
     depends_on:
       - mongo
     
-  # akto-api-security-testing:
-  #   image: aktosecurity/akto-api-testing:local
-  #   env_file: ./docker.env
-  #   depends_on:
-  #     - mongo    
-  #   restart: always
-
-  # akto-puppeteer-replay:
-  #   image: aktosecurity/akto-puppeteer-replay:latest
-  #   ports:
-  #     - "3000:3000"
-  #   restart: always
-
-  zoo1:
-    image: confluentinc/cp-zookeeper:6.2.1
-    restart: always
-    hostname: zoo1
-    user: "0"  
-    volumes:
-      - ./data-zoo-data:/var/lib/zookeeper/data
-      - ./data-zoo-logs:/var/lib/zookeeper/log
-      - ./data-zoo-secrets:/etc/zookeeper/secrets              
-    container_name: zoo1
-    ports:
-      - "2181:2181"
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_SERVER_ID: 1
-      ZOOKEEPER_SERVERS: zoo1:2888:3888
-    labels:
-      com.centurylinklabs.watchtower.enable: "false"
-
-  kafka1:
-    image: confluentinc/cp-kafka:6.2.1
-    restart: always
-    hostname: kafka1
-    user: "0"
-    ports:
-      - "9092:9092"
-      - "19092:19092"
-      - "29092:29092"
-      - "9999:9999"
-    environment:
-      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_EXTERNAL_DIFFHOST://10.191.63.199:9092, LISTENER_DOCKER_INTERNAL://akto-kafka1-1:19092,LISTENER_DOCKER_EXTERNAL_LOCALHOST://localhost:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: LISTENER_DOCKER_EXTERNAL_DIFFHOST:PLAINTEXT, LISTENER_DOCKER_INTERNAL:PLAINTEXT,LISTENER_DOCKER_EXTERNAL_LOCALHOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_DOCKER_INTERNAL
-      KAFKA_ZOOKEEPER_CONNECT: "zoo1:2181"
-      KAFKA_BROKER_ID: 1
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_CREATE_TOPICS: "akto.api.logs:3:3"
-      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 60000
-      KAFKA_LOG_RETENTION_HOURS: 5
-      KAFKA_LOG_SEGMENT_BYTES: 104857600
-      KAFKA_LOG_CLEANER_ENABLE: "true"
-      KAFKA_CLEANUP_POLICY: "delete"
-      KAFKA_LOG_RETENTION_BYTES: 10737418240
-    volumes:
-      - ./data-kafka-data:/var/lib/kafka/data
-      - ./data-kafka-secrets:/etc/kafka/secrets             
-    depends_on:
-      - zoo1
-    labels:
-      com.centurylinklabs.watchtower.enable: "false"
-
-  akto-api-security-runtime:
-    image: aktosecurity/mini-runtime:feature_mini_runtime_improved
+  akto-api-security-testing:
+    image: aktosecurity/akto-api-testing:local
     env_file: ./docker.env
-    mem_limit: 8g    
-    restart: always
     depends_on:
-      - kafka1
-  
-  # akto-api-security-mirror-api-logging:
-  #   image: aktosecurity/mirror-api-logging:k8s_agent
-  #   env_file: ./docker.env
-  #   mem_limit: 4g    
-  #   restart: always
-  #   depends_on:
-  #     - kafka1
-  #   network_mode: host
+      - mongo    
+    restart: always
 
-  # akto-api-security-database-abstractor:
-  #   image: coastaldemigod/db-abs
-  #   env_file: ./docker.env
-  #   restart: always
-  #   mem_limit: 7g
-  #   ports: 
-  #     - "9000:8080"
+  akto-puppeteer-replay:
+    image: aktosecurity/akto-puppeteer-replay:latest
+    ports:
+      - "3000:3000"
+    restart: always
 
 volumes:
   mongodata:
-  
-
-  # akto-hello-world:
-  #   image: public.ecr.aws/aktosecurity/hello-world-server:latest
-  #   restart: always
-  #   ports: 
-  #     - "8000:8000"
-
-  # watchtower:
-  #   image: containrrr/watchtower
-  #   restart: always
-  #   volumes:
-  #     - /var/run/docker.sock:/var/run/docker.sock
-  #   env_file: ./watchtower.env
-  #   labels:
-  #     com.centurylinklabs.watchtower.enable: "false"
