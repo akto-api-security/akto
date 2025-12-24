@@ -136,7 +136,7 @@ function APIQuery() {
                 setActive(false);
                 func.setToast(true, false, <div data-testid="collection_creation_message">{"API collection created successfully"}</div>);
             } catch (error) {
-                
+                func.setToast(true, true, "Failed to create collection. Please try again.");
             }
         } else {
             func.setToast(true, true, <div data-testid="collection_creation_message">{"No endpoints selected"}</div>);
@@ -169,7 +169,6 @@ function APIQuery() {
                 setSensitiveParams({});
             }
         } catch (error) {
-            
             setEndpointListFromConditions({});
             setSensitiveParams({});
         } finally {
@@ -271,7 +270,7 @@ function APIQuery() {
             api.updateCustomCollection(collectionId, dt).then((res) => {
                 func.setToast(true, false, "Conditions updated successfully")
             }).catch((error) => {
-                
+                func.setToast(true, true, "Failed to update conditions. Please try again.");
             })
         }else{
             openModal()
