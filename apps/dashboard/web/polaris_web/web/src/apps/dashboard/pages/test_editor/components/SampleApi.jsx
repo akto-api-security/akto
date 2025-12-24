@@ -75,7 +75,7 @@ const SampleApi = () => {
                     setTestRolesOptions(options)
                 }
             } catch (error) {
-                console.error('Error fetching test roles:', error)
+                func.setToast(true, true, "Error fetching test roles");
             }
         }
         fetchRoles()
