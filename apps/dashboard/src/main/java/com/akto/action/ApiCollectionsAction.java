@@ -647,7 +647,7 @@ public class ApiCollectionsAction extends UserAction {
         if (e.getCode() == MONGO_INVALID_REGEX_ERROR_CODE) {
             addActionError(ERROR_TYPE_INVALID_REGEX + ": Invalid regex pattern. Please check your filter conditions.");
         } else {
-            addActionError(ERROR_TYPE_DATABASE + ": Database error while processing request.");
+            addActionError(ERROR_TYPE_DATABASE + ": Internal error while processing request.");
         }
         return ERROR.toUpperCase();
     }
