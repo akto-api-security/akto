@@ -1,4 +1,4 @@
-import { useReducer, useState, useEffect, useCallback, useMemo } from "react";
+import { useReducer, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import DateRangeFilter from "../../components/layouts/DateRangeFilter";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "../../components/shared/TitleWithInfo";
@@ -247,6 +247,7 @@ function ThreatDetectionPage() {
     const [moreActions, setMoreActions] = useState(false);
     const [latencyData, setLatencyData] = useState([]);
     const [detailsLoading, setDetailsLoading] = useState(false);
+    const pollingIntervalRef = useRef(null);
     const [pendingRowContext, setPendingRowContext] = useState(null);
 
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
@@ -395,6 +396,16 @@ function ThreatDetectionPage() {
         // Force table refresh by incrementing the trigger
         setTriggerTableRefresh(prev => prev + 1)
     }
+
+      // Cleanup polling interval on unmount
+      useEffect(() => {
+        return () => {
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+        };
+      }, []);
 
       useEffect(() => {
         const fetchThreatCategoryCount = async () => {
@@ -601,13 +612,70 @@ function ThreatDetectionPage() {
     }
 
     const exportToAdx = async () => {
+        // Clear any existing polling interval
+        if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+        }
+
         try {
             const resp = await api.exportThreatActivityToAdx(startTimestamp, endTimestamp);
-            if (resp.exportSuccess) {
-                func.setToast(true, false, resp.exportMessage || "Successfully exported threat activity to ADX");
-            } else {
-                func.setToast(true, true, resp.exportMessage || "Failed to export threat activity to ADX");
-            }
+            
+            // Show initial processing message
+            func.setToast(true, false, resp.exportMessage || "Export under processing");
+            
+            // Start polling for status every 2 seconds
+            pollingIntervalRef.current = setInterval(async () => {
+                try {
+                    const statusResp = await api.getAdxExportStatus();
+                    
+                    if (statusResp.exportMessage === "No export in progress.") {
+                        // Export status was cleared (already completed)
+                        if (pollingIntervalRef.current) {
+                            clearInterval(pollingIntervalRef.current);
+                            pollingIntervalRef.current = null;
+                        }
+                        return;
+                    }
+                    
+                    const message = statusResp.exportMessage || "";
+                    const exportSuccess = statusResp.exportSuccess;
+                    
+                    // Backend status logic:
+                    // - PROCESSING: exportSuccess = true, message = "Export under processing"
+                    // - SUCCESS: exportSuccess = true, message = "Exported successfully"
+                    // - FAILED: exportSuccess = false, message = error message
+                    
+                    const isProcessing = message.includes("Export under processing");
+                    
+                    // If still processing, continue polling
+                    if (isProcessing) {
+                        return;
+                    }
+                    
+                    // Export completed - stop polling
+                    if (pollingIntervalRef.current) {
+                        clearInterval(pollingIntervalRef.current);
+                        pollingIntervalRef.current = null;
+                    }
+                    
+                    // Determine final state: exportSuccess is true for SUCCESS, false for FAILED
+                    if (exportSuccess) {
+                        // Status is SUCCESS
+                        func.setToast(true, false, message || "Exported successfully");
+                    } else {
+                        // Status is FAILED
+                        func.setToast(true, true, message || "Failed to export threat activity to ADX");
+                    }
+                } catch (error) {
+                    // On error, stop polling
+                    if (pollingIntervalRef.current) {
+                        clearInterval(pollingIntervalRef.current);
+                        pollingIntervalRef.current = null;
+                    }
+                    func.setToast(true, true, "Error checking export status: " + (error.message || "Unknown error"));
+                }
+            }, 2000); // Poll every 2 seconds
         } catch (error) {
             func.setToast(true, true, "Error exporting to ADX: " + (error.message || "Unknown error"));
         }

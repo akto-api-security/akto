@@ -33,6 +33,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 import static com.akto.action.threat_detection.utils.ThreatsUtils.getTemplates;
@@ -42,6 +45,7 @@ import org.apache.http.HttpHeaders;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.testing.ApiExecutor;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 
 @Getter
 @Setter
@@ -50,6 +54,33 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
     private static final LoggerMaker logger = new LoggerMaker(AdxIntegrationAction.class, LogDb.DASHBOARD);
     private static final int MAX_EXPORT_LIMIT = 10000;
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    
+    // Status tracking for async exports (keyed by account ID)
+    private static final Map<Integer, ExportStatus> exportStatusMap = new ConcurrentHashMap<>();
+    private static final ExecutorService exportExecutor = Executors.newCachedThreadPool();
+    
+    /**
+     * Status class for tracking export progress
+     */
+    private static class ExportStatus {
+        private volatile String status; // PROCESSING, SUCCESS, FAILED
+        private volatile String message;
+        private volatile int exportedCount;
+        
+        ExportStatus(String status, String message, int exportedCount) {
+            this.status = status;
+            this.message = message;
+            this.exportedCount = exportedCount;
+        }
+        
+        String getStatus() { return status; }
+        String getMessage() { return message; }
+        int getExportedCount() { return exportedCount; }
+        
+        void setStatus(String status) { this.status = status; }
+        void setMessage(String message) { this.message = message; }
+        void setExportedCount(int exportedCount) { this.exportedCount = exportedCount; }
+    }
     
     /**
      * GuardrailActivity table schema for Azure Data Explorer
@@ -122,7 +153,7 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
     private String statusFilter;
     private int startTimestamp;
     private int endTimestamp;
-    private boolean exportSuccess;
+    private Boolean exportSuccess;
     private String exportMessage;
     private int exportedCount;
 
@@ -217,8 +248,18 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
     /**
      * Export guardrail activity data to Azure Data Explorer
      * Uses stored ADX configuration from database
+     * Starts export in background thread and returns immediately
      */
     public String exportGuardrailActivityToAdx() {
+        Integer accountId = Context.accountId.get();
+        if (accountId == null || accountId == 0) {
+            addActionError("Account ID not found in context.");
+            exportSuccess = false;
+            exportMessage = "Account ID not found.";
+            exportedCount = 0;
+            return Action.ERROR.toUpperCase();
+        }
+        
         // Fetch stored ADX integration configuration
         AdxIntegration integration = AdxIntegrationDao.instance.findOne(new BasicDBObject());
         
@@ -243,23 +284,123 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
             return Action.ERROR.toUpperCase();
         }
 
-        // Get application key
-        String applicationKey = integration.getApplicationKey();
+        // Initialize status as PROCESSING
+        exportStatusMap.put(accountId, new ExportStatus("PROCESSING", "Export under processing", 0));
+        
+        // Capture current request parameters for background thread
+        final AdxIntegration finalIntegration = integration;
+        final Integer finalAccountId = accountId;
+        final List<String> finalIps = this.ips;
+        final List<Integer> finalApiCollectionIds = this.apiCollectionIds;
+        final List<String> finalUrls = this.urls;
+        final List<String> finalTypes = this.types;
+        final List<String> finalLatestAttack = this.latestAttack;
+        final Boolean finalSuccessfulExploit = this.successfulExploit;
+        final String finalLabel = this.label;
+        final List<String> finalHosts = this.hosts;
+        final String finalLatestApiOrigRegex = this.latestApiOrigRegex;
+        final String finalStatusFilter = this.statusFilter;
+        final int finalStartTimestamp = this.startTimestamp;
+        final int finalEndTimestamp = this.endTimestamp;
+        final CONTEXT_SOURCE finalContextSource = Context.contextSource.get();
 
+        // Start export in background thread
+        exportExecutor.submit(() -> {
+            try {
+                executeExportInBackground(
+                    finalAccountId,
+                    finalIntegration,
+                    finalIps,
+                    finalApiCollectionIds,
+                    finalUrls,
+                    finalTypes,
+                    finalLatestAttack,
+                    finalSuccessfulExploit,
+                    finalLabel,
+                    finalHosts,
+                    finalLatestApiOrigRegex,
+                    finalStatusFilter,
+                    finalStartTimestamp,
+                    finalEndTimestamp,
+                    finalContextSource
+                );
+            } catch (Exception e) {
+                logger.errorAndAddToDb("Error in background export thread: " + e.getMessage(), LogDb.DASHBOARD);
+                ExportStatus status = exportStatusMap.get(finalAccountId);
+                if (status != null) {
+                    status.setStatus("FAILED");
+                    status.setMessage("Error exporting data to ADX: " + e.getMessage());
+                    status.setExportedCount(0);
+                }
+            }
+        });
+
+        // Return immediately with processing status
+        exportSuccess = true;
+        exportMessage = "Export under processing";
+        exportedCount = 0;
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    /**
+     * Execute export in background thread
+     */
+    private void executeExportInBackground(
+            Integer accountId,
+            AdxIntegration integration,
+            List<String> ips,
+            List<Integer> apiCollectionIds,
+            List<String> urls,
+            List<String> types,
+            List<String> latestAttack,
+            Boolean successfulExploit,
+            String label,
+            List<String> hosts,
+            String latestApiOrigRegex,
+            String statusFilter,
+            int startTimestamp,
+            int endTimestamp,
+             CONTEXT_SOURCE contextSource) {
+        
         try {
+            // Get application key
+            String applicationKey = integration.getApplicationKey();
+
+            // Set context for background thread
+            Context.accountId.set(accountId);
+            Context.contextSource.set(contextSource);
+
             // Fetch malicious events from threat detection backend
-            List<DashboardMaliciousEvent> events = fetchMaliciousEventsForExport();
+            // Create a temporary action instance to use the fetch method with captured parameters
+            AdxIntegrationAction tempAction = new AdxIntegrationAction();
+            tempAction.setIps(ips);
+            tempAction.setApiCollectionIds(apiCollectionIds);
+            tempAction.setUrls(urls);
+            tempAction.setTypes(types);
+            tempAction.setLatestAttack(latestAttack);
+            tempAction.setSuccessfulExploit(successfulExploit);
+            tempAction.setLabel(label);
+            tempAction.setHosts(hosts);
+            tempAction.setLatestApiOrigRegex(latestApiOrigRegex);
+            tempAction.setStatusFilter(statusFilter);
+            tempAction.setStartTimestamp(startTimestamp);
+            tempAction.setEndTimestamp(endTimestamp);
+            
+            List<DashboardMaliciousEvent> events = tempAction.fetchMaliciousEventsForExport();
             
             if (events == null || events.isEmpty()) {
-                exportSuccess = false;
-                exportMessage = "No guardrail activity data found to export.";
-                exportedCount = 0;
-                logger.infoAndAddToDb("No guardrail activity data found for export to ADX", LogDb.DASHBOARD);
-                return Action.SUCCESS.toUpperCase();
+                ExportStatus status = exportStatusMap.get(accountId);
+                if (status != null) {
+                    status.setStatus("SUCCESS");
+                    status.setMessage("No guardrail activity data found to export.");
+                    status.setExportedCount(0);
+                }
+                logger.infoAndAddToDb("No guardrail activity data found for export to ADX");
+                return;
             }
 
             // Transform events to ADX format
-            List<Map<String, Object>> adxRecords = transformEventsToAdxFormat(events);
+            List<Map<String, Object>> adxRecords = tempAction.transformEventsToAdxFormat(events);
 
             // Export to ADX using stored configuration
             logger.infoAndAddToDb(
@@ -295,26 +436,64 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
                 adxRecords
             );
 
-            exportSuccess = true;
-            exportMessage = String.format("Successfully exported %d guardrail activity records to ADX.", adxRecords.size());
-            exportedCount = adxRecords.size();
+            // Update status to success
+            ExportStatus status = exportStatusMap.get(accountId);
+            if (status != null) {
+                status.setStatus("SUCCESS");
+                status.setMessage("Exported successfully");
+                status.setExportedCount(adxRecords.size());
+            }
 
             logger.infoAndAddToDb(
                 String.format("Successfully exported %d guardrail activity records to ADX", adxRecords.size()),
                 LogDb.DASHBOARD
             );
 
-            return Action.SUCCESS.toUpperCase();
-
         } catch (Exception e) {
             logger.errorAndAddToDb("Error exporting guardrail activity to ADX: " + e.getMessage(), LogDb.DASHBOARD);
             e.printStackTrace();
+            
+            // Update status to failed
+            ExportStatus status = exportStatusMap.get(accountId);
+            if (status != null) {
+                status.setStatus("FAILED");
+                status.setMessage("Error exporting data to ADX: " + e.getMessage());
+                status.setExportedCount(0);
+            }
+        }
+    }
+
+    /**
+     * Fetch export status for polling
+     */
+    public String fetchExportStatus() {
+        Integer accountId = Context.accountId.get();
+        if (accountId == null || accountId == 0) {
+            addActionError("Account ID not found in context.");
             exportSuccess = false;
-            exportMessage = "Error exporting data to ADX: " + e.getMessage();
+            exportMessage = "Account ID not found.";
             exportedCount = 0;
-            addActionError("Error exporting data to ADX: " + e.getMessage());
             return Action.ERROR.toUpperCase();
         }
+        
+        ExportStatus status = exportStatusMap.get(accountId);
+        if (status == null) {
+            exportSuccess = false;
+            exportMessage = "No export in progress.";
+            exportedCount = 0;
+            return Action.SUCCESS.toUpperCase();
+        }
+        
+        exportSuccess = "SUCCESS".equals(status.getStatus()) || "PROCESSING".equals(status.getStatus());
+        exportMessage = status.getMessage();
+        exportedCount = status.getExportedCount();
+        
+        // Remove status if completed (success or failed) to allow retry
+        if ("SUCCESS".equals(status.getStatus()) || "FAILED".equals(status.getStatus())) {
+            exportStatusMap.remove(accountId);
+        }
+        
+        return Action.SUCCESS.toUpperCase();
     }
 
     /**
@@ -326,6 +505,7 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
         );
         post.addHeader("Authorization", "Bearer " + this.getApiToken());
         post.addHeader("Content-Type", "application/json");
+        post.addHeader("x-context-source", Context.contextSource.get().toString());
 
         Map<String, Object> filter = new HashMap<>();
         if (ips != null && !ips.isEmpty()) {
@@ -353,8 +533,9 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
             filter.put("latestApiOrigRegex", latestApiOrigRegex);
         }
 
-        List<String> templates = getTemplates(latestAttack);
-        filter.put("latestAttack", templates);
+        if (latestAttack != null && !latestAttack.isEmpty()) {
+            filter.put("latestAttack", latestAttack);
+        }
 
         if (statusFilter != null && !statusFilter.isEmpty()) {
             filter.put("statusFilter", statusFilter);

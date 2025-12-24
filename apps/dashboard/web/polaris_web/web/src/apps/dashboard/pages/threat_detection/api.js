@@ -213,6 +213,13 @@ const threatDetectionRequests = {
                 label: 'THREAT'
             }
         })
+    },
+    getAdxExportStatus() {
+        return request({
+            url: '/api/getAdxExportStatus',
+            method: 'post',
+            data: {}
+        })
     }
 }
 export default threatDetectionRequests
