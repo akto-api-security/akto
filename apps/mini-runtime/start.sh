@@ -110,10 +110,10 @@ while true; do
     start_java
     EXIT_CODE=$?
 
-    # Exit code 137 signals that the container should terminate (pod restart requested)
-    if [ $EXIT_CODE -eq 137 ]; then
-        echo "Exit code 137 detected - terminating container for pod restart..." | tee -a "$LOG_FILE"
-        exit 137
+    # Exit code 201 [ custom code to signal pod restart ] 
+    if [ $EXIT_CODE -eq 201 ]; then
+        echo "Exit code 201 detected - terminating container for pod restart..." | tee -a "$LOG_FILE"
+        exit 201
     fi
 
     echo "Restarting Java after crash or memory limit (exit code: $EXIT_CODE)..." | tee -a "$LOG_FILE"
