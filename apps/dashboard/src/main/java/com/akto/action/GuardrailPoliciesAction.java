@@ -65,7 +65,7 @@ public class GuardrailPoliciesAction extends UserAction {
             // Get current context source for this guardrail, default to ENDPOINT if not set
             CONTEXT_SOURCE contextSource = Context.contextSource.get();
             if (contextSource == null) {
-                contextSource = CONTEXT_SOURCE.ENDPOINT;
+                contextSource = CONTEXT_SOURCE.AGENTIC;
             }
 
             loggerMaker.info("createGuardrailPolicy called with hexId: " + hexId);
