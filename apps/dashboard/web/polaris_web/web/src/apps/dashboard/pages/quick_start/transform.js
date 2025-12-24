@@ -16,7 +16,7 @@ import GithubSource from "./components/GithubSource"
 import AktoJax from "./components/AktoJax"  
 import McpScan from "./components/McpScan" 
 import AiAgentScan from "./components/AiAgentScan"
-import { isGenAISecurityCategory, isMCPSecurityCategory, isAgenticSecurityCategory, isDastCategory, isApiSecurityCategory } from "../../../main/labelHelper"
+import { isGenAISecurityCategory, isMCPSecurityCategory, isAgenticSecurityCategory, isDastCategory, isApiSecurityCategory, isEndpointSecurityCategory } from "../../../main/labelHelper"
 import McpRecon from "./components/McpRecon"
 import McpProxy from "./components/McpProxy"
 import AwsLogAccountComponent from "./components/shared/AwsLogAccountComponent"
@@ -1542,6 +1542,11 @@ const quickStartFunc = {
             chromeExtensionObj, firefoxExtensionObj, safariExtensionObj
         ]
 
+        // Endpoint Agents
+        const endpointAgents = [
+            mcpWrapperObj
+        ]
+
        if(func.checkLocal() || func.isLimitedAccount()){
            return {
                "Manual": manual
@@ -1566,19 +1571,27 @@ const quickStartFunc = {
             connectors["DAST"] = crawler
         }
 
-        connectors = {
-            "Hybrid SaaS": hybridSaas,
-            ...connectors,
-            "Kubernetes": kubernetes,
-            "API Gateways": apiGateways,
-            "Mirroring": mirroring,
-            "AWS Services": awsServices,
-            "GCP Services": gcpServices,
-            "Azure Services": azureServices,
-            "Manual": manual,
-            "Akto SDK": aktoSdk,
-            "Virtual Machines": vm,
-            "Source Code": sourceCode,
+        if(isEndpointSecurityCategory()){
+            connectors = {
+                "Endpoint Agents": endpointAgents,
+                "Browser Extension": browserExtensions,
+                "Secure Web Networks": secureWebNetworks
+            }
+        } else {
+            connectors = {
+                "Hybrid SaaS": hybridSaas,
+                ...connectors,
+                "Kubernetes": kubernetes,
+                "API Gateways": apiGateways,
+                "Mirroring": mirroring,
+                "AWS Services": awsServices,
+                "GCP Services": gcpServices,
+                "Azure Services": azureServices,
+                "Manual": manual,
+                "Akto SDK": aktoSdk,
+                "Virtual Machines": vm,
+                "Source Code": sourceCode,
+            }
         }
 
         return connectors;
@@ -1606,7 +1619,7 @@ const quickStartFunc = {
             cloudflareWarpObj, zscalerObj
         ]
 
-        if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
+        if(isGenAISecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory()){
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj,
                 awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,

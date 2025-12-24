@@ -36,7 +36,7 @@ import ReactFlow, {
   
   } from 'react-flow-renderer';
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
-import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isGenAISecurityCategory } from "../../../../main/labelHelper";
+import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isGenAISecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
   
 const CenterViewType = {
     Table: 0,
@@ -179,7 +179,14 @@ const headers = [
         filterKey: 'isOutOfTestingScope',
         tooltipContent: 'Whether the collection is excluded from testing '
     }
-];
+].filter(header => {
+    // Filter out testing-related columns for Endpoint Security mode
+    if (isEndpointSecurityCategory()) {
+        const testingRelatedColumns = ['coverage', 'issuesArr', 'outOfTestingScopeComp'];
+        return !testingRelatedColumns.includes(header.value);
+    }
+    return true;
+});
 
 const tempSortOptions = [
     { label: 'Name', value: 'customGroupsSort asc', directionLabel: 'A-Z', sortKey: 'customGroupsSort', columnIndex: 1 },
@@ -580,90 +587,90 @@ function ApiCollections(props) {
                     setLoading(true);
                 }
             }
-            // Build all API promises to run in parallel
+            // Build all API promises to run in parallel using named keys
             const shouldCallHeavyApis = (now - lastFetchedInfo.lastRiskScoreInfo) >= (5 * 60)
-            
-            let apiPromises = [
-                api.getAllCollectionsBasic(),  // index 0
-                api.getUserEndpoints(),         // index 1
-                api.getCoverageInfoForCollections(), // index 2
-                api.getLastTrafficSeen(),            // index 3
-                collectionApi.fetchCountForHostnameDeactivatedCollections(), // index 4
-                collectionApi.fetchCountForUningestedApis(), // index 5
-                collectionApi.fetchUningestedApis(),        // index 6
-            ];
-            
+
+            // Create a map of named promises instead of an array
+            const apiPromiseMap = {
+                collections: api.getAllCollectionsBasic(),
+                userEndpoints: api.getUserEndpoints(),
+                trafficInfo: api.getLastTrafficSeen(),
+                deactivatedCount: collectionApi.fetchCountForHostnameDeactivatedCollections(),
+                uningestedCount: collectionApi.fetchCountForUningestedApis(),
+                uningestedDetails: collectionApi.fetchUningestedApis(),
+            };
+
+            // Conditionally add coverage API (skip for Endpoint Security)
+            if (!isEndpointSecurityCategory()) {
+                apiPromiseMap.coverage = api.getCoverageInfoForCollections();
+            }
+
+            // Conditionally add heavy APIs
             if(shouldCallHeavyApis){
-                apiPromises = [
-                    ...apiPromises,
-                    ...[api.getRiskScoreInfo(), api.getSeverityInfoForCollections()] // indices 7,8 (removed getSensitiveInfoForCollections)
-                ]
+                apiPromiseMap.riskScore = api.getRiskScoreInfo();
+                apiPromiseMap.severity = api.getSeverityInfoForCollections();
             }
 
+            // Conditionally add RBAC APIs
             if(userRole === 'ADMIN' && func.checkForRbacFeature()) {
-                apiPromises = [
-                    ...apiPromises,
-                    ...[api.getAllUsersCollections(), settingRequests.getTeamData()] // indices 10,11 or 7,8 if no heavy APIs
-                ]
+                apiPromiseMap.usersCollections = api.getAllUsersCollections();
+                apiPromiseMap.teamData = settingRequests.getTeamData();
             }
 
-            let results = await Promise.allSettled(apiPromises);
-            
-            // Extract collections response (index 0)
-            const apiCollectionsResp = results[0].status === 'fulfilled' ? results[0].value : { apiCollections: [] };
-            // Extract user endpoints (index 1)
-            let hasUserEndpoints = results[1].status === 'fulfilled' ? results[1].value : false;
-            
+            // Execute all promises and get results by name
+            const results = await Promise.allSettled(Object.values(apiPromiseMap));
+            const resultKeys = Object.keys(apiPromiseMap);
+            const resultMap = Object.fromEntries(
+                resultKeys.map((key, index) => [
+                    key,
+                    results[index].status === 'fulfilled' ? results[index].value : null
+                ])
+            );
 
-            // Extract metadata responses (with corrected indices)
-            let coverageInfo = results[2].status === 'fulfilled' ? results[2].value : {};
-            let trafficInfo = results[3].status === 'fulfilled' ? results[3].value : {};
-            let deactivatedCountInfo = results[4].status === 'fulfilled' ? results[4].value : {};
-            let uningestedApiCountInfo = results[5].status === 'fulfilled' ? results[5].value : {};
-            let uningestedApiDetails = results[6].status === 'fulfilled' ? results[6].value : {};
-            let riskScoreObj = lastFetchedResp
-            let sensitiveInfo = lastFetchedSensitiveResp
-            let severityObj = lastFetchedSeverityResp
+            // Extract results using named keys (with defaults)
+            const apiCollectionsResp = resultMap.collections || { apiCollections: [] };
+            let hasUserEndpoints = resultMap.userEndpoints || false;
+            let coverageInfo = resultMap.coverage || {};
+            let trafficInfo = resultMap.trafficInfo || {};
+            let deactivatedCountInfo = resultMap.deactivatedCount || {};
+            let uningestedApiCountInfo = resultMap.uningestedCount || {};
+            let uningestedApiDetails = resultMap.uningestedDetails || {};
 
-        if(shouldCallHeavyApis){
-            if(results[7]?.status === "fulfilled"){
-                const res = results[7].value
-                riskScoreObj = {
-                    criticalUrls: res.criticalEndpointsCount,
-                    riskScoreMap: res.riskScoreOfCollectionsMap
+            let riskScoreObj = lastFetchedResp;
+            let sensitiveInfo = lastFetchedSensitiveResp;
+            let severityObj = lastFetchedSeverityResp;
+
+            if(shouldCallHeavyApis){
+                // Extract heavy API results using named keys
+                if (resultMap.riskScore) {
+                    riskScoreObj = {
+                        criticalUrls: resultMap.riskScore.criticalEndpointsCount,
+                        riskScoreMap: resultMap.riskScore.riskScoreOfCollectionsMap
+                    };
                 }
+
+                if (resultMap.severity) {
+                    severityObj = resultMap.severity;
+                }
+
+                // update the store which has the cached response
+                setLastFetchedInfo({lastRiskScoreInfo: func.timeNow(), lastSensitiveInfo: func.timeNow()})
+                setLastFetchedResp(riskScoreObj)
+                setLastFetchedSeverityResp(severityObj)
             }
-
-            // Skip results[8] - will fetch sensitive info asynchronously
-
-            if(results[8]?.status === "fulfilled"){
-                const res = results[8].value
-                severityObj = res
-            }
-
-            // update the store which has the cached response
-            setLastFetchedInfo({lastRiskScoreInfo: func.timeNow(), lastSensitiveInfo: func.timeNow()})
-            setLastFetchedResp(riskScoreObj)
-            setLastFetchedSeverityResp(severityObj)
-
-        }
         setCoverageMap(coverageInfo)
         setTrafficMap(trafficInfo)
 
         let usersCollectionList = []
         let userList = []
 
-        const index = !shouldCallHeavyApis ? 7 : 9 // Updated index after removing sensitive info
-
         if(userRole === 'ADMIN' && func.checkForRbacFeature()) {
-            if(results[index]?.status === "fulfilled") {
-                const res = results[index].value
-                usersCollectionList = res
+            if(resultMap.usersCollections) {
+                usersCollectionList = resultMap.usersCollections
             }
-            
-            if(results[index+1]?.status === "fulfilled") {
-                const res = results[index+1].value
-                userList = res
+
+            if(resultMap.teamData) {
+                userList = resultMap.teamData
                 if (userList) {
                     userList = userList.filter(x => {
                         if (x?.role === "ADMIN") {
@@ -1279,24 +1286,34 @@ function ApiCollections(props) {
         }
     }
 
-      const summaryItems = [
+    const summaryItems = [
         {
             title: mapLabel("Total APIs", getDashboardCategory()),
             data: transform.formatNumberWithCommas(totalAPIs),
         },
-        {
-            title: mapLabel("Critical APIs", getDashboardCategory()),
-            data: transform.formatNumberWithCommas(summaryData.totalCriticalEndpoints || 0),
-        },
-        {
-            title: mapLabel("Tested APIs (Coverage)", getDashboardCategory()),
-            data: coverage
-        },
+    
+        ...(!isEndpointSecurityCategory()
+            ? [
+                  {
+                      title: mapLabel("Critical APIs", getDashboardCategory()),
+                      data: transform.formatNumberWithCommas(
+                          summaryData.totalCriticalEndpoints || 0
+                      ),
+                  },
+                  {
+                      title: mapLabel("Tested APIs (Coverage)", getDashboardCategory()),
+                      data: coverage,
+                  },
+              ]
+            : []),
+    
         {
             title: mapLabel("Sensitive in response APIs", getDashboardCategory()),
-            data: transform.formatNumberWithCommas(summaryData.totalSensitiveEndpoints || 0),
-        }
-    ]
+            data: transform.formatNumberWithCommas(
+                summaryData.totalSensitiveEndpoints || 0
+            ),
+        },
+    ];
 
     function switchToGraphView() {
         setCenterView(centerView === CenterViewType.Graph ? CenterViewType.Table : CenterViewType.Graph)
