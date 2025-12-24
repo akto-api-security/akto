@@ -70,7 +70,7 @@ const SampleApi = () => {
                     // use hexId as value (consistent with RunTestConfiguration) and name as label
                     const options = response.testRoles.map(role => ({
                         label: role.name,
-                        value: role.hexId || role.name
+                        value: role.hexId
                     }))
                     setTestRolesOptions(options)
                 }
