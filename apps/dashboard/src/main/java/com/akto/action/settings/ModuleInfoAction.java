@@ -22,15 +22,13 @@ public class ModuleInfoAction extends UserAction {
         return SUCCESS;
     }
 
+    // TODO: Make these thresholds configurable from UI
     private static final int heartbeatThresholdSeconds = 5 * 60; // 5 minutes
     private static final int rebootThresholdSeconds = 60; // 1 minute
     private static final String _DEFAULT_PREFIX_REGEX_STRING = "^Default_";
 
     public String fetchModuleInfo() {
         List<Bson> filters = new ArrayList<>();
-
-        int deltaTime = Context.now() - heartbeatThresholdSeconds;
-        filters.add(Filters.gte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, deltaTime));
 
         // Apply filter if provided
         if (filter != null && !filter.isEmpty()) {
