@@ -91,9 +91,9 @@ const headers = [
         shouldMerge: true,
         boxWidth: '80px'
     },
-    {   
+    ...(!isEndpointSecurityCategory() ? [{
         title: mapLabel('Test', getDashboardCategory()) + ' coverage',
-        text: mapLabel('Test', getDashboardCategory()) + ' coverage', 
+        text: mapLabel('Test', getDashboardCategory()) + ' coverage',
         value: 'coverage',
         isText: CellType.TEXT,
         tooltipContent: (<Text variant="bodySm">Percentage of endpoints tested successfully in the collection</Text>),
@@ -103,10 +103,10 @@ const headers = [
         numericValue: 'testedEndpoints',
         shouldMerge: true,
         boxWidth: '80px'
-    },
-    {
-        title: 'Issues', 
-        text: 'Issues', 
+    }] : []),
+    ...(!isEndpointSecurityCategory() ? [{
+        title: 'Issues',
+        text: 'Issues',
         value: 'issuesArr',
         numericValue: 'severityInfo',
         textValue: 'issuesArrVal',
@@ -120,7 +120,7 @@ const headers = [
         },
         shouldMerge: true,
         boxWidth: '140px'
-    },
+    }] : []),
     {   
         title: 'Sensitive data',
         text: 'Sensitive data',
@@ -171,22 +171,15 @@ const headers = [
         filterKey: "description",
         tooltipContent: 'Description of the collection'
     },
-    {
+    ...(!isEndpointSecurityCategory() ? [{
         title: "Out of " + mapLabel('Testing', getDashboardCategory()) + " scope",
         text: 'Out of ' + mapLabel('Testing', getDashboardCategory()) + ' scope',
         value: 'outOfTestingScopeComp',
         textValue: 'isOutOfTestingScope',
         filterKey: 'isOutOfTestingScope',
         tooltipContent: 'Whether the collection is excluded from testing '
-    }
-].filter(header => {
-    // Filter out testing-related columns for Endpoint Security mode
-    if (isEndpointSecurityCategory()) {
-        const testingRelatedColumns = ['coverage', 'issuesArr', 'outOfTestingScopeComp'];
-        return !testingRelatedColumns.includes(header.value);
-    }
-    return true;
-});
+    }] : [])
+];
 
 const tempSortOptions = [
     { label: 'Name', value: 'customGroupsSort asc', directionLabel: 'A-Z', sortKey: 'customGroupsSort', columnIndex: 1 },
@@ -644,8 +637,8 @@ function ApiCollections(props) {
                 // Extract heavy API results using named keys
                 if (resultMap.riskScore) {
                     riskScoreObj = {
-                        criticalUrls: resultMap.riskScore.criticalEndpointsCount,
-                        riskScoreMap: resultMap.riskScore.riskScoreOfCollectionsMap
+                        criticalUrls: resultMap.riskScore?.criticalEndpointsCount || 0,
+                        riskScoreMap: resultMap.riskScore?.riskScoreOfCollectionsMap || {}
                     };
                 }
 

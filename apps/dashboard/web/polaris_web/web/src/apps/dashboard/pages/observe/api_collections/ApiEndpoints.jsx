@@ -336,9 +336,9 @@ function ApiEndpoints(props) {
             sensitiveParamsResp = { data: { endpoints: [] } };
             setShowEmptyScreen(stisEndpoints?.list !== undefined && stisEndpoints?.list?.length === 0)
             apiEndpointsInCollection = stisEndpoints?.list !== undefined && stisEndpoints.list.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
-            apiInfoListInCollection = apiInfosData.apiInfoList
-            unusedEndpointsInCollection = stisEndpoints.unusedEndpoints
-            setIsRedacted(apiInfosData.redacted)
+            apiInfoListInCollection = apiInfosData?.apiInfoList || []
+            unusedEndpointsInCollection = stisEndpoints?.unusedEndpoints || []
+            setIsRedacted(apiInfosData?.redacted || false)
             setCollectionIssuesData(issuesDataResp?.issues || []);
         }
 
