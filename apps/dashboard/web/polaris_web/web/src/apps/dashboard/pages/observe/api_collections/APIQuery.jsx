@@ -136,10 +136,7 @@ function APIQuery() {
                 setActive(false);
                 func.setToast(true, false, <div data-testid="collection_creation_message">{"API collection created successfully"}</div>);
             } catch (error) {
-                const errorMessage = error?.response?.data?.actionErrors?.[0] || 
-                                    error?.message || 
-                                    "Failed to create collection";
-                func.setToast(true, true, errorMessage);
+                
             }
         } else {
             func.setToast(true, true, <div data-testid="collection_creation_message">{"No endpoints selected"}</div>);
@@ -172,10 +169,7 @@ function APIQuery() {
                 setSensitiveParams({});
             }
         } catch (error) {
-            const errorMessage = error?.response?.data?.actionErrors?.[0] || 
-                                error?.message || 
-                                "An error occurred while exploring endpoints";
-            func.setToast(true, true, errorMessage);
+            
             setEndpointListFromConditions({});
             setSensitiveParams({});
         } finally {
@@ -277,10 +271,7 @@ function APIQuery() {
             api.updateCustomCollection(collectionId, dt).then((res) => {
                 func.setToast(true, false, "Conditions updated successfully")
             }).catch((error) => {
-                const errorMessage = error?.response?.data?.actionErrors?.[0] || 
-                                    error?.message || 
-                                    "Error in updating conditions";
-                func.setToast(true, true, errorMessage);
+                
             })
         }else{
             openModal()
