@@ -9,7 +9,6 @@ import java.util.regex.Pattern;
 
 import com.akto.RuntimeMode;
 import com.akto.dao.*;
-import com.akto.dao.AgentTrafficLogDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.billing.FeatureAccess;
@@ -18,6 +17,7 @@ import com.akto.usage.OrgUtils;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.kafka.Kafka;
+import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
@@ -62,9 +62,9 @@ public class Main {
 
     // this sync threshold time is used for deleting sample data
     public static final int sync_threshold_time = 120;
-    public static final boolean isKafkaAuthenticationEnabled = System.getenv("KAFKA_AUTH_ENABLED") != null && System.getenv("KAFKA_AUTH_ENABLED").equalsIgnoreCase("true");
-    public static final String kafkaUsername = System.getenv("KAFKA_USERNAME");
-    public static final String kafkaPassword = System.getenv("KAFKA_PASSWORD");
+    public static final boolean isKafkaAuthenticationEnabled = KafkaConfig.isKafkaAuthenticationEnabled();
+    public static final String kafkaUsername = KafkaConfig.getKafkaUsername();
+    public static final String kafkaPassword = KafkaConfig.getKafkaPassword();
     public static final boolean isSendToThreatEnabled = System.getenv("SEND_TO_THREAT_ENABLED") != null && System.getenv("SEND_TO_THREAT_ENABLED").equalsIgnoreCase("true");
 
     private static int debugPrintCounter = 500;
@@ -131,15 +131,7 @@ public class Main {
             int centralKafkaLingerMS = AccountSettings.DEFAULT_CENTRAL_KAFKA_LINGER_MS;
             if (centralKafkaBrokerUrl != null) {
                 // Get Kafka authentication credentials from environment variables
-                if(isKafkaAuthenticationEnabled){
-                    if(StringUtils.isEmpty(kafkaPassword) || StringUtils.isEmpty(kafkaUsername)){
-                        loggerMaker.errorAndAddToDb("Kafka authentication credentials not provided");
-                        return;
-                    }
-                    kafkaProducer = new Kafka(centralKafkaBrokerUrl, centralKafkaLingerMS, centralKafkaBatchSize, kafkaUsername, kafkaPassword, true);
-                }else{
-                    kafkaProducer = new Kafka(centralKafkaBrokerUrl, centralKafkaLingerMS, centralKafkaBatchSize);
-                }
+                kafkaProducer = new Kafka(centralKafkaBrokerUrl, centralKafkaLingerMS, centralKafkaBatchSize, kafkaUsername, kafkaPassword, isKafkaAuthenticationEnabled);
                 loggerMaker.info("Connected to central kafka @ " + Context.now());
             }
         } else {
@@ -165,40 +157,25 @@ public class Main {
         int lingerMS = AccountSettings.DEFAULT_CENTRAL_KAFKA_LINGER_MS;
         
         try {
-            Properties kafkaProps = new Properties();
-            kafkaProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBrokerUrl);
+            Properties kafkaProps = KafkaConfig.createProducerProperties(
+                kafkaBrokerUrl, lingerMS, batchSize, 5000, 1,
+                isKafkaAuthenticationEnabled, kafkaUsername, kafkaPassword
+            );
+
+            if (kafkaProps == null) {
+                loggerMaker.errorAndAddToDb("Failed to create Kafka producer properties");
+                return;
+            }
+
             kafkaProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
             kafkaProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-            kafkaProps.put(ProducerConfig.BATCH_SIZE_CONFIG, batchSize);
-            kafkaProps.put(ProducerConfig.LINGER_MS_CONFIG, lingerMS);
-            kafkaProps.put(ProducerConfig.RETRIES_CONFIG, 3);
-            kafkaProps.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 5000);
-            kafkaProps.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, lingerMS + 5000);
-            kafkaProps.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 100);
-            
-            if (isKafkaAuthenticationEnabled) {
-                if(StringUtils.isEmpty(kafkaPassword) || StringUtils.isEmpty(kafkaUsername)){
-                    loggerMaker.errorAndAddToDb("Kafka authentication credentials not provided");
-                    return;
-                }
-                kafkaProps.put("security.protocol", "SASL_PLAINTEXT");
-                kafkaProps.put("sasl.mechanism", "PLAIN");
-                
-                // Create JAAS configuration for SASL PLAIN
-                String jaasConfig = String.format(
-                    "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"%s\" password=\"%s\";",
-                    kafkaUsername, kafkaPassword
-                );
-                kafkaProps.put("sasl.jaas.config", jaasConfig);
-            }
+
             protobufKafkaProducer = new KafkaProducer<>(kafkaProps);
             loggerMaker.info("Connected to protobuf kafka producer @ " + Context.now());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error building protobuf kafka producer: " + e.getMessage());
         }
     }
-    
-
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
@@ -231,15 +208,6 @@ public class Main {
         }
     }
 
-    public static String getTopicName(){
-        String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
-        if (topicName == null) {
-            topicName = "akto.api.logs";
-        }
-        // DictionaryFilter.readDictionaryBinary();
-        return topicName;
-    }
-
     public static String getLogTopicName() {
         String topicName = System.getenv("AKTO_KAFKA_LOG_TOPIC_NAME");
         if (topicName == null) {
@@ -261,7 +229,7 @@ public class Main {
     public static void main(String[] args) {
         //String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         String configName = System.getenv("AKTO_CONFIG_NAME");
-        String topicName = getTopicName();
+        String topicName = KafkaConfig.getTopicName();
         String kafkaBrokerUrl = System.getenv().getOrDefault("AKTO_KAFKA_BROKER_URL","kafka1:19092");
         String isKubernetes = System.getenv("IS_KUBERNETES");
         if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
@@ -1067,15 +1035,7 @@ public class Main {
                 loggerMaker.errorAndAddToDb("Kafka authentication credentials not provided");
                 return null;
             }
-            properties.put("security.protocol", "SASL_PLAINTEXT");
-            properties.put("sasl.mechanism", "PLAIN");
-            
-            // Create JAAS configuration for SASL PLAIN
-            String jaasConfig = String.format(
-                "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"%s\" password=\"%s\";",
-                kafkaUsername, kafkaPassword
-            );
-            properties.put("sasl.jaas.config", jaasConfig);
+            KafkaConfig.addAuthenticationProperties(properties, kafkaUsername, kafkaPassword);
         }
 
         return properties;
