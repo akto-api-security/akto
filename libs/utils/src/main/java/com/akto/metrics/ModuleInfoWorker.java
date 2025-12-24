@@ -3,6 +3,7 @@ package com.akto.metrics;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.dto.monitoring.ModuleInfo.ModuleType;
 import com.akto.log.LoggerMaker;
 import com.akto.util.VersionUtil;
 
@@ -10,6 +11,9 @@ import java.io.InputStream;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+
+import com.akto.kafka.Kafka;
+import com.akto.kafka.KafkaConfig;
 
 public class ModuleInfoWorker {
     private final static LoggerMaker loggerMaker = new LoggerMaker(ModuleInfoWorker.class, LoggerMaker.LogDb.RUNTIME);
@@ -63,7 +67,15 @@ public class ModuleInfoWorker {
 
             if (moduleInfoFromService.isRebootContainer()) {
                 loggerMaker.warnAndAddToDb("Restarting pod for module: " + moduleInfoFromService.getModuleType().name() + " id: " + moduleInfoFromService.getId());
-                System.exit(201); 
+
+                if (ModuleType.MINI_RUNTIME.equals(moduleInfoFromService.getModuleType())) {
+                    // Delete Kafka topic before restarting
+                    String kafkaBrokerUrl = KafkaConfig.getKafkaBrokerUrl();
+                    String topicName = KafkaConfig.getTopicName();
+                    Kafka.deleteKafkaTopic(topicName, kafkaBrokerUrl);
+                }
+
+                System.exit(201);
                 return;
             }
             if (moduleInfoFromService.isReboot()) {
