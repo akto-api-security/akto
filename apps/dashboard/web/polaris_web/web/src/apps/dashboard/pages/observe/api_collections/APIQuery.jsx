@@ -131,9 +131,13 @@ function APIQuery() {
         }
         let dt = prepareData();
         if (dt && dt.length > 0) {
-            await api.createCustomCollection(newCollectionName, dt);
-            setActive(false);
-            func.setToast(true, false, <div data-testid="collection_creation_message">{"API collection created successfully"}</div>);
+            try {
+                await api.createCustomCollection(newCollectionName, dt);
+                setActive(false);
+                func.setToast(true, false, <div data-testid="collection_creation_message">{"API collection created successfully"}</div>);
+            } catch (error) {
+                func.setToast(true, true, "Failed to create collection. Please try again.");
+            }
         } else {
             func.setToast(true, true, <div data-testid="collection_creation_message">{"No endpoints selected"}</div>);
         }
@@ -150,20 +154,26 @@ function APIQuery() {
 
     const exploreEndpoints = useCallback(async () => {
         setIsLoading(true);
-        let dt = prepareData();
-        if (dt.length > 0) {
-            let endpointListFromConditions = await api.getEndpointsListFromConditions(dt, skipTagsMismatch);
-            let sensitiveParams = await api.loadSensitiveParameters(-1);
-            if (endpointListFromConditions || sensitiveParams) {
-                setEndpointListFromConditions(endpointListFromConditions);
-                setSensitiveParams(sensitiveParams);
-                setApiCount(endpointListFromConditions.apiCount);
+        try {
+            let dt = prepareData();
+            if (dt.length > 0) {
+                let endpointListFromConditions = await api.getEndpointsListFromConditions(dt, skipTagsMismatch);
+                let sensitiveParams = await api.loadSensitiveParameters(-1);
+                if (endpointListFromConditions || sensitiveParams) {
+                    setEndpointListFromConditions(endpointListFromConditions);
+                    setSensitiveParams(sensitiveParams);
+                    setApiCount(endpointListFromConditions.apiCount);
+                }
+            } else {
+                setEndpointListFromConditions({});
+                setSensitiveParams({});
             }
-        } else {
+        } catch (error) {
             setEndpointListFromConditions({});
             setSensitiveParams({});
+        } finally {
+            setIsLoading(false);
         }
-        setIsLoading(false);
     }, [prepareData, skipTagsMismatch]);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -258,11 +268,9 @@ function APIQuery() {
         if(isUpdate){
             let dt = prepareData()
             api.updateCustomCollection(collectionId, dt).then((res) => {
-                try {
-                    func.setToast(true, false, "Conditions updated successfully")
-                } catch (error) {
-                    func.setToast(true,true, "Error in updating conditions")
-                }
+                func.setToast(true, false, "Conditions updated successfully")
+            }).catch((error) => {
+                func.setToast(true, true, "Error in updating conditions");
             })
         }else{
             openModal()
