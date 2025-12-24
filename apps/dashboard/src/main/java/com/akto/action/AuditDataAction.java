@@ -60,12 +60,13 @@ public class AuditDataAction extends UserAction {
             List<Integer> collectionsIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
                 Context.accountId.get());
 
-            Bson finalFilter = Filters.in("hostCollectionId", collectionsIds);
-
             List<Bson> filterList = prepareFilters(filters);
-            if (!filterList.isEmpty()) {
-                finalFilter = Filters.and(finalFilter, Filters.and(filterList));
+            
+            if (collectionsIds != null) {
+                filterList.add(Filters.in("hostCollectionId", collectionsIds));
             }
+            
+            Bson finalFilter = filterList.isEmpty() ? new BasicDBObject() : Filters.and(filterList);
             Bson sort = sortOrder == 1 ? Sorts.ascending(sortKey) : Sorts.descending(sortKey);
             
             this.auditData = McpAuditInfoDao.instance.findAll(finalFilter, skip, limit, sort);   
