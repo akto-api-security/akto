@@ -600,6 +600,20 @@ function ThreatDetectionPage() {
         func.setToast(true, false, "JSON exported successfully");
     }
 
+    const exportToAdx = async () => {
+        try {
+            const resp = await api.exportThreatActivityToAdx(startTimestamp, endTimestamp);
+            if (resp.exportSuccess) {
+                func.setToast(true, false, resp.exportMessage || "Successfully exported threat activity to ADX");
+            } else {
+                func.setToast(true, true, resp.exportMessage || "Failed to export threat activity to ADX");
+            }
+        } catch (error) {
+            func.setToast(true, true, "Error exporting to ADX: " + (error.message || "Unknown error"));
+        }
+        setMoreActions(false);
+    }
+
     const secondaryActionsComp = (
         <HorizontalStack gap={2}>
             <Popover
@@ -623,6 +637,11 @@ function ThreatDetectionPage() {
                                         {
                                             content: 'Export',
                                             onAction: () => exportJson(),
+                                            prefix: <Box><Icon source={FileMinor} /></Box>
+                                        },
+                                        {
+                                            content: 'Export to ADX(Azure Data Explorer)',
+                                            onAction: exportToAdx,
                                             prefix: <Box><Icon source={FileMinor} /></Box>
                                         },
                                         {
