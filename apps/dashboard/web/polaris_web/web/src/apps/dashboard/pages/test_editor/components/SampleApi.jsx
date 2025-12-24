@@ -421,7 +421,7 @@ const SampleApi = () => {
                         active={rolePopoverActive}
                         activator={
                             <Button id={"select-test-role"} onClick={() => setRolePopoverActive(!rolePopoverActive)} size="slim" disclosure>
-                                <Box minWidth="150px">
+                                <Box minWidth="50px">
                                     <Tooltip content={(() => {
                                         const found = testRolesOptions.find(r => r.value === selectedRole)
                                         return found ? found.label : "Select role"
