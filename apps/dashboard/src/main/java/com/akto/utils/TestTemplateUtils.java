@@ -129,7 +129,6 @@ public class TestTemplateUtils {
                 return llmCategories;
 
             case AGENTIC:
-            case ENDPOINT:
                 return allCategories;
 
             // for DAST and API security
