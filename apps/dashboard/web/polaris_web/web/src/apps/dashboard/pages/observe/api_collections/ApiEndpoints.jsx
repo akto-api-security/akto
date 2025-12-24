@@ -441,7 +441,7 @@ function ApiEndpoints(props) {
                 tagsComp: t?.comp || null,
                 tagsString: t?.str || "",
                 isNew: transform.isNewEndpoint(obj.lastSeenTs),
-                open: obj.auth_type === "UNAUTHENTICATED" || obj.auth_type === undefined,
+                open:  obj.auth_type === undefined || obj.auth_type.toLowerCase() === "unauthenticated" || obj.auth_type.toLowerCase() === "no auth type found",
             };
         });
 
