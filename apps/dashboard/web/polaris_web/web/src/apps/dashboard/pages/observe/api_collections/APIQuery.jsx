@@ -270,7 +270,7 @@ function APIQuery() {
             api.updateCustomCollection(collectionId, dt).then((res) => {
                 func.setToast(true, false, "Conditions updated successfully")
             }).catch((error) => {
-                func.setToast(true, true, "Failed to update conditions. Please try again.");
+                func.setToast(true, true, "Error in updating conditions");
             })
         }else{
             openModal()
