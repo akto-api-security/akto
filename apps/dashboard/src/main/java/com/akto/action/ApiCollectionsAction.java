@@ -66,9 +66,6 @@ public class ApiCollectionsAction extends UserAction {
     
     // Error codes
     private static final int MONGO_INVALID_REGEX_ERROR_CODE = 51091;
-    private static final String ERROR_TYPE_INVALID_REGEX = "INVALID_REGEX";
-    private static final String ERROR_TYPE_DATABASE = "DATABASE_ERROR";
-    private static final String ERROR_TYPE_GENERAL = "GENERAL_ERROR";
 
     List<ApiCollection> apiCollections = new ArrayList<>();
     Map<Integer,Integer> testedEndpointsMaps = new HashMap<>();
@@ -645,16 +642,16 @@ public class ApiCollectionsAction extends UserAction {
     private String handleMongoException(MongoCommandException e) {
         loggerMaker.errorAndAddToDb(e, "MongoCommandException while processing request");
         if (e.getCode() == MONGO_INVALID_REGEX_ERROR_CODE) {
-            addActionError(ERROR_TYPE_INVALID_REGEX + ": Invalid regex pattern. Please check your filter conditions.");
+            addActionError("Invalid regex pattern. Please check your filter conditions.");
         } else {
-            addActionError(ERROR_TYPE_DATABASE + ": Internal error while processing request.");
+            addActionError("Internal error while processing request.");
         }
         return ERROR.toUpperCase();
     }
     
     private String handleGeneralException(Exception e, String context) {
         loggerMaker.errorAndAddToDb(e, context);
-        addActionError(ERROR_TYPE_GENERAL + ": " + context);
+        addActionError(context);
         return ERROR.toUpperCase();
     }
 
