@@ -270,7 +270,7 @@ function Integrations() {
         }
         return alertsItems;
       case 'automation':
-        if (!func.checkLocal()) {
+        if (func.checkLocal()) {
           return emptyItem;
         }
         return automationItems;
