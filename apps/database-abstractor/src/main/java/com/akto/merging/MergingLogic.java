@@ -42,7 +42,7 @@ public class MergingLogic {
             mergedUrls = MergedUrlsDao.instance.getMergedUrls();
             loggerMaker.infoAndAddToDb("Loaded " + mergedUrls.size() + " demerged URLs", LogDb.DB_ABS);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error loading merged URLs: " + e.getMessage(), LogDb.DB_ABS);
+            loggerMaker.warnAndAddToDb("Error loading merged URLs: " + e.getMessage(), LogDb.DB_ABS);
             mergedUrls = new HashSet<>();
         }
     }
@@ -57,7 +57,7 @@ public class MergingLogic {
                 }
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error checking demerged URL: " + e.getMessage(), LogDb.DB_ABS);
+            loggerMaker.warnAndAddToDb("Error checking demerged URL: " + e.getMessage(), LogDb.DB_ABS);
         }
         return false;
     }
@@ -111,12 +111,12 @@ public class MergingLogic {
             boolean isFirst = true;
             for (String matchedURL: matchStaticURLs) {
                 if (matchedURL == null || matchedURL.isEmpty() || !matchedURL.contains(" ")) {
-                    loggerMaker.errorAndAddToDb("Invalid matchedURL: '" + matchedURL + "'");
+                    loggerMaker.warnAndAddToDb("Invalid matchedURL: '" + matchedURL + "'");
                     continue;
                 }
                 String[] parts = matchedURL.split(" ", 2);
                 if (parts.length < 2) {
-                    loggerMaker.errorAndAddToDb("matchedURL missing space: '" + matchedURL + "'");
+                    loggerMaker.warnAndAddToDb("matchedURL missing space: '" + matchedURL + "'");
                     continue;
                 }
                 URLMethods.Method delMethod = URLMethods.Method.fromString(parts[0]);
@@ -191,12 +191,12 @@ public class MergingLogic {
 
         for (String deleteStaticUrl: result.deleteStaticUrls) {
             if (deleteStaticUrl == null || deleteStaticUrl.isEmpty() || !deleteStaticUrl.contains(" ")) {
-                loggerMaker.errorAndAddToDb("Invalid deleteStaticUrl: '" + deleteStaticUrl + "'");
+                loggerMaker.warnAndAddToDb("Invalid deleteStaticUrl: '" + deleteStaticUrl + "'");
                 continue;
             }
             String[] parts = deleteStaticUrl.split(" ", 2);
             if (parts.length < 2) {
-                loggerMaker.errorAndAddToDb("deleteStaticUrl missing space: '" + deleteStaticUrl + "'");
+                loggerMaker.warnAndAddToDb("deleteStaticUrl missing space: '" + deleteStaticUrl + "'");
                 continue;
             }
             URLMethods.Method delMethod = URLMethods.Method.fromString(parts[0]);
@@ -223,7 +223,7 @@ public class MergingLogic {
             try {
                 SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForSti, new BulkWriteOptions().ordered(false));
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("STI bulkWrite error: " + e.getMessage());
+                loggerMaker.warnAndAddToDb("STI bulkWrite error: " + e.getMessage());
             }
         }
 
@@ -231,7 +231,7 @@ public class MergingLogic {
             try {
                 SampleDataDao.instance.getMCollection().bulkWrite(bulkUpdatesForSampleData, new BulkWriteOptions().ordered(false));
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("SampleData bulkWrite error: " + e.getMessage());
+                loggerMaker.warnAndAddToDb("SampleData bulkWrite error: " + e.getMessage());
             }
         }
 
@@ -239,7 +239,7 @@ public class MergingLogic {
             try {
                 ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo, new BulkWriteOptions().ordered(false));
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("ApiInfo bulkWrite error: " + e.getMessage());
+                loggerMaker.warnAndAddToDb("ApiInfo bulkWrite error: " + e.getMessage());
             }
         }
     }
@@ -292,7 +292,7 @@ public class MergingLogic {
             List<String> templateUrls = new ArrayList<>();
             for(SingleTypeInfo sti: singleTypeInfos) {
                 if (sti.getMethod() == null || sti.getUrl() == null || sti.getUrl().isEmpty()) {
-                    loggerMaker.errorAndAddToDb("STI with null/empty method or url: method=" + sti.getMethod() + " url=" + sti.getUrl(), LogDb.DB_ABS);
+                    loggerMaker.warnAndAddToDb("STI with null/empty method or url: method=" + sti.getMethod() + " url=" + sti.getUrl(), LogDb.DB_ABS);
                     continue;
                 }
                 String key = sti.getMethod() + " " + sti.getUrl();
@@ -325,38 +325,38 @@ public class MergingLogic {
             while (iterator.hasNext()) {
                 String staticURL = iterator.next();
                 if (staticURL == null || staticURL.isEmpty() || !staticURL.contains(" ")) {
-                    loggerMaker.errorAndAddToDb("Invalid staticURL: '" + staticURL + "'");
+                    loggerMaker.warnAndAddToDb("Invalid staticURL: '" + staticURL + "'");
                     iterator.remove();
                     continue;
                 }
                 String[] staticParts = staticURL.split(" ", 2);
                 if (staticParts.length < 2) {
-                    loggerMaker.errorAndAddToDb("staticURL missing space: '" + staticURL + "'");
+                    loggerMaker.warnAndAddToDb("staticURL missing space: '" + staticURL + "'");
                     iterator.remove();
                     continue;
                 }
                 URLMethods.Method staticMethod = URLMethods.Method.fromString(staticParts[0]);
                 String staticEndpoint = staticParts[1];
                 if (staticEndpoint.contains("//") || staticEndpoint.isEmpty()) {
-                    loggerMaker.errorAndAddToDb("staticEndpoint has empty tokens: '" + staticEndpoint + "'");
+                    loggerMaker.warnAndAddToDb("staticEndpoint has empty tokens: '" + staticEndpoint + "'");
                     iterator.remove();
                     continue;
                 }
 
                 for (String templateURL: templateUrls) {
                     if (templateURL == null || templateURL.isEmpty() || !templateURL.contains(" ")) {
-                        loggerMaker.errorAndAddToDb("Invalid templateURL: '" + templateURL + "'");
+                        loggerMaker.warnAndAddToDb("Invalid templateURL: '" + templateURL + "'");
                         continue;
                     }
                     String[] templateParts = templateURL.split(" ", 2);
                     if (templateParts.length < 2) {
-                        loggerMaker.errorAndAddToDb("templateURL missing space: '" + templateURL + "'");
+                        loggerMaker.warnAndAddToDb("templateURL missing space: '" + templateURL + "'");
                         continue;
                     }
                     URLMethods.Method templateMethod = URLMethods.Method.fromString(templateParts[0]);
                     String templateEndpoint = templateParts[1];
                     if (templateEndpoint.contains("//") || templateEndpoint.isEmpty()) {
-                        loggerMaker.errorAndAddToDb("templateEndpoint has empty tokens: '" + templateEndpoint + "'");
+                        loggerMaker.warnAndAddToDb("templateEndpoint has empty tokens: '" + templateEndpoint + "'");
                         continue;
                     }
 
@@ -392,17 +392,17 @@ public class MergingLogic {
         Map<Integer, Map<String, Set<String>>> sizeToURL = new HashMap<>();
         for(String rawURLPlusMethod: catalog.keySet()) {
             if (rawURLPlusMethod == null || rawURLPlusMethod.isEmpty()) {
-                loggerMaker.errorAndAddToDb("Empty rawURLPlusMethod in groupByTokenSize");
+                loggerMaker.warnAndAddToDb("Empty rawURLPlusMethod in groupByTokenSize");
                 continue;
             }
             String[] rawUrlPlusMethodSplit = rawURLPlusMethod.split(" ");
             if (rawUrlPlusMethodSplit.length == 0) {
-                loggerMaker.errorAndAddToDb("Split resulted in empty array for: '" + rawURLPlusMethod + "'");
+                loggerMaker.warnAndAddToDb("Split resulted in empty array for: '" + rawURLPlusMethod + "'");
                 continue;
             }
             String rawURL = rawUrlPlusMethodSplit.length > 1 ? rawUrlPlusMethodSplit[1] : rawUrlPlusMethodSplit[0];
             if (rawURL == null || rawURL.isEmpty()) {
-                loggerMaker.errorAndAddToDb("Empty rawURL for rawURLPlusMethod: '" + rawURLPlusMethod + "'");
+                loggerMaker.warnAndAddToDb("Empty rawURL for rawURLPlusMethod: '" + rawURLPlusMethod + "'");
                 continue;
             }
             Set<String> reqTemplate = catalog.get(rawURLPlusMethod);
@@ -431,12 +431,12 @@ public class MergingLogic {
 
             String newUrl = entry.getKey();
             if (newUrl == null || newUrl.isEmpty() || !newUrl.contains(" ")) {
-                loggerMaker.errorAndAddToDb("Invalid newUrl: '" + newUrl + "'");
+                loggerMaker.warnAndAddToDb("Invalid newUrl: '" + newUrl + "'");
                 continue;
             }
             String[] newUrlParts = newUrl.split(" ", 2);
             if (newUrlParts.length < 2) {
-                loggerMaker.errorAndAddToDb("newUrl missing space: '" + newUrl + "'");
+                loggerMaker.warnAndAddToDb("newUrl missing space: '" + newUrl + "'");
                 continue;
             }
             Set<String> newTemplate = entry.getValue();
@@ -460,12 +460,12 @@ public class MergingLogic {
             Map<URLTemplate, Map<String, Set<String>>> potentialMerges = new HashMap<>();
             for(String aUrl: pendingRequests.keySet()) {
                 if (aUrl == null || aUrl.isEmpty() || !aUrl.contains(" ")) {
-                    loggerMaker.errorAndAddToDb("Invalid aUrl: '" + aUrl + "'");
+                    loggerMaker.warnAndAddToDb("Invalid aUrl: '" + aUrl + "'");
                     continue;
                 }
                 String[] aUrlParts = aUrl.split(" ", 2);
                 if (aUrlParts.length < 2) {
-                    loggerMaker.errorAndAddToDb("aUrl missing space: '" + aUrl + "'");
+                    loggerMaker.warnAndAddToDb("aUrl missing space: '" + aUrl + "'");
                     continue;
                 }
                 Set<String> aTemplate = pendingRequests.get(aUrl);
