@@ -66,7 +66,7 @@ public class ModuleInfoWorker {
              */
 
             if (moduleInfoFromService.isRebootContainer()) {
-                loggerMaker.warnAndAddToDb("Restarting pod for module: " + moduleInfoFromService.getModuleType().name() + " id: " + moduleInfoFromService.getId());
+                loggerMaker.warnAndAddToDb("Restarting container for module: " + moduleInfoFromService.getModuleType().name() + " id: " + moduleInfoFromService.getId());
 
                 if (ModuleType.MINI_RUNTIME.equals(moduleInfoFromService.getModuleType())) {
                     // Delete Kafka topic before restarting
