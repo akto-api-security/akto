@@ -15,17 +15,13 @@ import com.opensymphony.xwork2.Action;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
-import org.apache.http.NameValuePair;
-import org.apache.http.client.entity.UrlEncodedFormEntity;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpPut;
-import org.apache.http.entity.ContentType;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.message.BasicNameValuePair;
-import org.apache.http.util.EntityUtils;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import okhttp3.MediaType;
+import okhttp3.FormBody;
+import com.akto.util.http_util.CoreHTTPClient;
 import org.bson.conversions.Bson;
 
 import java.nio.charset.StandardCharsets;
@@ -128,7 +124,7 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
     }
     @Getter(AccessLevel.NONE)
     @Setter(AccessLevel.NONE)
-    private final CloseableHttpClient httpClient;
+    private static final OkHttpClient httpClient = CoreHTTPClient.client.newBuilder().build();
 
     // ADX configuration fields (for integration setup)
     private String clusterEndpoint;
@@ -159,7 +155,6 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
 
     public AdxIntegrationAction() {
         super();
-        this.httpClient = HttpClients.createDefault();
     }
 
     /**
@@ -500,12 +495,8 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
      * Fetch malicious events from threat detection backend
      */
     private List<DashboardMaliciousEvent> fetchMaliciousEventsForExport() throws Exception {
-        HttpPost post = new HttpPost(
-            String.format("%s/api/dashboard/list_malicious_requests", this.getBackendUrl())
-        );
-        post.addHeader("Authorization", "Bearer " + this.getApiToken());
-        post.addHeader("Content-Type", "application/json");
-        post.addHeader("x-context-source", Context.contextSource.get().toString());
+        String url = String.format("%s/api/dashboard/list_malicious_requests", this.getBackendUrl());
+        MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
         Map<String, Object> filter = new HashMap<>();
         if (ips != null && !ips.isEmpty()) {
@@ -560,12 +551,18 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
         };
 
         String msg = objectMapper.valueToTree(body).toString();
-        StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
-        post.setEntity(requestEntity);
+        RequestBody requestBody = RequestBody.create(msg, JSON);
+        Request request = new Request.Builder()
+            .url(url)
+            .post(requestBody)
+            .addHeader("Authorization", "Bearer " + this.getApiToken())
+            .addHeader("Content-Type", "application/json")
+            .addHeader("x-context-source", Context.contextSource.get().toString())
+            .build();
 
         List<DashboardMaliciousEvent> events = new ArrayList<>();
-        try (CloseableHttpResponse resp = httpClient.execute(post)) {
-            String responseBody = EntityUtils.toString(resp.getEntity());
+        try (Response resp = httpClient.newCall(request).execute()) {
+            String responseBody = resp.body() != null ? resp.body().string() : "";
 
             ProtoMessageUtils.<ListMaliciousRequestsResponse>toProtoMessage(
                 ListMaliciousRequestsResponse.class, responseBody
@@ -1043,13 +1040,17 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
         
         // Upload blob using Azure Storage REST API (Put Blob)
         // Reference: https://learn.microsoft.com/en-us/rest/api/storageservices/put-blob
-        HttpPut put = new HttpPut(blobUrl);
-        put.addHeader("x-ms-blob-type", "BlockBlob");
-        put.addHeader("Content-Type", "application/json");
-        put.setEntity(new StringEntity(data, StandardCharsets.UTF_8));
+        MediaType JSON_MEDIA = MediaType.parse("application/json");
+        RequestBody requestBody = RequestBody.create(data, JSON_MEDIA);
+        Request request = new Request.Builder()
+            .url(blobUrl)
+            .put(requestBody)
+            .addHeader("x-ms-blob-type", "BlockBlob")
+            .addHeader("Content-Type", "application/json")
+            .build();
         
-        try (CloseableHttpResponse response = httpClient.execute(put)) {
-            int statusCode = response.getStatusLine().getStatusCode();
+        try (Response response = httpClient.newCall(request).execute()) {
+            int statusCode = response.code();
             if (statusCode >= 200 && statusCode < 300) {
                 // Extract host for logging
                 String host = baseUrl.substring(baseUrl.indexOf("://") + 3);
@@ -1057,7 +1058,7 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
                 logger.infoAndAddToDb("Successfully uploaded blob: " + blobName + " to " + host, LogDb.DASHBOARD);
                 return blobUrl;
             } else {
-                String errorBody = EntityUtils.toString(response.getEntity());
+                String errorBody = response.body() != null ? response.body().string() : "";
                 throw new Exception("Failed to upload blob: " + statusCode + ", response: " + errorBody);
             }
         }
@@ -1125,18 +1126,22 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
         String base64Message = java.util.Base64.getEncoder().encodeToString(message.getBytes(StandardCharsets.UTF_8));
         String xmlMessage = String.format("<QueueMessage><MessageText>%s</MessageText></QueueMessage>", base64Message);
         
-        HttpPost post = new HttpPost(queueEndpoint);
-        post.addHeader("Content-Type", "application/xml");
-        post.setEntity(new StringEntity(xmlMessage, StandardCharsets.UTF_8));
+        MediaType XML_MEDIA = MediaType.parse("application/xml");
+        RequestBody requestBody = RequestBody.create(xmlMessage, XML_MEDIA);
+        Request request = new Request.Builder()
+            .url(queueEndpoint)
+            .post(requestBody)
+            .addHeader("Content-Type", "application/xml")
+            .build();
         
-        try (CloseableHttpResponse response = httpClient.execute(post)) {
-            int statusCode = response.getStatusLine().getStatusCode();
+        try (Response response = httpClient.newCall(request).execute()) {
+            int statusCode = response.code();
             if (statusCode >= 200 && statusCode < 300) {
                 // Extract queue name for logging (everything after last / before ?)
                 String queueName = baseUrl.substring(baseUrl.lastIndexOf('/') + 1);
                 logger.infoAndAddToDb("Successfully posted ingestion message to queue: " + queueName, LogDb.DASHBOARD);
             } else {
-                String errorBody = EntityUtils.toString(response.getEntity());
+                String errorBody = response.body() != null ? response.body().string() : "";
                 throw new Exception("Failed to post message to queue: " + statusCode + ", response: " + errorBody);
             }
         }
@@ -1148,25 +1153,25 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
     private String getAzureAdAccessToken(String tenantId, String clientId, String clientSecret) throws Exception {
         String tokenUrl = String.format("https://login.microsoftonline.com/%s/oauth2/v2.0/token", tenantId);
         
-        // Use Apache HttpClient directly to ensure proper form-urlencoded handling
-        // This bypasses ApiExecutor's form-urlencoded conversion which may have issues
-        HttpPost post = new HttpPost(tokenUrl);
-        post.addHeader(HttpHeaders.CONTENT_TYPE, "application/x-www-form-urlencoded");
-        post.addHeader(HttpHeaders.ACCEPT, "application/json");
+        // Build form-urlencoded request body using OkHttp FormBody
+        FormBody.Builder formBuilder = new FormBody.Builder();
+        formBuilder.add("client_id", clientId);
+        formBuilder.add("scope", "https://kusto.kusto.windows.net/.default");
+        formBuilder.add("client_secret", clientSecret);
+        formBuilder.add("grant_type", "client_credentials");
+        RequestBody requestBody = formBuilder.build();
         
-        // Build form-urlencoded request body
-        List<NameValuePair> params = new ArrayList<>();
-        params.add(new BasicNameValuePair("client_id", clientId));
-        params.add(new BasicNameValuePair("scope", "https://kusto.kusto.windows.net/.default"));
-        params.add(new BasicNameValuePair("client_secret", clientSecret));
-        params.add(new BasicNameValuePair("grant_type", "client_credentials"));
+        Request request = new Request.Builder()
+            .url(tokenUrl)
+            .post(requestBody)
+            .addHeader("Content-Type", "application/x-www-form-urlencoded")
+            .addHeader("Accept", "application/json")
+            .build();
         
-        post.setEntity(new UrlEncodedFormEntity(params, StandardCharsets.UTF_8));
-        
-        try (CloseableHttpResponse response = httpClient.execute(post)) {
-            String responseBody = EntityUtils.toString(response.getEntity());
+        try (Response response = httpClient.newCall(request).execute()) {
+            String responseBody = response.body() != null ? response.body().string() : "";
             
-            if (response.getStatusLine().getStatusCode() == 200) {
+            if (response.code() == 200) {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> tokenResponse = objectMapper.readValue(responseBody, Map.class);
                 String accessToken = (String) tokenResponse.get("access_token");
@@ -1175,7 +1180,7 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
                 }
                 return accessToken;
             } else {
-                throw new Exception("Failed to get Azure AD token: " + response.getStatusLine().getStatusCode() + ", response: " + responseBody);
+                throw new Exception("Failed to get Azure AD token: " + response.code() + ", response: " + responseBody);
             }
         } catch (Exception e) {
             logger.errorAndAddToDb("Error getting Azure AD access token: " + e.getMessage(), LogDb.DASHBOARD);
