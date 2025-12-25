@@ -202,6 +202,24 @@ const threatDetectionRequests = {
             method: 'post',
             data: {startTs, endTs, latestAttack: latestAttack || [], limit}
         })
+    },
+    exportThreatActivityToAdx(startTimestamp, endTimestamp) {
+        return request({
+            url: '/api/exportGuardrailActivityToAdx',
+            method: 'post',
+            data: {
+                startTimestamp: startTimestamp,
+                endTimestamp: endTimestamp,
+                label: 'THREAT'
+            }
+        })
+    },
+    getAdxExportStatus() {
+        return request({
+            url: '/api/getAdxExportStatus',
+            method: 'post',
+            data: {}
+        })
     }
 }
 export default threatDetectionRequests
