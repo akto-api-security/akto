@@ -24,6 +24,7 @@ import com.mongodb.client.model.Projections;
 import com.slack.api.Slack;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -164,7 +165,7 @@ public class LoggerMaker  {
         }
         logger.error(err);
         try{
-            insert(err, "error", db);
+            asyncInsert(err, "error", db, Context.accountId.get());
         } catch (Exception e){
 
         }
@@ -214,11 +215,7 @@ public class LoggerMaker  {
         String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
         String infoMessage = "acc: " + accountId + ", " + info;
         logger.info(infoMessage);
-        try{
-            insert(infoMessage, "info",db);
-        } catch (Exception e){
-
-        }
+        asyncInsert(infoMessage, "info", db, Context.accountId.get());
     }
 
     public void warnAndAddToDb(String info, LogDb db) {
@@ -255,7 +252,15 @@ public class LoggerMaker  {
         }
         return true;
     }
-    
+
+
+    private void asyncInsert(String text, String key, LogDb db, int accountId) {
+        CompletableFuture.runAsync(() -> {
+            Context.accountId.set(accountId);
+            insert(text, key, db);
+        });
+    }
+
     private void insert(String info, String key, LogDb db) {
         String text = aClass + " : " + info;
         Log log = new Log(text, key, Context.now());
