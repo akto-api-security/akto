@@ -2204,21 +2204,6 @@ public class DbLayer {
         }
     }
 
-    public static List<GuardrailPolicies> fetchAllGuardrailPolicies(Integer updatedAfter) {
-        try {
-            Bson finalFilter = Filters.empty();
-
-            if (updatedAfter != null && updatedAfter > 0) {
-                finalFilter = Filters.gt("updatedTimestamp", updatedAfter);
-            }
-
-            return GuardrailPoliciesDao.instance.findAll(finalFilter);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in fetchGuardrailPolicies: " + e.getMessage());
-            return new ArrayList<>();
-        }
-    }
-
     public static List<GuardrailPolicies> fetchGuardrailPolicies(Integer updatedAfter, CONTEXT_SOURCE contextSource) {
         try {
             List<Bson> filters = new ArrayList<>();
