@@ -1,4 +1,4 @@
-import { isAgenticSecurityCategory, isApiSecurityCategory, isGenAISecurityCategory, isMCPSecurityCategory } from "../../../../main/labelHelper";
+import { isAgenticSecurityCategory, isApiSecurityCategory, isEndpointSecurityCategory, isGenAISecurityCategory, isMCPSecurityCategory } from "../../../../main/labelHelper";
 import SessionStore from "../../../../main/SessionStore";
 
 export function updateThreatFiltersStore(templates) {
@@ -10,10 +10,10 @@ export function updateThreatFiltersStore(templates) {
         const name = (trimmed?.category?.name || '').toLowerCase();
         delete trimmed['info'];
 
-        if (name?.includes("mcp") && (isMCPSecurityCategory() || isAgenticSecurityCategory())) {
+        if (name?.includes("mcp") && (isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory())) {
             filteredTemplates[x.id] = trimmed;
             filteredTemplatesArray.push(x)
-        } else if (name?.includes("gen") && (isGenAISecurityCategory() || isAgenticSecurityCategory())) {
+        } else if (name?.includes("gen") && (isGenAISecurityCategory() || isAgenticSecurityCategory()|| isEndpointSecurityCategory())) {
             filteredTemplates[x.id] = trimmed;
             filteredTemplatesArray.push(x)
         } else if (isApiSecurityCategory()) {

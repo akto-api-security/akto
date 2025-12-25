@@ -113,7 +113,9 @@ service.interceptors.request.use((config) => {
   } else if (currentCategory === "Agentic Security") {
     contextSource = "AGENTIC";
   } else if (currentCategory === "DAST") {
-    contextSource = "DAST"
+    contextSource = "DAST";
+  } else if (currentCategory === "Endpoint Security") {
+    contextSource = "ENDPOINT";
   }
   config.headers['x-context-source'] = contextSource;
 

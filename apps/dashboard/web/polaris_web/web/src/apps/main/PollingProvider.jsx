@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useRef } from 'r
 import testingApi from "../dashboard/pages/testing/api"
 import homeRequests from '../dashboard/pages/home/api';
 import PersistStore from './PersistStore';
+import { isEndpointSecurityCategory } from './labelHelper';
 const PollingContext = createContext();
 
 export const usePolling = () => useContext(PollingContext);
@@ -53,7 +54,9 @@ export const PollingProvider = ({ children }) => {
             intervalAlertRef.current = id2
         };
         if (window.location.pathname.startsWith('/dashboard')) {
-            fetchTestingStatus();
+            if (!isEndpointSecurityCategory()) {
+                fetchTestingStatus();
+            }
             if (window.USER_NAME.length > 0 && window.USER_NAME.includes('akto.io')) {
                 fetchAlerts();
             }

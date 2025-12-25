@@ -27,7 +27,7 @@ import ForbiddenRole from "../../../components/shared/ForbiddenRole";
 
 import Highcharts from 'highcharts';
 import HighchartsMore from 'highcharts/highcharts-more';
-import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
+import { getDashboardCategory, mapLabel, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 
 HighchartsMore(Highcharts);
 
@@ -796,19 +796,24 @@ function ApiDetails(props) {
                 </VerticalStack>
                 <VerticalStack gap="3" align="space-between">
                     <HorizontalStack gap={"1"} wrap={false} >
-                    <RunTest
-                        apiCollectionId={apiDetail["apiCollectionId"]}
-                        endpoints={[apiDetail]}
-                        filtered={true}
-                        useLocalSubCategoryData={useLocalSubCategoryData}
-                        preActivator={false}
-                        disabled={window.USER_ROLE === "GUEST"}
-                    />
-                    <Box>
-                        <Tooltip content="Open URL in test editor" dismissOnMouseOut>
-                            <Button monochrome onClick={() => openTest()} icon={FileMinor} />
-                        </Tooltip>
-                    </Box>
+                    {/* Hide Run Test button for Endpoint Security */}
+                    {!isEndpointSecurityCategory() && (
+                        <RunTest
+                            apiCollectionId={apiDetail["apiCollectionId"]}
+                            endpoints={[apiDetail]}
+                            filtered={true}
+                            useLocalSubCategoryData={useLocalSubCategoryData}
+                            preActivator={false}
+                            disabled={window.USER_ROLE === "GUEST"}
+                        />
+                    )}
+                    {!isEndpointSecurityCategory() && (
+                        <Box>
+                            <Tooltip content="Open URL in test editor" dismissOnMouseOut>
+                                <Button monochrome onClick={() => openTest()} icon={FileMinor} />
+                            </Tooltip>
+                        </Box>
+                    )}
                     {
                         isGptActive || isDemergingActive ? <Popover
                             active={showMoreActions}
