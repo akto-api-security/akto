@@ -67,7 +67,7 @@ useEffect(() => {
     }, [dashboardCategory]);
 
 
-    const logoSrc = dashboardCategory === "Agentic Security" ? "/public/white_logo.svg" : "/public/akto_name_with_logo.svg";
+    const logoSrc = dashboardCategory === "Agentic Security" ? "/public/akto-christmas-agentic.svg" : "/public/akto-christmas.svg";
     const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {};
     const agenticSecurityGranted =
         stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || true
