@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './Wrapped2025.css';
 import api from '../../../../signup/api';
 import { Button, Icon } from '@shopify/polaris';
@@ -45,7 +45,7 @@ const Wrapped2025 = ({ onClose }) => {
     useEffect(() => {
         const handleEscapeKey = (event) => {
             if (event.key === 'Escape') {
-                onClose();
+                fadeOutAndClose();
             }
         };
 
@@ -54,7 +54,7 @@ const Wrapped2025 = ({ onClose }) => {
         return () => {
             document.removeEventListener('keydown', handleEscapeKey);
         };
-    }, [onClose]);
+    }, [onClose, playing]);
 
     const fetchData = async () => {
         try {
@@ -75,6 +75,31 @@ const Wrapped2025 = ({ onClose }) => {
         }
     };
 
+    const fadeOutAndClose = useCallback(() => {
+        if (audioRef.current && playing) {
+            const audio = audioRef.current;
+            const fadeOutDuration = 500; // ms
+            const fadeOutSteps = 20;
+            const stepDuration = fadeOutDuration / fadeOutSteps;
+            const volumeStep = audio.volume / fadeOutSteps;
+
+            let currentStep = 0;
+            const fadeInterval = setInterval(() => {
+                currentStep++;
+                audio.volume = Math.max(0, audio.volume - volumeStep);
+
+                if (currentStep >= fadeOutSteps || audio.volume <= 0) {
+                    clearInterval(fadeInterval);
+                    audio.pause();
+                    audio.volume = 1; // Reset for next time
+                    onClose();
+                }
+            }, stepDuration);
+        } else {
+            onClose();
+        }
+    }, [playing, onClose]);
+
     const toggleAudio = () => {
         if (audioRef.current) {
             if (playing) {
@@ -90,7 +115,7 @@ const Wrapped2025 = ({ onClose }) => {
         if (step < slides.length - 1) {
             setStep(step + 1);
         } else {
-            onClose();
+            fadeOutAndClose();
         }
     };
 
@@ -235,7 +260,7 @@ const Wrapped2025 = ({ onClose }) => {
             <div className="wrapped-bg-fallback"></div>
 
             <div className="wrapped-close-btn-container">
-                <button className="wrapped-close-btn" onClick={onClose}>
+                <button className="wrapped-close-btn" onClick={fadeOutAndClose}>
                     <Icon source={MobileCancelMajor} color="subdued" />
                 </button>
             </div>
