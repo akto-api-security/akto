@@ -1,0 +1,219 @@
+.history-overlay {
+    position: fixed;
+    top: 70px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 999;
+}
+
+.history-sidebar {
+    position: fixed;
+    top: 70px;
+    right: 0;
+    width: 320px;
+    height: calc(100% - 70px);
+    background: white;
+    border-left: 1px solid #e1e3e5;
+    z-index: 1000;
+    font-family: -apple-system, BlinkMacSystemFont, San Francisco, Segoe UI, Roboto, Helvetica Neue, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    align-self: stretch;
+}
+
+.history-header {
+    padding: 12px 16px 0 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.history-title {
+    color: var(--Text-Default, #202223);
+    font-feature-settings: 'liga' off, 'clig' off;
+    font-family: "SF Pro Text";
+    font-size: 14px;
+    font-style: normal;
+    font-weight: 600;
+    line-height: 20px;
+    margin: 0;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: #6d7175;
+    cursor: pointer;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.close-btn:hover {
+    color: #202223;
+}
+
+.search-container {
+    padding: 0 16px 12px 16px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.search-input-wrapper {
+    position: relative;
+    width: 416px;
+    height: 36px;
+    flex-shrink: 0;
+}
+
+.search-input {
+    width: 100%;
+    height: 100%;
+    padding: 8px 12px 8px 40px;
+    border: 1px solid #c9cccf;
+    border-radius: 6px;
+    font-size: 13px;
+    background: white;
+    color: #202223;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.search-input:focus {
+    border-color: #008060;
+    box-shadow: 0 0 0 1px #008060;
+}
+
+.search-input::placeholder {
+    color: #6d7175;
+}
+
+.search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    pointer-events: none;
+}
+
+.search-icon svg {
+    width: 16px;
+    height: 16px;
+    fill: var(--Icon-Default, #5C5F62);
+}
+
+.history-list {
+    overflow-y: auto;
+    height: calc(100% - 100px);
+    padding: 0 16px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.history-item {
+    display: flex;
+    padding: 12px;
+    justify-content: space-between;
+    align-items: flex-start;
+    align-self: stretch;
+    border-radius: 8px;
+    background: var(--Surface-Hovered, #F6F6F7);
+    cursor: pointer;
+    transition: background-color 0.1s ease-in-out;
+    margin-bottom: 8px;
+}
+
+.history-item:hover {
+    background-color: #F6F6F7;
+}
+
+.history-item-content {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    align-self: stretch;
+    flex: 1;
+    min-width: 0;
+}
+
+.history-item-title {
+    display: -webkit-box;
+    width: 275px;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+    overflow: hidden;
+    color: var(--Text-Default, #202223);
+    font-feature-settings: 'liga' off, 'clig' off;
+    text-overflow: ellipsis;
+    font-family: "SF Pro Text";
+    font-size: 12px;
+    font-style: normal;
+    font-weight: 500;
+    line-height: 16px;
+    margin: 0 0 4px 0;
+}
+
+.history-item-date {
+    color: var(--Text-Subdued, #6D7175);
+    font-feature-settings: 'liga' off, 'clig' off;
+    font-family: "SF Pro Text";
+    font-size: 12px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: 16px;
+    margin: 0;
+}
+
+.history-delete-btn {
+    background: none;
+    border: none;
+    color: transparent;
+    cursor: pointer;
+    padding: 2px;
+    opacity: 0;
+    transition: opacity 0.1s ease-in-out;
+    width: 14px;
+    height: 14px;
+    aspect-ratio: 1/1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.history-item:hover .history-delete-btn {
+    opacity: 1;
+}
+
+.history-delete-btn svg {
+    width: 14px;
+    height: 14px;
+    fill: #5C5F62;
+}
+
+.history-delete-btn:hover svg {
+    fill: #d72c0d;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .history-sidebar {
+        width: 100vw;
+    }
+    
+    .search-input-wrapper {
+        width: calc(100% - 32px);
+    }
+}

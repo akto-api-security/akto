@@ -1,0 +1,389 @@
+.ask-akto-container {
+    height: calc(100vh - 120px);
+    display: flex;
+    flex-direction: column;
+    background: transparent;
+    font-size: 14px;
+}
+
+.ask-akto-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 30px;
+    max-width: 900px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.ask-akto-welcome {
+    width: 100%;
+    max-width: 700px;
+    text-align: center;
+}
+
+.ask-akto-header {
+    margin-bottom: 40px;
+}
+
+.greeting {
+    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 24px;
+    font-weight: 500;
+    line-height: 28px;
+    color: #202223;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 8px;
+}
+
+.akto-logo-image {
+    height: 24px;
+    max-width: 80px;
+    object-fit: contain;
+    align-self: center;
+}
+
+.chat-input-main {
+    width: 100%;
+    max-width: 496px;
+    margin: 0 auto 32px;
+    position: relative;
+}
+
+.chat-input-wrapper {
+    position: relative;
+    border: 1px solid #D1D5DB;
+    border-radius: 8px;
+    background: #FFFFFF;
+    min-height: 48px;
+    display: flex;
+    flex-direction: column;
+    transition: border-color 0.2s ease;
+}
+
+.chat-input-wrapper:focus-within {
+    border-color: #8B5CF6;
+}
+
+.attached-files-inline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 40px 8px 40px;
+    border-bottom: 1px solid #E5E7EB;
+}
+
+.attached-file-inline-item {
+    position: relative;
+    display: inline-block;
+}
+
+.attached-file-inline-thumbnail {
+    width: 40px;
+    height: 40px;
+    aspect-ratio: 1/1;
+    border-radius: 4px;
+    background: lightgray 50% / cover no-repeat;
+    box-shadow: 0 0 5px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.15);
+    display: block;
+}
+
+.attached-file-inline-icon {
+    width: 40px;
+    height: 40px;
+    aspect-ratio: 1/1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #F3F4F6;
+    border-radius: 4px;
+    box-shadow: 0 0 5px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.15);
+    font-size: 16px;
+}
+
+.remove-file-inline-button {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 16px;
+    height: 16px;
+    background: #EF4444;
+    border: 1px solid #FFFFFF;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.remove-file-inline-button:hover {
+    background: #DC2626;
+    transform: scale(1.1);
+}
+
+.remove-file-inline-icon {
+    width: 8px;
+    height: 8px;
+    color: white;
+}
+
+.main-chat-input {
+    width: 100%;
+    height: 48px;
+    padding: 12px 50px 12px 40px;
+    border: none;
+    border-radius: 0 0 8px 8px;
+    font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    outline: none;
+    background: transparent;
+    box-sizing: border-box;
+}
+
+.main-chat-input:focus {
+    background: transparent;
+}
+
+.main-chat-input::placeholder {
+    color: #9CA3AF;
+    font-size: 14px;
+}
+
+.attachment-button {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.attachment-button:hover {
+    background: #F3F4F6;
+}
+
+.attachment-icon {
+    width: 16px;
+    height: 16px;
+    color: #6B7280;
+}
+
+.send-button {
+    position: absolute;
+    right: 8px;
+    bottom: 10px;
+    background: #C4B5FD;
+    border: none;
+    border-radius: 6px;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease;
+}
+
+.send-button:hover {
+    background: #A78BFA;
+}
+
+.send-button:disabled {
+    background: #E5E7EB;
+    cursor: not-allowed;
+}
+
+.send-icon {
+    width: 14px;
+    height: 14px;
+    color: white;
+}
+
+.ask-akto-suggestions {
+    margin-bottom: 48px;
+}
+
+.suggestions-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.suggestion-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+    width: 100%;
+    color: rgba(109, 113, 117, 0.80);
+    font-feature-settings: 'liga' off, 'clig' off;
+    font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 12px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: 16px;
+}
+
+.suggestion-item:hover {
+    color: #8B5CF6;
+}
+
+.suggestion-item:hover .suggestion-icon path {
+    fill: #8B5CF6;
+}
+
+.suggestion-icon {
+    width: 17px;
+    height: 13px;
+    flex-shrink: 0;
+}
+
+.suggestion-icon path {
+    fill: #898C90;
+    transition: fill 0.2s ease;
+}
+
+.suggestion-text {
+    color: inherit;
+    font-size: 12px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: 16px;
+    font-feature-settings: 'liga' off, 'clig' off;
+    font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.ask-akto-history {
+    width: 100%;
+    max-width: 496px;
+    margin: 0 auto;
+}
+
+.history-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.history-title {
+    font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 16px;
+    color: #202223;
+}
+
+.view-all-button {
+    background: none;
+    border: none;
+    color: #8B5CF6;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    transition: background 0.2s ease;
+}
+
+.view-all-button:hover {
+    background: #F3F4F6;
+}
+
+.history-items {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    width: 100%;
+}
+
+.history-item {
+    display: flex;
+    padding: 12px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 32px;
+    flex: 1 0 0;
+    border-radius: 8px;
+    background: #FAFAFA;
+    box-shadow: 0 0 5px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.15);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+    height: 120px;
+    min-height: 120px;
+    justify-content: space-between;
+}
+
+.history-item:hover {
+    border-color: #8B5CF6;
+    box-shadow: 0 1px 4px rgba(139, 92, 246, 0.1);
+}
+
+.history-item-title {
+    font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 16px;
+    color: #202223;
+    margin-bottom: 8px;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    flex-grow: 1;
+}
+
+.history-item-date {
+    font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 10px;
+    font-weight: 400;
+    line-height: 12px;
+    color: #6B7280;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .ask-akto-main {
+        padding: 16px 20px;
+    }
+    
+    .greeting {
+        font-size: 20px;
+    }
+    
+    .history-items {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    
+    .suggestions-container {
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 1024px) {
+    .history-items {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}

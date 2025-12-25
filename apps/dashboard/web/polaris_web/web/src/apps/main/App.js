@@ -114,6 +114,8 @@ import ThreatDashboardPage from "../dashboard/pages/threat_detection/ThreatDashb
 import OpenApiAgentTester from "../dashboard/pages/observe/OpenApiAgentTester";
 import DastProgress from "../dashboard/pages/observe/api_collections/DastProgress.jsx";
 import DastProgressSingle from "../dashboard/pages/observe/api_collections/DastProgressSingle.jsx";
+import AskAkto from "../dashboard/pages/ask_akto/AskAkto.jsx";
+import AskAktoConversation from "../dashboard/pages/ask_akto/AskAktoConversation.jsx";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -291,6 +293,14 @@ const router = createBrowserRouter([
                     {
                         path: "quick-start",
                         element: <QuickStart/>,
+                    },
+                    {
+                        path: "ask-akto",
+                        element: <AskAkto/>,
+                    },
+                    {
+                        path: "ask-akto/conversation",
+                        element: <AskAktoConversation/>,
                     },
                     {
                         path: "agent-team",

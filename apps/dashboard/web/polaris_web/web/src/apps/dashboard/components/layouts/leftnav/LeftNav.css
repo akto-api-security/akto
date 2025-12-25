@@ -23,3 +23,17 @@
 body:has(.agentic-security-nav) .Polaris-Navigation {
     background: #ffffff !important;
 }
+
+/* Ask Akto gradient text styling */
+.ask-akto-gradient-text {
+    background: linear-gradient(90deg, rgba(98, 0, 234, 0.67) 0%, #18A4EA 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-feature-settings: 'liga' off, 'clig' off;
+    font-family: "SF Pro Text";
+    font-size: 14px;
+    font-style: normal;
+    font-weight: 500;
+    line-height: 20px;
+}
