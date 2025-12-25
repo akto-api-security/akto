@@ -294,7 +294,7 @@ useEffect(() => {
                     <Box paddingInlineStart={3} paddingInlineEnd={3}>
                         <HorizontalStack gap={4} wrap={false}>
                             <div style={{ cursor: 'pointer' }} onClick={() => window.location.href = "/dashboard/observe/inventory"} className='logo'>
-                                <img src={logoSrc} alt="Akto Logo" style={{ maxWidth: '78px' }} />
+                                <img src={logoSrc} alt="Akto Logo" style={{ maxWidth: '90x' }} />
                             </div>
 
                             <Box minWidth='170px'>
