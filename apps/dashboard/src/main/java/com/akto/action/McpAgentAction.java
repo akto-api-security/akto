@@ -5,6 +5,7 @@ import com.akto.dao.testing.AgentConversationDao;
 import com.akto.dto.testing.GenericAgentConversation;
 import com.akto.dto.testing.GenericAgentConversation.ConversationType;
 import com.akto.util.Constants;
+import com.akto.util.McpTokenGenerator;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -43,6 +44,8 @@ public class McpAgentAction extends UserAction {
                 return ERROR.toUpperCase();
             }
 
+            String accessTokenForRequest = McpTokenGenerator.generateToken();
+
             boolean isFirstRequest = true;
             String storedTitle = null;
             if(StringUtils.isNotEmpty(conversationId)) {
@@ -57,7 +60,7 @@ public class McpAgentAction extends UserAction {
                 this.conversationId = UUID.randomUUID().toString();
             }
             AgentClient agentClient = new AgentClient(Constants.AKTO_MCP_SERVER);
-            GenericAgentConversation responseFromMcpServer = agentClient.getResponseFromMcpServer(message, conversationId, 20000, storedTitle, conversationTypeEnum);
+            GenericAgentConversation responseFromMcpServer = agentClient.getResponseFromMcpServer(message, conversationId, 20000, storedTitle, conversationTypeEnum, accessTokenForRequest);
             if(responseFromMcpServer != null) {
                 AgentConversationDao.instance.insertOne(responseFromMcpServer);
             }
