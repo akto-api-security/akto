@@ -2212,19 +2212,23 @@ public class DbLayer {
                 filters.add(Filters.gt("updatedTimestamp", updatedAfter));
             }
 
-            if (contextSource == null || contextSource == CONTEXT_SOURCE.AGENTIC) {
-                filters.add(Filters.or(
-                    Filters.eq("contextSource", CONTEXT_SOURCE.AGENTIC.name()),
-                    Filters.exists("contextSource", false)
-                ));
-            } else {
-                filters.add(Filters.eq("contextSource", contextSource.name()));
+            if (contextSource != null) {
+                if (contextSource == CONTEXT_SOURCE.AGENTIC) {
+                    filters.add(Filters.or(
+                        Filters.eq("contextSource", CONTEXT_SOURCE.AGENTIC.name()),
+                        Filters.exists("contextSource", false)
+                    ));
+                } else {
+                    filters.add(Filters.eq("contextSource", contextSource.name()));
+                }
             }
 
-            Bson finalFilter = Filters.and(filters);
+            Bson finalFilter = Filters.empty();
+            if (!filters.isEmpty()) {
+                finalFilter = Filters.and(filters);
+            }
 
-            List<GuardrailPolicies> policies = GuardrailPoliciesDao.instance.findAll(finalFilter);
-            return policies;
+            return GuardrailPoliciesDao.instance.findAll(finalFilter);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchGuardrailPolicies: " + e.getMessage());
             return new ArrayList<>();
