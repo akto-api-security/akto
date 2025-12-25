@@ -3,6 +3,7 @@ package com.akto.action;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.UsersDao;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
@@ -11,6 +12,7 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
+import com.akto.dto.billing.Organization;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.usage.UsageMetricCalculator;
@@ -69,7 +71,27 @@ public class WrappedAction extends UserAction {
         );
 
         List<User> users = UsersDao.instance.findAll(Filters.exists("accounts." + accountId));
-        int teamSize = users.size();
+        Organization org = OrganizationsDao.instance.findOne(Filters.in(Organization.ACCOUNTS, accountId));
+        String orgDomain = null;
+        if (org != null) {
+            orgDomain = org.getAdminEmail().substring(org.getAdminEmail().indexOf("@") + 1).toLowerCase();
+        }
+
+        int teamSize = 0;
+        if (orgDomain != null) {
+            for (User user : users) {
+                if (user == null) {
+                    continue;
+                }
+                String email = user.getLogin();
+                String userDomain = email.substring(email.indexOf("@") + 1).toLowerCase();
+                if (orgDomain.equals(userDomain)) {
+                    teamSize++;
+                }
+            }
+        } else {
+            teamSize = users.size();
+        }
 
         if (totalCollections.isEmpty()) {
             data.put("newCollections", newCollectionsCount);
