@@ -580,77 +580,81 @@ function ApiCollections(props) {
                     setLoading(true);
                 }
             }
-            // Build all API promises to run in parallel using named keys
+            // Build all API promises to run in parallel
             const shouldCallHeavyApis = (now - lastFetchedInfo.lastRiskScoreInfo) >= (5 * 60)
 
-            // Create a map of named promises instead of an array
-            const apiPromiseMap = {
-                collections: api.getAllCollectionsBasic(),
-                userEndpoints: api.getUserEndpoints(),
-                trafficInfo: api.getLastTrafficSeen(),
-                deactivatedCount: collectionApi.fetchCountForHostnameDeactivatedCollections(),
-                uningestedCount: collectionApi.fetchCountForUningestedApis(),
-                uningestedDetails: collectionApi.fetchUningestedApis(),
-            };
+            let apiPromises = [
+                api.getAllCollectionsBasic(),  // index 0
+                api.getUserEndpoints(),         // index 1
+                api.getLastTrafficSeen(),            // index 2
+                collectionApi.fetchCountForHostnameDeactivatedCollections(), // index 3
+                collectionApi.fetchCountForUningestedApis(), // index 4
+                collectionApi.fetchUningestedApis(),        // index 5
+            ];
 
             // Conditionally add coverage API (skip for Endpoint Security)
             if (!isEndpointSecurityCategory()) {
-                apiPromiseMap.coverage = api.getCoverageInfoForCollections();
+                apiPromises.push(api.getCoverageInfoForCollections()); // index 6
             }
 
-            // Conditionally add heavy APIs
             if(shouldCallHeavyApis){
-                apiPromiseMap.riskScore = api.getRiskScoreInfo();
-                apiPromiseMap.severity = api.getSeverityInfoForCollections();
+                apiPromises.push(api.getRiskScoreInfo()); // index 6 or 7
+                apiPromises.push(api.getSeverityInfoForCollections()); // index 7 or 8
             }
 
-            // Conditionally add RBAC APIs
             if(userRole === 'ADMIN' && func.checkForRbacFeature()) {
-                apiPromiseMap.usersCollections = api.getAllUsersCollections();
-                apiPromiseMap.teamData = settingRequests.getTeamData();
+                apiPromises.push(api.getAllUsersCollections()); // index varies
+                apiPromises.push(settingRequests.getTeamData()); // index varies
             }
 
-            // Execute all promises and get results by name
-            const results = await Promise.allSettled(Object.values(apiPromiseMap));
-            const resultKeys = Object.keys(apiPromiseMap);
-            const resultMap = Object.fromEntries(
-                resultKeys.map((key, index) => [
-                    key,
-                    results[index].status === 'fulfilled' ? results[index].value : null
-                ])
-            );
+            let results = await Promise.allSettled(apiPromises);
 
-            // Extract results using named keys (with defaults)
-            const apiCollectionsResp = resultMap.collections || { apiCollections: [] };
-            let hasUserEndpoints = resultMap.userEndpoints || false;
-            let coverageInfo = resultMap.coverage || {};
-            let trafficInfo = resultMap.trafficInfo || {};
-            let deactivatedCountInfo = resultMap.deactivatedCount || {};
-            let uningestedApiCountInfo = resultMap.uningestedCount || {};
-            let uningestedApiDetails = resultMap.uningestedDetails || {};
+            // Extract collections response (index 0)
+            const apiCollectionsResp = results[0].status === 'fulfilled' ? results[0].value : { apiCollections: [] };
+            // Extract user endpoints (index 1)
+            let hasUserEndpoints = results[1].status === 'fulfilled' ? results[1].value : false;
 
-            let riskScoreObj = lastFetchedResp;
-            let sensitiveInfo = lastFetchedSensitiveResp;
-            let severityObj = lastFetchedSeverityResp;
 
-            if(shouldCallHeavyApis){
-                // Extract heavy API results using named keys
-                if (resultMap.riskScore) {
-                    riskScoreObj = {
-                        criticalUrls: resultMap.riskScore?.criticalEndpointsCount || 0,
-                        riskScoreMap: resultMap.riskScore?.riskScoreOfCollectionsMap || {}
-                    };
-                }
+            // Extract metadata responses (with corrected indices)
+            let trafficInfo = results[2].status === 'fulfilled' ? results[2].value : {};
+            let deactivatedCountInfo = results[3].status === 'fulfilled' ? results[3].value : {};
+            let uningestedApiCountInfo = results[4].status === 'fulfilled' ? results[4].value : {};
+            let uningestedApiDetails = results[5].status === 'fulfilled' ? results[5].value : {};
 
-                if (resultMap.severity) {
-                    severityObj = resultMap.severity;
-                }
+            let coverageInfo = {};
+            let currentIndex = 6;
 
-                // update the store which has the cached response
-                setLastFetchedInfo({lastRiskScoreInfo: func.timeNow(), lastSensitiveInfo: func.timeNow()})
-                setLastFetchedResp(riskScoreObj)
-                setLastFetchedSeverityResp(severityObj)
+            // Conditionally extract coverage info (skip for Endpoint Security)
+            if (!isEndpointSecurityCategory()) {
+                coverageInfo = results[6].status === 'fulfilled' ? results[6].value : {};
+                currentIndex = 7;
             }
+
+            let riskScoreObj = lastFetchedResp
+            let sensitiveInfo = lastFetchedSensitiveResp
+            let severityObj = lastFetchedSeverityResp
+
+        if(shouldCallHeavyApis){
+            if(results[currentIndex]?.status === "fulfilled"){
+                const res = results[currentIndex].value
+                riskScoreObj = {
+                    criticalUrls: res.criticalEndpointsCount,
+                    riskScoreMap: res.riskScoreOfCollectionsMap
+                }
+            }
+            currentIndex++;
+
+            if(results[currentIndex]?.status === "fulfilled"){
+                const res = results[currentIndex].value
+                severityObj = res
+            }
+            currentIndex++;
+
+            // update the store which has the cached response
+            setLastFetchedInfo({lastRiskScoreInfo: func.timeNow(), lastSensitiveInfo: func.timeNow()})
+            setLastFetchedResp(riskScoreObj)
+            setLastFetchedSeverityResp(severityObj)
+        }
         setCoverageMap(coverageInfo)
         setTrafficMap(trafficInfo)
 
@@ -658,12 +662,15 @@ function ApiCollections(props) {
         let userList = []
 
         if(userRole === 'ADMIN' && func.checkForRbacFeature()) {
-            if(resultMap.usersCollections) {
-                usersCollectionList = resultMap.usersCollections
+            if(results[currentIndex]?.status === "fulfilled") {
+                const res = results[currentIndex].value
+                usersCollectionList = res
             }
+            currentIndex++;
 
-            if(resultMap.teamData) {
-                userList = resultMap.teamData
+            if(results[currentIndex]?.status === "fulfilled") {
+                const res = results[currentIndex].value
+                userList = res
                 if (userList) {
                     userList = userList.filter(x => {
                         if (x?.role === "ADMIN") {

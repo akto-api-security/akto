@@ -278,6 +278,7 @@ function ApiEndpoints(props) {
         let sensitiveParamsResp;
         let sourceCodeData = {};
         let apiInfoSeverityMap ;
+        let issuesDataResp;
         if (isQueryPage) {
             let apiCollectionData = endpointListFromConditions
             if (Object.keys(endpointListFromConditions).length === 0) {
@@ -303,42 +304,39 @@ function ApiEndpoints(props) {
                 }
             }
         } else {
-            // Build API promises map with conditional inclusion
-            const apiPromiseMap = {
-                stiApis: api.fetchApisFromStis(apiCollectionId),
-                apiInfo: api.fetchApiInfosForCollection(apiCollectionId),
-                sourceCodeApis: api.fetchAPIsFromSourceCode(apiCollectionId),
-            };
+            let apiPromises = [
+                api.fetchApisFromStis(apiCollectionId),
+                api.fetchApiInfosForCollection(apiCollectionId),
+                api.fetchAPIsFromSourceCode(apiCollectionId),
+            ];
 
             // Conditionally add testing-related APIs (skip for Endpoint Security)
             if (!isEndpointSecurityCategory()) {
-                apiPromiseMap.severityCount = api.getSeveritiesCountPerCollection(apiCollectionId);
-                apiPromiseMap.issues = IssuesApi.fetchIssues(0, 1000, ["OPEN"], [apiCollectionId], null, null, null, null, null, null, true, null);
+                apiPromises.push(api.getSeveritiesCountPerCollection(apiCollectionId));
+                apiPromises.push(IssuesApi.fetchIssues(0, 1000, ["OPEN"], [apiCollectionId], null, null, null, null, null, null, true, null));
             }
 
-            let results = await Promise.allSettled(Object.values(apiPromiseMap));
-            const resultKeys = Object.keys(apiPromiseMap);
-            const resultMap = Object.fromEntries(
-                resultKeys.map((key, index) => [
-                    key,
-                    results[index].status === 'fulfilled' ? results[index].value : null
-                ])
-            );
+            let results = await Promise.allSettled(apiPromises);
+            let stisEndpoints = results[0].status === 'fulfilled' ? results[0].value : {};
+            let apiInfosData = results[1].status === 'fulfilled' ? results[1].value : {};
+            sourceCodeData = results[2].status === 'fulfilled' ? results[2].value : {};
 
-            // Extract results using named keys
-            let stisEndpoints = resultMap.stiApis || {};
-            let apiInfosData = resultMap.apiInfo || {};
-            sourceCodeData = resultMap.sourceCodeApis || {};
-            apiInfoSeverityMap = resultMap.severityCount || {};
-            let issuesDataResp = resultMap.issues || {};
+            // Conditionally extract testing-related results (skip for Endpoint Security)
+            if (!isEndpointSecurityCategory()) {
+                apiInfoSeverityMap = results[3].status === 'fulfilled' ? results[3].value : {};
+                issuesDataResp = results[4].status === 'fulfilled' ? results[4].value : {};
+            } else {
+                apiInfoSeverityMap = {};
+                issuesDataResp = {};
+            }
 
             // Initialize with empty sensitive params for fast UI loading
             sensitiveParamsResp = { data: { endpoints: [] } };
             setShowEmptyScreen(stisEndpoints?.list !== undefined && stisEndpoints?.list?.length === 0)
             apiEndpointsInCollection = stisEndpoints?.list !== undefined && stisEndpoints.list.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
-            apiInfoListInCollection = apiInfosData?.apiInfoList || []
-            unusedEndpointsInCollection = stisEndpoints?.unusedEndpoints || []
-            setIsRedacted(apiInfosData?.redacted || false)
+            apiInfoListInCollection = apiInfosData.apiInfoList
+            unusedEndpointsInCollection = stisEndpoints.unusedEndpoints
+            setIsRedacted(apiInfosData.redacted)
             setCollectionIssuesData(issuesDataResp?.issues || []);
         }
 

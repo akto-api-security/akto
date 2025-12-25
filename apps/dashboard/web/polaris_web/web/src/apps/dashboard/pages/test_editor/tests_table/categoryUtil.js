@@ -36,7 +36,7 @@ export function getCategoriesBasedOnDashboardCategory(dashboardCategory, categor
     let categoriesName = Object.keys(categoryMap);
     if(dashboardCategory === "MCP Security"){
         categoriesName = mcpCategories;
-    } else if (dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") {
+    } else if (dashboardCategory === "Agentic Security") {
         categoriesName = [...llmCategories, ...mcpCategories];
     }
     return categoriesName;

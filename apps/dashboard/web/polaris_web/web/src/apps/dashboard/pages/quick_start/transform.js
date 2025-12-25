@@ -1619,7 +1619,7 @@ const quickStartFunc = {
             cloudflareWarpObj, zscalerObj
         ]
 
-        if(isGenAISecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory()){
+        if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj,
                 awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
