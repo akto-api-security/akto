@@ -435,7 +435,7 @@ func (c *Consumer) processBatch(ctx context.Context, batch []models.IngestDataBa
 
 	c.logger.Info("Processing batch from Kafka", zap.Int("size", len(batch)))
 
-	results, err := c.validatorService.ValidateBatch(ctx, batch)
+	results, err := c.validatorService.ValidateBatch(ctx, batch, "")
 	if err != nil {
 		c.logger.Error("Failed to validate batch", zap.Error(err))
 		return
