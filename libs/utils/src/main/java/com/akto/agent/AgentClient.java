@@ -3,8 +3,10 @@ package com.akto.agent;
 import com.akto.dao.testing.AgentConversationResultDao;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.AgentConversationResult;
+import com.akto.dto.testing.GenericAgentConversation;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunConfig;
+import com.akto.dto.testing.GenericAgentConversation.ConversationType;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import okhttp3.*;
@@ -81,7 +83,7 @@ public class AgentClient {
             return testResult;
             
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error executing agentic test: " + e.getMessage(), LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Error executing agentic test: " + e.getMessage());
             
             TestResult errorResult = new TestResult();
             errorResult.setMessage("Agentic test execution failed: " + e.getMessage());
@@ -106,7 +108,7 @@ public class AgentClient {
                 AgentConversationResult result = sendChatRequest(prompt, conversationId, testMode, index == totalRequests);
                 results.add(result);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error processing prompt: " + prompt + ", error: " + e.getMessage(), LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("Error processing prompt: " + prompt + ", error: " + e.getMessage());
                 throw e;
             }
         }
@@ -115,7 +117,7 @@ public class AgentClient {
     }
     
     private AgentConversationResult sendChatRequest(String prompt, String conversationId, String testMode, boolean isLastRequest) throws Exception {
-        Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest);
+        Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest, null, ConversationType.TEST_EXECUTION_RESULT, "", "");
         
         try (Response response = agentHttpClient.newCall(request).execute()) {
             if (!response.isSuccessful()) {
@@ -128,27 +130,32 @@ public class AgentClient {
         }
     }
     
-    private Request buildOkHttpChatRequest(String prompt, String conversationId, boolean isLastRequest) {
+    private Request buildOkHttpChatRequest(String prompt, String conversationId, boolean isLastRequest, String chatUrl, GenericAgentConversation.ConversationType conversationType, String accessTokenForRequest, String contextString) {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("prompt", prompt);
         requestBody.put("conversationId", conversationId);
         requestBody.put("isLastRequest", isLastRequest);
+        requestBody.put("conversationType", conversationType);
+        requestBody.put("contextString", contextString);
+
+        String url = agentBaseUrl + (chatUrl != null ? chatUrl :  "/chat");
         
         String body;
         try {
             body = objectMapper.writeValueAsString(requestBody);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error serializing request body: " + e.getMessage(), LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Error serializing request body: " + e.getMessage());
             body = "{\"prompt\":\"" + prompt.replace("\"", "\\\"") + "\"}";
         }
         
         RequestBody requestBodyObj = RequestBody.create(body, MediaType.parse("application/json"));
         
         return new Request.Builder()
-                .url(agentBaseUrl + "/chat")
+                .url(url)
                 .post(requestBodyObj)
                 .addHeader("Content-Type", "application/json")
                 .addHeader("Accept", "application/json")
+                .addHeader("x-akto-token", accessTokenForRequest)
                 .build();
     }
     
@@ -186,7 +193,7 @@ public class AgentClient {
             return new AgentConversationResult(conversationId, originalPrompt, response, conversation, timestamp, validation, validationMessage, finalSentPrompt, remediationMessage);
             
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error parsing agent response: " + e.getMessage() + ", response body: " + responseBody, LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Error parsing agent response: " + e.getMessage() + ", response body: " + responseBody);
             throw new Exception("Failed to parse agent response: " + e.getMessage(), e);
         }
     }
@@ -196,7 +203,7 @@ public class AgentClient {
             AgentConversationResultDao.instance.insertMany(conversationResults);
             loggerMaker.infoAndAddToDb("Stored " + conversationResults.size() + " conversation results in MongoDB");
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error storing conversation results: " + e.getMessage(), LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Error storing conversation results: " + e.getMessage());
         }
     }
 
@@ -212,7 +219,7 @@ public class AgentClient {
                 return response.isSuccessful();
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Agent health check failed with exception: " + e.getMessage(), LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Agent health check failed with exception: " + e.getMessage());
             return false;
         }
     }
@@ -260,7 +267,7 @@ public class AgentClient {
         try {
             body = objectMapper.writeValueAsString(requestBody);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error serializing initialize request body: " + e.getMessage(), LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Error serializing initialize request body: " + e.getMessage());
             // TODO: Fix at sse URL.
             // body = "{\"sseUrl\":\"" + sseUrl.replace("\"", "\\\"") + "\"}";
         }
@@ -273,6 +280,30 @@ public class AgentClient {
                 .addHeader("Content-Type", "application/json")
                 .addHeader("Accept", "application/json")
                 .build();
+    }
+
+    // call akto's mcp server (centralized)
+    public GenericAgentConversation getResponseFromMcpServer(String prompt, String conversationId, int tokensLimit, String storedTitle, GenericAgentConversation.ConversationType conversationType, String accessTokenForRequest, String contextString) throws Exception {
+        Request request = buildOkHttpChatRequest(prompt, conversationId, false, "/generic_chat", conversationType, accessTokenForRequest, contextString);
+        try (Response response = agentHttpClient.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                String responseBody = response.body() != null ? response.body().string() : "";
+                throw new Exception("MCP server returned status code: " + response.code() + ", body: " + responseBody);
+            }
+            String responseBody = response.body() != null ? response.body().string() : "";
+            JsonNode jsonNode = objectMapper.readTree(responseBody);
+            String responseFromMcpServer = jsonNode.has("response") ? jsonNode.get("response").asText() : null;
+            int timestamp = jsonNode.has("timestamp") ? jsonNode.get("timestamp").intValue() : 0;
+            String finalSentPrompt = jsonNode.has("finalSentPrompt") ? jsonNode.get("finalSentPrompt").asText() : null;
+            int tokensUsed = jsonNode.has("tokensUsed") ? jsonNode.get("tokensUsed").intValue() : 0;
+            String title = jsonNode.has("title") ? jsonNode.get("title").asText() : null;
+            if(storedTitle != null) {
+                title = storedTitle;
+            }
+            return new GenericAgentConversation(title, conversationId, prompt, responseFromMcpServer, finalSentPrompt, timestamp, timestamp, tokensUsed, tokensLimit, conversationType);
+        } catch (Exception e) {
+            throw new Exception("Failed to get response from MCP server: " + e.getMessage());
+        }
     }
     
 }

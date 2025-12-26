@@ -94,6 +94,21 @@ public class SampleDataDao extends AccountsContextDaoWithRbac<SampleData> {
         );
     }
 
+    public static String getLatestSampleData(int apiCollectionId, String url, String method) {
+        try {
+            URLMethods.Method methodEnum = URLMethods.Method.valueOf(method);
+            Bson filterQSampleData = filterForSampleData(apiCollectionId, url, methodEnum);
+            SampleData sampleData = SampleDataDao.instance.findOne(filterQSampleData);
+            if(sampleData != null && sampleData.getSamples() != null && !sampleData.getSamples().isEmpty()) {
+                return sampleData.getSamples().get(sampleData.getSamples().size() - 1);
+            }
+        } catch (Exception e) {
+            return null;
+        }
+        
+        return null;
+    }
+
 
     public static List<Bson> filterForMultipleSampleData(List<Key> sampleList) {
         List<Bson> ret = new ArrayList<>();
