@@ -212,7 +212,12 @@ function AskAktoConversation() {
 <div dangerouslySetInnerHTML={{ __html: (() => {
   const escapeHtml = s => s ? s.replace(/[&<>\"']/g, c => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : c.charCodeAt(0) === 34 ? '&quot;' : '&#39;')) : '';
   return escapeHtml(response).replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
-})() }} />
+<div className="response-text">
+  {response.split('\n').map((line, idx) => {
+    const parts = line.split(/\*\*(.*?)\*\*/g);
+    return (<div key={idx}>{parts.map((part, i) => i % 2 === 1 ? <strong key={i}>{part}</strong> : <span key={i}>{part}</span>)}</div>)
+  })}
+</div>
                             <div dangerouslySetInnerHTML={{ __html: response.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
                         </div>
                         
