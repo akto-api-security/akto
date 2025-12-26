@@ -8,11 +8,12 @@ export const ContentFiltersConfig = {
         return { isValid: true, errorMessage: null };
     },
 
-    getSummary: ({ enableHarmfulCategories, enablePromptAttacks }) => {
-        if (enableHarmfulCategories || enablePromptAttacks) {
-            return `${enableHarmfulCategories ? 'Harmful categories' : ''}${enableHarmfulCategories && enablePromptAttacks ? ', ' : ''}${enablePromptAttacks ? 'Prompt attacks' : ''}`;
-        }
-        return null;
+    getSummary: ({ enableHarmfulCategories, enablePromptAttacks, enableCodeFilter }) => {
+        const filters = [];
+        if (enableHarmfulCategories) filters.push('Harmful categories');
+        if (enablePromptAttacks) filters.push('Prompt attacks');
+        if (enableCodeFilter) filters.push('Code detection');
+        return filters.length > 0 ? filters.join(', ') : null;
     }
 };
 
@@ -24,7 +25,11 @@ const ContentFiltersStep = ({
     enablePromptAttacks,
     setEnablePromptAttacks,
     promptAttackLevel,
-    setPromptAttackLevel
+    setPromptAttackLevel,
+    enableCodeFilter,
+    setEnableCodeFilter,
+    codeFilterLevel,
+    setCodeFilterLevel
 }) => {
     return (
         <VerticalStack gap="4">
@@ -123,6 +128,39 @@ const ContentFiltersStep = ({
                                     onChange={(value) => {
                                         const levels = ['none', 'low', 'medium', 'high'];
                                         setPromptAttackLevel(levels[value]);
+                                    }}
+                                />
+                            </Box>
+                        </Box>
+                    )}
+                </VerticalStack>
+            </Box>
+
+            <Box padding="4" borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
+                <VerticalStack gap="4">
+                    <Text variant="headingSm">Code detection</Text>
+                    <Text variant="bodyMd" tone="subdued">
+                        Enable to detect and block programming code in user inputs. This helps prevent code injection attacks and ensures users cannot inject executable code snippets.
+                    </Text>
+                    <Checkbox
+                        label="Enable code detection filter"
+                        checked={enableCodeFilter}
+                        onChange={setEnableCodeFilter}
+                    />
+                    {enableCodeFilter && (
+                        <Box>
+                            <Text variant="bodyMd" fontWeight="medium">Code Detection Level</Text>
+                            <Box paddingBlockStart="2">
+                                <RangeSlider
+                                    label=""
+                                    value={codeFilterLevel === 'none' ? 0 : codeFilterLevel === 'low' ? 1 : codeFilterLevel === 'medium' ? 2 : 3}
+                                    min={0}
+                                    max={3}
+                                    step={1}
+                                    output
+                                    onChange={(value) => {
+                                        const levels = ['none', 'low', 'medium', 'high'];
+                                        setCodeFilterLevel(levels[value]);
                                     }}
                                 />
                             </Box>
