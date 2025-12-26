@@ -1,8 +1,6 @@
 package com.akto.dto.metrics;
 
 import com.akto.dao.context.Context;
-import com.akto.dto.data_types.Conditions;
-import com.akto.dto.usage.MetricTypes;
 import org.bson.types.ObjectId;
 
 public class MetricData {
@@ -22,7 +20,7 @@ public class MetricData {
     }
 
     public enum MetricType {
-        LATENCY, SUM
+        LATENCY, SUM, MAX, GAUGE
     }
 
     private MetricType metricType;
@@ -32,8 +30,8 @@ public class MetricData {
         RT_KAFKA_RECORD_SIZE("Kafka Records Size", "Total size of records processed by runtime module"),
         RT_KAFKA_LATENCY("Runtime Processing Latency", "Time taken to process records in runtime module"),
         RT_API_RECEIVED_COUNT("APIs Received", "Number of APIs received by mini-runtime module"),
-        KAFKA_RECORDS_LAG_MAX("Kafka Records Lag", "Maximum lag in processing Kafka records"),
-        KAFKA_RECORDS_CONSUMED_RATE("Kafka Consumption Rate", "Rate at which Kafka records are being consumed"),
+        KAFKA_RECORDS_LAG_MAX("Kafka Records Lag", "Maximum lag in processing Kafka records in this time period"),
+        KAFKA_RECORDS_CONSUMED_RATE("Kafka Consumption Rate", "Rate at which Kafka records are being consumed per second"),
         KAFKA_FETCH_AVG_LATENCY("Kafka Fetch Latency", "Average time taken to fetch records from Kafka"),
         KAFKA_BYTES_CONSUMED_RATE("Kafka Bytes Consumption Rate", "Rate at which bytes are being consumed from Kafka"),
         CYBORG_NEW_API_COUNT("New APIs Detected", "Count of newly discovered APIs by Cyborg"),
