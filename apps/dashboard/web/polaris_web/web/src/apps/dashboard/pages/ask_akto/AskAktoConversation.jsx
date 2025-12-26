@@ -205,7 +205,10 @@ function AskAktoConversation() {
                 {/* Step 3: Analysis/Response */}
                 {showAnalysis && (
                     <div className="response-section">
-                        <div className="response-content">
+<div dangerouslySetInnerHTML={{ __html: (() => {
+  const escapeHtml = s => s ? s.replace(/[&<>\"']/g, c => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : c.charCodeAt(0) === 34 ? '&quot;' : '&#39;')) : '';
+  return escapeHtml(response).replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
+})() }} />
                             <div dangerouslySetInnerHTML={{ __html: response.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
                         </div>
                         
