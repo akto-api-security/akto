@@ -1,5 +1,52 @@
 import { VerticalStack, Text, Checkbox, Box, HorizontalStack, Button, RangeSlider } from "@shopify/polaris";
 
+// Reusable component for filter sections with level slider
+const FilterSection = ({
+    title,
+    description,
+    checkboxLabel,
+    enabled,
+    onEnabledChange,
+    levelLabel,
+    level,
+    onLevelChange
+}) => {
+    return (
+        <Box padding="4" borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
+            <VerticalStack gap="4">
+                <Text variant="headingSm">{title}</Text>
+                <Text variant="bodyMd" tone="subdued">
+                    {description}
+                </Text>
+                <Checkbox
+                    label={checkboxLabel}
+                    checked={enabled}
+                    onChange={onEnabledChange}
+                />
+                {enabled && (
+                    <Box>
+                        <Text variant="bodyMd" fontWeight="medium">{levelLabel}</Text>
+                        <Box paddingBlockStart="2">
+                            <RangeSlider
+                                label=""
+                                value={level === 'none' ? 0 : level === 'low' ? 1 : level === 'medium' ? 2 : 3}
+                                min={0}
+                                max={3}
+                                step={1}
+                                output
+                                onChange={(value) => {
+                                    const levels = ['none', 'low', 'medium', 'high'];
+                                    onLevelChange(levels[value]);
+                                }}
+                            />
+                        </Box>
+                    </Box>
+                )}
+            </VerticalStack>
+        </Box>
+    );
+};
+
 export const ContentFiltersConfig = {
     number: 2,
     title: "Configure content filters",
@@ -8,11 +55,12 @@ export const ContentFiltersConfig = {
         return { isValid: true, errorMessage: null };
     },
 
-    getSummary: ({ enableHarmfulCategories, enablePromptAttacks }) => {
-        if (enableHarmfulCategories || enablePromptAttacks) {
-            return `${enableHarmfulCategories ? 'Harmful categories' : ''}${enableHarmfulCategories && enablePromptAttacks ? ', ' : ''}${enablePromptAttacks ? 'Prompt attacks' : ''}`;
-        }
-        return null;
+    getSummary: ({ enableHarmfulCategories, enablePromptAttacks, enableCodeFilter }) => {
+        const filters = [];
+        if (enableHarmfulCategories) filters.push('Harmful categories');
+        if (enablePromptAttacks) filters.push('Prompt attacks');
+        if (enableCodeFilter) filters.push('Code detection');
+        return filters.length > 0 ? filters.join(', ') : null;
     }
 };
 
@@ -24,7 +72,11 @@ const ContentFiltersStep = ({
     enablePromptAttacks,
     setEnablePromptAttacks,
     promptAttackLevel,
-    setPromptAttackLevel
+    setPromptAttackLevel,
+    enableCodeFilter,
+    setEnableCodeFilter,
+    codeFilterLevel,
+    setCodeFilterLevel
 }) => {
     return (
         <VerticalStack gap="4">
@@ -98,38 +150,27 @@ const ContentFiltersStep = ({
                 </VerticalStack>
             </Box>
 
-            <Box padding="4" borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
-                <VerticalStack gap="4">
-                    <Text variant="headingSm">Prompt attacks</Text>
-                    <Text variant="bodyMd" tone="subdued">
-                        Enable to detect and block user inputs attempting to override system instructions. To avoid misclassifying system prompts as a prompt attack and ensure that the filters are selectively applied to user inputs, use input tagging.
-                    </Text>
-                    <Checkbox
-                        label="Enable prompt attacks filter"
-                        checked={enablePromptAttacks}
-                        onChange={setEnablePromptAttacks}
-                    />
-                    {enablePromptAttacks && (
-                        <Box>
-                            <Text variant="bodyMd" fontWeight="medium">Prompt Attack</Text>
-                            <Box paddingBlockStart="2">
-                                <RangeSlider
-                                    label=""
-                                    value={promptAttackLevel === 'none' ? 0 : promptAttackLevel === 'low' ? 1 : promptAttackLevel === 'medium' ? 2 : 3}
-                                    min={0}
-                                    max={3}
-                                    step={1}
-                                    output
-                                    onChange={(value) => {
-                                        const levels = ['none', 'low', 'medium', 'high'];
-                                        setPromptAttackLevel(levels[value]);
-                                    }}
-                                />
-                            </Box>
-                        </Box>
-                    )}
-                </VerticalStack>
-            </Box>
+            <FilterSection
+                title="Prompt attacks"
+                description="Enable to detect and block user inputs attempting to override system instructions. To avoid misclassifying system prompts as a prompt attack and ensure that the filters are selectively applied to user inputs, use input tagging."
+                checkboxLabel="Enable prompt attacks filter"
+                enabled={enablePromptAttacks}
+                onEnabledChange={setEnablePromptAttacks}
+                levelLabel="Prompt Attack"
+                level={promptAttackLevel}
+                onLevelChange={setPromptAttackLevel}
+            />
+
+            <FilterSection
+                title="Code detection"
+                description="Enable to detect and block programming code in user inputs. This helps prevent code injection attacks and ensures users cannot inject executable code snippets."
+                checkboxLabel="Enable code detection filter"
+                enabled={enableCodeFilter}
+                onEnabledChange={setEnableCodeFilter}
+                levelLabel="Code Detection Level"
+                level={codeFilterLevel}
+                onLevelChange={setCodeFilterLevel}
+            />
         </VerticalStack>
     );
 };

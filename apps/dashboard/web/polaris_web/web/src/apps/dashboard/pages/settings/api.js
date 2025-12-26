@@ -607,6 +607,29 @@ const settingRequests = {
         })
     },
 
+    fetchAdxIntegration() {
+        return request({
+            url: '/api/fetchAdxIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addAdxIntegration(clusterEndpoint, databaseName, tenantId, applicationClientId, applicationKey) {
+        return request({
+            url: '/api/addAdxIntegration',
+            method: 'post',
+            data: {clusterEndpoint, databaseName, tenantId, applicationClientId, applicationKey}
+        })
+    },
+    removeAdxIntegration() {
+        return request({
+            url: '/api/removeAdxIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
     fetchServiceNowIntegration() {
         return request({
             url: '/api/fetchServiceNowIntegration',

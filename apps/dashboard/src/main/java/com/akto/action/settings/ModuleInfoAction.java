@@ -4,6 +4,7 @@ import com.akto.action.UserAction;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.dto.monitoring.ModuleInfo.ModuleType;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
@@ -36,18 +37,26 @@ public class ModuleInfoAction extends UserAction {
     public String fetchModuleInfo() {
         List<Bson> filters = new ArrayList<>();
 
-        int deltaTime = Context.now() - heartbeatThresholdSeconds;
-        filters.add(Filters.gte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, deltaTime));
+        boolean isEndpointShield = false;
 
         // Apply filter if provided
         if (filter != null && !filter.isEmpty()) {
             if (filter.containsKey(ModuleInfo.MODULE_TYPE)) {
-                filters.add(Filters.eq(ModuleInfo.MODULE_TYPE, filter.get(ModuleInfo.MODULE_TYPE)));
+                String moduleTypeStr = (String) filter.get(ModuleInfo.MODULE_TYPE);
+                if(ModuleType.MCP_ENDPOINT_SHIELD.toString().equals(moduleTypeStr)) {
+                    isEndpointShield = true;
+                }
+                filters.add(Filters.eq(ModuleInfo.MODULE_TYPE, moduleTypeStr));
             }
             // Add more filter fields as needed
         }
 
-        Bson finalFilter = Filters.and(filters);
+        if (!isEndpointShield) {
+            int deltaTime = Context.now() - heartbeatThresholdSeconds;
+            filters.add(Filters.gte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, deltaTime));
+        }
+
+        Bson finalFilter = filters.isEmpty() ? Filters.empty() : Filters.and(filters);
         moduleInfos = ModuleInfoDao.instance.findAll(finalFilter);
         return SUCCESS.toUpperCase();
     }

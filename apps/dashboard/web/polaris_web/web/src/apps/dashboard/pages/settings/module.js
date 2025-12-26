@@ -295,6 +295,27 @@ const settingFunctions = {
       })
       return trafficData
     },
+    fetchAdxIntegration: async function(){
+      let adxInteg = {}
+      await settingRequests.fetchAdxIntegration().then((resp)=>{
+        adxInteg = resp.adxIntegration
+      })
+      return adxInteg
+    },
+    addAdxIntegration: async function(clusterEndpoint, databaseName, tenantId, applicationClientId, applicationKey) {
+        let trafficData = {}
+        await settingRequests.addAdxIntegration(clusterEndpoint, databaseName, tenantId, applicationClientId, applicationKey).then((resp)=>{
+            trafficData = resp
+        })
+        return trafficData
+    },
+    removeAdxIntegration: async function() {
+      let trafficData = {}
+      await settingRequests.removeAdxIntegration().then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
     fetchServiceNowIntegration: async function(){
       let serviceNowInteg = {}
       await settingRequests.fetchServiceNowIntegration().then((resp)=>{
