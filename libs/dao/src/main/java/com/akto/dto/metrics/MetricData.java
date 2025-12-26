@@ -1,8 +1,6 @@
 package com.akto.dto.metrics;
 
 import com.akto.dao.context.Context;
-import com.akto.dto.data_types.Conditions;
-import com.akto.dto.usage.MetricTypes;
 import org.bson.types.ObjectId;
 
 public class MetricData {
@@ -22,7 +20,7 @@ public class MetricData {
     }
 
     public enum MetricType {
-        LATENCY, SUM
+        LATENCY, SUM, MAX, GAUGE
     }
 
     private MetricType metricType;

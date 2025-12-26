@@ -349,6 +349,17 @@ public class Main {
                     MetricName key = entry.getKey();
                     Metric value = entry.getValue();
 
+                    // Only process consumer-level metrics (not per-partition metrics)
+                    // Per-partition metrics have a "partition" tag, consumer-level metrics don't
+                    if (key.tags().containsKey("partition")) {
+                        continue;
+                    }
+
+                    // Also skip per-topic metrics - we only want consumer-level aggregated metrics
+                    if (key.tags().containsKey("topic")) {
+                        continue;
+                    }
+
                     if(key.name().equals("records-lag-max")){
                         double val = value.metricValue().equals(Double.NaN) ? 0d: (double) value.metricValue();
                         AllMetrics.instance.setKafkaRecordsLagMax((float) val);
