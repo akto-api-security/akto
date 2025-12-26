@@ -1,6 +1,7 @@
 package com.akto.action;
 
 import com.akto.agent.AgentClient;
+import com.akto.dao.SampleDataDao;
 import com.akto.dao.testing.AgentConversationDao;
 import com.akto.dto.testing.GenericAgentConversation;
 import com.akto.dto.testing.GenericAgentConversation.ConversationType;
@@ -16,6 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public class McpAgentAction extends UserAction {
@@ -28,6 +30,8 @@ public class McpAgentAction extends UserAction {
     private String agentEndpoint;
     private int limit;
     private String conversationType;
+
+    private Map<String, Object> metaData;
 
     public String chatAndStoreConversation() {
         try {
@@ -60,7 +64,28 @@ public class McpAgentAction extends UserAction {
                 this.conversationId = UUID.randomUUID().toString();
             }
             AgentClient agentClient = new AgentClient(Constants.AKTO_MCP_SERVER);
-            GenericAgentConversation responseFromMcpServer = agentClient.getResponseFromMcpServer(message, conversationId, 20000, storedTitle, conversationTypeEnum, accessTokenForRequest);
+            String contextString = "";
+
+            if(metaData != null) {
+                String type = (String) metaData.get("type");
+                if(StringUtils.isNotEmpty(type) && type.equals("sample_request")) {
+                    // get sample data from metaData
+                    // it will be data -> apiCollectionId, url, method
+                    Object data = metaData.get("data");
+                    if(data != null && data instanceof Map) {
+                        Map<String, Object> dataMap = (Map<String, Object>) data;
+                        Integer apiCollectionId = (Integer) dataMap.get("apiCollectionId");
+                        String url = (String) dataMap.get("url");
+                        String method = (String) dataMap.get("method");
+                        String latestSampleData = SampleDataDao.getLatestSampleData(apiCollectionId, url, method);
+                        if(StringUtils.isNotEmpty(latestSampleData)) {
+                            contextString = "Current context: " + latestSampleData;
+                        }
+                    }
+                }
+            }
+
+            GenericAgentConversation responseFromMcpServer = agentClient.getResponseFromMcpServer(message, conversationId, 20000, storedTitle, conversationTypeEnum, accessTokenForRequest, contextString);
             if(responseFromMcpServer != null) {
                 AgentConversationDao.instance.insertOne(responseFromMcpServer);
             }
@@ -115,5 +140,9 @@ public class McpAgentAction extends UserAction {
     public void setLimit(int limit) { this.limit = limit; }
     public String getConversationType() { return conversationType; }
     public void setConversationType(String conversationType) { this.conversationType = conversationType; }
+    public Map<String, Object> getMetaData() { return metaData; }
+    public void setMetaData(Map<String, Object> metaData) {
+        this.metaData = metaData;
+    }
 
 }

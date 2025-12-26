@@ -117,7 +117,7 @@ public class AgentClient {
     }
     
     private AgentConversationResult sendChatRequest(String prompt, String conversationId, String testMode, boolean isLastRequest) throws Exception {
-        Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest, null, ConversationType.TEST_EXECUTION_RESULT, "");
+        Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest, null, ConversationType.TEST_EXECUTION_RESULT, "", "");
         
         try (Response response = agentHttpClient.newCall(request).execute()) {
             if (!response.isSuccessful()) {
@@ -130,12 +130,13 @@ public class AgentClient {
         }
     }
     
-    private Request buildOkHttpChatRequest(String prompt, String conversationId, boolean isLastRequest, String chatUrl, GenericAgentConversation.ConversationType conversationType, String accessTokenForRequest) {
+    private Request buildOkHttpChatRequest(String prompt, String conversationId, boolean isLastRequest, String chatUrl, GenericAgentConversation.ConversationType conversationType, String accessTokenForRequest, String contextString) {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("prompt", prompt);
         requestBody.put("conversationId", conversationId);
         requestBody.put("isLastRequest", isLastRequest);
         requestBody.put("conversationType", conversationType);
+        requestBody.put("contextString", contextString);
 
         String url = agentBaseUrl + (chatUrl != null ? chatUrl :  "/chat");
         
@@ -282,8 +283,8 @@ public class AgentClient {
     }
 
     // call akto's mcp server (centralized)
-    public GenericAgentConversation getResponseFromMcpServer(String prompt, String conversationId, int tokensLimit, String storedTitle, GenericAgentConversation.ConversationType conversationType, String accessTokenForRequest) throws Exception {
-        Request request = buildOkHttpChatRequest(prompt, conversationId, false, "/generic_chat", conversationType, accessTokenForRequest);
+    public GenericAgentConversation getResponseFromMcpServer(String prompt, String conversationId, int tokensLimit, String storedTitle, GenericAgentConversation.ConversationType conversationType, String accessTokenForRequest, String contextString) throws Exception {
+        Request request = buildOkHttpChatRequest(prompt, conversationId, false, "/generic_chat", conversationType, accessTokenForRequest, contextString);
         try (Response response = agentHttpClient.newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 String responseBody = response.body() != null ? response.body().string() : "";
