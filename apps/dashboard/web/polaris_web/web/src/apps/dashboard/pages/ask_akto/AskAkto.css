@@ -51,7 +51,7 @@
 .chat-input-main {
     width: 100%;
     max-width: 496px;
-    margin: 0 auto 32px;
+    margin: 0 auto 24px;
     position: relative;
 }
 
@@ -212,7 +212,7 @@
 }
 
 .ask-akto-suggestions {
-    margin-bottom: 48px;
+    margin-bottom: 32px;
 }
 
 .suggestions-container {
@@ -221,7 +221,7 @@
     gap: 8px;
     width: 100%;
     max-width: 500px;
-    margin: 0 auto;
+    margin: 0;
 }
 
 .suggestion-item {
@@ -273,93 +273,93 @@
     font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-.ask-akto-history {
+/* Main page history section - completely separate from sidebar */
+.ask-akto-main-history {
     width: 100%;
-    max-width: 496px;
+    max-width: 520px;
     margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+    justify-content: center;
 }
 
-.history-header {
+.main-history-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 16px;
-}
-
-.history-title {
-    font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 12px;
-    font-weight: 500;
-    line-height: 16px;
-    color: #202223;
-}
-
-.view-all-button {
-    background: none;
-    border: none;
-    color: #8B5CF6;
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    padding: 4px 6px;
-    border-radius: 4px;
-    transition: background 0.2s ease;
-}
-
-.view-all-button:hover {
-    background: #F3F4F6;
-}
-
-.history-items {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
     width: 100%;
 }
 
-.history-item {
+.main-view-all-button {
+    background: none;
+    border: none;
+    color: #202223;
+    font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 20px;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+    text-decoration-skip-ink: none;
+    text-underline-position: from-font;
+    transition: color 0.2s ease;
+}
+
+.main-view-all-button:hover {
+    color: #6200EA;
+}
+
+/* History cards container */
+.main-history-cards-container {
     display: flex;
-    padding: 12px;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 32px;
-    flex: 1 0 0;
-    border-radius: 8px;
-    background: #FAFAFA;
-    box-shadow: 0 0 5px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.15);
+    gap: 16px;
+    width: 100%;
+}
+
+/* Individual history card styling*/
+.main-history-card-item {
+    flex: 1;
     cursor: pointer;
     transition: all 0.2s ease;
+    background: #fafafa;
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.05), 0px 1px 2px 0px rgba(0,0,0,0.15);
+    border: none;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    min-height: 80px;
     text-align: left;
-    height: 120px;
-    min-height: 120px;
-    justify-content: space-between;
 }
 
-.history-item:hover {
-    border-color: #8B5CF6;
-    box-shadow: 0 1px 4px rgba(139, 92, 246, 0.1);
+.main-history-card-item:hover {
+    background: #f0f0f0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.history-item-title {
+/* Title text styling to match Figma exactly */
+.main-card-title {
     font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-size: 12px;
     font-weight: 500;
     line-height: 16px;
     color: #202223;
-    margin-bottom: 8px;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    flex-grow: 1;
+    margin: 0;
 }
 
-.history-item-date {
+/* Date text styling to match Figma exactly */
+.main-card-date {
     font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 400;
-    line-height: 12px;
-    color: #6B7280;
+    line-height: 16px;
+    color: #6d7175;
+    margin: 0;
+    white-space: nowrap;
 }
 
 /* Responsive */
@@ -372,18 +372,29 @@
         font-size: 20px;
     }
     
-    .history-items {
-        grid-template-columns: 1fr;
-        gap: 8px;
+    .main-history-cards-container {
+        flex-direction: column;
+        width: 100%;
+        gap: 12px;
     }
     
     .suggestions-container {
         max-width: 100%;
     }
+    
+    .ask-akto-main-history {
+        max-width: 100%;
+    }
 }
 
 @media (max-width: 1024px) {
-    .history-items {
-        grid-template-columns: repeat(2, 1fr);
+    .main-history-cards-container {
+        flex-direction: column;
+        width: 100%;
+        gap: 12px;
+    }
+    
+    .ask-akto-main-history {
+        max-width: 100%;
     }
 }

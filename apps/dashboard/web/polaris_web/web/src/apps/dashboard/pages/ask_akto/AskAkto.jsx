@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { SearchMinor } from '@shopify/polaris-icons'
 import { useNavigate } from 'react-router-dom'
+import { Text } from '@shopify/polaris'
 import AskAktoChatInput from '../../components/shared/AskAktoChatInput'
 import SuggestionsComponent from '../../components/shared/SuggestionsComponent'
 import HistorySidebar from '../../components/shared/HistorySidebar'
@@ -121,32 +121,33 @@ function AskAkto() {
                         onSuggestionClick={handleSuggestionClick}
                     />
 
-                    {/* History section with 3 horizontal tiles */}
-                    <div className="ask-akto-history">
-                        <div className="history-header">
-                            <div className="history-title">History</div>
-                            <button className="view-all-button" onClick={handleViewAllClick}>
+                    {/* History section with 3 Polaris Cards */}
+                    <div className="ask-akto-main-history">
+                        <div className="main-history-header">
+                            <Text as="h3" variant="headingMd">History</Text>
+                            <button className="main-view-all-button" onClick={handleViewAllClick}>
                                 View all
                             </button>
                         </div>
                         
-                        <div className="history-items">
+                        <div className="main-history-cards-container">
                             {historyData.map((item) => (
                                 <div
                                     key={item.id}
-                                    className="history-item"
+                                    className="main-history-card-item"
                                     onClick={() => handleHistoryClick(item)}
                                 >
-                                    <div className="history-item-title">
+                                    <div className="main-card-title">
                                         {item.title}
                                     </div>
-                                    <div className="history-item-date">
+                                    <div className="main-card-date">
                                         {item.date}
                                     </div>
                                 </div>
                             ))}
                         </div>
                     </div>
+
                 </div>
             </div>
 

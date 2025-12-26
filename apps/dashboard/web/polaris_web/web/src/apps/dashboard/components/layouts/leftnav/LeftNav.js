@@ -508,13 +508,9 @@ export default function LeftNav() {
         if (!askAktoExists) {
             items.splice(1, 0, {
                 label: (
-                    <Text
-                        variant="bodyMd"
-                        fontWeight="medium"
-                        className="ask-akto-gradient-text"
-                    >
+                    <span className="ask-akto-gradient-text">
                         Ask Akto
-                    </Text>
+                    </span>
                 ),
                 icon: MagicMajor,
                 onClick: () => {
