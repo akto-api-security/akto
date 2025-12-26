@@ -227,7 +227,7 @@ public class ClientActor extends DataActor {
     }
 
     @Override
-    public boolean updateModuleInfo(ModuleInfo moduleInfo) {
+    public ModuleInfo updateModuleInfo(ModuleInfo moduleInfo) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("moduleInfo", moduleInfo);
@@ -238,21 +238,21 @@ public class ClientActor extends DataActor {
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in updateModuleInfoForHeartbeat", LoggerMaker.LogDb.RUNTIME);
-                return false;
+                return null;
             }
             BasicDBObject payloadObj;
             try {
                 payloadObj =  BasicDBObject.parse(responsePayload);
                 BasicDBObject moduleInfoObj = (BasicDBObject) payloadObj.get("moduleInfo");
                 ModuleInfo moduleInfoResp = objectMapper.readValue(moduleInfoObj.toJson(), ModuleInfo.class);
-                return moduleInfoResp.isReboot();
+                return moduleInfoResp;
             } catch(Exception e) {
-                return false;
+                return null;
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error updating heartbeat for :" + moduleInfo.getModuleType().name(), LoggerMaker.LogDb.RUNTIME);
         }
-        return false;
+        return null;
     }
 
     public APIConfig fetchApiConfig(String configName) {
@@ -419,7 +419,7 @@ public class ClientActor extends DataActor {
                 loggerMaker.errorAndAddToDb("invalid response in updateUsage", LoggerMaker.LogDb.RUNTIME);
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in updateUsage" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb(e, "error in updateUsage " + e, LoggerMaker.LogDb.RUNTIME);
         }
         return;
     };
@@ -438,7 +438,7 @@ public class ClientActor extends DataActor {
                 loggerMaker.errorAndAddToDb("invalid response in updateUsage", LoggerMaker.LogDb.RUNTIME);
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in updateUsage" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb(e, "error in ingestMetricData " + e, LoggerMaker.LogDb.RUNTIME);
         }
         return;
     };
@@ -464,7 +464,7 @@ public class ClientActor extends DataActor {
                 return null;
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in findTestSourceConfig" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb(e, "error in findTestSourceConfig" + e, LoggerMaker.LogDb.RUNTIME);
             return null;
         }
     }
@@ -3341,7 +3341,7 @@ public class ClientActor extends DataActor {
                 return;
             }
         } catch (Exception e) {
-            loggerMaker.error("error in insertTestingLog" + e);
+            loggerMaker.error("error in insertTestingLog " + e);
             return;
         }
     }
