@@ -24,104 +24,14 @@ body:has(.agentic-security-nav) .Polaris-Navigation {
     background: #ffffff !important;
 }
 
-/* Ask Akto gradient text styling  */
+/* Ask Akto gradient text styling - simplified but with proper specificity */
+.Polaris-Navigation .ask-akto-gradient-text,
 span.ask-akto-gradient-text {
     background: linear-gradient(to right, rgba(98, 0, 234, 0.67) 0%, #18a4ea 100%) !important;
     background-clip: text !important;
     -webkit-background-clip: text !important;
     -webkit-text-fill-color: transparent !important;
     color: transparent !important;
-    font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-    font-size: 14px !important;
-    font-style: normal !important;
     font-weight: 500 !important;
-    line-height: 20px !important;
-    text-decoration: none !important;
     display: inline-block !important;
-    white-space: nowrap !important;
-}
-
-/* Ensure gradient works in all Navigation states */
-.Polaris-Navigation__Item span.ask-akto-gradient-text,
-.Polaris-Navigation__Text span.ask-akto-gradient-text,
-.Polaris-Navigation span.ask-akto-gradient-text {
-    background: linear-gradient(to right, rgba(98, 0, 234, 0.67) 0%, #18a4ea 100%) !important;
-    background-clip: text !important;
-    -webkit-background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
-    color: transparent !important;
-    font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
-}
-
-/* Ask Akto navigation item styling  */
-.Polaris-Navigation__Item:has(.ask-akto-gradient-text) {
-    position: relative;
-}
-
-.Polaris-Navigation__Item:has(.ask-akto-gradient-text) .Polaris-Navigation__ItemInnerWrapper {
-    background: #EDEEEF !important;
-    border-radius: 4px;
-    margin-left: 8px;
-    overflow: hidden;
-    position: relative;
-}
-
-/* Ask Akto selected state with purple left indicator */
-.Polaris-Navigation__Item--selected:has(.ask-akto-gradient-text) .Polaris-Navigation__ItemInnerWrapper::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background: #6200EA;
-    border-radius: 0 4px 4px 0;
-    z-index: 1;
-}
-
-/* Ensure the Ask Akto item maintains its background when selected */
-.Polaris-Navigation__Item--selected:has(.ask-akto-gradient-text) .Polaris-Navigation__ItemInnerWrapper {
-    background: #EDEEEF !important;
-}
-
-/* Magic icon styling for Ask Akto */
-.Polaris-Navigation__Item:has(.ask-akto-gradient-text) .Polaris-Navigation__Icon {
-    position: relative;
-    width: 20px;
-    height: 20px;
-    /* Remove custom margin to align with standard navigation */
-}
-
-.Polaris-Navigation__Item:has(.ask-akto-gradient-text) .Polaris-Navigation__Icon svg {
-    width: 20px;
-    height: 20px;
-}
-
-/* Position the text properly */
-.Polaris-Navigation__Item:has(.ask-akto-gradient-text) .Polaris-Navigation__Text {
-    /* Remove custom positioning to align with standard navigation */
-}
-
-/* Additional overrides for Polaris Navigation selected states */
-.Polaris-Navigation__Item--selected:has(.ask-akto-gradient-text) .Polaris-Navigation__Text,
-.Polaris-Navigation__Item--selected:has(.ask-akto-gradient-text) .Polaris-Navigation__Text span,
-.Polaris-Navigation__Item--selected:has(.ask-akto-gradient-text) .ask-akto-gradient-text {
-    color: transparent !important;
-    background: linear-gradient(to right, rgba(98, 0, 234, 0.67) 0%, #18a4ea 100%) !important;
-    background-clip: text !important;
-    -webkit-background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
-}
-
-/* Override any hover or focus states that might change color */
-.Polaris-Navigation__Item:has(.ask-akto-gradient-text):hover .Polaris-Navigation__Text,
-.Polaris-Navigation__Item:has(.ask-akto-gradient-text):focus .Polaris-Navigation__Text,
-.Polaris-Navigation__Item:has(.ask-akto-gradient-text):active .Polaris-Navigation__Text {
-    color: transparent !important;
-    background: linear-gradient(to right, rgba(98, 0, 234, 0.67) 0%, #18a4ea 100%) !important;
-    background-clip: text !important;
-    -webkit-background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
 }
