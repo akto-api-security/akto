@@ -11,7 +11,7 @@ function AskAktoChatInput({
 }) {
 
 
-    const handleKeyPress = (e) => {
+    const handleKeyDown = (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
             handleSubmit()
@@ -31,7 +31,7 @@ function AskAktoChatInput({
                     className="akto-main-chat-input"
                     value={value}
                     onChange={onChange}
-                    onKeyPress={handleKeyPress}
+                    onKeyDown={handleKeyDown}
                     placeholder={placeholder}
                     disabled={disabled}
                 />

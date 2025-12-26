@@ -112,27 +112,27 @@ function AskAktoConversation() {
         return `**Weekly Agentic Risk Summary**
 
 **Scope analyzed**
-• 14 active agent workflows  
-• 7 day observation window
+ 14 active agent workflows
+ 7 day observation window
 
 **Key risks identified**  
-• 2 agents (14%) executing tools or APIs without execution guardrails
-• 1 agent (7%) accessing sensitive customer data without output redaction  
-• 1 newly discovered agent with elevated execution privileges
-• 1 shadow agent without an assigned owner
+ 2 agents (14%) executing tools or APIs without execution guardrails
+ 1 agent (7%) accessing sensitive customer data without output redaction
+ 1 newly discovered agent with elevated execution privileges
+ 1 shadow agent without an assigned owner
 
 **Threat activity observed**
-• 3 prompt injection attempts detected
-• 100% of attempts blocked before execution
+  3 prompt injection attempts detected
+  100% of attempts blocked before execution
 
 **Posture change**
-• Overall agentic risk increased week over week
-• Primary drivers: new agents and expanded execution scope
+ Overall agentic risk increased week over week
+ Primary drivers: new agents and expanded execution scope
 
 **Top priorities**
-• Apply execution guardrails to the 2 highest risk agents
-• Enforce output redaction on agents handling sensitive data  
-• Assign ownership and review permissions for shadow agents`
+ Apply execution guardrails to the 2 highest risk agents
+ Enforce output redaction on agents handling sensitive data
+ Assign ownership and review permissions for shadow agents`
     }
 
     const handleFollowUpSubmit = (message, attachments) => {
@@ -147,8 +147,8 @@ function AskAktoConversation() {
     ]
 
     const handleFollowUpSuggestionClick = (suggestion) => {
-        // Handle suggestion click - you can restart the process or navigate
-        console.log('Follow-up suggestion:', suggestion)
+        // Populate the chat input with the suggestion text
+        setFollowUpInput(suggestion)
     }
 
     const handleEditClick = () => {

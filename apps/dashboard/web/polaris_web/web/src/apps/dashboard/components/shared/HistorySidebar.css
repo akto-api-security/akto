@@ -1,6 +1,7 @@
+/* Simplified History Sidebar using Polaris components */
 .history-overlay {
     position: fixed;
-    top: 70px;
+    top: 0;
     left: 0;
     right: 0;
     bottom: 0;
@@ -8,257 +9,154 @@
     z-index: 999;
 }
 
-.history-sidebar {
+.history-sidebar-wrapper {
     position: fixed;
-    top: 70px;
+    top: 0;
     right: 0;
-    width: 320px;
-    height: calc(100% - 70px);
-    background: white;
-    border-left: 1px solid #e1e3e5;
+    width: 400px;
+    height: 100vh;
     z-index: 1000;
-    font-family: -apple-system, BlinkMacSystemFont, San Francisco, Segoe UI, Roboto, Helvetica Neue, sans-serif;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    align-self: stretch;
+    overflow-y: auto;
+    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
 }
 
-.history-header {
-    padding: 12px 16px 0 16px;
+.history-sidebar-wrapper .Polaris-LegacyCard {
+    height: 100%;
+    min-height: 100vh;
+}
+
+/* Force hide all delete buttons in sidebar by default */
+.history-sidebar-wrapper [class*="delete-button"],
+.history-sidebar-wrapper button[aria-label*="Delete"],
+.history-sidebar-wrapper .history-delete-button {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+}
+
+/* Show delete buttons only on hover */
+.history-item-container:hover [class*="delete-button"],
+.history-item-container:hover button[aria-label*="Delete"],
+.history-item-container:hover .history-delete-button {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* History item container */
+.history-item-container {
+    position: relative;
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
     width: 100%;
-    box-sizing: border-box;
 }
 
-.history-title {
-    color: var(--Text-Default, #202223);
-    font-feature-settings: 'liga' off, 'clig' off;
-    font-family: "SF Pro Text";
-    font-size: 14px;
-    font-style: normal;
-    font-weight: 600;
-    line-height: 20px;
-    margin: 0;
-}
-
-.close-btn {
-    background: none;
-    border: none;
-    font-size: 18px;
-    color: #6d7175;
+/* Clickable history item styling */
+.history-item-clickable {
     cursor: pointer;
-    padding: 0;
-    width: 20px;
-    height: 20px;
+    flex: 1;
+    min-width: 0;
+    padding: 8px 12px;
+    border-radius: 6px;
+    transition: background-color 0.2s ease;
+}
+
+.history-item-container:hover .history-item-clickable {
+    background-color: #f6f6f7;
+}
+
+/* Simple history item styling */
+.history-simple-item {
+    padding: 12px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.history-simple-item:hover {
+    background-color: #f6f6f7;
+}
+
+.history-simple-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.history-simple-right {
+    margin-left: 12px;
+    min-width: 80px;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.delete-icon-simple {
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: background-color 0.2s ease;
 }
 
-.close-btn:hover {
-    color: #202223;
+.delete-icon-simple:hover {
+    background-color: rgba(220, 38, 38, 0.1);
 }
 
-.search-container {
-    padding: 0 12px 16px 12px;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-.search-input-wrapper {
-    position: relative;
-    width: 100%;
-    height: 36px;
-    background: #E4E5E7;
-    border-radius: 4px;
-    flex-shrink: 0;
-}
-
-.search-input {
-    width: 100%;
-    height: 100%;
-    padding: 8px 12px 8px 40px;
-    border: none;
-    border-radius: 4px;
-    font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 14px;
-    font-weight: 400;
-    line-height: 20px;
-    background: #F1F2F3;
-    color: #202223;
-    outline: none;
-    box-sizing: border-box;
-}
-
-.search-input:focus {
-    background: #F1F2F3;
-    border: none;
-    outline: none;
-}
-
-.search-input::placeholder {
-    color: #6D7175;
-    font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 14px;
-    font-weight: 400;
-    line-height: 20px;
-}
-
-.search-icon {
-    position: absolute;
-    left: 10px;
-    top: 8px;
-    width: 20px;
-    height: 20px;
-    pointer-events: none;
-}
-
-.search-icon svg {
-    width: 16px;
-    height: 16px;
-    fill: #5C5F62;
-}
-
-.history-list {
-    overflow-y: auto;
-    height: calc(100% - 100px);
-    padding: 0 12px;
-    width: 100%;
-    box-sizing: border-box;
-    background: transparent !important;
-    background-color: transparent !important;
-}
-
-/* Force remove all card styling except on hover */
-.history-list .history-item *,
-.history-sidebar .history-item * {
-    background: transparent !important;
-    background-color: transparent !important;
-    border: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-}
-
-/* Allow hover state to override */
-.history-item:hover * {
-    background: inherit !important;
-    background-color: inherit !important;
-}
-
-.history-item {
+/* History header */
+.history-header {
     display: flex;
-    padding: 4px 12px;
     justify-content: space-between;
-    align-items: flex-start;
-    align-self: stretch;
-    cursor: pointer;
-    margin: 0 -12px;
-    background: transparent !important;
-    background-color: transparent !important;
-    border: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    outline: none !important;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 8px;
+}
+
+/* Close button styling */
+.history-close-button {
+    color: #6B7280 !important;
+    padding: 8px !important;
+}
+
+.history-close-button:hover {
+    background-color: #F3F4F6 !important;
+    color: #374151 !important;
+}
+
+/* Prevent time from wrapping */
+.history-item-date {
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    transition: opacity 0.2s ease;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    min-width: 80px !important;
+    max-width: 100px !important;
     position: relative;
+    z-index: 1;
 }
 
-.history-item:hover {
-    background: #F6F6F7 !important;
-    background-color: #F6F6F7 !important;
-    border-radius: 8px !important;
-    border: none !important;
-    box-shadow: none !important;
-}
-
+/* Ensure title can truncate while date stays on same line */
 .history-item-content {
     display: flex;
-    flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    align-self: stretch;
-    flex: 1;
+    width: 100%;
     min-width: 0;
-    background: transparent !important;
-    background-color: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    border-radius: 0 !important;
-    gap: 1px;
 }
 
 .history-item-title {
     flex: 1;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    color: #202223;
-    font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 12px;
-    font-style: normal;
-    font-weight: 500;
-    line-height: 14px;
-    margin: 0;
     min-width: 0;
-}
-
-.history-item-date {
-    color: #6D7175;
-    font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 12px;
-    font-style: normal;
-    font-weight: 400;
-    line-height: 14px;
-    margin: 0;
-    white-space: nowrap;
-    flex-shrink: 0;
-}
-
-.history-item:hover .history-item-date {
-    display: none;
-}
-
-.history-delete-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0;
-    width: 14px;
-    height: 14px;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    position: absolute;
-    right: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-}
-
-.history-item:hover .history-delete-btn {
-    display: flex;
-}
-
-.history-delete-btn svg {
-    width: 14px;
-    height: 14px;
-    fill: #5C5F62;
-}
-
-.history-delete-btn:hover svg {
-    fill: #d72c0d;
+    margin-right: 12px;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
-    .history-sidebar {
+    .history-sidebar-wrapper {
         width: 100vw;
-    }
-    
-    .search-input-wrapper {
-        width: calc(100% - 32px);
     }
 }
