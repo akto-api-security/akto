@@ -1,14 +1,17 @@
 package com.akto.kafka;
 
 import com.akto.log.LoggerMaker;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.DeleteTopicsResult;
 import org.apache.kafka.clients.producer.*;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.akto.log.LoggerMaker.LogDb;
 
+import java.util.Collections;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Kafka {
@@ -84,34 +87,18 @@ public class Kafka {
     private void setProducer(String brokerIP, int lingerMS, int batchSize, int maxRequestTimeout, int maxRetries, String username, String password, boolean isAuthenticationEnabled) {
         if (producer != null) close(); // close existing producer connection
 
-        Properties kafkaProps = new Properties();
-        kafkaProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, brokerIP);
+        Properties kafkaProps = KafkaConfig.createProducerProperties(
+            brokerIP, lingerMS, batchSize, maxRequestTimeout, maxRetries,
+            isAuthenticationEnabled, username, password
+        );
+
+        if (kafkaProps == null) {
+            loggerMaker.errorAndAddToDb("Failed to create Kafka producer properties");
+            return;
+        }
+
         kafkaProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         kafkaProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        kafkaProps.put(ProducerConfig.BATCH_SIZE_CONFIG, batchSize);
-        kafkaProps.put(ProducerConfig.LINGER_MS_CONFIG, lingerMS);
-        kafkaProps.put(ProducerConfig.RETRIES_CONFIG, 3);
-        kafkaProps.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, maxRequestTimeout);
-        kafkaProps.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, lingerMS + maxRequestTimeout);
-
-        if(maxRetries > 0){
-            kafkaProps.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 100);
-        }
-
-        // Add authentication if username and password are provided
-        if (isAuthenticationEnabled) {
-            if(StringUtils.isEmpty(username) || StringUtils.isEmpty(password)){
-                logger.error("Kafka authentication credentials not provided");
-                return;
-            }
-            kafkaProps.put("security.protocol", "SASL_PLAINTEXT");
-            kafkaProps.put("sasl.mechanism", "PLAIN");
-            String jaasConfig = String.format(
-                "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"%s\" password=\"%s\";",
-                username, password
-            );
-            kafkaProps.put("sasl.jaas.config", jaasConfig);
-        }
 
         producer = new KafkaProducer<String, String>(kafkaProps);
 
@@ -135,6 +122,33 @@ public class Kafka {
                 Kafka.this.close();
                 logger.error("onCompletion error: " + e.getMessage());
             }
+        }
+    }
+
+    public static void deleteKafkaTopic(String topicName, String kafkaBrokerUrl) {
+        try {
+            loggerMaker.infoAndAddToDb("Attempting to delete Kafka topic: " + topicName);
+
+            // Use centralized method to create admin properties
+            Properties adminProps = KafkaConfig.createAdminProperties(
+                kafkaBrokerUrl,
+                KafkaConfig.isKafkaAuthenticationEnabled(),
+                KafkaConfig.getKafkaUsername(),
+                KafkaConfig.getKafkaPassword()
+            );
+
+            if (adminProps == null) {
+                loggerMaker.warnAndAddToDb("Failed to create Kafka admin properties, skipping topic deletion");
+                return;
+            }
+
+            try (AdminClient adminClient = AdminClient.create(adminProps)) {
+                DeleteTopicsResult result = adminClient.deleteTopics(Collections.singletonList(topicName));
+                result.all().get(30, TimeUnit.SECONDS);
+                loggerMaker.infoAndAddToDb("Successfully deleted Kafka topic: " + topicName);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error deleting Kafka topic: " + topicName + " - " + e.getMessage());
         }
     }
 

@@ -26,6 +26,10 @@ public class ModuleInfo {
     private boolean reboot;
     public static final String _REBOOT = "reboot";
 
+    @Getter @Setter
+    private boolean deleteTopicAndReboot;
+    public static final String DELETE_TOPIC_AND_REBOOT = "deleteTopicAndReboot";
+
     public ModuleType getModuleType() {
         return moduleType;
     }

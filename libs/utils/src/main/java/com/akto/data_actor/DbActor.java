@@ -653,9 +653,9 @@ public class DbActor extends DataActor {
     }
 
     @Override
-    public boolean updateModuleInfo(ModuleInfo moduleInfo) {
+    public ModuleInfo updateModuleInfo(ModuleInfo moduleInfo) {
         // no implementation needed.
-        return false;
+        return null;
     }
 
     public void insertMCPAuditDataLog(McpAuditInfo auditInfo) {
