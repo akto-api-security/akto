@@ -27,8 +27,8 @@ public class ModuleInfo {
     public static final String _REBOOT = "reboot";
 
     @Getter @Setter
-    private boolean rebootContainer;
-    public static final String _REBOOT_CONTAINER = "rebootContainer";
+    private boolean deleteTopicAndReboot;
+    public static final String DELETE_TOPIC_AND_REBOOT = "deleteTopicAndReboot";
 
     public ModuleType getModuleType() {
         return moduleType;

@@ -98,24 +98,12 @@ start_java() {
     MONITOR_PID=$!
 
     wait "$JAVA_PID"
-    JAVA_EXIT_CODE=$?
-    echo "Java process exited with code: $JAVA_EXIT_CODE. Cleaning up memory monitor..." | tee -a "$LOG_FILE"
+    echo "Java process exited. Cleaning up memory monitor..." | tee -a "$LOG_FILE"
     kill "$MONITOR_PID" 2>/dev/null
-
-    # Return the exit code so the caller can decide what to do
-    return $JAVA_EXIT_CODE
 }
 
 while true; do
     start_java
-    EXIT_CODE=$?
-
-    # Exit code 201 [ custom code to signal pod restart ] 
-    if [ $EXIT_CODE -eq 201 ]; then
-        echo "Exit code 201 detected - terminating container for pod restart..." | tee -a "$LOG_FILE"
-        exit 201
-    fi
-
-    echo "Restarting Java after crash or memory limit (exit code: $EXIT_CODE)..." | tee -a "$LOG_FILE"
+    echo "Restarting Java after crash or memory limit..." | tee -a "$LOG_FILE"
     sleep 2
 done
