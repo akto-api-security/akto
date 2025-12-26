@@ -55,30 +55,22 @@ public class ModuleInfoWorker {
                     + moduleInfoFromService.getModuleType().name());
 
             /*
+             * Some theory on exit codes and signals:
              * https://man7.org/linux/man-pages/man3/sysexits.h.3head.html [ system exit codes ]
              * https://tldp.org/LDP/abs/html/exitcodes.html [ All signal ranges ]
              * states that exit code 128+n indicates termination by signal n
              * OS signals (n) : https://man7.org/linux/man-pages/man7/signal.7.html [ 0-31 are coming from here ]
              * 
-             * using custom exit code 201, to signal module restart
-             * Not using a standard signal exit code to avoid confusion with actual signals
-             * being caught in start.sh
              */
 
-            if (moduleInfoFromService.isRebootContainer()) {
-                loggerMaker.warnAndAddToDb("Restarting container for module: " + moduleInfoFromService.getModuleType().name() + " id: " + moduleInfoFromService.getId());
-
-                if (ModuleType.MINI_RUNTIME.equals(moduleInfoFromService.getModuleType())) {
-                    // Delete Kafka topic before restarting
-                    String kafkaBrokerUrl = KafkaConfig.getKafkaBrokerUrl();
-                    String topicName = KafkaConfig.getTopicName();
-                    Kafka.deleteKafkaTopic(topicName, kafkaBrokerUrl);
-                }
-
-                System.exit(201);
-                return;
+            if (moduleInfoFromService.isDeleteTopicAndReboot() &&
+                    ModuleType.MINI_RUNTIME.equals(moduleInfoFromService.getModuleType())) {
+                // Delete Kafka topic before restarting
+                String kafkaBrokerUrl = KafkaConfig.getKafkaBrokerUrl();
+                String topicName = KafkaConfig.getTopicName();
+                Kafka.deleteKafkaTopic(topicName, kafkaBrokerUrl);
             }
-            if (moduleInfoFromService.isReboot()) {
+            if (moduleInfoFromService.isReboot() || moduleInfoFromService.isDeleteTopicAndReboot()) {
                 loggerMaker.warnAndAddToDb("Rebooting module: " + moduleInfoFromService.getModuleType().name() + " id: " + moduleInfoFromService.getId());
                 System.exit(0);
                 return;
