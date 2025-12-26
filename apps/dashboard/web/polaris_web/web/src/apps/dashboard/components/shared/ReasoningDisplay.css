@@ -1,0 +1,71 @@
+.reasoning-display {
+    margin: 16px 0;
+    background: transparent;
+    padding: 0;
+    border: none;
+}
+
+.reasoning-summary {
+    display: none; /* Hide the summary/collapsible part for simpler display */
+}
+
+.reasoning-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.reasoning-indicator {
+    font-size: 14px;
+    color: #6b7280;
+}
+
+.reasoning-content {
+    padding: 0;
+}
+
+.reasoning-step {
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: #6b7280;
+    font-style: italic;
+    line-height: 1.4;
+}
+
+.thinking-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.thinking-dots {
+    display: flex;
+    gap: 4px;
+}
+
+.thinking-dots span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #8b5cf6;
+    animation: bounce 1.4s infinite ease-in-out;
+}
+
+.thinking-dots span:nth-child(1) {
+    animation-delay: -0.32s;
+}
+
+.thinking-dots span:nth-child(2) {
+    animation-delay: -0.16s;
+}
+
+@keyframes bounce {
+    0%, 80%, 100% {
+        transform: scale(0);
+    }
+    40% {
+        transform: scale(1);
+    }
+}

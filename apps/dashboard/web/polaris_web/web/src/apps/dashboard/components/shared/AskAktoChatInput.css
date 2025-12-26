@@ -1,0 +1,162 @@
+.akto-chat-input-main {
+    width: 100%;
+    max-width: 496px;
+    margin: 0 auto 32px;
+    position: relative;
+}
+
+.akto-chat-input-wrapper {
+    position: relative;
+    border: 1px solid #D1D5DB;
+    border-radius: 8px;
+    background: #FFFFFF;
+    min-height: 48px;
+    display: flex;
+    flex-direction: column;
+    transition: border-color 0.2s ease;
+}
+
+.akto-chat-input-wrapper:focus-within {
+    border-color: #8B5CF6;
+}
+
+.akto-attached-files-inline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 40px 8px 40px;
+    border-bottom: 1px solid #E5E7EB;
+}
+
+.akto-attached-file-inline-item {
+    position: relative;
+    display: inline-block;
+}
+
+.akto-attached-file-inline-thumbnail {
+    width: 40px;
+    height: 40px;
+    aspect-ratio: 1/1;
+    border-radius: 4px;
+    background: lightgray 50% / cover no-repeat;
+    box-shadow: 0 0 5px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.15);
+    display: block;
+}
+
+.akto-attached-file-inline-icon {
+    width: 40px;
+    height: 40px;
+    aspect-ratio: 1/1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #F3F4F6;
+    border-radius: 4px;
+    box-shadow: 0 0 5px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.15);
+    font-size: 16px;
+}
+
+.akto-remove-file-inline-button {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 16px;
+    height: 16px;
+    background: #EF4444;
+    border: 1px solid #FFFFFF;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.akto-remove-file-inline-button:hover {
+    background: #DC2626;
+    transform: scale(1.1);
+}
+
+.akto-remove-file-inline-icon {
+    width: 8px;
+    height: 8px;
+    color: white;
+}
+
+.akto-main-chat-input {
+    width: 100%;
+    height: 48px;
+    padding: 12px 50px 12px 40px;
+    border: none;
+    border-radius: 0 0 8px 8px;
+    font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    outline: none;
+    background: transparent;
+    box-sizing: border-box;
+}
+
+.akto-main-chat-input:focus {
+    background: transparent;
+}
+
+.akto-main-chat-input::placeholder {
+    color: #9CA3AF;
+    font-size: 14px;
+}
+
+.akto-attachment-button {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.akto-attachment-button:hover {
+    background: #F3F4F6;
+}
+
+.akto-attachment-icon {
+    width: 16px;
+    height: 16px;
+    color: #6B7280;
+}
+
+.akto-send-button {
+    position: absolute;
+    right: 8px;
+    bottom: 10px;
+    background: #C4B5FD;
+    border: none;
+    border-radius: 6px;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease;
+}
+
+.akto-send-button:hover {
+    background: #A78BFA;
+}
+
+.akto-send-button:disabled {
+    background: #E5E7EB;
+    cursor: not-allowed;
+}
+
+.akto-send-icon {
+    width: 14px;
+    height: 14px;
+    color: white;
+}

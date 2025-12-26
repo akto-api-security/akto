@@ -1,0 +1,68 @@
+.ask-akto-suggestions {
+    margin-top: 24px;
+    margin-left: 0;
+    text-align: left;
+}
+
+.conversation-page .ask-akto-suggestions {
+    text-align: left;
+    margin-left: 0;
+}
+
+.suggestions-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.conversation-page .suggestions-container {
+    align-items: flex-start;
+    text-align: left;
+}
+
+.suggestion-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+    width: 100%;
+}
+
+.suggestion-item:hover {
+    color: #8B5CF6;
+}
+
+.suggestion-item:hover .suggestion-icon path {
+    fill: #8B5CF6;
+}
+
+.suggestion-icon {
+    width: 17px;
+    height: 13px;
+    flex-shrink: 0;
+}
+
+.suggestion-icon path {
+    transition: fill 0.2s ease;
+    fill: #898C90;
+}
+
+.suggestion-text {
+    color: rgba(109, 113, 117, 0.80);
+    font-family: "SF Pro Text";
+    font-size: 12px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: normal;
+    transition: color 0.2s ease;
+}
+
+.suggestion-item:hover .suggestion-text {
+    color: #8B5CF6;
+}

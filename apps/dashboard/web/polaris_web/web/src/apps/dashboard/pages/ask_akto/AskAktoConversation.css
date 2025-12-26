@@ -1,0 +1,310 @@
+.ask-akto-conversation {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: #f8f9fa;
+    font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.conversation-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 32px;
+    background: #f8f9fa;
+}
+
+.conversation-header h1 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #111827;
+    margin: 0;
+}
+
+.header-actions {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.share-btn {
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.share-btn:hover {
+    background: #e5e7eb;
+}
+
+.action-btn {
+    background: none;
+    border: none;
+    padding: 8px;
+    color: #374151;
+    cursor: pointer;
+    transition: background 0.2s;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.action-btn:hover {
+    background: #e5e7eb;
+}
+
+.conversation-content {
+    flex: 1;
+    padding: 0 32px;
+    overflow-y: auto;
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
+    background: #f8f9fa;
+}
+
+.generate-button-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 32px;
+}
+
+.generate-button {
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 16px;
+    padding: 12px 20px;
+    font-size: 14px;
+    color: #374151;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.generate-button:hover {
+    background: #e5e7eb;
+}
+
+.user-question {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 24px;
+}
+
+.user-message-bubble {
+    display: flex;
+    padding: 8px 12px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 24px;
+    border-radius: 12px 12px 4px 12px;
+    border: 1px solid var(--Border-Subdued, #C9CCCF);
+    background: rgba(255, 255, 255, 0.40);
+    font-size: 14px;
+    color: #374151;
+    max-width: 80%;
+}
+
+.thinking-section {
+    margin-bottom: 24px;
+}
+
+.thought-label {
+    font-size: 14px;
+    color: #6b7280;
+    font-weight: 500;
+    margin: 16px 0;
+}
+
+.response-section {
+    margin-bottom: 24px;
+}
+
+.response-actions {
+    display: flex;
+    gap: 12px;
+    margin: 16px 0;
+    padding: 8px 0;
+}
+
+.action-icon {
+    background: none;
+    border: none;
+    padding: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+}
+
+.action-icon:hover {
+    background: #f3f4f6;
+}
+
+.followup-suggestions {
+    margin-top: 20px;
+}
+
+.suggestion-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    color: #6b7280;
+    font-size: 14px;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.suggestion-item:hover {
+    color: #374151;
+}
+
+.suggestion-icon {
+    color: #9ca3af;
+    font-size: 16px;
+}
+
+.ai-analysis {
+    margin-bottom: 16px;
+}
+
+.analysis-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.analysis-list li {
+    padding: 8px 0;
+    font-size: 14px;
+    color: #374151;
+    position: relative;
+    padding-left: 16px;
+}
+
+.analysis-list li::before {
+    content: "•";
+    position: absolute;
+    left: 0;
+    color: #6b7280;
+}
+
+
+.response-content {
+    background: transparent;
+    padding: 16px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #374151;
+    margin-bottom: 16px;
+}
+
+.response-content strong {
+    font-weight: 600;
+    color: #111827;
+}
+
+.typing-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+}
+
+.typing-dots {
+    display: flex;
+    gap: 4px;
+}
+
+.typing-dots span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #9ca3af;
+    animation: bounce 1.4s infinite ease-in-out;
+}
+
+.typing-dots span:nth-child(1) {
+    animation-delay: -0.32s;
+}
+
+.typing-dots span:nth-child(2) {
+    animation-delay: -0.16s;
+}
+
+.conversation-footer {
+    background: #f8f9fa;
+    padding: 20px 32px;
+    display: flex;
+    justify-content: center;
+}
+
+/* Force left alignment for suggestions in conversation page */
+.conversation-suggestions-wrapper {
+    width: 100%;
+    text-align: left;
+}
+
+.conversation-suggestions-wrapper .ask-akto-suggestions {
+    text-align: left !important;
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.conversation-suggestions-wrapper .suggestions-container {
+    width: 100% !important;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+}
+
+/* Animations */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes bounce {
+    0%, 80%, 100% {
+        transform: scale(0);
+    }
+    40% {
+        transform: scale(1);
+    }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .conversation-content {
+        padding: 20px;
+    }
+    
+    .conversation-header {
+        padding: 16px 20px;
+    }
+    
+    .conversation-input {
+        padding: 16px 20px;
+    }
+    
+    .message-bubble {
+        max-width: 85%;
+    }
+}

@@ -18,6 +18,8 @@
     "@tiptap/extension-placeholder": "^2.11.5",
     "@tiptap/react": "^2.11.5",
     "@tiptap/starter-kit": "^2.11.5",
+    "ai": "^6.0.3",
+    "ai-elements": "^1.6.3",
     "assert": "^2.1.0",
     "axios": "^1.4.0",
     "buffer": "^6.0.3",
