@@ -204,7 +204,11 @@ function AskAktoConversation() {
 
                 {/* Step 3: Analysis/Response */}
                 {showAnalysis && (
-                    <div className="response-section">
+                            <div className="response-content">
+                                {response.split("\n").map((lineText, idx) => (
+                                    <div key={idx}>{lineText.split(/\*\*(.*?)\*\*/).map((seg, j) => j % 2 === 1 ? <strong key={j}>{seg}</strong> : seg)}</div>
+                                ))}
+                            </div>
 <div dangerouslySetInnerHTML={{ __html: (() => {
   const escapeHtml = s => s ? s.replace(/[&<>\"']/g, c => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : c.charCodeAt(0) === 34 ? '&quot;' : '&#39;')) : '';
   return escapeHtml(response).replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
