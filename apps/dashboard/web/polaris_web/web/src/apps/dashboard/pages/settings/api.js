@@ -805,11 +805,11 @@ const settingRequests = {
             data: {filterLogPolicy}
         })
     },
-    rebootModules(moduleIds, rebootContainer = false) {
+    rebootModules(moduleIds, deleteTopicAndReboot = false) {
         return request({
             url: '/api/rebootModules',
             method: 'post',
-            data: {moduleIds, rebootContainer}
+            data: {moduleIds, deleteTopicAndReboot}
         })
     }
 }

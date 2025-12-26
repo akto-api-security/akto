@@ -22,7 +22,7 @@ public class ModuleInfoAction extends UserAction {
     private List<String> moduleIds;
     @Getter
     @Setter
-    private boolean rebootContainer;
+    private boolean deleteTopicAndReboot;
 
     @Override
     public String execute() {
@@ -81,8 +81,8 @@ public class ModuleInfoAction extends UserAction {
             );
 
             // Update reboot flag to true for matching modules
-            // Use rebootContainer flag if specified, otherwise use regular reboot flag
-            String rebootField = rebootContainer ? ModuleInfo._REBOOT_CONTAINER : ModuleInfo._REBOOT;
+            // Use deleteTopicAndReboot flag if specified, otherwise use regular reboot flag
+            String rebootField = deleteTopicAndReboot ? ModuleInfo.DELETE_TOPIC_AND_REBOOT : ModuleInfo._REBOOT;
             ModuleInfoDao.instance.updateMany(rebootFilter, Updates.set(rebootField, true));
 
             return SUCCESS.toUpperCase();

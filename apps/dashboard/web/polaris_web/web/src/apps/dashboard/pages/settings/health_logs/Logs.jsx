@@ -98,14 +98,14 @@ const Logs = () => {
         }
     }
 
-    const handleRebootModules = async (rebootContainer) => {
+    const handleRebootModules = async (deleteTopicAndReboot) => {
         if (selectedModules.length === 0) {
             func.setToast(true, true, "Please select at least one module to reboot");
             return;
         }
         try {
-            await settingRequests.rebootModules(selectedModules, rebootContainer);
-            const rebootType = rebootContainer ? "Container reboot" : "Restart process";
+            await settingRequests.rebootModules(selectedModules, deleteTopicAndReboot);
+            const rebootType = deleteTopicAndReboot ? "Container reboot" : "Restart process";
             func.setToast(true, false, `${rebootType} flag set for eligible modules`);
             setSelectedModules([]);
             await fetchModuleInfo(); // Refresh the module list
@@ -201,7 +201,7 @@ const Logs = () => {
                             disabled: selectedModules.length === 0
                         },
                         {
-                            content: 'Reboot container',
+                            content: 'Delete topic and restart process',
                             onAction: () => handleRebootModules(true),
                             disabled: selectedModules.length === 0
                         }
