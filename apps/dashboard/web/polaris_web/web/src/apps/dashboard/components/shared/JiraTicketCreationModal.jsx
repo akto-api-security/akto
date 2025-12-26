@@ -61,10 +61,26 @@ const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handl
         if (!isAzureModal && !isServiceNowModal && !isDevRevModal && projId && issueType) {
             const initialFieldMetaData = createJiraIssueFieldMetaData?.[projId]?.[issueType] || [];
 
-            const filteredFieldMetaData = initialFieldMetaData.filter(field => {
-                const isCustom = field?.schema?.custom !== undefined ? true : false; // filter out fields that are not custom fields
-                return isCustom
+            let prioritySystemField = null, customFields = []; 
+            initialFieldMetaData.forEach(field => {
+                const fieldSchema = field?.schema;
+                if (typeof fieldSchema !== "object") return;
+                
+                if (Object.hasOwn(fieldSchema, 'system')) {
+                    const systemFieldURI = fieldSchema.system;
+
+                    if (systemFieldURI === 'priority') 
+                        prioritySystemField = field;
+
+                } else if (Object.hasOwn(fieldSchema, 'custom')) {
+                    customFields.push(field);
+                }
             });
+
+            const filteredFieldMetaData = [];
+            if (prioritySystemField) filteredFieldMetaData.push(prioritySystemField);
+            filteredFieldMetaData.push(...customFields);
+
             setDisplayJiraIssueFieldMetadata(filteredFieldMetaData);
 
             const initialValues = filteredFieldMetaData.reduce((acc, field) => {
