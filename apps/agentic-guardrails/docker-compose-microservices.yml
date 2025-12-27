@@ -1,0 +1,194 @@
+version: '3.8'
+
+services:
+  # Model Router Service - Entry point for all scan requests
+  model-router:
+    build:
+      context: ./model-router
+      dockerfile: Dockerfile
+    container_name: agent-guard-model-router
+    ports:
+      - "8090:8090"
+    environment:
+      - PORT=8090
+      - PROMPT_INJECTION_URL=http://prompt-injection:8091
+      - TOXIC_SPEECH_URL=http://toxic-speech:8092
+      - BAN_WORDS_URL=http://ban-words-content:8093
+      - INTENT_ANALYSIS_URL=http://intent-analysis:8094
+      - OUTPUT_QUALITY_URL=http://output-quality:8095
+      - REQUEST_TIMEOUT=30
+      - MAX_RETRIES=2
+      - HEALTH_CHECK_INTERVAL=30
+    depends_on:
+      - prompt-injection
+      - toxic-speech
+      - ban-words-content
+      - intent-analysis
+      - output-quality
+    networks:
+      - agent-guard-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Prompt Injection Detection Service
+  prompt-injection:
+    build:
+      context: ./services/prompt-injection
+      dockerfile: Dockerfile
+    container_name: agent-guard-prompt-injection
+    ports:
+      - "8091:8091"
+    environment:
+      - PORT=8091
+      - HF_HOME=/app/.cache/huggingface
+      - TRANSFORMERS_VERBOSITY=error
+      - HF_HUB_VERBOSITY=error
+    volumes:
+      - model-cache-prompt:/app/.cache
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+    networks:
+      - agent-guard-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8091/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Toxic Speech Detection Service
+  toxic-speech:
+    build:
+      context: ./services/toxic-speech
+      dockerfile: Dockerfile
+    container_name: agent-guard-toxic-speech
+    ports:
+      - "8092:8092"
+    environment:
+      - PORT=8092
+      - HF_HOME=/app/.cache/huggingface
+      - TRANSFORMERS_VERBOSITY=error
+      - HF_HUB_VERBOSITY=error
+    volumes:
+      - model-cache-toxic:/app/.cache
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+        reservations:
+          memory: 1.5G
+    networks:
+      - agent-guard-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8092/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Ban Words & Content Filter Service
+  ban-words-content:
+    build:
+      context: ./services/ban-words-content
+      dockerfile: Dockerfile
+    container_name: agent-guard-ban-words
+    ports:
+      - "8093:8093"
+    environment:
+      - PORT=8093
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+    networks:
+      - agent-guard-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8093/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Intent & Semantic Analysis Service
+  intent-analysis:
+    build:
+      context: ./services/intent-analysis
+      dockerfile: Dockerfile
+    container_name: agent-guard-intent-analysis
+    ports:
+      - "8094:8094"
+    environment:
+      - PORT=8094
+      - HF_HOME=/app/.cache/huggingface
+      - TRANSFORMERS_VERBOSITY=error
+      - HF_HUB_VERBOSITY=error
+    volumes:
+      - model-cache-intent:/app/.cache
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+        reservations:
+          memory: 1.5G
+    networks:
+      - agent-guard-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8094/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Output Quality & Safety Service
+  output-quality:
+    build:
+      context: ./services/output-quality
+      dockerfile: Dockerfile
+    container_name: agent-guard-output-quality
+    ports:
+      - "8095:8095"
+    environment:
+      - PORT=8095
+      - HF_HOME=/app/.cache/huggingface
+      - TRANSFORMERS_VERBOSITY=error
+      - HF_HUB_VERBOSITY=error
+    volumes:
+      - model-cache-output:/app/.cache
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+        reservations:
+          memory: 1.5G
+    networks:
+      - agent-guard-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8095/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  model-cache-prompt:
+    driver: local
+  model-cache-toxic:
+    driver: local
+  model-cache-intent:
+    driver: local
+  model-cache-output:
+    driver: local
+
+networks:
+  agent-guard-net:
+    driver: bridge
