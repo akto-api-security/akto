@@ -144,6 +144,7 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_inventory",
                     },
+                    ...(!(func.isDemoAccount() && (dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security")) ? [
                     {
                         label: "Recent Changes",
                         onClick: () => {
@@ -152,7 +153,7 @@ export default function LeftNav() {
                             setActive("active");
                         },
                         selected: leftNavSelected === "dashboard_observe_changes",
-                    },
+                    }] : []),
                     {
                         label: "Sensitive Data",
                         onClick: () => {

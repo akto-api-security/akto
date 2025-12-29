@@ -320,15 +320,15 @@ export default function Header() {
                                         { value: "API Security", label: "API Security", id: "api-security" },
                                         {
                                             value: "Agentic Security",
-                                            label: func.isDemoAccount() ? "Cloud Security" : "Agentic Security",
+                                            label: func.isDemoAccount() ? "Akto ARGUS" : "Agentic Security",
                                             id: "agentic-security",
-                                            helpText: func.isDemoAccount() ? "Akto ARGUS - Security for homegrown Gen AI apps, AI agents, MCPs, LLMs" : undefined
+                                            helpText: func.isDemoAccount() ? "Agentic AI Security for Homegrown AI" : undefined
                                         },
                                         ...(func.isDemoAccount() ? [{
                                             value: "Endpoint Security",
-                                            label: "Akto ATLAS - Endpoint Security",
+                                            label: "Akto ATLAS",
                                             id: "endpoint-security",
-                                            helpText: "AI Trust Layer for Autonomous Systems"
+                                            helpText: "Agentic AI Security for Employee Endpoints"
                                         }] : []),
                                         { value: "DAST", label: "DAST", id: "dast" },
                                     ]}

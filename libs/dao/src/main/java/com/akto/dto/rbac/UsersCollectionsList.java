@@ -154,9 +154,10 @@ public class UsersCollectionsList {
                     Filters.or(
                         Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
                         Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG))
-                    ),
-                    Filters.nor(getEndpointSourceFilter())
-                );
+                    ));
+                if (Context.accountId.get() == 1000000 || Context.accountId.get() == 1669322524) {
+                    finalFilter = Filters.and(finalFilter, Filters.nor(getEndpointSourceFilter()));
+                }
                 break;
             case DAST:
                 finalFilter = Filters.and(

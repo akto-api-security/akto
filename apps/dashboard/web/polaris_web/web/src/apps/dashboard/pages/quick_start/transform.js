@@ -369,8 +369,8 @@ const awsBedrockObj = {
 
 const aiAgentGlobalProxy = {
     icon: '/public/aws_bedrock.svg',
-    label: "AI Agent Global Proxy",
-    text: "A publicly hosted secure gateway that enforces guardrails and advanced threat protection for all requests to your public AI agents, ensuring safe and compliant communication.",
+    label: "Agentic Proxy",
+    text: "A publicly hosted secure gateway that enforces guardrails and advanced threat protection for all requests to your public AI agents and MCP servers, ensuring safe and compliant communication.",
     docsUrl: 'https://docs.akto.io/akto-agent-proxy',
     key: "AI_AGENT_GLOBAL_PROXY",
     component : <AIAgentsGateway />
@@ -378,8 +378,8 @@ const aiAgentGlobalProxy = {
 
 const aiAgentGateway = {
     icon: '/public/aws_bedrock.svg',
-    label: "AI Agent Gateway",
-    text: "AI agent proxy gateway to be deployed on premise for securing AI agents in your network",
+    label: "Agentic Gateway",
+    text: "Agentic gateway to be deployed on premise for securing AI agents and MCP servers in your network",
     docsUrl: 'https://docs.akto.io/akto-agent-proxy',
     key: "AI_AGENT_GATEWAY",
     component : <AIAgentsGateway />
@@ -873,7 +873,7 @@ const safariExtensionObj = {
 }
 
 const cursorHookObj = {
-    icon: '/public/akto_name_with_icon.svg',
+    icon: '/public/cursor-ai.svg',
     label: "Cursor Hook",
     text: "IDE-level protection monitoring AI-powered code completions in real-time.",
     docsUrl: 'https://docs.akto.io/cursor-hook',
@@ -1585,8 +1585,12 @@ const quickStartFunc = {
                 }
             } else {
                 // Non-demo accounts: original Agentic Security structure
-                connectors["AI Agent Scan"] = aiAgentGateway
-                connectors["AI Agent Security"] = aiAgentConnectors
+                connectors["AI Agent Scan"] = agenticProxies
+                connectors["AI Agent Security"] = [
+                    awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj,
+                    ibmWatsonxObj, customAgentObj, agenticShieldObj,  // Include agenticShieldObj for non-demo
+                    n8nImportObj, langchainImportObj, copilotStudioImportObj
+                ]
                 connectors["AI Model Security"] = aiScanConnectors
                 connectors["Browser Extension"] = browserExtensions
                 connectors["Secure Web Networks"] = secureWebNetworks
