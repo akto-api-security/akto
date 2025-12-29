@@ -7,7 +7,8 @@ import {
     DiamondAlertMinor,
     FinancesMinor,
     LockMajor,
-    AutomationFilledMajor
+    AutomationFilledMajor,
+    MagicMajor
 } from "@shopify/polaris-icons";
 import {useLocation, useNavigate} from "react-router-dom";
 
@@ -502,9 +503,30 @@ export default function LeftNav() {
             }] : [])
         ]
 
-        const exists = items.find(item => item.key === "quick_start")
-        if (!exists) {
+        // Insert Ask Akto first
+        const askAktoExists = items.find(item => item.key === "ask_akto")
+        if (!askAktoExists) {
             items.splice(1, 0, {
+                label: (
+                    <span className="ask-akto-gradient-text">
+                        Ask Akto
+                    </span>
+                ),
+                icon: MagicMajor,
+                onClick: () => {
+                    handleSelect("dashboard_ask_akto");
+                    navigate("/dashboard/ask-akto");
+                    setActive("normal");
+                },
+                selected: leftNavSelected === "dashboard_ask_akto",
+                key: "ask_akto",
+            })
+        }
+
+        // Then insert Quick Start after Ask Akto
+        const quickStartExists = items.find(item => item.key === "quick_start")
+        if (!quickStartExists) {
+            items.splice(2, 0, {
                 label: "Quick Start",
                 icon: AppsFilledMajor,
                 onClick: () => {

@@ -23,3 +23,15 @@
 body:has(.agentic-security-nav) .Polaris-Navigation {
     background: #ffffff !important;
 }
+
+/* Ask Akto gradient text styling - simplified but with proper specificity */
+.Polaris-Navigation .ask-akto-gradient-text,
+span.ask-akto-gradient-text {
+    background: linear-gradient(to right, rgba(98, 0, 234, 0.67) 0%, #18a4ea 100%) !important;
+    background-clip: text !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    color: transparent !important;
+    font-weight: 500 !important;
+    display: inline-block !important;
+}
