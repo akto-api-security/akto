@@ -70,7 +70,7 @@ public class ThreatApiServiceTest {
     ThreatSeverityWiseCountRequest req = baseRequest(Collections.singletonList("f1"));
 
     ThreatSeverityWiseCountResponse resp =
-        threatApiService.getSeverityWiseCount(ACCOUNT_ID, req, "API");
+        threatApiService.getSeverityWiseCount(ACCOUNT_ID, req);
 
     assertEquals(4, resp.getCategoryWiseCountsCount());
     assertEquals("CRITICAL", resp.getCategoryWiseCounts(0).getSeverity());
@@ -88,7 +88,7 @@ public class ThreatApiServiceTest {
     ThreatSeverityWiseCountRequest req = baseRequest(Collections.emptyList());
 
     ThreatSeverityWiseCountResponse resp =
-        threatApiService.getSeverityWiseCount(ACCOUNT_ID, req, "API");
+        threatApiService.getSeverityWiseCount(ACCOUNT_ID, req);
 
     assertEquals(0, resp.getCategoryWiseCountsCount());
   }
@@ -100,7 +100,7 @@ public class ThreatApiServiceTest {
     ThreatSeverityWiseCountRequest req = baseRequest(Collections.singletonList("f1"));
 
     ThreatSeverityWiseCountResponse resp =
-        threatApiService.getSeverityWiseCount(ACCOUNT_ID, req, "API");
+        threatApiService.getSeverityWiseCount(ACCOUNT_ID, req);
 
     assertEquals(0, resp.getCategoryWiseCountsCount());
   }
@@ -120,7 +120,7 @@ public class ThreatApiServiceTest {
     ThreatSeverityWiseCountRequest req = baseRequest(Collections.singletonList("f1"));
 
     ThreatSeverityWiseCountResponse resp =
-        threatApiService.getSeverityWiseCount(ACCOUNT_ID, req, "API");
+        threatApiService.getSeverityWiseCount(ACCOUNT_ID, req);
 
     // Should include only CRITICAL and LOW, in fixed order
     assertEquals(2, resp.getCategoryWiseCountsCount());
@@ -145,7 +145,7 @@ public class ThreatApiServiceTest {
     ThreatSeverityWiseCountRequest req = baseRequest(Collections.singletonList("f1"));
 
     ThreatSeverityWiseCountResponse resp =
-        threatApiService.getSeverityWiseCount(ACCOUNT_ID, req, "API");
+        threatApiService.getSeverityWiseCount(ACCOUNT_ID, req);
 
     assertEquals(1, resp.getCategoryWiseCountsCount());
     assertEquals("HIGH", resp.getCategoryWiseCounts(0).getSeverity());

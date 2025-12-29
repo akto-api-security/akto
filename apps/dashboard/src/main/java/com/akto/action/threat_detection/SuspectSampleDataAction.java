@@ -28,6 +28,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 
+import static com.akto.action.threat_detection.utils.ThreatsUtils.getTemplates;
 import com.akto.action.threat_detection.utils.ThreatDetectionHelper;
 import lombok.Getter;
 import lombok.Setter;
@@ -81,7 +82,6 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
         String.format("%s/api/dashboard/list_malicious_requests", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
-    post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
 
     Map<String, Object> filter = new HashMap<>();
     if (this.ips != null && !this.ips.isEmpty()) {
@@ -120,7 +120,8 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       filter.put("latestApiOrigRegex", this.latestApiOrigRegex);
     }
 
-    filter.put("latestAttack", latestAttack);
+    List<String> templates = getTemplates(latestAttack);
+    filter.put("latestAttack", templates);
 
     if (this.statusFilter != null) {
       filter.put("statusFilter", this.statusFilter);
@@ -258,9 +259,10 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     if (this.types != null && !this.types.isEmpty()) {
       filterBuilder.addAllTypes(this.types);
     }
-    // Always populate latestAttack, even if empty
-    if (latestAttack != null && !latestAttack.isEmpty()) {
-      filterBuilder.addAllLatestAttack(latestAttack);
+    // Always populate latestAttack with available templates, even if empty
+    List<String> templates = getTemplates(latestAttack);
+    if (!templates.isEmpty()) {
+      filterBuilder.addAllLatestAttack(templates);
     }
     if (this.statusFilter != null) {
       filterBuilder.setStatusFilter(this.statusFilter);
@@ -343,7 +345,6 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
             String.format("%s/api/dashboard/delete_malicious_events", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
-    post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
 
     DeleteMaliciousEventsRequest.Builder requestBuilder = DeleteMaliciousEventsRequest.newBuilder();
 
