@@ -407,9 +407,9 @@ const SampleApi = () => {
                 <div className="req-resp-tabs">
                     <LegacyTabs tabs={tabs} selected={selected} onSelect={handleTabChange} fitted />
                 </div>
-                <HorizontalStack gap={2} align="center" wrap={false}>
+                <HorizontalStack gap={2}>
                     <Button id={"select-sample-api"} onClick={toggleSelectApiActive} size="slim">
-                        <Box maxWidth="200px" minWidth="150px">
+                        <Box maxWidth="200px">
                             <Tooltip content={func.toMethodUrlString({...func.toMethodUrlObject(copySelectedApiEndpoint), shouldParse: true})} hoverDelay={"100"}>
                                 <Text variant="bodyMd" truncate>{func.toMethodUrlString({...func.toMethodUrlObject(copySelectedApiEndpoint), shouldParse: true})}</Text>
                             </Tooltip>
