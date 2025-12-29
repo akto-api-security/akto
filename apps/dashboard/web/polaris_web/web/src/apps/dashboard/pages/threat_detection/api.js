@@ -35,8 +35,8 @@ const threatDetectionRequests = {
                 types: types,
                 apiCollectionIds: apiCollectionIds,
                 sort: sort,
-                startTimestamp: startTimestamp,
-                endTimestamp: endTimestamp,
+                ...(startTimestamp !== undefined && startTimestamp !== null ? { startTimestamp } : {}),
+                ...(endTimestamp !== undefined && endTimestamp !== null ? { endTimestamp } : {}),
                 latestAttack: latestAttack || [],
                 limit: limit || 50,
                 statusFilter: statusFilter,
@@ -219,6 +219,39 @@ const threatDetectionRequests = {
             url: '/api/getAdxExportStatus',
             method: 'post',
             data: {}
+        })
+    },
+    generateThreatReport(filtersForReport, threatIdsForReport) {
+        return request({
+            url: '/api/generateThreatReport',
+            method: 'post',
+            data: {
+                filtersForReport: filtersForReport,
+                threatIdsForReport: threatIdsForReport
+            }
+        })
+    },
+    getThreatReportFilters(reportId) {
+        return request({
+            url: '/api/getThreatReportFilters',
+            method: 'post',
+            data: {
+                generatedReportId: reportId
+            }
+        })
+    },
+    downloadThreatReportPDF(reportId, organizationName, reportDate, reportUrl, username, firstPollRequest) {
+        return request({
+            url: '/api/downloadThreatReportPDF',
+            method: 'post',
+            data: {
+                reportId: reportId,
+                organizationName: organizationName,
+                reportDate: reportDate,
+                reportUrl: reportUrl,
+                username: username,
+                firstPollRequest: firstPollRequest
+            }
         })
     }
 }

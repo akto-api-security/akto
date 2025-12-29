@@ -1,0 +1,64 @@
+/* Threat Report Specific Styles */
+@import '../../../../../components/shared/reports/report-styles.css';
+
+/* Severity Badges - Threat Report Specific */
+.severity-badge-critical {
+    background-color: #d72c0d;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.severity-badge-high {
+    background-color: #f49342;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.severity-badge-medium {
+    background-color: #ffc453;
+    color: #1f2124;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.severity-badge-low {
+    background-color: #47c1bf;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+/* Print Optimization - Threat Report Specific */
+@media print {
+    #threat-report-summary .issues-severity-graph-table-container {
+        transform: scale(0.8) !important;
+        width: 100% !important;
+    }
+
+    #threat-report-summary .pie-chart {
+        transform: scale(0.6) !important;
+    }
+
+    .threat-findings-table {
+        break-inside: avoid;
+    }
+
+    .threat-findings-table table {
+        font-size: 11px !important;
+    }
+
+    .threat-findings-table th,
+    .threat-findings-table td {
+        padding: 8px 6px !important;
+    }
+}

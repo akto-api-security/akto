@@ -57,124 +57,39 @@ public class ReportAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ReportAction.class, LogDb.DASHBOARD);
 
     public String downloadReportPDF() {
-        if(reportUrl == null || reportUrl.isEmpty()) {
-            status = "ERROR";
-            addActionError("Report URL cannot be empty");
-            return ERROR.toUpperCase();
-        }
-
-        String reportUrlId;
         try {
-            String path = new URL(reportUrl).getPath();
-            String[] segments = path.split("/");
-            reportUrlId = segments[segments.length - 1];
-        } catch (Exception e) {
-            status = "ERROR";
-            addActionError("Report URL cannot be empty");
-            return ERROR.toUpperCase();
-        }
+            User user = getSUser();
+            PDFDownloadService.PDFDownloadResult result = PDFDownloadService.downloadPDF(
+                reportId,
+                organizationName,
+                reportDate,
+                reportUrl,
+                username,
+                firstPollRequest,
+                TestReportsDao.instance,
+                TestReports.PDF_REPORT_STRING,
+                user,
+                "pdf"
+            );
 
-        if(!ObjectId.isValid(reportUrlId)) {
-            status = "ERROR";
-            addActionError("Report URL is invalid");
-            return ERROR.toUpperCase();
-        }
+            this.pdf = result.getPdf();
+            this.status = result.getStatus();
+            this.reportId = result.getReportId();
 
-        ObjectId reportUrlIdObj = new ObjectId(reportUrlId);
-
-        if(firstPollRequest) {
-            TestReports testReport = TestReportsDao.instance.findOne(Filters.eq("_id", reportUrlIdObj));
-            if(testReport != null && (testReport.getPdfReportString() != null && !testReport.getPdfReportString().isEmpty())) {
-                status = "COMPLETED";
-                pdf = testReport.getPdfReportString();
-                return SUCCESS.toUpperCase();
-            }
-        }
-
-        if (reportId == null) {
-            // Initiate PDF generation
-
-            reportId = new ObjectId().toHexString();
-            loggerMaker.debugAndAddToDb("Triggering pdf download for report id - " + reportId, LogDb.DASHBOARD);
-
-            // Make call to puppeteer service
-            try {
-                HttpServletRequest request = ServletActionContext.getRequest();
-                HttpSession session = request.getSession();
-                String jsessionId = session.getId();
-                User user = getSUser();
-                String accessToken = Token.generateAccessToken(user.getLogin(), "true");
-
-                // Set login time if API triggered PDF download
-                String apiKey = request.getHeader("X-API-KEY");
-                boolean apiKeyFlag = apiKey != null;
-                if (apiKeyFlag) {
-                    session.setAttribute("login", Context.now());
-                }
-
-                String url = System.getenv("PUPPETEER_REPLAY_SERVICE_URL") + "/downloadReportPDF";
-                JSONObject requestBody = new JSONObject();
-                requestBody.put("reportId", reportId);
-                requestBody.put("username", username);
-                requestBody.put("accessToken", accessToken);
-                requestBody.put("jsessionId", jsessionId);
-                requestBody.put("organizationName", organizationName);
-                requestBody.put("reportDate", reportDate);
-                requestBody.put("reportUrl", reportUrl);
-                String reqData = requestBody.toString();
-                JsonNode node = ApiRequest.postRequest(new HashMap<>(), url, reqData);
-                status = node.get("status").textValue();
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error while triggering pdf download for report id - " + reportId, LogDb.DASHBOARD);
-                status = "ERROR";
-            }
-        } else {
-            // Check for report completion
-            loggerMaker.debugAndAddToDb("Polling pdf download status for report id - " + reportId, LogDb.DASHBOARD);
-
-            try {
-                String url = System.getenv("PUPPETEER_REPLAY_SERVICE_URL") + "/downloadReportPDF";
-                JSONObject requestBody = new JSONObject();
-                requestBody.put("reportId", reportId);
-                String reqData = requestBody.toString();
-                JsonNode node = ApiRequest.postRequest(new HashMap<>(), url, reqData);
-                if(node == null) {
-                    addActionError("The report is too large to save. Please reduce its size and try again.");
-                    status = "ERROR";
+            if (result.getError() != null) {
+                addActionError(result.getError());
+                if (this.status.equals("ERROR")) {
                     return ERROR.toUpperCase();
                 }
-                status = (String) node.get("status").textValue();
-                loggerMaker.debugAndAddToDb("Pdf download status for report id - " + reportId + " - " + status, LogDb.DASHBOARD);
-
-                if (status.equals("COMPLETED")) {
-                    loggerMaker.debugAndAddToDb("Pdf download status for report id - " + reportId + " completed. Attaching pdf in response ", LogDb.DASHBOARD);
-                    pdf = node.get("base64PDF").textValue();
-                    try {
-                        TestReportsDao.instance.updateOne(Filters.eq("_id", reportUrlIdObj), Updates.set(TestReports.PDF_REPORT_STRING, pdf));
-                    } catch(Exception e) {
-                        loggerMaker.errorAndAddToDb("Error: " + e.getMessage() + ", while updating report binary for reportId: " + reportId, LogDb.DASHBOARD);
-                        if (e instanceof MongoCommandException) {
-                            MongoCommandException mongoException = (MongoCommandException) e;
-                            if (mongoException.getCode() == 17420) {
-                                addActionError("The report is too large to save. Please reduce its size and try again.");
-                            } else {
-                                addActionError("A database error occurred while saving the report. Try again later.");
-                            }
-                        } else {
-                            addActionError("An error occurred while updating the report in DB. Please try again.");
-                        }
-                        status = "ERROR";
-                    }
-                } else if(status.equals("FAILED")) {
-                    status = "ERROR";
-                }
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error while polling pdf download for report id - " + reportId, LogDb.DASHBOARD);
-                status = "ERROR";
             }
-        }
 
-        return SUCCESS.toUpperCase();
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in downloadReportPDF", LogDb.DASHBOARD);
+            status = "ERROR";
+            addActionError("An unexpected error occurred during PDF download");
+            return ERROR.toUpperCase();
+        }
     }
 
     public String downloadSamplePdf() {
