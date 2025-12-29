@@ -1,8 +1,9 @@
 import { Badge, Box, Button, Divider, Frame, HorizontalStack, LegacyTabs, Modal, Text, Tooltip, VerticalStack } from "@shopify/polaris"
-import {ChevronUpMinor } from "@shopify/polaris-icons"
+import { ChevronUpMinor } from "@shopify/polaris-icons"
 
 import { useEffect, useRef, useState } from "react";
 import DropdownSearch from "../../../components/shared/DropdownSearch";
+import TitleWithInfo from "../../../components/shared/TitleWithInfo";
 import api from "../../testing/api"
 import testEditorRequests from "../api";
 import func from "@/util/func";
@@ -501,7 +502,13 @@ const SampleApi = () => {
 
                     <DropdownSearch
                         id={"select-test-role"}
-                        label="Role"
+                        label={
+                            <TitleWithInfo
+                                titleText="Role"
+                                tooltipContent="Roles support is only available in Akto testing module."
+                                textProps={{ variant: 'bodyMd' }}
+                            />
+                        }
                         placeholder="Select role"
                         optionsList={testRolesOptions}
                         setSelected={setSelectedRole}
