@@ -1,17 +1,6 @@
 import { useState } from 'react'
 import func from '@/util/func'
 
-/**
- * Custom hook for handling report PDF downloads with polling
- *
- * @param {Object} config - Configuration object
- * @param {Function} config.downloadFunction - API function to call (e.g., api.downloadReportPDF)
- * @param {string} config.organizationName - Organization name for the report
- * @param {string} config.currentDate - Current date for the report
- * @param {string} config.userName - User name for the report
- * @param {string} config.filename - Filename for the downloaded PDF
- * @returns {Object} { handleDownloadPDF, pdfDownloadEnabled }
- */
 function useReportPDFDownload({ downloadFunction, organizationName, currentDate, userName, filename }) {
     const [pdfDownloadEnabled, setPdfDownloadEnabled] = useState(true)
 
@@ -42,14 +31,12 @@ function useReportPDFDownload({ downloadFunction, organizationName, currentDate,
         }, 6000)
 
         try {
-            // Trigger PDF download
             const startDownloadResponse = await downloadFunction(null, organizationName, currentDate, reportUrl, userName, true)
             const reportId = startDownloadResponse?.reportId
             status = startDownloadResponse?.status
             pdf = startDownloadResponse?.pdf
 
             if (reportId !== null && status === "IN_PROGRESS") {
-                // Poll for PDF completion
                 for (let i = 0; i < MAX_RETRIES; i++) {
                     const pdfPollResponse = await downloadFunction(reportId, organizationName, currentDate, reportUrl, userName, false)
                     status = pdfPollResponse?.status
@@ -85,7 +72,6 @@ function useReportPDFDownload({ downloadFunction, organizationName, currentDate,
             if (pdf === undefined) {
                 pdfError = "Failed to download PDF"
             } else {
-                // Download the PDF
                 try {
                     const byteCharacters = atob(pdf)
                     const byteNumbers = new Array(byteCharacters.length)

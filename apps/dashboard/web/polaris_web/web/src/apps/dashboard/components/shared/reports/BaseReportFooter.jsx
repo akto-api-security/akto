@@ -1,13 +1,5 @@
 import { Box, HorizontalStack, Link, Text, VerticalStack } from "@shopify/polaris"
 
-/**
- * Base component for report footers with G2 badges and end image
- *
- * @param {Object} props - Component props
- * @param {string} props.assessmentType - Type of assessment (e.g., "API Security", "Threat")
- * @param {string} props.leftBadgeLabel - Label for left badge (default: "DAST")
- * @param {string} props.rightBadgeLabel - Label for right badge (e.g., "API SECURITY")
- */
 const BaseReportFooter = ({
     assessmentType = "API Security",
     leftBadgeLabel = "DAST",
@@ -33,7 +25,7 @@ const BaseReportFooter = ({
                         </VerticalStack>
 
                         <VerticalStack gap={2} align='center' inlineAlign='center'>
-                            <Text>{"\u2008"}</Text> {/* Punctuation space for G2 badge alignment */}
+                            <Text>{"\u2008"}</Text>
                             <Link url='https://www.g2.com/products/akto/reviews' target='_blank' removeUnderline>
                                 <img src='/public/g2-badge-1.png' alt="G2 Badge" className='g2-badge' />
                             </Link>

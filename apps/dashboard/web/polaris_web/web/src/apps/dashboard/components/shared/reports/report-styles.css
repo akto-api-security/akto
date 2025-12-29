@@ -1,18 +1,13 @@
-/* Shared Report Styles - Used by both Vulnerability and Threat Reports */
-
-/* Page Breaks */
 .report-page-break {
     page-break-before: always;
 }
 
-/* Base Container */
 #report-container {
     margin: 8px 22vw 0px 22vw;
     height: 94vh;
     overflow: auto;
 }
 
-/* Header Bar */
 .report-header-css {
     background-color: #1E3161;
     padding: 16px;
@@ -26,7 +21,6 @@
     margin-left: 16px;
 }
 
-/* Cover Page */
 .report-cover-page-container {
     position: relative;
     width: 100%;
@@ -67,7 +61,6 @@
     width: 74.4px;
 }
 
-/* Typography */
 .report-default-heading {
     color: #FDCA34;
     font-size: 14px;
@@ -92,7 +85,6 @@
     color: #6D7175;
 }
 
-/* Editable Fields */
 #organization-name:hover,
 #second-line-wrapper:hover {
     cursor: pointer;
@@ -106,7 +98,6 @@
     color: white !important;
 }
 
-/* Footer */
 .report-end-image-container {
     position: relative;
     width: 100%;
@@ -145,7 +136,6 @@
     width: 104px;
 }
 
-/* HTTP Request/Response Display */
 .header-name {
     word-break: normal !important;
 }
@@ -159,7 +149,6 @@
     color: #0451a5 !important;
 }
 
-/* Print Optimization - Base Styles */
 @media print {
     #report-container {
         margin: auto 5vw;

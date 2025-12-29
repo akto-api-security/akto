@@ -1,7 +1,5 @@
-/* Threat Report Specific Styles */
 @import '../../../../../components/shared/reports/report-styles.css';
 
-/* Severity Badges - Threat Report Specific */
 .severity-badge-critical {
     background-color: #d72c0d;
     color: white;
@@ -38,7 +36,6 @@
     font-weight: 600;
 }
 
-/* Print Optimization - Threat Report Specific */
 @media print {
     #threat-report-summary .issues-severity-graph-table-container {
         transform: scale(0.8) !important;

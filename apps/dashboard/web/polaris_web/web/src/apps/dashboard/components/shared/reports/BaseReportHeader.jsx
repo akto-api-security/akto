@@ -1,19 +1,6 @@
 import { Box, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 
-/**
- * Base component for report headers with editable organization name and date/user fields
- *
- * @param {Object} props - Component props
- * @param {string} props.reportTitle - Title displayed above the main heading (e.g., "Vulnerability Report", "Threat Detection Report")
- * @param {string} props.subtitleText - Text after organization name (e.g., "API Security Findings", "Threat Detection Report")
- * @param {string} props.organizationName - Organization name to display
- * @param {Function} props.setOrganizationName - Function to update organization name
- * @param {string} props.userName - User name to display
- * @param {Function} props.setUserName - Function to update user name
- * @param {string} props.currentDate - Current date to display
- * @param {boolean} props.showDateInfo - Whether to show date in the second line (default: true)
- */
 const BaseReportHeader = ({
     reportTitle,
     subtitleText,
@@ -29,7 +16,6 @@ const BaseReportHeader = ({
 
     const [tempOrgName, setTempOrgName] = useState(organizationName)
 
-    // Determine initial second line text based on showDateInfo
     const getDefaultSecondLine = () => {
         const isIssuesPage = window.location.pathname.includes('issues')
         if (!showDateInfo || isIssuesPage) {
@@ -43,7 +29,6 @@ const BaseReportHeader = ({
     useEffect(() => {
         const defaultLine = getDefaultSecondLine()
 
-        // Only update if not editing and temp line still has "-"
         if (!isEditingSecondLine && tempSecondLine.includes('-')) {
             setTempSecondLine(defaultLine)
         }

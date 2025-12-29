@@ -1,12 +1,5 @@
 import { Box, Link, Text, VerticalStack } from "@shopify/polaris"
 
-/**
- * Base component for report table of contents
- *
- * @param {Object} props - Component props
- * @param {Array} props.tocList - Array of TOC items with { text, link, children } structure
- * @param {string} props.numberingStyle - Numbering style: "simple" (1, 2, 3) or "hierarchical" (1.1, 1.2) (default: "simple")
- */
 function BaseReportTOC({ tocList, numberingStyle = "simple" }) {
     return (
         <Box paddingBlockStart={8} paddingBlockEnd={8} paddingInlineStart={5} paddingInlineEnd={5}>
