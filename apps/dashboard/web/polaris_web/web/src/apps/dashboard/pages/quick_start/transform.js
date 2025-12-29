@@ -906,7 +906,7 @@ const langchainImportObj = {
 const copilotStudioImportObj = {
     icon: '/public/copilot.svg',
     label: "Copilot Studio",
-    text: "Use our Copilot Studio feature to capture traffic from Azure Application Insights and instantly send it to your dashboard for real-time insights.",
+    text: "Use our Copilot Studio feature to capture conversation data from Azure Dataverse API and instantly send it to your dashboard for real-time insights.",
     docsUrl: 'https://docs.akto.io/copilot-studio-import',
     key: "COPILOT_STUDIO_IMPORT",
     component: <AIAgentConnectorImport
