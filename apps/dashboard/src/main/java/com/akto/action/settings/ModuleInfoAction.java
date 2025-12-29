@@ -7,6 +7,10 @@ import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.monitoring.ModuleInfo.ModuleType;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
+
+import lombok.Getter;
+import lombok.Setter;
+
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
@@ -17,6 +21,9 @@ public class ModuleInfoAction extends UserAction {
     private List<ModuleInfo> moduleInfos;
     private Map<String, Object> filter;
     private List<String> moduleIds;
+    @Getter
+    @Setter
+    private boolean deleteTopicAndReboot;
 
     @Override
     public String execute() {
@@ -83,7 +90,9 @@ public class ModuleInfoAction extends UserAction {
             );
 
             // Update reboot flag to true for matching modules
-            ModuleInfoDao.instance.updateMany(rebootFilter, Updates.set(ModuleInfo._REBOOT, true));
+            // Use deleteTopicAndReboot flag if specified, otherwise use regular reboot flag
+            String rebootField = deleteTopicAndReboot ? ModuleInfo.DELETE_TOPIC_AND_REBOOT : ModuleInfo._REBOOT;
+            ModuleInfoDao.instance.updateMany(rebootFilter, Updates.set(rebootField, true));
 
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
