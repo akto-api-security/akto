@@ -97,6 +97,7 @@ import F5Waf from "../dashboard/pages/settings/integrations/F5Waf";
 import AWSWaf from "../dashboard/pages/settings/integrations/AWSWaf";
 import AgentConfig from "../dashboard/pages/settings/integrations/AgentConfig";
 import AzureBoards from "../dashboard/pages/settings/integrations/AzureBoards";
+import AzureDataExplorer from "../dashboard/pages/settings/integrations/AzureDataExplorer";
 import ServiceNow from "../dashboard/pages/settings/integrations/ServiceNow";
 import DevRev from "../dashboard/pages/settings/integrations/DevRev";
 import McpRegistry from "../dashboard/pages/settings/integrations/McpRegistry";
@@ -391,6 +392,10 @@ const router = createBrowserRouter([
                     {
                         path: "integrations/azure_boards",
                         element: <AzureBoards/>,
+                    },
+                    {
+                        path: "integrations/adx",
+                        element: <AzureDataExplorer/>,
                     },
                     {
                         path: "integrations/servicenow",

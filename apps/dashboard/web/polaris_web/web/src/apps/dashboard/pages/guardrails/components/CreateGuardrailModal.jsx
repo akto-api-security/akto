@@ -59,7 +59,9 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         useForResponses: false
     });
     const [enablePromptAttacks, setEnablePromptAttacks] = useState(false);
-    const [promptAttackLevel, setPromptAttackLevel] = useState("HIGH");
+    const [promptAttackLevel, setPromptAttackLevel] = useState("high");
+    const [enableCodeFilter, setEnableCodeFilter] = useState(false);
+    const [codeFilterLevel, setCodeFilterLevel] = useState("high");
 
     // Step 3: Denied topics
     const [deniedTopics, setDeniedTopics] = useState([]);
@@ -115,6 +117,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         // Step 2
         enableHarmfulCategories,
         enablePromptAttacks,
+        enableCodeFilter,
         // Step 3
         deniedTopics,
         // Step 4
@@ -289,7 +292,9 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             misconduct: "HIGH",
             useForResponses: false
         });
-        setPromptAttackLevel("HIGH");
+        setPromptAttackLevel("high");
+        setEnableCodeFilter(false);
+        setCodeFilterLevel("high");
         setDeniedTopics([]);
         setWordFilters({
             profanity: false,
@@ -334,7 +339,18 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             }
             if (policy.contentFiltering.promptAttacks) {
                 setEnablePromptAttacks(true);
-                setPromptAttackLevel(policy.contentFiltering.promptAttacks.level || "HIGH");
+                const level = policy.contentFiltering.promptAttacks.level || "high";
+                setPromptAttackLevel(level.toLowerCase());
+            }
+            if (policy.contentFiltering.code) {
+                setEnableCodeFilter(true);
+                // Handle both boolean and object format
+                if (typeof policy.contentFiltering.code === 'object' && policy.contentFiltering.code.level) {
+                    const level = policy.contentFiltering.code.level || "high";
+                    setCodeFilterLevel(level.toLowerCase());
+                } else {
+                    setCodeFilterLevel("high");
+                }
             }
         }
         
@@ -468,7 +484,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 applyToResponses,
                 contentFilters: {
                     harmfulCategories: enableHarmfulCategories ? harmfulCategoriesSettings : null,
-                    promptAttacks: enablePromptAttacks ? { level: promptAttackLevel } : null
+                    promptAttacks: enablePromptAttacks ? { level: promptAttackLevel.toUpperCase() } : null,
+                    code: enableCodeFilter ? { level: codeFilterLevel.toUpperCase() } : null
                 },
                 deniedTopics,
                 wordFilters,
@@ -656,6 +673,10 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         setEnablePromptAttacks={setEnablePromptAttacks}
                         promptAttackLevel={promptAttackLevel}
                         setPromptAttackLevel={setPromptAttackLevel}
+                        enableCodeFilter={enableCodeFilter}
+                        setEnableCodeFilter={setEnableCodeFilter}
+                        codeFilterLevel={codeFilterLevel}
+                        setCodeFilterLevel={setCodeFilterLevel}
                     />
                 );
             case 3:
