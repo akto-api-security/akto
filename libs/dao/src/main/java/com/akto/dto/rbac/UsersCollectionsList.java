@@ -193,6 +193,6 @@ public class UsersCollectionsList {
 
     public static boolean isDemoAccount() {
         Integer accountId = Context.accountId.get();
-        return accountId == 1000000 || accountId == 1669322524;
+        return accountId == 1669322524;
     }
 }
