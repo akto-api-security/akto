@@ -23,6 +23,7 @@ public class McpTokenGenerator {
         }
         claims.put("contextSource", contextSource);
         claims.put("accountId", accountId);
+        claims.put("auth_role", "mcp");
 
         try {
             String token = JwtAuthenticator.createJWT(
