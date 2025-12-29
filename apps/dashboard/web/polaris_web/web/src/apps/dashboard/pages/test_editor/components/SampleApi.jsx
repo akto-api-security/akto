@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Divider, Frame, HorizontalStack, LegacyTabs, Modal, Text, Tooltip, VerticalStack, Popover } from "@shopify/polaris"
+import { Badge, Box, Button, Divider, Frame, HorizontalStack, LegacyTabs, Modal, Text, Tooltip, VerticalStack } from "@shopify/polaris"
 import {ChevronUpMinor } from "@shopify/polaris-icons"
 
 import { useEffect, useRef, useState } from "react";
@@ -59,7 +59,6 @@ const SampleApi = () => {
     const subCategoryMap = LocalStore(state => state.subCategoryMap)
     const [testRoles, setTestRoles] = useState([])
     const [testRolesOptions, setTestRolesOptions] = useState([])
-    const [rolePopoverActive, setRolePopoverActive] = useState(false)
 
     useEffect(() => {
         const fetchRoles = async () => {
@@ -408,54 +407,14 @@ const SampleApi = () => {
                 <div className="req-resp-tabs">
                     <LegacyTabs tabs={tabs} selected={selected} onSelect={handleTabChange} fitted />
                 </div>
-                <HorizontalStack gap={2} align="center">
+                <HorizontalStack gap={2} align="center" wrap={false}>
                     <Button id={"select-sample-api"} onClick={toggleSelectApiActive} size="slim">
-                        <Box maxWidth="200px">
+                        <Box maxWidth="200px" minWidth="150px">
                             <Tooltip content={func.toMethodUrlString({...func.toMethodUrlObject(copySelectedApiEndpoint), shouldParse: true})} hoverDelay={"100"}>
                                 <Text variant="bodyMd" truncate>{func.toMethodUrlString({...func.toMethodUrlObject(copySelectedApiEndpoint), shouldParse: true})}</Text>
                             </Tooltip>
                         </Box>
                     </Button>
-
-                    <Popover
-                        active={rolePopoverActive}
-                        activator={
-                            <Button id={"select-test-role"} onClick={() => setRolePopoverActive(!rolePopoverActive)} size="slim" disclosure>
-                                <Box minWidth="50px">
-                                    <Tooltip content={(() => {
-                                        const found = testRolesOptions.find(r => r.value === selectedRole)
-                                        return found ? found.label : "Select role"
-                                    })()} hoverDelay={"100"}>
-                                        <Text variant="bodyMd" truncate>{(() => {
-                                            const found = testRolesOptions.find(r => r.value === selectedRole)
-                                            return found ? found.label : "Select role"
-                                        })()}</Text>
-                                    </Tooltip>
-                                </Box>
-                            </Button>
-                        }
-                        onClose={() => setRolePopoverActive(false)}
-                    >
-                        <Popover.Pane fixed>
-                            <Box padding={4} minWidth="320px">
-                                <DropdownSearch
-                                    id={"role-search"}
-                                    placeholder={"Search roles"}
-                                    optionsList={testRolesOptions}
-                                    setSelected={(val) => { setSelectedRole(val); setRolePopoverActive(false); }}
-                                    value={(() => {
-                                        const found = testRolesOptions.find(r => r.value === selectedRole)
-                                        return found ? found.label : ''
-                                    })()}
-                                    preSelected={selectedRole ? [selectedRole] : []}
-                                />
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-                                    <Button plain onClick={() => { setSelectedRole(null); setRolePopoverActive(false); }}>Clear</Button>
-                                </div>
-                            </Box>
-                        </Popover.Pane>
-                    </Popover>
-
                     <Button id={"run-test"} disabled={showEmptyLayout || editorData?.message?.length === 0} loading={loading} primary onClick={runTest} size="slim">{isChatBotOpen ? "Chat" : mapLabel('Run test', getDashboardCategory())}</Button>
                 </HorizontalStack>
             </div>
@@ -536,6 +495,21 @@ const SampleApi = () => {
                         setSelected={setCopySelectedApiEndpoint}
                         value={copySelectedApiEndpoint==null ? "No endpoints selected" : func.toMethodUrlString({...func.toMethodUrlObject(copySelectedApiEndpoint), shouldParse: true})}
                         preSelected={[copySelectedApiEndpoint]}
+                    />
+
+                    <br />
+
+                    <DropdownSearch
+                        id={"select-test-role"}
+                        label="Role"
+                        placeholder="Select role"
+                        optionsList={testRolesOptions}
+                        setSelected={setSelectedRole}
+                        value={(() => {
+                            const found = testRolesOptions.find(r => r.value === selectedRole)
+                            return found ? found.label : ''
+                        })()}
+                        preSelected={selectedRole ? [selectedRole] : []}
                     />
 
                 </Modal.Section>
