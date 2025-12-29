@@ -61,6 +61,7 @@ import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 
 import lombok.Getter;
+import lombok.Setter;
 
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
@@ -98,6 +99,7 @@ public class SaveTestEditorAction extends UserAction {
     private HashMap<String, Integer> testCountMap;
     private String testingRunPlaygroundHexId;
     private State testingRunPlaygroundStatus;
+    @Getter @Setter
     private String testRoleId;
 
     public String fetchTestingRunResultFromTestingRun() {
@@ -809,14 +811,6 @@ public class SaveTestEditorAction extends UserAction {
 
     public String getTestingRunPlaygroundHexId() {
         return testingRunPlaygroundHexId;
-    }
-
-    public String getTestRoleId() {
-        return testRoleId;
-    }
-
-    public void setTestRoleId(String testRoleId) {
-        this.testRoleId = testRoleId;
     }
 
 }
