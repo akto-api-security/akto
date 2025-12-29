@@ -28,8 +28,10 @@ export const FIELD_N8N_URL = 'n8nUrl';
 export const FIELD_N8N_API_KEY = 'n8nApiKey';
 export const FIELD_LANGSMITH_URL = 'langsmithUrl';
 export const FIELD_LANGSMITH_API_KEY = 'langsmithApiKey';
-export const FIELD_APPINSIGHTS_APP_ID = 'appInsightsAppId';
-export const FIELD_APPINSIGHTS_API_KEY = 'appInsightsApiKey';
+export const FIELD_DATAVERSE_ENVIRONMENT_URL = 'dataverseEnvironmentUrl';
+export const FIELD_DATAVERSE_TENANT_ID = 'dataverseTenantId';
+export const FIELD_DATAVERSE_CLIENT_ID = 'dataverseClientId';
+export const FIELD_DATAVERSE_CLIENT_SECRET = 'dataverseClientSecret';
 export const FIELD_DATA_INGESTION_URL = 'dataIngestionUrl';
 
 // Field Types
@@ -40,7 +42,7 @@ export const FIELD_TYPE_PASSWORD = 'password';
 // Descriptions
 export const DESCRIPTION_N8N = 'Use our N8N feature to capture traffic and instantly send it to your dashboard for real-time insights.';
 export const DESCRIPTION_LANGCHAIN = 'Use our Langchain feature to capture traffic from LangSmith and instantly send it to your dashboard for real-time insights.';
-export const DESCRIPTION_COPILOT_STUDIO = 'Use our Copilot Studio feature to capture traffic from Azure Application Insights and instantly send it to your dashboard for real-time insights.';
+export const DESCRIPTION_COPILOT_STUDIO = 'Use our Copilot Studio feature to capture conversation data from Azure Dataverse API and instantly send it to your dashboard for real-time insights.';
 
 // N8N Field Configuration
 export const N8N_FIELDS = [
@@ -93,18 +95,32 @@ export const LANGCHAIN_FIELDS = [
 // Copilot Studio Field Configuration
 export const COPILOT_STUDIO_FIELDS = [
     {
-        name: FIELD_APPINSIGHTS_APP_ID,
-        label: 'App Insights App ID',
-        type: FIELD_TYPE_TEXT,
-        placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
-        configKey: FIELD_APPINSIGHTS_APP_ID
+        name: FIELD_DATAVERSE_ENVIRONMENT_URL,
+        label: 'Dataverse Environment URL',
+        type: FIELD_TYPE_URL,
+        placeholder: 'https://org.crm.dynamics.com',
+        configKey: FIELD_DATAVERSE_ENVIRONMENT_URL
     },
     {
-        name: FIELD_APPINSIGHTS_API_KEY,
-        label: 'App Insights API Key',
+        name: FIELD_DATAVERSE_TENANT_ID,
+        label: 'Azure AD Tenant ID',
+        type: FIELD_TYPE_TEXT,
+        placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+        configKey: FIELD_DATAVERSE_TENANT_ID
+    },
+    {
+        name: FIELD_DATAVERSE_CLIENT_ID,
+        label: 'Azure AD App Client ID',
+        type: FIELD_TYPE_TEXT,
+        placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+        configKey: FIELD_DATAVERSE_CLIENT_ID
+    },
+    {
+        name: FIELD_DATAVERSE_CLIENT_SECRET,
+        label: 'Azure AD App Client Secret',
         type: FIELD_TYPE_PASSWORD,
         placeholder: '*******',
-        configKey: FIELD_APPINSIGHTS_API_KEY
+        configKey: FIELD_DATAVERSE_CLIENT_SECRET
     },
     {
         name: FIELD_DATA_INGESTION_URL,
