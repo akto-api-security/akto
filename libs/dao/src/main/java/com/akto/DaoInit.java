@@ -11,6 +11,8 @@ import com.akto.dao.monitoring.EndpointShieldLogsDao;
 import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunDao;
+import com.akto.dao.testing.AgentConversationDao;
+import com.akto.dao.testing.AgentConversationResultDao;
 import com.akto.dao.testing.BidirectionalSyncSettingsDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
@@ -407,6 +409,7 @@ public class DaoInit {
                 new EnumCodec<>(ModuleInfo.ModuleType.class),
                 new EnumCodec<>(TLSAuthParam.CertificateType.class),
                 new EnumCodec<>(TicketSource.class),
+                new EnumCodec<>(GenericAgentConversation.ConversationType.class),
                 new EnumCodec<>(GlobalEnums.CONTEXT_SOURCE.class)
         );
 
@@ -488,5 +491,7 @@ public class DaoInit {
         McpReconRequestDao.instance.createIndicesIfAbsent();
         GuardrailPoliciesDao.instance.createIndicesIfAbsent();
         EndpointShieldLogsDao.instance.createIndicesIfAbsent();
+        AgentConversationDao.instance.createIndexIfAbsent();
+        AgentConversationResultDao.instance.createIndexIfAbsent();
     }
 }

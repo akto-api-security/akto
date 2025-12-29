@@ -28,9 +28,11 @@ public final class AIAgentConnectorConstants {
     public static final String CONFIG_LANGSMITH_BASE_URL = "LANGSMITH_BASE_URL";
     public static final String CONFIG_LANGSMITH_API_KEY = "LANGSMITH_API_KEY";
 
-    // Configuration Keys - Copilot Studio
-    public static final String CONFIG_APPINSIGHTS_APP_ID = "APPINSIGHTS_APP_ID";
-    public static final String CONFIG_APPINSIGHTS_API_KEY = "APPINSIGHTS_API_KEY";
+    // Configuration Keys - Copilot Studio (Dataverse API)
+    public static final String CONFIG_DATAVERSE_ENVIRONMENT_URL = "DATAVERSE_ENVIRONMENT_URL";
+    public static final String CONFIG_DATAVERSE_TENANT_ID = "DATAVERSE_TENANT_ID";
+    public static final String CONFIG_DATAVERSE_CLIENT_ID = "DATAVERSE_CLIENT_ID";
+    public static final String CONFIG_DATAVERSE_CLIENT_SECRET = "DATAVERSE_CLIENT_SECRET";
 
     // Common Configuration Keys
     public static final String CONFIG_DATA_INGESTION_SERVICE_URL = "DATA_INGESTION_SERVICE_URL";
