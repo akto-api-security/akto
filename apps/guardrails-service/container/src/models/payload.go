@@ -3,28 +3,28 @@ package models
 // IngestDataBatch represents the batch data received from traffic sources
 // Similar to IngestDataBatch.java from mini-runtime-service
 type IngestDataBatch struct {
-	Path              string   `json:"path"`
-	RequestHeaders    string   `json:"requestHeaders"`
-	ResponseHeaders   string   `json:"responseHeaders"`
-	Method            string   `json:"method"`
-	RequestPayload    string   `json:"requestPayload"`
-	ResponsePayload   string   `json:"responsePayload"`
-	IP                string   `json:"ip"`
-	DestIP            string   `json:"destIp"`
-	Time              string   `json:"time"`
-	StatusCode        string   `json:"statusCode"`
-	Type              string   `json:"type"`
-	Status            string   `json:"status"`
-	AktoAccountID     string   `json:"akto_account_id"`
-	AktoVxlanID       string   `json:"akto_vxlan_id"`
-	IsPending         string   `json:"is_pending"`
-	Source            string   `json:"source"`
-	Direction         string   `json:"direction"`
-	ProcessID         string   `json:"process_id"`
-	SocketID          string   `json:"socket_id"`
-	DaemonsetID       string   `json:"daemonset_id"`
-	EnabledGraph      string   `json:"enabled_graph"`
-	Tag               string   `json:"tag"`
+	Path               string   `json:"path"`
+	RequestHeaders     string   `json:"requestHeaders"`
+	ResponseHeaders    string   `json:"responseHeaders"`
+	Method             string   `json:"method"`
+	RequestPayload     string   `json:"requestPayload"`
+	ResponsePayload    string   `json:"responsePayload"`
+	IP                 string   `json:"ip"`
+	DestIP             string   `json:"destIp"`
+	Time               string   `json:"time"`
+	StatusCode         string   `json:"statusCode"`
+	Type               string   `json:"type"`
+	Status             string   `json:"status"`
+	AktoAccountID      string   `json:"akto_account_id"`
+	AktoVxlanID        string   `json:"akto_vxlan_id"`
+	IsPending          string   `json:"is_pending"`
+	Source             string   `json:"source"`
+	Direction          string   `json:"direction"`
+	ProcessID          string   `json:"process_id"`
+	SocketID           string   `json:"socket_id"`
+	DaemonsetID        string   `json:"daemonset_id"`
+	EnabledGraph       string   `json:"enabled_graph"`
+	Tag                string   `json:"tag"`
 	ParentMcpToolNames []string `json:"parentMcpToolNames"`
 }
 
@@ -62,7 +62,8 @@ type HttpResponseParams struct {
 
 // ValidationRequest represents the request to validate payloads
 type ValidationRequest struct {
-	BatchData []IngestDataBatch `json:"batchData"`
+	BatchData     []IngestDataBatch `json:"batchData"`
+	ContextSource string            `json:"contextSource,omitempty"` // Optional context source for policy filtering
 }
 
 // ValidationResponse represents the response from validation
