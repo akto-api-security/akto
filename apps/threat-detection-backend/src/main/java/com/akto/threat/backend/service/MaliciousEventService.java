@@ -1,7 +1,6 @@
 package com.akto.threat.backend.service;
 
 import com.akto.dto.threat_detection_backend.MaliciousEventDto;
-import com.akto.threat.backend.utils.ThreatUtils;
 import com.akto.dto.type.URLMethods;
 import com.akto.kafka.Kafka;
 import com.akto.kafka.KafkaConfig;
@@ -127,13 +126,8 @@ public class MaliciousEventService {
 
     String status = (evt.getStatus() != null && !evt.getStatus().isEmpty()) ? evt.getStatus() : ThreatDetectionConstants.ACTIVE;
 
-    // Extract contextSource from the event message
-    String contextSource = null;
-    if (evt.getContextSource() != null && !evt.getContextSource().isEmpty()) {
-        contextSource = evt.getContextSource();
-    }
-
-    MaliciousEventDto.Builder builder = MaliciousEventDto.newBuilder()
+    MaliciousEventDto maliciousEventModel =
+        MaliciousEventDto.newBuilder()
             .setDetectedAt(evt.getDetectedAt())
             .setActor(actor)
             .setFilterId(filterId)
@@ -153,14 +147,8 @@ public class MaliciousEventService {
             .setSuccessfulExploit(evt.getSuccessfulExploit())
             .setStatus(MaliciousEventDto.Status.valueOf(status.toUpperCase()))
             .setLabel(label)
-            .setHost(evt.getHost() != null ? evt.getHost() : "");
-
-    // Set contextSource if available
-    if (contextSource != null && !contextSource.isEmpty()) {
-        builder.setContextSource(contextSource);
-    }
-
-    MaliciousEventDto maliciousEventModel = builder.build();
+            .setHost(evt.getHost() != null ? evt.getHost() : "")
+            .build();
 
     this.kafka.send(
         KafkaUtils.generateMsg(
@@ -213,7 +201,7 @@ public class MaliciousEventService {
   }
 
   public ListMaliciousRequestsResponse listMaliciousRequests(
-      String accountId, ListMaliciousRequestsRequest request, String contextSource) {
+      String accountId, ListMaliciousRequestsRequest request) {
 
     if(!shouldNotCreateIndexes.getOrDefault(accountId, false)) {
       createIndexIfAbsent(accountId);
@@ -223,6 +211,10 @@ public class MaliciousEventService {
     int skip = request.hasSkip() ? request.getSkip() : 0;
     Map<String, Integer> sort = request.getSortMap();
     ListMaliciousRequestsRequest.Filter filter = request.getFilter();
+
+    if(filter.getLatestAttackList() == null || filter.getLatestAttackList().isEmpty()) {
+      return ListMaliciousRequestsResponse.newBuilder().build();
+    }
 
     Document query = new Document();
     if (!filter.getActorsList().isEmpty()) {
@@ -293,12 +285,6 @@ public class MaliciousEventService {
       applyLabelFilter(query, labelEnum);
     }
 
-    // Apply simple context filter (only for ENDPOINT and AGENTIC)
-    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
-    if (!contextFilter.isEmpty()) {
-      query.putAll(contextFilter);
-    }
-
     long total = maliciousEventDao.countDocuments(accountId, query);
     try (MongoCursor<MaliciousEventDto> cursor =
         maliciousEventDao.getCollection(accountId)
@@ -350,7 +336,7 @@ public class MaliciousEventService {
     shouldNotCreateIndexes.put(accountId, true);
   }
 
-  public int updateMaliciousEventStatus(String accountId, List<String> eventIds, Map<String, Object> filterMap, String status, String jiraTicketUrl, String contextSource) {
+  public int updateMaliciousEventStatus(String accountId, List<String> eventIds, Map<String, Object> filterMap, String status, String jiraTicketUrl) {
     try {
       Bson update = null;
 
@@ -362,7 +348,7 @@ public class MaliciousEventService {
         update = Updates.set("jiraTicketUrl", jiraTicketUrl);
       }
 
-      Document query = buildQuery(eventIds, filterMap, "update", contextSource);
+      Document query = buildQuery(eventIds, filterMap, "update");
       if (query == null) {
         return 0;
       }
@@ -379,9 +365,9 @@ public class MaliciousEventService {
     }
   }
 
-  public int deleteMaliciousEvents(String accountId, List<String> eventIds, Map<String, Object> filterMap, String contextSource) {
+  public int deleteMaliciousEvents(String accountId, List<String> eventIds, Map<String, Object> filterMap) {
     try {
-      Document query = buildQuery(eventIds, filterMap, "delete", contextSource);
+      Document query = buildQuery(eventIds, filterMap, "delete");
       if (query == null) {
         return 0;
       }
@@ -399,13 +385,13 @@ public class MaliciousEventService {
     }
   }
 
-  private Document buildQuery(List<String> eventIds, Map<String, Object> filterMap, String operation, String contextSource) {
+  private Document buildQuery(List<String> eventIds, Map<String, Object> filterMap, String operation) {
     if (eventIds != null && !eventIds.isEmpty()) {
       // Query by event IDs
       return new Document("_id", new Document("$in", eventIds));
     } else if (filterMap != null && !filterMap.isEmpty()) {
       // Query by filter criteria
-      return buildQueryFromFilter(filterMap, contextSource);
+      return buildQueryFromFilter(filterMap);
     } else {
       logger.warn("Neither eventIds nor filterMap provided for " + operation);
       return null;
@@ -416,7 +402,7 @@ public class MaliciousEventService {
     if (eventIds != null && !eventIds.isEmpty()) {
       return "by IDs: " + eventIds;
     } else if (filterMap != null && !filterMap.isEmpty()) {
-      Document query = buildQueryFromFilter(filterMap, null);
+      Document query = buildQueryFromFilter(filterMap);
       return "by filter: " + query.toJson();
     }
     return "";
@@ -444,7 +430,7 @@ public class MaliciousEventService {
     }
   }
 
-  private Document buildQueryFromFilter(Map<String, Object> filter, String contextSource) {
+  private Document buildQueryFromFilter(Map<String, Object> filter) {
     Document query = new Document();
 
     // Handle ips/actors filter
@@ -502,12 +488,6 @@ public class MaliciousEventService {
     String latestApiOrigRegex = (String) filter.get("latestApiOrigRegex");
     if (latestApiOrigRegex != null && !latestApiOrigRegex.isEmpty()) {
       query.append("latestApiOrig", new Document("$regex", latestApiOrigRegex));
-    }
-
-    // Apply simple context filter (only for ENDPOINT and AGENTIC)
-    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
-    if (!contextFilter.isEmpty()) {
-      query.putAll(contextFilter);
     }
 
     return query;

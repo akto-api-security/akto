@@ -1,7 +1,6 @@
 package com.akto.action.threat_detection;
 
 import com.akto.ProtoMessageUtils;
-import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.Category;
@@ -30,6 +29,8 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.bson.Document;
 import lombok.Getter;
+
+import static com.akto.action.threat_detection.utils.ThreatsUtils.getTemplates;
 
 public class ThreatApiAction extends AbstractThreatDetectionAction {
 
@@ -102,13 +103,12 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
         String.format("%s/api/dashboard/get_subcategory_wise_count", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
-    post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
 
     Map<String, Object> body = new HashMap<String, Object>() {
       {
         put("start_ts", startTs);
         put("end_ts", endTs);
-        put("latestAttack", latestAttack);
+        put("latestAttack", getTemplates(latestAttack));
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -147,13 +147,12 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
 
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
-    post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
 
     Map<String, Object> body = new HashMap<String, Object>() {
       {
         put("start_ts", startTs);
         put("end_ts", endTs);
-        put("latestAttack", latestAttack);
+        put("latestAttack", getTemplates(latestAttack));
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -186,13 +185,14 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_daily_actor_count", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
-    post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
+
+    List<String> templatesContext = getTemplates(this.latestAttack);
 
     Map<String, Object> body = new HashMap<String, Object>() {
       {
         put("start_ts", startTs);
         put("end_ts", endTs);
-        put("latestAttack", latestAttack);
+        put("latestAttack", templatesContext);
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -234,13 +234,14 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_threat_activity_timeline", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
-    post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
+
+    List<String> templatesContext = getTemplates(this.latestAttack);
 
     Map<String, Object> body = new HashMap<String, Object>() {
       {
         put("start_ts", startTs);
         put("end_ts", endTs);
-        put("latestAttack", latestAttack);
+        put("latestAttack", templatesContext);
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -279,11 +280,11 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     HttpPost post = new HttpPost(String.format("%s/api/dashboard/list_threat_apis", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
-    post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
 
     Map<String, Object> filters = new HashMap<>();
 
-    filters.put("latestAttack", latestAttack);
+    List<String> templates = getTemplates(latestAttack);
+    filters.put("latestAttack", templates);
 
     Map<String, Object> body = new HashMap<String, Object>() {
       {
@@ -332,13 +333,14 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_top_n_data", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
-    post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
+
+    List<String> templatesContext = getTemplates(this.latestAttack);
 
     Map<String, Object> body = new HashMap<String, Object>() {
       {
         put("start_ts", startTs);
         put("end_ts", endTs);
-        put("latestAttack", latestAttack);
+        put("latestAttack", templatesContext);
         put("limit", 5);
       }
     };
