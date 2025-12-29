@@ -25,6 +25,7 @@ import AIAgentsGateway from "./AIAgentsGateway"
 import ImpervaImport from "./components/ImpervaImport"
 import BrowserExtension from "./components/BrowserExtension"
 import AIAgentConnectorImport from "./components/AIAgentConnectorImport"
+import CursorHook from "./components/CursorHook"
 import {
     CONNECTOR_TYPE_N8N,
     CONNECTOR_NAME_N8N,
@@ -871,6 +872,15 @@ const safariExtensionObj = {
     key: "SAFARI_BROWSER_EXTENSION",
 }
 
+const cursorHookObj = {
+    icon: '/public/akto_name_with_icon.svg',
+    label: "Cursor Hook",
+    text: "IDE-level protection monitoring AI-powered code completions in real-time.",
+    docsUrl: 'https://docs.akto.io/cursor-hook',
+    key: "CURSOR_HOOK",
+    component: <CursorHook/>
+}
+
 const n8nImportObj = {
     icon: '/public/n8n.svg',
     label: "N8N",
@@ -1513,19 +1523,19 @@ const quickStartFunc = {
             geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj
         ]
 
-        const aiAgentGateways = [
+        const agenticProxies = [
             aiAgentGlobalProxy, aiAgentGateway
 
         ]
 
         const aiAgentConnectors = [
-            awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
+            awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
             n8nImportObj, langchainImportObj, copilotStudioImportObj
         ]
 
         // MCP Scan
         const mcpScan = [
-            mcpScanObj, mcpReconObj, mcpProxyObj, mcpGateway,mcpWrapperObj
+            mcpReconObj, mcpScanObj
         ];
 
         // Akto SDK
@@ -1544,7 +1554,8 @@ const quickStartFunc = {
 
         // Endpoint Agents
         const endpointAgents = [
-            mcpWrapperObj
+            mcpWrapperObj,
+            cursorHookObj
         ]
 
        if(func.checkLocal() || func.isLimitedAccount()){
@@ -1555,29 +1566,44 @@ const quickStartFunc = {
 
         let connectors = {}
 
-        if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
-            connectors["AI Agent Scan"] = aiAgentGateways
-            connectors["AI Agent Security"] = aiAgentConnectors
-            connectors["AI Model Security"] = aiScanConnectors
-            connectors["Browser Extension"] = browserExtensions
-            connectors["Secure Web Networks"] = secureWebNetworks
-        }
-
-        if(isMCPSecurityCategory() || isAgenticSecurityCategory()){
-            connectors["MCP Scan"] = mcpScan
-        }
-
-        if (isDastCategory()) {
+        if(isAgenticSecurityCategory()){
+            if(func.isDemoAccount()){
+                // Argus (Cloud Security) - ONLY these sections (DEMO ONLY)
+                connectors = {
+                    "Agentic Proxies": agenticProxies,
+                    "AI Agent Platforms": aiAgentConnectors,
+                    "AI Model Security": aiScanConnectors,
+                    "MCP": mcpScan,
+                    "Kubernetes": kubernetes,
+                    "API Gateways": apiGateways,
+                    "AWS Services": awsServices,
+                    "GCP Services": gcpServices,
+                    "Azure Services": azureServices,
+                    "Manual": manual,
+                    "Virtual Machines": vm,
+                    "Akto SDK": aktoSdk,
+                }
+            } else {
+                // Non-demo accounts: original Agentic Security structure
+                connectors["AI Agent Scan"] = aiAgentGateway
+                connectors["AI Agent Security"] = aiAgentConnectors
+                connectors["AI Model Security"] = aiScanConnectors
+                connectors["Browser Extension"] = browserExtensions
+                connectors["Secure Web Networks"] = secureWebNetworks
+                connectors["MCP Scan"] = [mcpScanObj, mcpReconObj, mcpProxyObj, mcpGateway, mcpWrapperObj]
+            }
+        } else if (isDastCategory()) {
             connectors["DAST"] = crawler
-        }
-
-        if(isEndpointSecurityCategory()){
+        } else if(isEndpointSecurityCategory()){
+            // Atlas (Akto Atlas - Endpoint Security) - DEMO ONLY
             connectors = {
                 "Endpoint Agents": endpointAgents,
+                "Agentic Proxies": agenticProxies,
                 "Browser Extension": browserExtensions,
-                "Secure Web Networks": secureWebNetworks
-            }
+                "Secure Web Networks": secureWebNetworks,
+            };
         } else {
+            // API Security - all categories
             connectors = {
                 "Hybrid SaaS": hybridSaas,
                 ...connectors,

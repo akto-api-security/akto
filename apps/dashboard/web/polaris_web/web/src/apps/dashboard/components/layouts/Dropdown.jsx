@@ -1,4 +1,4 @@
-import { Autocomplete, Box, Icon } from '@shopify/polaris'
+import { Autocomplete, Box, Icon, Text, VerticalStack } from '@shopify/polaris'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {CircleRightMajor, ChevronDownMinor} from "@shopify/polaris-icons"
 import func from "@/util/func"
@@ -12,10 +12,20 @@ function Dropdown(props) {
             return [];
         }
 
-        return props.menuItems.map(option => ({
-            ...option,
-            disabled: props?.disabledOptions?.includes?.(option.value) || false
-        }));
+        return props.menuItems.map(option => {
+            const hasHelpText = option.helpText && option.helpText.trim() !== '';
+
+            return {
+                ...option,
+                disabled: props?.disabledOptions?.includes?.(option.value) || false,
+                label: hasHelpText ? (
+                    <VerticalStack gap="1">
+                        <Text variant="bodyMd" fontWeight="medium">{option.label}</Text>
+                        <Text variant="bodySm" color="subdued">{option.helpText}</Text>
+                    </VerticalStack>
+                ) : option.label
+            };
+        });
     }, [props.menuItems, props.disabledOptions]);
 
 

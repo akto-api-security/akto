@@ -505,7 +505,7 @@ export default function LeftNav() {
         const exists = items.find(item => item.key === "quick_start")
         if (!exists) {
             items.splice(1, 0, {
-                label: "Quick Start",
+                label: mapLabel("Quick Start", dashboardCategory),
                 icon: AppsFilledMajor,
                 onClick: () => {
                     handleSelect("dashboard_quick_start")
