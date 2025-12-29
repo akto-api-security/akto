@@ -22,17 +22,10 @@ import com.mongodb.MongoCommandException;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
-/**
- * Service class for handling PDF download operations for both vulnerability and threat reports.
- * Centralizes common PDF generation logic to avoid code duplication.
- */
 public class PDFDownloadService {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(PDFDownloadService.class, LogDb.DASHBOARD);
 
-    /**
-     * Result object containing PDF download status and data
-     */
     public static class PDFDownloadResult {
         private String pdf;
         private String status;
@@ -63,21 +56,6 @@ public class PDFDownloadService {
         }
     }
 
-    /**
-     * Downloads PDF for a report - handles both initiation and polling phases.
-     *
-     * @param reportId The report ID for tracking (null for initiation phase)
-     * @param organizationName Name of the organization
-     * @param reportDate Date of the report
-     * @param reportUrl URL of the report to convert to PDF
-     * @param username Username requesting the PDF
-     * @param firstPollRequest Whether this is the first poll request
-     * @param dao DAO instance for accessing report data (TestReportsDao or ThreatReportsDao)
-     * @param pdfReportStringField Field name for storing PDF string in DTO
-     * @param user User object for token generation
-     * @param reportType Type of report for logging ("pdf" or "threat PDF")
-     * @return PDFDownloadResult containing status, PDF data, and any errors
-     */
     public static <T> PDFDownloadResult downloadPDF(
             String reportId,
             String organizationName,
@@ -90,12 +68,10 @@ public class PDFDownloadService {
             User user,
             String reportType) {
 
-        // Validate report URL
         if (reportUrl == null || reportUrl.isEmpty()) {
             return new PDFDownloadResult(null, "ERROR", "Report URL cannot be empty", reportId);
         }
 
-        // Extract report ID from URL
         String reportUrlId;
         try {
             String path = new URL(reportUrl).getPath();
@@ -111,12 +87,10 @@ public class PDFDownloadService {
 
         ObjectId reportUrlIdObj = new ObjectId(reportUrlId);
 
-        // Check if PDF was already generated (first poll optimization)
         if (firstPollRequest) {
             try {
                 T report = dao.findOne(Filters.eq("_id", reportUrlIdObj));
                 if (report != null) {
-                    // Use reflection to get pdfReportString field
                     java.lang.reflect.Method getter = report.getClass().getMethod("getPdfReportString");
                     String existingPdf = (String) getter.invoke(report);
                     if (existingPdf != null && !existingPdf.isEmpty()) {
@@ -129,7 +103,6 @@ public class PDFDownloadService {
         }
 
         if (reportId == null) {
-            // Phase 1: Initiate PDF generation
             reportId = new ObjectId().toHexString();
             loggerMaker.debugAndAddToDb("Triggering " + reportType + " download for report id - " + reportId, LogDb.DASHBOARD);
 
@@ -139,7 +112,6 @@ public class PDFDownloadService {
                 String jsessionId = session.getId();
                 String accessToken = Token.generateAccessToken(user.getLogin(), "true");
 
-                // Set login time if API triggered PDF download
                 String apiKey = request.getHeader("X-API-KEY");
                 boolean apiKeyFlag = apiKey != null;
                 if (apiKeyFlag) {
@@ -164,7 +136,6 @@ public class PDFDownloadService {
                 return new PDFDownloadResult(null, "ERROR", e.getMessage(), reportId);
             }
         } else {
-            // Phase 2: Poll for PDF completion
             loggerMaker.debugAndAddToDb("Polling " + reportType + " download status for report id - " + reportId, LogDb.DASHBOARD);
 
             try {

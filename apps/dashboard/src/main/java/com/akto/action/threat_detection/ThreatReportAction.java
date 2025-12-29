@@ -31,7 +31,6 @@ public class ThreatReportAction extends UserAction {
     private List<String> threatIdsForReport;
     private BasicDBObject response;
 
-    // Fields for PDF download
     private String reportId;
     private String organizationName;
     private String username;
@@ -41,13 +40,8 @@ public class ThreatReportAction extends UserAction {
     private String status;
     private boolean firstPollRequest;
 
-    /**
-     * Generates a threat report document in MongoDB with the provided filters
-     * @return SUCCESS if report is created, ERROR otherwise
-     */
     public String generateThreatReport() {
         try {
-            // Ensure label filter is set to THREAT
             if (filtersForReport == null) {
                 filtersForReport = new HashMap<>();
             }
@@ -64,10 +58,6 @@ public class ThreatReportAction extends UserAction {
         }
     }
 
-    /**
-     * Retrieves the filters for a previously generated threat report
-     * @return SUCCESS if filters are found, ERROR otherwise
-     */
     public String getThreatReportFilters() {
         if (this.generatedReportId == null) {
             addActionError("Report id cannot be null");
@@ -94,11 +84,6 @@ public class ThreatReportAction extends UserAction {
         }
     }
 
-    /**
-     * Downloads threat report PDF - handles both initiation and polling
-     * Uses PDFDownloadService to centralize PDF generation logic
-     * @return SUCCESS for all status updates, ERROR on exceptions
-     */
     public String downloadThreatReportPDF() {
         try {
             User user = getSUser();
