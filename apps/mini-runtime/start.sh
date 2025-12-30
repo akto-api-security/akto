@@ -44,8 +44,9 @@ rotate_log() {
         runtime_log_size=$(stat -c%s "$RUNTIME_LOG_FILE")  # Get the size of the runtime log file
 
         if (( runtime_log_size >= MAX_LOG_SIZE )); then
-            echo "$(date): Rotating runtime.log (size: ${runtime_log_size} bytes)"
+            # Truncate the log file, then log the rotation event to both stdout and the new log
             echo "" > "$RUNTIME_LOG_FILE"
+            echo "$(date): Rotating runtime.log (previous size: ${runtime_log_size} bytes)" | tee -a "$RUNTIME_LOG_FILE"
         fi
     fi
 }
