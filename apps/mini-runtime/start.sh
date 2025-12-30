@@ -4,6 +4,9 @@ MAX_LOG_SIZE=${MAX_LOG_SIZE:-104857600}  # Default to 100 MB if not set (100 MB 
 CHECK_INTERVAL=60                        # Check interval in seconds
 MEMORY_RESTART_THRESHOLD=${MEMORY_RESTART_THRESHOLD:-95}  # Restart if memory usage exceeds 95%
 
+# Ensure log directory exists before first use
+mkdir -p /var/log/app
+
 # 1. Detect and read cgroup memory limits
 if [ -f /sys/fs/cgroup/memory.max ]; then
     # cgroup v2
