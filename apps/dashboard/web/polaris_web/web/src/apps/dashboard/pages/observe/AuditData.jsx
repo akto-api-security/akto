@@ -24,9 +24,9 @@ const headings = [
         text: 'Type',
     },
     {
-        text: "MCP component name",
+        text: "Agentic Component name",
         value: "resourceName",
-        title: "MCP component name"
+        title: "Agentic Component name"
     },
     {
         text: "Collection name",

@@ -312,6 +312,7 @@ public class DaoInit {
         ClassModel<CollectionTags> collectionTagsModel = ClassModel.builder(CollectionTags.class).enableDiscriminator(true).build();
         ClassModel<ApiSequences> apiSequencesClassModel = ClassModel.builder(ApiSequences.class).enableDiscriminator(true).build();
         ClassModel<EndpointShieldLog> endpointShieldLogClassModel = ClassModel.builder(EndpointShieldLog.class).enableDiscriminator(true).build();
+        ClassModel<GuardrailPolicies> guardrailPoliciesClassModel = ClassModel.builder(GuardrailPolicies.class).enableDiscriminator(true).build();
 
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
@@ -354,7 +355,8 @@ public class DaoInit {
                 RuntimeMetricsClassModel, codeAnalysisRepoModel, codeAnalysisApiModel, historicalDataClassModel,
                 configSettingClassModel, configSettingsConditionTypeClassModel, roleClassModel, testingInstanceHeartBeat,
                 jobParams, autoTicketParams, agentModel, ModuleInfoClassModel, testingIssueTicketsModel, tlsAuthClassModel,
-                ticketSyncJobParamsClassModel, apiHitCountInfoClassModel, collectionTagsModel, apiSequencesClassModel, endpointShieldLogClassModel)
+                ticketSyncJobParamsClassModel, apiHitCountInfoClassModel, collectionTagsModel, apiSequencesClassModel,
+                endpointShieldLogClassModel, guardrailPoliciesClassModel)
             .automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
@@ -407,7 +409,8 @@ public class DaoInit {
                 new EnumCodec<>(ModuleInfo.ModuleType.class),
                 new EnumCodec<>(TLSAuthParam.CertificateType.class),
                 new EnumCodec<>(TicketSource.class),
-                new EnumCodec<>(GenericAgentConversation.ConversationType.class)
+                new EnumCodec<>(GenericAgentConversation.ConversationType.class),
+                new EnumCodec<>(GlobalEnums.CONTEXT_SOURCE.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,

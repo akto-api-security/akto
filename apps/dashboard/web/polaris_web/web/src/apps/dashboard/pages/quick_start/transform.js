@@ -16,7 +16,7 @@ import GithubSource from "./components/GithubSource"
 import AktoJax from "./components/AktoJax"  
 import McpScan from "./components/McpScan" 
 import AiAgentScan from "./components/AiAgentScan"
-import { isGenAISecurityCategory, isMCPSecurityCategory, isAgenticSecurityCategory, isDastCategory, isApiSecurityCategory } from "../../../main/labelHelper"
+import { isGenAISecurityCategory, isMCPSecurityCategory, isAgenticSecurityCategory, isDastCategory, isApiSecurityCategory, isEndpointSecurityCategory } from "../../../main/labelHelper"
 import McpRecon from "./components/McpRecon"
 import McpProxy from "./components/McpProxy"
 import AwsLogAccountComponent from "./components/shared/AwsLogAccountComponent"
@@ -25,6 +25,7 @@ import AIAgentsGateway from "./AIAgentsGateway"
 import ImpervaImport from "./components/ImpervaImport"
 import BrowserExtension from "./components/BrowserExtension"
 import AIAgentConnectorImport from "./components/AIAgentConnectorImport"
+import CursorHook from "./components/CursorHook"
 import {
     CONNECTOR_TYPE_N8N,
     CONNECTOR_NAME_N8N,
@@ -368,8 +369,8 @@ const awsBedrockObj = {
 
 const aiAgentGlobalProxy = {
     icon: '/public/aws_bedrock.svg',
-    label: "AI Agent Global Proxy",
-    text: "A publicly hosted secure gateway that enforces guardrails and advanced threat protection for all requests to your public AI agents, ensuring safe and compliant communication.",
+    label: "Agentic Proxy",
+    text: "A publicly hosted secure gateway that enforces guardrails and advanced threat protection for all requests to your public AI agents and MCP servers, ensuring safe and compliant communication.",
     docsUrl: 'https://docs.akto.io/akto-agent-proxy',
     key: "AI_AGENT_GLOBAL_PROXY",
     component : <AIAgentsGateway />
@@ -377,8 +378,8 @@ const aiAgentGlobalProxy = {
 
 const aiAgentGateway = {
     icon: '/public/aws_bedrock.svg',
-    label: "AI Agent Gateway",
-    text: "AI agent proxy gateway to be deployed on premise for securing AI agents in your network",
+    label: "Agentic Gateway",
+    text: "Agentic gateway to be deployed on premise for securing AI agents and MCP servers in your network",
     docsUrl: 'https://docs.akto.io/akto-agent-proxy',
     key: "AI_AGENT_GATEWAY",
     component : <AIAgentsGateway />
@@ -869,6 +870,15 @@ const safariExtensionObj = {
     docsUrl: 'https://docs.akto.io/browser-extension',
     component: <BrowserExtension browserName="Safari"/>,
     key: "SAFARI_BROWSER_EXTENSION",
+}
+
+const cursorHookObj = {
+    icon: '/public/cursor-ai.svg',
+    label: "Cursor Hook",
+    text: "IDE-level protection monitoring AI-powered code completions in real-time.",
+    docsUrl: 'https://docs.akto.io/cursor-hook',
+    key: "CURSOR_HOOK",
+    component: <CursorHook/>
 }
 
 const n8nImportObj = {
@@ -1513,19 +1523,19 @@ const quickStartFunc = {
             geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj
         ]
 
-        const aiAgentGateways = [
+        const agenticProxies = [
             aiAgentGlobalProxy, aiAgentGateway
 
         ]
 
         const aiAgentConnectors = [
-            awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
+            awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
             n8nImportObj, langchainImportObj, copilotStudioImportObj
         ]
 
         // MCP Scan
         const mcpScan = [
-            mcpScanObj, mcpReconObj, mcpProxyObj, mcpGateway,mcpWrapperObj
+            mcpReconObj, mcpScanObj
         ];
 
         // Akto SDK
@@ -1542,6 +1552,12 @@ const quickStartFunc = {
             chromeExtensionObj, firefoxExtensionObj, safariExtensionObj
         ]
 
+        // Endpoint Agents
+        const endpointAgents = [
+            mcpWrapperObj,
+            cursorHookObj
+        ]
+
        if(func.checkLocal() || func.isLimitedAccount()){
            return {
                "Manual": manual
@@ -1550,35 +1566,62 @@ const quickStartFunc = {
 
         let connectors = {}
 
-        if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
-            connectors["AI Agent Scan"] = aiAgentGateways
-            connectors["AI Agent Security"] = aiAgentConnectors
-            connectors["AI Model Security"] = aiScanConnectors
-            connectors["Browser Extension"] = browserExtensions
-            connectors["Secure Web Networks"] = secureWebNetworks
-        }
-
-        if(isMCPSecurityCategory() || isAgenticSecurityCategory()){
-            connectors["MCP Scan"] = mcpScan
-        }
-
-        if (isDastCategory()) {
+        if(isAgenticSecurityCategory()){
+            if(func.isDemoAccount()){
+                // Argus (Cloud Security) - ONLY these sections (DEMO ONLY)
+                connectors = {
+                    "Agentic Proxies": agenticProxies,
+                    "AI Agent Platforms": aiAgentConnectors,
+                    "AI Model Security": aiScanConnectors,
+                    "MCP": mcpScan,
+                    "Kubernetes": kubernetes,
+                    "API Gateways": apiGateways,
+                    "AWS Services": awsServices,
+                    "GCP Services": gcpServices,
+                    "Azure Services": azureServices,
+                    "Manual": manual,
+                    "Virtual Machines": vm,
+                    "Akto SDK": aktoSdk,
+                }
+            } else {
+                // Non-demo accounts: original Agentic Security structure
+                connectors["AI Agent Scan"] = agenticProxies
+                connectors["AI Agent Security"] = [
+                    awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj,
+                    ibmWatsonxObj, customAgentObj, agenticShieldObj,  // Include agenticShieldObj for non-demo
+                    n8nImportObj, langchainImportObj, copilotStudioImportObj
+                ]
+                connectors["AI Model Security"] = aiScanConnectors
+                connectors["Browser Extension"] = browserExtensions
+                connectors["Secure Web Networks"] = secureWebNetworks
+                connectors["MCP Scan"] = [mcpScanObj, mcpReconObj, mcpProxyObj, mcpGateway, mcpWrapperObj]
+            }
+        } else if (isDastCategory()) {
             connectors["DAST"] = crawler
-        }
-
-        connectors = {
-            "Hybrid SaaS": hybridSaas,
-            ...connectors,
-            "Kubernetes": kubernetes,
-            "API Gateways": apiGateways,
-            "Mirroring": mirroring,
-            "AWS Services": awsServices,
-            "GCP Services": gcpServices,
-            "Azure Services": azureServices,
-            "Manual": manual,
-            "Akto SDK": aktoSdk,
-            "Virtual Machines": vm,
-            "Source Code": sourceCode,
+        } else if(isEndpointSecurityCategory()){
+            // Atlas (Akto Atlas - Endpoint Security) - DEMO ONLY
+            connectors = {
+                "Endpoint Agents": endpointAgents,
+                "Agentic Proxies": agenticProxies,
+                "Browser Extension": browserExtensions,
+                "Secure Web Networks": secureWebNetworks,
+            };
+        } else {
+            // API Security - all categories
+            connectors = {
+                "Hybrid SaaS": hybridSaas,
+                ...connectors,
+                "Kubernetes": kubernetes,
+                "API Gateways": apiGateways,
+                "Mirroring": mirroring,
+                "AWS Services": awsServices,
+                "GCP Services": gcpServices,
+                "Azure Services": azureServices,
+                "Manual": manual,
+                "Akto SDK": aktoSdk,
+                "Virtual Machines": vm,
+                "Source Code": sourceCode,
+            }
         }
 
         return connectors;
