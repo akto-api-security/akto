@@ -8,7 +8,6 @@ import com.akto.kafka.KafkaConfig;
 import com.akto.kafka.KafkaConsumerConfig;
 import com.akto.kafka.KafkaProducerConfig;
 import com.akto.kafka.Serializer;
-import com.akto.log.LoggerMaker;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.dao.ThreatDetectionDaoInit;
 import com.akto.threat.backend.service.ApiDistributionDataService;
@@ -29,12 +28,13 @@ import org.bson.codecs.pojo.PojoCodecProvider;
 
 public class Main {
 
-  private static final LoggerMaker logger = new LoggerMaker(Main.class);
 
   public static void main(String[] args) throws Exception {
 
     ConnectionString connectionString =
         new ConnectionString(System.getenv("AKTO_THREAT_PROTECTION_MONGO_CONN"));
+    ConnectionString dashboardMongoConnectionString =
+        new ConnectionString(System.getenv("AKTO_MONGO_CONN"));
     System.out.println("connectionString: " + connectionString);
     CodecRegistry pojoCodecRegistry =
         fromProviders(PojoCodecProvider.builder().automatic(true).build());
@@ -52,7 +52,7 @@ public class Main {
 
     // Initialize legacy DaoInit for AuthenticationInterceptor (ConfigsDao)
     // ConfigsDao uses CommonContextDao which connects to "common" database
-    DaoInit.init(connectionString);
+    DaoInit.init(dashboardMongoConnectionString, ReadPreference.primary(), WriteConcern.W1);
 
     ThreatDetectionDaoInit.init(threatProtectionMongo);
 

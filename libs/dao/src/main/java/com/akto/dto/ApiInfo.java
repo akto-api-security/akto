@@ -76,6 +76,9 @@ public class ApiInfo {
     public static final String DETECTED_BASE_PROMPT = "detectedBasePrompt";
     private String detectedBasePrompt;
 
+    private float threatScore;
+    public static final String THREAT_SCORE = "threatScore";
+
     public enum ApiType {
         REST, GRAPHQL, GRPC, SOAP
     }
@@ -261,6 +264,7 @@ public class ApiInfo {
         this.isSensitive = that.isSensitive || this.isSensitive;
         this.severityScore = this.severityScore + that.severityScore;
         this.riskScore = Math.max(this.riskScore, that.riskScore);
+        this.threatScore = Math.max(this.threatScore, that.threatScore);
 
         if (that.lastCalculatedTime > this.lastCalculatedTime) {
             this.lastCalculatedTime = that.lastCalculatedTime;
@@ -553,5 +557,13 @@ public class ApiInfo {
 
     public void setDetectedBasePrompt(String detectedBasePrompt) {
         this.detectedBasePrompt = detectedBasePrompt;
+    }
+
+    public void setThreatScore(float threatScore) {
+        this.threatScore = threatScore;
+    }
+
+    public float getThreatScore() {
+        return threatScore;
     }
 }
