@@ -4,9 +4,9 @@ import java.util.*;
 
 import com.akto.action.UserAction;
 import com.akto.dao.context.Context;
-import com.akto.dao.testing.sources.ThreatReportsDao;
+import com.akto.dao.testing.sources.TestReportsDao;
 import com.akto.dto.User;
-import com.akto.dto.testing.sources.ThreatReports;
+import com.akto.dto.testing.sources.TestReports;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
@@ -17,7 +17,6 @@ import com.mongodb.client.result.InsertOneResult;
 import lombok.Getter;
 import lombok.Setter;
 
-import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 @Getter
@@ -47,8 +46,8 @@ public class ThreatReportAction extends UserAction {
             }
             filtersForReport.put("label", Arrays.asList("THREAT"));
 
-            ThreatReports threatReport = new ThreatReports(filtersForReport, Context.now(), "", threatIdsForReport);
-            InsertOneResult insertResult = ThreatReportsDao.instance.insertOne(threatReport);
+            TestReports threatReport = new TestReports(filtersForReport, Context.now(), "", null, threatIdsForReport);
+            InsertOneResult insertResult = TestReportsDao.instance.insertOne(threatReport);
             this.generatedReportId = insertResult.getInsertedId().asObjectId().getValue().toHexString();
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
@@ -67,15 +66,15 @@ public class ThreatReportAction extends UserAction {
         try {
             response = new BasicDBObject();
             ObjectId reportId = new ObjectId(this.generatedReportId);
-            ThreatReports reportDoc = ThreatReportsDao.instance.findOne(Filters.eq(Constants.ID, reportId));
+            TestReports reportDoc = TestReportsDao.instance.findOne(Filters.eq(Constants.ID, reportId));
 
             if (reportDoc == null) {
                 addActionError("Threat report not found");
                 return ERROR.toUpperCase();
             }
 
-            response.put(ThreatReports.FILTERS_FOR_REPORT, reportDoc.getFiltersForReport());
-            response.put(ThreatReports.THREAT_IDS_FOR_REPORT, reportDoc.getThreatIdsForReport());
+            response.put(TestReports.FILTERS_FOR_REPORT, reportDoc.getFiltersForReport());
+            response.put(TestReports.THREAT_IDS_FOR_REPORT, reportDoc.getThreatIdsForReport());
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error retrieving threat report filters", LogDb.DASHBOARD);
@@ -94,8 +93,8 @@ public class ThreatReportAction extends UserAction {
                 reportUrl,
                 username,
                 firstPollRequest,
-                ThreatReportsDao.instance,
-                ThreatReports.PDF_REPORT_STRING,
+                TestReportsDao.instance,
+                TestReports.PDF_REPORT_STRING,
                 user,
                 "threat PDF"
             );

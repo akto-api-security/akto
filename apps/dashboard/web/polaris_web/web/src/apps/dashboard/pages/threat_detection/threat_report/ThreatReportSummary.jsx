@@ -7,6 +7,7 @@ import { flags } from '../components/flags/index.mjs'
 import ThreatReportSummaryInfoCard from './ThreatReportSummaryInfoCard'
 import GithubSimpleTable from '../../../components/tables/GithubSimpleTable'
 import { CellType } from '../../../components/tables/rows/GithubRow'
+import func from '@/util/func'
 
 const ThreatReportSummary = ({
     totalThreats,
@@ -70,25 +71,13 @@ const ThreatReportSummary = ({
         }
     ]
 
-    // Prepare severity map for pie chart in the format ChartypeComponent expects
-    const severityMap = {
-        "CRITICAL": {
-            text: severityCount.CRITICAL || 0,
-            color: '#d72c0d'
-        },
-        "HIGH": {
-            text: severityCount.HIGH || 0,
-            color: '#f49342'
-        },
-        "MEDIUM": {
-            text: severityCount.MEDIUM || 0,
-            color: '#ffc453'
-        },
-        "LOW": {
-            text: severityCount.LOW || 0,
-            color: '#47c1bf'
+    const severityMap = func.getAktoSeverities().reduce((acc, severity) => {
+        acc[severity] = {
+            text: severityCount[severity] || 0,
+            color: func.getHexColorForSeverity(severity)
         }
-    }
+        return acc
+    }, {})
 
     // Color palette for categories (same as used in TopThreatTypeChart)
     const categoryColors = ['#7FB3D5', '#85C1E9', '#F7DC6F', '#F8C471', '#F5B7B1']

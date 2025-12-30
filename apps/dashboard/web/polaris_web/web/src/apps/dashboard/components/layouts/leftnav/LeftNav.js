@@ -334,7 +334,7 @@ export default function LeftNav() {
                 subNavigationItems: reportsSubNavigationItems,
                 key: "6",
             },
-            ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted && dashboardCategory !== CATEGORY_DAST  ?  [{
+            ...(true  ?  [{
                     label: (
                         <Text variant="bodyMd" fontWeight="medium">
                             {mapLabel("Threat Detection", dashboardCategory)}
