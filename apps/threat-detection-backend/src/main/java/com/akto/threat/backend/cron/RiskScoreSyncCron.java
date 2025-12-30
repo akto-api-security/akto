@@ -19,6 +19,7 @@ import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
@@ -36,6 +37,7 @@ import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
 
 import static com.akto.jobs.utils.Utils.getRiskScoreValueFromSeverityScore;
+import static com.akto.billing.UsageMetricUtils.getFeatureAccessSaas;
 
 public class RiskScoreSyncCron {
     
@@ -49,6 +51,10 @@ public class RiskScoreSyncCron {
                     public void accept(Account t) {
                         int accountId = t.getId();
                         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                        FeatureAccess featureAccess = getFeatureAccessSaas(accountId, "THREAT_DETECTION");
+                        if(!featureAccess.getIsGranted()){
+                            return;
+                        }
                         LastCronRunInfo lastRunTimerInfo = accountSettings.getLastUpdatedCronInfo();
                         int deltaStarTime = 0;
                         int deltaEndTime = Context.now();

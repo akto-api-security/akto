@@ -17,6 +17,7 @@ import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
 import com.akto.threat.backend.tasks.FlushMessagesToDB;
 import com.akto.threat.backend.cron.ArchiveOldMaliciousEventsCron;
+import com.akto.threat.backend.cron.RiskScoreSyncCron;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.ReadPreference;
@@ -85,6 +86,8 @@ public class Main {
 
     ArchiveOldMaliciousEventsCron cron = new ArchiveOldMaliciousEventsCron(threatProtectionMongo);
     cron.cron();
+    RiskScoreSyncCron riskScoreSyncCron = new RiskScoreSyncCron();
+    riskScoreSyncCron.setUpRiskScoreSyncCronScheduler();
   }
 
 }
