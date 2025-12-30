@@ -144,6 +144,12 @@ const DevRev = () => {
         try {
             await settingFunctions.removeDevRevIntegration()
             func.setToast(true, false, "Successfully removed DevRev Integration")
+            setOrgUrl('')
+            setPersonalAccessToken('')
+            setSelectedParts([])
+            setParts([])
+            setPartsFetched(false)
+            setIsRemoveable(false)
 
             // Reload the page after successful removal
             window.location.reload()
