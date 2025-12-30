@@ -460,7 +460,7 @@ const SampleApi = () => {
             <Modal
                 open={selectApiActive}
                 onClose={toggleSelectApiActive}
-                title="Select sample API"
+                title="Select sample API and Test Role"
                 primaryAction={{
                     id:"save",
                     content: 'Save',
