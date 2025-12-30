@@ -1,4 +1,4 @@
-@import '../../../../../components/shared/reports/report-styles.css';
+@import '../../../components/shared/reports/report-styles.css';
 
 .severity-badge-critical {
     background-color: #d72c0d;
