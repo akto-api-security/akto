@@ -42,6 +42,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   List<String> ips;
   List<String> urls;
   List<Integer> apiCollectionIds;
+  List<String> method;
   long total;
   Map<String, Integer> sort;
   List<String> severity;
@@ -98,6 +99,14 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
     if (this.urls != null && !this.urls.isEmpty()) {
       filter.put("urls", this.urls);
+    }
+
+    if (this.apiCollectionIds != null && !this.apiCollectionIds.isEmpty()) {
+      filter.put("apiCollectionId", this.apiCollectionIds);
+    }
+
+    if (this.method != null && !this.method.isEmpty()) {
+      filter.put("method", this.method);
     }
 
     if(this.types != null && !this.types.isEmpty()){
@@ -254,6 +263,12 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     }
     if (this.urls != null && !this.urls.isEmpty()) {
       filterBuilder.addAllUrls(this.urls);
+    }
+    if (this.apiCollectionIds != null && !this.apiCollectionIds.isEmpty()) {
+      filterBuilder.addAllApiCollectionId(this.apiCollectionIds);
+    }
+    if (this.method != null && !this.method.isEmpty()) {
+      filterBuilder.addAllMethod(this.method);
     }
     if (this.types != null && !this.types.isEmpty()) {
       filterBuilder.addAllTypes(this.types);
@@ -446,6 +461,14 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
   public void setApiCollectionIds(List<Integer> apiCollectionIds) {
     this.apiCollectionIds = apiCollectionIds;
+  }
+
+  public List<String> getMethod() {
+    return method;
+  }
+
+  public void setMethod(List<String> method) {
+    this.method = method;
   }
 
   public long getTotal() {

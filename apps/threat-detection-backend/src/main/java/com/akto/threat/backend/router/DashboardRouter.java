@@ -21,7 +21,6 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.De
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DeleteMaliciousEventsResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ToggleArchivalEnabledRequest;
-import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ToggleArchivalEnabledResponse;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
