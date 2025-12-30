@@ -27,10 +27,10 @@ public class AllMetrics {
             runtimeKafkaRecordSize = new SumMetric("RT_KAFKA_RECORD_SIZE", 60, accountId, orgId);
             runtimeProcessLatency = new LatencyMetric("RT_KAFKA_LATENCY", 60, accountId, orgId);
             runtimeApiReceivedCount = new SumMetric("RT_API_RECEIVED_COUNT", 60, accountId, orgId);
-            kafkaRecordsLagMax = new SumMetric("KAFKA_RECORDS_LAG_MAX", 60, accountId, orgId);
-            kafkaRecordsConsumedRate = new SumMetric("KAFKA_RECORDS_CONSUMED_RATE", 60, accountId, orgId);
-            kafkaFetchAvgLatency = new LatencyMetric("KAFKA_FETCH_AVG_LATENCY", 60, accountId, orgId);
-            kafkaBytesConsumedRate = new SumMetric("KAFKA_BYTES_CONSUMED_RATE", 60, accountId, orgId);
+            kafkaRecordsLagMax = new MaxMetric("KAFKA_RECORDS_LAG_MAX", 60, accountId, orgId);
+            kafkaRecordsConsumedRate = new GaugeMetric("KAFKA_RECORDS_CONSUMED_RATE", 60, accountId, orgId);
+            kafkaFetchAvgLatency = new GaugeMetric("KAFKA_FETCH_AVG_LATENCY", 60, accountId, orgId);
+            kafkaBytesConsumedRate = new GaugeMetric("KAFKA_BYTES_CONSUMED_RATE", 60, accountId, orgId);
             cyborgNewApiCount = new SumMetric("CYBORG_NEW_API_COUNT", 60, accountId, orgId);
             cyborgTotalApiCount = new SumMetric("CYBORG_TOTAL_API_COUNT", 60, accountId, orgId);
             deltaCatalogTotalCount = new SumMetric("DELTA_CATALOG_TOTAL_COUNT", 60, accountId, orgId);
@@ -98,6 +98,13 @@ public class AllMetrics {
                             break;
                         case LATENCY:
                             type = MetricData.MetricType.LATENCY;
+                            break;
+                        case MAX:
+                            type = MetricData.MetricType.MAX;
+                            break;
+                        case GAUGE:
+                            type = MetricData.MetricType.GAUGE;
+                            break;
                     }
                     MetricData metricData = new MetricData(
                             m.metricId,
@@ -317,7 +324,7 @@ public class AllMetrics {
     private static final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
 
     public enum MetricType{
-        LATENCY, SUM
+        LATENCY, SUM, MAX, GAUGE
     }
 
     public abstract class Metric{
@@ -422,6 +429,76 @@ public class AllMetrics {
         float getMetricAndReset() {
             float val = getMetric();
             this.sum = 0;
+            return val;
+        }
+    }
+
+    class MaxMetric extends Metric{
+        float max;
+
+        public MaxMetric(String metricId, int periodInSecs) {
+            super(metricId, periodInSecs);
+        }
+
+        public MaxMetric(String metricId, int periodInSecs, int accountId, String orgId) {
+            super(metricId, periodInSecs, accountId, orgId);
+        }
+
+        @Override
+        public void record(float val) {
+            if(val > max) {
+                max = val;
+            }
+        }
+
+        @Override
+        float getMetric() {
+            return max;
+        }
+
+        @Override
+        MetricType getMetricType() {
+            return MetricType.MAX;
+        }
+
+        @Override
+        float getMetricAndReset() {
+            float val = getMetric();
+            this.max = 0;
+            return val;
+        }
+    }
+
+    class GaugeMetric extends Metric{
+        float value;
+
+        public GaugeMetric(String metricId, int periodInSecs) {
+            super(metricId, periodInSecs);
+        }
+
+        public GaugeMetric(String metricId, int periodInSecs, int accountId, String orgId) {
+            super(metricId, periodInSecs, accountId, orgId);
+        }
+
+        @Override
+        public void record(float val) {
+            this.value = val;
+        }
+
+        @Override
+        float getMetric() {
+            return value;
+        }
+
+        @Override
+        MetricType getMetricType() {
+            return MetricType.GAUGE;
+        }
+
+        @Override
+        float getMetricAndReset() {
+            float val = getMetric();
+            this.value = 0;
             return val;
         }
     }
