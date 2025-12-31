@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { Box, VerticalStack, Text, Badge } from '@shopify/polaris';
+import { Box, VerticalStack, HorizontalStack, Text, Badge } from '@shopify/polaris';
 import { MarkdownRenderer, markdownStyles } from '../../../../components/shared/MarkdownComponents';
 import styles from './ChatMessage.module.css';
 
@@ -67,33 +67,35 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
 
     return (
         <Box padding="3">
-            <div className={styles.container}>
+            <HorizontalStack gap="3" align="start" blockAlign="start">
                 {/* Icon */}
-                <div className={styles.icon}>
+                <Box>
                     <img
                         src={iconSrc}
                         alt={iconAlt}
-                        className={styles.iconImage}
+                        style={{ width: '20px', height: '20px', objectFit: 'contain' }}
                     />
-                </div>
+                </Box>
 
                 {/* Divider */}
-                <div className={styles.divider}>
+                <Box style={{ width: '2px', alignSelf: 'stretch' }}>
                     <img
                         src={dividerSrc}
                         alt=""
-                        className={styles.dividerImage}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     />
-                </div>
+                </Box>
 
-                {/* Content */}
-                <div className={styles.content}>
+                {/* Content - Takes remaining space */}
+                <Box style={{ flex: 1, minWidth: 0 }}>
                     <VerticalStack gap="1">
                         {/* Header */}
-                        <div className={styles.header}>
-                            <span className={styles.label}>{label}</span>
+                        <HorizontalStack align="space-between" blockAlign="center">
+                            <Text variant="bodyMd" fontWeight="semibold" color="subdued">
+                                {label}
+                            </Text>
                             <Text variant="bodySm" color="subdued">{formattedTime}</Text>
-                        </div>
+                        </HorizontalStack>
 
                         {/* Message Content */}
                         <Box paddingBlockStart="1">
@@ -115,8 +117,8 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                             </Box>
                         )}
                     </VerticalStack>
-                </div>
-            </div>
+                </Box>
+            </HorizontalStack>
             <style jsx>{`
                 ${markdownStyles}
             `}</style>

@@ -1,56 +1,4 @@
-.container {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-}
-
-.icon {
-    height: 20px;
-    width: 20px;
-    flex-shrink: 0;
-}
-
-.iconImage {
-    height: 100%;
-    width: 100%;
-    object-fit: contain;
-}
-
-.divider {
-    display: flex;
-    width: 2px;
-    flex-direction: column;
-    align-items: flex-start;
-    align-self: stretch;
-}
-
-.dividerImage {
-    height: 100%;
-    width: 100%;
-    object-fit: cover;
-}
-
-.content {
-    flex: 1;
-    min-width: 0;
-}
-
-.header {
-    display: flex;
-    justify-content: space-between;
-    width: 100%;
-}
-
-.label {
-    color: var(--Text-Subdued, #6D7175);
-    font-feature-settings: 'liga' off, 'clig' off;
-    font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, sans-serif;
-    font-size: 12px;
-    font-style: normal;
-    font-weight: 600;
-    line-height: 16px;
-}
-
+/* Code content styling */
 .codeContent {
     white-space: pre-wrap;
     font-family: monospace;
@@ -58,6 +6,7 @@
     color: #202223;
 }
 
+/* Markdown content - styles are handled by global MarkdownRenderer */
 .markdownContent {
-    /* Markdown styles are handled by global MarkdownRenderer styles */
+    /* Placeholder for any custom markdown overrides */
 }
