@@ -56,6 +56,9 @@ const ThreatReportFindings = ({ threatsTableData, severityCount, organizationNam
                             .filter(t => t.severity === severity)
                             .map(threat => ({
                                 ...threat,
+                                targetedApi: (
+                                    <Text breakWord>{threat.targetedApi}</Text>
+                                ),
                                 severityBadge: (
                                     <div className={`badge-wrapper-${threat.severity}`}>
                                         <Badge>{threat.severity}</Badge>
