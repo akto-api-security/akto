@@ -86,9 +86,14 @@ const ThreatReport = () => {
 
             // For API Security: Filter by successfulExploit === true
             // For Agentic Security/MCP: Include all threats (successfulExploit field may be false for blocked attacks)
-            let filteredThreats = isApiSecurityCategory()
+            const isApiSecurity = isApiSecurityCategory()
+            let filteredThreats = isApiSecurity
                 ? allThreats.filter(threat => threat.successfulExploit === true)
                 : allThreats
+
+            if (isApiSecurity && allThreats.length > filteredThreats.length) {
+                func.setToast(true, false, `Report shows ${filteredThreats.length} successful threats out of ${allThreats.length} total threats detected. Only successful exploits are included in this report.`)
+            }
 
             // Limit to 200 threats maximum for report (roughly 30 pages, ~6-7 threats per page)
             const THREAT_LIMIT = 200

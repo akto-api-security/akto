@@ -254,6 +254,13 @@ const threatDetectionRequests = {
                 firstPollRequest: firstPollRequest
             }
         })
+    },
+    fetchThreatComplianceInfos() {
+        return request({
+            url: '/api/fetchThreatComplianceInfos',
+            method: 'post',
+            data: {}
+        })
     }
 }
 export default threatDetectionRequests
