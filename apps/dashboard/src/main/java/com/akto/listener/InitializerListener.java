@@ -9,6 +9,7 @@ import static com.mongodb.client.model.Filters.eq;
 
 import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dto.jobs.JobExecutorType;
+import com.akto.dto.threat_detection.ThreatComplianceInfo;
 import com.akto.utils.crons.JobsCron;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
@@ -275,7 +276,7 @@ public class InitializerListener implements ServletContextListener {
     private final ScheduledExecutorService telemetryExecutorService = Executors.newSingleThreadScheduledExecutor();
 
     public static boolean connectedToMongo = false;
-    
+
     SyncCron syncCronInfo = new SyncCron();
     TokenGeneratorCron tokenGeneratorCron = new TokenGeneratorCron();
     UpdateSensitiveInfoInApiInfo updateSensitiveInfoInApiInfo = new UpdateSensitiveInfoInApiInfo();
@@ -437,7 +438,7 @@ public class InitializerListener implements ServletContextListener {
         List<BasicDBObject> totalEndpoints = new InventoryAction().fetchRecentEndpoints(0, now);
         List<BasicDBObject> newEndpoints  = new InventoryAction().fetchRecentEndpoints(now - 604800, now);
 
-        DashboardMode dashboardMode = DashboardMode.getDashboardMode();        
+        DashboardMode dashboardMode = DashboardMode.getDashboardMode();
 
         RBAC record = RBACDao.instance.findOne("role", Role.ADMIN.name());
 
@@ -464,7 +465,7 @@ public class InitializerListener implements ServletContextListener {
         aktoMixpanel.sendEvent(distinct_id, "Endpoints Populated", props);
 
     }
-    
+
     public void setUpPiiAndTestSourcesScheduler(){
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
@@ -749,7 +750,7 @@ public class InitializerListener implements ServletContextListener {
                 if(existingCDT != null && existingCDT.getUserModifiedTimestamp() > 0){
                     userHasChangedCondition = true;
                 }
-                
+
                 if (userHasChangedCondition || hasNotChangedCondition) {
                     continue;
                 } else {
@@ -761,12 +762,12 @@ public class InitializerListener implements ServletContextListener {
                         try {
                             dtSeverity = Severity.valueOf(dt.getString(AktoDataType.DATA_TYPE_PRIORITY));
                             newCDT.setDataTypePriority(dtSeverity);
-                           
+
                         } catch (Exception e) {
                             e.printStackTrace();
                             logger.errorAndAddToDb("Invalid severity of dataType " + piiKey);
                         }
-                        
+
                     }
                     if(categoriesList != null){
                         newCDT.setCategoriesList(categoriesList);
@@ -1082,7 +1083,7 @@ public class InitializerListener implements ServletContextListener {
         /*
          * TESTING_RUN_RESULTS type webhooks are
          * triggered only on test complete not periodically.
-         * 
+         *
          * TRAFFIC_ALERTS type webhooks have a separate cron.
          * PENDING_TESTS_ALERTS type webhooks have a separate job
          */
@@ -1122,7 +1123,7 @@ public class InitializerListener implements ServletContextListener {
                     break;
                 }
             }
-        } 
+        }
 
         if (webhook.getBody() != null && !sendApiThreats) {
             String accountId = String.valueOf(Context.accountId.get());
@@ -1153,10 +1154,10 @@ public class InitializerListener implements ServletContextListener {
         if (ci != null) {
             valueMap.put("AKTO.changes_info.newSensitiveEndpoints", ci.newSensitiveParamsObject);
             valueMap.put("AKTO.changes_info.newSensitiveEndpointsCount", ci.newSensitiveParams.size());
-            
+
             valueMap.put("AKTO.changes_info.newEndpoints", ci.newEndpointsLast7DaysObject);
             valueMap.put("AKTO.changes_info.newEndpointsCount", ci.newEndpointsLast7Days.size());
-            
+
             valueMap.put("AKTO.changes_info.newSensitiveParametersCount", ci.recentSentiiveParams);
             valueMap.put("AKTO.changes_info.newParametersCount", ci.newParamsInExistingEndpoints);
         }
@@ -1207,7 +1208,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private static final ObjectMapper mapper = new ObjectMapper();
-    
+
     private static String escapeJsonString(String str) {
         if (str == null) {
             return "";
@@ -1268,7 +1269,7 @@ public class InitializerListener implements ServletContextListener {
                 "                \"version\": \"1.5\",\n" +
                 "\"msteams\": { \"width\": \"full\" }," +
                 "                \"body\": [";
-    
+
     private static String TEAMS_WEBHOOK_CLOSING_BODY = "]\n" +
                 "            }\n" +
                 "        }\n" +
@@ -1292,13 +1293,13 @@ public class InitializerListener implements ServletContextListener {
     private static String createMicrosoftTeamsWorkflowWebhookPayload(CustomWebhook webhook, Map<String, Object> valueMap){
         StringBuilder body = new StringBuilder();
         body.append(TEAMS_WEBHOOK_OPENING_BODY);
-        
+
         if (webhook.getSelectedWebhookOptions() != null) {
             for (WebhookOptions webhookOption : webhook.getSelectedWebhookOptions()) {
-    
+
                 String replaceString = webhookOption.getOptionReplaceString().substring(2, webhookOption.getOptionReplaceString().length() - 1);
                 String name = webhookOption.getOptionName();
-    
+
                 Object value = valueMap.get(replaceString);
                 if(replaceString.equals("AKTO.changes_info.apiThreatPayloads")){
                     buildApiThreatsTeamsWebhookBody(body, name, value);
@@ -1307,9 +1308,9 @@ public class InitializerListener implements ServletContextListener {
                 }
             }
         }
-    
+
         body.append(TEAMS_WEBHOOK_CLOSING_BODY);
-    
+
         return body.toString();
     }
 
@@ -1320,19 +1321,19 @@ public class InitializerListener implements ServletContextListener {
                     "            \"text\": \"" + name + "\",\n" +
                     "            \"wrap\": true\n" +
                     "        },");
-            
+
             List<Object> list = (List<Object>) value;
             boolean headerAdded = false;
-   
+
             for (Object obj : list) {
                 Map<String, Object> data = mapper.convertValue(obj, HashMap.class);
-                
+
                 if (!headerAdded) {
                     // Add the table headers (first row)
                     body.append("        {\n" +
                             "            \"type\": \"Table\",\n" +
                             "            \"columns\": [\n");
-   
+
                     for (String key : data.keySet()) {
                         if(key=="id" || key=="sample"){
                             continue;
@@ -1340,13 +1341,13 @@ public class InitializerListener implements ServletContextListener {
 
                         body.append("                {\"width\": 1},\n");
                     }
-   
+
                     body.append("            ],\n" +
                             "            \"rows\": [\n" +
                             "                {\n" +
                             "                    \"type\": \"TableRow\",\n" +
                             "                    \"cells\": [\n");
-   
+
                     // Add header row (keys)
                     for (String key : data.keySet()) {
                         if(key=="id" || key=="sample"){
@@ -1363,18 +1364,18 @@ public class InitializerListener implements ServletContextListener {
                                 "                            ]\n" +
                                 "                        },\n");
                     }
-   
+
                     body.append("                    ]\n" +
                             "                },\n");
-   
+
                     headerAdded = true;
                 }
-   
+
                 // Add each data row (values)
                 body.append("                {\n" +
                         "                    \"type\": \"TableRow\",\n" +
                         "                    \"cells\": [\n");
-   
+
                 for (Entry<String,Object> entry : data.entrySet()) {
                     if(entry.getKey()=="id" || entry.getKey()=="sample"){
                         continue;
@@ -1390,15 +1391,15 @@ public class InitializerListener implements ServletContextListener {
                             "                            ]\n" +
                             "                        },\n");
                 }
-   
+
                 body.append("                    ]\n" +
                         "                },\n");
             }
-   
+
             // Close the table structure
             body.append("            ]\n" +
                     "        },\n");
-            
+
         } else {
             body.append("        {\n" +
                     "            \"type\": \"TextBlock\",\n" +
@@ -1407,7 +1408,7 @@ public class InitializerListener implements ServletContextListener {
                     "        },");
         }
     }
-    
+
 
     private static void buildApiThreatsTeamsWebhookBody(StringBuilder body, String name, Object value) {
         final String dashboardBaseUrl = getDashboardBaseUrl();
@@ -1418,40 +1419,40 @@ public class InitializerListener implements ServletContextListener {
                     "            \"weight\": \"bolder\",\n" +
                     "            \"wrap\": true\n" +
                     "        },");
-            
+
             List<Object> list = (List<Object>) value;
             boolean isFirstItem = true;
 
             for (Object obj : list) {
                 Map<String, Object> data = mapper.convertValue(obj, HashMap.class);
-                
+
                 // Create a FactSet for each object (better for key-value pairs)
                 body.append("        {\n" +
                         "            \"type\": \"FactSet\",\n" +
                         (isFirstItem ? "" : "            \"separator\": true,\n            \"spacing\": \"extraLarge\",\n") +
                         "            \"facts\": [\n");
-                
+
                 boolean firstFact = true;
                 for (Entry<String, Object> entry : data.entrySet()) {
                     String key = entry.getKey();
                     if ("id".equals(key) || "sample".equals(key) || "metadata".equals(key)) {
                         continue;
                     }
-                    
+
                     if (!firstFact) {
                         body.append(",\n");
                     }
-                    
+
                     Object val = entry.getValue();
                     String valueStr = val == null ? "" : val.toString();
-                    
+
                     body.append("                {\n" +
                             "                    \"title\": \"" + escapeJsonString(key) + ":\",\n" +
                             "                    \"value\": \"" + escapeJsonString(valueStr) + "\"\n" +
                             "                }");
                     firstFact = false;
                 }
-                
+
                 body.append("\n            ]\n" +
                         "        },\n");
 
@@ -1464,7 +1465,7 @@ public class InitializerListener implements ServletContextListener {
                 }
                 isFirstItem = false;
             }
-            
+
         } else {
             String valueStr = value == null ? "" : value.toString();
             body.append("        {\n" +
@@ -1474,7 +1475,7 @@ public class InitializerListener implements ServletContextListener {
                     "        },");
         }
     }
-        
+
     private static void actuallySendWebhook(CustomWebhook webhook, Map<String, Object> valueMap, int now){
         List<String> errors = new ArrayList<>();
         String payload = null;
@@ -1490,7 +1491,7 @@ public class InitializerListener implements ServletContextListener {
                     // in case the body is provided, then the data needs to escaped.
                     // for Microsoft teams workflow webhooks
                     payload = Utils.replaceVariables(webhook.getBody(), valueMap, true, true);
-                } 
+                }
             } else {
                 // default case.
                 payload = Utils.replaceVariables(webhook.getBody(), valueMap, false, true);
@@ -1781,7 +1782,7 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
-    
+
     public static void dropAuthMechanismData(BackwardCompatibility authMechanismData) {
         if (authMechanismData.getAuthMechanismData() == 0) {
             AuthMechanismsDao.instance.getMCollection().drop();
@@ -1894,7 +1895,7 @@ public class InitializerListener implements ServletContextListener {
         }
 
     }
-    
+
 
     public static void createFirstUnauthenticatedApiGroup(){
         createUnauthenticatedApiGroup();
@@ -1903,9 +1904,9 @@ public class InitializerListener implements ServletContextListener {
 
     public static void createRiskScoreApiGroup(int id, String name, RiskScoreTestingEndpoints.RiskScoreGroupType riskScoreGroupType) {
         logger.debugAndAddToDb("Creating risk score group: " + name, LogDb.DASHBOARD);
-        
+
         ApiCollection riskScoreGroup = new ApiCollection(id, name, Context.now(), new HashSet<>(), null, 0, false, false);
-            
+
         List<TestingEndpoints> riskScoreConditions = new ArrayList<>();
         RiskScoreTestingEndpoints riskScoreTestingEndpoints = new RiskScoreTestingEndpoints(riskScoreGroupType);
         riskScoreConditions.add(riskScoreTestingEndpoints);
@@ -1914,7 +1915,7 @@ public class InitializerListener implements ServletContextListener {
         riskScoreGroup.setType(ApiCollection.Type.API_GROUP);
         riskScoreGroup.setAutomated(true);
 
-        ApiCollectionsDao.instance.insertOne(riskScoreGroup); 
+        ApiCollectionsDao.instance.insertOne(riskScoreGroup);
     }
 
     public static void createRiskScoreGroups(BackwardCompatibility backwardCompatibility) {
@@ -1942,7 +1943,7 @@ public class InitializerListener implements ServletContextListener {
                     if (!apiCollection.getAutomated()) {
                         apiCollection.setAutomated(true);
                         ApiCollectionsDao.instance.updateOne(
-                            Filters.eq("_id", apiCollectionId), 
+                            Filters.eq("_id", apiCollectionId),
                             Updates.set(ApiCollection.AUTOMATED, true));
                     }
                 }
@@ -2038,7 +2039,7 @@ public class InitializerListener implements ServletContextListener {
         if (backwardCompatibility.getEnableNewMerging() == 0) {
 
             AccountSettingsDao.instance.updateOne(
-                AccountSettingsDao.generateFilter(), 
+                AccountSettingsDao.generateFilter(),
                 Updates.set(AccountSettings.URL_REGEX_MATCHING_ENABLED, true));
         }
 
@@ -2197,11 +2198,11 @@ public class InitializerListener implements ServletContextListener {
 
             //         // Check if account has already been assigned to an organization
             //         //Boolean isNewAccountOnSaaS = OrganizationUtils.checkIsNewAccountOnSaaS(accountId);
-                
+
             //         logger.debugAndAddToDb(String.format("Initializing organization to which account %d belongs", accountId), LogDb.DASHBOARD);
             //         RBAC adminRbac = RBACDao.instance.findOne(
             //             Filters.and(
-            //                 Filters.eq(RBAC.ACCOUNT_ID, accountId),  
+            //                 Filters.eq(RBAC.ACCOUNT_ID, accountId),
             //                 Filters.eq(RBAC.ROLE, RBAC.Role.ADMIN)
             //             )
             //         );
@@ -2230,7 +2231,7 @@ public class InitializerListener implements ServletContextListener {
 
             //         // Check if organization exists
             //         Organization organization = OrganizationsDao.instance.findOne(
-            //             Filters.eq(Organization.ADMIN_EMAIL, adminEmail) 
+            //             Filters.eq(Organization.ADMIN_EMAIL, adminEmail)
             //         );
 
             //         String organizationUUID;
@@ -2249,7 +2250,7 @@ public class InitializerListener implements ServletContextListener {
             //             organizationUUID = UUID.randomUUID().toString();
             //             organization = new Organization(organizationUUID, name, adminEmail, accounts);
             //             OrganizationsDao.instance.insertOne(organization);
-            //         } 
+            //         }
 
             //         organizationUUID = organization.getId();
 
@@ -2270,17 +2271,17 @@ public class InitializerListener implements ServletContextListener {
             //         if (!syncedWithAkto) {
             //             logger.debugAndAddToDb(String.format("Organization %s - Syncing with akto", organization.getName()), LogDb.DASHBOARD);
             //             attemptSyncWithAktoSuccess = OrganizationUtils.syncOrganizationWithAkto(organization);
-                        
+
             //             if (!attemptSyncWithAktoSuccess) {
             //                 logger.debugAndAddToDb(String.format("Organization %s - Sync with akto failed", organization.getName()), LogDb.DASHBOARD);
             //                 return;
-            //             } 
+            //             }
 
             //             logger.debugAndAddToDb(String.format("Organization %s - Sync with akto successful", organization.getName()), LogDb.DASHBOARD);
             //         } else {
             //             logger.debugAndAddToDb(String.format("Organization %s - Alredy Synced with akto. Skipping sync ... ", organization.getName()), LogDb.DASHBOARD);
             //         }
-                    
+
             //         // Set backward compatibility dao
             //         BackwardCompatibilityDao.instance.updateOne(
             //             Filters.eq("_id", backwardCompatibility.getId()),
@@ -2381,7 +2382,7 @@ public class InitializerListener implements ServletContextListener {
         for(Map.Entry<CollectionType, MCollection<?>[]> collections : collectionsMap.entrySet()){
 
             List<Bson> update = Arrays.asList(
-                            Updates.set(SingleTypeInfo._COLLECTION_IDS, 
+                            Updates.set(SingleTypeInfo._COLLECTION_IDS,
                             matchKeyMap.get(collections.getKey())));
 
             if(collections.getKey().equals(CollectionType.ApiCollectionId)){
@@ -2420,7 +2421,7 @@ public class InitializerListener implements ServletContextListener {
         EventsMetrics lastEventsMetrics = EventsMetricsDao.instance.findLatestOne(Filters.empty());
         EventsMetrics currentEventsMetrics = new EventsMetrics(
             false, new EventsExample(0, new ArrayList<>()), new HashMap<>(), new HashMap<>(), new HashMap<>(), 0, Context.now());
-            
+
         int lastSentEpoch = 0;
         int lastApisCount = 0;
         if(lastEventsMetrics != null){
@@ -2481,7 +2482,7 @@ public class InitializerListener implements ServletContextListener {
     public static void fetchIntegratedConnections(BackwardCompatibility backwardCompatibility){
         if(backwardCompatibility.getComputeIntegratedConnections() == 0){
             Map<String,ConnectionInfo> infoMap = new HashMap<>();
-            
+
             // check if mirroring is enabled for getting traffic.
             ApiCollection collection = ApiCollectionsDao.instance.findOne(Filters.exists(ApiCollection.HOST_NAME));
             if(collection != null){
@@ -2534,7 +2535,7 @@ public class InitializerListener implements ServletContextListener {
 
     public static boolean isNotKubernetes() {
         return !DashboardMode.isKubernetes();
-    } 
+    }
 
 
     @Override
@@ -2627,7 +2628,7 @@ public class InitializerListener implements ServletContextListener {
                     agentBasePromptDetectionCron.setUpAgentBasePromptDetectionScheduler();
                     setUpTestEditorTemplatesScheduler();
                     JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
-                    updateApiGroupsForAccounts(); 
+                    updateApiGroupsForAccounts();
                     setupAutomatedApiGroupsScheduler();
                     if(runJobFunctionsAnyway) {
                         crons.trafficAlertsScheduler();
@@ -2645,7 +2646,7 @@ public class InitializerListener implements ServletContextListener {
                         crons.deleteTestRunsScheduler();
                         setUpUpdateCustomCollections();
                         setUpFillCollectionIdArrayJob();
-                                               
+
 
                         // CleanInventory.cleanInventoryJobRunner();
 
@@ -2705,9 +2706,9 @@ public class InitializerListener implements ServletContextListener {
                                 } catch (Exception e) {
                                     logger.errorAndAddToDb(e, "Error while filling query params");
                                 }
-                                
+
                             }
-                            
+
                         }
                     }
                 }, "backfill-query-params");
@@ -2719,7 +2720,7 @@ public class InitializerListener implements ServletContextListener {
     private void alertsForTestingNonFunctional() {
         // Hourly cron to update organization cache
         testingAlertsCron.setUpOrganizationFeatureCacheScheduler();
-        
+
         // 5-minute cron to check accounts
         testingAlertsCron.setUpTestingAlertsScheduler();
     }
@@ -2821,13 +2822,13 @@ public class InitializerListener implements ServletContextListener {
     public static void clear(AccountsContextDao mCollection, int maxDocuments) {
         try {
             /*
-             * If capped collections are allowed (mongoDB) and 
+             * If capped collections are allowed (mongoDB) and
              * the collection is actually capped, only then skip.
              */
             if (DbMode.allowCappedCollections() && mCollection.isCapped()) return;
 
             /*
-             * Primarily for initial cleanup. 
+             * Primarily for initial cleanup.
              * In cases the data up till now has accumulated to a very large size,
              * we do not want to overwhelm the db in those cases
              * as .drop() is far cheaper operation that .deleteMany()
@@ -2841,7 +2842,7 @@ public class InitializerListener implements ServletContextListener {
             if(droppedIfGreaterThanThreeTimes){
                 /*
                  * Not creating capped collections again,
-                 * because eventually we want to move away from capped collections 
+                 * because eventually we want to move away from capped collections
                  * because they add serious startup time to mongo.
                  */
                 return;
@@ -2866,7 +2867,7 @@ public class InitializerListener implements ServletContextListener {
             insertAktoTestLibraries(accountSettings);
             insertAktoThreatPolicies(accountSettings);
         }
-        
+
         insertCompliances(accountSettings);
     }
 
@@ -2893,7 +2894,7 @@ public class InitializerListener implements ServletContextListener {
 
         for (String pendingLib: aktoTestLibraries) {
             AccountSettingsDao.instance.updateOne(
-                AccountSettingsDao.generateFilter(), 
+                AccountSettingsDao.generateFilter(),
                 Updates.addToSet(AccountSettings.TEST_LIBRARIES, new TestLibrary(pendingLib, Constants._AKTO, Context.now())));
         }
     }
@@ -2913,7 +2914,7 @@ public class InitializerListener implements ServletContextListener {
 
         for (String pendingLib: aktoTestLibraries) {
             AccountSettingsDao.instance.updateOne(
-                AccountSettingsDao.generateFilter(), 
+                AccountSettingsDao.generateFilter(),
                 Updates.addToSet(AccountSettings.THREAT_POLICIES, new TestLibrary(pendingLib, Constants._AKTO, Context.now())));
         }
     }
@@ -2954,7 +2955,7 @@ public class InitializerListener implements ServletContextListener {
     private final static int REFRESH_INTERVAL = 60 * 15; // 15 minute
 
     public static Organization fetchAndSaveFeatureWiseAllowed(Organization organization) {
-        
+
         int lastFeatureMapUpdate = organization.getLastFeatureMapUpdate();
         if((lastFeatureMapUpdate + REFRESH_INTERVAL) >= Context.now()){
             return organization;
@@ -2995,7 +2996,7 @@ public class InitializerListener implements ServletContextListener {
                  * If feature map unavailable and account belongs b/w
                  * 1724544000 -> Sunday, August 25, 2024 12:00:00 AM GMT
                  * 1724976000 -> Friday, August 30, 2024 12:00:00 AM GMT
-                 * 
+                 *
                  * then attempt to recreate org in stigg.
                  */
                 if(accounts!=null && !accounts.isEmpty()){
@@ -3047,7 +3048,7 @@ public class InitializerListener implements ServletContextListener {
             logger.debugAndAddToDb("Processed org metadata",LogDb.DASHBOARD);
 
             organization.setHotjarSiteId(hotjarSiteId);
-            
+
             organization.setplanType(planType);
 
             organization.settrialMsg(trialMsg);
@@ -3294,7 +3295,7 @@ public class InitializerListener implements ServletContextListener {
 
     private static void makeFirstUserAdmin(BackwardCompatibility backwardCompatibility){
         if(backwardCompatibility.getAddAdminRoleIfAbsent() < 1733228772){
-           
+
             User firstUser = UsersDao.instance.getFirstUser(Context.accountId.get());
             if(firstUser == null){
                 return;
@@ -3393,7 +3394,7 @@ public class InitializerListener implements ServletContextListener {
                     }else{
                         adminEmail = org.getAdminEmail();
                     }
-                    
+
                     String domain = "";
                     if(!adminEmail.isEmpty()){
                         domain = OrganizationUtils.determineEmailDomain(adminEmail);
@@ -3408,7 +3409,7 @@ public class InitializerListener implements ServletContextListener {
                     ConfigsDao.instance.deleteAll(filterQ);
                 }
             }
-            
+
             BackwardCompatibilityDao.instance.updateOne(
                 Filters.eq("_id", backwardCompatibility.getId()),
                 Updates.set(BackwardCompatibility.MOVE_AZURE_SAML, Context.now())
@@ -3457,7 +3458,7 @@ public class InitializerListener implements ServletContextListener {
             List<ObjectId> summaryIds = VulnerableTestingRunResultDao.instance.summaryIdsStoredForVulnerableTests();
             if(!summaryIds.isEmpty()){
                 TestingRunResultSummariesDao.instance.updateMany(
-                    Filters.in(Constants.ID, summaryIds), 
+                    Filters.in(Constants.ID, summaryIds),
                     Updates.set(TestingRunResultSummary.IS_NEW_TESTING_RUN_RESULT_SUMMARY, true)
                 );
             }
@@ -3477,9 +3478,9 @@ public class InitializerListener implements ServletContextListener {
                     Filters.or(
                         Filters.exists(CustomDataType.USER_MODIFIED_TIMESTAMP, false),
                         Filters.eq(CustomDataType.USER_MODIFIED_TIMESTAMP, 0)
-                    )  
+                    )
                 ),
-                Updates.set(CustomDataType.OPERATOR, Operator.AND) 
+                Updates.set(CustomDataType.OPERATOR, Operator.AND)
             );
 
             BackwardCompatibilityDao.instance.updateOne(
@@ -3690,7 +3691,7 @@ public class InitializerListener implements ServletContextListener {
                 try {
                     processRemedationFilesZip(testingTemplates);
                     processComplianceInfosFromZip(testingTemplates);
-                    
+
                 } catch (Exception e) {
                     e.printStackTrace();
                     logger.errorAndAddToDb("Unable to import remediations", LogDb.DASHBOARD);
@@ -3703,7 +3704,7 @@ public class InitializerListener implements ServletContextListener {
                     logger.errorAndAddToDb("Unable to import threat compliance", LogDb.DASHBOARD);
                 }
                 Map<String, ComplianceInfo> complianceCommonMap = getFromCommonDb();
-                Map<String, com.akto.dto.threat_detection.ThreatComplianceInfo> threatComplianceCommonMap = getThreatComplianceFromCommonDb();
+                Map<String, ThreatComplianceInfo> threatComplianceCommonMap = getThreatComplianceFromCommonDb();
                 Map<String, byte[]> allYamlTemplates = TestTemplateUtils.getZipFromMultipleRepoAndBranch(getAktoDefaultTestLibs());
                 AccountTask.instance.executeTask((account) -> {
                     try {
@@ -3712,7 +3713,7 @@ public class InitializerListener implements ServletContextListener {
                         if (!DashboardMode.isMetered()) return;
 
                         logger.infoAndAddToDb("Updating Pro and Standard Templates for accountId: " + account.getId(), LogDb.DASHBOARD);
-                        
+
                         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
 
                         if (accountSettings == null ||accountSettings.getTestLibraries() == null) return;
@@ -3725,10 +3726,10 @@ public class InitializerListener implements ServletContextListener {
                             }
                         }
 
-                        if (accountSettings.getComplianceInfosUpdatedTs() > 0) {                            
+                        if (accountSettings.getComplianceInfosUpdatedTs() > 0) {
                             logger.infoAndAddToDb("Updating Compliances for accountId: " + account.getId(), LogDb.DASHBOARD);
                             addComplianceFromCommonToAccount(complianceCommonMap);
-                            replaceComplianceFromCommonToAccount(complianceCommonMap);    
+                            replaceComplianceFromCommonToAccount(complianceCommonMap);
                         }
 
                         if (accountSettings.getThreatPolicies() != null && !accountSettings.getThreatPolicies().isEmpty()) {
@@ -3741,7 +3742,7 @@ public class InitializerListener implements ServletContextListener {
                             addThreatComplianceToFilterYamlTemplates(threatComplianceCommonMap);
                             replaceThreatComplianceInFilterYamlTemplates(threatComplianceCommonMap);
                         }
-                         
+
                     } catch (Exception e) {
                         cacheLoggerMaker.errorAndAddToDb(e,
                                 String.format("Error while updating Test Editor Files %s", e.toString()),
@@ -3803,12 +3804,12 @@ public class InitializerListener implements ServletContextListener {
                                 countUnchangedRemediations++;
                             } else {
                                 logger.debugAndAddToDb("Updating remediation content: " + entryName, LogDb.DASHBOARD);
-                                Bson updates = 
+                                Bson updates =
                                     Updates.combine(
                                         Updates.set(Remediation.REMEDIATION_TEXT, templateContent),
                                         Updates.set(Remediation.HASH, remediationHashFromFile)
                                     );
-                                        
+
                                 RemediationsDao.instance.updateOne(Remediation.TEST_ID, Remediation.REMEDIATION_TEXT, updates);
                             }
                         } else {
@@ -3823,7 +3824,7 @@ public class InitializerListener implements ServletContextListener {
                 if (countTotalRemediations != countUnchangedRemediations) {
                     logger.debugAndAddToDb(countUnchangedRemediations + "/" + countTotalRemediations + "remediations unchanged", LogDb.DASHBOARD);
                 }
-        
+
             } catch (Exception ex) {
                 cacheLoggerMaker.errorAndAddToDb(ex,
                         String.format("Error while processing Test template files zip. Error %s", ex.getMessage()),
@@ -3831,14 +3832,14 @@ public class InitializerListener implements ServletContextListener {
             }
         } else {
             logger.debugAndAddToDb("Received null zip file");
-        }        
+        }
     }
 
     private static Map<String, ComplianceInfo> getFromCommonDb() {
         Bson emptyFilter = Filters.empty();
         List<ComplianceInfo> complianceInfosInDb = ComplianceInfosDao.instance.findAll(emptyFilter);
         Map<String, ComplianceInfo> mapIdToComplianceInDb = complianceInfosInDb.stream().collect(Collectors.toMap(ComplianceInfo::getId, Function.identity()));
-        return mapIdToComplianceInDb;        
+        return mapIdToComplianceInDb;
     }
 
     public static void replaceComplianceFromCommonToAccount(Map<String, ComplianceInfo> mapIdToComplianceInCommon) {
@@ -3847,16 +3848,16 @@ public class InitializerListener implements ServletContextListener {
             for(String fileSourceId: mapIdToComplianceInCommon.keySet()) {
                 ComplianceInfo complianceInfoInCommon = mapIdToComplianceInCommon.get(fileSourceId);
 
-                Bson filters = 
+                Bson filters =
                     Filters.and(
-                        Filters.eq("info.compliance.source", fileSourceId), 
+                        Filters.eq("info.compliance.source", fileSourceId),
                         Filters.ne(ic+ComplianceInfo.HASH, complianceInfoInCommon.getHash())
                     );
 
                 Bson updates = Updates.combine(
                     Updates.set(ic+ComplianceInfo.HASH, complianceInfoInCommon.getHash()),
                     Updates.set(ic+ComplianceInfo.MAP_COMPLIANCE_TO_LIST_CLAUSES, complianceInfoInCommon.getMapComplianceToListClauses())
-                );                 
+                );
                 UpdateResult updateResult = YamlTemplateDao.instance.updateMany(filters, updates);
                 logger.debugAndAddToDb("replaceComplianceFromCommonToAccount: " + Context.accountId.get() + " : " +fileSourceId+" "+ updateResult);
             }
@@ -3868,7 +3869,7 @@ public class InitializerListener implements ServletContextListener {
 
     public static void addComplianceFromCommonToAccount(Map<String, ComplianceInfo> mapIdToComplianceInCommon) {
         try {
-            
+
             for(String fileSourceId: mapIdToComplianceInCommon.keySet()) {
                 ComplianceInfo complianceInfoInCommon = mapIdToComplianceInCommon.get(fileSourceId);
                 String compId = complianceInfoInCommon.getId().split("/")[1].split("\\.")[0].toUpperCase();
@@ -3877,16 +3878,16 @@ public class InitializerListener implements ServletContextListener {
 
                 if (isCategoryTemplate) continue;
 
-                Bson filters = 
+                Bson filters =
                     Filters.and(
-                        Filters.eq(Constants.ID, compId), 
+                        Filters.eq(Constants.ID, compId),
                         Filters.or(Filters.exists("info.compliance", false), Filters.ne("info.compliance.source", fileSourceId))
                     );
 
-                ComplianceMapping complianceMapping = ComplianceMapping.createFromInfo(complianceInfoInCommon);    
+                ComplianceMapping complianceMapping = ComplianceMapping.createFromInfo(complianceInfoInCommon);
                 UpdateResult updateResult = YamlTemplateDao.instance.updateMany(filters, Updates.set("info.compliance", complianceMapping));
                 logger.debugAndAddToDb("addComplianceFromCommonToAccount for test id: " + Context.accountId.get() + " : " + compId + " " + updateResult);
-            }            
+            }
 
 
             for(String fileSourceId: mapIdToComplianceInCommon.keySet()) {
@@ -3897,26 +3898,26 @@ public class InitializerListener implements ServletContextListener {
 
                 if (!isCategoryTemplate) continue;
 
-                Bson filters = 
+                Bson filters =
                     Filters.and(
-                        Filters.eq("info.category.name", compId.toUpperCase()), 
+                        Filters.eq("info.category.name", compId.toUpperCase()),
                         Filters.exists("info.compliance", false)
                     );
 
-                ComplianceMapping complianceMapping = ComplianceMapping.createFromInfo(complianceInfoInCommon);    
+                ComplianceMapping complianceMapping = ComplianceMapping.createFromInfo(complianceInfoInCommon);
                 UpdateResult updateResult = YamlTemplateDao.instance.updateMany(filters, Updates.set("info.compliance", complianceMapping));
                 logger.debugAndAddToDb("addComplianceFromCommonToAccount for category: " + Context.accountId.get() + " : " + compId + " "  + updateResult);
-            }            
+            }
         } catch (Exception e) {
             logger.errorAndAddToDb("Error in addComplianceFromCommonToAccount: " + Context.accountId.get() + " : " + e.getMessage());
             e.printStackTrace();
         }
     }
 
-    public static void addThreatComplianceToFilterYamlTemplates(Map<String, com.akto.dto.threat_detection.ThreatComplianceInfo> mapIdToThreatComplianceInCommon) {
+    public static void addThreatComplianceToFilterYamlTemplates(Map<String, ThreatComplianceInfo> mapIdToThreatComplianceInCommon) {
         try {
             for(String fileSourceId: mapIdToThreatComplianceInCommon.keySet()) {
-                com.akto.dto.threat_detection.ThreatComplianceInfo threatComplianceInfoInCommon = mapIdToThreatComplianceInCommon.get(fileSourceId);
+                ThreatComplianceInfo threatComplianceInfoInCommon = mapIdToThreatComplianceInCommon.get(fileSourceId);
                 String compId = threatComplianceInfoInCommon.getId().split("/")[1].split("\\.")[0];
 
                 Bson filters = Filters.and(
@@ -3934,20 +3935,20 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    public static void replaceThreatComplianceInFilterYamlTemplates(Map<String, com.akto.dto.threat_detection.ThreatComplianceInfo> mapIdToThreatComplianceInCommon) {
+    public static void replaceThreatComplianceInFilterYamlTemplates(Map<String, ThreatComplianceInfo> mapIdToThreatComplianceInCommon) {
         try {
             String ic = "info.compliance.";
             for(String fileSourceId: mapIdToThreatComplianceInCommon.keySet()) {
-                com.akto.dto.threat_detection.ThreatComplianceInfo threatComplianceInfoInCommon = mapIdToThreatComplianceInCommon.get(fileSourceId);
+                ThreatComplianceInfo threatComplianceInfoInCommon = mapIdToThreatComplianceInCommon.get(fileSourceId);
 
                 Bson filters = Filters.and(
                     Filters.eq("info.compliance.source", fileSourceId),
-                    Filters.ne(ic + com.akto.dto.threat_detection.ThreatComplianceInfo.HASH, threatComplianceInfoInCommon.getHash())
+                    Filters.ne(ic + ThreatComplianceInfo.HASH, threatComplianceInfoInCommon.getHash())
                 );
 
                 Bson updates = Updates.combine(
-                    Updates.set(ic + com.akto.dto.threat_detection.ThreatComplianceInfo.HASH, threatComplianceInfoInCommon.getHash()),
-                    Updates.set(ic + com.akto.dto.threat_detection.ThreatComplianceInfo.MAP_COMPLIANCE_TO_LIST_CLAUSES, threatComplianceInfoInCommon.getMapComplianceToListClauses())
+                    Updates.set(ic + ThreatComplianceInfo.HASH, threatComplianceInfoInCommon.getHash()),
+                    Updates.set(ic + ThreatComplianceInfo.MAP_COMPLIANCE_TO_LIST_CLAUSES, threatComplianceInfoInCommon.getMapComplianceToListClauses())
                 );
                 UpdateResult updateResult = FilterYamlTemplateDao.instance.updateMany(filters, updates);
                 logger.debugAndAddToDb("replaceThreatComplianceInFilterYamlTemplates: " + Context.accountId.get() + " : " + fileSourceId + " " + updateResult);
@@ -4043,7 +4044,7 @@ public class InitializerListener implements ServletContextListener {
                 if (countTotalCompliances != countUnchangedCompliances) {
                     logger.debugAndAddToDb(countUnchangedCompliances + "/" + countTotalCompliances + "compliances unchanged", LogDb.DASHBOARD);
                 }
-        
+
             } catch (Exception ex) {
                 cacheLoggerMaker.errorAndAddToDb(ex,
                         String.format("Error while processing Test template files zip. Error %s", ex.getMessage()),
@@ -4055,10 +4056,10 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    private static Map<String, com.akto.dto.threat_detection.ThreatComplianceInfo> getThreatComplianceFromCommonDb() {
+    private static Map<String, ThreatComplianceInfo> getThreatComplianceFromCommonDb() {
         Bson emptyFilter = Filters.empty();
-        List<com.akto.dto.threat_detection.ThreatComplianceInfo> threatComplianceInfosInDb = com.akto.dao.threat_detection.ThreatComplianceInfosDao.instance.findAll(emptyFilter);
-        Map<String, com.akto.dto.threat_detection.ThreatComplianceInfo> mapIdToThreatComplianceInDb = threatComplianceInfosInDb.stream().collect(Collectors.toMap(com.akto.dto.threat_detection.ThreatComplianceInfo::getId, Function.identity()));
+        List<ThreatComplianceInfo> threatComplianceInfosInDb = com.akto.dao.threat_detection.ThreatComplianceInfosDao.instance.findAll(emptyFilter);
+        Map<String, ThreatComplianceInfo> mapIdToThreatComplianceInDb = threatComplianceInfosInDb.stream().collect(Collectors.toMap(ThreatComplianceInfo::getId, Function.identity()));
         return mapIdToThreatComplianceInDb;
     }
 
@@ -4072,7 +4073,7 @@ public class InitializerListener implements ServletContextListener {
                 int countUnchangedCompliances = 0;
                 int countTotalCompliances = 0;
 
-                Map<String, com.akto.dto.threat_detection.ThreatComplianceInfo> mapIdToThreatComplianceInDb = getThreatComplianceFromCommonDb();
+                Map<String, ThreatComplianceInfo> mapIdToThreatComplianceInDb = getThreatComplianceFromCommonDb();
 
                 while ((entry = zipInputStream.getNextEntry()) != null) {
                     if (!entry.isDirectory()) {
@@ -4124,18 +4125,18 @@ public class InitializerListener implements ServletContextListener {
 
                         Map<String, List<String>> contentMap = TestConfigYamlParser.parseComplianceTemplate(templateContent);
 
-                        com.akto.dto.threat_detection.ThreatComplianceInfo threatComplianceInfoInDb = mapIdToThreatComplianceInDb.get(fileSourceId);
+                        ThreatComplianceInfo threatComplianceInfoInDb = mapIdToThreatComplianceInDb.get(fileSourceId);
                         countTotalCompliances++;
 
                         if (threatComplianceInfoInDb == null) {
-                            com.akto.dto.threat_detection.ThreatComplianceInfo newThreatComplianceInfo = new com.akto.dto.threat_detection.ThreatComplianceInfo(fileSourceId, contentMap, Constants._AKTO, templateHashCode, "");
+                            ThreatComplianceInfo newThreatComplianceInfo = new ThreatComplianceInfo(fileSourceId, contentMap, Constants._AKTO, templateHashCode, "");
                             logger.debugAndAddToDb("Inserting threat compliance content: " + entryName, LogDb.DASHBOARD);
                             com.akto.dao.threat_detection.ThreatComplianceInfosDao.instance.insertOne(newThreatComplianceInfo);
 
                         } else if (threatComplianceInfoInDb.getHash() == templateHashCode ) {
                             countUnchangedCompliances++;
                         } else {
-                            Bson updates = Updates.combine(Updates.set(com.akto.dto.threat_detection.ThreatComplianceInfo.MAP_COMPLIANCE_TO_LIST_CLAUSES, contentMap), Updates.set(com.akto.dto.threat_detection.ThreatComplianceInfo.HASH, templateHashCode));
+                            Bson updates = Updates.combine(Updates.set(ThreatComplianceInfo.MAP_COMPLIANCE_TO_LIST_CLAUSES, contentMap), Updates.set(ThreatComplianceInfo.HASH, templateHashCode));
                             logger.debugAndAddToDb("Updating threat compliance content: " + entryName, LogDb.DASHBOARD);
                             com.akto.dao.threat_detection.ThreatComplianceInfosDao.instance.updateOne(Constants.ID, fileSourceId, updates);
                         }
