@@ -67,22 +67,22 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
 
     return (
         <Box padding="3">
-            <HorizontalStack gap="3" align="start" blockAlign="start">
+            <Box style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                 {/* Icon */}
-                <Box>
+                <Box style={{ flexShrink: 0, width: '20px', height: '20px' }}>
                     <img
                         src={iconSrc}
                         alt={iconAlt}
-                        style={{ width: '20px', height: '20px', objectFit: 'contain' }}
+                        style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
                     />
                 </Box>
 
                 {/* Divider */}
-                <Box style={{ width: '2px', alignSelf: 'stretch' }}>
+                <Box style={{ width: '2px', flexShrink: 0, alignSelf: 'stretch' }}>
                     <img
                         src={dividerSrc}
                         alt=""
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                     />
                 </Box>
 
@@ -118,7 +118,7 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                         )}
                     </VerticalStack>
                 </Box>
-            </HorizontalStack>
+            </Box>
             <style jsx>{`
                 ${markdownStyles}
             `}</style>

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Box, Text, VerticalStack, HorizontalStack, Button } from '@shopify/polaris';
 import { ChevronDownMinor, ChevronUpMinor } from '@shopify/polaris-icons';
 
-const MagicIcon = '/public/magic_icon.png';
+const MagicIcon = '/public/magic_icon.svg';
 
 const styles = {
     iconContainer: {
