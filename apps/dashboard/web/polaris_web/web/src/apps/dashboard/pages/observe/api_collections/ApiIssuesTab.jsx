@@ -1,4 +1,4 @@
-import { Box, Text, VerticalStack } from "@shopify/polaris";
+import { Badge, Box, Text, VerticalStack } from "@shopify/polaris";
 import { useState, useEffect } from "react";
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import transformIssues from "../../issues/transform";
@@ -9,6 +9,7 @@ import IssuesApi from "../../issues/api"
 import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 import SessionStore from "../../../../main/SessionStore";
 import threatDetectionApi from "../../threat_detection/api";
+import ShowListInBadge from "../../../components/shared/ShowListInBadge";
 
 const ApiIssuesTab = ({ apiDetail, collectionIssuesData, isThreatEnabled }) => {
     const [filteredIssues, setFilteredIssues] = useState([]);
@@ -114,14 +115,18 @@ const ApiIssuesTab = ({ apiDetail, collectionIssuesData, isThreatEnabled }) => {
             if(resp?.maliciousEvents && resp?.maliciousEvents?.length > 0) {
                 resp?.maliciousEvents?.filter(event => event?.successfulExploit).forEach(event => {
                     const threatFilter = threatFiltersMap[event?.filterId];
+                    const severity = func.toSentenceCase(threatFilter?.severity || "HIGH");
+
                     threatIssuesData.push({
                         id: event?.actor,
-                        severity: threatFilter?.severity || "HIGH",
+                        severity: (<div className={`badge-wrapper-${severity.toUpperCase()}`}>
+                        <Badge size="small">{severity}</Badge>
+                    </div>),
                         issueName: threatFilter?.name,
                         category: event?.category,
-                        domains: [event?.host],
+                        domains: <ShowListInBadge itemsArr={[event?.host]} maxItems={1} maxWidth={"250px"} status={"new"} itemWidth={"200px"} />,
                         compliance: [],
-                        creationTime: func.prettifyEpochTime(event?.timestamp),
+                        creationTime: func.prettifyEpoch(event?.timestamp),
                         url: event?.url,
                         method: event?.method,
                         apiCollectionId: event?.apiCollectionId,
@@ -130,9 +135,11 @@ const ApiIssuesTab = ({ apiDetail, collectionIssuesData, isThreatEnabled }) => {
                 setFilteredIssues(threatIssuesData);
             }
             setTotalThreatIssues(resp?.total || 0);
+            setLoadingIssues(false);
         } catch (error) {
             console.error("Error filtering issues:", error);
             setFilteredIssues([]);
+            setLoadingIssues(false);
         }
     }
 

@@ -20,6 +20,8 @@ import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.billing.FeatureAccess;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
@@ -42,6 +44,7 @@ import static com.akto.billing.UsageMetricUtils.getFeatureAccessSaas;
 public class RiskScoreSyncCron {
     
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(RiskScoreSyncCron.class, LogDb.THREAT_DETECTION);
 
     public void setUpRiskScoreSyncCronScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -53,8 +56,11 @@ public class RiskScoreSyncCron {
                         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
                         FeatureAccess featureAccess = getFeatureAccessSaas(accountId, "THREAT_DETECTION");
                         if(!featureAccess.getIsGranted()){
+                            loggerMaker.debugAndAddToDb("Feature access not granted for account " + accountId);
                             return;
                         }
+                        int startTimestamp = Context.now();
+                        loggerMaker.debugAndAddToDb("Risk score sync cron started for account " + accountId + " at " + startTimestamp);
                         LastCronRunInfo lastRunTimerInfo = accountSettings.getLastUpdatedCronInfo();
                         int deltaStarTime = 0;
                         int deltaEndTime = Context.now();
@@ -99,9 +105,11 @@ public class RiskScoreSyncCron {
                             updates.add(new UpdateManyModel<>(ApiInfoDao.getFilter(apiInfo.getId()), Updates.combine(Updates.set(ApiInfo.RISK_SCORE, riskScore), Updates.set(ApiInfo.THREAT_SCORE, threatScore)), new UpdateOptions().upsert(false)));
                         }
                         if(updates.size() > 0){
+                            loggerMaker.warnAndAddToDb("Updating risk score for " + updates.size() + " api infos");
                             ApiInfoDao.instance.bulkWrite(updates, new BulkWriteOptions().ordered(false));
                         }
                         AccountSettingsDao.instance.updateOne(AccountSettingsDao.generateFilter(), updateForLastCronRunInfo);
+                        loggerMaker.warnAndAddToDb("Risk score sync cron completed for account " + accountId + " in " + (Context.now() - startTimestamp) + "seconds");
                     }
                 }, "risk-score-sync-cron");
             }
