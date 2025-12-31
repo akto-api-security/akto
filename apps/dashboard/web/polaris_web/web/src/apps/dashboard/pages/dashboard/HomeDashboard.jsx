@@ -97,7 +97,7 @@ function HomeDashboard() {
     const [mcpTopApplications, setMcpTopApplications] = useState([])
     const [threatActorsTimeline, setThreatActorsTimeline] = useState([])
     const [threatSeverityData, setThreatSeverityData] = useState({})
-    const [threatCategoryData, setThreatCategoryData] = useState([{ data: [], color: "#E45357" }])
+    const [threatCategoryData, setThreatCategoryData] = useState([{ data: [], color: observeFunc.getColorForSensitiveData('CRITICAL') }])
 
     // MCP API Requests time selector state
     const statsOptions = [
@@ -189,7 +189,7 @@ function HomeDashboard() {
     }
 
     function transformSeverityData(categoryCounts) {
-        const severityLevels = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
+        const severityLevels = func.getAktoSeverities();
         const severityMap = {};
 
         severityLevels.forEach(severity => {
@@ -214,7 +214,7 @@ function HomeDashboard() {
 
     function transformThreatCategoryData(threatCategoryCount) {
         if (!threatCategoryCount || !Array.isArray(threatCategoryCount)) {
-            return [{ data: [], color: "#E45357" }];
+            return [{ data: [], color: observeFunc.getColorForSensitiveData('CRITICAL') }];
         }
 
         const categoryMap = {};
@@ -237,7 +237,7 @@ function HomeDashboard() {
 
         const data = sortedCategories.map(([name, count]) => [name, count]);
 
-        return [{ data, color: "#E45357", name: "Threats" }];
+        return [{ data, color: observeFunc.getColorForSensitiveData('CRITICAL'), name: "Threats" }];
     }
 
     const testSummaryData = async () => {
@@ -558,13 +558,13 @@ function HomeDashboard() {
                 setThreatCategoryData(categoryData);
             } else {
                 console.log('Category result:', results[2]);
-                setThreatCategoryData([{ data: [], color: "#E45357" }]);
+                setThreatCategoryData([{ data: [], color: observeFunc.getColorForSensitiveData('CRITICAL') }]);
             }
         } catch (error) {
             console.error('Error fetching threat detection data:', error);
             setThreatActorsTimeline([]);
             setThreatSeverityData({});
-            setThreatCategoryData([{ data: [], color: "#E45357" }]);
+            setThreatCategoryData([{ data: [], color: observeFunc.getColorForSensitiveData('CRITICAL') }]);
         }
     };
 
@@ -1434,11 +1434,11 @@ function HomeDashboard() {
                         <GraphMetric
                             data={[{
                                 data: threatActorsTimeline,
-                                color: '#E45357',
+                                color: observeFunc.getColorForSensitiveData('CRITICAL'),
                                 name: 'Threat Actors'
                             }]}
                             type='spline'
-                            color='#E45357'
+                            color={observeFunc.getColorForSensitiveData('CRITICAL')}
                             areaFillHex='true'
                             height='250'
                             title=''
@@ -1508,7 +1508,7 @@ function HomeDashboard() {
                     {hasCategoryData ? (
                         <StackedChart
                             type='column'
-                            color='#E45357'
+                            color={observeFunc.getColorForSensitiveData('CRITICAL')}
                             height="280"
                             data={threatCategoryData}
                             yAxisTitle="Number of Threats"
