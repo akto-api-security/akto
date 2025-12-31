@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Divider, HorizontalStack, Modal, Text, Tooltip, VerticalStack, Popover, ActionList } from "@shopify/polaris";
+import { Badge, Box, Button, Divider, HorizontalStack, Modal, Text, Tooltip, VerticalStack, Popover, ActionList, Avatar } from "@shopify/polaris";
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
@@ -67,6 +67,27 @@ function SampleDetails(props) {
                 <VerticalStack gap={"2"}>
                     <Text variant="headingMd">Impact</Text>
                     <Text variant="bodyMd">{currentTemplateObj?.impact || "-"}</Text>
+                </VerticalStack>
+                <Divider />
+                <VerticalStack gap={"2"}>
+                    <Text variant="headingMd">Compliance</Text>
+                    {currentTemplateObj?.compliance?.mapComplianceToListClauses &&
+                     Object.keys(currentTemplateObj.compliance.mapComplianceToListClauses).length > 0 ? (
+                        <HorizontalStack gap={2} wrap>
+                            {Object.keys(currentTemplateObj.compliance.mapComplianceToListClauses).map((complianceName, idx) => (
+                                <HorizontalStack key={idx} gap={1} blockAlign="center">
+                                    <Avatar
+                                        source={func.getComplianceIcon(complianceName)}
+                                        shape="square"
+                                        size="extraSmall"
+                                    />
+                                    <Text>{complianceName}</Text>
+                                </HorizontalStack>
+                            ))}
+                        </HorizontalStack>
+                    ) : (
+                        <Text variant="bodyMd" color="subdued">-</Text>
+                    )}
                 </VerticalStack>
                 <Divider />
             </VerticalStack>

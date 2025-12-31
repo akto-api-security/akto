@@ -41,6 +41,12 @@ public class FilterYamlTemplateDao extends AccountsContextDao<YamlTemplate> {
                     filterConfig.setAuthor(yamlTemplate.getAuthor());
                     filterConfig.setCreatedAt(yamlTemplate.getCreatedAt());
                     filterConfig.setUpdatedAt(yamlTemplate.getUpdatedAt());
+                    if (yamlTemplate.getInfo() != null && yamlTemplate.getInfo().getCompliance() != null) {
+                        if (filterConfig.getInfo() == null) {
+                            filterConfig.setInfo(new com.akto.dto.test_editor.Info());
+                        }
+                        filterConfig.getInfo().setCompliance(yamlTemplate.getInfo().getCompliance());
+                    }
                     if (includeYamlContent) {
                         filterConfig.setContent(yamlTemplate.getContent());
                     }

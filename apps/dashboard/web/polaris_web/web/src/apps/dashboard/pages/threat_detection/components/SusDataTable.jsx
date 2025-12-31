@@ -6,7 +6,7 @@ import { CellType } from "../../../components/tables/rows/GithubRow";
 import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import PersistStore from "../../../../main/PersistStore";
 import func from "../../../../../util/func";
-import { Badge, IndexFiltersMode } from "@shopify/polaris";
+import { Badge, IndexFiltersMode, Avatar, Box, HorizontalStack, Text } from "@shopify/polaris";
 import dayjs from "dayjs";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
@@ -45,6 +45,12 @@ const headers = [
     text: "Filter",
     value: "filterId",
     title: "Attack type",
+  },
+  {
+    text: "Compliance",
+    value: "compliance",
+    title: "Compliance",
+    maxWidth: "200px",
   },
   {
     text: "successfulExploit",
@@ -458,8 +464,11 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     let total = res.total;
     let ret = res?.maliciousEvents.map((x) => {
       const severity = threatFiltersMap[x?.filterId]?.severity || "HIGH"
-      
-      // Build nextUrl for table navigation (similar to prepareTestRunResult)
+
+      const filterTemplate = threatFiltersMap[x?.filterId];
+      const complianceMap = filterTemplate?.compliance?.mapComplianceToListClauses || {};
+      const complianceList = Object.keys(complianceMap);
+
       let nextUrl = null;
       if (x.refId && x.eventType && x.actor && x.filterId) {
         const params = new URLSearchParams();
@@ -497,6 +506,23 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
                           <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                       </div>
         ),
+        compliance: complianceList.length > 0 ? (
+          <HorizontalStack wrap={false} gap={1}>
+            {complianceList.slice(0, 2).map((complianceName, idx) =>
+              <Avatar
+                key={idx}
+                source={func.getComplianceIcon(complianceName)}
+                shape="square"
+                size="extraSmall"
+              />
+            )}
+            {complianceList.length > 2 && (
+              <Box>
+                <Badge size="extraSmall">+{complianceList.length - 2}</Badge>
+              </Box>
+            )}
+          </HorizontalStack>
+        ) : <Text color="subdued">-</Text>,
         nextUrl: nextUrl
       };
     });

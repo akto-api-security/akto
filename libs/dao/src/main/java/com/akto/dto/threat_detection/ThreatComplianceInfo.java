@@ -1,35 +1,43 @@
-package com.akto.dto.testing;
+package com.akto.dto.threat_detection;
 
 import java.util.List;
 import java.util.Map;
 
-public class ComplianceMapping {
-    
+import org.bson.codecs.pojo.annotations.BsonId;
+
+public class ThreatComplianceInfo {
+
+    @BsonId
+    private String id;
+
+    public static final String MAP_COMPLIANCE_TO_LIST_CLAUSES = "mapComplianceToListClauses";
     private Map<String, List<String>> mapComplianceToListClauses;
 
+    public static final String AUTHOR = "author";
     private String author;
 
-    public static final String SOURCE = "source";
-    private String source;
-
+    public static final String HASH = "hash";
     private int hash;
 
-    public ComplianceMapping() {
+    private String sourcePath;
+
+    public ThreatComplianceInfo() {
     }
 
-    public ComplianceMapping(Map<String,List<String>> mapComplianceToListClauses, String author, String source, int hash) {
+    public ThreatComplianceInfo(String id, Map<String,List<String>> mapComplianceToListClauses, String author, int hash, String sourcePath) {
+        this.id = id;
         this.mapComplianceToListClauses = mapComplianceToListClauses;
         this.author = author;
-        this.source = source;
         this.hash = hash;
+        this.sourcePath = sourcePath;
     }
 
-    public static ComplianceMapping createFromInfo(ComplianceInfo complianceInfo) {
-        return new ComplianceMapping(complianceInfo.getMapComplianceToListClauses(), complianceInfo.getAuthor(), complianceInfo.getId(), complianceInfo.getHash());
+    public String getId() {
+        return this.id;
     }
 
-    public static ComplianceMapping createFromThreatInfo(com.akto.dto.threat_detection.ThreatComplianceInfo threatComplianceInfo) {
-        return new ComplianceMapping(threatComplianceInfo.getMapComplianceToListClauses(), threatComplianceInfo.getAuthor(), threatComplianceInfo.getId(), threatComplianceInfo.getHash());
+    public void setId(String id) {
+        this.id = id;
     }
 
     public Map<String,List<String>> getMapComplianceToListClauses() {
@@ -48,14 +56,6 @@ public class ComplianceMapping {
         this.author = author;
     }
 
-    public String getSource() {
-        return this.source;
-    }
-
-    public void setSource(String source) {
-        this.source = source;
-    }
-
     public int getHash() {
         return this.hash;
     }
@@ -64,14 +64,23 @@ public class ComplianceMapping {
         this.hash = hash;
     }
 
+    public String getSourcePath() {
+        return this.sourcePath;
+    }
+
+    public void setSourcePath(String sourcePath) {
+        this.sourcePath = sourcePath;
+    }
+
     @Override
     public String toString() {
         return "{" +
+            " id='" + getId() + "'" +
             ", mapComplianceToListClauses='" + getMapComplianceToListClauses() + "'" +
             ", author='" + getAuthor() + "'" +
-            ", source='" + getSource() + "'" +
             ", hash='" + getHash() + "'" +
+            ", sourcePath='" + getSourcePath() + "'" +
             "}";
     }
-    
+
 }

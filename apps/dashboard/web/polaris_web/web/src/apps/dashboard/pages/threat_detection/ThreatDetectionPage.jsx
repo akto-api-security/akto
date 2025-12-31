@@ -415,6 +415,43 @@ function ThreatDetectionPage() {
       }, []);
 
       useEffect(() => {
+        const loadThreatCompliance = async () => {
+          try {
+            const resp = await api.fetchThreatComplianceInfos();
+
+            if (resp?.threatComplianceInfos && Array.isArray(resp.threatComplianceInfos)) {
+              const threatComplianceMap = {};
+              resp.threatComplianceInfos.forEach((compliance) => {
+                threatComplianceMap[compliance._id] = compliance;
+              });
+
+              const currentThreatFiltersMap = SessionStore.getState().threatFiltersMap || {};
+
+              const updatedThreatFiltersMap = { ...currentThreatFiltersMap };
+              Object.keys(updatedThreatFiltersMap).forEach((filterId) => {
+                const complianceKey = `threat_compliance/${filterId}.conf`;
+                const compliance = threatComplianceMap[complianceKey];
+
+                if (compliance) {
+                  updatedThreatFiltersMap[filterId] = {
+                    ...updatedThreatFiltersMap[filterId],
+                    compliance: {
+                      mapComplianceToListClauses: compliance.mapComplianceToListClauses
+                    }
+                  };
+                }
+              });
+
+              SessionStore.getState().setThreatFiltersMap(updatedThreatFiltersMap);
+            }
+          } catch (error) {
+            console.error('[ThreatDetectionPage] Failed to load threat compliance:', error);
+          }
+        };
+        loadThreatCompliance();
+      }, []);
+
+      useEffect(() => {
         const fetchThreatCategoryCount = async () => {
             const res = await api.fetchThreatCategoryCount(startTimestamp, endTimestamp);
             const finalObj = threatDetectionFunc.getGraphsData(res);
