@@ -33,6 +33,7 @@ import { fetchActionItemsData } from './components/actionItemsTransform';
 import { getDashboardCategory, isMCPSecurityCategory, mapLabel } from '../../../main/labelHelper';
 import GraphMetric from '../../components/GraphMetric';
 import Dropdown from '../../components/layouts/Dropdown';
+import TopThreatTypeChart from '../threat_detection/components/TopThreatTypeChart';
 
 function HomeDashboard() {
 
@@ -182,10 +183,12 @@ function HomeDashboard() {
         if (!actorsCounts || !Array.isArray(actorsCounts)) {
             return [];
         }
-        return actorsCounts.map(item => [
-            item.ts * 1000,
-            item.totalActors || 0
-        ]);
+        return actorsCounts
+            .sort((a, b) => a.ts - b.ts)
+            .map(item => [
+                item.ts * 1000,
+                item.totalActors || 0
+            ]);
     }
 
     function transformSeverityData(categoryCounts) {
@@ -1424,7 +1427,7 @@ function HomeDashboard() {
         minHeight="344px"
     />
 
-    const hasTimelineData = Array.isArray(threatActorsTimeline) && threatActorsTimeline.length > 0 && threatActorsTimeline.some(p => p && p[1] > 0);
+    const hasTimelineData = Array.isArray(threatActorsTimeline) && threatActorsTimeline.length > 0;
 
     const threatActorsTimelineComponent = (
         <InfoCard
@@ -1435,7 +1438,7 @@ function HomeDashboard() {
                             data={[{
                                 data: threatActorsTimeline,
                                 color: observeFunc.getColorForSensitiveData('CRITICAL'),
-                                name: 'Threat Actors'
+                                name: 'Active Threat Actors'
                             }]}
                             type='spline'
                             color={observeFunc.getColorForSensitiveData('CRITICAL')}
@@ -1443,16 +1446,9 @@ function HomeDashboard() {
                             height='250'
                             title=''
                             subtitle=''
+                            defaultChartOptions={defaultChartOptions}
                             backgroundColor='#ffffff'
                             text='true'
-                            defaultChartOptions={{
-                                legend: { enabled: false },
-                                plotOptions: {
-                                    series: {
-                                        marker: { radius: 2 }
-                                    }
-                                }
-                            }}
                             inputMetrics={[]}
                         />
                     ) : (
