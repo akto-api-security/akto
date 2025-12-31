@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { Box, VerticalStack, HorizontalStack, Text, Badge } from '@shopify/polaris';
 import { MarkdownRenderer, markdownStyles } from '../../../../components/shared/MarkdownComponents';
@@ -21,9 +21,6 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
     // Icon
     const iconSrc = isRequest ? CHAT_ASSETS.AKTO_LOGO : CHAT_ASSETS.FRAME_LOGO;
     const iconAlt = isRequest ? 'Akto Logo' : 'Agent Logo';
-
-    // Divider
-    const dividerSrc = isVulnerable ? CHAT_ASSETS.DIVIDER_ALERT : CHAT_ASSETS.DIVIDER;
 
     // Label
     const label = customLabel || (isRequest ? MESSAGE_LABELS.TESTED_INTERACTION : MESSAGE_LABELS.HR_AGENT_RESPONSE);
@@ -50,13 +47,7 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                 </Box>
 
                 {/* Divider */}
-                <Box style={{ width: '2px', flexShrink: 0, alignSelf: 'stretch' }}>
-                    <img
-                        src={dividerSrc}
-                        alt=""
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                    />
-                </Box>
+                <Box style={{ width: '2px', flexShrink: 0, alignSelf: 'stretch', backgroundColor: isVulnerable ? '#D72C0D' : '#E1E3E5' }} />
 
                 {/* Content - Takes remaining space */}
                 <Box style={{ flex: 1, minWidth: 0 }}>
