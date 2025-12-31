@@ -1,0 +1,121 @@
+package com.akto.action.threat_detection;
+
+import java.util.*;
+
+import com.akto.action.UserAction;
+import com.akto.dao.context.Context;
+import com.akto.dao.testing.sources.TestReportsDao;
+import com.akto.dto.User;
+import com.akto.dto.testing.sources.TestReports;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.Constants;
+import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.result.InsertOneResult;
+
+import lombok.Getter;
+import lombok.Setter;
+
+import org.bson.types.ObjectId;
+
+@Getter
+@Setter
+public class ThreatReportAction extends UserAction {
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ThreatReportAction.class, LogDb.DASHBOARD);
+
+    private Map<String, List<String>> filtersForReport;
+    private String generatedReportId;
+    private List<String> threatIdsForReport;
+    private BasicDBObject response;
+
+    private String reportId;
+    private String organizationName;
+    private String username;
+    private String reportDate;
+    private String reportUrl;
+    private String pdf;
+    private String status;
+    private boolean firstPollRequest;
+
+    public String generateThreatReport() {
+        try {
+            if (filtersForReport == null) {
+                filtersForReport = new HashMap<>();
+            }
+            filtersForReport.put("label", Arrays.asList("THREAT"));
+
+            TestReports threatReport = new TestReports(filtersForReport, Context.now(), "", null, threatIdsForReport);
+            InsertOneResult insertResult = TestReportsDao.instance.insertOne(threatReport);
+            this.generatedReportId = insertResult.getInsertedId().asObjectId().getValue().toHexString();
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in generating threat report", LogDb.DASHBOARD);
+            addActionError("Error in generating threat report");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String getThreatReportFilters() {
+        if (this.generatedReportId == null) {
+            addActionError("Report id cannot be null");
+            return ERROR.toUpperCase();
+        }
+
+        try {
+            response = new BasicDBObject();
+            ObjectId reportId = new ObjectId(this.generatedReportId);
+            TestReports reportDoc = TestReportsDao.instance.findOne(Filters.eq(Constants.ID, reportId));
+
+            if (reportDoc == null) {
+                addActionError("Threat report not found");
+                return ERROR.toUpperCase();
+            }
+
+            response.put(TestReports.FILTERS_FOR_REPORT, reportDoc.getFiltersForReport());
+            response.put(TestReports.THREAT_IDS_FOR_REPORT, reportDoc.getThreatIdsForReport());
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error retrieving threat report filters", LogDb.DASHBOARD);
+            addActionError("Error retrieving threat report filters");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String downloadThreatReportPDF() {
+        try {
+            User user = getSUser();
+            com.akto.action.PDFDownloadService.PDFDownloadResult result = com.akto.action.PDFDownloadService.downloadPDF(
+                reportId,
+                organizationName,
+                reportDate,
+                reportUrl,
+                username,
+                firstPollRequest,
+                TestReportsDao.instance,
+                TestReports.PDF_REPORT_STRING,
+                user,
+                "threat PDF"
+            );
+
+            this.pdf = result.getPdf();
+            this.status = result.getStatus();
+            this.reportId = result.getReportId();
+
+            if (result.getError() != null) {
+                addActionError(result.getError());
+                if (this.status.equals("ERROR")) {
+                    return ERROR.toUpperCase();
+                }
+            }
+
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in downloadThreatReportPDF", LogDb.DASHBOARD);
+            status = "ERROR";
+            addActionError("An unexpected error occurred during PDF download");
+            return ERROR.toUpperCase();
+        }
+    }
+}

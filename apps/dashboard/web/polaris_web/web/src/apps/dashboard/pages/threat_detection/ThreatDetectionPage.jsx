@@ -23,6 +23,7 @@ import { getDashboardCategory, isApiSecurityCategory, isDastCategory, mapLabel }
 import LineChart from "../../components/charts/LineChart";
 import P95LatencyGraph from "../../components/charts/P95LatencyGraph";
 import { LABELS } from "./constants";
+import useThreatReportDownload from "../../hooks/useThreatReportDownload";
 
 const convertToGraphData = (severityMap) => {
     let dataArr = []
@@ -254,6 +255,12 @@ function ThreatDetectionPage() {
 
     const startTimestamp = parseInt(currDateRange.period.since.getTime()/1000)
     const endTimestamp = parseInt(currDateRange.period.until.getTime()/1000)
+
+    const { downloadThreatReport } = useThreatReportDownload({
+        startTimestamp,
+        endTimestamp,
+        onComplete: () => setMoreActions(false)
+    })
 
     const isDemoMode = func.isDemoAccount();
 
@@ -702,6 +709,11 @@ function ThreatDetectionPage() {
                                 {
                                     title: 'Export',
                                     items: [
+                                        {
+                                            content: 'Download Threat Report',
+                                            onAction: () => downloadThreatReport(),
+                                            prefix: <Box><Icon source={FileMinor} /></Box>
+                                        },
                                         {
                                             content: 'Export',
                                             onAction: () => exportJson(),
