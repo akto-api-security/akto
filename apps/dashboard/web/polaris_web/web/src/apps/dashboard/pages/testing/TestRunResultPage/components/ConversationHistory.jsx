@@ -1,8 +1,8 @@
 import React from 'react';
 import { Box, VerticalStack } from '@shopify/polaris';
-import ChatMessage from './ChatMessage/index';
+import ChatMessage from './ChatMessage';
 
-function InteractionLog({ trafficData, conversations, isVulnerable }) {
+function ConversationHistory({ trafficData, conversations, isVulnerable }) {
     // trafficData is expected to be { request: string, response: string, requestTime: number, responseTime: number }
 
     return (
@@ -54,4 +54,4 @@ function InteractionLog({ trafficData, conversations, isVulnerable }) {
     );
 }
 
-export default InteractionLog;
+export default ConversationHistory;

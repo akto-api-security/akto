@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, VerticalStack } from '@shopify/polaris';
 import AiAnalysisCard from './components/AiAnalysisCard';
-import InteractionLog from './components/InteractionLog';
+import ConversationHistory from './components/ConversationHistory';
 
 function TestRunResultChat({ analysis, trafficData, conversations, onSendMessage, isStreaming, isVulnerable }) {
     return (
@@ -13,7 +13,7 @@ function TestRunResultChat({ analysis, trafficData, conversations, onSendMessage
                     isStreaming={isStreaming}
                 />
 
-                <InteractionLog
+                <ConversationHistory
                     trafficData={trafficData}
                     conversations={conversations}
                     isVulnerable={isVulnerable}
