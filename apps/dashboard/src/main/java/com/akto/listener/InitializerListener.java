@@ -3680,7 +3680,8 @@ public class InitializerListener implements ServletContextListener {
     public void setUpTestEditorTemplatesScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                byte[] testingTemplates = TestTemplateUtils.getTestingTemplates();
+                byte[] templatesFromFeatureBranch = new com.akto.utils.GithubSync().syncRepo("akto-api-security/tests-library", "master");
+                final byte[] testingTemplates = templatesFromFeatureBranch != null ? templatesFromFeatureBranch : TestTemplateUtils.getTestingTemplates();
                 if(testingTemplates == null){
                     logger.errorAndAddToDb("Error while fetching Test Editor Templates from Github and local", LogDb.DASHBOARD);
                     return;
@@ -3694,7 +3695,15 @@ public class InitializerListener implements ServletContextListener {
                     e.printStackTrace();
                     logger.errorAndAddToDb("Unable to import remediations", LogDb.DASHBOARD);
                 }
+                try {
+                    logger.infoAndAddToDb("Processing Threat Compliance from tests-library", LogDb.DASHBOARD);
+                    processThreatComplianceInfosFromZip(testingTemplates);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    logger.errorAndAddToDb("Unable to import threat compliance", LogDb.DASHBOARD);
+                }
                 Map<String, ComplianceInfo> complianceCommonMap = getFromCommonDb();
+                Map<String, com.akto.dto.threat_detection.ThreatComplianceInfo> threatComplianceCommonMap = getThreatComplianceFromCommonDb();
                 Map<String, byte[]> allYamlTemplates = TestTemplateUtils.getZipFromMultipleRepoAndBranch(getAktoDefaultTestLibs());
                 AccountTask.instance.executeTask((account) -> {
                     try {
@@ -3725,6 +3734,12 @@ public class InitializerListener implements ServletContextListener {
                         if (accountSettings.getThreatPolicies() != null && !accountSettings.getThreatPolicies().isEmpty()) {
                             logger.infoAndAddToDb("Updating Threat Policies for accountId: " + account.getId(), LogDb.DASHBOARD);
                             processThreatFilterTemplateFilesZip(testingTemplates, Constants._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
+                        }
+
+                        if (threatComplianceCommonMap != null && !threatComplianceCommonMap.isEmpty()) {
+                            logger.infoAndAddToDb("Updating Threat Compliances for accountId: " + account.getId(), LogDb.DASHBOARD);
+                            addThreatComplianceToFilterYamlTemplates(threatComplianceCommonMap);
+                            replaceThreatComplianceInFilterYamlTemplates(threatComplianceCommonMap);
                         }
                          
                     } catch (Exception e) {
@@ -3898,6 +3913,51 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public static void addThreatComplianceToFilterYamlTemplates(Map<String, com.akto.dto.threat_detection.ThreatComplianceInfo> mapIdToThreatComplianceInCommon) {
+        try {
+            for(String fileSourceId: mapIdToThreatComplianceInCommon.keySet()) {
+                com.akto.dto.threat_detection.ThreatComplianceInfo threatComplianceInfoInCommon = mapIdToThreatComplianceInCommon.get(fileSourceId);
+                String compId = threatComplianceInfoInCommon.getId().split("/")[1].split("\\.")[0];
+
+                Bson filters = Filters.and(
+                    Filters.eq(Constants.ID, compId),
+                    Filters.or(Filters.exists("info.compliance", false), Filters.ne("info.compliance.source", fileSourceId))
+                );
+
+                ComplianceMapping complianceMapping = ComplianceMapping.createFromThreatInfo(threatComplianceInfoInCommon);
+                UpdateResult updateResult = FilterYamlTemplateDao.instance.updateMany(filters, Updates.set("info.compliance", complianceMapping));
+                logger.debugAndAddToDb("addThreatComplianceToFilterYamlTemplates for filter id: " + Context.accountId.get() + " : " + compId + " " + updateResult);
+            }
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Error in addThreatComplianceToFilterYamlTemplates: " + Context.accountId.get() + " : " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    public static void replaceThreatComplianceInFilterYamlTemplates(Map<String, com.akto.dto.threat_detection.ThreatComplianceInfo> mapIdToThreatComplianceInCommon) {
+        try {
+            String ic = "info.compliance.";
+            for(String fileSourceId: mapIdToThreatComplianceInCommon.keySet()) {
+                com.akto.dto.threat_detection.ThreatComplianceInfo threatComplianceInfoInCommon = mapIdToThreatComplianceInCommon.get(fileSourceId);
+
+                Bson filters = Filters.and(
+                    Filters.eq("info.compliance.source", fileSourceId),
+                    Filters.ne(ic + com.akto.dto.threat_detection.ThreatComplianceInfo.HASH, threatComplianceInfoInCommon.getHash())
+                );
+
+                Bson updates = Updates.combine(
+                    Updates.set(ic + com.akto.dto.threat_detection.ThreatComplianceInfo.HASH, threatComplianceInfoInCommon.getHash()),
+                    Updates.set(ic + com.akto.dto.threat_detection.ThreatComplianceInfo.MAP_COMPLIANCE_TO_LIST_CLAUSES, threatComplianceInfoInCommon.getMapComplianceToListClauses())
+                );
+                UpdateResult updateResult = FilterYamlTemplateDao.instance.updateMany(filters, updates);
+                logger.debugAndAddToDb("replaceThreatComplianceInFilterYamlTemplates: " + Context.accountId.get() + " : " + fileSourceId + " " + updateResult);
+            }
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Error in replaceThreatComplianceInFilterYamlTemplates: " + Context.accountId.get() + " : " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
     public static void processComplianceInfosFromZip(byte[] zipFile) {
         if (zipFile != null) {
             try (ByteArrayInputStream inputStream = new ByteArrayInputStream(zipFile);
@@ -3948,6 +4008,14 @@ public class InitializerListener implements ServletContextListener {
                         }
 
                         String templateContent = new String(outputStream.toByteArray(), "UTF-8");
+
+                        if (templateContent == null || templateContent.trim().isEmpty()) {
+                            logger.debugAndAddToDb(
+                                String.format("%s is empty, skipping", entryName),
+                                LogDb.DASHBOARD);
+                            continue;
+                        }
+
                         int templateHashCode = templateContent.hashCode();
 
                         Map<String, List<String>> contentMap = TestConfigYamlParser.parseComplianceTemplate(templateContent);
@@ -3984,7 +4052,111 @@ public class InitializerListener implements ServletContextListener {
             }
         } else {
             logger.debugAndAddToDb("Received null zip file");
-        }        
+        }
+    }
+
+    private static Map<String, com.akto.dto.threat_detection.ThreatComplianceInfo> getThreatComplianceFromCommonDb() {
+        Bson emptyFilter = Filters.empty();
+        List<com.akto.dto.threat_detection.ThreatComplianceInfo> threatComplianceInfosInDb = com.akto.dao.threat_detection.ThreatComplianceInfosDao.instance.findAll(emptyFilter);
+        Map<String, com.akto.dto.threat_detection.ThreatComplianceInfo> mapIdToThreatComplianceInDb = threatComplianceInfosInDb.stream().collect(Collectors.toMap(com.akto.dto.threat_detection.ThreatComplianceInfo::getId, Function.identity()));
+        return mapIdToThreatComplianceInDb;
+    }
+
+    public static void processThreatComplianceInfosFromZip(byte[] zipFile) {
+        if (zipFile != null) {
+            try (ByteArrayInputStream inputStream = new ByteArrayInputStream(zipFile);
+                    ZipInputStream zipInputStream = new ZipInputStream(inputStream)) {
+
+                ZipEntry entry;
+
+                int countUnchangedCompliances = 0;
+                int countTotalCompliances = 0;
+
+                Map<String, com.akto.dto.threat_detection.ThreatComplianceInfo> mapIdToThreatComplianceInDb = getThreatComplianceFromCommonDb();
+
+                while ((entry = zipInputStream.getNextEntry()) != null) {
+                    if (!entry.isDirectory()) {
+                        String entryName = entry.getName();
+
+                        boolean isThreatCompliance = entryName.contains("Threat-Protection/compliance/");
+                        if (!isThreatCompliance) {
+                            logger.debugAndAddToDb(
+                                    String.format("%s not a threat compliance file, skipping", entryName),
+                                    LogDb.DASHBOARD);
+                            continue;
+                        }
+
+                        if (!entryName.endsWith(".conf")) {
+                            logger.debugAndAddToDb(
+                                    String.format("%s not a conf file, skipping", entryName),
+                                    LogDb.DASHBOARD);
+                            continue;
+                        }
+
+                        String[] filePathTokens = entryName.split("/");
+
+                        if (filePathTokens.length <= 1) {
+                            logger.debugAndAddToDb(
+                                String.format("%s has no directory pattern", entryName),
+                                LogDb.DASHBOARD);
+                            continue;
+                        }
+
+                        String fileSourceId = "threat_compliance/"+filePathTokens[filePathTokens.length-1];
+
+                        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                        byte[] buffer = new byte[1024];
+                        int bytesRead;
+                        while ((bytesRead = zipInputStream.read(buffer)) != -1) {
+                            outputStream.write(buffer, 0, bytesRead);
+                        }
+
+                        String templateContent = new String(outputStream.toByteArray(), "UTF-8");
+
+                        if (templateContent == null || templateContent.trim().isEmpty()) {
+                            logger.debugAndAddToDb(
+                                String.format("%s is empty, skipping", entryName),
+                                LogDb.DASHBOARD);
+                            continue;
+                        }
+
+                        int templateHashCode = templateContent.hashCode();
+
+                        Map<String, List<String>> contentMap = TestConfigYamlParser.parseComplianceTemplate(templateContent);
+
+                        com.akto.dto.threat_detection.ThreatComplianceInfo threatComplianceInfoInDb = mapIdToThreatComplianceInDb.get(fileSourceId);
+                        countTotalCompliances++;
+
+                        if (threatComplianceInfoInDb == null) {
+                            com.akto.dto.threat_detection.ThreatComplianceInfo newThreatComplianceInfo = new com.akto.dto.threat_detection.ThreatComplianceInfo(fileSourceId, contentMap, Constants._AKTO, templateHashCode, "");
+                            logger.debugAndAddToDb("Inserting threat compliance content: " + entryName, LogDb.DASHBOARD);
+                            com.akto.dao.threat_detection.ThreatComplianceInfosDao.instance.insertOne(newThreatComplianceInfo);
+
+                        } else if (threatComplianceInfoInDb.getHash() == templateHashCode ) {
+                            countUnchangedCompliances++;
+                        } else {
+                            Bson updates = Updates.combine(Updates.set(com.akto.dto.threat_detection.ThreatComplianceInfo.MAP_COMPLIANCE_TO_LIST_CLAUSES, contentMap), Updates.set(com.akto.dto.threat_detection.ThreatComplianceInfo.HASH, templateHashCode));
+                            logger.debugAndAddToDb("Updating threat compliance content: " + entryName, LogDb.DASHBOARD);
+                            com.akto.dao.threat_detection.ThreatComplianceInfosDao.instance.updateOne(Constants.ID, fileSourceId, updates);
+                        }
+                    }
+
+                    zipInputStream.closeEntry();
+                }
+
+                if (countTotalCompliances != countUnchangedCompliances) {
+                    logger.debugAndAddToDb(countUnchangedCompliances + "/" + countTotalCompliances + " threat compliances unchanged", LogDb.DASHBOARD);
+                }
+
+            } catch (Exception ex) {
+                cacheLoggerMaker.errorAndAddToDb(ex,
+                        String.format("Error while processing threat compliance files zip. Error %s", ex.getMessage()),
+                        LogDb.DASHBOARD);
+                        ex.printStackTrace();
+            }
+        } else {
+            logger.debugAndAddToDb("Received null zip file for threat compliance");
+        }
     }
 
     public static void processTemplateFilesZip(byte[] zipFile, String author, String source, String repositoryUrl) {
