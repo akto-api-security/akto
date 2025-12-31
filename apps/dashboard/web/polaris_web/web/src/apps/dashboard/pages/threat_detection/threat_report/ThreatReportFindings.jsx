@@ -1,8 +1,7 @@
-import { Badge, Box, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
+import { Badge, Box, Text, VerticalStack } from '@shopify/polaris'
 import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 import GithubSimpleTable from '../../../components/tables/GithubSimpleTable'
 import { CellType } from '../../../components/tables/rows/GithubRow'
-import func from '@/util/func'
 
 const ThreatReportFindings = ({ threatsTableData, severityCount, organizationName }) => {
     const dashboardCategory = getDashboardCategory()
@@ -28,11 +27,6 @@ const ThreatReportFindings = ({ threatsTableData, severityCount, organizationNam
             title: `Targeted ${mapLabel("API", dashboardCategory)}`,
             value: "targetedApi",
             type: CellType.TEXT
-        },
-        {
-            title: "Compliance",
-            value: "complianceComp",
-            textValue: "complianceText"
         },
         {
             title: "Severity",
@@ -62,23 +56,6 @@ const ThreatReportFindings = ({ threatsTableData, severityCount, organizationNam
                             .filter(t => t.severity === severity)
                             .map(threat => ({
                                 ...threat,
-                                complianceComp: threat.compliance?.length > 0 ? (
-                                    <HorizontalStack gap="2" wrap={true}>
-                                        {threat.compliance.map((complianceName) => (
-                                            <HorizontalStack gap="1" align="center" key={complianceName}>
-                                                <img
-                                                    src={func.getComplianceIcon(complianceName)}
-                                                    alt={complianceName}
-                                                    style={{ width: '16px', height: '16px' }}
-                                                />
-                                                <Text variant="bodyMd">{complianceName}</Text>
-                                            </HorizontalStack>
-                                        ))}
-                                    </HorizontalStack>
-                                ) : <Text color="subdued">-</Text>,
-                                complianceText: threat.compliance?.length > 0
-                                    ? threat.compliance.join(', ')
-                                    : '-',
                                 severityBadge: (
                                     <div className={`badge-wrapper-${threat.severity}`}>
                                         <Badge>{threat.severity}</Badge>

@@ -4,10 +4,9 @@ const transform = {
     /**
      * Process threats data for report display
      * @param {Array} threats - Array of malicious event objects
-     * @param {Object} threatFiltersMap - Map of threat filter IDs to compliance info
      * @returns {Object} Transformed data for report
      */
-    processThreatsForReport(threats, threatFiltersMap = {}) {
+    processThreatsForReport(threats) {
         const severityCount = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 }
         const threatsByActor = {}
         const threatsByCategory = {}
@@ -51,11 +50,6 @@ const transform = {
             threatsByCategory[category].severityCounts[severity]++
             threatsByCategory[category].threats.push(threat)
 
-            // Get compliance information for this threat
-            const filterTemplate = threatFiltersMap[threat.filterId]
-            const complianceMap = filterTemplate?.compliance?.mapComplianceToListClauses || {}
-            const complianceList = Object.keys(complianceMap)
-
             // Prepare table data
             threatsTableData.push({
                 id: threat.id || threat._id,
@@ -69,10 +63,7 @@ const transform = {
                 method: threat.latestApiMethod || '',
                 severity: severity,
                 country: threat.country || '',
-                payload: threat.latestApiOrig || '',
-                filterId: threat.filterId,
-                compliance: complianceList,
-                complianceMap: complianceMap
+                payload: threat.latestApiOrig || ''
             })
         })
 

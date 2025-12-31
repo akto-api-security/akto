@@ -28,7 +28,6 @@ const ThreatReport = () => {
     const [organizationName, setOrganizationName] = useState(func.capitalizeFirstLetter(window.ACCOUNT_NAME || ""))
     const [currentDate, setCurrentDate] = useState('-')
     const [userName, setUserName] = useState(func.capitalizeFirstLetter(window.USER_NAME.split('@')[0] || ""))
-    const [threatFiltersMap, setThreatFiltersMap] = useState({})
 
     const { handleDownloadPDF: handleDownloadPF, pdfDownloadEnabled } = useReportPDFDownload({
         downloadFunction: api.downloadThreatReportPDF,
@@ -51,15 +50,6 @@ const ThreatReport = () => {
                 delete trimmed['info']
                 localThreatFiltersMap[x.id] = trimmed
             })
-
-            const complianceResponse = await api.fetchThreatComplianceInfos()
-            const complianceInfos = complianceResponse?.threatComplianceInfos || []
-            const threatFiltersMapTemp = {}
-            complianceInfos.forEach((x) => {
-                const id = x._id.split('/')[1].split('.')[0]
-                threatFiltersMapTemp[id] = x
-            })
-            setThreatFiltersMap(threatFiltersMapTemp)
 
             const filterResponse = await api.getThreatReportFilters(reportId)
             const filters = filterResponse?.response?.filtersForReport || {}
@@ -96,9 +86,14 @@ const ThreatReport = () => {
 
             // For API Security: Filter by successfulExploit === true
             // For Agentic Security/MCP: Include all threats (successfulExploit field may be false for blocked attacks)
-            let filteredThreats = isApiSecurityCategory()
+            const isApiSecurity = isApiSecurityCategory()
+            let filteredThreats = isApiSecurity
                 ? allThreats.filter(threat => threat.successfulExploit === true)
                 : allThreats
+
+            if (isApiSecurity && allThreats.length > filteredThreats.length) {
+                func.setToast(true, false, `Report shows ${filteredThreats.length} successful threats out of ${allThreats.length} total threats detected. Only successful exploits are included in this report.`)
+            }
 
             // Limit to 200 threats maximum for report (roughly 30 pages, ~6-7 threats per page)
             const THREAT_LIMIT = 200
@@ -119,7 +114,7 @@ const ThreatReport = () => {
                 severity: localThreatFiltersMap[threat?.filterId]?.severity || 'HIGH'
             }))
 
-            const transformedData = transform.processThreatsForReport(threats, threatFiltersMapTemp)
+            const transformedData = transform.processThreatsForReport(threats)
 
             setTotalThreats(transformedData.totalThreats)
             setSeverityCount(transformedData.severityCount)

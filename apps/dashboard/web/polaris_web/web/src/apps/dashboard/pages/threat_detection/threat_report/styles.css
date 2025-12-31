@@ -58,9 +58,4 @@
     .threat-findings-table td {
         padding: 8px 6px !important;
     }
-
-    .threat-findings-table img {
-        max-width: 14px !important;
-        max-height: 14px !important;
-    }
 }
