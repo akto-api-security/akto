@@ -74,9 +74,9 @@ const ThreatReport = () => {
                 startTs,
                 endTs,
                 [],
-                2000,
+                200,
                 undefined,
-                undefined,
+                true,
                 'THREAT',
                 undefined,
                 undefined
