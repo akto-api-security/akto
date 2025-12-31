@@ -34,8 +34,7 @@ public class Main {
 
     ConnectionString connectionString =
         new ConnectionString(System.getenv("AKTO_THREAT_PROTECTION_MONGO_CONN"));
-    ConnectionString dashboardMongoConnectionString =
-        new ConnectionString(System.getenv("AKTO_MONGO_CONN"));
+    String dashboardMongoString = System.getenv("AKTO_MONGO_CONN");
     System.out.println("connectionString: " + connectionString);
     CodecRegistry pojoCodecRegistry =
         fromProviders(PojoCodecProvider.builder().automatic(true).build());
@@ -53,7 +52,10 @@ public class Main {
 
     // Initialize legacy DaoInit for AuthenticationInterceptor (ConfigsDao)
     // ConfigsDao uses CommonContextDao which connects to "common" database
-    DaoInit.init(dashboardMongoConnectionString, ReadPreference.primary(), WriteConcern.W1);
+    if(dashboardMongoString != null && !dashboardMongoString.isEmpty()) {
+        ConnectionString dashboardMongoConnectionString = new ConnectionString(dashboardMongoString);
+        DaoInit.init(dashboardMongoConnectionString, ReadPreference.primary(), WriteConcern.W1);
+    }
 
     ThreatDetectionDaoInit.init(threatProtectionMongo);
 
