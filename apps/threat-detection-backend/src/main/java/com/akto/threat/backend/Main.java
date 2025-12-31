@@ -55,6 +55,8 @@ public class Main {
     if(dashboardMongoString != null && !dashboardMongoString.isEmpty()) {
         ConnectionString dashboardMongoConnectionString = new ConnectionString(dashboardMongoString);
         DaoInit.init(dashboardMongoConnectionString, ReadPreference.primary(), WriteConcern.W1);
+    }else {
+        DaoInit.init(connectionString);
     }
 
     ThreatDetectionDaoInit.init(threatProtectionMongo);
