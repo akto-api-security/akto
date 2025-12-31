@@ -84,6 +84,7 @@ const ThreatReportFindings = ({ threatsTableData, severityCount, organizationNam
                                     headings={threatHeaders}
                                     hidePagination={true}
                                     showFooter={false}
+                                    pageLimit={filteredThreats.length}
                                 />
                             </Box>
                         )
