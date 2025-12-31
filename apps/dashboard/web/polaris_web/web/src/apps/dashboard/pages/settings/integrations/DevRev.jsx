@@ -127,7 +127,9 @@ const DevRev = () => {
 
             const message = isRemoveable ? "Successfully updated DevRev Integration" : "Successfully added DevRev Integration"
             func.setToast(true, false, message)
-            fetchDevRevInteg()
+
+            // Reload the page after successful save/update
+            window.location.reload()
         } catch (error) {
             const errorMessage = error?.response?.data?.actionErrors?.[0] ||
                 (isRemoveable ? "Failed to update DevRev Integration" : "Failed to add DevRev Integration")
@@ -148,6 +150,9 @@ const DevRev = () => {
             setParts([])
             setPartsFetched(false)
             setIsRemoveable(false)
+
+            // Reload the page after successful removal
+            window.location.reload()
         } catch (error) {
             const errorMessage = error?.response?.data?.actionErrors?.[0] || "Failed to remove DevRev Integration"
             func.setToast(true, true, errorMessage)

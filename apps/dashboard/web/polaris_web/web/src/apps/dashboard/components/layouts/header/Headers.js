@@ -76,6 +76,7 @@ export default function Header() {
     const mcpSecurityGranted =
         stiggFeatures?.MCP_SECURITY?.isGranted || true;
     const dastGranted = func.checkForFeatureSaas("AKTO_DAST")
+    const endpointSecurityGranted = stiggFeatures?.ENDPOINT_SECURITY?.isGranted || true
 
     const disabledDashboardCategories = useMemo(() => {
         const disabled = [];
@@ -88,8 +89,11 @@ export default function Header() {
         if (dastGranted === false) {
             disabled.push("DAST")
         }
+        if (endpointSecurityGranted === false) {
+            disabled.push("Endpoint Security")
+        }
         return disabled;
-    }, [mcpSecurityGranted, agenticSecurityGranted]);
+    }, [mcpSecurityGranted, agenticSecurityGranted, dastGranted, endpointSecurityGranted]);
 
     const dropdownInitial = disabledDashboardCategories.includes(dashboardCategory)
         ? "API Security"
@@ -314,7 +318,18 @@ export default function Header() {
                                 <Dropdown
                                     menuItems={[
                                         { value: "API Security", label: "API Security", id: "api-security" },
-                                        { value: "Agentic Security", label: "Agentic Security", id: "agentic-security" },
+                                        {
+                                            value: "Agentic Security",
+                                            label: func.isDemoAccount() ? "Akto ARGUS" : "Agentic Security",
+                                            id: "agentic-security",
+                                            helpText: func.isDemoAccount() ? "Agentic AI Security for Homegrown AI" : undefined
+                                        },
+                                        ...(func.isDemoAccount() ? [{
+                                            value: "Endpoint Security",
+                                            label: "Akto ATLAS",
+                                            id: "endpoint-security",
+                                            helpText: "Agentic AI Security for Employee Endpoints"
+                                        }] : []),
                                         { value: "DAST", label: "DAST", id: "dast" },
                                     ]}
                                     initial={dropdownInitial}

@@ -3,10 +3,10 @@ import { useRef, useState } from 'react'
 import func from '@/util/func'
 import transform from '../onboarding/transform'
 import observeFunc from "./transform"
-import { isAgenticSecurityCategory, isMCPSecurityCategory } from '../../../main/labelHelper'
+import { isAgenticSecurityCategory, isMCPSecurityCategory, isEndpointSecurityCategory } from '../../../main/labelHelper'
 
 export const getMethod = (url, method) => {
-    if(isMCPSecurityCategory() || isAgenticSecurityCategory()){
+    if(isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory()){
         if(url.includes("tool")){
             return "TOOL";
         }else if(url.includes("resource")){

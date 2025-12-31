@@ -86,9 +86,9 @@ public class FilterYamlTemplateDao extends AccountsContextDao<YamlTemplate> {
             }
 
             List<String> finalIds;
-            
-            // Handle AGENTIC context - combine both MCP and GenAI templates
-            if (source == CONTEXT_SOURCE.AGENTIC) {
+
+            // Handle AGENTIC and ENDPOINT contexts - combine both MCP and GenAI templates
+            if (source == CONTEXT_SOURCE.AGENTIC || source == CONTEXT_SOURCE.ENDPOINT) {
                 finalIds = new ArrayList<>();
                 finalIds.addAll(templatesByCategory.getOrDefault(CONTEXT_SOURCE.MCP.name(), new ArrayList<>()));
                 finalIds.addAll(templatesByCategory.getOrDefault(CONTEXT_SOURCE.GEN_AI.name(), new ArrayList<>()));

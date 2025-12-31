@@ -4,6 +4,7 @@ import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.McpAuditInfo;
 import com.akto.dto.User;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
@@ -55,9 +56,16 @@ public class AuditDataAction extends UserAction {
             if (skip < 0) {
                 skip = 0;
             }
-            
-           
+
+            List<Integer> collectionsIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
+                Context.accountId.get());
+
             List<Bson> filterList = prepareFilters(filters);
+            
+            if (collectionsIds != null) {
+                filterList.add(Filters.in("hostCollectionId", collectionsIds));
+            }
+            
             Bson finalFilter = filterList.isEmpty() ? new BasicDBObject() : Filters.and(filterList);
             Bson sort = sortOrder == 1 ? Sorts.ascending(sortKey) : Sorts.descending(sortKey);
             
@@ -113,7 +121,7 @@ public class AuditDataAction extends UserAction {
                     break;
             }
         }
-        
+
         return filterList;
     }
 

@@ -94,36 +94,70 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
 
     private Map<String, String> fetchAllPartsFromDevRev(String token) {
         Map<String, String> partsIdToNameMap = new HashMap<>();
-
         String url = DevRevIntegration.API_BASE_URL + "/parts.list";
 
         Map<String, List<String>> headers = new HashMap<>();
         headers.put("Authorization", Collections.singletonList("Bearer " + token));
         headers.put("Content-Type", Collections.singletonList("application/json"));
 
-        OriginalHttpRequest request = new OriginalHttpRequest(url, "", Method.GET.name(), null, headers, "");
+        String cursor = null;
+        String lastCursor = null;
+        int maxIterations = 20; // Safety limit
+        int iteration = 0;
 
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-            logger.infoAndAddToDb("Status from DevRev parts.list API: " + response.getStatusCode(), LoggerMaker.LogDb.DASHBOARD);
-
-            if (response.getStatusCode() > 201) {
-                logger.errorAndAddToDb("Failed to fetch parts from DevRev: " + response.getBody(), LoggerMaker.LogDb.DASHBOARD);
-                return partsIdToNameMap;
-            }
-
-            String responsePayload = response.getBody();
-            BasicDBObject respPayloadObj = BasicDBObject.parse(responsePayload);
-            BasicDBList partsListObj = (BasicDBList) respPayloadObj.get("parts");
-
-            if (partsListObj != null) {
-                for (Object partObj : partsListObj) {
-                    BasicDBObject part = (BasicDBObject) partObj;
-                    String partId = part.getString("id");
-                    String partName = part.getString("name");
-                    partsIdToNameMap.put(partId, partName);
+            do {
+                // Build request body with cursor and limit
+                BasicDBObject requestBody = new BasicDBObject("limit", 100);
+                if (cursor != null) {
+                    requestBody.put("cursor", cursor);
                 }
-            }
+
+                OriginalHttpRequest request = new OriginalHttpRequest(
+                    url, "", Method.POST.name(),
+                    requestBody.toJson(),
+                    headers, ""
+                );
+
+                OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+
+                if (response.getStatusCode() > 201) {
+                    logger.errorAndAddToDb("Failed to fetch parts from DevRev: " + response.getBody(), LoggerMaker.LogDb.DASHBOARD);
+                    break;
+                }
+
+                BasicDBObject respPayloadObj = BasicDBObject.parse(response.getBody());
+                BasicDBList partsListObj = (BasicDBList) respPayloadObj.get("parts");
+
+                if (partsListObj != null) {
+                    for (Object partObj : partsListObj) {
+                        BasicDBObject part = (BasicDBObject) partObj;
+                        String partId = part.getString("id");
+                        String partName = part.getString("name");
+                        partsIdToNameMap.put(partId, partName);
+                    }
+                }
+
+                // Get next cursor
+                cursor = respPayloadObj.getString("next_cursor");
+
+                // Infinite loop protection
+                if (cursor != null && cursor.equals(lastCursor)) {
+                    logger.errorAndAddToDb("Detected same cursor, stopping pagination", LoggerMaker.LogDb.DASHBOARD);
+                    break;
+                }
+
+                lastCursor = cursor;
+                iteration++;
+
+                if (iteration >= maxIterations) {
+                    logger.errorAndAddToDb("Max iterations reached, stopping pagination", LoggerMaker.LogDb.DASHBOARD);
+                    break;
+                }
+
+            } while (cursor != null);
+
+            logger.infoAndAddToDb("Fetched " + partsIdToNameMap.size() + " parts from DevRev in " + iteration + " iterations", LoggerMaker.LogDb.DASHBOARD);
 
         } catch (Exception e) {
             logger.errorAndAddToDb("Error fetching parts from DevRev: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
