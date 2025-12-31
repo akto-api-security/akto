@@ -1153,6 +1153,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
               description: description,
               descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={description} text={description}/></Box>),
               lastTested: apiInfoMap[key] ? apiInfoMap[key]["lastTested"] : 0,
+              isThreatActive: apiInfoMap[key] ? apiInfoMap[key]["threatScore"] > 0 : false,
           }
 
       }

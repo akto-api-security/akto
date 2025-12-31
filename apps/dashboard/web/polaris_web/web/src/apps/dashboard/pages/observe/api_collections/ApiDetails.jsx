@@ -671,7 +671,13 @@ function ApiDetails(props) {
     const IssuesTab = {
         id: 'issues',
         content: 'Issues',
-        component: <ApiIssuesTab apiDetail={apiDetail} collectionIssuesData={collectionIssuesData} />,
+        component: <ApiIssuesTab apiDetail={apiDetail} collectionIssuesData={collectionIssuesData} isThreatEnabled={false} />,
+    };
+
+    const ThreatIssuesTab = {
+        id: 'threat-issues',
+        content: 'Threat Issues',
+        component: <ApiIssuesTab apiDetail={apiDetail} isThreatEnabled={true} />,
     };
 
 
@@ -865,6 +871,7 @@ function ApiDetails(props) {
                     SchemaTab,
                     ...(shouldShowBasePromptTab ? [BasePromptTab] : []),
                     ...(hasIssues ? [IssuesTab] : []),
+                    ...(apiDetail?.isThreatEnabled ? [ThreatIssuesTab] : []),
                     ApiCallStatsTab,
                     DependencyTab
                 ]}
