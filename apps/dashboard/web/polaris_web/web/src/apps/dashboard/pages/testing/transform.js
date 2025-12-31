@@ -1431,13 +1431,8 @@ const transform = {
   prepareConversationsList(agentConversationResults) {
     let conversationsListCopy = []
     let extractedRemediationText = ''
-    let validationFailed = false
 
     agentConversationResults.forEach(conversation => {
-
-      if (conversation?.validation === false) {
-        validationFailed = true
-      }
 
       let commonObj = {
         creationTimestamp: conversation.timestamp,
@@ -1447,6 +1442,7 @@ const transform = {
         ...commonObj,
         _id: "user_" + conversation.prompt,
         message: conversation?.finalSentPrompt || conversation.prompt,
+        validation:conversation?.validation,
         role: "user"
       })
 
@@ -1480,8 +1476,7 @@ const transform = {
 
     return {
       conversations: conversationsListCopy,
-      remediationText: extractedRemediationText,
-      validationFailed: validationFailed
+      remediationText: extractedRemediationText
     }
   }
 }

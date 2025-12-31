@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, VerticalStack } from '@shopify/polaris';
-import TrafficMessage from './TrafficMessage';
+import ChatMessage from './ChatMessage/index';
 
 function InteractionLog({ trafficData, conversations, isVulnerable }) {
     // trafficData is expected to be { request: string, response: string, requestTime: number, responseTime: number }
@@ -11,13 +11,13 @@ function InteractionLog({ trafficData, conversations, isVulnerable }) {
                 {/* Tested Interaction (Traffic) */}
                 {trafficData && (
                     <Box>
-                        <TrafficMessage
+                        <ChatMessage
                             type="request"
                             content={trafficData.request}
                             timestamp={trafficData.requestTime}
                             isVulnerable={isVulnerable}
                         />
-                        <TrafficMessage
+                        <ChatMessage
                             type="response"
                             content={trafficData.response}
                             timestamp={trafficData.responseTime}
@@ -26,7 +26,7 @@ function InteractionLog({ trafficData, conversations, isVulnerable }) {
                     </Box>
                 )}
 
-                {/* Chat History - Rendered as TrafficMessage rows */}
+                {/* Chat History - Rendered as ChatMessage rows */}
                 {conversations && conversations.map((msg, index) => {
                     // Skip welcome message if needed, or render all
                     if (msg.role === 'system' && msg.message.includes("You have selected the")) {
@@ -34,15 +34,17 @@ function InteractionLog({ trafficData, conversations, isVulnerable }) {
                         // return null;
                     }
 
+                    console.log("Rendering chat message:", msg);
+
                     const isUser = msg.role === 'user';
                     return (
-                        <TrafficMessage
+                        <ChatMessage
                             key={msg._id || index}
                             type={isUser ? 'request' : 'response'}
                             content={msg.message}
-                            timestamp={msg.creationTimestamp / 1000} // Convert ms to s if needed by TrafficMessage
+                            timestamp={msg.creationTimestamp / 1000} // Convert ms to s if needed by ChatMessage
                             customLabel={isUser ? 'Tested interaction' : 'HR agent response'}
-                            isVulnerable={false} // Chat messages usually not vulnerable unless flagged
+                            isVulnerable={msg.validation} // Chat messages usually not vulnerable unless flagged
                             isCode={false} // Render chat messages as text/markdown, never code
                         />
                     )
