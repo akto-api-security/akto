@@ -1,19 +1,9 @@
 import { useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { Box, VerticalStack, HorizontalStack, Text, Badge } from '@shopify/polaris';
-import { MarkdownRenderer, markdownStyles } from '../../../../components/shared/MarkdownComponents';
-import styles from './ChatMessage.module.css';
+import MarkdownViewer from '../../../../components/shared/MarkdownViewer';
 import { CHAT_ASSETS, MESSAGE_LABELS, MESSAGE_TYPES, VULNERABILITY_BADGE } from './chatConstants';
 import { formatChatTimestamp } from './dateHelpers';
-
-// Helper to auto-link URLs in markdown text (since remark-gfm is not available)
-const autoLinkText = (text) => {
-    if (!text) return "";
-    // Regex to match URLs that are NOT already part of a markdown link
-    // Negative lookbehind (?<!]\() ensures we don't match url in [text](url)
-    const urlRegex = /(?<!\]\()(?<!href=")(https?:\/\/[^\s<)]+)/g;
-    return text.replace(urlRegex, '[$1]($1)');
-};
 
 function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCode }) {
     const isRequest = type === MESSAGE_TYPES.REQUEST;
@@ -27,9 +17,6 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
 
     // Format timestamp with memoization
     const formattedTime = useMemo(() => formatChatTimestamp(timestamp), [timestamp]);
-
-    // Memoize auto-linked content
-    const linkedContent = useMemo(() => autoLinkText(content), [content]);
 
     // Determine if content should be rendered as code
     const shouldRenderAsCode = isCode !== undefined ? isCode : isRequest;
@@ -61,17 +48,21 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                         </HorizontalStack>
 
                         {/* Message Content */}
-                        <Box paddingBlockStart="1">
-                            {shouldRenderAsCode ? (
-                                <div className={styles.codeContent}>
+                        {shouldRenderAsCode ? (
+                            <Box paddingBlockStart="1">
+                                <Box style={{
+                                    whiteSpace: 'pre-wrap',
+                                    fontFamily: 'monospace',
+                                    fontSize: '13px',
+                                    color: '#202223',
+                                    margin: 0
+                                }}>
                                     {content}
-                                </div>
-                            ) : (
-                                <div className={`markdown-content ${styles.markdownContent}`}>
-                                    <MarkdownRenderer>{linkedContent}</MarkdownRenderer>
-                                </div>
-                            )}
-                        </Box>
+                                </Box>
+                            </Box>
+                        ) : (
+                            <MarkdownViewer markdown={content} />
+                        )}
 
                         {/* Vulnerability Badge */}
                         {isVulnerable && !isRequest && (
@@ -82,9 +73,6 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                     </VerticalStack>
                 </Box>
             </Box>
-            <style jsx>{`
-                ${markdownStyles}
-            `}</style>
         </Box>
     );
 }
