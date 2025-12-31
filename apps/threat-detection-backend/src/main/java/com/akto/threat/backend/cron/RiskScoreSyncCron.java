@@ -73,18 +73,19 @@ public class RiskScoreSyncCron {
                         Set<Integer> apiCollectionIds = apiCollections.stream().map(ApiCollection::getId).collect(Collectors.toSet());
 
                         // get successful exploits from malicious events in this time range, grouping by host, method, endpoint
-                        BasicDBObject groupedId = new BasicDBObject("latestApiCollectionId", "$latestApiCollectionId").append("method", "$method").append("endpoint", "$latestApiEndpoint");
+                        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$latestApiCollectionId").append("method", "$latestApiMethod").append("endpoint", "$latestApiEndpoint");
                         List<Bson> pipeline = new ArrayList<>();
                         pipeline.add(Aggregates.sort(Sorts.descending("detectedAt")));
-                        pipeline.add(Aggregates.match(Filters.and(Filters.gte("detectedAt", deltaStarTime), Filters.lte("detectedAt", deltaEndTime))));
+                        pipeline.add(Aggregates.match(Filters.and(Filters.gte("detectedAt", deltaStarTime), Filters.lte("detectedAt", deltaEndTime), Filters.in("latestApiCollectionId", apiCollectionIds), Filters.eq("successfulExploit", true))));
                         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));
                         MongoCursor<BasicDBObject> cursor = MaliciousEventDao.instance.getCollection(String.valueOf(accountId)).aggregate(pipeline, BasicDBObject.class).cursor();
                         List<Bson> filters = new ArrayList<>();
                         while(cursor.hasNext()){
                             BasicDBObject document = cursor.next();
-                            int apiCollectionIdFromDoc = document.getInt("apiCollectionId");
-                            String method = document.getString("method");
-                            String endpoint = document.getString("endpoint");
+                            BasicDBObject id = (BasicDBObject) document.get("_id");
+                            int apiCollectionIdFromDoc = id.getInt("apiCollectionId");
+                            String method = id.getString("method");
+                            String endpoint = id.getString("endpoint");
                             if(apiCollectionIds.contains(apiCollectionIdFromDoc)){
                                 filters.add(ApiInfoDao.getFilter(endpoint, method, apiCollectionIdFromDoc));
                             }
@@ -100,6 +101,7 @@ public class RiskScoreSyncCron {
                         if(updates.size() > 0){
                             ApiInfoDao.instance.bulkWrite(updates, new BulkWriteOptions().ordered(false));
                         }
+                        AccountSettingsDao.instance.updateOne(AccountSettingsDao.generateFilter(), updateForLastCronRunInfo);
                     }
                 }, "risk-score-sync-cron");
             }
