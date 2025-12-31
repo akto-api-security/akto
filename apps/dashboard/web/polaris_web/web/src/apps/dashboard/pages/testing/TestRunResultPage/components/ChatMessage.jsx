@@ -3,26 +3,8 @@ import PropTypes from 'prop-types';
 import { Box, VerticalStack, HorizontalStack, Text, Badge } from '@shopify/polaris';
 import { MarkdownRenderer, markdownStyles } from '../../../../components/shared/MarkdownComponents';
 import styles from './ChatMessage.module.css';
-
-// Asset paths
-const ASSETS = {
-    AKTO_LOGO: '/public/akto.svg',
-    FRAME_LOGO: '/public/Frame.svg',
-    DIVIDER: '/public/Divider.svg',
-    DIVIDER_ALERT: '/public/Divider_alert.svg',
-};
-
-// Default labels
-const DEFAULT_LABELS = {
-    REQUEST: 'Tested interaction',
-    RESPONSE: 'HR agent response',
-};
-
-// Message types
-const MESSAGE_TYPES = {
-    REQUEST: 'request',
-    RESPONSE: 'response',
-};
+import { CHAT_ASSETS, MESSAGE_LABELS, MESSAGE_TYPES, VULNERABILITY_BADGE } from './chatConstants';
+import { formatChatTimestamp } from './dateHelpers';
 
 // Helper to auto-link URLs in markdown text (since remark-gfm is not available)
 const autoLinkText = (text) => {
@@ -37,27 +19,17 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
     const isRequest = type === MESSAGE_TYPES.REQUEST;
 
     // Icon
-    const iconSrc = isRequest ? ASSETS.AKTO_LOGO : ASSETS.FRAME_LOGO;
+    const iconSrc = isRequest ? CHAT_ASSETS.AKTO_LOGO : CHAT_ASSETS.FRAME_LOGO;
     const iconAlt = isRequest ? 'Akto Logo' : 'Agent Logo';
 
     // Divider
-    const dividerSrc = isVulnerable ? ASSETS.DIVIDER_ALERT : ASSETS.DIVIDER;
+    const dividerSrc = isVulnerable ? CHAT_ASSETS.DIVIDER_ALERT : CHAT_ASSETS.DIVIDER;
 
     // Label
-    const label = customLabel || (isRequest ? DEFAULT_LABELS.REQUEST : DEFAULT_LABELS.RESPONSE);
+    const label = customLabel || (isRequest ? MESSAGE_LABELS.TESTED_INTERACTION : MESSAGE_LABELS.HR_AGENT_RESPONSE);
 
     // Format timestamp with memoization
-    const formattedTime = useMemo(() => {
-        if (!timestamp) return '';
-        return new Date(timestamp * 1000).toLocaleString('en-US', {
-            month: 'numeric',
-            day: 'numeric',
-            year: '2-digit',
-            hour: 'numeric',
-            minute: 'numeric',
-            hour12: true
-        });
-    }, [timestamp]);
+    const formattedTime = useMemo(() => formatChatTimestamp(timestamp), [timestamp]);
 
     // Memoize auto-linked content
     const linkedContent = useMemo(() => autoLinkText(content), [content]);
@@ -113,7 +85,7 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                         {/* Vulnerability Badge */}
                         {isVulnerable && !isRequest && (
                             <Box paddingBlockStart="2">
-                                <Badge status="critical">System Prompt Leak</Badge>
+                                <Badge status="critical">{VULNERABILITY_BADGE.SYSTEM_PROMPT_LEAK}</Badge>
                             </Box>
                         )}
                     </VerticalStack>

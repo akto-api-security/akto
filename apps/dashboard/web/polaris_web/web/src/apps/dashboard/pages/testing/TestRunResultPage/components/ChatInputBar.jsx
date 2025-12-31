@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+import PropTypes from 'prop-types';
 import { Box, TextField, Button } from '@shopify/polaris';
 import { SendMajor } from '@shopify/polaris-icons';
+import { PLACEHOLDER_TEXT } from './chatConstants';
 
 function ChatInputBar({ onSendMessage, isStreaming }) {
     const [inputValue, setInputValue] = useState('');
@@ -12,7 +14,7 @@ function ChatInputBar({ onSendMessage, isStreaming }) {
         }
     };
 
-    const handleKeyPress = (e) => {
+    const handleKeyDown = (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             handleSend();
@@ -32,7 +34,7 @@ function ChatInputBar({ onSendMessage, isStreaming }) {
                 <TextField
                     value={inputValue}
                     onChange={setInputValue}
-                    placeholder="Ask a follow up..."
+                    placeholder={PLACEHOLDER_TEXT.INPUT_DEFAULT}
                     autoComplete="off"
                     connectedRight={
                         <Button
@@ -42,18 +44,27 @@ function ChatInputBar({ onSendMessage, isStreaming }) {
                             accessibilityLabel="Send"
                         />
                     }
-                    onKeyPress={handleKeyPress}
+                    onKeyDown={handleKeyDown}
                 />
             ) : (
                 <TextField
                     value=""
                     disabled
-                    placeholder="Pondering, stand by..."
+                    placeholder={PLACEHOLDER_TEXT.INPUT_LOADING}
                     autoComplete="off"
                 />
             )}
         </Box>
     );
 }
+
+ChatInputBar.propTypes = {
+    onSendMessage: PropTypes.func.isRequired,
+    isStreaming: PropTypes.bool,
+};
+
+ChatInputBar.defaultProps = {
+    isStreaming: false,
+};
 
 export default ChatInputBar;

@@ -1,51 +1,26 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { Box, VerticalStack } from '@shopify/polaris';
 import ChatMessage from './ChatMessage';
+import { MESSAGE_LABELS } from './chatConstants';
+import { normalizeTimestamp } from './dateHelpers';
 
-function ConversationHistory({ trafficData, conversations, isVulnerable }) {
-    // trafficData is expected to be { request: string, response: string, requestTime: number, responseTime: number }
-
+function ConversationHistory({ conversations }) {
     return (
         <Box paddingBlockStart="4">
             <VerticalStack gap="4">
-                {/* Tested Interaction (Traffic) */}
-                {trafficData && (
-                    <Box>
-                        <ChatMessage
-                            type="request"
-                            content={trafficData.request}
-                            timestamp={trafficData.requestTime}
-                            isVulnerable={isVulnerable}
-                        />
-                        <ChatMessage
-                            type="response"
-                            content={trafficData.response}
-                            timestamp={trafficData.responseTime}
-                            isVulnerable={isVulnerable}
-                        />
-                    </Box>
-                )}
-
                 {/* Chat History - Rendered as ChatMessage rows */}
                 {conversations && conversations.map((msg, index) => {
-                    // Skip welcome message if needed, or render all
-                    if (msg.role === 'system' && msg.message.includes("You have selected the")) {
-                        // Optionally skip generic welcome message if redundancy is an issue
-                        // return null;
-                    }
-
-                    console.log("Rendering chat message:", msg);
-
                     const isUser = msg.role === 'user';
                     return (
                         <ChatMessage
                             key={msg._id || index}
                             type={isUser ? 'request' : 'response'}
                             content={msg.message}
-                            timestamp={msg.creationTimestamp / 1000} // Convert ms to s if needed by ChatMessage
-                            customLabel={isUser ? 'Tested interaction' : 'HR agent response'}
-                            isVulnerable={msg.validation} // Chat messages usually not vulnerable unless flagged
-                            isCode={false} // Render chat messages as text/markdown, never code
+                            timestamp={normalizeTimestamp(msg.creationTimestamp) / 1000} // Normalize then convert to seconds for ChatMessage
+                            customLabel={isUser ? MESSAGE_LABELS.TESTED_INTERACTION : MESSAGE_LABELS.HR_AGENT_RESPONSE}
+                            isVulnerable={msg.validation}
+                            isCode={false}
                         />
                     )
                 })}
@@ -53,5 +28,19 @@ function ConversationHistory({ trafficData, conversations, isVulnerable }) {
         </Box>
     );
 }
+
+ConversationHistory.propTypes = {
+    conversations: PropTypes.arrayOf(PropTypes.shape({
+        _id: PropTypes.string,
+        role: PropTypes.string.isRequired,
+        message: PropTypes.string.isRequired,
+        creationTimestamp: PropTypes.number,
+        validation: PropTypes.bool,
+    })),
+};
+
+ConversationHistory.defaultProps = {
+    conversations: [],
+};
 
 export default ConversationHistory;

@@ -31,7 +31,7 @@ import TestRunResultChat from './TestRunResultChat.jsx'
 function TestRunResultFlyout(props) {
 
 
-    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, validationFailed, showForbidden } = props
+    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, showForbidden } = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
@@ -694,45 +694,25 @@ function TestRunResultFlyout(props) {
     const conversationTab = useMemo(() => {
         if (typeof selectedTestRunResult !== "object") return null;
 
-        // Prepare traffic data
-        // TODO: This needs better extraction logic, possibly from testResults
-        // For now, taking the first result if available or fallback
-        const result = selectedTestRunResult?.testResults && selectedTestRunResult.testResults.length > 0
-            ? selectedTestRunResult.testResults[selectedTestRunResult.testResults.length - 1]
-            : null;
-
-        let trafficData = null;
-        if (result) {
-            let message = result.message;
-            if (typeof message === 'string') {
-                try {
-                    message = JSON.parse(message);
-                } catch (e) { }
-            }
-
-            if (message) {
-                trafficData = {
-                    request: message.request?.url ? `${message.request.method} ${message.request.url}\n\n${JSON.stringify(message.request.headers, null, 2)}\n\n${message.request.body || ''}` : '',
-                    response: message.response ? `HTTP/1.1 ${message.response.statusCode}\n\n${JSON.stringify(message.response.headers, null, 2)}\n\n${message.response.body || ''}` : '',
-                    requestTime: selectedTestRunResult.startTimestamp, // Approximation
-                    responseTime: selectedTestRunResult.endTimestamp  // Approximation
-                }
-            }
-        }
-
-        // Mock analysis for now if not available in props
+        // TODO: Replace with real AI analysis from backend
+        // Mock analysis for UI development - replace when backend endpoint is ready
         const analysis = "Your HR Agent exposed its system instructions after a follow up request framed as internal debugging. The disclosure occurred while interacting with getAutomationTestCommandLogs, indicating a multi part prompt injection vulnerability.";
+
+        // TODO: Implement real message sending handler
+        // Replace with actual API call when chat endpoint is available
+        const handleSendMessage = (msg) => {
+            console.log("TODO: Send message to backend:", msg);
+            // Future: Call testingApi.sendChatMessage(issueDetails.id, msg)
+        };
 
         return {
             id: 'evidence',
             content: "Evidence",
             component: <TestRunResultChat
                 analysis={analysis}
-                trafficData={trafficData}
                 conversations={conversations}
-                onSendMessage={(msg) => console.log("Sending:", msg)}
+                onSendMessage={handleSendMessage}
                 isStreaming={false}
-                isVulnerable={selectedTestRunResult?.vulnerable || validationFailed}
             />
         }
     }, [selectedTestRunResult, conversations])

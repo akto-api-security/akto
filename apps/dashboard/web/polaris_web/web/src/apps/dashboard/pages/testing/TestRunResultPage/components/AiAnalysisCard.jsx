@@ -1,8 +1,8 @@
 import { useState } from 'react';
+import PropTypes from 'prop-types';
 import { Box, Text, VerticalStack, HorizontalStack, Button } from '@shopify/polaris';
 import { ChevronDownMinor, ChevronUpMinor } from '@shopify/polaris-icons';
-
-const MagicIcon = '/public/magic_icon.svg';
+import { CHAT_ASSETS, ANALYSIS_TEXT } from './chatConstants';
 
 const styles = {
     iconContainer: {
@@ -36,14 +36,14 @@ function AiAnalysisCard({ summary }) {
                     <HorizontalStack gap="2" blockAlign="center">
                         <Box as="span" style={styles.iconContainer}>
                             <img
-                                src={MagicIcon}
+                                src={CHAT_ASSETS.MAGIC_ICON}
                                 alt=""
                                 aria-hidden="true"
                                 style={styles.iconImage}
                             />
                         </Box>
                         <Text variant="headingSm" as="h3">
-                            Akto AI Overview
+                            {ANALYSIS_TEXT.HEADER}
                         </Text>
                     </HorizontalStack>
 
@@ -58,7 +58,7 @@ function AiAnalysisCard({ summary }) {
                 {isExpanded && (
                     <Box paddingBlockStart="2">
                         <Text variant="bodyMd" as="p" color="subdued">
-                            {summary || "Analyzing interaction..."}
+                            {summary || ANALYSIS_TEXT.LOADING}
                         </Text>
                     </Box>
                 )}
@@ -66,5 +66,13 @@ function AiAnalysisCard({ summary }) {
         </Box>
     );
 }
+
+AiAnalysisCard.propTypes = {
+    summary: PropTypes.string,
+};
+
+AiAnalysisCard.defaultProps = {
+    summary: null,
+};
 
 export default AiAnalysisCard;
