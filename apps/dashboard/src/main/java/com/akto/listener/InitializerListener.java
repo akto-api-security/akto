@@ -3681,8 +3681,7 @@ public class InitializerListener implements ServletContextListener {
     public void setUpTestEditorTemplatesScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                byte[] templatesFromFeatureBranch = new com.akto.utils.GithubSync().syncRepo("akto-api-security/tests-library", "master");
-                final byte[] testingTemplates = templatesFromFeatureBranch != null ? templatesFromFeatureBranch : TestTemplateUtils.getTestingTemplates();
+                final byte[] testingTemplates = TestTemplateUtils.getTestingTemplates();
                 if(testingTemplates == null){
                     logger.errorAndAddToDb("Error while fetching Test Editor Templates from Github and local", LogDb.DASHBOARD);
                     return;
