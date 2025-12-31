@@ -20,20 +20,17 @@ import com.akto.threat.backend.constants.KafkaTopic;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.utils.KafkaUtils;
-import com.akto.threat.backend.utils.ThreatUtils;
 import com.akto.util.ThreatDetectionConstants;
-import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.DistinctIterable;
 import com.mongodb.client.MongoCursor;
 import org.bson.conversions.Bson;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
-import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.Document;
-import org.bson.conversions.Bson;
 
 public class MaliciousEventService {
 
@@ -231,6 +228,21 @@ public class MaliciousEventService {
 
     if (!filter.getUrlsList().isEmpty()) {
       query.append("latestApiEndpoint", new Document("$in", filter.getUrlsList()));
+    }
+
+    if (!filter.getApiCollectionIdList().isEmpty()) {
+      query.append("latestApiCollectionId", new Document("$in", filter.getApiCollectionIdList()));
+    }
+
+    if (!filter.getMethodList().isEmpty()) {
+      // Convert string methods to uppercase to match enum names stored in MongoDB
+      List<String> methodStrings = filter.getMethodList().stream()
+          .map(m -> m != null ? m.toUpperCase() : null)
+          .filter(m -> m != null)
+          .collect(Collectors.toList());
+      if (!methodStrings.isEmpty()) {
+        query.append("latestApiMethod", new Document("$in", methodStrings));
+      }
     }
 
     if (!filter.getIpsList().isEmpty()) {
@@ -457,6 +469,25 @@ public class MaliciousEventService {
     List<String> urls = (List<String>) filter.get("urls");
     if (urls != null && !urls.isEmpty()) {
       query.append("latestApiEndpoint", new Document("$in", urls));
+    }
+
+    // Handle apiCollectionId filter
+    List<Integer> apiCollectionIds = (List<Integer>) filter.get("apiCollectionId");
+    if (apiCollectionIds != null && !apiCollectionIds.isEmpty()) {
+      query.append("latestApiCollectionId", new Document("$in", apiCollectionIds));
+    }
+
+    // Handle method filter
+    List<String> methods = (List<String>) filter.get("method");
+    if (methods != null && !methods.isEmpty()) {
+      // Convert string methods to uppercase to match enum names stored in MongoDB
+      List<String> normalizedMethods = methods.stream()
+          .map(m -> m != null ? m.toUpperCase() : null)
+          .filter(m -> m != null)
+          .collect(Collectors.toList());
+      if (!normalizedMethods.isEmpty()) {
+        query.append("latestApiMethod", new Document("$in", normalizedMethods));
+      }
     }
 
     // Handle types filter
