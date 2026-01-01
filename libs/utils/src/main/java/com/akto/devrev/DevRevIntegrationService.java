@@ -304,6 +304,7 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
         String title = String.format("Security Issue: %s (%s - %s)",
             testInfo.getName(), method, endpointPath);
 
+        // Max length for title (as per deverv docs)
         if (title.length() > 256) {
             title = title.substring(0, 253) + "...";
         }
@@ -337,6 +338,7 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
         }
 
         String bodyString = body.toString();
+        // Max length for body (as per deverv docs)
         if (bodyString.length() > 65536) {
             bodyString = bodyString.substring(0, 65533) + "...";
         }
