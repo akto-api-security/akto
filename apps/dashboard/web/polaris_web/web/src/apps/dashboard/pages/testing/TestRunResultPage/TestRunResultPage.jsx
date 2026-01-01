@@ -248,7 +248,7 @@ function TestRunResultPage(props) {
         setToast(true, false, "DevRev Ticket Created, scroll down to view")
       }
     }).catch((err) => {
-      setToast(true, true, err?.response?.data?.errorMessage || "Error creating DevRev ticket")
+      setToast(true, true, err?.response?.data?.errorMessage || err?.response?.data?.actionErrors?.[0] || "Error creating DevRev ticket")
     })
   }
 

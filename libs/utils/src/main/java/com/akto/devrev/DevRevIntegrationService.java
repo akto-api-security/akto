@@ -102,7 +102,7 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
 
         String cursor = null;
         String lastCursor = null;
-        int maxIterations = 20; // Safety limit
+        int maxIterations = 10; // Safety limit
         int iteration = 0;
 
         try {
@@ -301,11 +301,13 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
         String hostname = endpointDetails.getFirst();
         String endpointPath = endpointDetails.getSecond();
 
-        String truncatedEndpoint = endpointPath.length() > 50 ?
-            endpointPath.substring(0, 25) + "..." + endpointPath.substring(endpointPath.length() - 25) : endpointPath;
-
         String title = String.format("Security Issue: %s (%s - %s)",
-            testInfo.getName(), method, truncatedEndpoint);
+            testInfo.getName(), method, endpointPath);
+
+        if (title.length() > 256) {
+            title = title.substring(0, 253) + "...";
+        }
+
         payload.put("title", title);
 
         StringBuilder body = new StringBuilder();
@@ -334,7 +336,12 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
             }
         }
 
-        payload.put("body", body.toString());
+        String bodyString = body.toString();
+        if (bodyString.length() > 65536) {
+            bodyString = bodyString.substring(0, 65533) + "...";
+        }
+
+        payload.put("body", bodyString);
         payload.put("applies_to_part", partId);
         return payload;
     }
