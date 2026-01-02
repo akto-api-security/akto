@@ -77,6 +77,7 @@ public class DevRevIntegrationAction extends UserAction {
 
     public String createDevRevTickets() {
         try {
+
             DevRevIntegrationService devRevService = new DevRevIntegrationService();
             TicketCreationResult result = devRevService.createTickets(testingIssuesIdList, partId, workItemType, aktoDashboardHost);
 
