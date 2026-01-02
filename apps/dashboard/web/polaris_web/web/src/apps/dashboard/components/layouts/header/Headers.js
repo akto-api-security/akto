@@ -277,11 +277,11 @@ export default function Header() {
                 </HorizontalStack> : null}
 
             {/* 2025 Wrapped Button */}
-            <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => setShowWrapped(true)}>
+            {/* <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => setShowWrapped(true)}>
                 <div style={{ background: 'linear-gradient(to right, #ff416c, #ff4b2b)', borderRadius: '4px', padding: '4px 8px', color: 'white', fontWeight: 'bold', fontSize: '12px' }}>
                     2025 Wrapped <span style={{marginInlineStart: '2px'}}>🎁</span>
                 </div>
-            </div>
+            </div> */}
 
             <TopBar.Menu
                 activatorContent={
