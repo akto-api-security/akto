@@ -84,11 +84,11 @@ public class ThreatUtils {
         requiredIndexes.put("idx_host", Indexes.ascending("host"));
         requiredIndexes.put("idx_latestApiEndpoint", Indexes.ascending("latestApiEndpoint"));
         
-        // Compound indices for time-range aggregations with additional filters
+        // Compound indices for time-range aggregations with contextSource filter and additional fields
+        // Note: All queries filter by detectedAt range + contextSource, so these indices are optimized for that pattern
         requiredIndexes.put("detectedAt_1_contextSource_1_successfulExploit_1", Indexes.compoundIndex(Indexes.ascending("detectedAt"), Indexes.ascending("contextSource"), Indexes.ascending("successfulExploit")));
         requiredIndexes.put("detectedAt_1_contextSource_1_severity_1", Indexes.compoundIndex(Indexes.ascending("detectedAt"), Indexes.ascending("contextSource"), Indexes.ascending("severity")));
         requiredIndexes.put("detectedAt_1_contextSource_1_subCategory_1", Indexes.compoundIndex(Indexes.ascending("detectedAt"), Indexes.ascending("contextSource"), Indexes.ascending("subCategory")));
-        requiredIndexes.put("detectedAt_1_contextSource_1_status_1", Indexes.compoundIndex(Indexes.ascending("detectedAt"), Indexes.ascending("contextSource"), Indexes.ascending("status")));
         requiredIndexes.put("detectedAt_1_contextSource_1_status_1_label_1", Indexes.compoundIndex(Indexes.ascending("detectedAt"), Indexes.ascending("contextSource"), Indexes.ascending("status"), Indexes.ascending("label")));
         requiredIndexes.put("detectedAt_1_contextSource_1_category_1_subCategory_1", Indexes.compoundIndex(Indexes.ascending("detectedAt"), Indexes.ascending("contextSource"), Indexes.ascending("category"), Indexes.ascending("subCategory")));
         
