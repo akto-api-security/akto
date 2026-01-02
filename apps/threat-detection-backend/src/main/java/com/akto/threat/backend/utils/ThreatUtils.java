@@ -78,7 +78,20 @@ public class ThreatUtils {
         requiredIndexes.put("filterId_1", Indexes.ascending("filterId"));
         requiredIndexes.put("contextSource_1_filterId_1_detectedAt_-1", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.ascending("filterId"), Indexes.descending("detectedAt")));
         requiredIndexes.put("contextSource_1_detectedAt_-1", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.descending("detectedAt")));
+        requiredIndexes.put("detectedAt_1_contextSource_1_filterId_1", Indexes.compoundIndex(Indexes.ascending("detectedAt"), Indexes.ascending("contextSource"), Indexes.ascending("filterId")));
+        
+        // Simple indices for distinct operations to avoid COLLSCAN
         requiredIndexes.put("idx_host", Indexes.ascending("host"));
+        requiredIndexes.put("idx_latestApiEndpoint", Indexes.ascending("latestApiEndpoint"));
+        
+        // Compound indices for time-range aggregations with additional filters
+        requiredIndexes.put("detectedAt_1_contextSource_1_successfulExploit_1", Indexes.compoundIndex(Indexes.ascending("detectedAt"), Indexes.ascending("contextSource"), Indexes.ascending("successfulExploit")));
+        requiredIndexes.put("detectedAt_1_contextSource_1_severity_1", Indexes.compoundIndex(Indexes.ascending("detectedAt"), Indexes.ascending("contextSource"), Indexes.ascending("severity")));
+        requiredIndexes.put("detectedAt_1_contextSource_1_subCategory_1", Indexes.compoundIndex(Indexes.ascending("detectedAt"), Indexes.ascending("contextSource"), Indexes.ascending("subCategory")));
+        requiredIndexes.put("detectedAt_1_contextSource_1_status_1", Indexes.compoundIndex(Indexes.ascending("detectedAt"), Indexes.ascending("contextSource"), Indexes.ascending("status")));
+        requiredIndexes.put("detectedAt_1_contextSource_1_status_1_label_1", Indexes.compoundIndex(Indexes.ascending("detectedAt"), Indexes.ascending("contextSource"), Indexes.ascending("status"), Indexes.ascending("label")));
+        requiredIndexes.put("detectedAt_1_contextSource_1_category_1_subCategory_1", Indexes.compoundIndex(Indexes.ascending("detectedAt"), Indexes.ascending("contextSource"), Indexes.ascending("category"), Indexes.ascending("subCategory")));
+        
         requiredIndexes.put("idx_detected_context_actor_country", Indexes.compoundIndex(Indexes.descending("detectedAt"), Indexes.ascending("contextSource"), Indexes.ascending("filterId"), Indexes.ascending("actor"), Indexes.ascending("country")));
 
         for (Map.Entry<String, Bson> entry : requiredIndexes.entrySet()) {
