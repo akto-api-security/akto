@@ -1,6 +1,7 @@
 import {  HorizontalStack,  Page, VerticalStack } from "@shopify/polaris";
 import { useNavigate, useLocation } from "react-router-dom";
 import { learnMoreObject } from "../../../main/onboardingData"
+import { getDashboardCategory, CATEGORY_AGENTIC_SECURITY, CATEGORY_ENDPOINT_SECURITY } from "../../../main/labelHelper"
 import LearnPopoverComponent from "./LearnPopoverComponent";
 import func from  "@/util/func"
 import { useEffect, useRef } from "react";
@@ -60,9 +61,12 @@ const PageWithMultipleCards = (props) => {
 
     const learnMoreObj = learnMoreObject.hasOwnProperty(func.transformString(location.pathname)) ? learnMoreObject[func.transformString(location.pathname)] : null
 
+    const currentCategory = getDashboardCategory()
+    const showLearnButton = learnMoreObj && currentCategory !== CATEGORY_AGENTIC_SECURITY && currentCategory !== CATEGORY_ENDPOINT_SECURITY
+
     const learnMoreComp = (
-        learnMoreObj ?
-        <LearnPopoverComponent learnMoreObj={learnMoreObj} /> : null
+        showLearnButton ?
+            <LearnPopoverComponent learnMoreObj={learnMoreObj} /> : null
     )
 
     const useSecondaryActions = (
