@@ -533,38 +533,28 @@ function HomeDashboard() {
 
             // Process timeline data
             if (results[0].status === 'fulfilled' && results[0].value?.actorsCounts) {
-                console.log('Threat actors raw data:', results[0].value);
                 const timelineData = transformThreatActorsTimeline(results[0].value.actorsCounts);
-                console.log('Threat actors transformed:', timelineData);
                 setThreatActorsTimeline(timelineData);
             } else {
-                console.log('Threat actors result:', results[0]);
                 setThreatActorsTimeline([]);
             }
 
             // Process severity data
             if (results[1].status === 'fulfilled' && results[1].value?.categoryCounts) {
-                console.log('Severity raw data:', results[1].value);
                 const severityData = transformSeverityData(results[1].value.categoryCounts);
-                console.log('Severity transformed:', severityData);
                 setThreatSeverityData(severityData);
             } else {
-                console.log('Severity result:', results[1]);
                 setThreatSeverityData({});
             }
 
             // Process category data
             if (results[2].status === 'fulfilled' && results[2].value?.categoryCounts) {
-                console.log('Category raw data:', results[2].value);
                 const categoryData = transformThreatCategoryData(results[2].value.categoryCounts);
-                console.log('Category transformed:', categoryData);
                 setThreatCategoryData(categoryData);
             } else {
-                console.log('Category result:', results[2]);
                 setThreatCategoryData([{ data: [], color: observeFunc.getColorForSensitiveData('CRITICAL') }]);
             }
         } catch (error) {
-            console.error('Error fetching threat detection data:', error);
             setThreatActorsTimeline([]);
             setThreatSeverityData({});
             setThreatCategoryData([{ data: [], color: observeFunc.getColorForSensitiveData('CRITICAL') }]);
