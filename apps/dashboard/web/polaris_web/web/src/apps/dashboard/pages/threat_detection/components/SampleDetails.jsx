@@ -654,10 +654,7 @@ Reference URL: ${window.location.href}`.trim();
     const tabsComponent = (
         <LayoutWithTabs
             key={`tabs-comp-${eventId || 'default'}`}
-            tabs={ window.location.href.indexOf("guardrails") > -1
-                ? [overviewTab, ValuesTab]  // Show overview + values for guardrails
-                : [overviewTab, timelineTab, ValuesTab, remediationTab]  // Full tabs for threat detection
-            }
+            tabs={ window.location.href.indexOf("guardrails") > -1 ? [overviewTab, ValuesTab] : [overviewTab, timelineTab, ValuesTab, remediationTab]}
             currTab = {() => {}}
         />
     )
