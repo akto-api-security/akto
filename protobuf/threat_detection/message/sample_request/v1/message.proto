@@ -10,10 +10,8 @@ message Metadata {
   repeated SchemaConformanceError schema_errors = 2;
   string policy_name = 3;
   string rule_violated = 4;
-  string pii_type = 5;
-  string risk_score = 6;
-  string scanner_name = 7;
-  string llm_reason = 8;
+  string risk_score = 5;
+  string reason = 6;
 }
 
 message SchemaConformanceError {
