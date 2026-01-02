@@ -387,16 +387,6 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
 
             StringBuilder data = new StringBuilder();
 
-            if (StringUtils.isNotBlank(origCurl)) {
-                data.append("### Original Curl\n\n");
-                data.append("```\n").append(origCurl).append("\n```\n\n");
-            }
-
-            if (StringUtils.isNotBlank(origResponse)) {
-                data.append("### Original API Response\n\n");
-                data.append("```\n").append(origResponse).append("\n```\n\n");
-            }
-
             if (StringUtils.isNotBlank(testCurl)) {
                 data.append("### Test Curl\n\n");
                 data.append("```\n").append(testCurl).append("\n```\n\n");
@@ -405,6 +395,16 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
             if (StringUtils.isNotBlank(testResponse)) {
                 data.append("### Test API Response\n\n");
                 data.append("```\n").append(testResponse).append("\n```\n\n");
+            }
+
+            if (StringUtils.isNotBlank(origCurl)) {
+                data.append("### Original Curl\n\n");
+                data.append("```\n").append(origCurl).append("\n```\n\n");
+            }
+
+            if (StringUtils.isNotBlank(origResponse)) {
+                data.append("### Original API Response\n\n");
+                data.append("```\n").append(origResponse).append("\n```\n\n");
             }
 
             return data.toString();
