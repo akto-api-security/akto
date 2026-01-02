@@ -77,10 +77,7 @@ public class DevRevIntegrationAction extends UserAction {
 
     public String createDevRevTickets() {
         try {
-            if (testingIssuesIdList != null && testingIssuesIdList.size() > 10) {
-                addActionError("Cannot create more than 10 tickets at a time");
-                return Action.ERROR.toUpperCase();
-            }
+
             DevRevIntegrationService devRevService = new DevRevIntegrationService();
             TicketCreationResult result = devRevService.createTickets(testingIssuesIdList, partId, workItemType, aktoDashboardHost);
 
