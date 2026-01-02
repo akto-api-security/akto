@@ -77,8 +77,8 @@ public class DevRevIntegrationAction extends UserAction {
 
     public String createDevRevTickets() {
         try {
-            if (testingIssuesIdList != null && testingIssuesIdList.size() > 20) {
-                addActionError("Cannot create more than 20 tickets at a time");
+            if (testingIssuesIdList != null && testingIssuesIdList.size() > 10) {
+                addActionError("Cannot create more than 10 tickets at a time");
                 return Action.ERROR.toUpperCase();
             }
             DevRevIntegrationService devRevService = new DevRevIntegrationService();
