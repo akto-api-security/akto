@@ -340,7 +340,7 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
         String bodyString = body.toString();
         // Max length for body (as per deverv docs)
         if (bodyString.length() > 65536) {
-            bodyString = bodyString.substring(0, 65533) + "...";
+            bodyString = bodyString.substring(0, 65500) + "...";
         }
 
         payload.put("body", bodyString);
