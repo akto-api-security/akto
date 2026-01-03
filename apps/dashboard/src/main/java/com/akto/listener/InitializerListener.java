@@ -221,6 +221,7 @@ import com.akto.util.tasks.OrganizationTask;
 import com.akto.utils.Auth0;
 import com.akto.utils.AutomatedApiGroupsUtils;
 import com.akto.utils.TestTemplateUtils;
+import com.akto.utils.api_audit_logs.ApiAuditLogsUtils;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.crons.Crons;
 import com.akto.utils.crons.SyncCron;
@@ -2601,6 +2602,9 @@ public class InitializerListener implements ServletContextListener {
                 }, "context-initializer");
 
                 SingleTypeInfo.init();
+
+                // Populate audit generator map for api audit logs
+                ApiAuditLogsUtils.init();
 
                 int now = Context.now();
                 if (runJobFunctions || runJobFunctionsAnyway) {

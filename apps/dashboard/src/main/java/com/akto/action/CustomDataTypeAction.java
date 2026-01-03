@@ -37,6 +37,7 @@ import com.mongodb.client.model.*;
 import com.mongodb.client.result.UpdateResult;
 import com.opensymphony.xwork2.Action;
 import org.apache.commons.lang3.EnumUtils;
+import org.apache.struts2.json.annotations.JSON;
 import org.bson.conversions.Bson;
 
 import java.io.IOException;
@@ -1016,8 +1017,18 @@ public class CustomDataTypeAction extends UserAction{
         return dataType;
     }
 
+    @JSON(serialize = false)
+    public boolean getCreateNew() {
+        return createNew;
+    }
+
     public void setCreateNew(boolean createNew) {
         this.createNew = createNew;
+    }
+
+    @JSON(serialize = false)
+    public String getName() {
+        return name;
     }
 
     public void setName(String name) {

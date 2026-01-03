@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
+import org.apache.struts2.json.annotations.JSON;
 
 public class HarAction extends UserAction {
 
@@ -163,6 +164,11 @@ public class HarAction extends UserAction {
 
     public void setContent(BasicDBObject content) {
         this.content = content;
+    }
+
+    @JSON(serialize = false)
+    public int getApiCollectionId() {
+        return apiCollectionId;
     }
 
     public void setApiCollectionId(int apiCollectionId) {

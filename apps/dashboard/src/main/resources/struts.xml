@@ -2510,7 +2510,7 @@
             <interceptor-ref name="defaultStack"/>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ</param> 
+                <param name="accessType">READ_WRITE</param> 
                 <param name="actionDescription">User toggled collections testing scope status</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
