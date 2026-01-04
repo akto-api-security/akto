@@ -322,7 +322,7 @@ public class MaliciousEventService {
       List<ListMaliciousRequestsResponse.MaliciousEvent> maliciousEvents = new ArrayList<>();
       while (cursor.hasNext()) {
         MaliciousEventDto evt = cursor.next();
-        String metadata = evt.getMetadata() != null ? evt.getMetadata() : "";
+        String metadata = ThreatUtils.fetchMetadataString(evt.getMetadata() != null ? evt.getMetadata() : "");
 
         maliciousEvents.add(
             ListMaliciousRequestsResponse.MaliciousEvent.newBuilder()

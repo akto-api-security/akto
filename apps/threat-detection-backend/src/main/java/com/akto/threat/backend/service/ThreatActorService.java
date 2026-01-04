@@ -4,7 +4,6 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.log.LoggerMaker;
-import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsResponse;
@@ -23,7 +22,6 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorResponse.ActivityData;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataResponse;
-import com.akto.ProtoMessageUtils;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.utils.ThreatUtils;
@@ -31,8 +29,6 @@ import com.akto.threat.backend.db.ActorInfoModel;
 import com.akto.threat.backend.dto.RateLimitConfigDTO;
 import com.akto.util.ThreatDetectionConstants;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
-import com.akto.threat.backend.utils.ThreatUtils;
-import com.google.protobuf.TextFormat;
 import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -539,23 +535,6 @@ public class ThreatActorService {
         return ThreatActivityTimelineResponse.newBuilder().addAllThreatActivityTimeline(timeline).build();
   }
 
-
-  private String fetchMetadataString(String metadataStr){
-    if(metadataStr == null || metadataStr.isEmpty()){
-        return "";
-    }
-
-    Metadata.Builder metadataBuilder = Metadata.newBuilder();
-    try {
-      TextFormat.getParser().merge(metadataStr, metadataBuilder);
-    } catch (Exception e) {
-      return "";
-    }
-    Metadata metadataProto = metadataBuilder.build();
-    metadataStr = ProtoMessageUtils.toString(metadataProto).orElse("");
-    return metadataStr;
-  }
-
   private List<FetchMaliciousEventsResponse.MaliciousPayloadsResponse> fetchMaliciousPayloadsResponse(FindIterable<MaliciousEventDto> respList){
     if (respList == null) {
       return Collections.emptyList();
@@ -565,7 +544,7 @@ public class ThreatActorService {
         maliciousPayloadsResponse.add(
             FetchMaliciousEventsResponse.MaliciousPayloadsResponse.newBuilder().
             setOrig(HttpResponseParams.getSampleStringFromProtoString(event.getLatestApiOrig())).
-            setMetadata(fetchMetadataString(event.getMetadata() != null ? event.getMetadata() : "")).
+            setMetadata(ThreatUtils.fetchMetadataString(event.getMetadata() != null ? event.getMetadata() : "")).
             setTs(event.getDetectedAt()).build());
     }
     return maliciousPayloadsResponse;

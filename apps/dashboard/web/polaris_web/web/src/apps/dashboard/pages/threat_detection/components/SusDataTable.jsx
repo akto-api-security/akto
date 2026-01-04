@@ -13,6 +13,7 @@ import { labelMap } from "../../../../main/labelHelperMap";
 import { formatActorId } from "../utils/formatUtils";
 import threatDetectionRequests from "../api";
 import { LABELS } from "../constants";
+import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 
 const resourceName = {
   singular: "activity",
@@ -46,6 +47,12 @@ const headers = [
     value: "filterId",
     title: "Attack type",
   },
+  ...((isAgenticSecurityCategory() || isEndpointSecurityCategory()) ? [{
+    text: "Rule Violated",
+    value: "ruleViolated",
+    title: "Rule Violated",
+    maxWidth: "200px",
+  }] : []),
   {
     text: "Compliance",
     value: "compliance",
@@ -463,11 +470,24 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 //    setSubCategoryChoices(distinctSubCategories);
     let total = res.total;
     let ret = res?.maliciousEvents.map((x) => {
-      const severity = threatFiltersMap[x?.filterId]?.severity || "HIGH"
+      const severity = (isAgenticSecurityCategory() || isEndpointSecurityCategory())
+        ? (x?.severity || "HIGH")
+        : (threatFiltersMap[x?.filterId]?.severity || "HIGH")
 
       const filterTemplate = threatFiltersMap[x?.filterId];
       const complianceMap = filterTemplate?.compliance?.mapComplianceToListClauses || {};
       const complianceList = Object.keys(complianceMap);
+
+      // Parse metadata to extract rule_violated for agentic/endpoint dashboards
+      let ruleViolated = "-";
+      if ((isAgenticSecurityCategory() || isEndpointSecurityCategory()) && x?.metadata) {
+        try {
+          const metadata = JSON.parse(x.metadata);
+          ruleViolated = metadata.rule_violated || metadata.ruleViolated || "-";
+        } catch (e) {
+          ruleViolated = "-";
+        }
+      }
 
       let nextUrl = null;
       if (x.refId && x.eventType && x.actor && x.filterId) {
@@ -488,11 +508,11 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         actorComp: formatActorId(x.actor),
         host: x.host || "-",
         endpointComp: (
-          <GetPrettifyEndpoint 
-            maxWidth="300px" 
+          <GetPrettifyEndpoint
+            maxWidth="300px"
             method={x.method}
-            url={x.url} 
-            isNew={false} 
+            url={x.url}
+            isNew={false}
           />
         ),
         apiCollectionName: collectionsMap[x.apiCollectionId] || "-",
@@ -506,6 +526,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
                           <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                       </div>
         ),
+        ruleViolated: ruleViolated,
         compliance: complianceList.length > 0 ? (
           <HorizontalStack wrap={false} gap={1}>
             {complianceList.slice(0, 2).map((complianceName, idx) =>
@@ -540,7 +561,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     let ipChoices = res?.ips.map((x) => {
       return { label: x, value: x };
     });
-    
+
     // Extract unique hosts from the fetched data
     let hostChoices = [];
     if (res?.hosts && Array.isArray(res.hosts) && res.hosts.length > 0) {
