@@ -1,20 +1,24 @@
-
-import React from 'react';
-import { Text, VerticalStack, Box } from '@shopify/polaris';
+import { Text, Box, HorizontalStack } from '@shopify/polaris';
 
 function AgenticWelcomeHeader({ username }) {
-    // Fallback if username is not provided
-    const name = username || 'User';
+  const name = username || 'User';
 
-    return (
-        <Box paddingBlockStart="10" paddingBlockEnd="8">
-            <VerticalStack gap="2" align="center">
-                <Text variant="heading3xl" as="h1" alignment="center" fontWeight="bold">
-                    Hi {name}, Welcome back!
-                </Text>
-            </VerticalStack>
+  return (
+    <Box style={{ marginBottom: '24px', display: 'flex', justifyContent: 'center' }}>
+      <HorizontalStack gap="3" blockAlign="center">
+        <Box style={{ width: '20px', height: '20px' }}>
+          <img
+            src="/public/akto.svg"
+            alt="Akto"
+            style={{ width: '100%', height: '100%', display: 'block' }}
+          />
         </Box>
-    );
+        <Text variant="headingLg" as="h1" fontWeight="semibold">
+          Hi {name}, Welcome back!
+        </Text>
+      </HorizontalStack>
+    </Box>
+  );
 }
 
 export default AgenticWelcomeHeader;

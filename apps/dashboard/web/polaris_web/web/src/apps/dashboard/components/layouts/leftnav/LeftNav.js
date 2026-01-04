@@ -7,7 +7,8 @@ import {
     DiamondAlertMinor,
     FinancesMinor,
     LockMajor,
-    AutomationFilledMajor
+    AutomationFilledMajor,
+    MagicMinor
 } from "@shopify/polaris-icons";
 import {useLocation, useNavigate} from "react-router-dom";
 
@@ -503,9 +504,26 @@ export default function LeftNav() {
             }] : [])
         ]
 
+        // Add Ask AI navigation item
+        const askAiExists = items.find(item => item.key === "ask_ai")
+        if (!askAiExists) {
+            items.splice(1, 0, {
+                label: "Ask AI",
+                icon: MagicMinor,
+                onClick: () => {
+                    handleSelect("dashboard_agentic_main")
+                    navigate("/dashboard/agentic-main")
+                    setActive("normal")
+                },
+                selected: leftNavSelected === "dashboard_agentic_main",
+                key: "ask_ai",
+            })
+        }
+
+        // Add Quick Start navigation item
         const exists = items.find(item => item.key === "quick_start")
         if (!exists) {
-            items.splice(1, 0, {
+            items.splice(2, 0, {
                 label: mapLabel("Quick Start", dashboardCategory),
                 icon: AppsFilledMajor,
                 onClick: () => {

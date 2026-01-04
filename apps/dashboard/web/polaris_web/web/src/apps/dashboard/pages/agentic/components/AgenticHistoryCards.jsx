@@ -1,59 +1,72 @@
-
-import React from 'react';
-import { Box, Card, Text, HorizontalGrid, VerticalStack, Icon, HorizontalStack } from '@shopify/polaris';
-import { ClockMinor } from '@shopify/polaris-icons';
+import { Box, Text, HorizontalStack } from '@shopify/polaris';
 
 function AgenticHistoryCards() {
     const historyItems = [
         {
             id: 1,
             title: 'Validate agent resilience to instruction override attacks',
-            time: '2 hours ago',
+            time: '1 day ago',
         },
         {
             id: 2,
             title: 'Prompt injection risks across agents',
-            time: 'Yesterday',
+            time: '1 day ago',
         },
         {
             id: 3,
             title: 'Investigating agent behavior',
-            time: '2 days ago',
-        },
-        {
-            id: 4,
-            title: 'Security policy update check',
-            time: '3 days ago',
+            time: '1 day ago',
         },
     ];
 
     return (
-        <Box paddingBlock="4" maxWidth="1000px" marginInline="auto">
-            <Box paddingBlockEnd="4">
-                <Text variant="headingMd" as="h2" color="subdued">
-                    History
-                </Text>
-            </Box>
-            <HorizontalGrid columns={{ xs: 1, sm: 2, md: 4 }} gap="4">
-                {historyItems.map((item) => (
-                    <Card key={item.id}>
-                        {/* Using a clickable container logic if needed, for now just static layout */}
-                        <Box padding="4" minHeight="120px">
-                            <VerticalStack gap="4" justify="space-between">
-                                <Text variant="bodyLg" fontWeight="semibold" as="h3">
+        <Box width="100%">
+            {/* Whole container divided into two parts with gap of 16px */}
+            <Box style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* First box: Header section with History text (left) and View all button (right) */}
+                <Box width="100%">
+                    <HorizontalStack align="space-between" blockAlign="center">
+                        <Text variant="headingSm" as="h2">
+                            History
+                        </Text>
+                        <Text variant="bodySm" as="span" tone="interactive" style={{ cursor: 'pointer' }}>
+                            View all
+                        </Text>
+                    </HorizontalStack>
+                </Box>
+
+                {/* Second container: Tiles with horizontal gap of 16px */}
+                <Box width="100%" style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                    {historyItems.map((item) => (
+                        <Box
+                            key={item.id}
+                            style={{
+                                cursor: 'pointer',
+                                padding: '12px', // Inner padding of 12px for each card
+                                borderRadius: '8px',
+                                background: '#FAFAFA',
+                                boxShadow: '0 0 5px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.15)',
+                                flex: '1 1 calc(33.333% - 11px)', // 3 columns with 16px gap
+                                minWidth: '150px'
+                            }}
+                        >
+                            {/* Each tile contains two vertical boxes with gap of 32px */}
+                            <Box style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px' }}>
+                                <Text
+                                    variant="bodySm"
+                                    fontWeight="medium"
+                                    as="p"
+                                >
                                     {item.title}
                                 </Text>
-                                <HorizontalStack gap="1" align="start">
-                                    <Icon source={ClockMinor} color="subdued" />
-                                    <Text variant="bodySm" color="subdued">
-                                        {item.time}
-                                    </Text>
-                                </HorizontalStack>
-                            </VerticalStack>
+                                <Text variant="bodyXs" tone="subdued" as="span">
+                                    {item.time}
+                                </Text>
+                            </Box>
                         </Box>
-                    </Card>
-                ))}
-            </HorizontalGrid>
+                    ))}
+                </Box>
+            </Box>
         </Box>
     );
 }
