@@ -6,12 +6,12 @@ import Store from "../../../store";
 import func from "@/util/func";
 import { MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
-import { Button, Popover, Box, Avatar, Text, HorizontalGrid, HorizontalStack, IndexFiltersMode, VerticalStack, ActionList } from "@shopify/polaris";
+import { Button, Popover, Box, Avatar, Text, HorizontalGrid, HorizontalStack, IndexFiltersMode, VerticalStack, ActionList, Link } from "@shopify/polaris";
 import CompulsoryDescriptionModal from "../components/CompulsoryDescriptionModal.jsx";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import { useSearchParams } from "react-router-dom";
 import TestRunResultPage from "../../testing/TestRunResultPage/TestRunResultPage";
@@ -31,12 +31,17 @@ import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreati
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import { isMCPSecurityCategory, isGenAISecurityCategory, isAgenticSecurityCategory, mapLabel, getDashboardCategory  } from "../../../../main/labelHelper";
 import testingApi from "../../testing/api.js"
+import threatDetectionApi from "../../threat_detection/api"
+import SessionStore from "../../../../main/SessionStore"
+import SampleDetails from "../../threat_detection/components/SampleDetails"
+import { Badge } from "@shopify/polaris";
+import ShowListInBadge from "../../../components/shared/ShowListInBadge";
 
 const sortOptions = [
     { label: 'Severity', value: 'severity asc', directionLabel: 'Highest', sortKey: 'severity', columnIndex: 2 },
     { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest', sortKey: 'severity', columnIndex: 2 },
-    { label: 'Number of endpoints', value: 'numberOfEndpoints asc', directionLabel: 'More', sortKey: 'numberOfEndpoints', columnIndex: 5 },
-    { label: 'Number of endpoints', value: 'numberOfEndpoints desc', directionLabel: 'Less', sortKey: 'numberOfEndpoints', columnIndex: 5 },
+    { label: mapLabel('Number of endpoints', getDashboardCategory()), value: 'numberOfEndpoints asc', directionLabel: 'More', sortKey: 'numberOfEndpoints', columnIndex: 5 },
+    { label: mapLabel('Number of endpoints', getDashboardCategory()), value: 'numberOfEndpoints desc', directionLabel: 'Less', sortKey: 'numberOfEndpoints', columnIndex: 5 },
     { label: 'Discovered time', value: 'creationTime asc', directionLabel: 'Newest', sortKey: 'creationTime', columnIndex: 7 },
     { label: 'Discovered time', value: 'creationTime desc', directionLabel: 'Oldest', sortKey: 'creationTime', columnIndex: 7 },
 ];
@@ -133,8 +138,8 @@ function CompliancePage() {
             value: "category"
         },
         {
-            title: "Number of endpoints",
-            text: "Number of endpoints",
+            title: mapLabel("Number of endpoints", getDashboardCategory()),
+            text: mapLabel("Number of endpoints", getDashboardCategory()),
             value: "numberOfEndpoints",
             sortActive: true
         },
@@ -160,6 +165,55 @@ function CompliancePage() {
         },
     ])
 
+    const threatHeaders = [
+        {
+          title: '',
+          type: CellType.COLLAPSIBLE
+        },
+        {
+            title: "Severity",
+            text: "Severity",
+            value: "severity",
+            sortActive: true
+        },
+        {
+            title: "Threat name",
+            text: "Threat name",
+            value: "issueName",
+        },
+        {
+            title: "Category",
+            text: "Category",
+            value: "category"
+        },
+        {
+            title: mapLabel("Number of endpoints", getDashboardCategory()),
+            text: mapLabel("Number of endpoints", getDashboardCategory()),
+            value: "numberOfEndpoints",
+            sortActive: true
+        },
+        {
+            title: "Domains",
+            text: "Domains",
+            value: "domains"
+        },
+        {
+            title: "Compliance",
+            text: "Compliance",
+            value: "compliance",
+            sortActive: true
+        },
+        {
+            title: "Discovered",
+            text: "Discovered",
+            value: "creationTime",
+            sortActive: true
+        },
+        {
+            value: 'collectionIds'
+        },
+    ]
+
 
     function calcFilteredTestIds(complianceView) {
         let ret = Object.entries(subCategoryMap).filter(([_, v]) => {return !!v.compliance?.mapComplianceToListClauses[complianceView]}).map(([k, _]) => k)
@@ -168,15 +222,21 @@ function CompliancePage() {
     }
 
     const subCategoryMap = LocalStore(state => state.subCategoryMap);
+    const threatFiltersMap = SessionStore(state => state.threatFiltersMap);
     const [issuesFilters, setIssuesFilters] = useState({})
     const [key, setKey] = useState(false);
+    const [threatsKey, setThreatsKey] = useState(false);
     const apiCollectionMap = PersistStore(state => state.collectionsMap);
     const [showEmptyScreen, setShowEmptyScreen] = useState(true)
     const [selectedTab, setSelectedTab] = useState("open")
+    const [selectedThreatTab, setSelectedThreatTab] = useState("active")
     const [loading, setLoading] = useState(true)
     const [selected, setSelected] = useState(0)
+    const [selectedThreat, setSelectedThreat] = useState(0)
     const [tableLoading, setTableLoading] = useState(false)
+    const [threatsLoading, setThreatsLoading] = useState(false)
     const [issuesDataCount, setIssuesDataCount] = useState([])
+    const [threatsDataCount, setThreatsDataCount] = useState([])
     const [jiraModalActive, setJiraModalActive] = useState(false)
     const [selectedIssuesItems, setSelectedIssuesItems] = useState([])
     const [jiraProjectMaps,setJiraProjectMap] = useState({})
@@ -185,6 +245,15 @@ function CompliancePage() {
     const [moreActions, setMoreActions] = useState(false);
     const [complianceView, setComplianceView] = useState('SOC 2');
     const [filteredTestIds, setFilteredTestIds] = useState([]);
+
+    const [showThreatDetails, setShowThreatDetails] = useState(false);
+    const [threatEventState, setThreatEventState] = useState({
+        currentRefId: null,
+        rowDataList: [],
+        moreInfoData: {},
+        currentEventId: '',
+        currentEventStatus: ''
+    });
 
     const [boardsModalActive, setBoardsModalActive] = useState(false)
     const [projectToWorkItemsMap, setProjectToWorkItemsMap] = useState({})
@@ -235,11 +304,26 @@ function CompliancePage() {
         }, 200)
     }
 
-    const definedTableTabs = ["Open", "Fixed", "Ignored"]
+    const handleSelectedThreatTab = (selectedIndex) => {
+        setThreatsLoading(true)
+        setSelectedThreat(selectedIndex)
+        setSelectedThreatTab(definedThreatTabs[selectedIndex].toLowerCase())
+        setTimeout(()=> {
+            setThreatsLoading(false)
+        }, 200)
+    }
 
-    const { tabsInfo, selectItems } = useTable()
+    const definedTableTabs = ["Open", "Fixed", "Ignored"]
+    const definedThreatTabs = ["Active", "Under Review", "Ignored"]
+
+    // Separate table hooks for issues and threats to prevent cross-table interference
+    const { tabsInfo: issuesTabsInfo, selectItems } = useTable()
     const tableCountObj = func.getTabsCount(definedTableTabs, {}, issuesDataCount)
-    const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
+    const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, issuesTabsInfo)
+
+    const { tabsInfo: threatsTabsInfo } = useTable()
+    const threatTableCountObj = func.getTabsCount(definedThreatTabs, {}, threatsDataCount)
+    const threatTableTabs = func.getTableTabsContent(definedThreatTabs, threatTableCountObj, setSelectedThreatTab, selectedThreatTab, threatsTabsInfo)
 
     const resetResourcesSelected = () => {
         TableStore.getState().setSelectedItems([])
@@ -248,13 +332,14 @@ function CompliancePage() {
         setSelectedIssuesItems([])
     }
     
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
         const statusHeader = {
             title: "Status",
             text: "Status",
             value: "issueStatus"
         }
-    
+
         if (selectedTab.toUpperCase() === 'OPEN') {
             if (!headers.some(header => header.value === "issueStatus")) {
                 setHeaders(prevHeaders => {
@@ -265,11 +350,15 @@ function CompliancePage() {
         } else {
             setHeaders(prevHeaders => prevHeaders.filter(header => header.value !== "issueStatus"))
         }
-        resetResourcesSelected();
+        // Reset selection and trigger issues table refresh only
+        TableStore.getState().setSelectedItems([])
+        selectItems([])
+        setSelectedIssuesItems([])
+        setKey(prev => !prev)
     }, [selectedTab])
 
     useEffect(() => {
-        setKey(!key)
+        setKey(prev => !prev)
     }, [startTimestamp, endTimestamp])
 
     // Fetch compulsory description settings
@@ -352,6 +441,27 @@ function CompliancePage() {
     ]
 
     filtersOptions = func.getCollectionFilters(filtersOptions)
+
+    let threatFiltersOptions = [
+        {
+            key: 'apiCollectionId',
+            label: 'Collection',
+            title: 'Collection',
+            choices: [],
+        },
+        {
+            key: 'severity',
+            label: 'Severity',
+            title: 'Severity',
+            choices: [
+                {label: 'Critical', value: 'CRITICAL'},
+                { label: "High", value: "HIGH" },
+                { label: "Medium", value: "MEDIUM" },
+                { label: "Low", value: "LOW" }
+            ],
+        },
+    ];
+    threatFiltersOptions = func.getCollectionFilters(threatFiltersOptions)
 
     const handleSaveJiraAction = (issueId, labels) => {
         let jiraMetaData;
@@ -616,7 +726,62 @@ function CompliancePage() {
     useEffect(() => {
         issuesFunctions.fetchIntegrationCustomFieldsMetadata();
     }, [])
-  
+
+    function calcFilteredThreatIds(complianceView) {
+        return Object.entries(threatFiltersMap)
+            .filter(([_, v]) => !!v.compliance?.mapComplianceToListClauses?.[complianceView])
+            .map(([k, _]) => k);
+    }
+
+    const fetchThreatCounts = useCallback(async () => {
+        const filterThreatIds = Object.entries(threatFiltersMap)
+            .filter(([_, v]) => !!v.compliance?.mapComplianceToListClauses?.[complianceView])
+            .map(([k, _]) => k);
+
+        if (filterThreatIds.length === 0) {
+            setThreatsDataCount([0, 0, 0]);
+            return;
+        }
+
+        try {
+            // Fetch for all statuses to get accurate counts
+            const [activeResponse, underReviewResponse, ignoredResponse] = await Promise.all([
+                threatDetectionApi.fetchSuspectSampleData(
+                    0, [], [], [], [], { timestamp: -1 },
+                    startTimestamp, endTimestamp, filterThreatIds,
+                    10000, 'ACTIVE', undefined, 'THREAT', [], ''
+                ),
+                threatDetectionApi.fetchSuspectSampleData(
+                    0, [], [], [], [], { timestamp: -1 },
+                    startTimestamp, endTimestamp, filterThreatIds,
+                    10000, 'UNDER_REVIEW', undefined, 'THREAT', [], ''
+                ),
+                threatDetectionApi.fetchSuspectSampleData(
+                    0, [], [], [], [], { timestamp: -1 },
+                    startTimestamp, endTimestamp, filterThreatIds,
+                    10000, 'IGNORED', undefined, 'THREAT', [], ''
+                )
+            ]);
+
+            // Count unique endpoints, not categories
+            const activeCount = activeResponse.maliciousEvents.length;
+            const underReviewCount = underReviewResponse.maliciousEvents.length;
+            const ignoredCount = ignoredResponse.maliciousEvents.length;
+
+            setThreatsDataCount([activeCount, underReviewCount, ignoredCount]); // [Active, Under Review, Ignored]
+        } catch (error) {
+            console.error('Failed to fetch threat counts:', error);
+            setThreatsDataCount([0, 0, 0]);
+        }
+    }, [complianceView, startTimestamp, endTimestamp, threatFiltersMap]);
+
+    useEffect(() => {
+        setThreatsKey(prev => !prev);
+    }, [complianceView, selectedThreatTab, startTimestamp, endTimestamp]);
+
+    useEffect(() => {
+        fetchThreatCounts();
+    }, [complianceView, startTimestamp, endTimestamp, fetchThreatCounts]);
 
     const onSelectCompliance = (compliance) => {
         setComplianceView(compliance)
@@ -624,7 +789,286 @@ function CompliancePage() {
         setMoreActions(false)
     }
 
-    const fetchTableData = async (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => {
+    const handleThreatClick = async (event) => {
+        setShowThreatDetails(true);
+        const parsedId = typeof event.id === 'string' ? JSON.parse(event.id) : event.id;
+
+        setThreatEventState({
+            currentRefId: parsedId.refId,
+            rowDataList: [],
+            moreInfoData: {
+                url: event.url || '',
+                method: event.method || '',
+                actor: parsedId.actor,
+                templateId: parsedId.filterId, // templateId is what SampleDetails expects
+                filterId: parsedId.filterId,
+                refId: parsedId.refId,
+                eventType: parsedId.eventType,
+                timestamp: event.timestamp,
+                successfulExploit: event.successfulExploit
+            },
+            currentEventId: event.eventId || '',
+            currentEventStatus: event.status || ''
+        });
+
+        try {
+            const response = await threatDetectionApi.fetchMaliciousRequest(
+                parsedId.refId,
+                parsedId.eventType,
+                parsedId.actor,
+                parsedId.filterId
+            );
+
+            const maliciousPayloads = response?.maliciousPayloadsResponses || [];
+            setThreatEventState(prev => ({
+                ...prev,
+                rowDataList: maliciousPayloads
+            }));
+        } catch (error) {
+            console.error('Failed to fetch threat details:', error);
+        }
+    };
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const fetchThreatsTableData = useCallback(async (sortKey, sortOrder, skip, limit, filters) => {
+        setThreatsLoading(true);
+
+        const filterThreatIds = calcFilteredThreatIds(complianceView);
+        const hostNameMap = PersistStore.getState().hostNameMap;
+
+        if (filterThreatIds.length === 0) {
+            setThreatsLoading(false);
+            return { value: [], total: 0 };
+        }
+
+        // Extract filters
+        const filterSeverity = filters?.severity || [];
+        const apiCollectionId = filters?.apiCollectionId || [];
+
+        // Map tab index to status value
+        const threatStatusMap = ['ACTIVE', 'UNDER_REVIEW', 'IGNORED'];
+        const statusFilter = threatStatusMap[selectedThreat] || null;
+
+        try {
+            const response = await threatDetectionApi.fetchSuspectSampleData(
+                0,
+                [],
+                apiCollectionId,
+                [],
+                [],
+                { [sortKey]: sortOrder },
+                startTimestamp,
+                endTimestamp,
+                filterThreatIds,
+                10000,
+                statusFilter,
+                undefined,
+                'THREAT',
+                [],
+                ''
+            );
+
+            // Aggregate threats by filterId
+            const uniqueThreatsMap = new Map();
+
+            response.maliciousEvents.forEach(event => {
+                const threatInfo = threatFiltersMap[event.filterId];
+                const severity = threatInfo?.severity || 'HIGH';
+
+                // Apply severity filter
+                if (filterSeverity.length > 0 && !filterSeverity.includes(severity)) {
+                    return;
+                }
+
+                const key = event.filterId;
+
+                if (!uniqueThreatsMap.has(key)) {
+                    uniqueThreatsMap.set(key, {
+                        _isThreat: true,
+                        id: { filterId: event.filterId },
+                        severity: func.toSentenceCase(severity),
+                        severityType: severity,
+                        issueName: event.filterId,
+                        category: threatInfo?.category?.name || 'Threat',
+                        numberOfEndpoints: 1,
+                        creationTime: event.timestamp,
+                        compliance: Object.keys(threatInfo?.compliance?.mapComplianceToListClauses || {}),
+                        issueStatus: 'false',
+                        domains: [(hostNameMap[event.apiCollectionId] || apiCollectionMap[event.apiCollectionId])],
+                        urls: [{
+                            method: event.method,
+                            url: event.url,
+                            id: JSON.stringify({
+                                filterId: event.filterId,
+                                refId: event.refId,
+                                eventType: event.eventType,
+                                actor: event.actor,
+                                _isThreat: true
+                            }),
+                            actor: event.actor,
+                            timestamp: event.timestamp,
+                            successfulExploit: event.successfulExploit,
+                            eventId: event.id,
+                            status: event.status
+                        }]
+                    });
+                } else {
+                    const existing = uniqueThreatsMap.get(key);
+                    const domain = hostNameMap[event.apiCollectionId] || apiCollectionMap[event.apiCollectionId];
+                    if (!existing.domains.includes(domain)) {
+                        existing.domains.push(domain);
+                    }
+                    existing.urls.push({
+                        method: event.method,
+                        url: event.url,
+                        id: JSON.stringify({
+                            filterId: event.filterId,
+                            refId: event.refId,
+                            eventType: event.eventType,
+                            actor: event.actor,
+                            _isThreat: true
+                        }),
+                        actor: event.actor,
+                        timestamp: event.timestamp,
+                        successfulExploit: event.successfulExploit,
+                        eventId: event.id,
+                        status: event.status
+                    });
+                    existing.numberOfEndpoints += 1;
+                }
+            });
+
+            let allThreatItems = Array.from(uniqueThreatsMap.values());
+
+            // Calculate total endpoints across all categories
+            const threatsTotal = allThreatItems.reduce((sum, threat) => sum + threat.numberOfEndpoints, 0);
+
+            // Flatten all endpoints with their category info for endpoint-level pagination
+            const allEndpoints = [];
+            allThreatItems.forEach(threat => {
+                threat.urls.forEach(url => {
+                    allEndpoints.push({
+                        ...threat,
+                        urls: [url],
+                        singleEndpoint: true
+                    });
+                });
+            });
+
+            // Apply pagination at endpoint level
+            const paginatedEndpoints = allEndpoints.slice(skip, skip + limit);
+
+            // Re-aggregate by filterId for display
+            const displayMap = new Map();
+            paginatedEndpoints.forEach(endpoint => {
+                const key = endpoint.id.filterId;
+                if (!displayMap.has(key)) {
+                    displayMap.set(key, {
+                        ...endpoint,
+                        numberOfEndpoints: 1,
+                        urls: [endpoint.urls[0]]
+                    });
+                } else {
+                    const existing = displayMap.get(key);
+                    existing.urls.push(endpoint.urls[0]);
+                    existing.numberOfEndpoints += 1;
+                }
+            });
+
+            const threatItems = Array.from(displayMap.values());
+
+            // Transform for table
+            const threatTableData = threatItems.map((threat, idx) => {
+                const maxShowCompliance = 3;
+                const badge = threat.compliance.length > maxShowCompliance ? (
+                    <Text variant="bodySm" fontWeight="medium" tone="subdued">
+                        +{threat.compliance.length - maxShowCompliance}
+                    </Text>
+                ) : null;
+
+                return {
+                    key: `${threat.id.filterId}|${idx}`,
+                    id: threat.urls.map((x) => x.id),
+                    severity: <div className={`badge-wrapper-${threat.severityType}`}>
+                        <Badge size="small">{threat.severity}</Badge>
+                    </div>,
+                    issueName: <Text>{threatFiltersMap[threat.issueName]?._id || threat.issueName}</Text>,
+                    category: threatFiltersMap[threat.issueName]?.category?.shortName || 'Threat',
+                    numberOfEndpoints: threat.numberOfEndpoints,
+                    compliance: <HorizontalStack wrap={false} gap={1}>
+                        {threat.compliance.slice(0, maxShowCompliance).map((x, i) =>
+                            <Avatar key={i} source={func.getComplianceIcon(x)} shape="square" size="extraSmall"/>
+                        )}
+                        <Box>{badge}</Box>
+                    </HorizontalStack>,
+                    creationTime: func.prettifyEpoch(threat.creationTime),
+                    issueStatus: null,
+                    domains: <ShowListInBadge itemsArr={threat.domains} maxItems={1} maxWidth={"250px"} status={"new"} itemWidth={"200px"} />,
+                    collapsibleRow: getThreatCollapsibleRow(threat.urls)
+                };
+            });
+
+            setThreatsLoading(false);
+            return { value: threatTableData, total: threatsTotal };
+        } catch (error) {
+            console.error('Failed to fetch threats:', error);
+            setThreatsLoading(false);
+            return { value: [], total: 0 };
+        }
+    }, [selectedThreat, complianceView, startTimestamp, endTimestamp, threatFiltersMap, apiCollectionMap]);
+
+    const getThreatCollapsibleRow = (urls) => {
+        return (
+            <tr style={{background: "#FAFBFB", padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
+                <td colSpan={'100%'} style={{padding: '0px !important'}}>
+                    {urls.map((ele, index) => {
+                        const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth: 1} : {}
+                        return (
+                            <Box padding={"2"} paddingInlineEnd={"4"} paddingInlineStart={"3"} key={index}
+                                borderColor="border-subdued" {...borderStyle}>
+                                <HorizontalStack gap={24} wrap={false}>
+                                    <Box paddingInlineStart={10}>
+                                        <div style={{width: '20px'}}></div>
+                                    </Box>
+                                    <HorizontalStack gap={"4"}>
+                                        <Link monochrome onClick={() => handleThreatClick({
+                                            id: ele.id,
+                                            url: ele.url,
+                                            method: ele.method,
+                                            timestamp: ele.timestamp,
+                                            successfulExploit: ele.successfulExploit,
+                                            eventId: ele.eventId,
+                                            status: ele.status
+                                        })} removeUnderline>
+                                            <Text>{ele.method} {ele.url}</Text>
+                                        </Link>
+                                        <Box paddingInlineStart="3">
+                                            <HorizontalStack gap={2}>
+                                                <Text color="subdued" variant="bodySm">Actor: {ele.actor}</Text>
+                                                <Text color="subdued" variant="bodySm">•</Text>
+                                                <Text color="subdued" variant="bodySm">
+                                                    {func.prettifyEpoch(ele.timestamp)}
+                                                </Text>
+                                                {ele.successfulExploit && (
+                                                    <>
+                                                        <Text color="subdued" variant="bodySm">•</Text>
+                                                        <Badge tone="critical" size="small">Exploited</Badge>
+                                                    </>
+                                                )}
+                                            </HorizontalStack>
+                                        </Box>
+                                    </HorizontalStack>
+                                </HorizontalStack>
+                            </Box>
+                        )
+                    })}
+                </td>
+            </tr>
+        )
+    };
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const fetchTableData = useCallback(async (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => {
         setTableLoading(true)
         let filterStatus = [selectedTab.toUpperCase()]
         let filterSeverity = filters.severity
@@ -633,7 +1077,7 @@ function CompliancePage() {
         const apiCollectionId = filters.apiCollectionId || []
         let filterCollectionsId = apiCollectionId.concat(filters.collectionIds)
         let filterSubCategory = calcFilteredTestIds(complianceView)
-        
+
         const collectionIdsArray = filterCollectionsId.map((x) => {return x.toString()})
 
         let obj = {
@@ -709,7 +1153,7 @@ function CompliancePage() {
         setLoading(false)
 
         return {value: ret, total: total}
-    }
+    }, [selectedTab, complianceView, startTimestamp, endTimestamp, subCategoryMap, apiCollectionMap, initialValForResponseFilter])
 
     const components = (
         <>
@@ -718,31 +1162,76 @@ function CompliancePage() {
                 <CriticalFindingsGraph startTimestamp={getTimeEpoch("since")} endTimestamp={getTimeEpoch("until")} linkText={""} linkUrl={""} complianceMode={complianceView}/>
             </HorizontalGrid>
 
-            <GithubServerTable
-                key={key}
-                pageLimit={50}
-                fetchData={fetchTableData}
-                appliedFilters={appliedFilters}
-                sortOptions={sortOptions}
-                resourceName={resourceName}
-                filters={filtersOptions}
-                disambiguateLabel={disambiguateLabel}
-                headers={headers}
-                getStatus={() => { return "warning" }}
-                selected={selected}
-                onRowClick={() => {}}
-                onSelect={handleSelectedTab}
-                getFilteredItems={()=>{}}
-                mode={IndexFiltersMode.Default}
-                headings={headers}
-                useNewRow={true}
-                condensedHeight={true}
-                tableTabs={tableTabs}
-                selectable={true}
-                promotedBulkActions={promotedBulkActions}
-                loading={loading || tableLoading}
-                hideQueryField={true}
-                isMultipleItemsSelected={true}
+            <VerticalStack gap={2}>
+                <Text variant="headingMd" as="h2">Vulnerability Issues</Text>
+                <GithubServerTable
+                    key={key}
+                    pageLimit={50}
+                    fetchData={fetchTableData}
+                    appliedFilters={appliedFilters}
+                    sortOptions={sortOptions}
+                    resourceName={resourceName}
+                    filters={filtersOptions}
+                    disambiguateLabel={disambiguateLabel}
+                    headers={headers}
+                    getStatus={() => { return "warning" }}
+                    selected={selected}
+                    onRowClick={() => {}}
+                    onSelect={handleSelectedTab}
+                    getFilteredItems={()=>{}}
+                    mode={IndexFiltersMode.Default}
+                    headings={headers}
+                    useNewRow={true}
+                    condensedHeight={true}
+                    tableTabs={tableTabs}
+                    selectable={true}
+                    promotedBulkActions={promotedBulkActions}
+                    loading={loading || tableLoading}
+                    hideQueryField={true}
+                    isMultipleItemsSelected={true}
+                    showFooter={false}
+                />
+            </VerticalStack>
+
+            <VerticalStack gap={2}>
+                <Text variant="headingMd" as="h2">Threat Detection</Text>
+                <GithubServerTable
+                    key={threatsKey}
+                    pageLimit={50}
+                    fetchData={fetchThreatsTableData}
+                    sortOptions={sortOptions}
+                    resourceName={resourceName}
+                    headers={threatHeaders}
+                    getStatus={() => { return "warning" }}
+                    selected={selectedThreat}
+                    onRowClick={() => {}}
+                    onSelect={handleSelectedThreatTab}
+                    getFilteredItems={()=>{}}
+                    mode={IndexFiltersMode.Default}
+                    headings={threatHeaders}
+                    useNewRow={true}
+                    condensedHeight={true}
+                    tableTabs={threatTableTabs}
+                    loading={threatsLoading}
+                    hideQueryField={true}
+                    filters={threatFiltersOptions}
+                />
+            </VerticalStack>
+
+            <SampleDetails
+                title={"Attacker payload"}
+                showDetails={showThreatDetails}
+                setShowDetails={setShowThreatDetails}
+                data={threatEventState.rowDataList}
+                key={`threat-sample-details-${threatEventState.currentRefId || 'default'}`}
+                moreInfoData={threatEventState.moreInfoData}
+                threatFiltersMap={threatFiltersMap}
+                eventId={threatEventState.currentEventId}
+                eventStatus={threatEventState.currentEventStatus}
+                onStatusUpdate={() => {
+                    setThreatsKey(prev => !prev);
+                    fetchThreatCounts();
+                }}
             />
         </>
     )

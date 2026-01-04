@@ -93,7 +93,7 @@ const sortOptions = [
 
 let filters = [];
 
-function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABELS.THREAT }) {
+function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABELS.THREAT, complianceMode = null }) {
   const location = useLocation();
   const getTimeEpoch = (key) => {
     return Math.floor(Date.parse(currDateRange.period[key]) / 1000);
@@ -422,7 +422,22 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     if(filters?.host){
       hostFilter = filters?.host
     }
-    
+
+    // Apply compliance filtering if complianceMode is provided
+    if (complianceMode) {
+      const complianceFilteredThreatIds = Object.entries(threatFiltersMap)
+        .filter(([_, v]) => !!v.compliance?.mapComplianceToListClauses?.[complianceMode])
+        .map(([k, _]) => k);
+
+      // If latestAttack filter exists, intersect with compliance filtered IDs
+      if (latestAttack.length > 0) {
+        latestAttack = latestAttack.filter(id => complianceFilteredThreatIds.includes(id));
+      } else {
+        // If no latestAttack filter, use all compliance filtered IDs
+        latestAttack = complianceFilteredThreatIds;
+      }
+    }
+
     // Store current filters for bulk operations
     setCurrentFilters({
       actor: sourceIpsFilter,
