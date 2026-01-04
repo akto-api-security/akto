@@ -4,6 +4,7 @@ const transform = {
     /**
      * Process threats data for report display
      * @param {Array} threats - Array of malicious event objects
+     * @param {Object} threatFiltersMap - Map of filterId to threat template with display name
      * @returns {Object} Transformed data for report
      */
     processThreatsForReport(threats) {
@@ -35,12 +36,15 @@ const transform = {
             threatsByActor[actor].count++
             threatsByActor[actor].threats.push(threat)
 
-            // Group by category
+            // Get display name from threat filter template
+            const displayName = threat?.filterId || threat.subCategory || threat.category || 'Unknown'
+
+            // Group by category - use display name as key
             const category = threat.category || 'Unknown'
             if (!threatsByCategory[category]) {
                 threatsByCategory[category] = {
                     category: category,
-                    subCategory: threat.subCategory || '',
+                    subCategory: displayName,
                     count: 0,
                     severityCounts: { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 },
                     threats: []
@@ -56,8 +60,8 @@ const transform = {
                 actor: actor,
                 time: threat.detectedAt ? new Date(threat.detectedAt * 1000).toLocaleString() : '-',
                 timestamp: threat.detectedAt || 0,
-                category: category,
-                subCategory: threat.subCategory || '',
+                category: displayName,
+                subCategory: displayName,
                 targetedApi: `${threat.latestApiMethod || ''} ${threat.latestApiEndpoint || ''}`.trim(),
                 endpoint: threat.latestApiEndpoint || '',
                 method: threat.latestApiMethod || '',

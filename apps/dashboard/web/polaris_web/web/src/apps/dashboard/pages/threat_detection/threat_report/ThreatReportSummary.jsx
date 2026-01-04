@@ -86,7 +86,7 @@ const ThreatReportSummary = ({
     const topCategoriesChartData = threatsByCategory
         .slice(0, 5) // Top 5
         .map((cat, idx) => ({
-            text: cat.category.replaceAll("_", " "),
+            text: cat.subCategory || cat.category.replaceAll("_", " "),
             value: cat.count,
             color: categoryColors[idx % categoryColors.length]
         }))
