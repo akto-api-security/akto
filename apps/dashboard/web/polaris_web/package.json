@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@ai-sdk/react": "^3.0.6",
     "@emotion/react": "^11.9.3",
     "@emotion/styled": "^11.9.3",
     "@fortawesome/free-regular-svg-icons": "^5.15.3",
@@ -18,6 +19,7 @@
     "@tiptap/extension-placeholder": "^2.11.5",
     "@tiptap/react": "^2.11.5",
     "@tiptap/starter-kit": "^2.11.5",
+    "ai": "^6.0.6",
     "assert": "^2.1.0",
     "axios": "^1.4.0",
     "buffer": "^6.0.3",

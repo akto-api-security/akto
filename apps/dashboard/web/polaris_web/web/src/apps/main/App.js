@@ -116,7 +116,8 @@ import ThreatDashboardPage from "../dashboard/pages/threat_detection/ThreatDashb
 import OpenApiAgentTester from "../dashboard/pages/observe/OpenApiAgentTester";
 import DastProgress from "../dashboard/pages/observe/api_collections/DastProgress.jsx";
 import DastProgressSingle from "../dashboard/pages/observe/api_collections/DastProgressSingle.jsx";
-import AgenticMainPage from "../dashboard/pages/agentic/AgenticMainPage.jsx";
+import AgenticMainPage from "../dashboard/pages/agentic/AgenticMainPageV2.jsx";
+import AgenticV3MainPage from "../dashboard/pages/agenticv3/MainPage.jsx";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -294,6 +295,10 @@ const router = createBrowserRouter([
                     {
                         path: "ask-ai",
                         element: <AgenticMainPage/>,
+                    },
+                    {
+                        path: "ask-ai-v3",
+                        element: <AgenticV3MainPage/>,
                     },
                     {
                         path: "quick-start",

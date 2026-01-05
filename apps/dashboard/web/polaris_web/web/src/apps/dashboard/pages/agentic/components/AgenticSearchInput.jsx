@@ -1,35 +1,50 @@
-import { useState, useCallback } from 'react';
-import { Box, Icon, TextField } from '@shopify/polaris';
+import { useCallback } from 'react';
+import { Box, Icon, TextField, Form, Button } from '@shopify/polaris';
 import { ArrowUpMinor } from '@shopify/polaris-icons';
 
+/**
+ * AgenticSearchInput - AI SDK Compatible
+ *
+ * Works with AI SDK's useChat hook by accepting:
+ * - input: from useChat's input state
+ * - handleInputChange: from useChat's handleInputChange
+ * - handleSubmit: from useChat's handleSubmit
+ * - isLoading: from useChat's isLoading
+ */
 function AgenticSearchInput({
-    value: externalValue,
-    onChange,
-    onSubmit,
+    input = '',
+    handleInputChange = () => {},
+    handleSubmit = () => {},
+    isLoading = false,
     placeholder = "How can I help you today?",
-    isStreaming = false,
     isFixed = false,
-    containerStyle = {}
+    containerStyle = {},
 }) {
-    const [internalValue, setInternalValue] = useState('');
-
-    const value = externalValue !== undefined ? externalValue : internalValue;
-    const setValue = onChange || setInternalValue;
-
-    const handleChange = useCallback((newValue) => setValue(newValue), [setValue]);
-
-    const handleSubmit = useCallback(() => {
-        if (value.trim() && onSubmit) {
-            onSubmit(value);
+    // Handle input changes - AI SDK expects (e) => void
+    const handleChange = useCallback((newValue) => {
+        if (typeof newValue === 'string') {
+            // Polaris TextField passes string directly
+            handleInputChange({ target: { value: newValue } });
+        } else {
+            // Already an event object
+            handleInputChange(newValue);
         }
-    }, [value, onSubmit]);
+    }, [handleInputChange]);
+
+    // Handle form submission - AI SDK handles the actual submission
+    const onFormSubmit = useCallback((e) => {
+        e.preventDefault();
+        if (input.trim()) {
+            handleSubmit(e);
+        }
+    }, [input, handleSubmit]);
 
     const handleKeyDown = useCallback((e) => {
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            handleSubmit();
+            onFormSubmit(e);
         }
-    }, [handleSubmit]);
+    }, [onFormSubmit]);
 
     // Wrapper styles for fixed vs normal positioning
     const wrapperStyle = isFixed ? {
@@ -84,72 +99,75 @@ function AgenticSearchInput({
             `}</style>
             <Box style={{ ...wrapperStyle, ...containerStyle }}>
                 <Box style={innerContainerStyle}>
-                    <Box
-                        className="agentic-search-input"
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            width: isFixed ? '100%' : '520px',
-                            padding: '8px 12px',
-                            borderRadius: '12px',
-                            border: '1px solid rgba(98, 0, 234, 0.67)',
-                            background: '#FFF',
-                            boxShadow: '0 0 5px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.15)'
-                        }}
-                        onKeyDown={handleKeyDown}
-                    >
-                        <Box style={{ flex: 1 }}>
-                            <TextField
-                                value={value}
-                                onChange={handleChange}
-                                placeholder={placeholder}
-                                autoComplete="off"
-                                borderless
-                            />
-                        </Box>
-                    <Box
-                        onClick={handleSubmit}
-                        style={{
-                            padding: '8px',
-                            borderRadius: '8px',
-                            background: (isStreaming || value.trim()) ? 'rgba(109, 59, 239, 1)' : 'rgba(109, 59, 239, 0.2)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: isStreaming ? 'default' : 'pointer',
-                            flexShrink: 0,
-                            marginLeft: '8px',
-                            transition: 'background 0.2s ease',
-                            width: '32px',
-                            height: '32px',
-                            pointerEvents: isStreaming ? 'none' : 'auto'
-                        }}
-                    >
-                        {isStreaming ? (
-                            <img
-                                src="/public/stream.svg"
-                                alt="Processing"
-                                style={{
-                                    width: '16px',
-                                    height: '16px',
-                                    filter: 'brightness(0) invert(1)',
-                                    color: 'rgba(255, 255, 255, 1)',
-                                    animation: 'spin 1s linear infinite'
-                                }}
-                            />
-                        ) : (
-                            <Box style={{
-                                color: 'rgba(255, 255, 255, 1)',
+                    <Form onSubmit={onFormSubmit}>
+                        <Box
+                            className="agentic-search-input"
+                            style={{
                                 display: 'flex',
-                                filter: 'brightness(0) invert(1)'
-                            }}>
-                                <Icon source={ArrowUpMinor} />
+                                alignItems: 'center',
+                                width: isFixed ? '100%' : '520px',
+                                padding: '8px 12px',
+                                borderRadius: '12px',
+                                border: '1px solid rgba(98, 0, 234, 0.67)',
+                                background: '#FFF',
+                                boxShadow: '0 0 5px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.15)'
+                            }}
+                            onKeyDown={handleKeyDown}
+                        >
+                            <Box style={{ flex: 1 }}>
+                                <TextField
+                                    value={input}
+                                    onChange={handleChange}
+                                    placeholder={placeholder}
+                                    autoComplete="off"
+                                    borderless
+                                />
                             </Box>
-                        )}
-                    </Box>
+                            <Button
+                                submit
+                                disabled={isLoading || !input.trim()}
+                                plain
+                            >
+                                <Box
+                                    style={{
+                                        padding: '8px',
+                                        borderRadius: '8px',
+                                        background: (isLoading || input.trim()) ? 'rgba(109, 59, 239, 1)' : 'rgba(109, 59, 239, 0.2)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transition: 'background 0.2s ease',
+                                        width: '32px',
+                                        height: '32px'
+                                    }}
+                                >
+                                    {isLoading ? (
+                                        <img
+                                            src="/public/stream.svg"
+                                            alt="Processing"
+                                            style={{
+                                                width: '16px',
+                                                height: '16px',
+                                                filter: 'brightness(0) invert(1)',
+                                                color: 'rgba(255, 255, 255, 1)',
+                                                animation: 'spin 1s linear infinite'
+                                            }}
+                                        />
+                                    ) : (
+                                        <Box style={{
+                                            color: 'rgba(255, 255, 255, 1)',
+                                            display: 'flex',
+                                            filter: 'brightness(0) invert(1)'
+                                        }}>
+                                            <Icon source={ArrowUpMinor} />
+                                        </Box>
+                                    )}
+                                </Box>
+                            </Button>
+                        </Box>
+                    </Form>
                 </Box>
             </Box>
-        </Box>
         </>
     );
 }
