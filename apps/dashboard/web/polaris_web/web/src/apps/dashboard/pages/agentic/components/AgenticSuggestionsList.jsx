@@ -7,7 +7,7 @@ function AgenticSuggestionsList({ suggestions, onSuggestionClick }) {
                 width: '100%',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '4px'
+                gap: '2px'
             }}
         >
             {suggestions.map((suggestion, suggestionIndex) => (

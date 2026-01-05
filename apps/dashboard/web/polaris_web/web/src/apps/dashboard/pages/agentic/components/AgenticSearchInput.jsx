@@ -1,8 +1,8 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
 import { Box, Icon, TextField } from '@shopify/polaris';
 import { ArrowUpMinor } from '@shopify/polaris-icons';
 
-function AgenticSearchInput({
+const AgenticSearchInput = forwardRef(({
     value: externalValue,
     onChange,
     onSubmit,
@@ -10,12 +10,24 @@ function AgenticSearchInput({
     isStreaming = false,
     isFixed = false,
     containerStyle = {}
-}) {
+}, ref) => {
     const [internalValue, setInternalValue] = useState('');
     const inputRef = useRef(null);
 
     const value = externalValue !== undefined ? externalValue : internalValue;
     const setValue = onChange || setInternalValue;
+
+    // Expose focus method to parent component
+    useImperativeHandle(ref, () => ({
+        focus: () => {
+            if (inputRef.current) {
+                const input = inputRef.current.querySelector('input');
+                if (input) {
+                    input.focus();
+                }
+            }
+        }
+    }));
 
     const handleChange = useCallback((newValue) => setValue(newValue), [setValue]);
 
@@ -209,6 +221,8 @@ function AgenticSearchInput({
         </Box>
         </>
     );
-}
+});
+
+AgenticSearchInput.displayName = 'AgenticSearchInput';
 
 export default AgenticSearchInput;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Page, Box, Text, Banner, Icon } from '@shopify/polaris';
 import { ArrowLeftMinor } from '@shopify/polaris-icons';
 import AgenticUserMessage from './components/AgenticUserMessage';
@@ -38,6 +38,9 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack 
 
     // Error state
     const [error, setError] = useState(null);
+
+    // Ref for search input
+    const searchInputRef = useRef(null);
 
     // Initialize conversation on mount
     useEffect(() => {
@@ -89,6 +92,30 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack 
             saveConversationToLocal(conversationId, messages);
         }
     }, [conversationId, messages]);
+
+    // Auto-focus input on keypress
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            // Ignore if user is already typing in an input/textarea
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                return;
+            }
+
+            // Ignore special keys
+            const ignoredKeys = ['Escape', 'Tab', 'Enter', 'Shift', 'Control', 'Alt', 'Meta', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+            if (ignoredKeys.includes(e.key)) {
+                return;
+            }
+
+            // Focus the input field
+            if (searchInputRef.current) {
+                searchInputRef.current.focus();
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, []);
 
     // Process a query and handle streaming
     const processQuery = async (convId, query) => {
@@ -231,6 +258,9 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack 
                     display: flex;
                     flex-direction: column;
                 }
+                .Polaris-Page > .Polaris-Box {
+                    background: transparent !important;
+                }
             `}</style>
             <Page fullWidth>
                 {/* Error Banner */}
@@ -347,6 +377,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack 
 
                 {/* Fixed follow-up input bar */}
                 <AgenticSearchInput
+                    ref={searchInputRef}
                     value={followUpValue}
                     onChange={setFollowUpValue}
                     onSubmit={() => handleFollowUpSubmit(followUpValue)}
