@@ -144,6 +144,9 @@ public class DbAction extends ActionSupport {
     @Getter @Setter
     private ModuleInfo moduleInfo;
 
+    @Getter @Setter
+    private List<ModuleInfo> moduleInfoList;
+
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbAction.class, LogDb.DB_ABS);
 
     public List<BulkUpdates> getWritesForTestingRunIssues() {
@@ -422,6 +425,16 @@ public class DbAction extends ActionSupport {
             // TODO: in case of modules with fixed names, reset reboot value, if reboot true;
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in updateModuleInfo " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String bulkUpdateModuleInfo() {
+        try {
+            DbLayer.bulkUpdateModuleInfo(moduleInfoList);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in bulkUpdateModuleInfo " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
