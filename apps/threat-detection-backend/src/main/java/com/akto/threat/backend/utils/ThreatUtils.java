@@ -62,7 +62,8 @@ public class ThreatUtils {
             return false;
         }
         String contextSourceUpper = contextSource.toUpperCase();
-        return "AGENTIC".equals(contextSourceUpper) || "ENDPOINT".equals(contextSourceUpper);
+        return CONTEXT_SOURCE.AGENTIC.name().equals(contextSourceUpper)
+                || CONTEXT_SOURCE.ENDPOINT.name().equals(contextSourceUpper);
     }
 
     public static String fetchMetadataString(String metadataStr) {
