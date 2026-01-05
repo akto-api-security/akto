@@ -4,15 +4,20 @@ import AgenticWelcomeHeader from './components/AgenticWelcomeHeader';
 import AgenticSearchInput from './components/AgenticSearchInput';
 import AgenticSuggestions from './components/AgenticSuggestions';
 import AgenticHistoryCards from './components/AgenticHistoryCards';
+import AgenticConversationPage from './AgenticConversationPage';
 
 function AgenticMainPage() {
     // In a real app, this might come from a context or prop
     const username = window.USER_FULL_NAME || window.USER_NAME || "User";
 
     const [searchValue, setSearchValue] = useState('');
+    const [showConversation, setShowConversation] = useState(false);
+    const [currentQuery, setCurrentQuery] = useState('');
 
     const handleSearchSubmit = useCallback((query) => {
         console.log('Search submitted:', query);
+        setCurrentQuery(query);
+        setShowConversation(true);
         // Add your search logic here
         // For example: navigate to results page, fetch data, etc.
     }, []);
@@ -21,6 +26,11 @@ function AgenticMainPage() {
         setSearchValue(suggestion);
         handleSearchSubmit(suggestion);
     }, [handleSearchSubmit]);
+
+    // If conversation is active, show the conversation page
+    if (showConversation) {
+        return <AgenticConversationPage initialQuery={currentQuery} />;
+    }
 
     return (
        <Page fullWidth>

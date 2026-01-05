@@ -20,10 +20,9 @@ function AgenticSuggestions({ onSuggestionClick, hide }) {
             display: 'flex',
             justifyContent: 'center',
             opacity: hide ? 0 : 1,
-            maxHeight: hide ? 0 : '500px',
-            overflow: 'hidden',
-            transition: 'opacity 0.3s ease, max-height 0.3s ease, margin-bottom 0.3s ease',
-            marginBottom: hide ? 0 : '32px'
+            visibility: hide ? 'hidden' : 'visible',
+            transition: 'opacity 0.3s ease, visibility 0.3s ease',
+            pointerEvents: hide ? 'none' : 'auto'
         }}>
             <Box style={{ width: '520px' }}>
                 <VerticalStack gap="4">

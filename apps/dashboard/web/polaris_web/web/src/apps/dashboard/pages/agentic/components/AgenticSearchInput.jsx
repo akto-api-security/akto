@@ -16,8 +16,9 @@ function AgenticSearchInput({ value: externalValue, onChange, onSubmit, placehol
         }
     }, [value, onSubmit]);
 
-    const handleKeyPress = useCallback((e) => {
+    const handleKeyDown = useCallback((e) => {
         if (e.key === 'Enter') {
+            e.preventDefault();
             handleSubmit();
         }
     }, [handleSubmit]);
@@ -35,6 +36,7 @@ function AgenticSearchInput({ value: externalValue, onChange, onSubmit, placehol
                     background: '#FFF',
                     boxShadow: '0 0 5px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.15)'
                 }}
+                onKeyDown={handleKeyDown}
             >
                 <Box style={{ flex: 1 }}>
                     <TextField
@@ -42,7 +44,6 @@ function AgenticSearchInput({ value: externalValue, onChange, onSubmit, placehol
                         onChange={handleChange}
                         placeholder={placeholder}
                         autoComplete="off"
-                        onKeyPress={handleKeyPress}
                         borderless
                     />
                 </Box>
