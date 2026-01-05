@@ -4399,10 +4399,12 @@ public class DbAction extends ActionSupport {
             loggerMaker.infoAndAddToDb("Fetching all API IDs for Bloom filter initialization", LogDb.DB_ABS);
 
             // Query api_info collection, projection to only return _id fields
+            // Use withDocumentClass to convert MongoCollection<ApiInfo> to MongoCollection<Document>
             com.mongodb.client.FindIterable<org.bson.Document> cursor = ApiInfoDao.instance
                 .getMCollection()
+                .withDocumentClass(org.bson.Document.class)
                 .find()
-                .projection(com.mongodb.client.model.Projections.include("_id.apiCollectionId", "_id.url", "_id.method"))
+                .projection(Projections.include("_id.apiCollectionId", "_id.url", "_id.method"))
                 .batchSize(10000);
 
             List<Map<String, Object>> apiIdsList = new ArrayList<>();
@@ -4457,24 +4459,26 @@ public class DbAction extends ActionSupport {
             loggerMaker.infoAndAddToDb("Checking existence for " + apiIdsToCheck.size() + " APIs", LogDb.DB_ABS);
 
             // Build batch query
-            List<com.mongodb.client.model.Bson> orConditions = new ArrayList<>();
+            List<Bson> orConditions = new ArrayList<>();
             for (Map<String, Object> apiIdMap : apiIdsToCheck) {
                 int apiCollectionId = ((Number) apiIdMap.get("apiCollectionId")).intValue();
                 String url = (String) apiIdMap.get("url");
                 String method = (String) apiIdMap.get("method");
 
-                orConditions.add(com.mongodb.client.model.Filters.and(
-                    com.mongodb.client.model.Filters.eq("_id.apiCollectionId", apiCollectionId),
-                    com.mongodb.client.model.Filters.eq("_id.url", url),
-                    com.mongodb.client.model.Filters.eq("_id.method", method)
+                orConditions.add(Filters.and(
+                    Filters.eq("_id.apiCollectionId", apiCollectionId),
+                    Filters.eq("_id.url", url),
+                    Filters.eq("_id.method", method)
                 ));
             }
 
             // Query existing APIs
+            // Use withDocumentClass to convert MongoCollection<ApiInfo> to MongoCollection<Document>
             com.mongodb.client.FindIterable<org.bson.Document> existing = ApiInfoDao.instance
                 .getMCollection()
-                .find(com.mongodb.client.model.Filters.or(orConditions))
-                .projection(com.mongodb.client.model.Projections.include("_id"));
+                .withDocumentClass(org.bson.Document.class)
+                .find(Filters.or(orConditions))
+                .projection(Projections.include("_id"));
 
             Set<String> existingKeys = new HashSet<>();
             for (org.bson.Document doc : existing) {
