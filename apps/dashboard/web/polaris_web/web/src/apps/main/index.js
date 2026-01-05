@@ -13,7 +13,7 @@ const container = document.getElementById("root");
 const root = createRoot(container);
 
 let expired = false;
-const ALLOWED_PLANS = ['enterprise', 'professional'];
+const ALLOWED_PLANS = ['enterprise', 'professional', 'trial'];
 
 if (
   window.STIGG_CUSTOMER_ID &&
