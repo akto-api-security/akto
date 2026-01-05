@@ -91,6 +91,7 @@ import com.akto.task.Cluster;
 import com.akto.telemetry.TelemetryJob;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
+import com.akto.testing.HostDNSLookup;
 import com.akto.testing.workflow_node_executor.Utils;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.util.*;
@@ -761,9 +762,9 @@ public class InitializerListener implements ServletContextListener {
                                 loggerMaker.infoAndAddToDb(payload, LogDb.DASHBOARD);
                                 try {
                                     URI uri = URI.create(webhookUrl);
-                                    // if (!HostDNSLookup.isRequestValid(uri.getHost())) {
-                                    //     throw new IllegalArgumentException("SSRF attack attempt");
-                                    // }
+                                    if (!HostDNSLookup.isRequestValid(uri.getHost())) {
+                                        throw new IllegalArgumentException("SSRF attack attempt");
+                                    }
                                     loggerMaker.infoAndAddToDb("Payload for changes:" + payload, LogDb.DASHBOARD);
                                     WebhookResponse response = slack.send(webhookUrl, payload);
                                     loggerMaker.infoAndAddToDb("Changes webhook response: " + response.getBody(), LogDb.DASHBOARD);
