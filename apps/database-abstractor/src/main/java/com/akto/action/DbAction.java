@@ -4377,4 +4377,135 @@ public class DbAction extends ActionSupport {
     public void setTestedApisMap(Map<String, Integer> testedApisMap) {
         this.testedApisMap = testedApisMap;
     }
+
+    // Fields for fetchApiIds API (Fast-Discovery Consumer)
+    private List<Map<String, Object>> apiIds;
+
+    public List<Map<String, Object>> getApiIds() {
+        return apiIds;
+    }
+
+    public void setApiIds(List<Map<String, Object>> apiIds) {
+        this.apiIds = apiIds;
+    }
+
+    /**
+     * Fetch all API IDs for Bloom filter initialization in fast-discovery consumer.
+     * Returns lightweight projection: apiCollectionId, url, method only.
+     * Endpoint: GET /api/fetchApiIds
+     */
+    public String fetchApiIds() {
+        try {
+            loggerMaker.infoAndAddToDb("Fetching all API IDs for Bloom filter initialization", LogDb.DB_ABS);
+
+            // Query api_info collection, projection to only return _id fields
+            com.mongodb.client.FindIterable<org.bson.Document> cursor = ApiInfoDao.instance
+                .getMCollection()
+                .find()
+                .projection(com.mongodb.client.model.Projections.include("_id.apiCollectionId", "_id.url", "_id.method"))
+                .batchSize(10000);
+
+            List<Map<String, Object>> apiIdsList = new ArrayList<>();
+            for (org.bson.Document doc : cursor) {
+                org.bson.Document id = (org.bson.Document) doc.get("_id");
+                if (id != null) {
+                    Map<String, Object> apiId = new HashMap<>();
+                    apiId.put("apiCollectionId", id.getInteger("apiCollectionId"));
+                    apiId.put("url", id.getString("url"));
+                    apiId.put("method", id.getString("method"));
+                    apiIdsList.add(apiId);
+                }
+            }
+
+            this.apiIds = apiIdsList;
+            loggerMaker.infoAndAddToDb("Fetched " + apiIdsList.size() + " API IDs", LogDb.DB_ABS);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchApiIds: " + e.toString(), LogDb.DB_ABS);
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    // Fields for checkApisExist API (Fast-Discovery Consumer)
+    private List<Map<String, Object>> apiIdsToCheck;
+    private List<Map<String, Object>> apiExistenceResults;
+
+    public List<Map<String, Object>> getApiIdsToCheck() {
+        return apiIdsToCheck;
+    }
+
+    public void setApiIdsToCheck(List<Map<String, Object>> apiIdsToCheck) {
+        this.apiIdsToCheck = apiIdsToCheck;
+    }
+
+    public List<Map<String, Object>> getApiExistenceResults() {
+        return apiExistenceResults;
+    }
+
+    public void setApiExistenceResults(List<Map<String, Object>> apiExistenceResults) {
+        this.apiExistenceResults = apiExistenceResults;
+    }
+
+    /**
+     * Check if APIs exist in database (batch check for fast-discovery consumer).
+     * Request: {"apiIds": [{"apiCollectionId": 1, "url": "/api/users", "method": "GET"}, ...]}
+     * Response: {"results": [{"apiCollectionId": 1, "url": "/api/users", "method": "GET", "exists": true}, ...]}
+     * Endpoint: POST /api/checkApisExist
+     */
+    public String checkApisExist() {
+        try {
+            loggerMaker.infoAndAddToDb("Checking existence for " + apiIdsToCheck.size() + " APIs", LogDb.DB_ABS);
+
+            // Build batch query
+            List<com.mongodb.client.model.Bson> orConditions = new ArrayList<>();
+            for (Map<String, Object> apiIdMap : apiIdsToCheck) {
+                int apiCollectionId = ((Number) apiIdMap.get("apiCollectionId")).intValue();
+                String url = (String) apiIdMap.get("url");
+                String method = (String) apiIdMap.get("method");
+
+                orConditions.add(com.mongodb.client.model.Filters.and(
+                    com.mongodb.client.model.Filters.eq("_id.apiCollectionId", apiCollectionId),
+                    com.mongodb.client.model.Filters.eq("_id.url", url),
+                    com.mongodb.client.model.Filters.eq("_id.method", method)
+                ));
+            }
+
+            // Query existing APIs
+            com.mongodb.client.FindIterable<org.bson.Document> existing = ApiInfoDao.instance
+                .getMCollection()
+                .find(com.mongodb.client.model.Filters.or(orConditions))
+                .projection(com.mongodb.client.model.Projections.include("_id"));
+
+            Set<String> existingKeys = new HashSet<>();
+            for (org.bson.Document doc : existing) {
+                org.bson.Document id = (org.bson.Document) doc.get("_id");
+                String key = id.getInteger("apiCollectionId") + "|" + id.getString("url") + "|" + id.getString("method");
+                existingKeys.add(key);
+            }
+
+            // Build response with exists flag
+            List<Map<String, Object>> results = new ArrayList<>();
+            for (Map<String, Object> apiIdMap : apiIdsToCheck) {
+                int apiCollectionId = ((Number) apiIdMap.get("apiCollectionId")).intValue();
+                String url = (String) apiIdMap.get("url");
+                String method = (String) apiIdMap.get("method");
+                String key = apiCollectionId + "|" + url + "|" + method;
+
+                Map<String, Object> result = new HashMap<>();
+                result.put("apiCollectionId", apiCollectionId);
+                result.put("url", url);
+                result.put("method", method);
+                result.put("exists", existingKeys.contains(key));
+                results.add(result);
+            }
+
+            this.apiExistenceResults = results;
+            long existingCount = results.stream().filter(r -> (Boolean) r.get("exists")).count();
+            loggerMaker.infoAndAddToDb("Checked " + results.size() + " APIs, " + existingCount + " exist", LogDb.DB_ABS);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in checkApisExist: " + e.toString(), LogDb.DB_ABS);
+            return Action.ERROR.toUpperCase();
+        }
+    }
 }
