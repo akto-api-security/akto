@@ -29,6 +29,7 @@ const ScannerDetectionStep = ({
 }) => {
     return (
         <VerticalStack gap="4">
+            <Text variant="headingSm">{title}</Text>
             <Text variant="bodyMd" tone="subdued">
                 {description}
             </Text>

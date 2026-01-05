@@ -451,6 +451,17 @@ function GuardrailPolicies() {
                 ...(guardrailData.basePromptRule ? { basePromptRule: guardrailData.basePromptRule } : {}),
                 // Add Gibberish Detection if present (same pattern as llmRule)
                 ...(guardrailData.gibberishDetection ? { gibberishDetection: guardrailData.gibberishDetection } : {}),
+                // Add Advanced Scanner Detections if present
+                ...(guardrailData.anonymizeDetection ? { anonymizeDetection: guardrailData.anonymizeDetection } : {}),
+                ...(guardrailData.banCodeDetection ? { banCodeDetection: guardrailData.banCodeDetection } : {}),
+                ...(guardrailData.banCompetitorsDetection ? { banCompetitorsDetection: guardrailData.banCompetitorsDetection } : {}),
+                ...(guardrailData.banSubstringsDetection ? { banSubstringsDetection: guardrailData.banSubstringsDetection } : {}),
+                ...(guardrailData.banTopicsDetection ? { banTopicsDetection: guardrailData.banTopicsDetection } : {}),
+                ...(guardrailData.intentAnalysisDetection ? { intentAnalysisDetection: guardrailData.intentAnalysisDetection } : {}),
+                ...(guardrailData.languageDetection ? { languageDetection: guardrailData.languageDetection } : {}),
+                ...(guardrailData.secretsDetection ? { secretsDetection: guardrailData.secretsDetection } : {}),
+                ...(guardrailData.sentimentDetection ? { sentimentDetection: guardrailData.sentimentDetection } : {}),
+                ...(guardrailData.tokenLimitDetection ? { tokenLimitDetection: guardrailData.tokenLimitDetection } : {}),
                 applyOnResponse: guardrailData.applyOnResponse || false,
                 applyOnRequest: guardrailData.applyOnRequest || false,
                 url: guardrailData.url || '',
