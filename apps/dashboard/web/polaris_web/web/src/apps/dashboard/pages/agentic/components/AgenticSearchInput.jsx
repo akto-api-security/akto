@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Box, Icon, TextField } from '@shopify/polaris';
 import { ArrowUpMinor } from '@shopify/polaris-icons';
 
@@ -12,6 +12,7 @@ function AgenticSearchInput({
     containerStyle = {}
 }) {
     const [internalValue, setInternalValue] = useState('');
+    const inputRef = useRef(null);
 
     const value = externalValue !== undefined ? externalValue : internalValue;
     const setValue = onChange || setInternalValue;
@@ -21,6 +22,23 @@ function AgenticSearchInput({
     const handleSubmit = useCallback(() => {
         if (value.trim() && onSubmit) {
             onSubmit(value);
+
+            // Scroll to the bottom of the page smoothly
+            setTimeout(() => {
+                // Scroll to the absolute bottom of the page
+                window.scrollTo({
+                    top: document.documentElement.scrollHeight,
+                    behavior: 'smooth'
+                });
+
+                // Focus the input field
+                if (inputRef.current) {
+                    const input = inputRef.current.querySelector('input');
+                    if (input) {
+                        input.focus();
+                    }
+                }
+            }, 100);
         }
     }, [value, onSubmit]);
 
@@ -56,6 +74,15 @@ function AgenticSearchInput({
     return (
         <>
             <style>{`
+                @keyframes shimmer {
+                    0% {
+                        background-position: -1000px 0;
+                    }
+                    100% {
+                        background-position: 1000px 0;
+                    }
+                }
+
                 .agentic-search-input .Polaris-TextField {
                     border: none !important;
                     box-shadow: none !important;
@@ -81,18 +108,48 @@ function AgenticSearchInput({
                     border: none !important;
                     box-shadow: none !important;
                 }
+
+                .shimmer-container {
+                    position: relative;
+                    overflow: hidden;
+                }
+
+                .shimmer-container::before {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    border-radius: 12px;
+                    padding: 1px;
+                    background: linear-gradient(
+                        90deg,
+                        rgba(98, 0, 234, 0.67) 0%,
+                        rgba(98, 0, 234, 0.67) 40%,
+                        rgba(200, 150, 255, 1) 50%,
+                        rgba(98, 0, 234, 0.67) 60%,
+                        rgba(98, 0, 234, 0.67) 100%
+                    );
+                    background-size: 200% 100%;
+                    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+                    -webkit-mask-composite: xor;
+                    mask-composite: exclude;
+                    animation: shimmer 3s linear infinite;
+                    pointer-events: none;
+                }
             `}</style>
             <Box style={{ ...wrapperStyle, ...containerStyle }}>
                 <Box style={innerContainerStyle}>
                     <Box
-                        className="agentic-search-input"
+                        className="agentic-search-input shimmer-container"
+                        ref={inputRef}
                         style={{
                             display: 'flex',
                             alignItems: 'center',
                             width: isFixed ? '100%' : '520px',
                             padding: '8px 12px',
                             borderRadius: '12px',
-                            border: '1px solid rgba(98, 0, 234, 0.67)',
                             background: '#FFF',
                             boxShadow: '0 0 5px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.15)'
                         }}

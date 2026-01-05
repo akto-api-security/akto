@@ -164,7 +164,10 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack 
                     const suggestions = await getSuggestions(convId);
                     setCurrentSuggestions(suggestions);
 
-                    // Add complete assistant message to history FIRST
+                    // Stop streaming FIRST to prevent double display
+                    setIsStreaming(false);
+
+                    // Then add complete assistant message to history
                     const assistantMessage = {
                         id: generateMessageId(),
                         type: 'assistant',
@@ -177,9 +180,6 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack 
                     };
 
                     setMessages(prev => [...prev, assistantMessage]);
-
-                    // Then stop streaming - this prevents flicker
-                    setIsStreaming(false);
                 },
                 (err) => {
                     console.error('Error streaming response:', err);
