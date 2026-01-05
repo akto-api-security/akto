@@ -69,9 +69,9 @@ public class ApiExecutor {
                 HTTPClientHandler.instance.getNewDebugClient(isSaasDeployment, followRedirects, testLogs) :
                 HTTPClientHandler.instance.getHTTPClient(followRedirects);
 
-        // if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
-        //     throw new IllegalArgumentException("SSRF attack attempt");
-        // }
+        if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
+            throw new IllegalArgumentException("SSRF attack attempt");
+        }
         boolean isCyborgCall = request.url().toString().contains("cyborg.akto.io");
         long start = System.currentTimeMillis();
 
