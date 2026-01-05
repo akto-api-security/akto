@@ -69,17 +69,38 @@ public class KafkaUtils {
     public static void main(String[] args) throws Exception {
         try {
             KafkaUtils kafkaUtils = new KafkaUtils();
-            if (kafkaUtils.isReadEnabled()) {
-                kafkaUtils.initKafkaConsumer();
-            }
 
+            // Start Kafka producer if write enabled
             if (kafkaUtils.isWriteEnabled()) {
                 kafkaUtils.initKafkaProducer();
             }
+
+            // Start fast-discovery consumer if enabled
+            if (kafkaUtils.isFastDiscoveryEnabled()) {
+                String brokerUrl = getBrokerUrl();
+                String topicName = getFastDiscoveryTopicName();
+                String groupId = "fast-discovery-consumer";
+                int maxPollRecords = Integer.parseInt(getCachedEnv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
+
+                com.akto.FastDiscoveryKafkaConsumer fastDiscoveryConsumer =
+                    new com.akto.FastDiscoveryKafkaConsumer(
+                        brokerUrl,
+                        topicName,
+                        groupId,
+                        maxPollRecords
+                    );
+                fastDiscoveryConsumer.start();
+                loggerMaker.infoAndAddToDb("Fast-discovery consumer started on topic: " + topicName, LogDb.DB_ABS);
+            }
+
+            // Start main consumer if read enabled (this blocks)
+            if (kafkaUtils.isReadEnabled()) {
+                kafkaUtils.initKafkaConsumer();
+            }
         } catch (Exception e) {
-            // TODO: handle exception
+            loggerMaker.errorAndAddToDb(e, "Error in main: " + e.toString(), LogDb.DB_ABS);
         }
-        
+
     }
 
     public static String getReadTopicName() {
@@ -263,6 +284,63 @@ public class KafkaUtils {
             return false;
         }
         return writeEnabled.equalsIgnoreCase("true");
+    }
+
+    /**
+     * Check if fast-discovery Kafka topic is enabled.
+     * Used by FastDiscoveryKafkaConsumer to determine if it should start.
+     */
+    public boolean isFastDiscoveryEnabled() {
+        String fastDiscoveryEnabled = getCachedEnv("FAST_DISCOVERY_KAFKA_ENABLED");
+        if (fastDiscoveryEnabled == null) {
+            return false;  // Disabled by default
+        }
+        return fastDiscoveryEnabled.equalsIgnoreCase("true");
+    }
+
+    /**
+     * Get the fast-discovery Kafka topic name.
+     * Default: akto.fast-discovery.writes
+     */
+    public static String getFastDiscoveryTopicName() {
+        String topicName = getCachedEnv("FAST_DISCOVERY_KAFKA_TOPIC_NAME");
+        if (topicName == null || topicName.isEmpty()) {
+            return "akto.fast-discovery.writes";  // Default topic name
+        }
+        return topicName;
+    }
+
+    /**
+     * Get broker URL for Kafka connections.
+     */
+    public static String getBrokerUrl() {
+        String kafkaBrokerUrl = getCachedEnv("AKTO_KAFKA_BROKER_URL");
+        String isKubernetes = getCachedEnv("IS_KUBERNETES");
+        if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
+            return "127.0.0.1:29092";
+        }
+        return kafkaBrokerUrl != null ? kafkaBrokerUrl : "localhost:9092";
+    }
+
+    /**
+     * Insert data to fast-discovery Kafka topic.
+     * Used by fastDiscoveryBulkWriteSti and fastDiscoveryBulkWriteApiInfo endpoints.
+     */
+    public void insertFastDiscoveryData(Object data, String triggerMethod, int accountId) {
+        try {
+            String topicName = getFastDiscoveryTopicName();
+            String payloadStr = gson.toJson(data);
+            BasicDBObject obj = new BasicDBObject();
+            obj.put("triggerMethod", triggerMethod);
+            obj.put("payload", payloadStr);
+            obj.put("accountId", accountId);
+            obj.put("source", "fast-discovery");  // Mark source for identification
+
+            kafkaProducer.send(obj.toString(), topicName);
+            loggerMaker.infoAndAddToDb("Sent fast-discovery data to topic: " + topicName, LogDb.DB_ABS);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertFastDiscoveryData: " + e.toString(), LogDb.DB_ABS);
+        }
     }
 
 

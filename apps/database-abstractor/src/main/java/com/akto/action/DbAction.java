@@ -4512,4 +4512,110 @@ public class DbAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
     }
+
+    /**
+     * Fast-discovery bulk write to single_type_info collection.
+     * Writes to dedicated fast-discovery Kafka topic: akto.fast-discovery.writes
+     * Endpoint: POST /api/fastDiscoveryBulkWriteSti
+     *
+     * This endpoint is optimized for fast-discovery consumer which only sends
+     * minimal data (host header entries) for quick API discovery.
+     */
+    public String fastDiscoveryBulkWriteSti() {
+        try {
+            int accountId = Context.accountId.get();
+            loggerMaker.infoAndAddToDb("Fast-discovery bulkWriteSti: " + writesForSti.size() +
+                " writes for account " + accountId, LogDb.DB_ABS);
+
+            KafkaUtils kafkaUtils = new KafkaUtils();
+
+            if (kafkaUtils.isWriteEnabled() && kafkaUtils.isFastDiscoveryEnabled()) {
+                // Write to fast-discovery Kafka topic
+                kafkaUtils.insertFastDiscoveryData(writesForSti, "bulkWriteSti", accountId);
+                loggerMaker.infoAndAddToDb("Sent fast-discovery STI writes to Kafka topic: " +
+                    KafkaUtils.getFastDiscoveryTopicName(), LogDb.DB_ABS);
+            } else {
+                // Direct DB write (fallback when Kafka disabled)
+                loggerMaker.infoAndAddToDb("Kafka disabled, writing directly to DB", LogDb.DB_ABS);
+                bulkWriteSti();  // Reuse existing logic
+            }
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fastDiscoveryBulkWriteSti: " + e.toString(), LogDb.DB_ABS);
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Fast-discovery bulk write to api_info collection.
+     * Writes to dedicated fast-discovery Kafka topic: akto.fast-discovery.writes
+     * Endpoint: POST /api/fastDiscoveryBulkWriteApiInfo
+     *
+     * This endpoint is optimized for fast-discovery consumer which only sends
+     * minimal API info data for quick API discovery.
+     */
+    public String fastDiscoveryBulkWriteApiInfo() {
+        try {
+            int accountId = Context.accountId.get();
+            loggerMaker.infoAndAddToDb("Fast-discovery bulkWriteApiInfo: " + apiInfoList.size() +
+                " writes for account " + accountId, LogDb.DB_ABS);
+
+            KafkaUtils kafkaUtils = new KafkaUtils();
+
+            if (kafkaUtils.isWriteEnabled() && kafkaUtils.isFastDiscoveryEnabled()) {
+                // Convert apiInfoList to BulkUpdates format for Kafka message
+                List<BulkUpdates> bulkWrites = convertApiInfoToBulkUpdates(apiInfoList);
+
+                // Write to fast-discovery Kafka topic
+                kafkaUtils.insertFastDiscoveryData(bulkWrites, "bulkWriteApiInfo", accountId);
+                loggerMaker.infoAndAddToDb("Sent fast-discovery API info writes to Kafka topic: " +
+                    KafkaUtils.getFastDiscoveryTopicName(), LogDb.DB_ABS);
+            } else {
+                // Direct DB write (fallback when Kafka disabled)
+                loggerMaker.infoAndAddToDb("Kafka disabled, writing directly to DB", LogDb.DB_ABS);
+                bulkWriteApiInfo();  // Reuse existing logic
+            }
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fastDiscoveryBulkWriteApiInfo: " + e.toString(), LogDb.DB_ABS);
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Convert apiInfoList (BasicDBObject format) back to BulkUpdates format
+     * for transmission via Kafka. This is needed because the fast-discovery
+     * consumer expects BulkUpdates format in Kafka messages.
+     */
+    private List<BulkUpdates> convertApiInfoToBulkUpdates(List<BasicDBObject> apiInfoList) {
+        List<BulkUpdates> bulkWrites = new ArrayList<>();
+
+        for (BasicDBObject apiInfo : apiInfoList) {
+            // Extract _id for filters
+            Map<String, Object> filters = new HashMap<>();
+            Object id = apiInfo.get("id");
+            if (id != null) {
+                filters.put("_id", id);
+            }
+
+            // Convert remaining fields to updates
+            ArrayList<String> updates = new ArrayList<>();
+            for (String key : apiInfo.keySet()) {
+                if (!key.equals("id")) {  // Skip id, it's in filters
+                    Object value = apiInfo.get(key);
+                    Map<String, Object> update = new HashMap<>();
+                    update.put("field", key);
+                    update.put("val", value);
+                    update.put("op", "set");
+                    updates.add(new Gson().toJson(update));
+                }
+            }
+
+            bulkWrites.add(new BulkUpdates(filters, updates));
+        }
+
+        return bulkWrites;
+    }
 }
