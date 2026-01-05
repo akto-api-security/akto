@@ -102,7 +102,7 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
 
         String cursor = null;
         String lastCursor = null;
-        int maxIterations = 10; // Safety limit
+        int maxIterations = 20; // Safety limit
         int iteration = 0;
 
         try {
