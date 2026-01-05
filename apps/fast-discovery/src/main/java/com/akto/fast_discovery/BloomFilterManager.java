@@ -20,7 +20,7 @@ public class BloomFilterManager {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(BloomFilterManager.class);
 
-    private BloomFilter<String> seenApis;
+    private BloomFilter<CharSequence> seenApis;
     private final long expectedSize;
     private final double falsePositiveRate;
     private final DatabaseAbstractorClient dbAbstractorClient;
@@ -56,9 +56,10 @@ public class BloomFilterManager {
         long startTime = System.currentTimeMillis();
 
         // Create Bloom filter
+        // Cast expectedSize to int (Guava's BloomFilter.create expects int, not long)
         seenApis = BloomFilter.create(
                 Funnels.stringFunnel(Charsets.UTF_8),
-                expectedSize,
+                (int) expectedSize,
                 falsePositiveRate
         );
 
