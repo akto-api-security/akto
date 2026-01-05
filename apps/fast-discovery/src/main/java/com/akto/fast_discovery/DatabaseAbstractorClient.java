@@ -1,8 +1,8 @@
 package com.akto.fast_discovery;
 
+import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.fast_discovery.dto.ApiExistenceResult;
 import com.akto.fast_discovery.dto.ApiId;
-import com.akto.fast_discovery.dto.BulkUpdates;
 import com.akto.log.LoggerMaker;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
