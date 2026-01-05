@@ -1,9 +1,9 @@
 package com.akto.fast_discovery;
 
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.fast_discovery.dto.ApiExistenceResult;
 import com.akto.fast_discovery.dto.ApiId;
-import com.akto.fast_discovery.dto.BulkUpdates;
 import com.akto.log.LoggerMaker;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -215,7 +215,7 @@ public class FastDiscoveryConsumer {
             filters.put("_id", id);
 
             // Build updates
-            List<String> updates = new ArrayList<>();
+            ArrayList<String> updates = new ArrayList<>();
             updates.add(String.format("{\"field\": \"timestamp\", \"val\": %d, \"op\": \"set\"}", timestamp));
             updates.add(String.format("{\"field\": \"collectionIds\", \"val\": [%d], \"op\": \"set\"}", apiCollectionId));
             updates.add("{\"field\": \"count\", \"val\": 1, \"op\": \"set\"}");
@@ -249,7 +249,7 @@ public class FastDiscoveryConsumer {
             filters.put("_id", id);
 
             // Build updates
-            List<String> updates = new ArrayList<>();
+            ArrayList<String> updates = new ArrayList<>();
             updates.add(String.format("{\"field\": \"lastSeen\", \"val\": %d, \"op\": \"set\"}", timestamp));
             updates.add(String.format("{\"field\": \"discoveredTimestamp\", \"val\": %d, \"op\": \"setOnInsert\"}", timestamp));
             updates.add(String.format("{\"field\": \"collectionIds\", \"val\": [%d], \"op\": \"set\"}", apiCollectionId));
