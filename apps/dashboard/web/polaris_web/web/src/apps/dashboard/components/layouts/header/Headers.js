@@ -69,7 +69,7 @@ export default function Header() {
     }, [dashboardCategory]);
 
 
-    const logoSrc = dashboardCategory === "Agentic Security" ? "/public/akto-christmas-agentic.svg" : "/public/akto-christmas.svg";
+    const logoSrc = dashboardCategory === "Agentic Security" ? "/public/white_logo.svg" : "/public/akto_name_with_logo.svg";
     const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {};
     const agenticSecurityGranted =
         stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || true
@@ -277,11 +277,11 @@ export default function Header() {
                 </HorizontalStack> : null}
 
             {/* 2025 Wrapped Button */}
-            <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => setShowWrapped(true)}>
+            {/* <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => setShowWrapped(true)}>
                 <div style={{ background: 'linear-gradient(to right, #ff416c, #ff4b2b)', borderRadius: '4px', padding: '4px 8px', color: 'white', fontWeight: 'bold', fontSize: '12px' }}>
                     2025 Wrapped <span style={{marginInlineStart: '2px'}}>🎁</span>
                 </div>
-            </div>
+            </div> */}
 
             <TopBar.Menu
                 activatorContent={
@@ -311,7 +311,7 @@ export default function Header() {
                     <Box paddingInlineStart={3} paddingInlineEnd={3}>
                         <HorizontalStack gap={4} wrap={false}>
                             <div style={{ cursor: 'pointer' }} onClick={() => window.location.href = "/dashboard/observe/inventory"} className='logo'>
-                                <img src={logoSrc} alt="Akto Logo" style={{ maxWidth: '90px' }} />
+                                <img src={logoSrc} alt="Akto Logo" style={{ maxWidth: '78px' }} />
                             </div>
 
                             <Box minWidth='170px'>

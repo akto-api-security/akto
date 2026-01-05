@@ -97,6 +97,11 @@ public class RiskScoreSyncCron {
                             }
                         }
 
+                        if(filters.isEmpty()){
+                            loggerMaker.warnAndAddToDb("No filters found for account " + accountId);
+                            return;
+                        }
+
                         List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(Filters.or(filters));
                         List<WriteModel<ApiInfo>> updates = new ArrayList<>();
                         for(ApiInfo apiInfo: apiInfos){
