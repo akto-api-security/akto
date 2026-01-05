@@ -403,7 +403,7 @@ function IssuesPage() {
             }
             resetResourcesSelected()
         }).catch((err) => {
-            setToast(true, true, err?.response?.data?.errorMessage || "Error creating DevRev tickets")
+            setToast(true, true, err?.response?.data?.errorMessage || err?.response?.data?.actionErrors?.[0] || "Error creating DevRev tickets")
         })
     }
 

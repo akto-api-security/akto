@@ -102,7 +102,7 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
 
         String cursor = null;
         String lastCursor = null;
-        int maxIterations = 20; // Safety limit
+        int maxIterations = 10; // Safety limit
         int iteration = 0;
 
         try {
@@ -301,11 +301,14 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
         String hostname = endpointDetails.getFirst();
         String endpointPath = endpointDetails.getSecond();
 
-        String truncatedEndpoint = endpointPath.length() > 50 ?
-            endpointPath.substring(0, 25) + "..." + endpointPath.substring(endpointPath.length() - 25) : endpointPath;
-
         String title = String.format("Security Issue: %s (%s - %s)",
-            testInfo.getName(), method, truncatedEndpoint);
+            testInfo.getName(), method, endpointPath);
+
+        // Max length for title (as per deverv docs)
+        if (title.length() > 256) {
+            title = title.substring(0, 253) + "...";
+        }
+
         payload.put("title", title);
 
         StringBuilder body = new StringBuilder();
@@ -334,7 +337,13 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
             }
         }
 
-        payload.put("body", body.toString());
+        String bodyString = body.toString();
+        // Max length for body (as per deverv docs)
+        if (bodyString.length() > 65536) {
+            bodyString = bodyString.substring(0, 65500) + "...";
+        }
+
+        payload.put("body", bodyString);
         payload.put("applies_to_part", partId);
         return payload;
     }
@@ -378,16 +387,6 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
 
             StringBuilder data = new StringBuilder();
 
-            if (StringUtils.isNotBlank(origCurl)) {
-                data.append("### Original Curl\n\n");
-                data.append("```\n").append(origCurl).append("\n```\n\n");
-            }
-
-            if (StringUtils.isNotBlank(origResponse)) {
-                data.append("### Original API Response\n\n");
-                data.append("```\n").append(origResponse).append("\n```\n\n");
-            }
-
             if (StringUtils.isNotBlank(testCurl)) {
                 data.append("### Test Curl\n\n");
                 data.append("```\n").append(testCurl).append("\n```\n\n");
@@ -396,6 +395,16 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
             if (StringUtils.isNotBlank(testResponse)) {
                 data.append("### Test API Response\n\n");
                 data.append("```\n").append(testResponse).append("\n```\n\n");
+            }
+
+            if (StringUtils.isNotBlank(origCurl)) {
+                data.append("### Original Curl\n\n");
+                data.append("```\n").append(origCurl).append("\n```\n\n");
+            }
+
+            if (StringUtils.isNotBlank(origResponse)) {
+                data.append("### Original API Response\n\n");
+                data.append("```\n").append(origResponse).append("\n```\n\n");
             }
 
             return data.toString();
