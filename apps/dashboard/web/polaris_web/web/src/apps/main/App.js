@@ -292,7 +292,7 @@ const router = createBrowserRouter([
                         ]
                     },
                     {
-                        path: "agentic-main",
+                        path: "ask-ai",
                         element: <AgenticMainPage/>,
                     },
                     {

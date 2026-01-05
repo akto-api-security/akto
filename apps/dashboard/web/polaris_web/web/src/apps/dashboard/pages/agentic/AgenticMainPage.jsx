@@ -4,6 +4,7 @@ import AgenticWelcomeHeader from './components/AgenticWelcomeHeader';
 import AgenticSearchInput from './components/AgenticSearchInput';
 import AgenticSuggestions from './components/AgenticSuggestions';
 import AgenticHistoryCards from './components/AgenticHistoryCards';
+import AgenticHistoryModal from './components/AgenticHistoryModal';
 import AgenticConversationPage from './AgenticConversationPage';
 
 function AgenticMainPage() {
@@ -13,10 +14,13 @@ function AgenticMainPage() {
     const [searchValue, setSearchValue] = useState('');
     const [showConversation, setShowConversation] = useState(false);
     const [currentQuery, setCurrentQuery] = useState('');
+    const [loadConversationId, setLoadConversationId] = useState(null);
+    const [showHistoryModal, setShowHistoryModal] = useState(false);
 
     const handleSearchSubmit = useCallback((query) => {
         console.log('Search submitted:', query);
         setCurrentQuery(query);
+        setLoadConversationId(null); // Clear conversation ID for new search
         setShowConversation(true);
         // Add your search logic here
         // For example: navigate to results page, fetch data, etc.
@@ -27,9 +31,29 @@ function AgenticMainPage() {
         handleSearchSubmit(suggestion);
     }, [handleSearchSubmit]);
 
+    const handleHistoryClick = useCallback((conversationId, title) => {
+        console.log('History clicked:', conversationId, title);
+        setLoadConversationId(conversationId); // Load existing conversation
+        setCurrentQuery(''); // Clear query for history load
+        setShowConversation(true);
+    }, []);
+
+    const handleViewAllClick = useCallback(() => {
+        setShowHistoryModal(true);
+    }, []);
+
     // If conversation is active, show the conversation page
     if (showConversation) {
-        return <AgenticConversationPage initialQuery={currentQuery} />;
+        return (
+            <AgenticConversationPage
+                initialQuery={currentQuery}
+                existingConversationId={loadConversationId}
+                onBack={() => {
+                    setShowConversation(false);
+                    setSearchValue(''); // Clear search input when going back
+                }}
+            />
+        );
     }
 
     return (
@@ -64,12 +88,22 @@ function AgenticMainPage() {
                         </Box>
                         <Box width="100%" style={{ display: 'flex', justifyContent: 'center' }}>
                             <Box style={{ width: '520px' }}>
-                                <AgenticHistoryCards />
+                                <AgenticHistoryCards
+                                    onHistoryClick={handleHistoryClick}
+                                    onViewAllClick={handleViewAllClick}
+                                />
                             </Box>
                         </Box>
                     </VerticalStack>
                 </Box>
             </Box>
+
+            {/* History Modal */}
+            <AgenticHistoryModal
+                isOpen={showHistoryModal}
+                onClose={() => setShowHistoryModal(false)}
+                onHistoryClick={handleHistoryClick}
+            />
         </Page>
     );
 }

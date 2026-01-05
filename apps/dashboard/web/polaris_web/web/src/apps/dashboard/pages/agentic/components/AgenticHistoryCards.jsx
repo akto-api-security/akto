@@ -1,23 +1,33 @@
+import { useState, useEffect } from 'react';
 import { Box, Text, HorizontalStack } from '@shopify/polaris';
+import { getConversationsList } from '../services/agenticService';
 
-function AgenticHistoryCards() {
-    const historyItems = [
-        {
-            id: 1,
-            title: 'Validate agent resilience to instruction override attacks',
-            time: '1 day ago',
-        },
-        {
-            id: 2,
-            title: 'Prompt injection risks across agents',
-            time: '1 day ago',
-        },
-        {
-            id: 3,
-            title: 'Investigating agent behavior',
-            time: '1 day ago',
-        },
-    ];
+function AgenticHistoryCards({ onHistoryClick, onViewAllClick }) {
+    const [historyItems, setHistoryItems] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        // Load conversation history from service
+        const loadHistory = async () => {
+            setIsLoading(true);
+            try {
+                const conversations = await getConversationsList(3); // Get 3 most recent
+                setHistoryItems(conversations);
+            } catch (error) {
+                console.error('Error loading conversation history:', error);
+                setHistoryItems([]);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadHistory();
+    }, []);
+
+    // Don't render if no history
+    if (historyItems.length === 0) {
+        return null;
+    }
 
     return (
         <Box width="100%">
@@ -29,9 +39,18 @@ function AgenticHistoryCards() {
                         <Text variant="headingSm" as="h2">
                             History
                         </Text>
-                        <Text variant="bodySm" as="span" tone="interactive" style={{ cursor: 'pointer' }}>
-                            View all
-                        </Text>
+                        <div
+                            onClick={onViewAllClick}
+                            style={{ cursor: 'pointer' }}
+                        >
+                            <Text
+                                variant="bodySm"
+                                as="span"
+                                tone="interactive"
+                            >
+                                View all
+                            </Text>
+                        </div>
                     </HorizontalStack>
                 </Box>
 
@@ -40,14 +59,16 @@ function AgenticHistoryCards() {
                     {historyItems.map((item) => (
                         <Box
                             key={item.id}
+                            onClick={() => onHistoryClick && onHistoryClick(item.id, item.title)}
                             style={{
                                 cursor: 'pointer',
                                 padding: '12px', // Inner padding of 12px for each card
                                 borderRadius: '8px',
                                 background: '#FAFAFA',
                                 boxShadow: '0 0 5px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.15)',
-                                flex: '1 1 calc(33.333% - 11px)', // 3 columns with 16px gap
-                                minWidth: '150px'
+                                flex: '0 0 calc(33.333% - 11px)', // 3 columns with 16px gap, no grow
+                                minWidth: '150px',
+                                maxWidth: 'calc(33.333% - 11px)' // Prevent single card from stretching
                             }}
                         >
                             {/* Each tile contains two vertical boxes with gap of 32px */}

@@ -512,7 +512,7 @@ export default function LeftNav() {
                 icon: MagicMinor,
                 onClick: () => {
                     handleSelect("dashboard_agentic_main")
-                    navigate("/dashboard/agentic-main")
+                    navigate("/dashboard/ask-ai")
                     setActive("normal")
                 },
                 selected: leftNavSelected === "dashboard_agentic_main",
