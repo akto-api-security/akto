@@ -31,6 +31,8 @@ import {
     BasePromptConfig,
     GibberishDetectionStep,
     GibberishDetectionConfig,
+    AdvancedScannersStep,
+    AdvancedScannersConfig,
     ExternalModelStep,
     ExternalModelConfig,
     ServerSettingsStep,
@@ -90,6 +92,27 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [enableGibberishDetection, setEnableGibberishDetection] = useState(false);
     const [gibberishConfidenceScore, setGibberishConfidenceScore] = useState(0.7);
 
+    // Step 8.5: Advanced Scanners
+    const [enableAnonymize, setEnableAnonymize] = useState(false);
+    const [anonymizeConfidenceScore, setAnonymizeConfidenceScore] = useState(0.7);
+    const [enableBanCode, setEnableBanCode] = useState(false);
+    const [banCodeConfidenceScore, setBanCodeConfidenceScore] = useState(0.7);
+    const [enableBanCompetitors, setEnableBanCompetitors] = useState(false);
+    const [banCompetitorsConfidenceScore, setBanCompetitorsConfidenceScore] = useState(0.7);
+    const [enableBanSubstrings, setEnableBanSubstrings] = useState(false);
+    const [banSubstringsConfidenceScore, setBanSubstringsConfidenceScore] = useState(0.7);
+    const [enableBanTopics, setEnableBanTopics] = useState(false);
+    const [banTopicsConfidenceScore, setBanTopicsConfidenceScore] = useState(0.7);
+    const [enableIntentAnalysis, setEnableIntentAnalysis] = useState(false);
+    const [intentAnalysisConfidenceScore, setIntentAnalysisConfidenceScore] = useState(0.7);
+    const [enableLanguage, setEnableLanguage] = useState(false);
+    const [languageConfidenceScore, setLanguageConfidenceScore] = useState(0.7);
+    const [enableSecrets, setEnableSecrets] = useState(false);
+    const [secretsConfidenceScore, setSecretsConfidenceScore] = useState(0.7);
+    const [enableSentiment, setEnableSentiment] = useState(false);
+    const [sentimentConfidenceScore, setSentimentConfidenceScore] = useState(0.7);
+    const [enableTokenLimit, setEnableTokenLimit] = useState(false);
+    const [tokenLimitConfidenceScore, setTokenLimitConfidenceScore] = useState(0.7);
 
     // Step 9: External model based evaluation
     const [url, setUrl] = useState("");
@@ -134,6 +157,27 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         // Step 8
         enableGibberishDetection,
         gibberishConfidenceScore,
+        // Step 8.5
+        enableAnonymize,
+        anonymizeConfidenceScore,
+        enableBanCode,
+        banCodeConfidenceScore,
+        enableBanCompetitors,
+        banCompetitorsConfidenceScore,
+        enableBanSubstrings,
+        banSubstringsConfidenceScore,
+        enableBanTopics,
+        banTopicsConfidenceScore,
+        enableIntentAnalysis,
+        intentAnalysisConfidenceScore,
+        enableLanguage,
+        languageConfidenceScore,
+        enableSecrets,
+        secretsConfidenceScore,
+        enableSentiment,
+        sentimentConfidenceScore,
+        enableTokenLimit,
+        tokenLimitConfidenceScore,
 
         // Step 9
         url,
@@ -200,13 +244,19 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 ...GibberishDetectionConfig.validate(storedStateData)
             },
             {
-                number: ExternalModelConfig.number,
+                number: AdvancedScannersConfig.number,
+                title: AdvancedScannersConfig.title,
+                summary: AdvancedScannersConfig.getSummary(storedStateData),
+                ...AdvancedScannersConfig.validate(storedStateData)
+            },
+            {
+                number: 10,
                 title: ExternalModelConfig.title,
                 summary: ExternalModelConfig.getSummary(storedStateData),
                 ...ExternalModelConfig.validate(storedStateData)
             },
             {
-                number: ServerSettingsConfig.number,
+                number: 11,
                 title: ServerSettingsConfig.title,
                 summary: ServerSettingsConfig.getSummary(storedStateData),
                 ...ServerSettingsConfig.validate(storedStateData)
@@ -310,6 +360,26 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setBasePromptConfidenceScore(0.5);
         setEnableGibberishDetection(false);
         setGibberishConfidenceScore(0.7);
+        setEnableAnonymize(false);
+        setAnonymizeConfidenceScore(0.7);
+        setEnableBanCode(false);
+        setBanCodeConfidenceScore(0.7);
+        setEnableBanCompetitors(false);
+        setBanCompetitorsConfidenceScore(0.7);
+        setEnableBanSubstrings(false);
+        setBanSubstringsConfidenceScore(0.7);
+        setEnableBanTopics(false);
+        setBanTopicsConfidenceScore(0.7);
+        setEnableIntentAnalysis(false);
+        setIntentAnalysisConfidenceScore(0.7);
+        setEnableLanguage(false);
+        setLanguageConfidenceScore(0.7);
+        setEnableSecrets(false);
+        setSecretsConfidenceScore(0.7);
+        setEnableSentiment(false);
+        setSentimentConfidenceScore(0.7);
+        setEnableTokenLimit(false);
+        setTokenLimitConfidenceScore(0.7);
         setUrl("");
         setConfidenceScore(25);
         setSelectedMcpServers([]);
@@ -406,6 +476,28 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             setEnableGibberishDetection(false);
             setGibberishConfidenceScore(0.7);
         }
+
+        // Advanced Scanners
+        const setScannerState = (detection, setEnabled, setConfidence) => {
+            if (detection) {
+                setEnabled(detection.enabled || false);
+                setConfidence(detection.confidenceScore !== undefined ? detection.confidenceScore : 0.7);
+            } else {
+                setEnabled(false);
+                setConfidence(0.7);
+            }
+        };
+
+        setScannerState(policy.anonymizeDetection, setEnableAnonymize, setAnonymizeConfidenceScore);
+        setScannerState(policy.banCodeDetection, setEnableBanCode, setBanCodeConfidenceScore);
+        setScannerState(policy.banCompetitorsDetection, setEnableBanCompetitors, setBanCompetitorsConfidenceScore);
+        setScannerState(policy.banSubstringsDetection, setEnableBanSubstrings, setBanSubstringsConfidenceScore);
+        setScannerState(policy.banTopicsDetection, setEnableBanTopics, setBanTopicsConfidenceScore);
+        setScannerState(policy.intentAnalysisDetection, setEnableIntentAnalysis, setIntentAnalysisConfidenceScore);
+        setScannerState(policy.languageDetection, setEnableLanguage, setLanguageConfidenceScore);
+        setScannerState(policy.secretsDetection, setEnableSecrets, setSecretsConfidenceScore);
+        setScannerState(policy.sentimentDetection, setEnableSentiment, setSentimentConfidenceScore);
+        setScannerState(policy.tokenLimitDetection, setEnableTokenLimit, setTokenLimitConfidenceScore);
 
 
         // External model based evaluation
@@ -516,6 +608,46 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 gibberishDetection: {
                     enabled: enableGibberishDetection,
                     confidenceScore: gibberishConfidenceScore
+                },
+                anonymizeDetection: {
+                    enabled: enableAnonymize,
+                    confidenceScore: anonymizeConfidenceScore
+                },
+                banCodeDetection: {
+                    enabled: enableBanCode,
+                    confidenceScore: banCodeConfidenceScore
+                },
+                banCompetitorsDetection: {
+                    enabled: enableBanCompetitors,
+                    confidenceScore: banCompetitorsConfidenceScore
+                },
+                banSubstringsDetection: {
+                    enabled: enableBanSubstrings,
+                    confidenceScore: banSubstringsConfidenceScore
+                },
+                banTopicsDetection: {
+                    enabled: enableBanTopics,
+                    confidenceScore: banTopicsConfidenceScore
+                },
+                intentAnalysisDetection: {
+                    enabled: enableIntentAnalysis,
+                    confidenceScore: intentAnalysisConfidenceScore
+                },
+                languageDetection: {
+                    enabled: enableLanguage,
+                    confidenceScore: languageConfidenceScore
+                },
+                secretsDetection: {
+                    enabled: enableSecrets,
+                    confidenceScore: secretsConfidenceScore
+                },
+                sentimentDetection: {
+                    enabled: enableSentiment,
+                    confidenceScore: sentimentConfidenceScore
+                },
+                tokenLimitDetection: {
+                    enabled: enableTokenLimit,
+                    confidenceScore: tokenLimitConfidenceScore
                 },
                 url: url || null,
                 confidenceScore: confidenceScore,
@@ -735,6 +867,51 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 );
             case 9:
                 return (
+                    <AdvancedScannersStep
+                        enableAnonymize={enableAnonymize}
+                        setEnableAnonymize={setEnableAnonymize}
+                        anonymizeConfidenceScore={anonymizeConfidenceScore}
+                        setAnonymizeConfidenceScore={setAnonymizeConfidenceScore}
+                        enableBanCode={enableBanCode}
+                        setEnableBanCode={setEnableBanCode}
+                        banCodeConfidenceScore={banCodeConfidenceScore}
+                        setBanCodeConfidenceScore={setBanCodeConfidenceScore}
+                        enableBanCompetitors={enableBanCompetitors}
+                        setEnableBanCompetitors={setEnableBanCompetitors}
+                        banCompetitorsConfidenceScore={banCompetitorsConfidenceScore}
+                        setBanCompetitorsConfidenceScore={setBanCompetitorsConfidenceScore}
+                        enableBanSubstrings={enableBanSubstrings}
+                        setEnableBanSubstrings={setEnableBanSubstrings}
+                        banSubstringsConfidenceScore={banSubstringsConfidenceScore}
+                        setBanSubstringsConfidenceScore={setBanSubstringsConfidenceScore}
+                        enableBanTopics={enableBanTopics}
+                        setEnableBanTopics={setEnableBanTopics}
+                        banTopicsConfidenceScore={banTopicsConfidenceScore}
+                        setBanTopicsConfidenceScore={setBanTopicsConfidenceScore}
+                        enableIntentAnalysis={enableIntentAnalysis}
+                        setEnableIntentAnalysis={setEnableIntentAnalysis}
+                        intentAnalysisConfidenceScore={intentAnalysisConfidenceScore}
+                        setIntentAnalysisConfidenceScore={setIntentAnalysisConfidenceScore}
+                        enableLanguage={enableLanguage}
+                        setEnableLanguage={setEnableLanguage}
+                        languageConfidenceScore={languageConfidenceScore}
+                        setLanguageConfidenceScore={setLanguageConfidenceScore}
+                        enableSecrets={enableSecrets}
+                        setEnableSecrets={setEnableSecrets}
+                        secretsConfidenceScore={secretsConfidenceScore}
+                        setSecretsConfidenceScore={setSecretsConfidenceScore}
+                        enableSentiment={enableSentiment}
+                        setEnableSentiment={setEnableSentiment}
+                        sentimentConfidenceScore={sentimentConfidenceScore}
+                        setSentimentConfidenceScore={setSentimentConfidenceScore}
+                        enableTokenLimit={enableTokenLimit}
+                        setEnableTokenLimit={setEnableTokenLimit}
+                        tokenLimitConfidenceScore={tokenLimitConfidenceScore}
+                        setTokenLimitConfidenceScore={setTokenLimitConfidenceScore}
+                    />
+                );
+            case 10:
+                return (
                     <ExternalModelStep
                         url={url}
                         setUrl={setUrl}
@@ -742,7 +919,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         setConfidenceScore={setConfidenceScore}
                     />
                 );
-            case 10:
+            case 11:
                 return (
                     <ServerSettingsStep
                         selectedMcpServers={selectedMcpServers}
