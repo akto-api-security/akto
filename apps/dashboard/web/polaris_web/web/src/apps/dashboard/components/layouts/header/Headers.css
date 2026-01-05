@@ -32,7 +32,7 @@ body:has(.agentic-security-nav) .Polaris-TopBar button:hover {
 }
 
 body:has(.agentic-security-nav) .logo img {
-    max-width: 90px !important;
+    max-width: 78px !important;
 }
 
 /* Fix text colors for Agentic Security test run status */
