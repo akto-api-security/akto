@@ -6,7 +6,7 @@ import {
 } from "react-router-dom";
 
 function FreeApp() {
-    const contactSalesUrl = "https://www.akto.io/agentic-security-demo";
+    const contactSalesUrl = "https://www.akto.io/demo";
     const signInUrl = "https://app-akto.us.auth0.com/u/login?state=hKFo2SB5RXdvcmdwU1hTYUdzc092WHZGYjc0VGtEbUdTdkg3cKFur3VuaXZlcnNhbC1sb2dpbqN0aWTZIFFqeG9kUWJpY3VFcW9vWXJnemlKTWQwSy1vSWRCVUYto2NpZNkgY0tFNFZOVXlvTG41SnVlb25kdFY2RDlmUGJKZ1ZpajM";
 
     const description = (
