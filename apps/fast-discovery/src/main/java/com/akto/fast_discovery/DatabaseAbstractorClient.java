@@ -149,15 +149,15 @@ public class DatabaseAbstractorClient {
     }
 
     /**
-     * Bulk write to single_type_info collection.
-     * Calls: POST /api/bulkWriteSti
+     * Bulk write to single_type_info collection via fast-discovery endpoint.
+     * Calls: POST /api/fastDiscoveryBulkWriteSti (dedicated fast-discovery endpoint)
      *
      * @param writes List of bulk updates
      * @throws Exception if HTTP call fails
      */
     public void bulkWriteSti(List<BulkUpdates> writes) throws Exception {
-        String endpoint = baseUrl + "/api/bulkWriteSti";
-        loggerMaker.infoAndAddToDb("Bulk writing " + writes.size() + " entries to single_type_info");
+        String endpoint = baseUrl + "/api/fastDiscoveryBulkWriteSti";  // Use fast-discovery endpoint
+        loggerMaker.infoAndAddToDb("Fast-discovery: Bulk writing " + writes.size() + " entries to single_type_info");
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("writesForSti", writes);
@@ -166,15 +166,15 @@ public class DatabaseAbstractorClient {
     }
 
     /**
-     * Bulk write to api_info collection.
-     * Calls: POST /api/bulkWriteApiInfo
+     * Bulk write to api_info collection via fast-discovery endpoint.
+     * Calls: POST /api/fastDiscoveryBulkWriteApiInfo (dedicated fast-discovery endpoint)
      *
      * @param writes List of bulk updates
      * @throws Exception if HTTP call fails
      */
     public void bulkWriteApiInfo(List<BulkUpdates> writes) throws Exception {
-        String endpoint = baseUrl + "/api/bulkWriteApiInfo";
-        loggerMaker.infoAndAddToDb("Bulk writing " + writes.size() + " entries to api_info");
+        String endpoint = baseUrl + "/api/fastDiscoveryBulkWriteApiInfo";  // Use fast-discovery endpoint
+        loggerMaker.infoAndAddToDb("Fast-discovery: Bulk writing " + writes.size() + " entries to api_info");
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("apiInfoList", convertToApiInfoList(writes));
