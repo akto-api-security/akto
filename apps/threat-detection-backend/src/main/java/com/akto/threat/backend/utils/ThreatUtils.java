@@ -57,6 +57,14 @@ public class ThreatUtils {
         return new Document("$and", Arrays.asList(nullOrNotExistsCondition, filterIdCondition));
     }
 
+    public static boolean isAgenticOrEndpointContext(String contextSource) {
+        if (contextSource == null || contextSource.isEmpty()) {
+            return false;
+        }
+        String contextSourceUpper = contextSource.toUpperCase();
+        return "AGENTIC".equals(contextSourceUpper) || "ENDPOINT".equals(contextSourceUpper);
+    }
+
     public static String fetchMetadataString(String metadataStr) {
         if (metadataStr == null || metadataStr.isEmpty()) {
             return "";

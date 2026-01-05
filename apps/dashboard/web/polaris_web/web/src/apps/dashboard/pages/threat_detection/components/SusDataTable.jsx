@@ -10,7 +10,7 @@ import { Badge, IndexFiltersMode, Avatar, Box, HorizontalStack, Text } from "@sh
 import dayjs from "dayjs";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
-import { formatActorId } from "../utils/formatUtils";
+import { formatActorId, extractRuleViolated } from "../utils/formatUtils";
 import threatDetectionRequests from "../api";
 import { LABELS } from "../constants";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
@@ -478,17 +478,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       const complianceMap = filterTemplate?.compliance?.mapComplianceToListClauses || {};
       const complianceList = Object.keys(complianceMap);
 
-      // Parse metadata to extract rule_violated for agentic/endpoint dashboards
-      let ruleViolated = "-";
-      if ((isAgenticSecurityCategory() || isEndpointSecurityCategory()) && x?.metadata) {
-        try {
-          const metadata = JSON.parse(x.metadata);
-          ruleViolated = metadata.rule_violated || metadata.ruleViolated || "-";
-        } catch (e) {
-          ruleViolated = "-";
-        }
-      }
-
       let nextUrl = null;
       if (x.refId && x.eventType && x.actor && x.filterId) {
         const params = new URLSearchParams();
@@ -526,7 +515,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
                           <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                       </div>
         ),
-        ruleViolated: ruleViolated,
+        ...((isAgenticSecurityCategory() || isEndpointSecurityCategory()) && {
+          ruleViolated: extractRuleViolated(x?.metadata)
+        }),
         compliance: complianceList.length > 0 ? (
           <HorizontalStack wrap={false} gap={1}>
             {complianceList.slice(0, 2).map((complianceName, idx) =>

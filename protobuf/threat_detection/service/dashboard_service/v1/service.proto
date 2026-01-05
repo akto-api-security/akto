@@ -102,6 +102,7 @@ message ListThreatActorResponse {
     string severity = 4;
     string method = 5;
     string host = 6;
+    string metadata = 7;
   }
   message ThreatActor {
     string id = 1;
@@ -113,6 +114,7 @@ message ListThreatActorResponse {
     repeated ActivityData activity_data = 7;
     string latest_subcategory = 8;
     string latest_api_host = 9;
+    string latest_metadata = 10;
   }
   repeated ThreatActor actors = 1;
   uint64 total = 2;

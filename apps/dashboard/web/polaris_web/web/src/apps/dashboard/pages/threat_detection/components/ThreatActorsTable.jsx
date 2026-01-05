@@ -11,9 +11,9 @@ import dayjs from "dayjs";
 import { flags } from "./flags/index.mjs";
 import { Tooltip } from "@shopify/polaris";
 import { useSearchParams } from "react-router-dom";
-import { isAgenticSecurityCategory, isMCPSecurityCategory } from "../../../../main/labelHelper";
+import { isAgenticSecurityCategory, isMCPSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import { labelMap } from "../../../../main/labelHelperMap";
-import { formatActorId } from "../utils/formatUtils";
+import { formatActorId, extractRuleViolated } from "../utils/formatUtils";
 
 const resourceName = {
   singular: "actor",
@@ -51,6 +51,11 @@ const headers = [
     title: "Latest Attack",
     value: "latestAttack",
   },
+  ...((isAgenticSecurityCategory() || isEndpointSecurityCategory()) ? [{
+    text: "Rule Violated",
+    title: "Rule Violated",
+    value: "ruleViolated",
+  }] : []),
   {
     text: "Access Type",
     title: "Access Type",
@@ -165,7 +170,7 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
         // Get the sensitive data for the endpoint
         const sensitiveData = sensitiveDataMap[x.latestApiEndpoint] || [];
         const accessTypes = accessTypesMap[x.latestApiEndpoint] || [];
-        
+
         const baseData = {
           ...x,
           actor: formatActorId(x.id),
@@ -174,6 +179,9 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
           discoveredAt: x.discoveredAt ? dayjs(x.discoveredAt*1000).format('YYYY-MM-DD, HH:mm:ss A') : "-",
           sensitiveData: sensitiveData && sensitiveData.length > 0 ? observeFunc.prettifySubtypes(sensitiveData, false) : "-",
           latestAttack: x.latestAttack || "-",
+          ...((isAgenticSecurityCategory() || isEndpointSecurityCategory()) && {
+            ruleViolated: extractRuleViolated(x.latestMetadata)
+          }),
           accessType: accessTypes.length > 0 ? getAccessType(accessTypes) : "-",
           status: "Active",
           country: (

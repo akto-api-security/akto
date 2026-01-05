@@ -211,6 +211,8 @@ public class ThreatActorService {
         int limit = request.getLimit();
         Map<String, Integer> sort = request.getSortMap();
 
+        boolean isAgenticOrEndpoint = ThreatUtils.isAgenticOrEndpointContext(contextSource);
+
         ListThreatActorsRequest.Filter filter = request.getFilter();
         Document match = new Document();
 
@@ -238,15 +240,21 @@ public class ThreatActorService {
         // Sort first for $first to work
         pipeline.add(new Document("$sort", new Document("detectedAt", -1)));
 
-        pipeline.add(new Document("$group", new Document("_id", "$actor")
+        Document groupDoc = new Document("_id", "$actor")
             .append("latestApiEndpoint", new Document("$first", "$latestApiEndpoint"))
             .append("latestApiMethod", new Document("$first", "$latestApiMethod"))
             .append("latestApiIp", new Document("$first", "$latestApiIp"))
             .append("latestApiHost", new Document("$first", "$host"))
             .append("country", new Document("$first", "$country"))
             .append("discoveredAt", new Document("$first", "$detectedAt"))
-            .append("latestSubCategory", new Document("$first", "$filterId"))
-        ));
+            .append("latestSubCategory", new Document("$first", "$filterId"));
+
+        // Only add metadata field for AGENTIC or ENDPOINT contexts
+        if (isAgenticOrEndpoint) {
+            groupDoc.append("latestMetadata", new Document("$first", "$metadata"));
+        }
+
+        pipeline.add(new Document("$group", groupDoc));
 
         if (!filter.getHostsList().isEmpty()) {
             pipeline.add(new Document("$match", new Document("latestApiHost", new Document("$in", filter.getHostsList()))));
@@ -289,18 +297,24 @@ public class ThreatActorService {
                     .cursor()) {
                 while (cursor2.hasNext()) {
                     MaliciousEventDto event = cursor2.next();
-                    activityDataList.add(ActivityData.newBuilder()
+                    ActivityData.Builder activityBuilder = ActivityData.newBuilder()
                         .setUrl(event.getLatestApiEndpoint())
                         .setDetectedAt(event.getDetectedAt())
                         .setSubCategory(event.getFilterId())
                         .setSeverity(event.getSeverity())
                         .setMethod(event.getLatestApiMethod().name())
-                        .setHost(event.getHost() != null ? event.getHost() : "")
-                        .build());
+                        .setHost(event.getHost() != null ? event.getHost() : "");
+
+                    // Only add metadata field for AGENTIC or ENDPOINT contexts
+                    if (isAgenticOrEndpoint) {
+                        activityBuilder.setMetadata(ThreatUtils.fetchMetadataString(event.getMetadata()));
+                    }
+
+                    activityDataList.add(activityBuilder.build());
                 }
             }
 
-            actors.add(ListThreatActorResponse.ThreatActor.newBuilder()
+            ListThreatActorResponse.ThreatActor.Builder actorBuilder = ListThreatActorResponse.ThreatActor.newBuilder()
                 .setId(actorId)
                 .setLatestApiEndpoint(doc.getString("latestApiEndpoint"))
                 .setLatestApiMethod(doc.getString("latestApiMethod"))
@@ -309,8 +323,14 @@ public class ThreatActorService {
                 .setDiscoveredAt(doc.getLong("discoveredAt"))
                 .setCountry(doc.getString("country"))
                 .setLatestSubcategory(doc.getString("latestSubCategory"))
-                .addAllActivityData(activityDataList)
-                .build());
+                .addAllActivityData(activityDataList);
+
+            // Only add metadata field for AGENTIC or ENDPOINT contexts
+            if (isAgenticOrEndpoint) {
+                actorBuilder.setLatestMetadata(ThreatUtils.fetchMetadataString(doc.getString("latestMetadata")));
+            }
+
+            actors.add(actorBuilder.build());
         }
 
         return ListThreatActorResponse.newBuilder().addAllActors(actors).setTotal(total).build();
