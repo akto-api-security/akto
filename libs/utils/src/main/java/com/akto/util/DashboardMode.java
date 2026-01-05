@@ -37,7 +37,7 @@ public enum DashboardMode {
         if("stairway".equalsIgnoreCase(dashboardMode)){
             return STAIRWAY;
         }
-        return Constants.DEFAULT_DASHBOARD_MODE;
+        return LOCAL_DEPLOY;
     }
 
     public static boolean isLocalDeployment(){
