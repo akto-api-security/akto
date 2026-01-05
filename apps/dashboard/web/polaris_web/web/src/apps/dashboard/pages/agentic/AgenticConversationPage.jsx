@@ -7,6 +7,8 @@ import AgenticResponseContent from './components/AgenticResponseContent';
 import AgenticCopyButton from './components/AgenticCopyButton';
 import AgenticSuggestionsList from './components/AgenticSuggestionsList';
 import AgenticSearchInput from './components/AgenticSearchInput';
+import AgenticHistoryModal from './components/AgenticHistoryModal';
+import './AgenticConversationPage.css';
 import {
     generateConversationId,
     generateMessageId,
@@ -29,6 +31,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack 
     const [isLoading, setIsLoading] = useState(false);
     const [isStreaming, setIsStreaming] = useState(false);
     const [followUpValue, setFollowUpValue] = useState('');
+    const [showHistoryModal, setShowHistoryModal] = useState(false);
 
     // Current response state
     const [streamedThinkingItems, setStreamedThinkingItems] = useState([]);
@@ -239,30 +242,18 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack 
         }
     };
 
+    const handleHistoryClick = (convId, title) => {
+        // Navigate back to main page and load the conversation
+        if (onBack) {
+            onBack();
+        }
+        // The main page will handle loading the conversation
+        window.location.href = `/dashboard/ask-ai?conversation=${convId}`;
+    };
+
     return (
         <>
-            <style>{`
-                @keyframes spin {
-                    from {
-                        transform: rotate(0deg);
-                    }
-                    to {
-                        transform: rotate(360deg);
-                    }
-                }
-                .Polaris-Page {
-                    min-height: 100vh;
-                    background: radial-gradient(115.53% 72.58% at 48.08% 50%, #FAFAFA 27.4%, #FAFAFA 54.33%, #F9F6FF 69.17%, #FFF 86.54%, #F0FAFF 98.08%), #F6F6F7;
-                    padding: 24px 32px;
-                    margin: 0;
-                    display: flex;
-                    flex-direction: column;
-                }
-                .Polaris-Page > .Polaris-Box {
-                    background: transparent !important;
-                }
-            `}</style>
-            <Page fullWidth>
+            <Page id="agentic-conversation-page" fullWidth>
                 {/* Error Banner */}
                 {error && (
                     <Box style={{ marginBottom: '16px' }}>
@@ -276,7 +267,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack 
                     </Box>
                 )}
 
-                {/* Header with Back and Share buttons */}
+                {/* Header with Back and History buttons */}
                 <Box style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Box style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         {onBack && (
@@ -302,19 +293,23 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack 
                             {messages[0]?.content || 'Agentic AI Conversation'}
                         </Text>
                     </Box>
-                    <button
+                    <Box
+                        onClick={() => setShowHistoryModal(true)}
                         style={{
-                            padding: '8px 16px',
-                            borderRadius: '8px',
-                            border: '1px solid #C9CCCF',
-                            background: '#FFF',
                             cursor: 'pointer',
-                            fontSize: '14px',
-                            fontWeight: 500
+                            padding: '8px',
+                            borderRadius: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'background 0.2s ease',
+                            background: 'transparent'
                         }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#F6F6F7'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                     >
-                        Share
-                    </button>
+                        <img src="/public/history.svg" alt="History" style={{ width: '20px', height: '20px' }} />
+                    </Box>
                 </Box>
 
                 {/* Conversation content */}
@@ -385,7 +380,14 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack 
                     isStreaming={isStreaming}
                     isFixed={true}
                 />
-        </Page>
+
+                {/* History Modal */}
+                <AgenticHistoryModal
+                    isOpen={showHistoryModal}
+                    onClose={() => setShowHistoryModal(false)}
+                    onHistoryClick={handleHistoryClick}
+                />
+            </Page>
         </>
     );
 }

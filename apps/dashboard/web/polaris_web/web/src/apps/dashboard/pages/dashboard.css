@@ -241,3 +241,11 @@
     margin-left: 0px !important;
     padding: 4px !important;
 }
+/* Remove padding from Frame's Box wrapper for ask-ai route */
+.dashboard.ask-ai-route .Polaris-Frame__Content > .Polaris-Box {
+    padding: 0 !important;
+    --pc-box-padding-block-end-xs: 0 !important;
+    --pc-box-padding-block-start-xs: 0 !important;
+    --pc-box-padding-inline-start-xs: 0 !important;
+    --pc-box-padding-inline-end-xs: 0 !important;
+}

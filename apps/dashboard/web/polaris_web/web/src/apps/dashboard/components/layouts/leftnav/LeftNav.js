@@ -511,11 +511,11 @@ export default function LeftNav() {
                 label: "Ask AI",
                 icon: MagicMinor,
                 onClick: () => {
-                    handleSelect("dashboard_agentic_main")
+                    handleSelect("dashboard_ask_ai")
                     navigate("/dashboard/ask-ai")
                     setActive("normal")
                 },
-                selected: leftNavSelected === "dashboard_agentic_main",
+                selected: leftNavSelected === "dashboard_ask_ai",
                 key: "ask_ai",
             })
         }
