@@ -6,7 +6,9 @@ import {
     Select,
     Button,
     TextField,
-    HorizontalStack
+    HorizontalStack,
+    Checkbox,
+    RangeSlider
 } from '@shopify/polaris';
 import { DeleteMajor } from '@shopify/polaris-icons';
 import DropdownSearch from "../../../../components/shared/DropdownSearch";
@@ -19,7 +21,7 @@ export const SensitiveInfoConfig = {
         return { isValid: true, errorMessage: null };
     },
 
-    getSummary: ({ piiTypes, regexPatterns }) => {
+    getSummary: ({ piiTypes, regexPatterns, enableAnonymize }) => {
         const filters = [];
 
         if (piiTypes?.length > 0) {
@@ -33,6 +35,10 @@ export const SensitiveInfoConfig = {
             filters.push(`${patternCount} regex pattern${patternCount > 1 ? 's' : ''}`);
         }
 
+        if (enableAnonymize) {
+            filters.push('Anonymize');
+        }
+
         return filters.length > 0 ? filters.join(", ") : null;
     }
 };
@@ -43,7 +49,11 @@ const SensitiveInfoStep = ({
     regexPatterns,
     setRegexPatterns,
     newRegexPattern,
-    setNewRegexPattern
+    setNewRegexPattern,
+    enableAnonymize,
+    setEnableAnonymize,
+    anonymizeConfidenceScore,
+    setAnonymizeConfidenceScore
 }) => {
     // PII types available (from AddPiiTypeModal)
     const availablePiiTypes = [
@@ -185,6 +195,34 @@ const SensitiveInfoStep = ({
                     )}
                 </VerticalStack>
             </Box>
+
+            <VerticalStack gap="4">
+                <Box>
+                    <Checkbox
+                        label="Enable anonymize detection"
+                        checked={enableAnonymize}
+                        onChange={setEnableAnonymize}
+                        helpText="Detect and prevent anonymization attempts in user inputs."
+                    />
+                    {enableAnonymize && (
+                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
+                            <VerticalStack gap="3">
+                                <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
+                                <RangeSlider
+                                    label=""
+                                    value={anonymizeConfidenceScore}
+                                    min={0}
+                                    max={1}
+                                    step={0.1}
+                                    output
+                                    onChange={setAnonymizeConfidenceScore}
+                                    helpText="Set the confidence threshold (0-1). Higher values are more permissive, lower values are more strict in detecting anonymization attempts."
+                                />
+                            </VerticalStack>
+                        </Box>
+                    )}
+                </Box>
+            </VerticalStack>
         </VerticalStack>
     );
 };

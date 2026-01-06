@@ -17,8 +17,8 @@ import PersistStore from '../../../../main/PersistStore';
 import {
     PolicyDetailsStep,
     PolicyDetailsConfig,
-    ContentFiltersStep,
-    ContentFiltersConfig,
+    CodeDetectionStep,
+    CodeDetectionConfig,
     DeniedTopicsStep,
     DeniedTopicsConfig,
     WordFiltersStep,
@@ -29,8 +29,6 @@ import {
     LlmPromptConfig,
     BasePromptStep,
     BasePromptConfig,
-    GibberishDetectionStep,
-    GibberishDetectionConfig,
     AdvancedScannersStep,
     AdvancedScannersConfig,
     ExternalModelStep,
@@ -97,16 +95,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [anonymizeConfidenceScore, setAnonymizeConfidenceScore] = useState(0.7);
     const [enableBanCode, setEnableBanCode] = useState(false);
     const [banCodeConfidenceScore, setBanCodeConfidenceScore] = useState(0.7);
-    const [enableBanCompetitors, setEnableBanCompetitors] = useState(false);
-    const [banCompetitorsConfidenceScore, setBanCompetitorsConfidenceScore] = useState(0.7);
-    const [enableBanSubstrings, setEnableBanSubstrings] = useState(false);
-    const [banSubstringsConfidenceScore, setBanSubstringsConfidenceScore] = useState(0.7);
-    const [enableBanTopics, setEnableBanTopics] = useState(false);
-    const [banTopicsConfidenceScore, setBanTopicsConfidenceScore] = useState(0.7);
-    const [enableIntentAnalysis, setEnableIntentAnalysis] = useState(false);
-    const [intentAnalysisConfidenceScore, setIntentAnalysisConfidenceScore] = useState(0.7);
-    const [enableLanguage, setEnableLanguage] = useState(false);
-    const [languageConfidenceScore, setLanguageConfidenceScore] = useState(0.7);
     const [enableSecrets, setEnableSecrets] = useState(false);
     const [secretsConfidenceScore, setSecretsConfidenceScore] = useState(0.7);
     const [enableSentiment, setEnableSentiment] = useState(false);
@@ -162,16 +150,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         anonymizeConfidenceScore,
         enableBanCode,
         banCodeConfidenceScore,
-        enableBanCompetitors,
-        banCompetitorsConfidenceScore,
-        enableBanSubstrings,
-        banSubstringsConfidenceScore,
-        enableBanTopics,
-        banTopicsConfidenceScore,
-        enableIntentAnalysis,
-        intentAnalysisConfidenceScore,
-        enableLanguage,
-        languageConfidenceScore,
         enableSecrets,
         secretsConfidenceScore,
         enableSentiment,
@@ -202,10 +180,10 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 ...PolicyDetailsConfig.validate(storedStateData)
             },
             {
-                number: ContentFiltersConfig.number,
-                title: ContentFiltersConfig.title,
-                summary: ContentFiltersConfig.getSummary(storedStateData),
-                ...ContentFiltersConfig.validate(storedStateData)
+                number: CodeDetectionConfig.number,
+                title: CodeDetectionConfig.title,
+                summary: CodeDetectionConfig.getSummary(storedStateData),
+                ...CodeDetectionConfig.validate(storedStateData)
             },
             {
                 number: DeniedTopicsConfig.number,
@@ -238,25 +216,19 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 ...BasePromptConfig.validate(storedStateData)
             },
             {
-                number: GibberishDetectionConfig.number,
-                title: GibberishDetectionConfig.title,
-                summary: GibberishDetectionConfig.getSummary(storedStateData),
-                ...GibberishDetectionConfig.validate(storedStateData)
-            },
-            {
                 number: AdvancedScannersConfig.number,
                 title: AdvancedScannersConfig.title,
                 summary: AdvancedScannersConfig.getSummary(storedStateData),
                 ...AdvancedScannersConfig.validate(storedStateData)
             },
             {
-                number: 10,
+                number: ExternalModelConfig.number,
                 title: ExternalModelConfig.title,
                 summary: ExternalModelConfig.getSummary(storedStateData),
                 ...ExternalModelConfig.validate(storedStateData)
             },
             {
-                number: 11,
+                number: ServerSettingsConfig.number,
                 title: ServerSettingsConfig.title,
                 summary: ServerSettingsConfig.getSummary(storedStateData),
                 ...ServerSettingsConfig.validate(storedStateData)
@@ -364,16 +336,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setAnonymizeConfidenceScore(0.7);
         setEnableBanCode(false);
         setBanCodeConfidenceScore(0.7);
-        setEnableBanCompetitors(false);
-        setBanCompetitorsConfidenceScore(0.7);
-        setEnableBanSubstrings(false);
-        setBanSubstringsConfidenceScore(0.7);
-        setEnableBanTopics(false);
-        setBanTopicsConfidenceScore(0.7);
-        setEnableIntentAnalysis(false);
-        setIntentAnalysisConfidenceScore(0.7);
-        setEnableLanguage(false);
-        setLanguageConfidenceScore(0.7);
         setEnableSecrets(false);
         setSecretsConfidenceScore(0.7);
         setEnableSentiment(false);
@@ -490,11 +452,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
 
         setScannerState(policy.anonymizeDetection, setEnableAnonymize, setAnonymizeConfidenceScore);
         setScannerState(policy.banCodeDetection, setEnableBanCode, setBanCodeConfidenceScore);
-        setScannerState(policy.banCompetitorsDetection, setEnableBanCompetitors, setBanCompetitorsConfidenceScore);
-        setScannerState(policy.banSubstringsDetection, setEnableBanSubstrings, setBanSubstringsConfidenceScore);
-        setScannerState(policy.banTopicsDetection, setEnableBanTopics, setBanTopicsConfidenceScore);
-        setScannerState(policy.intentAnalysisDetection, setEnableIntentAnalysis, setIntentAnalysisConfidenceScore);
-        setScannerState(policy.languageDetection, setEnableLanguage, setLanguageConfidenceScore);
         setScannerState(policy.secretsDetection, setEnableSecrets, setSecretsConfidenceScore);
         setScannerState(policy.sentimentDetection, setEnableSentiment, setSentimentConfidenceScore);
         setScannerState(policy.tokenLimitDetection, setEnableTokenLimit, setTokenLimitConfidenceScore);
@@ -616,26 +573,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 banCodeDetection: {
                     enabled: enableBanCode,
                     confidenceScore: banCodeConfidenceScore
-                },
-                banCompetitorsDetection: {
-                    enabled: enableBanCompetitors,
-                    confidenceScore: banCompetitorsConfidenceScore
-                },
-                banSubstringsDetection: {
-                    enabled: enableBanSubstrings,
-                    confidenceScore: banSubstringsConfidenceScore
-                },
-                banTopicsDetection: {
-                    enabled: enableBanTopics,
-                    confidenceScore: banTopicsConfidenceScore
-                },
-                intentAnalysisDetection: {
-                    enabled: enableIntentAnalysis,
-                    confidenceScore: intentAnalysisConfidenceScore
-                },
-                languageDetection: {
-                    enabled: enableLanguage,
-                    confidenceScore: languageConfidenceScore
                 },
                 secretsDetection: {
                     enabled: enableSecrets,
@@ -796,19 +733,19 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 );
             case 2:
                 return (
-                    <ContentFiltersStep
-                        enableHarmfulCategories={enableHarmfulCategories}
-                        setEnableHarmfulCategories={setEnableHarmfulCategories}
-                        harmfulCategoriesSettings={harmfulCategoriesSettings}
-                        setHarmfulCategoriesSettings={setHarmfulCategoriesSettings}
-                        enablePromptAttacks={enablePromptAttacks}
-                        setEnablePromptAttacks={setEnablePromptAttacks}
-                        promptAttackLevel={promptAttackLevel}
-                        setPromptAttackLevel={setPromptAttackLevel}
+                    <CodeDetectionStep
                         enableCodeFilter={enableCodeFilter}
                         setEnableCodeFilter={setEnableCodeFilter}
                         codeFilterLevel={codeFilterLevel}
                         setCodeFilterLevel={setCodeFilterLevel}
+                        enableBanCode={enableBanCode}
+                        setEnableBanCode={setEnableBanCode}
+                        banCodeConfidenceScore={banCodeConfidenceScore}
+                        setBanCodeConfidenceScore={setBanCodeConfidenceScore}
+                        enableSecrets={enableSecrets}
+                        setEnableSecrets={setEnableSecrets}
+                        secretsConfidenceScore={secretsConfidenceScore}
+                        setSecretsConfidenceScore={setSecretsConfidenceScore}
                     />
                 );
             case 3:
@@ -825,6 +762,18 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         setWordFilters={setWordFilters}
                         newCustomWord={newCustomWord}
                         setNewCustomWord={setNewCustomWord}
+                        enableHarmfulCategories={enableHarmfulCategories}
+                        setEnableHarmfulCategories={setEnableHarmfulCategories}
+                        harmfulCategoriesSettings={harmfulCategoriesSettings}
+                        setHarmfulCategoriesSettings={setHarmfulCategoriesSettings}
+                        enableGibberishDetection={enableGibberishDetection}
+                        setEnableGibberishDetection={setEnableGibberishDetection}
+                        gibberishConfidenceScore={gibberishConfidenceScore}
+                        setGibberishConfidenceScore={setGibberishConfidenceScore}
+                        enableSentiment={enableSentiment}
+                        setEnableSentiment={setEnableSentiment}
+                        sentimentConfidenceScore={sentimentConfidenceScore}
+                        setSentimentConfidenceScore={setSentimentConfidenceScore}
                     />
                 );
             case 5:
@@ -836,6 +785,10 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         setRegexPatterns={setRegexPatterns}
                         newRegexPattern={newRegexPattern}
                         setNewRegexPattern={setNewRegexPattern}
+                        enableAnonymize={enableAnonymize}
+                        setEnableAnonymize={setEnableAnonymize}
+                        anonymizeConfidenceScore={anonymizeConfidenceScore}
+                        setAnonymizeConfidenceScore={setAnonymizeConfidenceScore}
                     />
                 );
             case 6:
@@ -845,6 +798,10 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         setLlmRule={setLlmPrompt}
                         llmConfidenceScore={llmConfidenceScore}
                         setLlmConfidenceScore={setLlmConfidenceScore}
+                        enablePromptAttacks={enablePromptAttacks}
+                        setEnablePromptAttacks={setEnablePromptAttacks}
+                        promptAttackLevel={promptAttackLevel}
+                        setPromptAttackLevel={setPromptAttackLevel}
                     />
                 );
             case 7:
@@ -858,59 +815,14 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 );
             case 8:
                 return (
-                    <GibberishDetectionStep
-                        enableGibberishDetection={enableGibberishDetection}
-                        setEnableGibberishDetection={setEnableGibberishDetection}
-                        gibberishConfidenceScore={gibberishConfidenceScore}
-                        setGibberishConfidenceScore={setGibberishConfidenceScore}
-                    />
-                );
-            case 9:
-                return (
                     <AdvancedScannersStep
-                        enableAnonymize={enableAnonymize}
-                        setEnableAnonymize={setEnableAnonymize}
-                        anonymizeConfidenceScore={anonymizeConfidenceScore}
-                        setAnonymizeConfidenceScore={setAnonymizeConfidenceScore}
-                        enableBanCode={enableBanCode}
-                        setEnableBanCode={setEnableBanCode}
-                        banCodeConfidenceScore={banCodeConfidenceScore}
-                        setBanCodeConfidenceScore={setBanCodeConfidenceScore}
-                        enableBanCompetitors={enableBanCompetitors}
-                        setEnableBanCompetitors={setEnableBanCompetitors}
-                        banCompetitorsConfidenceScore={banCompetitorsConfidenceScore}
-                        setBanCompetitorsConfidenceScore={setBanCompetitorsConfidenceScore}
-                        enableBanSubstrings={enableBanSubstrings}
-                        setEnableBanSubstrings={setEnableBanSubstrings}
-                        banSubstringsConfidenceScore={banSubstringsConfidenceScore}
-                        setBanSubstringsConfidenceScore={setBanSubstringsConfidenceScore}
-                        enableBanTopics={enableBanTopics}
-                        setEnableBanTopics={setEnableBanTopics}
-                        banTopicsConfidenceScore={banTopicsConfidenceScore}
-                        setBanTopicsConfidenceScore={setBanTopicsConfidenceScore}
-                        enableIntentAnalysis={enableIntentAnalysis}
-                        setEnableIntentAnalysis={setEnableIntentAnalysis}
-                        intentAnalysisConfidenceScore={intentAnalysisConfidenceScore}
-                        setIntentAnalysisConfidenceScore={setIntentAnalysisConfidenceScore}
-                        enableLanguage={enableLanguage}
-                        setEnableLanguage={setEnableLanguage}
-                        languageConfidenceScore={languageConfidenceScore}
-                        setLanguageConfidenceScore={setLanguageConfidenceScore}
-                        enableSecrets={enableSecrets}
-                        setEnableSecrets={setEnableSecrets}
-                        secretsConfidenceScore={secretsConfidenceScore}
-                        setSecretsConfidenceScore={setSecretsConfidenceScore}
-                        enableSentiment={enableSentiment}
-                        setEnableSentiment={setEnableSentiment}
-                        sentimentConfidenceScore={sentimentConfidenceScore}
-                        setSentimentConfidenceScore={setSentimentConfidenceScore}
                         enableTokenLimit={enableTokenLimit}
                         setEnableTokenLimit={setEnableTokenLimit}
                         tokenLimitConfidenceScore={tokenLimitConfidenceScore}
                         setTokenLimitConfidenceScore={setTokenLimitConfidenceScore}
                     />
                 );
-            case 10:
+            case 9:
                 return (
                     <ExternalModelStep
                         url={url}
@@ -919,7 +831,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         setConfidenceScore={setConfidenceScore}
                     />
                 );
-            case 11:
+            case 10:
                 return (
                     <ServerSettingsStep
                         selectedMcpServers={selectedMcpServers}

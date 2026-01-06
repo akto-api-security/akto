@@ -61,11 +61,6 @@ public class GuardrailPolicies {
     // Step 7.6: Additional Scanner Detections
     private AnonymizeDetection anonymizeDetection;
     private BanCodeDetection banCodeDetection;
-    private BanCompetitorsDetection banCompetitorsDetection;
-    private BanSubstringsDetection banSubstringsDetection;
-    private BanTopicsDetection banTopicsDetection;
-    private IntentAnalysisDetection intentAnalysisDetection;
-    private LanguageDetection languageDetection;
     private SecretsDetection secretsDetection;
     private SentimentDetection sentimentDetection;
     private TokenLimitDetection tokenLimitDetection;
@@ -294,71 +289,6 @@ public class GuardrailPolicies {
         private double confidenceScore;
 
         public BanCodeDetection(boolean enabled, double confidenceScore) {
-            this.enabled = enabled;
-            this.confidenceScore = confidenceScore;
-        }
-    }
-
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    public static class BanCompetitorsDetection {
-        private boolean enabled;
-        private double confidenceScore;
-
-        public BanCompetitorsDetection(boolean enabled, double confidenceScore) {
-            this.enabled = enabled;
-            this.confidenceScore = confidenceScore;
-        }
-    }
-
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    public static class BanSubstringsDetection {
-        private boolean enabled;
-        private double confidenceScore;
-
-        public BanSubstringsDetection(boolean enabled, double confidenceScore) {
-            this.enabled = enabled;
-            this.confidenceScore = confidenceScore;
-        }
-    }
-
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    public static class BanTopicsDetection {
-        private boolean enabled;
-        private double confidenceScore;
-
-        public BanTopicsDetection(boolean enabled, double confidenceScore) {
-            this.enabled = enabled;
-            this.confidenceScore = confidenceScore;
-        }
-    }
-
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    public static class IntentAnalysisDetection {
-        private boolean enabled;
-        private double confidenceScore;
-
-        public IntentAnalysisDetection(boolean enabled, double confidenceScore) {
-            this.enabled = enabled;
-            this.confidenceScore = confidenceScore;
-        }
-    }
-
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    public static class LanguageDetection {
-        private boolean enabled;
-        private double confidenceScore;
-
-        public LanguageDetection(boolean enabled, double confidenceScore) {
             this.enabled = enabled;
             this.confidenceScore = confidenceScore;
         }

@@ -1,4 +1,4 @@
-import { VerticalStack, Text, Checkbox, HorizontalStack, Button, TextField, Box, DataTable } from "@shopify/polaris";
+import { VerticalStack, Text, Checkbox, HorizontalStack, Button, TextField, Box, DataTable, RangeSlider } from "@shopify/polaris";
 import { DeleteMajor } from '@shopify/polaris-icons';
 
 export const WordFiltersConfig = {
@@ -9,10 +9,13 @@ export const WordFiltersConfig = {
         return { isValid: true, errorMessage: null };
     },
 
-    getSummary: ({ wordFilters }) => {
+    getSummary: ({ wordFilters, enableHarmfulCategories, enableGibberishDetection, enableSentiment }) => {
         const filters = [];
+        if (enableHarmfulCategories) filters.push('Harmful categories');
         if (wordFilters.profanity) filters.push("Profanity");
         if (wordFilters.custom?.length > 0) filters.push(`${wordFilters.custom.length} Custom word${wordFilters.custom.length !== 1 ? 's' : ''}`);
+        if (enableGibberishDetection) filters.push('Gibberish detection');
+        if (enableSentiment) filters.push('Sentiment');
         return filters.length > 0 ? filters.join(", ") : null;
     }
 };
@@ -21,7 +24,19 @@ const WordFiltersStep = ({
     wordFilters,
     setWordFilters,
     newCustomWord,
-    setNewCustomWord
+    setNewCustomWord,
+    enableHarmfulCategories,
+    setEnableHarmfulCategories,
+    harmfulCategoriesSettings,
+    setHarmfulCategoriesSettings,
+    enableGibberishDetection,
+    setEnableGibberishDetection,
+    gibberishConfidenceScore,
+    setGibberishConfidenceScore,
+    enableSentiment,
+    setEnableSentiment,
+    sentimentConfidenceScore,
+    setSentimentConfidenceScore
 }) => {
     return (
         <VerticalStack gap="4">
@@ -30,7 +45,8 @@ const WordFiltersStep = ({
                 Use the word filters if you want to filter prompts or responses containing specific words.
             </Text>
 
-            <Checkbox
+            <VerticalStack gap="4">
+                <Checkbox
                 label="Profanity"
                 checked={wordFilters.profanity}
                 onChange={(checked) => setWordFilters({ ...wordFilters, profanity: checked })}
@@ -88,6 +104,122 @@ const WordFiltersStep = ({
                         />
                     </Box>
                 )}
+            </VerticalStack>
+
+                <Box>
+                    <Checkbox
+                        label="Enable harmful categories filters"
+                        checked={enableHarmfulCategories}
+                        onChange={setEnableHarmfulCategories}
+                        helpText="Enable to detect and block harmful user inputs and model responses. Use a higher filter strength to increase the likelihood of filtering harmful content in a given category."
+                    />
+                    {/* Harmful categories detailed settings */}
+                    {enableHarmfulCategories && (
+                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
+                            <VerticalStack gap="3">
+                                <HorizontalStack align="space-between">
+                                    <Text variant="headingSm">Filters for prompts</Text>
+                                    <Button variant="plain" onClick={() => {
+                                        const resetSettings = { ...harmfulCategoriesSettings };
+                                        Object.keys(resetSettings).forEach(key => {
+                                            if (key !== 'useForResponses') resetSettings[key] = 'none';
+                                        });
+                                        setHarmfulCategoriesSettings(resetSettings);
+                                    }}>
+                                        Reset all
+                                    </Button>
+                                </HorizontalStack>
+                                {Object.entries(harmfulCategoriesSettings).map(([category, level]) => {
+                                    if (category === 'useForResponses') return null;
+                                    return (
+                                        <Box key={category}>
+                                            <Text variant="bodyMd" fontWeight="medium" textTransform="capitalize">
+                                                {category}
+                                            </Text>
+                                            <Box paddingBlockStart="2">
+                                                <RangeSlider
+                                                    label=""
+                                                    value={level === 'none' ? 0 : level === 'low' ? 1 : level === 'medium' ? 2 : 3}
+                                                    min={0}
+                                                    max={3}
+                                                    step={1}
+                                                    output
+                                                    onChange={(value) => {
+                                                        const levels = ['none', 'low', 'medium', 'high'];
+                                                        setHarmfulCategoriesSettings({
+                                                            ...harmfulCategoriesSettings,
+                                                            [category]: levels[value]
+                                                        });
+                                                    }}
+                                                />
+                                            </Box>
+                                        </Box>
+                                    );
+                                })}
+                                <Checkbox
+                                    label="Use the same harmful categories filters for responses"
+                                    checked={harmfulCategoriesSettings.useForResponses}
+                                    onChange={(checked) => setHarmfulCategoriesSettings({
+                                        ...harmfulCategoriesSettings,
+                                        useForResponses: checked
+                                    })}
+                                />
+                            </VerticalStack>
+                        </Box>
+                    )}
+                </Box>
+
+                <Box>
+                    <Checkbox
+                        label="Enable gibberish detection"
+                        checked={enableGibberishDetection}
+                        onChange={setEnableGibberishDetection}
+                        helpText="Detect and block gibberish or nonsensical text in user inputs. This helps prevent meaningless prompts that could confuse the AI or be used as attack vectors."
+                    />
+                    {enableGibberishDetection && (
+                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
+                            <VerticalStack gap="3">
+                                <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
+                                <RangeSlider
+                                    label=""
+                                    value={gibberishConfidenceScore}
+                                    min={0}
+                                    max={1}
+                                    step={0.1}
+                                    output
+                                    onChange={setGibberishConfidenceScore}
+                                    helpText="Set the confidence threshold (0-1). Higher values are more permissive, lower values are more strict in detecting gibberish."
+                                />
+                            </VerticalStack>
+                        </Box>
+                    )}
+                </Box>
+
+                <Box>
+                    <Checkbox
+                        label="Enable sentiment detection"
+                        checked={enableSentiment}
+                        onChange={setEnableSentiment}
+                        helpText="Analyze sentiment in user inputs to detect negative, toxic, or inappropriate emotional content."
+                    />
+                    {enableSentiment && (
+                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
+                            <VerticalStack gap="3">
+                                <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
+                                <RangeSlider
+                                    label=""
+                                    value={sentimentConfidenceScore}
+                                    min={0}
+                                    max={1}
+                                    step={0.1}
+                                    output
+                                    onChange={setSentimentConfidenceScore}
+                                    helpText="Set the confidence threshold (0-1). Higher values are more permissive, lower values are more strict in detecting negative sentiment."
+                                />
+                            </VerticalStack>
+                        </Box>
+                    )}
+                </Box>
             </VerticalStack>
         </VerticalStack>
     );

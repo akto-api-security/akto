@@ -1,7 +1,7 @@
 import { VerticalStack, Text, RangeSlider, FormLayout, Checkbox, Box } from "@shopify/polaris";
 
 export const GibberishDetectionConfig = {
-    number: 8,
+    number: 9,
     title: "Gibberish Detection",
 
     validate: () => {
