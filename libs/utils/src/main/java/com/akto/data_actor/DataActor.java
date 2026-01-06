@@ -296,6 +296,7 @@ public abstract class DataActor {
 
     public abstract TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter);
     public abstract ModuleInfo updateModuleInfo(ModuleInfo moduleInfo);
+    public abstract void bulkUpdateModuleInfo(List<ModuleInfo> moduleInfoList);
 
     public abstract TestingRunPlayground getCurrentTestingRunDetailsFromEditor(int timestamp);
 
