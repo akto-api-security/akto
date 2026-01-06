@@ -8,11 +8,11 @@ function TestRunResultChat({ analysis, conversations, onSendMessage, isStreaming
     return (
         <Box padding="4" minHeight="500px">
             <VerticalStack gap="4">
-                <AiAnalysisCard
+                {/* <AiAnalysisCard
                     summary={analysis}
                     onSendMessage={onSendMessage}
                     isStreaming={isStreaming}
-                />
+                /> */}
 
                 <ConversationHistory
                     conversations={conversations}
