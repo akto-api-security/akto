@@ -192,13 +192,7 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
     public Map<String, String> fetchDevrevProjects(List<String> partTypes, String partName) throws Exception {
         String actualToken = getPersonalAccessToken(personalAccessToken);
 
-        Map<String, String> partsIdToNameMap = fetchAllPartsFromDevRev(actualToken, partTypes, partName);
-
-        if (partsIdToNameMap.isEmpty()) {
-            throw new Exception("Failed to fetch projects from DevRev. Please verify your personal access token and try again.");
-        }
-
-        return partsIdToNameMap;
+        return fetchAllPartsFromDevRev(actualToken, partTypes, partName);
     }
 
     public void removeIntegration() throws Exception {

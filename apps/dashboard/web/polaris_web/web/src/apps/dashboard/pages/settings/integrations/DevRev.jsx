@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import settingFunctions from '../module'
 import IntegrationsLayout from './IntegrationsLayout'
-import { Box, Button, Divider, HorizontalStack, LegacyCard, Tag, Text, TextField, VerticalStack } from '@shopify/polaris'
+import { Box, Button, Divider, HorizontalStack, LegacyCard, Link, Tag, Text, TextField, VerticalStack } from '@shopify/polaris'
 import PasswordTextField from '../../../components/layouts/PasswordTextField'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
 import func from "@/util/func"
@@ -282,17 +282,14 @@ const DevRev = () => {
                     )}
 
                     {selectedParts.length > 0 && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <HorizontalStack gap="2">
                             <Text variant="bodyMd">
-                                {selectedParts.length} part{selectedParts.length === 1 ? '' : 's'} selected
+                                {selectedParts.length} part{func.addPlurality(selectedParts.length)} selected
                             </Text>
-                            <Button
-                                size="slim"
-                                onClick={handleResetSelection}
-                            >
+                            <Link removeUnderline onClick={handleResetSelection}>
                                 Clear Selection
-                            </Button>
-                        </div>
+                            </Link>
+                        </HorizontalStack>
                     )}
 
                     {selectedParts.length > 0 && (
