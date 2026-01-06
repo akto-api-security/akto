@@ -102,7 +102,7 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
 
         String cursor = null;
         String lastCursor = null;
-        int maxIterations = 10; // Safety limit
+        int maxIterations = 20; // Safety limit
         int iteration = 0;
 
         try {
@@ -374,8 +374,12 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
 
             if (StringUtils.isNotBlank(originalMessage)) {
                 origCurl = CurlUtils.getCurl(originalMessage);
-                HttpResponseParams origObj = com.akto.runtime.utils.Utils.parseKafkaMessage(originalMessage);
-                origResponse = origObj.getPayload();
+                try {
+                    HttpResponseParams origObj = com.akto.runtime.utils.Utils.parseKafkaMessage(originalMessage);
+                    origResponse = origObj.getPayload();
+                } catch (Exception e) {
+                    logger.errorAndAddToDb(e, "Error in building http response params for DevRev");
+                }
             }
 
             if (StringUtils.isNotBlank(message)) {
@@ -410,7 +414,7 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
             return data.toString();
 
         } catch (Exception e) {
-            logger.errorAndAddToDb("Error building request/response data: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            logger.errorAndAddToDb(e,"Error building request/response data: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             return "";
         }
     }
