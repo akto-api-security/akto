@@ -169,7 +169,8 @@ public class FastDiscoveryKafkaConsumer implements Runnable {
             switch (triggerMethod) {
                 case "bulkWriteSti":
                     dbAction.setWritesForSti(bulkWrites);
-                    dbAction.bulkWriteSti();
+                    // Use direct write to bypass Kafka and write straight to MongoDB
+                    dbAction.bulkWriteStiDirect();
                     loggerMaker.infoAndAddToDb("FastDiscovery: Wrote " + bulkWrites.size() +
                         " STI entries for account " + accountId, LogDb.DB_ABS);
                     break;
