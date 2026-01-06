@@ -3,7 +3,7 @@ import GithubServerTable from "../../../components/tables/GithubServerTable"
 import { useReducer, useState, useEffect, useCallback } from "react";
 import func from "@/util/func";
 import PersistStore from "../../../../main/PersistStore";
-import { Button, Popover, Box, Avatar, Text, HorizontalStack, IndexFiltersMode, VerticalStack, Badge, Link } from "@shopify/polaris";
+import { Button, Popover, Box, Avatar, Text, HorizontalStack, IndexFiltersMode, VerticalStack, Badge } from "@shopify/polaris";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import DateRangeFilter from "../../../components/layouts/DateRangeFilter.jsx";
@@ -13,14 +13,14 @@ import values from "@/util/values";
 import { isMCPSecurityCategory, isGenAISecurityCategory, isAgenticSecurityCategory } from "../../../../main/labelHelper";
 import threatDetectionApi from "../../threat_detection/api.js"
 import SessionStore from "../../../../main/SessionStore"
-import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import ShowListInBadge from "../../../components/shared/ShowListInBadge";
 import { CellType } from "../../../components/tables/rows/GithubRow.js";
 import SampleDetails from "../../threat_detection/components/SampleDetails";
+import useTable from "../../../components/tables/TableContext.js";
+import TableStore from "../../../components/tables/TableStore.js";
+import transform from "../transform.js";
 
 const sortOptions = [
-    { label: 'Severity', value: 'severity asc', directionLabel: 'Highest', sortKey: 'severity', columnIndex: 1 },
-    { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest', sortKey: 'severity', columnIndex: 1 },
     { label: 'Number of endpoints', value: 'numberOfEndpoints asc', directionLabel: 'More', sortKey: 'numberOfEndpoints', columnIndex: 3 },
     { label: 'Number of endpoints', value: 'numberOfEndpoints desc', directionLabel: 'Less', sortKey: 'numberOfEndpoints', columnIndex: 3 },
     { label: 'Discovered time', value: 'creationTime asc', directionLabel: 'Newest', sortKey: 'creationTime', columnIndex: 6 },
@@ -65,9 +65,18 @@ function ThreatCompliancePage() {
     const [showDetails, setShowDetails] = useState(false);
     const [eventState, setEventState] = useState(initialEventState);
     const [detailsLoading, setDetailsLoading] = useState(false);
+    const [tableKey, setTableKey] = useState(false);
 
     const collectionsMap = PersistStore((state) => state.collectionsMap);
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
+
+    const { tabsInfo, selectItems } = useTable();
+
+    const resetResourcesSelected = () => {
+        TableStore.getState().setSelectedItems([])
+        selectItems([])
+        setTableKey(!tableKey)
+    };
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
@@ -89,8 +98,7 @@ function ThreatCompliancePage() {
         {
             title: "Severity",
             text: "Severity",
-            value: "severity",
-            sortActive: true
+            value: "severity"
         },
         {
             title: "Threat name",
@@ -111,8 +119,7 @@ function ThreatCompliancePage() {
         {
             title: "Compliance",
             text: "Compliance",
-            value: "compliance",
-            sortActive: true
+            value: "compliance"
         },
         {
             title: "Discovered",
@@ -228,36 +235,6 @@ function ThreatCompliancePage() {
         jiraTicketUrl: item?.jiraTicketUrl
     });
 
-    const getThreatCollapsibleRow = (urls) => {
-        return (
-            <tr style={{ background: "#FAFBFB", padding: '0px !important', borderTop: '1px solid #dde0e4' }}>
-                <td colSpan={'100%'} style={{ padding: '0px !important' }}>
-                    {urls.map((urlObj, index) => {
-                        const borderStyle = index < (urls.length - 1) ? { borderBlockEndWidth: 1 } : {}
-                        return (
-                            <Box padding={"2"} paddingInlineEnd={"4"} paddingInlineStart={"3"} key={index}
-                                borderColor="border-subdued" {...borderStyle}>
-                                <HorizontalStack gap={4} wrap={false}>
-                                    <Link
-                                        monochrome
-                                        onClick={() => handleThreatClick(urlObj.threatData)}
-                                        removeUnderline
-                                    >
-                                        <GetPrettifyEndpoint
-                                            maxWidth="300px"
-                                            method={urlObj.method}
-                                            url={urlObj.url}
-                                            isNew={false}
-                                        />
-                                    </Link>
-                                </HorizontalStack>
-                            </Box>
-                        )
-                    })}
-                </td>
-            </tr>
-        )
-    }
 
     const convertToThreatTableData = (rawData, threatFiltersMapWithTestName) => {
         return rawData.map((threat, idx) => {
@@ -268,7 +245,7 @@ function ThreatCompliancePage() {
 
             return {
                 key: key,
-                id: threat.urls.map((x) => x.id),
+                id: threat.urls.map((urlObj) => JSON.stringify({ eventId: urlObj.threatData?.eventId || "" })),
                 severity: <div className={`badge-wrapper-${threat.severityType}`}>
                     <Badge size="small" key={idx}>{threat.severity}</Badge>
                 </div>,
@@ -294,7 +271,11 @@ function ThreatCompliancePage() {
                     <Text color="subdued">-</Text>
                 ),
                 creationTime: func.prettifyEpoch(threat.creationTime),
-                collapsibleRow: getThreatCollapsibleRow(threat.urls)
+                collapsibleRow: transform.getThreatCollapsibleRow(threat.urls.map(urlObj => ({
+                    method: urlObj.method,
+                    url: urlObj.url,
+                    threatData: urlObj.threatData
+                })), handleThreatClick)
             }
         })
     }
@@ -317,6 +298,7 @@ function ThreatCompliancePage() {
             let typeFilter = [];
             let latestAttack = calcFilteredThreatFilterIds(complianceView);
             let hostFilter = [];
+            let severityFilter = [];
 
             let latestApiOrigRegex = queryValue.length > 3 ? queryValue : "";
 
@@ -335,14 +317,12 @@ function ThreatCompliancePage() {
             if (filtersObj?.host) {
                 hostFilter = filtersObj?.host;
             }
+            if (filtersObj?.severity) {
+                severityFilter = filtersObj?.severity;
+            }
 
             const sort = sortKey && sortOrder ? { [sortKey]: sortOrder === 'asc' ? 1 : -1 } : {};
-            const successfulFilterValue = Array.isArray(filtersObj?.successfulExploit)
-                ? filtersObj?.successfulExploit?.[0]
-                : filtersObj?.successfulExploit;
-            const successfulBool = (successfulFilterValue === true || successfulFilterValue === 'true') ? true
-                : (successfulFilterValue === false || successfulFilterValue === 'false') ? false
-                    : undefined;
+            const successfulBool = true;
 
             const res = await threatDetectionApi.fetchSuspectSampleData(
                 skip,
@@ -359,7 +339,9 @@ function ThreatCompliancePage() {
                 successfulBool,
                 'THREAT',
                 hostFilter,
-                latestApiOrigRegex
+                latestApiOrigRegex,
+                [],
+                true
             );
 
             const total = res?.total || 0;
@@ -380,6 +362,10 @@ function ThreatCompliancePage() {
                 });
 
                 if (!hasCompliance) return;
+
+                if (severityFilter.length > 0 && !severityFilter.includes(threatPolicy.severity)) {
+                    return;
+                }
 
                 const key = `${item?.filterId}|${threatPolicy.severity || 'HIGH'}`;
 
@@ -422,24 +408,35 @@ function ThreatCompliancePage() {
             let threatItem = Array.from(uniqueThreatsMap.values());
             const sortedThreatItem = threatItem.sort((a, b) => {
                 let aValue, bValue;
+                let order;
+
                 if (sortKey === 'numberOfEndpoints') {
                     aValue = a.numberOfEndpoints;
                     bValue = b.numberOfEndpoints;
-                } else if (sortKey === 'severity') {
-                    const severityOrder = func.getAktoSeverities();
-                    aValue = severityOrder.indexOf(a.severityType);
-                    bValue = severityOrder.indexOf(b.severityType);
+                    order = sortOrder === 'asc' ? 1 : -1;
+                    if (aValue !== bValue) {
+                        return aValue < bValue ? -1 * order : 1 * order;
+                    }
                 } else if (sortKey === 'creationTime') {
                     aValue = a.creationTime;
                     bValue = b.creationTime;
+                    order = sortOrder === 'asc' ? 1 : -1;
+                    if (aValue !== bValue) {
+                        return aValue < bValue ? -1 * order : 1 * order;
+                    }
                 } else {
-                    return 0;
+                    const severityOrder = func.getAktoSeverities();
+                    aValue = severityOrder.indexOf(a.severityType);
+                    bValue = severityOrder.indexOf(b.severityType);
+
+                    if (aValue !== bValue) {
+                        return aValue < bValue ? -1 : 1;
+                    }
+
+                    return b.creationTime - a.creationTime;
                 }
 
-                const order = sortOrder === 'asc' ? 1 : -1;
-                if (aValue < bValue) return -1 * order;
-                if (aValue > bValue) return 1 * order;
-                return 0;
+                return b.creationTime - a.creationTime;
             });
 
             const threatFiltersMapWithTestName = Object.fromEntries(
@@ -479,6 +476,17 @@ function ThreatCompliancePage() {
 
         return [
             {
+                key: 'severity',
+                label: 'Severity',
+                title: 'Severity',
+                choices: [
+                    { label: 'Critical', value: 'CRITICAL' },
+                    { label: 'High', value: 'HIGH' },
+                    { label: 'Medium', value: 'MEDIUM' },
+                    { label: 'Low', value: 'LOW' }
+                ]
+            },
+            {
                 key: "actor",
                 label: "Actor",
                 title: "Actor",
@@ -504,17 +512,7 @@ function ThreatCompliancePage() {
                     { label: 'Rule based', value: 'Rule-Based' },
                     { label: 'Anomaly', value: 'Anomaly' },
                 ],
-            },
-            {
-                key: 'successfulExploit',
-                label: 'Successful Exploit',
-                title: 'Successful Exploit',
-                choices: [
-                    { label: 'True', value: 'true' },
-                    { label: 'False', value: 'false' }
-                ],
-                singleSelect: true
-            },
+            }
         ];
     }
 
@@ -548,6 +546,133 @@ function ThreatCompliancePage() {
             description: "See which threats are mapped to specific compliance requirements.",
         }
     ];
+
+    const handleBulkOperation = async (selectedIds, operation, newState = null) => {
+        const actionLabels = {
+            ignore: { ing: 'ignoring', ed: 'ignored' },
+            delete: { ing: 'deleting', ed: 'deleted' },
+            markForReview: { ing: 'marking for review', ed: 'marked for review' },
+            removeFromReview: { ing: 'removing from review', ed: 'removed from review' }
+        };
+
+        const label = actionLabels[operation];
+
+        if (!selectedIds || selectedIds.length === 0) {
+            func.setToast(true, true, 'No events selected');
+            return;
+        }
+
+        let eventIds = [];
+        selectedIds.forEach(id => {
+            try {
+                const parsed = JSON.parse(id);
+                if (parsed.eventId) {
+                    eventIds.push(parsed.eventId);
+                } else if (Array.isArray(parsed)) {
+                    parsed.forEach(item => {
+                        if (item.eventId) eventIds.push(item.eventId);
+                    });
+                }
+            } catch (e) {
+                console.error('Error parsing ID:', e);
+            }
+        });
+
+        if (eventIds.length === 0) {
+            func.setToast(true, true, 'No valid events selected');
+            return;
+        }
+
+        try {
+            let response;
+            if (operation === 'delete') {
+                response = await threatDetectionApi.deleteMaliciousEvents({ eventIds });
+            } else {
+                response = await threatDetectionApi.updateMaliciousEventStatus({ eventIds, status: newState });
+            }
+
+            const isSuccess = operation === 'delete' ? response?.deleteSuccess : response?.updateSuccess;
+            const count = operation === 'delete' ? response?.deletedCount : response?.updatedCount;
+
+            if (isSuccess) {
+                func.setToast(true, false, `${count || eventIds.length} event${eventIds.length === 1 ? '' : 's'} ${label.ed} successfully`);
+                resetResourcesSelected();
+                setLoading(true);
+                setTimeout(() => setLoading(false), 500);
+            } else {
+                func.setToast(true, true, `Failed to ${operation} events`);
+            }
+        } catch (error) {
+            func.setToast(true, true, `Error ${label.ing} events`);
+        }
+    };
+
+    const promotedBulkActions = (selectedResources) => {
+        if (!selectedResources || selectedResources.length === 0) return [];
+
+        let items = [];
+        if (Array.isArray(selectedResources)) {
+            selectedResources.forEach(resource => {
+                if (typeof resource === 'string') {
+                    items.push(resource);
+                } else if (Array.isArray(resource)) {
+                    items.push(...resource);
+                }
+            });
+        }
+
+        const eventCount = items.length;
+        const eventText = `${eventCount} selected event${eventCount === 1 ? '' : 's'}`;
+
+        const createAction = (label, actionType, includeWarning = false) => {
+            const warningText = includeWarning
+                ? '\n\nNote: Future events matching these URL and Attack Type combinations will be automatically blocked.'
+                : '';
+
+            return {
+                content: `${label} ${eventText}`,
+                onAction: () => {
+                    const message = actionType === 'delete'
+                        ? `Are you sure you want to permanently delete ${eventText}? This action cannot be undone.`
+                        : `Are you sure you want to ${label.toLowerCase()} ${eventText}?${warningText}`;
+
+                    const handlers = {
+                        markForReview: () => handleBulkOperation(items, 'markForReview', 'UNDER_REVIEW'),
+                        ignore: () => handleBulkOperation(items, 'ignore', 'IGNORED'),
+                        removeFromReview: () => handleBulkOperation(items, 'removeFromReview', 'ACTIVE'),
+                        reactivate: () => handleBulkOperation(items, 'removeFromReview', 'ACTIVE'),
+                        delete: () => handleBulkOperation(items, 'delete')
+                    };
+
+                    func.showConfirmationModal(message, label, handlers[actionType]);
+                }
+            };
+        };
+
+        const actions = [];
+        const tabActions = {
+            'active': [
+                { label: 'Mark for Review', type: 'markForReview' },
+                { label: 'Ignore', type: 'ignore', warning: true }
+            ],
+            'under_review': [
+                { label: 'Remove from Review', type: 'removeFromReview' },
+                { label: 'Ignore', type: 'ignore', warning: true }
+            ],
+            'ignored': [
+                { label: 'Reactivate', type: 'reactivate' }
+            ]
+        };
+
+        const currentTabActions = tabActions[currentTab] || [];
+        currentTabActions.forEach(({ label, type, warning }) => {
+            actions.push(createAction(label, type, warning));
+        });
+
+        actions.push(createAction('Delete', 'delete'));
+
+        return actions;
+    }
 
     const key = startTimestamp + endTimestamp + currentTab + complianceView;
 
@@ -623,7 +748,9 @@ function ThreatCompliancePage() {
                         loading={loading}
                         fetchData={fetchData}
                         filters={filters}
-                        selectable={false}
+                        selectable={true}
+                        promotedBulkActions={promotedBulkActions}
+                        isMultipleItemsSelected={true}
                         headings={headers}
                         useNewRow={true}
                         condensedHeight={true}
