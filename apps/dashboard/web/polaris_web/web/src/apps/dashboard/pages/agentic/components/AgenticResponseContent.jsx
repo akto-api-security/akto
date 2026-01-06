@@ -28,7 +28,6 @@ function AgenticResponseContent({ content, timeTaken }) {
             {/* Markdown content */}
             <Box
                 style={{
-                    padding: '16px 20px',
                     borderRadius: '12px 12px 12px 0px',
                     background: 'transparent'
                 }}
