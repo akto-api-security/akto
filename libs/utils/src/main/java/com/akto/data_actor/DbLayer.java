@@ -218,12 +218,14 @@ public class DbLayer {
             Bson updates = Updates.combine(
                     //putting class name because findOneAndUpdate doesn't put class name by default
                     Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
-                    Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType()),
+                    Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType().name()),
                     Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
                     Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
                     Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()),
                     Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
-                    Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived())
+                    Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()),
+                    Updates.set(ModuleInfo._REBOOT, moduleInfo.isReboot()),
+                    Updates.set(ModuleInfo.DELETE_TOPIC_AND_REBOOT, moduleInfo.isDeleteTopicAndReboot())
             );
             bulkUpdates.add(new UpdateOneModel<>(filter, updates, updateOptions));
         }
