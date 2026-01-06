@@ -26,10 +26,12 @@ import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -92,7 +94,7 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
         return updatedIntegration;
     }
 
-    private Map<String, String> fetchAllPartsFromDevRev(String token) {
+    private Map<String, String> fetchAllPartsFromDevRev(String token, List<String> partTypes, String partNameFilter) {
         Map<String, String> partsIdToNameMap = new HashMap<>();
         String url = DevRevIntegration.API_BASE_URL + "/parts.list";
 
@@ -111,6 +113,19 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
                 BasicDBObject requestBody = new BasicDBObject("limit", 100);
                 if (cursor != null) {
                     requestBody.put("cursor", cursor);
+                }
+
+                if (partTypes != null && !partTypes.isEmpty()) {
+                    requestBody.put("type", partTypes);
+                }
+                if (partNameFilter != null && !partNameFilter.trim().isEmpty()) {
+                    List<String> nameList = Arrays.stream(partNameFilter.split(","))
+                        .map(String::trim)
+                        .filter(name -> !name.isEmpty())
+                        .collect(Collectors.toList());
+                    if (!nameList.isEmpty()) {
+                        requestBody.put("name", nameList);
+                    }
                 }
 
                 OriginalHttpRequest request = new OriginalHttpRequest(
@@ -174,10 +189,10 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
         return integration;
     }
 
-    public Map<String, String> fetchDevrevProjects() throws Exception {
+    public Map<String, String> fetchDevrevProjects(List<String> partTypes, String partName) throws Exception {
         String actualToken = getPersonalAccessToken(personalAccessToken);
 
-        Map<String, String> partsIdToNameMap = fetchAllPartsFromDevRev(actualToken);
+        Map<String, String> partsIdToNameMap = fetchAllPartsFromDevRev(actualToken, partTypes, partName);
 
         if (partsIdToNameMap.isEmpty()) {
             throw new Exception("Failed to fetch projects from DevRev. Please verify your personal access token and try again.");
