@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
 import { Box, Icon, TextField } from '@shopify/polaris';
 import { ArrowUpMinor } from '@shopify/polaris-icons';
+import '../AgenticConversationPage.css';
 
 const AgenticSearchInput = forwardRef(({
     value: externalValue,
@@ -85,72 +86,6 @@ const AgenticSearchInput = forwardRef(({
 
     return (
         <>
-            <style>{`
-                @keyframes shimmer {
-                    0% {
-                        background-position: -1000px 0;
-                    }
-                    100% {
-                        background-position: 1000px 0;
-                    }
-                }
-
-                .agentic-search-input .Polaris-TextField {
-                    border: none !important;
-                    box-shadow: none !important;
-                }
-                .agentic-search-input .Polaris-TextField__Input {
-                    border: none !important;
-                    box-shadow: none !important;
-                    padding: 8px !important;
-                    background: transparent !important;
-                }
-                .agentic-search-input .Polaris-TextField__Input:focus {
-                    border: none !important;
-                    box-shadow: none !important;
-                    outline: none !important;
-                }
-                .agentic-search-input .Polaris-TextField__Backdrop {
-                    border: none !important;
-                    box-shadow: none !important;
-                    background: transparent !important;
-                }
-                .agentic-search-input .Polaris-TextField__Backdrop::before,
-                .agentic-search-input .Polaris-TextField__Backdrop::after {
-                    border: none !important;
-                    box-shadow: none !important;
-                }
-
-                .shimmer-container {
-                    position: relative;
-                    overflow: hidden;
-                }
-
-                .shimmer-container::before {
-                    content: '';
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    border-radius: 12px;
-                    padding: 1px;
-                    background: linear-gradient(
-                        90deg,
-                        rgba(98, 0, 234, 0.67) 0%,
-                        rgba(98, 0, 234, 0.67) 40%,
-                        rgba(200, 150, 255, 1) 50%,
-                        rgba(98, 0, 234, 0.67) 60%,
-                        rgba(98, 0, 234, 0.67) 100%
-                    );
-                    background-size: 200% 100%;
-                    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-                    -webkit-mask-composite: xor;
-                    mask-composite: exclude;
-                    animation: shimmer 3s linear infinite;
-                    pointer-events: none;
-                }
-            `}</style>
             <Box style={{ ...wrapperStyle, ...containerStyle }}>
                 <Box style={innerContainerStyle}>
                     <Box
