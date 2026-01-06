@@ -6,15 +6,7 @@ function AgenticCopyButton({ content }) {
     const [isCopied, setIsCopied] = useState(false);
 
     const handleCopy = () => {
-        let textToCopy = `${content.title}\n\n`;
-        content.sections.forEach(section => {
-            textToCopy += `${section.header}\n`;
-            section.items.forEach(item => {
-                textToCopy += `• ${item}\n`;
-            });
-            textToCopy += '\n';
-        });
-        navigator.clipboard.writeText(textToCopy);
+        navigator.clipboard.writeText(content);
         setIsCopied(true);
         setTimeout(() => setIsCopied(false), 2000);
     };

@@ -18,49 +18,52 @@ export const getMockThinkingItems = () => {
  * In production, this will be replaced by streaming data from the API
  */
 export const getMockResponseContent = () => {
-    return {
-        title: 'Weekly Agentic Risk Summary',
-        sections: [
-            {
-                header: 'Scope analyzed',
-                items: [
-                    '14 active agent workflows',
-                    '7 day observation window'
-                ]
-            },
-            {
-                header: 'Key risks identified',
-                items: [
-                    '2 agents (14%) executing tools or APIs without execution guardrails',
-                    '1 agent (7%) accessing sensitive customer data without output redaction',
-                    '1 newly discovered agent with elevated execution privileges',
-                    '1 shadow agent without an assigned owner'
-                ]
-            },
-            {
-                header: 'Threat activity observed',
-                items: [
-                    '3 prompt injection attempts detected',
-                    '100% of attempts blocked before execution'
-                ]
-            },
-            {
-                header: 'Posture change',
-                items: [
-                    'Overall agentic risk increased week over week',
-                    'Primary drivers: new agents and expanded execution scope'
-                ]
-            },
-            {
-                header: 'Top priorities',
-                items: [
-                    'Apply execution guardrails to the 2 highest risk agents',
-                    'Enforce output redaction on agents handling sensitive data',
-                    'Assign ownership and review permissions for shadow agents'
-                ]
-            }
-        ]
-    };
+    return `# Weekly Agentic Risk Summary
+
+## Scope analyzed
+
+- **14 active agent workflows** running in production
+- **7 day** observation window with \`real-time\` monitoring
+
+## Key risks identified
+
+- **2 agents (14%)** executing tools or APIs without \`execution guardrails\` - [View Details](#)
+- **1 agent (7%)** accessing **sensitive customer data** without output redaction
+- **1 newly discovered agent** with \`elevated execution privileges\`
+
+\`\`\`bash
+# Agent ID: agent-prod-v2-xyz
+# Permissions: FULL_ACCESS
+\`\`\`
+
+- **1 shadow agent** without an assigned owner - requires immediate attention
+
+## Threat activity observed
+
+- **3 prompt injection attempts** detected using:
+  - SQL injection patterns
+  - System command execution
+  - Data exfiltration attempts
+- **100% of attempts blocked** before execution by our \`guardrail system\`
+
+## Posture change
+
+- **Overall agentic risk increased** week over week by \`23%\`
+- Primary drivers:
+  - New agents deployed: **4**
+  - Expanded execution scope
+  - Increased API access patterns
+
+## Top priorities
+
+- **Apply execution guardrails** to the 2 highest risk agents:
+  1. \`agent-checkout-processor\`
+  2. \`agent-payment-handler\`
+- **Enforce output redaction** on agents handling sensitive data
+  - Credit card numbers
+  - Personal identification info
+  - API keys
+- **Assign ownership** and review permissions for shadow agents - [Documentation](https://docs.example.com/agent-security)`;
 };
 
 /**
@@ -111,24 +114,17 @@ export const mockStreamThinkingItems = async (onItem, delayBetweenItems = 300) =
  * @param {Function} onChunk - Callback for each content chunk
  * @param {number} delayBetweenChunks - Delay in ms between chunks
  */
-export const mockStreamResponse = async (onChunk, delayBetweenChunks = 200) => {
+export const mockStreamResponse = async (onChunk, delayBetweenChunks = 30) => {
     // Random delay before starting response (5-10 seconds)
     await randomDelay(5000, 10000);
 
     const content = getMockResponseContent();
 
-    // Stream title
-    await mockDelay(delayBetweenChunks);
-    onChunk({ type: 'title', content: content.title });
+    // Stream the markdown content line by line for realistic effect
+    const lines = content.split('\n');
 
-    // Stream sections and items
-    for (const section of content.sections) {
+    for (const line of lines) {
         await mockDelay(delayBetweenChunks);
-        onChunk({ type: 'header', content: section.header });
-
-        for (const item of section.items) {
-            await mockDelay(delayBetweenChunks);
-            onChunk({ type: 'item', content: item });
-        }
+        onChunk({ type: 'markdown', content: line + '\n' });
     }
 };

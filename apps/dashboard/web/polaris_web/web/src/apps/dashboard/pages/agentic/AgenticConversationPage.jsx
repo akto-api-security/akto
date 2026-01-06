@@ -35,7 +35,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack 
 
     // Current response state
     const [streamedThinkingItems, setStreamedThinkingItems] = useState([]);
-    const [streamedContent, setStreamedContent] = useState({ sections: [] });
+    const [streamedContent, setStreamedContent] = useState('');
     const [currentTimeTaken, setCurrentTimeTaken] = useState(null);
     const [currentSuggestions, setCurrentSuggestions] = useState([]);
 
@@ -126,7 +126,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack 
             setError(null);
             setIsLoading(true);
             setStreamedThinkingItems([]);
-            setStreamedContent({ sections: [] });
+            setStreamedContent('');
             setCurrentTimeTaken(null);
             setCurrentSuggestions([]);
 
@@ -154,7 +154,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack 
             // Stream response content
             setIsStreaming(true);
             let isFirstChunk = true;
-            let fullResponseContent = { sections: [] };
+            let fullResponseContent = '';
 
             await streamResponse(
                 convId,
@@ -167,26 +167,10 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack 
                         setCurrentTimeTaken(duration);
                     }
 
-                    // Handle streaming chunk
-                    if (chunk.type === 'title') {
-                        setStreamedContent(prev => ({ ...prev, title: chunk.content }));
-                        fullResponseContent.title = chunk.content;
-                    } else if (chunk.type === 'header') {
-                        const newSection = { header: chunk.content, items: [] };
-                        setStreamedContent(prev => ({
-                            ...prev,
-                            sections: [...prev.sections, newSection]
-                        }));
-                        fullResponseContent.sections.push(newSection);
-                    } else if (chunk.type === 'item') {
-                        setStreamedContent(prev => {
-                            const newSections = [...prev.sections];
-                            const lastSection = { ...newSections[newSections.length - 1] };
-                            lastSection.items = [...lastSection.items, chunk.content];
-                            newSections[newSections.length - 1] = lastSection;
-                            return { ...prev, sections: newSections };
-                        });
-                        fullResponseContent.sections[fullResponseContent.sections.length - 1].items.push(chunk.content);
+                    // Handle streaming markdown chunk
+                    if (chunk.type === 'markdown') {
+                        setStreamedContent(prev => prev + chunk.content);
+                        fullResponseContent += chunk.content;
                     }
                 },
                 async (responseData) => {
@@ -202,7 +186,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack 
                         id: generateMessageId(),
                         type: 'assistant',
                         thinkingItems: streamedThinkingItems,
-                        response: fullResponseContent,
+                        content: fullResponseContent, // Changed from 'response' to 'content'
                         suggestions: suggestions,
                         timeTaken: responseData.timeTaken || currentTimeTaken,
                         timestamp: responseData.timestamp,
@@ -339,10 +323,10 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack 
                                 }}
                             >
                                 <AgenticResponseContent
-                                    content={message.response}
+                                    content={message.content}
                                     timeTaken={message.timeTaken}
                                 />
-                                <AgenticCopyButton content={message.response} />
+                                <AgenticCopyButton content={message.content} />
                                 {index === messages.length - 1 && !isLoading && !isStreaming && message.suggestions && (
                                     <AgenticSuggestionsList
                                         suggestions={message.suggestions}
@@ -362,7 +346,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack 
                     )}
 
                     {/* Streaming response */}
-                    {isStreaming && streamedContent.sections.length > 0 && (
+                    {isStreaming && streamedContent && (
                         <AgenticResponseContent
                             content={streamedContent}
                             timeTaken={currentTimeTaken}
