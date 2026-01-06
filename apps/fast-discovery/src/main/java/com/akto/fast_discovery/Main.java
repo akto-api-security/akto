@@ -40,10 +40,8 @@ public class Main {
 
         try {
             // 1. Initialize Database-Abstractor HTTP client
-            dbAbstractorClient = new DatabaseAbstractorClient(
-                    config.dbAbstractorUrl,
-                    config.dbAbstractorJwtToken
-            );
+            // JWT token read from DATABASE_ABSTRACTOR_SERVICE_TOKEN environment variable (same as mini-runtime)
+            dbAbstractorClient = new DatabaseAbstractorClient(config.dbAbstractorUrl);
             loggerMaker.infoAndAddToDb("DatabaseAbstractorClient initialized");
 
             // 2. Initialize Bloom Filter Manager
@@ -175,16 +173,11 @@ public class Main {
 
         // Database-Abstractor configuration
         config.dbAbstractorUrl = getEnv("DB_ABSTRACTOR_URL", "http://database-abstractor:9000");
-        config.dbAbstractorJwtToken = getEnv("DB_ABSTRACTOR_JWT_TOKEN", "");
+        // Note: JWT token (DATABASE_ABSTRACTOR_SERVICE_TOKEN) is read by DatabaseAbstractorClient
 
         // Bloom Filter configuration
         config.bloomFilterExpectedSize = Long.parseLong(getEnv("BLOOM_FILTER_EXPECTED_SIZE", "10000000"));
         config.bloomFilterFpp = Double.parseDouble(getEnv("BLOOM_FILTER_FPP", "0.01"));
-
-        // Validate required configuration
-        if (config.dbAbstractorJwtToken.isEmpty()) {
-            throw new RuntimeException("DB_ABSTRACTOR_JWT_TOKEN environment variable is required");
-        }
 
         return config;
     }
@@ -207,7 +200,6 @@ public class Main {
         loggerMaker.infoAndAddToDb("Kafka Group ID: " + config.kafkaGroupId);
         loggerMaker.infoAndAddToDb("Kafka Max Poll Records: " + config.kafkaMaxPollRecords);
         loggerMaker.infoAndAddToDb("Database-Abstractor URL: " + config.dbAbstractorUrl);
-        loggerMaker.infoAndAddToDb("Database-Abstractor JWT: " + (config.dbAbstractorJwtToken.isEmpty() ? "NOT SET" : "***"));
         loggerMaker.infoAndAddToDb("Bloom Filter Expected Size: " + config.bloomFilterExpectedSize);
         loggerMaker.infoAndAddToDb("Bloom Filter FPP: " + config.bloomFilterFpp);
         loggerMaker.infoAndAddToDb("===================================");
@@ -222,7 +214,7 @@ public class Main {
         String kafkaGroupId;
         int kafkaMaxPollRecords;
         String dbAbstractorUrl;
-        String dbAbstractorJwtToken;
+        // Note: JWT token is NOT stored here - DatabaseAbstractorClient reads it from environment
         long bloomFilterExpectedSize;
         double bloomFilterFpp;
     }

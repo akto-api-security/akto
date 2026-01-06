@@ -36,13 +36,30 @@ public class DatabaseAbstractorClient {
     private static final LoggerMaker loggerMaker = new LoggerMaker(DatabaseAbstractorClient.class);
 
     private final String baseUrl;
-    private final String jwtToken;
     private final CloseableHttpClient httpClient;
     private final Gson gson;
 
-    public DatabaseAbstractorClient(String baseUrl, String jwtToken) {
+    /**
+     * Get JWT token from environment variable.
+     * Same pattern as mini-runtime's ClientActor.getAuthToken()
+     *
+     * @return JWT token for authentication
+     * @throws IllegalStateException if token is not set
+     */
+    private static String getAuthToken() {
+        String token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+        if (token == null || token.isEmpty()) {
+            throw new IllegalStateException(
+                "DATABASE_ABSTRACTOR_SERVICE_TOKEN environment variable is required"
+            );
+        }
+        return token;
+    }
+
+    public DatabaseAbstractorClient(String baseUrl) {
         this.baseUrl = baseUrl;
-        this.jwtToken = jwtToken;
+        // Validate token is available at initialization
+        getAuthToken();
         this.httpClient = HttpClients.createDefault();
         this.gson = new Gson();
         loggerMaker.infoAndAddToDb("DatabaseAbstractorClient initialized with baseUrl: " + baseUrl);
@@ -60,7 +77,7 @@ public class DatabaseAbstractorClient {
         loggerMaker.infoAndAddToDb("Fetching API IDs from: " + endpoint);
 
         HttpGet request = new HttpGet(endpoint);
-        request.setHeader("Authorization", jwtToken);
+        request.setHeader("Authorization", getAuthToken());
 
         try (CloseableHttpResponse response = httpClient.execute(request)) {
             int statusCode = response.getStatusLine().getStatusCode();
@@ -109,7 +126,7 @@ public class DatabaseAbstractorClient {
         payload.put("apiIds", apiIds);
 
         HttpPost request = new HttpPost(endpoint);
-        request.setHeader("Authorization", jwtToken);
+        request.setHeader("Authorization", getAuthToken());
         request.setHeader("Content-Type", "application/json");
 
         String jsonPayload = gson.toJson(payload);
@@ -187,7 +204,7 @@ public class DatabaseAbstractorClient {
      */
     private void executePost(String endpoint, Object payload) throws Exception {
         HttpPost request = new HttpPost(endpoint);
-        request.setHeader("Authorization", jwtToken);
+        request.setHeader("Authorization", getAuthToken());
         request.setHeader("Content-Type", "application/json");
 
         String jsonPayload = gson.toJson(payload);
