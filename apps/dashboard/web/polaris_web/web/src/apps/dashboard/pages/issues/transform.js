@@ -86,6 +86,31 @@ const transform = {
         </tr>
         )
     },
+    getThreatCollapsibleRow(urls, handleThreatClick) {
+        return(
+        <tr style={{background: "#FAFBFB", padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
+            <td colSpan={'100%'} style={{padding: '0px !important'}}>
+                {urls.map((urlObj, index) => {
+                    const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth: 1} : {};
+                    return (
+                        <Box key={index} padding={"2"} paddingInlineEnd={"4"} paddingInlineStart={"3"} borderColor="border-subdued" {...borderStyle}>
+                            <HorizontalStack gap={24} wrap={false}>
+                                <Box paddingInlineStart={10}>
+                                    <IssuesCheckbox id={JSON.stringify({ eventId: urlObj.threatData?.eventId || "" })} />
+                                </Box>
+                                <HorizontalStack gap={"4"}>
+                                    <Link monochrome onClick={() => handleThreatClick(urlObj.threatData)} removeUnderline>
+                                        <Text>{urlObj.method} {urlObj.url}</Text>
+                                    </Link>
+                                </HorizontalStack>
+                            </HorizontalStack>
+                        </Box>
+                    );
+                })}
+            </td>
+        </tr>
+        )
+    },
     convertToIssueTableData: async (rawData, subCategoryMap, isCompliancePage = false) => {
         const processedData = await Promise.all(
             await Promise.all(rawData.map(async (issue, idx) => {
