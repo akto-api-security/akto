@@ -343,6 +343,33 @@ public class KafkaUtils {
         }
     }
 
+    /**
+     * Start FastDiscoveryKafkaConsumer in a background thread.
+     * Called from InitializerListener.contextInitialized() when web app starts.
+     * This runs independently from the main Kafka consumer.
+     */
+    public void startFastDiscoveryConsumer() {
+        try {
+            String brokerUrl = getBrokerUrl();
+            String topicName = getFastDiscoveryTopicName();
+            String groupId = "fast-discovery-consumer";
+            int maxPollRecords = Integer.parseInt(getCachedEnv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
+
+            loggerMaker.infoAndAddToDb("Starting FastDiscoveryKafkaConsumer in background thread...", LogDb.DB_ABS);
+
+            // Create and start consumer in background thread
+            com.akto.FastDiscoveryKafkaConsumer fastDiscoveryConsumer =
+                new com.akto.FastDiscoveryKafkaConsumer(
+                    brokerUrl, topicName, groupId, maxPollRecords
+                );
+
+            fastDiscoveryConsumer.start();  // Spawns daemon thread
+            loggerMaker.infoAndAddToDb("Fast-discovery consumer started on topic: " + topicName, LogDb.DB_ABS);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error starting FastDiscoveryKafkaConsumer: " + e.toString(), LogDb.DB_ABS);
+        }
+    }
+
 
     public static String getTopicNameForAccount(String defaultTopicEnvVar, int accountId) {
         String defaultTopic = getCachedEnv(defaultTopicEnvVar);
