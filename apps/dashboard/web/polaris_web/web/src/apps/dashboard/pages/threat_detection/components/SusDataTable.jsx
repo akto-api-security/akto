@@ -131,8 +131,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   ]
 
   // Check if AGENT_TRAFFIC_LOGS feature is enabled
-  //const hasAgentTrafficLogsAccess = func.checkForFeatureSaas('AGENT_TRAFFIC_LOGS');
-  const hasAgentTrafficLogsAccess = true;
+  const hasAgentTrafficLogsAccess = func.checkForFeatureSaas('AGENT_TRAFFIC_LOGS');
   // Add Training Data tab only for guardrail events and if feature is enabled
   const tableTabs = label === LABELS.GUARDRAIL && hasAgentTrafficLogsAccess
     ? [...baseTabs, {
