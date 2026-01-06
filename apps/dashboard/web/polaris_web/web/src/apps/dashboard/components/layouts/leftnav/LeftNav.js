@@ -508,7 +508,7 @@ export default function LeftNav() {
         const askAiExists = items.find(item => item.key === "ask_ai")
         if (!askAiExists) {
             items.splice(1, 0, {
-                label: "Ask AI",
+                label: "Ask Akto",
                 icon: MagicMinor,
                 onClick: () => {
                     handleSelect("dashboard_ask_ai")
