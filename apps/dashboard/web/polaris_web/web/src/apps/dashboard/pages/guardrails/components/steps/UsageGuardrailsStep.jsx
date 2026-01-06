@@ -1,31 +1,23 @@
 import { VerticalStack, Text, Checkbox, Box, RangeSlider } from "@shopify/polaris";
 
-export const AdvancedScannersConfig = {
-    number: 8,
-    title: "Token Limit Filter",
+export const UsageGuardrailsConfig = {
+    number: 7,
+    title: "Usage based Guardrails",
 
     validate: () => {
         return { isValid: true, errorMessage: null };
     },
 
-    getSummary: (stateData) => {
+    getSummary: ({ enableTokenLimit }) => {
         const scanners = [];
-        const scannerKeys = [
-            { key: 'enableTokenLimit', label: 'Token Limit' }
-        ];
-
-        scannerKeys.forEach(({ key, label }) => {
-            if (stateData[key]) {
-                scanners.push(label);
-            }
-        });
-
+        if (enableTokenLimit) {
+            scanners.push('Token Limit');
+        }
         return scanners.length > 0 ? scanners.join(', ') : null;
     }
 };
 
-const AdvancedScannersStep = ({
-    // TokenLimit
+const UsageGuardrailsStep = ({
     enableTokenLimit,
     setEnableTokenLimit,
     tokenLimitConfidenceScore,
@@ -33,9 +25,9 @@ const AdvancedScannersStep = ({
 }) => {
     return (
         <VerticalStack gap="4">
-            <Text variant="headingMd">Token Limit Filter</Text>
+            <Text variant="headingMd">Usage based Guardrails</Text>
             <Text variant="bodyMd" tone="subdued">
-                Configure token limit detection to block overly long user inputs.
+                Configure usage-based guardrails to control token limits and prevent abuse.
             </Text>
 
             <VerticalStack gap="4">
@@ -69,5 +61,5 @@ const AdvancedScannersStep = ({
     );
 };
 
-export default AdvancedScannersStep;
+export default UsageGuardrailsStep;
 
