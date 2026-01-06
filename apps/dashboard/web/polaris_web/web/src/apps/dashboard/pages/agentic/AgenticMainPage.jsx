@@ -57,25 +57,6 @@ function AgenticMainPage() {
     }
 
     return (
-        // <>
-        //     <style>{`
-        //         .Polaris-Page {
-        //             background: radial-gradient(68.5% 70.87% at 49.29% 41.78%, #FAFAFA 27.4%, #FAFAFA 54.33%, #F9F6FF 69.17%, #FFF 86.54%, #F0FAFF 98.08%) !important;
-        //             min-height: 100vh !important;
-        //         }
-        //         .Polaris-Page > .Polaris-Box,
-        //         .Polaris-Page .Polaris-Box {
-        //             background: transparent !important;
-        //             --pc-box-padding-block-end-xs: 0 !important;
-        //             --pc-box-padding-block-start-xs: 0 !important;
-        //             --pc-box-padding-inline-start-xs: 0 !important;
-        //             --pc-box-padding-inline-end-xs: 0 !important;
-        //         }
-        //         .Polaris-Page::before,
-        //         .Polaris-Page::after {
-        //             display: none !important;
-        //         }
-        //     `}</style>
             <Page id="agentic-main-page" fullWidth>
                 <Box
                     style={{

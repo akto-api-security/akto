@@ -1,5 +1,15 @@
 import { Box, Text, Icon } from '@shopify/polaris';
 import { CancelSmallMinor } from '@shopify/polaris-icons';
+import { keyframes } from '@emotion/react';
+
+const slideInRight = keyframes`
+    from {
+        transform: translateX(100%);
+    }
+    to {
+        transform: translateX(0);
+    }
+`;
 
 /**
  * Reusable right-side panel component
@@ -14,17 +24,6 @@ function RightSidePanel({ isOpen, onClose, title, children, width = '600px' }) {
 
     return (
         <>
-            <style>{`
-                @keyframes slideInRight {
-                    from {
-                        transform: translateX(100%);
-                    }
-                    to {
-                        transform: translateX(0);
-                    }
-                }
-            `}</style>
-
             {/* Backdrop */}
             <Box
                 onClick={onClose}
@@ -53,7 +52,7 @@ function RightSidePanel({ isOpen, onClose, title, children, width = '600px' }) {
                     zIndex: 1000,
                     display: 'flex',
                     flexDirection: 'column',
-                    animation: 'slideInRight 0.3s ease-out'
+                    animation: `${slideInRight} 0.3s ease-out`
                 }}
             >
                 {/* Header */}
