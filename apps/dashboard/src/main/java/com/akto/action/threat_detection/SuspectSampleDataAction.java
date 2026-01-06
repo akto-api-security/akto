@@ -92,6 +92,11 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   private static final String AGENT_TRAFFIC_FEATURE_LABEL = "AGENT_TRAFFIC_LOGS";
   private static final String AGENT_TRAFFIC_ANALYZER_URL_ENV = "AGENT_TRAFFIC_ANALYZER_URL";
   private static final ExecutorService executorService = Executors.newFixedThreadPool(1);
+  private static final OkHttpClient agentTrafficAnalyzerClient = CoreHTTPClient.client.newBuilder()
+    .connectTimeout(30000, TimeUnit.MILLISECONDS)
+    .readTimeout(30000, TimeUnit.MILLISECONDS)
+    .writeTimeout(30000, TimeUnit.MILLISECONDS)
+    .build();
 
   public SuspectSampleDataAction() {
     super();
@@ -458,25 +463,18 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
           String url = analyzerUrl + "/feedback";
           String jsonBody = new BasicDBObject(feedbackBody).toJson();
           
-          OkHttpClient client = CoreHTTPClient.client.newBuilder()
-            .connectTimeout(30000, TimeUnit.MILLISECONDS)
-            .readTimeout(30000, TimeUnit.MILLISECONDS)
-            .writeTimeout(30000, TimeUnit.MILLISECONDS)
-            .build();
-          
           Request request = new Request.Builder()
             .url(url)
             .post(RequestBody.create(jsonBody, MediaType.parse("application/json")))
             .build();
           
-          try (Response httpResponse = client.newCall(request).execute()) {
+          try (Response httpResponse = agentTrafficAnalyzerClient.newCall(request).execute()) {
             if (!httpResponse.isSuccessful()) {
               loggerMaker.errorAndAddToDb(
                 String.format("Agent Guardrail Feedback request failed for event %s with code %d: %s", 
                   eventIdToProcess, httpResponse.code(), httpResponse.message()),
                 LogDb.DASHBOARD
               );
-              continue;
             }
           }
         } catch (Exception e) {
