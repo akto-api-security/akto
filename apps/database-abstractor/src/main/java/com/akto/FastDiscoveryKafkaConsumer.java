@@ -218,6 +218,19 @@ public class FastDiscoveryKafkaConsumer implements Runnable {
                     String field = (String) update.get("field");
                     Object value = update.get("val");
                     if (field != null && value != null) {
+                        // Convert numeric fields from Double to Integer if needed
+                        if ((field.equals("discoveredTimestamp") || field.equals("lastSeen")) && value instanceof Number) {
+                            value = ((Number) value).intValue();
+                        }
+                        // Convert collection IDs from List<Double> to List<Integer>
+                        if (field.equals("collectionIds") && value instanceof List) {
+                            List<Number> numList = (List<Number>) value;
+                            List<Integer> intList = new ArrayList<>();
+                            for (Number num : numList) {
+                                intList.add(num.intValue());
+                            }
+                            value = intList;
+                        }
                         apiInfo.put(field, value);
                     }
                 } catch (Exception e) {
@@ -225,6 +238,7 @@ public class FastDiscoveryKafkaConsumer implements Runnable {
                 }
             }
 
+            loggerMaker.infoAndAddToDb("Fast-discovery API info object: " + apiInfo.toJson(), LogDb.DB_ABS);
             apiInfoList.add(apiInfo);
         }
 
