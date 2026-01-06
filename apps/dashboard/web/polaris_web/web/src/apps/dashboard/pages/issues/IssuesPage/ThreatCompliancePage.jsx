@@ -19,6 +19,7 @@ import SampleDetails from "../../threat_detection/components/SampleDetails";
 import useTable from "../../../components/tables/TableContext.js";
 import TableStore from "../../../components/tables/TableStore.js";
 import transform from "../transform.js";
+import useThreatReportDownload from "../../../hooks/useThreatReportDownload";
 
 const sortOptions = [
     { label: 'Number of endpoints', value: 'numberOfEndpoints asc', directionLabel: 'More', sortKey: 'numberOfEndpoints', columnIndex: 3 },
@@ -66,6 +67,7 @@ function ThreatCompliancePage() {
     const [eventState, setEventState] = useState(initialEventState);
     const [detailsLoading, setDetailsLoading] = useState(false);
     const [tableKey, setTableKey] = useState(false);
+    const [currentAppliedFilters, setCurrentAppliedFilters] = useState({});
 
     const collectionsMap = PersistStore((state) => state.collectionsMap);
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
@@ -89,6 +91,12 @@ function ThreatCompliancePage() {
 
     const startTimestamp = getTimeEpoch("since");
     const endTimestamp = getTimeEpoch("until");
+
+    const { downloadThreatReport } = useThreatReportDownload({
+        startTimestamp,
+        endTimestamp,
+        additionalFilters: currentAppliedFilters
+    });
 
     const headers = [
         {
@@ -320,6 +328,16 @@ function ThreatCompliancePage() {
             if (filtersObj?.severity) {
                 severityFilter = filtersObj?.severity;
             }
+
+            // Update current applied filters for report export
+            const appliedFilters = {};
+            if (sourceIpsFilter.length > 0) appliedFilters.actor = sourceIpsFilter;
+            if (matchingUrlFilter.length > 0) appliedFilters.url = matchingUrlFilter;
+            if (hostFilter.length > 0) appliedFilters.host = hostFilter;
+            if (typeFilter.length > 0) appliedFilters.type = typeFilter;
+            if (latestAttack.length > 0) appliedFilters.latestAttack = latestAttack;
+            if (severityFilter.length > 0) appliedFilters.severity = severityFilter;
+            setCurrentAppliedFilters(appliedFilters);
 
             const sort = sortKey && sortOrder ? { [sortKey]: sortOrder === 'asc' ? 1 : -1 } : {};
             const successfulBool = true;
@@ -778,6 +796,9 @@ function ThreatCompliancePage() {
             }
             secondaryActions={
                 <HorizontalStack gap={2}>
+                    <Button primary onClick={downloadThreatReport}>
+                        Export Threat Report
+                    </Button>
                     <DateRangeFilter
                         initialDispatch={currDateRange}
                         dispatch={(dateObj) => dispatchCurrDateRange({

@@ -4,7 +4,7 @@ import { useReducer, useState, useEffect, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import func from "@/util/func";
 import PersistStore from "../../../../main/PersistStore";
-import { IndexFiltersMode, Badge, Avatar, Box, HorizontalStack, Text } from "@shopify/polaris";
+import { IndexFiltersMode, Badge, Avatar, Box, HorizontalStack, Text, Button } from "@shopify/polaris";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import DateRangeFilter from "../../../components/layouts/DateRangeFilter.jsx";
@@ -20,6 +20,7 @@ import { CellType } from "../../../components/tables/rows/GithubRow.js";
 import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import dayjs from "dayjs";
 import { formatActorId } from "../../threat_detection/utils/formatUtils";
+import useThreatReportDownload from "../../../hooks/useThreatReportDownload";
 
 const sortOptions = [
     { label: 'Discovered time', value: 'detectedAt asc', directionLabel: 'Newest', sortKey: 'detectedAt', columnIndex: 8 },
@@ -48,6 +49,7 @@ function ThreatsPage() {
     const [eventState, setEventState] = useState(initialEventState);
     const [detailsLoading, setDetailsLoading] = useState(false);
     const [tableKey, setTableKey] = useState(false);
+    const [currentAppliedFilters, setCurrentAppliedFilters] = useState({});
 
     const collectionsMap = PersistStore((state) => state.collectionsMap);
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
@@ -72,6 +74,12 @@ function ThreatsPage() {
 
     const startTimestamp = getTimeEpoch("since");
     const endTimestamp = getTimeEpoch("until");
+
+    const { downloadThreatReport } = useThreatReportDownload({
+        startTimestamp,
+        endTimestamp,
+        additionalFilters: currentAppliedFilters
+    });
 
     const headers = [
         {
@@ -241,6 +249,16 @@ function ThreatsPage() {
             const severityFilter = filters?.severity || [];
             const apiCollectionIdsFilter = [];
             const latestApiOrigRegex = queryValue?.length > 3 ? queryValue : "";
+
+            // Update current applied filters for report export
+            const appliedFilters = {};
+            if (sourceIpsFilter.length > 0) appliedFilters.actor = sourceIpsFilter;
+            if (matchingUrlFilter.length > 0) appliedFilters.url = matchingUrlFilter;
+            if (hostFilter.length > 0) appliedFilters.host = hostFilter;
+            if (typeFilter.length > 0) appliedFilters.type = typeFilter;
+            if (latestAttack.length > 0) appliedFilters.latestAttack = latestAttack;
+            if (severityFilter.length > 0) appliedFilters.severity = severityFilter;
+            setCurrentAppliedFilters(appliedFilters);
 
             const sort = { [sortKey || 'detectedAt']: sortOrder === 'asc' ? 1 : -1 };
 
@@ -601,6 +619,11 @@ function ThreatsPage() {
                             alias: dateObj.alias
                         })}
                     />}
+                secondaryActions={
+                    <Button primary onClick={downloadThreatReport}>
+                        Export Threat Report
+                    </Button>
+                }
                 components={[
                     <GithubServerTable
                         key={`threats-table-${selected}-${tableKey}-${startTimestamp}-${endTimestamp}`}
