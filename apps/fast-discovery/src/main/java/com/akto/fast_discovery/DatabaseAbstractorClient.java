@@ -119,7 +119,7 @@ public class DatabaseAbstractorClient {
         loggerMaker.infoAndAddToDb("Checking existence for " + apiIds.size() + " APIs");
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("apiIds", apiIds);
+        payload.put("apiIdsToCheck", apiIds);  // Must match server's setter name
 
         HttpPost request = new HttpPost(endpoint);
         request.setHeader("Authorization", getAuthToken());
@@ -136,23 +136,19 @@ public class DatabaseAbstractorClient {
                 throw new Exception("HTTP " + statusCode + ": " + responseBody);
             }
 
-            // Parse JSON: {"results": [{"apiCollectionId": 1, "url": "/api/users", "method": "GET", "exists": true}, ...]}
-            Type responseType = new TypeToken<Map<String, Object>>(){}.getType();
-            Map<String, Object> result = gson.fromJson(responseBody, responseType);
+            // Parse JSON: [{"apiCollectionId": 1, "url": "/api/users", "method": "GET", "exists": true}, ...]
+            // Response is a direct array, not wrapped in an object
+            Type responseType = new TypeToken<List<Map<String, Object>>>(){}.getType();
+            List<Map<String, Object>> resultMaps = gson.fromJson(responseBody, responseType);
 
             List<ApiExistenceResult> results = new ArrayList<>();
-            Object resultsObj = result.get("results");
-
-            if (resultsObj instanceof List) {
-                List<Map<String, Object>> resultMaps = (List<Map<String, Object>>) resultsObj;
-                for (Map<String, Object> map : resultMaps) {
-                    ApiExistenceResult existenceResult = new ApiExistenceResult();
-                    existenceResult.setApiCollectionId(((Number) map.get("apiCollectionId")).intValue());
-                    existenceResult.setUrl((String) map.get("url"));
-                    existenceResult.setMethod((String) map.get("method"));
-                    existenceResult.setExists((Boolean) map.get("exists"));
-                    results.add(existenceResult);
-                }
+            for (Map<String, Object> map : resultMaps) {
+                ApiExistenceResult existenceResult = new ApiExistenceResult();
+                existenceResult.setApiCollectionId(((Number) map.get("apiCollectionId")).intValue());
+                existenceResult.setUrl((String) map.get("url"));
+                existenceResult.setMethod((String) map.get("method"));
+                existenceResult.setExists((Boolean) map.get("exists"));
+                results.add(existenceResult);
             }
 
             long existingCount = results.stream().filter(ApiExistenceResult::isExists).count();
