@@ -80,7 +80,26 @@ export default function LeftNav() {
             },
             selected: leftNavSelected === "dashboard_reports_compliance",
         })
+        reportsSubNavigationItems.push({
+            label: "Threat Compliance",
+            onClick: () => {
+                navigate("/dashboard/reports/threat-compliance");
+                handleSelect("dashboard_reports_threat_compliance");
+                setActive("active");
+            },
+            selected: leftNavSelected === "dashboard_reports_threat_compliance",
+        })
     }
+
+    reportsSubNavigationItems.push({
+        label: "Threats",
+        onClick: () => {
+            navigate("/dashboard/reports/threats");
+            handleSelect("dashboard_reports_threats");
+            setActive("active");
+        },
+        selected: leftNavSelected === "dashboard_reports_threats",
+    })
 
     const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
 
