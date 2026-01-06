@@ -561,12 +561,14 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         .map(x => ({ label: x, value: x }));
     }
 
-    const attackTypeChoices = Object.keys(threatFiltersMap).length === 0 ? [] : Object.entries(threatFiltersMap).map(([key, value]) => {
-      return {
-        label: value?._id || key,
-        value: value?._id || key
-      }
-    })
+    const attackTypeChoices = (isAgenticSecurityCategory() || isEndpointSecurityCategory())
+      ? (res?.subCategory || []).map(x => ({ label: x, value: x }))
+      : Object.keys(threatFiltersMap).length === 0 ? [] : Object.entries(threatFiltersMap).map(([key, value]) => {
+          return {
+            label: value?._id || key,
+            value: value?._id || key
+          }
+        })
 
     filters = [
       {
