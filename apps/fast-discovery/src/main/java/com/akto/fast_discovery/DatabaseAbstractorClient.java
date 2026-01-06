@@ -87,22 +87,18 @@ public class DatabaseAbstractorClient {
                 throw new Exception("HTTP " + statusCode + ": " + responseBody);
             }
 
-            // Parse JSON: {"apiIds": [{"apiCollectionId": 1, "url": "/api/users", "method": "GET"}, ...]}
-            Type responseType = new TypeToken<Map<String, Object>>(){}.getType();
-            Map<String, Object> result = gson.fromJson(responseBody, responseType);
+            // Parse JSON: [{"apiCollectionId": 1, "url": "/api/users", "method": "GET"}, ...]
+            // Response is a direct array, not wrapped in an object
+            Type responseType = new TypeToken<List<Map<String, Object>>>(){}.getType();
+            List<Map<String, Object>> apiIdMaps = gson.fromJson(responseBody, responseType);
 
             List<ApiId> apiIds = new ArrayList<>();
-            Object apiIdsObj = result.get("apiIds");
-
-            if (apiIdsObj instanceof List) {
-                List<Map<String, Object>> apiIdMaps = (List<Map<String, Object>>) apiIdsObj;
-                for (Map<String, Object> map : apiIdMaps) {
-                    ApiId apiId = new ApiId();
-                    apiId.setApiCollectionId(((Number) map.get("apiCollectionId")).intValue());
-                    apiId.setUrl((String) map.get("url"));
-                    apiId.setMethod((String) map.get("method"));
-                    apiIds.add(apiId);
-                }
+            for (Map<String, Object> map : apiIdMaps) {
+                ApiId apiId = new ApiId();
+                apiId.setApiCollectionId(((Number) map.get("apiCollectionId")).intValue());
+                apiId.setUrl((String) map.get("url"));
+                apiId.setMethod((String) map.get("method"));
+                apiIds.add(apiId);
             }
 
             loggerMaker.infoAndAddToDb("Fetched " + apiIds.size() + " API IDs");
