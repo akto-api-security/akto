@@ -37,11 +37,17 @@ import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.util.HttpRequestResponseUtils;
+import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBObject;
 import org.apache.commons.lang3.StringUtils;
 import lombok.Getter;
 import lombok.Setter;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import java.util.concurrent.TimeUnit;
 
 public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
@@ -450,19 +456,29 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
           feedbackBody.put("metadata", metadata);
 
           String url = analyzerUrl + "/feedback";
-          String response = HttpRequestResponseUtils.sendRequest(
-            url,
-            "POST",
-            new BasicDBObject(feedbackBody).toJson(),
-            new HashMap<>(),
-            null,
-            30000
-          );
-
-          loggerMaker.infoAndAddToDb(
-            String.format("Submitted training data to agent-traffic-analyzer for event %s", eventIdToProcess),
-            LogDb.DASHBOARD
-          );
+          String jsonBody = new BasicDBObject(feedbackBody).toJson();
+          
+          OkHttpClient client = CoreHTTPClient.client.newBuilder()
+            .connectTimeout(30000, TimeUnit.MILLISECONDS)
+            .readTimeout(30000, TimeUnit.MILLISECONDS)
+            .writeTimeout(30000, TimeUnit.MILLISECONDS)
+            .build();
+          
+          Request request = new Request.Builder()
+            .url(url)
+            .post(RequestBody.create(jsonBody, MediaType.parse("application/json")))
+            .build();
+          
+          try (Response httpResponse = client.newCall(request).execute()) {
+            if (!httpResponse.isSuccessful()) {
+              loggerMaker.errorAndAddToDb(
+                String.format("Agent Guardrail Feedback request failed for event %s with code %d: %s", 
+                  eventIdToProcess, httpResponse.code(), httpResponse.message()),
+                LogDb.DASHBOARD
+              );
+              continue;
+            }
+          }
         } catch (Exception e) {
           loggerMaker.errorAndAddToDb(
             String.format("Error submitting training data for event %s: %s", eventIdToProcess, e.getMessage()),
