@@ -6,10 +6,8 @@
 // Asset paths for chat components
 export const CHAT_ASSETS = {
     AKTO_LOGO: '/public/akto.svg',
-    FRAME_LOGO: '/public/Frame.svg',
+    BOT_LOGO: '/public/bot.svg',
     MAGIC_ICON: '/public/magic_icon.svg',
-    DIVIDER: '/public/Divider.svg',
-    DIVIDER_ALERT: '/public/Divider_alert.svg',
 };
 
 // Message labels used in ConversationHistory

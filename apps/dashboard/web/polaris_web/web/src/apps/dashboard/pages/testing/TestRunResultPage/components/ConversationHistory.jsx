@@ -3,7 +3,6 @@ import PropTypes from 'prop-types';
 import { Box, VerticalStack } from '@shopify/polaris';
 import ChatMessage from './ChatMessage';
 import { MESSAGE_LABELS } from './chatConstants';
-import { normalizeTimestamp } from './dateHelpers';
 
 function ConversationHistory({ conversations }) {
     return (
@@ -17,7 +16,7 @@ function ConversationHistory({ conversations }) {
                             key={msg._id || index}
                             type={isUser ? 'request' : 'response'}
                             content={msg.message}
-                            timestamp={normalizeTimestamp(msg.creationTimestamp) / 1000} // Normalize then convert to seconds for ChatMessage
+                            timestamp={msg.creationTimestamp} // Normalize then convert to seconds for ChatMessage
                             customLabel={isUser ? MESSAGE_LABELS.TESTED_INTERACTION : MESSAGE_LABELS.HR_AGENT_RESPONSE}
                             isVulnerable={msg.validation}
                             isCode={false}

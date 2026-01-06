@@ -3,20 +3,20 @@ import PropTypes from 'prop-types';
 import { Box, VerticalStack, HorizontalStack, Text, Badge } from '@shopify/polaris';
 import MarkdownViewer from '../../../../components/shared/MarkdownViewer';
 import { CHAT_ASSETS, MESSAGE_LABELS, MESSAGE_TYPES, VULNERABILITY_BADGE } from './chatConstants';
-import { formatChatTimestamp } from './dateHelpers';
+import func from "@/util/func";
 
 function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCode }) {
     const isRequest = type === MESSAGE_TYPES.REQUEST;
 
     // Icon
-    const iconSrc = isRequest ? CHAT_ASSETS.AKTO_LOGO : CHAT_ASSETS.FRAME_LOGO;
+    const iconSrc = isRequest ? CHAT_ASSETS.AKTO_LOGO : CHAT_ASSETS.BOT_LOGO;
     const iconAlt = isRequest ? 'Akto Logo' : 'Agent Logo';
 
     // Label
     const label = customLabel || (isRequest ? MESSAGE_LABELS.TESTED_INTERACTION : MESSAGE_LABELS.HR_AGENT_RESPONSE);
 
     // Format timestamp with memoization
-    const formattedTime = useMemo(() => formatChatTimestamp(timestamp), [timestamp]);
+    const formattedTime = useMemo(() => func.formatChatTimestamp(timestamp), [timestamp]);
 
     // Determine if content should be rendered as code
     const shouldRenderAsCode = isCode !== undefined ? isCode : isRequest;

@@ -2387,6 +2387,22 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       }
     }
     return placeholders;
+  },
+  /**
+   * Format timestamp for chat messages
+   * @param {number} timestamp - Unix timestamp in seconds
+   * @returns {string} Formatted timestamp string
+   */
+  formatChatTimestamp: (timestamp) => {
+    if (!timestamp) return '';
+    return new Date(timestamp * 1000).toLocaleString('en-US', {
+      month: 'numeric',
+      day: 'numeric',
+      year: '2-digit',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: true
+    });
   }
 }
 
