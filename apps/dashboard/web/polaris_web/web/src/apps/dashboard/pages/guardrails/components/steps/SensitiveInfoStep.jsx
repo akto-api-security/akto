@@ -36,7 +36,7 @@ export const SensitiveInfoConfig = {
         }
 
         if (enableAnonymize) {
-            filters.push('Anonymize');
+            filters.push('Sensitive data anonymization');
         }
 
         return filters.length > 0 ? filters.join(", ") : null;
@@ -199,10 +199,10 @@ const SensitiveInfoStep = ({
             <VerticalStack gap="4">
                 <Box>
                     <Checkbox
-                        label="Enable anonymize detection"
+                        label="Enable sensitive data anonymization"
                         checked={enableAnonymize}
                         onChange={setEnableAnonymize}
-                        helpText="Detect and prevent anonymization attempts in user inputs."
+                        helpText="Detect and automatically anonymize sensitive data (emails, credit cards, phone numbers, SSN, etc.) in user inputs by replacing them with placeholders like [REDACTED_EMAIL_1]. Original values are stored securely for later restoration if needed."
                     />
                     {enableAnonymize && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
@@ -216,7 +216,7 @@ const SensitiveInfoStep = ({
                                     step={0.1}
                                     output
                                     onChange={setAnonymizeConfidenceScore}
-                                    helpText="Set the confidence threshold (0-1). Higher values are more permissive, lower values are more strict in detecting anonymization attempts."
+                                    helpText="Set the confidence threshold (0-1). Higher values are more permissive, lower values are more strict in detecting sensitive data that should be anonymized."
                                 />
                             </VerticalStack>
                         </Box>
