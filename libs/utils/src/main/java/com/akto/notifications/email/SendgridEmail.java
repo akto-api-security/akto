@@ -17,6 +17,9 @@ import org.slf4j.LoggerFactory;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class SendgridEmail {
@@ -96,27 +99,11 @@ public class SendgridEmail {
 
     private void buildTemplateWithYamlTemplates(Personalization personalization, Map<String, YamlTemplate> yamlTemplates, Map<String, Integer> apisAffectedCount) {
         if (yamlTemplates == null || apisAffectedCount == null || yamlTemplates.isEmpty() || apisAffectedCount.isEmpty()) {
-            personalization.addDynamicTemplateData("findingsTable", "");
+            personalization.addDynamicTemplateData("findings", new ArrayList<>());
             return;
         }
 
-        StringBuilder tableHtml = new StringBuilder();
-        tableHtml.append("<table style=\"width: 100%; border-collapse: collapse; margin: 20px 0; font-family: Arial, sans-serif;\">");
-        
-        // Table header
-        tableHtml.append("<thead>");
-        tableHtml.append("<tr style=\"background-color: #f5f5f5; border-bottom: 2px solid #ddd;\">");
-        tableHtml.append("<th style=\"padding: 12px; text-align: left; border: 1px solid #ddd; font-weight: bold;\">S.No.</th>");
-        tableHtml.append("<th style=\"padding: 12px; text-align: left; border: 1px solid #ddd; font-weight: bold;\">Issue</th>");
-        tableHtml.append("<th style=\"padding: 12px; text-align: left; border: 1px solid #ddd; font-weight: bold;\">Issue description</th>");
-        tableHtml.append("<th style=\"padding: 12px; text-align: left; border: 1px solid #ddd; font-weight: bold;\">APIs affected</th>");
-        tableHtml.append("<th style=\"padding: 12px; text-align: left; border: 1px solid #ddd; font-weight: bold;\">Issue Category</th>");
-        tableHtml.append("<th style=\"padding: 12px; text-align: left; border: 1px solid #ddd; font-weight: bold;\">Impact</th>");
-        tableHtml.append("</tr>");
-        tableHtml.append("</thead>");
-        
-        // Table body
-        tableHtml.append("<tbody>");
+        List<Map<String, Object>> findings = new ArrayList<>();
         int serialNumber = 1;
         
         for(Map.Entry<String, Integer> entry : apisAffectedCount.entrySet()) {
@@ -141,6 +128,8 @@ public class SendgridEmail {
             String severity = yamlTemplate.getInfo().getSeverity();
             if (StringUtils.isBlank(severity)) {
                 severity = "-";
+            } else {
+                severity = severity.toUpperCase();
             }
             
             String categoryName = "-";
@@ -157,34 +146,26 @@ public class SendgridEmail {
                 }
             }
             
-            // Build table row
-            tableHtml.append("<tr style=\"border-bottom: 1px solid #ddd;\">");
-            tableHtml.append("<td style=\"padding: 12px; border: 1px solid #ddd;\">").append(serialNumber).append("</td>");
-            tableHtml.append("<td style=\"padding: 12px; border: 1px solid #ddd;\">").append(escapeHtml(issueName)).append("</td>");
-            tableHtml.append("<td style=\"padding: 12px; border: 1px solid #ddd;\">").append(escapeHtml(description)).append("</td>");
-            tableHtml.append("<td style=\"padding: 12px; border: 1px solid #ddd;\">").append(apisAffected).append("</td>");
-            tableHtml.append("<td style=\"padding: 12px; border: 1px solid #ddd;\">").append(escapeHtml(categoryName)).append("</td>");
-            tableHtml.append("<td style=\"padding: 12px; border: 1px solid #ddd;\">").append(escapeHtml(severity)).append("</td>");
-            tableHtml.append("</tr>");
+            Map<String, Object> finding = new HashMap<>();
+            finding.put("sno", serialNumber);
+            finding.put("issueName", issueName);
+            finding.put("description", description);
+            finding.put("apisAffected", apisAffected);
+            finding.put("category", categoryName);
+            finding.put("severity", severity);
             
+            // Add boolean flags for severity to use in Handlebars conditionals
+            finding.put("isCritical", "CRITICAL".equals(severity));
+            finding.put("isHigh", "HIGH".equals(severity));
+            finding.put("isMedium", "MEDIUM".equals(severity));
+            finding.put("isLow", "LOW".equals(severity));
+            finding.put("isUnknown", "-".equals(severity));
+            
+            findings.add(finding);
             serialNumber++;
         }
         
-        tableHtml.append("</tbody>");
-        tableHtml.append("</table>");
-        
-        personalization.addDynamicTemplateData("findingsTable", tableHtml.toString());
-    }
-    
-    private String escapeHtml(String text) {
-        if (text == null) {
-            return "";
-        }
-        return text.replace("&", "&amp;")
-                   .replace("<", "&lt;")
-                   .replace(">", "&gt;")
-                   .replace("\"", "&quot;")
-                   .replace("'", "&#39;");
+        personalization.addDynamicTemplateData("findings", findings);
     }
 
     public Mail buildTestingRunResultsEmail(TestingAlertData data, String email, String aktoUrl, String userName, Map<String, Integer> apisAffectedCount, Map<String, YamlTemplate> yamlTemplates) {
