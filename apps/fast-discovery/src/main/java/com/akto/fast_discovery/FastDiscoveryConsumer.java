@@ -215,25 +215,22 @@ public class FastDiscoveryConsumer {
             String url = FastDiscoveryParser.normalizeUrl(params.getRequestParams().getURL());
             String method = params.getRequestParams().getMethod();
 
-            // Build filters for single_type_info host header entry
+            // Build filters for single_type_info host header entry (flat structure, not nested under _id)
             Map<String, Object> filters = new HashMap<>();
-            Map<String, Object> id = new HashMap<>();
-            id.put("apiCollectionId", apiCollectionId);
-            id.put("url", url);
-            id.put("method", method);
-            id.put("responseCode", -1);
-            id.put("isHeader", true);
-            id.put("param", "host");
-            id.put("subType", "GENERIC");
-            id.put("isUrlParam", false);
-            filters.put("_id", id);
+            filters.put("apiCollectionId", apiCollectionId);
+            filters.put("url", url);
+            filters.put("method", method);
+            filters.put("responseCode", -1);
+            filters.put("isHeader", true);
+            filters.put("param", "host");
+            filters.put("subType", "GENERIC");
+            filters.put("isUrlParam", false);
 
             // Build updates
             ArrayList<String> updates = new ArrayList<>();
             updates.add(String.format("{\"field\": \"timestamp\", \"val\": %d, \"op\": \"set\"}", timestamp));
             updates.add(String.format("{\"field\": \"collectionIds\", \"val\": [%d], \"op\": \"set\"}", apiCollectionId));
             updates.add("{\"field\": \"count\", \"val\": 1, \"op\": \"set\"}");
-            updates.add("{\"field\": \"domain\", \"val\": \"ANY\", \"op\": \"set\"}");
 
             BulkUpdates bulkUpdate = new BulkUpdates(filters, updates);
             writes.add(bulkUpdate);
