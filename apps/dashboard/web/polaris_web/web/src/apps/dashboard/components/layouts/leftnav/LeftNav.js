@@ -21,7 +21,7 @@ import func from "@/util/func";
 import Dropdown from "../Dropdown";
 import SessionStore from "../../../../main/SessionStore";
 import IssuesStore from "../../../pages/issues/issuesStore";
-import { CATEGORY_DAST, mapLabel } from "../../../../main/labelHelper";
+import { CATEGORY_AGENTIC_SECURITY, CATEGORY_API_SECURITY, CATEGORY_DAST, mapLabel } from "../../../../main/labelHelper";
 
 export default function LeftNav() {
     const navigate = useNavigate();
@@ -118,6 +118,25 @@ export default function LeftNav() {
 
                 ) : null
             },
+            ...(dashboardCategory === CATEGORY_AGENTIC_SECURITY ? [{
+                label: "Dashboard",
+                icon: ReportFilledMinor,
+                onClick: () => {
+                    handleSelect("dashboard_agentic_dashboard");
+                    navigate("/dashboard/agentic-dashboard");
+                    setActive("normal");
+                },
+                selected: leftNavSelected === "dashboard_agentic_dashboard",
+                key: "1",
+            }] : dashboardCategory === CATEGORY_API_SECURITY ? [{
+                label: "Dashboard",
+                icon: ReportFilledMinor,
+                onClick: () => {
+                    handleSelect("dashboard_api_dashboard");
+                    navigate("/dashboard/api-dashboard");
+                    setActive("normal");
+                }
+            }] : []),
             ...(dashboardCategory !== "Endpoint Security" ? [{
                 label: mapLabel("API Security Posture", dashboardCategory),
                 icon: ReportFilledMinor,
@@ -524,7 +543,7 @@ export default function LeftNav() {
 
         const exists = items.find(item => item.key === "quick_start")
         if (!exists) {
-            items.splice(1, 0, {
+            items.splice(2, 0, {
                 label: mapLabel("Quick Start", dashboardCategory),
                 icon: AppsFilledMajor,
                 onClick: () => {

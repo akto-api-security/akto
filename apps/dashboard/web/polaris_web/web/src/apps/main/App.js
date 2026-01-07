@@ -118,6 +118,7 @@ import ThreatDashboardPage from "../dashboard/pages/threat_detection/ThreatDashb
 import OpenApiAgentTester from "../dashboard/pages/observe/OpenApiAgentTester";
 import DastProgress from "../dashboard/pages/observe/api_collections/DastProgress.jsx";
 import DastProgressSingle from "../dashboard/pages/observe/api_collections/DastProgressSingle.jsx";
+import AgenticDashboard from "../dashboard/pages/dashboard/AgenticDashboard.jsx";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -133,6 +134,14 @@ const router = createBrowserRouter([
                     {
                         path: "home",
                         element: <HomeDashboard/>,
+                    },
+                    {
+                        path: "agentic-dashboard",
+                        element: <AgenticDashboard/>,
+                    },
+                    {
+                        path: "api-dashboard",
+                        element: <AgenticDashboard/>,
                     },
                     {
                         path: "testing",
