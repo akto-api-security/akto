@@ -186,11 +186,8 @@ public class SampleParser {
         Map<String, Object> json = gson.fromJson(message, new com.google.gson.reflect.TypeToken<Map<String, Object>>(){}.getType());
 
         String daemonId = (String) json.getOrDefault("daemonId", null);
-        String moduleTypeStr = (String) json.getOrDefault("moduleType", "K8S");
+        String moduleTypeStr = (String) json.getOrDefault("moduleType", "TRAFFIC_COLLECTOR");
         String daemonPodName = (String) json.getOrDefault("daemonPodName", null);
-        String podName = (String) json.getOrDefault("podName", null);
-        String aktoDaemonSet = (String) json.getOrDefault("aktoDaemonSet", null);
-        String nodeName = (String) json.getOrDefault("nodeName", null);
         int timestamp = Integer.parseInt(json.getOrDefault("timestamp", String.valueOf(Context.now())).toString());
 
 
@@ -200,12 +197,6 @@ public class SampleParser {
         moduleInfo.setName(daemonPodName);
         moduleInfo.setLastHeartbeatReceived(timestamp);
         moduleInfo.setStartedTs(timestamp); 
-
-        Map<String, Object> additionalData = new HashMap<>();
-        additionalData.put("aktoDaemonSet", aktoDaemonSet);
-        additionalData.put("nodeName", nodeName);
-        additionalData.put("podName", podName);
-        moduleInfo.setAdditionalData(additionalData);
 
         return moduleInfo;
     }

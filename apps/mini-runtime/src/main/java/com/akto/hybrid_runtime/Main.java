@@ -216,24 +216,16 @@ public class Main {
         return topicName;
     }
 
-    public static String getHeartbeatTopicName() {
-        String topicName = System.getenv("AKTO_KAFKA_HEARTBEAT_TOPIC_NAME");
-        if (topicName == null) {
-            topicName = "akto.daemonset.producer.heartbeats";
-        }
-        return topicName;
-    }
-
 
     private static final String LOG_GROUP_ID = "-log";
-    private static final String HEARTBEAT_GROUP_ID = "-heartbeat";
+
 
     public static final String customMiniRuntimeServiceName;
     static {
         customMiniRuntimeServiceName = System.getenv("MINI_RUNTIME_NAME") == null? "Default_" + UUID.randomUUID().toString().substring(0, 4) : System.getenv("MINI_RUNTIME_NAME");
     }
 
-    static private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+    static private final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(2);
 
 
     //REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
@@ -473,70 +465,15 @@ public class Main {
         // Pod heartbeat consumer thread
         executorService.schedule(new Runnable() {
             public void run() {
-                try {
-                    Context.accountId.set(Context.getActualAccountId());
-                    
-                    loggerMaker.infoAndAddToDb("Starting pod heartbeat consumer");
-                    String heartbeatTopicName = getHeartbeatTopicName();
-
-                    Properties heartbeatConsumerProps = Main.configProperties(kafkaUrl, groupIdConfig + HEARTBEAT_GROUP_ID, maxPollRecordsConfig);
-                    KafkaConsumer<String, String> heartbeatConsumer = new KafkaConsumer<>(heartbeatConsumerProps);
-
-                    List<ModuleInfo> heartbeatBatch = new ArrayList<>();
-                    int batchSize = 100;
-
-                    try {
-                        heartbeatConsumer.subscribe(Collections.singletonList(heartbeatTopicName));
-                        loggerMaker.infoAndAddToDb("Heartbeat consumer subscribed to " + heartbeatTopicName);
-
-                        while (true) {
-                            ConsumerRecords<String, String> records = heartbeatConsumer.poll(Duration.ofMillis(10000));
-                            try {
-                                heartbeatConsumer.commitSync();
-                            } catch (Exception e) {
-                                throw e;
-                            }
-
-                            for (ConsumerRecord<String, String> record : records) {
-                                try {
-                                    ModuleInfo heartbeat = SampleParser.parseHeartbeatMessage(record.value());
-
-                                    if (heartbeat != null) {
-                                        heartbeatBatch.add(heartbeat);
-
-                                        // Batch upsert when we reach batch size
-                                        if (heartbeatBatch.size() >= batchSize) {
-                                            dataActor.bulkUpdateModuleInfo(heartbeatBatch);
-                                            loggerMaker.infoAndAddToDb("Upserted " + heartbeatBatch.size() + " module heartbeats to DB");
-                                            heartbeatBatch.clear();
-                                        }
-                                    } else {
-                                        loggerMaker.errorAndAddToDb("Failed to parse module heartbeat: " + record.value());
-                                    }
-
-                                } catch (Exception e) {
-                                    loggerMaker.errorAndAddToDb(e, "Error while parsing module heartbeat kafka message: " + e);
-                                    continue;
-                                }
-                            }
-
-                            // Upsert remaining heartbeats from this poll batch if any
-                            if (!heartbeatBatch.isEmpty()) {
-                                dataActor.bulkUpdateModuleInfo(heartbeatBatch);
-                                loggerMaker.infoAndAddToDb("Upserted remaining " + heartbeatBatch.size() + " module heartbeats to DB");
-                                heartbeatBatch.clear();
-                            }
-                        }
-                    } catch (WakeupException ignored) {
-                        // Shutdown
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e, "Error in heartbeat consumer");
-                    } finally {
-                        heartbeatConsumer.close();
-                    }
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "Error while starting pod heartbeat consumer");
-                }
+                String heartbeatTopicName = "akto.daemonset.producer.heartbeats";
+                AktoTrafficCollectorTelemetry telemetry = new AktoTrafficCollectorTelemetry(
+                    kafkaUrl,
+                    groupIdConfig,
+                    maxPollRecordsConfig,
+                    heartbeatTopicName,
+                    dataActor
+                );
+                telemetry.run();
             }
         }, 0, TimeUnit.SECONDS);
 

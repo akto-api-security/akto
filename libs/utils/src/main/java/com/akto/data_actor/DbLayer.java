@@ -1228,8 +1228,6 @@ public class DbLayer {
         for (ModuleInfo moduleInfo : moduleInfoList) {
             Bson filter = Filters.eq("_id", moduleInfo.getId());
             Bson updates = Updates.combine(
-                    // Putting class name because bulkWrite doesn't put class name by default
-                    Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
                     Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType().name()),
                     Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
                     Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
