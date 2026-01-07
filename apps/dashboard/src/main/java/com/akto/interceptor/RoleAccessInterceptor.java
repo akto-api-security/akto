@@ -1,5 +1,6 @@
 package com.akto.interceptor;
 
+import com.akto.audit_logs_util.Audit;
 import com.akto.audit_logs_util.AuditLogsUtil;
 import com.akto.dao.RBACDao;
 import com.akto.dao.audit_logs.ApiAuditLogsDao;
@@ -7,6 +8,8 @@ import com.akto.dao.context.Context;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.User;
 import com.akto.dto.audit_logs.ApiAuditLogs;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
 import com.akto.dto.rbac.RbacEnums;
 import com.akto.dto.rbac.RbacEnums.Feature;
 import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
@@ -16,10 +19,15 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.policies.UserAgentTypePolicy;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.DashboardMode;
+import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionInvocation;
+import com.opensymphony.xwork2.ActionProxy;
 import com.opensymphony.xwork2.ActionSupport;
+import com.opensymphony.xwork2.config.entities.ActionConfig;
 import com.opensymphony.xwork2.interceptor.AbstractInterceptor;
+
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
@@ -142,7 +150,60 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                     List<String> userProxyIpAddresses = AuditLogsUtil.getClientIpAddresses(request);
                     String userIpAddress = userProxyIpAddresses.get(0);
 
-                    apiAuditLogs = new ApiAuditLogs(timestamp, apiEndpoint, actionDescription, userEmail, userAgentType.name(), userIpAddress, userProxyIpAddresses);
+                    /** Audit Annotation details **/
+                    Resource resource = Resource.NOT_SPECIFIED;
+                    Operation operation = Operation.NOT_SPECIFIED;
+                    BasicDBObject metadata = new BasicDBObject();
+
+                    ActionProxy proxy = invocation.getProxy();
+                    ActionConfig config = proxy.getConfig();
+
+                    try {
+                        String actionClassName = config.getClassName();
+                        String actionMethodName = proxy.getMethod();
+                        if (actionMethodName == null || actionMethodName.isEmpty()) {
+                            actionMethodName = "execute";
+                        }
+
+                        Class<?> actionClass = Class.forName(actionClassName);
+                        Method actionMethod = actionClass.getMethod(actionMethodName);
+
+                        Audit audit = actionMethod.getDeclaredAnnotation(Audit.class);
+                        if (audit != null) {
+                            String auditDescription = audit.description();
+                            if (auditDescription != null && !auditDescription.isEmpty()) {
+                                actionDescription = auditDescription;
+                            }
+                            resource = audit.resource();
+                            operation = audit.operation();
+
+                            Object actionObj = invocation.getAction();
+                            String[] metadataGenerators = audit.metadataGenerators();
+                            for (String metadataGenerator : metadataGenerators) {
+                                if (metadataGenerator == null || metadataGenerator.isEmpty()) continue;
+                                Object metadataValue = null;
+
+                                String formattedMetadataKey = metadataGenerator;
+                                if (metadataGenerator.startsWith("get") && metadataGenerator.length() > 3) {
+                                    String withoutGet = metadataGenerator.substring(3);
+                                    formattedMetadataKey = Character.toLowerCase(withoutGet.charAt(0)) + withoutGet.substring(1);
+                                }
+
+                                try {
+                                    Method metadataGeneratorMethod = actionClass.getMethod(metadataGenerator);
+                                    metadataValue = metadataGeneratorMethod.invoke(actionObj);
+                                } catch (Exception e) {
+                                    loggerMaker.errorAndAddToDb(e, "Error while getting metadata value from method: " + metadataGenerator + " Error: " + e.getMessage());
+                                }
+                                metadata.put(formattedMetadataKey, metadataValue);
+                            }
+                        }
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e, "Error while getting audit annotation details for action method: " + e.getMessage());
+                    }
+                    /** Audit Annotation details **/
+
+                    apiAuditLogs = new ApiAuditLogs(timestamp, apiEndpoint, actionDescription, userEmail, userAgentType.name(), userIpAddress, userProxyIpAddresses, resource, operation, metadata);
                 }
             } catch(Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error while inserting api audit logs: " + e.getMessage(), LogDb.DASHBOARD);

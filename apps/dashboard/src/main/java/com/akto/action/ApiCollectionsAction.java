@@ -15,6 +15,7 @@ import lombok.Getter;
 import org.bson.conversions.Bson;
 
 import com.akto.action.observe.Utils;
+import com.akto.audit_logs_util.Audit;
 import com.akto.dao.*;
 import com.akto.dao.threat_detection.ApiHitCountInfoDao;
 import com.akto.billing.UsageMetricUtils;
@@ -31,6 +32,8 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.mongodb.MongoCommandException;
 import com.akto.dto.type.SingleTypeInfo;
@@ -290,6 +293,7 @@ public class ApiCollectionsAction extends UserAction {
         return true;
     }
 
+    @Audit(description = "User created a new API collection", resource = Resource.API_COLLECTION, operation = Operation.CREATE, metadataGenerators = {"getCollectionName"})
     public String createCollection() {
 
         if(!isValidApiCollectionName()){
@@ -1542,6 +1546,10 @@ public class ApiCollectionsAction extends UserAction {
 
     public void setApiCollections(List<ApiCollection> apiCollections) {
         this.apiCollections = apiCollections;
+    }
+
+    public String getCollectionName() {
+        return this.collectionName;
     }
 
     public void setCollectionName(String collectionName) {
