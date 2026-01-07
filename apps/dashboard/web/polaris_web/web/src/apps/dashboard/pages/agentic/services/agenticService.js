@@ -1,17 +1,6 @@
 // Agentic AI Service - Handles all API communication
-// This service can be configured to use mock data or real API endpoints
-
-import {
-    getMockThinkingItems,
-    getMockResponseContent,
-    getMockSuggestions,
-    mockStreamThinkingItems,
-    mockStreamResponse,
-    mockDelay
-} from './mockData';
 
 // Configuration
-const USE_MOCK_DATA = true; // Set to false when real API is ready
 const API_BASE_URL = '/api/agentic'; // Update with your actual API endpoint
 
 /**
@@ -34,11 +23,6 @@ export const generateMessageId = () => {
  * @returns {Promise<string>} - Conversation ID
  */
 export const createConversation = async (initialQuery) => {
-    if (USE_MOCK_DATA) {
-        await mockDelay(100);
-        return generateConversationId();
-    }
-
     try {
         const response = await fetch(`${API_BASE_URL}/conversations`, {
             method: 'POST',
@@ -67,15 +51,6 @@ export const createConversation = async (initialQuery) => {
  * @returns {Promise<Object>} - Query result with metadata
  */
 export const sendQuery = async (conversationId, query) => {
-    if (USE_MOCK_DATA) {
-        await mockDelay(500);
-        return {
-            success: true,
-            messageId: generateMessageId(),
-            timestamp: new Date().toISOString()
-        };
-    }
-
     try {
         const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/query`, {
             method: 'POST',
@@ -104,16 +79,6 @@ export const sendQuery = async (conversationId, query) => {
  * @param {Function} onError - Callback for errors
  */
 export const streamThinkingItems = async (conversationId, onThinkingItem, onComplete, onError) => {
-    if (USE_MOCK_DATA) {
-        try {
-            await mockStreamThinkingItems(onThinkingItem, 300);
-            onComplete();
-        } catch (error) {
-            onError(error);
-        }
-        return;
-    }
-
     try {
         const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/thinking`, {
             method: 'GET',
@@ -162,24 +127,6 @@ export const streamThinkingItems = async (conversationId, onThinkingItem, onComp
  * @returns {Promise<Object>} - Complete response data
  */
 export const streamResponse = async (conversationId, onChunk, onComplete, onError) => {
-    if (USE_MOCK_DATA) {
-        try {
-            const startTime = Date.now();
-            await mockStreamResponse(onChunk, 200);
-            const duration = Math.round((Date.now() - startTime) / 1000);
-            const completeResponse = {
-                content: getMockResponseContent(),
-                timeTaken: duration,
-                timestamp: new Date().toISOString()
-            };
-            onComplete(completeResponse);
-            return completeResponse;
-        } catch (error) {
-            onError(error);
-            throw error;
-        }
-    }
-
     try {
         const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/response`, {
             method: 'GET',
@@ -232,11 +179,6 @@ export const streamResponse = async (conversationId, onChunk, onComplete, onErro
  * @returns {Promise<Array>} - Array of suggestion strings
  */
 export const getSuggestions = async (conversationId) => {
-    if (USE_MOCK_DATA) {
-        await mockDelay(300);
-        return getMockSuggestions();
-    }
-
     try {
         const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/suggestions`, {
             method: 'GET',
@@ -263,11 +205,6 @@ export const getSuggestions = async (conversationId) => {
  * @returns {Promise<Array>} - Array of messages
  */
 export const getConversationHistory = async (conversationId) => {
-    if (USE_MOCK_DATA) {
-        // Mock doesn't store history, return empty
-        return [];
-    }
-
     try {
         const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/history`, {
             method: 'GET',
@@ -340,64 +277,6 @@ export const clearConversationFromLocal = (conversationId) => {
  * @returns {Promise<Array>} - Array of conversation summaries
  */
 export const getConversationsList = async (limit = 10) => {
-    if (USE_MOCK_DATA) {
-        // Load from localStorage
-        try {
-            const conversations = [];
-
-            // Scan localStorage for conversation keys
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && key.startsWith('agentic_conversation_')) {
-                    try {
-                        const data = JSON.parse(localStorage.getItem(key));
-                        if (data && data.messages && data.messages.length > 0) {
-                            const firstMessage = data.messages[0];
-                            const lastUpdated = new Date(data.lastUpdated);
-                            const now = new Date();
-                            const diffTime = Math.abs(now - lastUpdated);
-                            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                            const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
-                            const diffMinutes = Math.floor(diffTime / (1000 * 60));
-                            const diffSeconds = Math.floor(diffTime / 1000);
-
-                            let timeAgo;
-                            if (diffDays > 0) {
-                                timeAgo = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-                            } else if (diffHours > 0) {
-                                timeAgo = `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-                            } else if (diffMinutes > 0) {
-                                timeAgo = `${diffMinutes} min${diffMinutes > 1 ? 's' : ''} ago`;
-                            } else if (diffSeconds > 10) {
-                                timeAgo = `${diffSeconds} sec${diffSeconds > 1 ? 's' : ''} ago`;
-                            } else {
-                                timeAgo = 'Just now';
-                            }
-
-                            conversations.push({
-                                id: data.conversationId,
-                                title: firstMessage.content,
-                                time: timeAgo,
-                                timestamp: lastUpdated.getTime(),
-                                messageCount: data.messages.length
-                            });
-                        }
-                    } catch (err) {
-                        console.error('Error parsing conversation:', err);
-                    }
-                }
-            }
-
-            // Sort by timestamp (most recent first) and limit
-            conversations.sort((a, b) => b.timestamp - a.timestamp);
-            return conversations.slice(0, limit);
-        } catch (error) {
-            console.error('Error loading conversations from localStorage:', error);
-            return [];
-        }
-    }
-
-    // Load from API
     try {
         const response = await fetch(`${API_BASE_URL}/conversations?limit=${limit}`, {
             method: 'GET',
