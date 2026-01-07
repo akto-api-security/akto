@@ -139,9 +139,9 @@ function EndpointShieldMetadata() {
     const isDemoAccount = func.isDemoAccount();
 
     // Show demo version for demo accounts
-    // if (isDemoAccount) {
-    //     return <EndpointShieldMetadataDemo />;
-    // }
+    if (isDemoAccount) {
+        return <EndpointShieldMetadataDemo />;
+    }
 
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
