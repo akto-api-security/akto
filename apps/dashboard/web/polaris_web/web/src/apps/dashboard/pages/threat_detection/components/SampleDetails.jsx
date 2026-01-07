@@ -14,11 +14,26 @@ import settingFunctions from "../../settings/module";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal";
 import transform from "../../testing/transform";
 import issuesFunctions from "../../issues/module";
+import { GUARDRAIL_SECTIONS } from "../constants/guardrailDescriptions";
+import { isEndpointSecurityCategory } from "../../../../main/labelHelper";
 
 function SampleDetails(props) {
     const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate } = props
     const resolvedThreatFiltersMap = threatFiltersMap || {};
-    let currentTemplateObj = moreInfoData?.templateId ? resolvedThreatFiltersMap[moreInfoData?.templateId] : undefined;
+
+    const useGuardrailDescription = isEndpointSecurityCategory();
+
+    let currentTemplateObj;
+    if (useGuardrailDescription) {
+        // For Atlas guardrails, use structured content
+        currentTemplateObj = {
+            guardrailSections: GUARDRAIL_SECTIONS,
+            testName: moreInfoData?.templateId || "Guardrail Policy",
+            name: moreInfoData?.templateId || "Guardrail Policy"
+        };
+    } else {
+        currentTemplateObj = moreInfoData?.templateId ? resolvedThreatFiltersMap[moreInfoData?.templateId] : undefined;
+    }
 
     let severity = currentTemplateObj?.severity || "HIGH"
     const [remediationText, setRemediationText] = useState("")
@@ -51,7 +66,64 @@ function SampleDetails(props) {
         }
         
     }
-    const overviewComp = (
+    const overviewComp = useGuardrailDescription ? (
+        // Structured view for Argus/Atlas guardrails - show all 7 sections with hierarchy
+        <Box padding={"4"}>
+            <VerticalStack gap={"5"}>
+                {currentTemplateObj?.guardrailSections?.map((section, sectionIdx) => (
+                    <div key={sectionIdx}>
+                        <VerticalStack gap={"3"}>
+                            {/* Main Section Heading (numbered) */}
+                            <Text variant="headingMd" fontWeight="bold">
+                                {sectionIdx + 1}. {section.heading}
+                            </Text>
+
+                            {/* Main Section Description */}
+                            <Text variant="bodyMd">{section.description}</Text>
+
+                            {/* Sub-sections if present */}
+                            {section.subSections && section.subSections.length > 0 && (
+                                <VerticalStack gap={"3"} paddingBlockStart={"2"}>
+                                    {section.subSections.map((subSection, subIdx) => (
+                                        <div key={subIdx}>
+                                            <VerticalStack gap={"2"}>
+                                                {/* Sub-section Heading */}
+                                                <Text variant="headingSm" fontWeight="semibold">
+                                                    {subSection.subHeading}:
+                                                </Text>
+
+                                                {/* Sub-section Description */}
+                                                <Text variant="bodyMd">{subSection.description}</Text>
+
+                                                {/* Items list if present */}
+                                                {subSection.items && subSection.items.length > 0 && (
+                                                    <Box paddingInlineStart={"4"} paddingBlockStart={"1"}>
+                                                        <VerticalStack gap={"2"}>
+                                                            {subSection.items.map((item, itemIdx) => (
+                                                                <Text key={itemIdx} variant="bodyMd">• {item}</Text>
+                                                            ))}
+                                                        </VerticalStack>
+                                                    </Box>
+                                                )}
+                                            </VerticalStack>
+                                        </div>
+                                    ))}
+                                </VerticalStack>
+                            )}
+                        </VerticalStack>
+
+                        {/* Divider between sections (except last) */}
+                        {sectionIdx < currentTemplateObj.guardrailSections.length - 1 && (
+                            <Box paddingBlockStart={"4"}>
+                                <Divider />
+                            </Box>
+                        )}
+                    </div>
+                ))}
+            </VerticalStack>
+        </Box>
+    ) : (
+        // Full view for normal threat detection (existing code)
         <Box padding={"4"}>
             <VerticalStack gap={"5"}>
                 <VerticalStack gap={"2"}>
