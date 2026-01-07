@@ -63,7 +63,8 @@ const transform = {
                 method: threat.latestApiMethod || '',
                 severity: severity,
                 country: threat.country || '',
-                payload: threat.latestApiOrig || ''
+                payload: threat.latestApiOrig || '',
+                filterId: threat.filterId || ''
             })
         })
 

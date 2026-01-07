@@ -1,10 +1,23 @@
-import { Badge, Box, Text, VerticalStack } from '@shopify/polaris'
+import { Badge, Box, Text, VerticalStack, HorizontalStack, Link } from '@shopify/polaris'
 import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 import GithubSimpleTable from '../../../components/tables/GithubSimpleTable'
 import { CellType } from '../../../components/tables/rows/GithubRow'
 
 const ThreatReportFindings = ({ threatsTableData, severityCount, organizationName }) => {
     const dashboardCategory = getDashboardCategory()
+
+    const handleThreatClick = (threat) => {
+        const params = new URLSearchParams({
+            refId: threat.id,
+            eventType: 'SINGLE',
+            actor: threat.actor,
+            filterId: threat.filterId || '',
+            eventStatus: 'ACTIVE'
+        });
+
+        const navigateUrl = `${window.location.origin}/dashboard/protection/threat-activity?${params.toString()}#active`;
+        window.open(navigateUrl, "_blank");
+    }
 
 
     const threatHeaders = [
@@ -57,7 +70,13 @@ const ThreatReportFindings = ({ threatsTableData, severityCount, organizationNam
                             .map(threat => ({
                                 ...threat,
                                 targetedApi: (
-                                    <Text breakWord>{threat.targetedApi}</Text>
+                                    <HorizontalStack gap="2" align="center">
+                                        <Link onClick={() => handleThreatClick(threat)}>
+                                            <Box maxWidth="90%">
+                                                <Text breakWord>{threat.targetedApi}</Text>
+                                            </Box>
+                                        </Link>
+                                    </HorizontalStack>
                                 ),
                                 severityBadge: (
                                     <div className={`badge-wrapper-${threat.severity}`}>
