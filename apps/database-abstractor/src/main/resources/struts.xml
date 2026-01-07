@@ -480,6 +480,19 @@
             </result>
         </action>
 
+        <action name="api/ensureApiCollections" class="com.akto.action.DbAction" method="ensureApiCollections">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/insertRuntimeLog" class="com.akto.action.DbAction" method="insertRuntimeLog">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

@@ -1708,6 +1708,93 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    /**
+     * Fast-discovery endpoint to ensure api_collection entries exist for given collection IDs.
+     * Creates missing collections with auto-generated names.
+     * Called by fast-discovery flow to ensure collections exist before APIs are written.
+     */
+    private List<Integer> collectionIdsToEnsure;
+
+    public String ensureApiCollections() {
+        int accountId = Context.accountId.get();
+        try {
+            if (collectionIdsToEnsure == null || collectionIdsToEnsure.isEmpty()) {
+                loggerMaker.infoAndAddToDb("ensureApiCollections: No collection IDs provided", LogDb.DB_ABS);
+                return Action.SUCCESS.toUpperCase();
+            }
+
+            int ensuredCount = 0;
+            for (Integer collectionId : collectionIdsToEnsure) {
+                if (collectionId == null || collectionId == 0) {
+                    continue;
+                }
+
+                // Check if collection already exists
+                ApiCollection existing = ApiCollectionsDao.instance.findOne(Filters.eq("_id", collectionId));
+
+                if (existing == null) {
+                    // Create new collection using findOneAndUpdate with upsert (same pattern as DbLayer)
+                    int now = Context.now();
+                    String name = "Collection " + collectionId;
+
+                    FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
+                    updateOptions.upsert(true);
+                    updateOptions.returnDocument(ReturnDocument.AFTER);
+
+                    Bson updates = Updates.combine(
+                        Updates.setOnInsert("_id", collectionId),
+                        Updates.setOnInsert("name", name),
+                        Updates.setOnInsert("displayName", name),
+                        Updates.setOnInsert("startTs", now),
+                        Updates.setOnInsert("urls", new HashSet<>()),
+                        Updates.setOnInsert("vxlanId", collectionId),
+                        Updates.setOnInsert("deactivated", false),
+                        Updates.setOnInsert("redact", false),
+                        Updates.setOnInsert("automated", false),
+                        Updates.setOnInsert("dastCollection", false),
+                        Updates.setOnInsert("genAICollection", false),
+                        Updates.setOnInsert("guardRailCollection", false),
+                        Updates.setOnInsert("isOutOfTestingScope", false),
+                        Updates.setOnInsert("matchDependencyWithOtherCollections", false),
+                        Updates.setOnInsert("mcpCollection", false),
+                        Updates.setOnInsert("runDependencyAnalyser", false),
+                        Updates.setOnInsert("sampleCollectionsDropped", true)
+                    );
+
+                    try {
+                        ApiCollection result = ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(
+                            Filters.eq("_id", collectionId),
+                            updates,
+                            updateOptions
+                        );
+                        ensuredCount++;
+                        loggerMaker.infoAndAddToDb("Fast-discovery: Created api_collection ID=" + collectionId +
+                            ", name=" + name, LogDb.DB_ABS);
+                    } catch (Exception insertEx) {
+                        loggerMaker.errorAndAddToDb(insertEx, "Fast-discovery: Failed to create collection ID=" +
+                            collectionId + ": " + insertEx.toString(), LogDb.DB_ABS);
+                    }
+                }
+            }
+
+            loggerMaker.infoAndAddToDb("ensureApiCollections: checked=" +
+                collectionIdsToEnsure.size() + ", created=" + ensuredCount, LogDb.DB_ABS);
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in ensureApiCollections: " + e.toString(), LogDb.DB_ABS);
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public void setCollectionIdsToEnsure(List<Integer> collectionIdsToEnsure) {
+        this.collectionIdsToEnsure = collectionIdsToEnsure;
+    }
+
+    public List<Integer> getCollectionIdsToEnsure() {
+        return collectionIdsToEnsure;
+    }
+
     // Added to stop ingestion of unwanted logs
     private static String ignoreDaemonLog = "Kafka write successful";
     private static String ignoreMiniRuntimeLog = "lastExecutedBatch sample";
