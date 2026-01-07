@@ -187,7 +187,8 @@ public class SampleParser {
 
         String daemonId = (String) json.getOrDefault("daemonId", null);
         String moduleTypeStr = (String) json.getOrDefault("moduleType", "K8S");
-        String podName = (String) json.getOrDefault("daemonPodName", null);
+        String daemonPodName = (String) json.getOrDefault("daemonPodName", null);
+        String podName = (String) json.getOrDefault("podName", null);
         String aktoDaemonSet = (String) json.getOrDefault("aktoDaemonSet", null);
         String nodeName = (String) json.getOrDefault("nodeName", null);
         int timestamp = Integer.parseInt(json.getOrDefault("timestamp", String.valueOf(Context.now())).toString());
@@ -196,13 +197,14 @@ public class SampleParser {
         ModuleInfo moduleInfo = new ModuleInfo();
         moduleInfo.setId(daemonId); 
         moduleInfo.setModuleType(ModuleInfo.ModuleType.valueOf(moduleTypeStr));
-        moduleInfo.setName(podName);
+        moduleInfo.setName(daemonPodName);
         moduleInfo.setLastHeartbeatReceived(timestamp);
         moduleInfo.setStartedTs(timestamp); 
 
         Map<String, Object> additionalData = new HashMap<>();
         additionalData.put("aktoDaemonSet", aktoDaemonSet);
         additionalData.put("nodeName", nodeName);
+        additionalData.put("podName", podName);
         moduleInfo.setAdditionalData(additionalData);
 
         return moduleInfo;
