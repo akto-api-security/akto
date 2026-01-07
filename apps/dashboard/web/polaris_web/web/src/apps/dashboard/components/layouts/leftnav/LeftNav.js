@@ -21,7 +21,7 @@ import func from "@/util/func";
 import Dropdown from "../Dropdown";
 import SessionStore from "../../../../main/SessionStore";
 import IssuesStore from "../../../pages/issues/issuesStore";
-import { CATEGORY_DAST, mapLabel } from "../../../../main/labelHelper";
+import { CATEGORY_AGENTIC_SECURITY, CATEGORY_DAST, CATEGORY_ENDPOINT_SECURITY, mapLabel } from "../../../../main/labelHelper";
 
 export default function LeftNav() {
     const navigate = useNavigate();
@@ -200,7 +200,7 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_audit",
                     }] : []),
-                    ...(dashboardCategory === "Endpoint Security" ? [{
+                    ...((dashboardCategory === CATEGORY_ENDPOINT_SECURITY || dashboardCategory === CATEGORY_AGENTIC_SECURITY) ? [{
                         label: "Endpoint Shield",
                         onClick: () => {
                             navigate("/dashboard/observe/endpoint-shield");
