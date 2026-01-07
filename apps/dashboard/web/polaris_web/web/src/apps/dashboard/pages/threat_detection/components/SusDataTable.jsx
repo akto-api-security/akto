@@ -125,7 +125,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const [currentFilters, setCurrentFilters] = useState({})
   const [totalFilteredCount, setTotalFilteredCount] = useState(0)
 
-  const tableTabs = [
+  const baseTabs = [
     {
       content: 'Active',
       onAction: () => { setCurrentTab('active') },
@@ -145,6 +145,18 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       index: 2
     }
   ]
+
+  // Check if AGENT_TRAFFIC_LOGS feature is enabled
+  const hasAgentTrafficLogsAccess = func.checkForFeatureSaas('AGENT_TRAFFIC_LOGS');
+  // Add Training Data tab only for guardrail events and if feature is enabled
+  const tableTabs = label === LABELS.GUARDRAIL && hasAgentTrafficLogsAccess
+    ? [...baseTabs, {
+        content: 'Training Data',
+        onAction: () => { setCurrentTab('training'); },
+        id: 'training',
+        index: 3
+      }]
+    : baseTabs
 
   const handleSelectedTab = (selectedIndex) => {
     setLoading(true)
@@ -186,7 +198,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       ignore: { ing: 'ignoring', ed: 'ignored' },
       delete: { ing: 'deleting', ed: 'deleted' },
       markForReview: { ing: 'marking for review', ed: 'marked for review' },
-      removeFromReview: { ing: 'removing from review', ed: 'removed from review' }
+      removeFromReview: { ing: 'removing from review', ed: 'removed from review' },
+      markForTraining: { ing: 'marking for training', ed: 'marked for training' }
     };
 
     const label = actionLabels[operation];
@@ -234,7 +247,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       ignore: { ing: 'ignoring', ed: 'ignored' },
       delete: { ing: 'deleting', ed: 'deleted' },
       markForReview: { ing: 'marking for review', ed: 'marked for review' },
-      removeFromReview: { ing: 'removing from review', ed: 'removed from review' }
+      removeFromReview: { ing: 'removing from review', ed: 'removed from review' },
+      markForTraining: { ing: 'marking for training', ed: 'marked for training' }
     };
 
     const label = actionLabels[operation];
@@ -302,12 +316,24 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const handleBulkDelete = (selectedIds) => handleBulkOperation(selectedIds, 'delete');
   const handleBulkMarkForReview = (selectedIds) => handleBulkOperation(selectedIds, 'markForReview', 'UNDER_REVIEW');
   const handleBulkRemoveFromReview = (selectedIds) => handleBulkOperation(selectedIds, 'removeFromReview', 'ACTIVE');
+  const handleBulkMarkForTraining = async (selectedIds) => {
+    if (!hasAgentTrafficLogsAccess) return;
+    // Execute the bulk operation - backend will handle calling agent-traffic-analyzer
+    await handleBulkOperation(selectedIds, 'markForTraining', 'TRAINING');
+  };
 
   // Simplified filtered operation handlers
   const handleIgnoreAllFiltered = () => handleFilteredOperation('ignore', 'IGNORED');
   const handleDeleteAllFiltered = () => handleFilteredOperation('delete');
   const handleMarkAllFilteredForReview = () => handleFilteredOperation('markForReview', 'UNDER_REVIEW');
   const handleRemoveAllFilteredFromReview = () => handleFilteredOperation('removeFromReview', 'ACTIVE');
+  const handleMarkAllFilteredForTraining = async () => {
+    if (!hasAgentTrafficLogsAccess) {
+      return;
+    }
+    // Execute the filtered operation
+    await handleFilteredOperation('markForTraining', 'TRAINING');
+  };
 
 
   const promotedBulkActions = (selectedIds) => {
@@ -352,7 +378,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
               ignore: handleIgnoreAllFiltered,
               removeFromReview: handleRemoveAllFilteredFromReview,
               reactivate: handleRemoveAllFilteredFromReview,
-              delete: handleDeleteAllFiltered
+              delete: handleDeleteAllFiltered,
+              markForTraining: handleMarkAllFilteredForTraining
             };
             func.showConfirmationModal(message, label, handlers[actionType]);
           } else {
@@ -366,7 +393,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
               ignore: () => handleBulkIgnore(selectedIds),
               removeFromReview: () => handleBulkRemoveFromReview(selectedIds),
               reactivate: () => handleBulkRemoveFromReview(selectedIds),
-              delete: () => handleBulkDelete(selectedIds)
+              delete: () => handleBulkDelete(selectedIds),
+              markForTraining: () => handleBulkMarkForTraining(selectedIds)
             };
             func.showConfirmationModal(message, label, handlers[actionType]);
           }
@@ -378,14 +406,20 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     const tabActions = {
       'active': [
         { label: 'Mark for Review', type: 'markForReview' },
-        { label: 'Ignore', type: 'ignore', validationType: 'ignore', warning: true }
+        { label: 'Ignore', type: 'ignore', validationType: 'ignore', warning: true },
+        ...(label === LABELS.GUARDRAIL && hasAgentTrafficLogsAccess ? [{ label: 'Mark for Training', type: 'markForTraining' }] : [])
       ],
       'under_review': [
         { label: 'Remove from Review', type: 'removeFromReview' },
-        { label: 'Ignore', type: 'ignore', validationType: 'ignore', warning: true }
+        { label: 'Ignore', type: 'ignore', validationType: 'ignore', warning: true },
+        ...(label === LABELS.GUARDRAIL && hasAgentTrafficLogsAccess ? [{ label: 'Mark for Training', type: 'markForTraining' }] : [])
       ],
       'ignored': [
-        { label: 'Reactivate', type: 'reactivate' }
+        { label: 'Reactivate', type: 'reactivate' },
+        ...(label === LABELS.GUARDRAIL && hasAgentTrafficLogsAccess ? [{ label: 'Mark for Training', type: 'markForTraining' }] : [])
+      ],
+      'training': [
+        // No actions for training data - training data cannot be removed
       ]
     };
 
