@@ -11,6 +11,8 @@ import com.akto.dao.testing.BidirectionalSyncSettingsDao;
 import com.akto.dao.testing.RemediationsDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.Config.AktoHostUrlConfig;
 import com.akto.dto.Config.ConfigType;
 import com.akto.dto.AccountSettings;
@@ -134,6 +136,9 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private String description;
     @Setter
     private String labels;
+
+    private DataActor dataActor = DataActorFactory.fetchInstance();
+
 
     public String testIntegration() {
 
@@ -956,6 +961,8 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
     private BasicDBObject jiraTicketPayloadCreator(JiraMetaData jiraMetaData, TestingRunIssues issue,
         Info info, Remediation remediation) {
+        AccountSettings accountSettings = dataActor.fetchAccountSettings();
+
         String endpoint = jiraMetaData.getEndPointStr().replace("Endpoint - ", "");
         String truncatedEndpoint = endpoint;
         if(endpoint.length() > 30) {
@@ -978,7 +985,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             contentList.addAll(additionalFields);
         }
 
-        BasicDBObject fields = buildPayloadForJiraTicket(summary, this.projId, this.issueType, contentList,jiraMetaData.getAdditionalIssueFields());
+        BasicDBObject fields = buildPayloadForJiraTicket(summary, this.projId, this.issueType, contentList,jiraMetaData.getAdditionalIssueFields(), issue.getSeverity(), accountSettings);
         
         // Combine user labels with AKTO_SYNC label
         List<String> labelsList = new ArrayList<>();
@@ -1287,10 +1294,12 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             return ERROR.toUpperCase();
         }
 
+        AccountSettings accountSettings = dataActor.fetchAccountSettings();
+
         try {
             BasicDBList contentList = new BasicDBList();
             contentList.add(buildContentDetails(this.description, null));
-            BasicDBObject fields = buildPayloadForJiraTicket(this.title, this.projId, this.issueType, contentList, null);
+            BasicDBObject fields = buildPayloadForJiraTicket(this.title, this.projId, this.issueType, contentList, null, null, accountSettings);
             
             // Combine user labels with AKTO_SYNC label
             List<String> labelsList = new ArrayList<>();

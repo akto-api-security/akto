@@ -19,6 +19,7 @@ import org.apache.commons.lang3.StringUtils;
 import com.akto.calendar.DateUtils;
 import com.akto.dao.JiraIntegrationDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.jira_integration.JiraIntegration;
@@ -31,6 +32,7 @@ import com.akto.dto.testing.ComplianceMapping;
 import com.akto.dto.testing.Remediation;
 
 import com.akto.util.Pair;
+import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -410,12 +412,26 @@ public class Utils {
         return new Pair<>(jiraBaseUrl + "/browse/" + jiraTicketKey, jiraTicketKey);
     }
 
-    public static BasicDBObject buildPayloadForJiraTicket(String summary, String projectKey, String issueType, BasicDBList contentList, Map<String, Object> additionalIssueFields) {
+    public static BasicDBObject buildPayloadForJiraTicket(String summary, String projectKey, String issueType, BasicDBList contentList, Map<String, Object> additionalIssueFields, Severity severity, AccountSettings accountSettings) {
         BasicDBObject fields = new BasicDBObject();
         fields.put("summary", summary);
         fields.put("project", new BasicDBObject("key", projectKey));
         fields.put("issuetype", new BasicDBObject("id", issueType));
         fields.put("description", new BasicDBObject("type", "doc").append("version", 1).append("content", contentList));
+
+        if (severity != null && accountSettings != null) {
+            try {
+                Map<String, String> severityToPriorityMap = accountSettings.getIssueSeverityToJiraPriorityMap();
+                if (severityToPriorityMap != null && !severityToPriorityMap.isEmpty()) {
+                    String priorityId = severityToPriorityMap.get(severity.name());
+                    if (priorityId != null && !priorityId.isEmpty()) {
+                        fields.put("priority", new BasicDBObject("id", priorityId));
+                    }
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error setting Jira priority from severity mapping");
+            }
+        }
 
         if (additionalIssueFields != null) {
             try {
