@@ -1,0 +1,48 @@
+import { Box, Link, Text, VerticalStack } from "@shopify/polaris"
+
+function BaseReportTOC({ tocList, numberingStyle = "simple" }) {
+    return (
+        <Box paddingBlockStart={8} paddingBlockEnd={8} paddingInlineStart={5} paddingInlineEnd={5}>
+            <VerticalStack gap="4">
+                <Text variant="headingLg">Table of contents</Text>
+                <VerticalStack gap="2">
+                    {tocList.map((tocEntry, index) => {
+                        return (
+                            <Box key={index}>
+                                <VerticalStack gap={tocEntry.children === null ? 0 : 2}>
+                                    <Link key={index} url={`#${tocEntry.link}`} removeUnderline>
+                                        <Text variant='bodyMd' color='subdued'>
+                                            {index + 1}. {tocEntry.text}
+                                        </Text>
+                                    </Link>
+
+                                    {tocEntry.children !== null ?
+                                        <Box paddingInlineStart={6}>
+                                            <VerticalStack gap="2">
+                                                {tocEntry.children.map((child, childIndex) => {
+                                                    const childNumber = numberingStyle === "hierarchical"
+                                                        ? `${index + 1}.${childIndex + 1}`
+                                                        : `${childIndex + 1}`
+
+                                                    return (
+                                                        <Link key={childIndex} url={`#${child.link}`} removeUnderline>
+                                                            <Text variant='bodyMd' color='subdued'>
+                                                                {childNumber} {child.text}
+                                                            </Text>
+                                                        </Link>
+                                                    )
+                                                })}
+                                            </VerticalStack>
+                                        </Box>
+                                        : null}
+                                </VerticalStack>
+                            </Box>
+                        )
+                    })}
+                </VerticalStack>
+            </VerticalStack>
+        </Box>
+    )
+}
+
+export default BaseReportTOC

@@ -150,6 +150,16 @@ public class AccountSettings {
     private String awsAccountIdsForApiGatewayLogging;
     public static final String AWS_ACCOUNT_IDS_FOR_API_GATEWAY_LOGGING = "awsAccountIdsForApiGatewayLogging";
 
+    @Getter
+    @Setter
+    private boolean blockLogs;
+    public static final String BLOCK_LOGS = "blockLogs";
+
+    @Getter
+    @Setter
+    private List<String> filterLogPolicy;
+    public static final String FILTER_LOG_POLICY = "filterLogPolicy";
+
     public AccountSettings() {
     }
 

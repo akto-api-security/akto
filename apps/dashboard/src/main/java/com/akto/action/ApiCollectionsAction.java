@@ -32,6 +32,7 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
 import com.akto.dto.rbac.UsersCollectionsList;
+import com.mongodb.MongoCommandException;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
@@ -62,6 +63,9 @@ import com.akto.dto.type.URLMethods;
 public class ApiCollectionsAction extends UserAction {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiCollectionsAction.class, LogDb.DASHBOARD);
+    
+    // Error codes
+    private static final int MONGO_INVALID_REGEX_ERROR_CODE = 51091;
 
     List<ApiCollection> apiCollections = new ArrayList<>();
     Map<Integer,Integer> testedEndpointsMaps = new HashMap<>();
@@ -498,17 +502,23 @@ public class ApiCollectionsAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        List<TestingEndpoints> conditions = generateConditions(this.conditions);
+        try {
+            List<TestingEndpoints> conditions = generateConditions(this.conditions);
 
-        ApiCollection apiCollection = new ApiCollection(Context.now(), collectionName, conditions);
-        ApiCollectionsDao.instance.insertOne(apiCollection);
+            ApiCollection apiCollection = new ApiCollection(Context.now(), collectionName, conditions);
+            ApiCollectionsDao.instance.insertOne(apiCollection);
 
-        ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
+            ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
 
-        this.apiCollections = new ArrayList<>();
-        this.apiCollections.add(apiCollection);
+            this.apiCollections = new ArrayList<>();
+            this.apiCollections.add(apiCollection);
 
-        return SUCCESS.toUpperCase();
+            return SUCCESS.toUpperCase();
+        } catch (MongoCommandException e) {
+            return handleMongoException(e);
+        } catch (Exception e) {
+            return handleGeneralException(e, "Error creating collection");
+        }
     }
 
     public String updateCustomCollection(){
@@ -518,10 +528,16 @@ public class ApiCollectionsAction extends UserAction {
             addActionError("No collection with id exists.");
             return ERROR.toUpperCase();
         }
-        List<TestingEndpoints> conditions = generateConditions(this.conditions);
-        ApiCollectionsDao.instance.updateOneNoUpsert(filter, Updates.set(ApiCollection.CONDITIONS_STRING, conditions));
-        ApiCollectionUsers.computeCollectionsForCollectionId(conditions, collection.getId());
-        return SUCCESS.toUpperCase();
+        try {
+            List<TestingEndpoints> conditions = generateConditions(this.conditions);
+            ApiCollectionsDao.instance.updateOneNoUpsert(filter, Updates.set(ApiCollection.CONDITIONS_STRING, conditions));
+            ApiCollectionUsers.computeCollectionsForCollectionId(conditions, collection.getId());
+            return SUCCESS.toUpperCase();
+        } catch (MongoCommandException e) {
+            return handleMongoException(e);
+        } catch (Exception e) {
+            return handleGeneralException(e, "Error updating collection");
+        }
     }
 
     int apiCount;
@@ -580,35 +596,63 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String getEndpointsListFromConditions() {
-        List<TestingEndpoints> conditions = generateConditions(this.conditions);
-        List<BasicDBObject> list = ApiCollectionUsers.getSingleTypeInfoListFromConditions(conditions, 0, 200, Utils.DELTA_PERIOD_VALUE,  new ArrayList<>(deactivatedCollections));
-        
-        int initialCount = list.size();
-        
-        // Get accurate count with the same filter
-        int totalCount = ApiCollectionUsers.getApisCountFromConditionsWithStis(
-            conditions, new ArrayList<>(deactivatedCollections));
+        try {
+            List<TestingEndpoints> conditions = generateConditions(this.conditions);
+            List<BasicDBObject> list = ApiCollectionUsers.getSingleTypeInfoListFromConditions(conditions, 0, 200, Utils.DELTA_PERIOD_VALUE,  new ArrayList<>(deactivatedCollections));
+            
+            int initialCount = list.size();
+            
+            // Get accurate count with the same filter
+            int totalCount = ApiCollectionUsers.getApisCountFromConditionsWithStis(
+                conditions, new ArrayList<>(deactivatedCollections));
 
-        list = removeMismatchedCollections(list);
-        // removes from paginated results only
-        int removedCount = initialCount - list.size();
+            list = removeMismatchedCollections(list);
+            // removes from paginated results only
+            int removedCount = initialCount - list.size();
 
-        totalCount = totalCount - removedCount;
-        
-        InventoryAction inventoryAction = new InventoryAction();
-        inventoryAction.attachAPIInfoListInResponse(list,-1);
-        this.setResponse(inventoryAction.getResponse());
-        response.put("apiCount", totalCount);
-        
-        return SUCCESS.toUpperCase();
+            totalCount = totalCount - removedCount;
+            
+            InventoryAction inventoryAction = new InventoryAction();
+            inventoryAction.attachAPIInfoListInResponse(list,-1);
+            this.setResponse(inventoryAction.getResponse());
+            response.put("apiCount", totalCount);
+            
+            return SUCCESS.toUpperCase();
+        } catch (MongoCommandException e) {
+            return handleMongoException(e);
+        } catch (Exception e) {
+            return handleGeneralException(e, "Error processing conditions");
+        }
     }
 
     public String getEndpointsFromConditions(){
-        List<TestingEndpoints> conditions = generateConditions(this.conditions);
+        try {
+            List<TestingEndpoints> conditions = generateConditions(this.conditions);
 
-        apiCount = ApiCollectionUsers.getApisCountFromConditions(conditions, new ArrayList<>(deactivatedCollections));
+            apiCount = ApiCollectionUsers.getApisCountFromConditions(conditions, new ArrayList<>(deactivatedCollections));
 
-        return SUCCESS.toUpperCase();
+            return SUCCESS.toUpperCase();
+        } catch (MongoCommandException e) {
+            return handleMongoException(e);
+        } catch (Exception e) {
+            return handleGeneralException(e, "Error processing conditions");
+        }
+    }
+    
+    private String handleMongoException(MongoCommandException e) {
+        loggerMaker.errorAndAddToDb(e, "MongoCommandException while processing request");
+        if (e.getCode() == MONGO_INVALID_REGEX_ERROR_CODE) {
+            addActionError("Invalid regex pattern. Please check your filter conditions.");
+        } else {
+            addActionError("Internal error while processing request.");
+        }
+        return ERROR.toUpperCase();
+    }
+    
+    private String handleGeneralException(Exception e, String context) {
+        loggerMaker.errorAndAddToDb(e, context);
+        addActionError(context);
+        return ERROR.toUpperCase();
     }
 
     public String computeCustomCollections(){

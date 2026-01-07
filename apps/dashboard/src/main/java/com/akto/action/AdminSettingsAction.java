@@ -30,6 +30,7 @@ import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 
+import lombok.Getter;
 import lombok.Setter;
 
 import java.util.ArrayList;
@@ -93,6 +94,13 @@ public class AdminSettingsAction extends UserAction {
     private boolean allowRetrospectiveMerging;
 
     private Map<String, Boolean> compulsoryDescription;
+
+    @Setter
+    @Getter
+    private boolean blockLogs;
+    @Setter
+    @Getter
+    private List<String> filterLogPolicy;
 
     public String updateSetupType() {
         AccountSettingsDao.instance.getMCollection().updateOne(
@@ -517,6 +525,32 @@ public class AdminSettingsAction extends UserAction {
             }, 0, TimeUnit.SECONDS);
         }
         return SUCCESS.toUpperCase();
+    }
+
+    public String updateBlockLogs() {
+        try {
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.BLOCK_LOGS, this.blockLogs)
+            );
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.error("Error updating block logs setting", e);
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String updateFilterLogPolicy() {
+        try {
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.FILTER_LOG_POLICY, this.filterLogPolicy)
+            );
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.error("Error updating filter log policy", e);
+            return ERROR.toUpperCase();
+        }
     }
 
     public void setAccountPermission(String accountPermission) {

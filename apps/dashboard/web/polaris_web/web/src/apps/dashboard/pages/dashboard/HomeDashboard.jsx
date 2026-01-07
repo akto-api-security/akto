@@ -1,6 +1,7 @@
 import React, { useEffect, useReducer, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from './api';
+import threatApi from "../threat_detection/api"
 import func from '@/util/func';
 import observeFunc from "../observe/transform"
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
@@ -32,6 +33,7 @@ import { fetchActionItemsData } from './components/actionItemsTransform';
 import { getDashboardCategory, isMCPSecurityCategory, mapLabel } from '../../../main/labelHelper';
 import GraphMetric from '../../components/GraphMetric';
 import Dropdown from '../../components/layouts/Dropdown';
+import TopThreatTypeChart from '../threat_detection/components/TopThreatTypeChart';
 
 function HomeDashboard() {
 
@@ -94,6 +96,9 @@ function HomeDashboard() {
     const [mcpApiCallStats, setMcpApiCallStats] = useState([])
     const [policyGuardrailStats, setPolicyGuardrailStats] = useState([])
     const [mcpTopApplications, setMcpTopApplications] = useState([])
+    const [threatActorsTimeline, setThreatActorsTimeline] = useState([])
+    const [threatSeverityData, setThreatSeverityData] = useState({})
+    const [threatCategoryData, setThreatCategoryData] = useState([{ data: [], color: observeFunc.getColorForSensitiveData('CRITICAL') }])
 
     // MCP API Requests time selector state
     const statsOptions = [
@@ -172,6 +177,70 @@ function HomeDashboard() {
 
     const convertSeverityArrToMap = (arr) => {
         return Object.fromEntries(arr.map(item => [item.split(' ')[1].toLowerCase(), +item.split(' ')[0]]));
+    }
+
+    function transformThreatActorsTimeline(actorsCounts) {
+        if (!actorsCounts || !Array.isArray(actorsCounts)) {
+            return [];
+        }
+        return actorsCounts
+            .sort((a, b) => a.ts - b.ts)
+            .map(item => [
+                item.ts * 1000,
+                item.totalActors || 0
+            ]);
+    }
+
+    function transformSeverityData(categoryCounts) {
+        const severityLevels = func.getAktoSeverities();
+        const severityMap = {};
+
+        severityLevels.forEach(severity => {
+            severityMap[severity] = {
+                text: 0,
+                color: func.getHexColorForSeverity(severity),
+                filterKey: severity
+            };
+        });
+
+        if (categoryCounts && Array.isArray(categoryCounts)) {
+            categoryCounts.forEach(item => {
+                const severity = String(item.subCategory || item.severity || '').toUpperCase();
+                if (severityMap[severity]) {
+                    severityMap[severity].text = item.count || 0;
+                }
+            });
+        }
+
+        return severityMap;
+    }
+
+    function transformThreatCategoryData(threatCategoryCount) {
+        if (!threatCategoryCount || !Array.isArray(threatCategoryCount)) {
+            return [{ data: [], color: observeFunc.getColorForSensitiveData('CRITICAL') }];
+        }
+
+        const categoryMap = {};
+        threatCategoryCount.forEach(item => {
+            const category = item.category || item.subCategory || "Unknown";
+            const displayName = category
+                .replace(/_/g, ' ')
+                .toLowerCase()
+                .replace(/\b\w/g, l => l.toUpperCase());
+
+            if (!categoryMap[displayName]) {
+                categoryMap[displayName] = 0;
+            }
+            categoryMap[displayName] += item.count || 0;
+        });
+
+        const sortedCategories = Object.entries(categoryMap)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 10);
+
+        const data = sortedCategories.map(([name, count]) => [name, count]);
+
+        return [{ data, color: observeFunc.getColorForSensitiveData('CRITICAL'), name: "Threats" }];
     }
 
     const testSummaryData = async () => {
@@ -452,8 +521,49 @@ function HomeDashboard() {
         setLoading(false)
     }
 
+    const fetchThreatData = async () => {
+        try {
+            const threatPromises = [
+                threatApi.getDailyThreatActorsCount(startTimestamp, endTimestamp, []),
+                threatApi.fetchCountBySeverity(startTimestamp, endTimestamp),
+                threatApi.fetchThreatCategoryCount(startTimestamp, endTimestamp)
+            ];
+
+            const results = await Promise.allSettled(threatPromises);
+
+            // Process timeline data
+            if (results[0].status === 'fulfilled' && results[0].value?.actorsCounts) {
+                const timelineData = transformThreatActorsTimeline(results[0].value.actorsCounts);
+                setThreatActorsTimeline(timelineData);
+            } else {
+                setThreatActorsTimeline([]);
+            }
+
+            // Process severity data
+            if (results[1].status === 'fulfilled' && results[1].value?.categoryCounts) {
+                const severityData = transformSeverityData(results[1].value.categoryCounts);
+                setThreatSeverityData(severityData);
+            } else {
+                setThreatSeverityData({});
+            }
+
+            // Process category data
+            if (results[2].status === 'fulfilled' && results[2].value?.categoryCounts) {
+                const categoryData = transformThreatCategoryData(results[2].value.categoryCounts);
+                setThreatCategoryData(categoryData);
+            } else {
+                setThreatCategoryData([{ data: [], color: observeFunc.getColorForSensitiveData('CRITICAL') }]);
+            }
+        } catch (error) {
+            setThreatActorsTimeline([]);
+            setThreatSeverityData({});
+            setThreatCategoryData([{ data: [], color: observeFunc.getColorForSensitiveData('CRITICAL') }]);
+        }
+    };
+
     useEffect(() => {
         fetchData()
+        fetchThreatData()
     }, [startTimestamp, endTimestamp])
     
     // Fetch MCP API call stats when time range changes
@@ -1307,11 +1417,115 @@ function HomeDashboard() {
         minHeight="344px"
     />
 
+    const hasTimelineData = Array.isArray(threatActorsTimeline) && threatActorsTimeline.length > 0;
+
+    const threatActorsTimelineComponent = (
+        <InfoCard
+            component={
+                <Box>
+                    {hasTimelineData ? (
+                        <GraphMetric
+                            data={[{
+                                data: threatActorsTimeline,
+                                color: observeFunc.getColorForSensitiveData('CRITICAL'),
+                                name: 'Active Threat Actors'
+                            }]}
+                            type='spline'
+                            color={observeFunc.getColorForSensitiveData('CRITICAL')}
+                            areaFillHex='true'
+                            height='250'
+                            title=''
+                            subtitle=''
+                            defaultChartOptions={defaultChartOptions}
+                            backgroundColor='#ffffff'
+                            text='true'
+                            inputMetrics={[]}
+                        />
+                    ) : (
+                        <Box minHeight="250px" paddingBlockStart="8">
+                            <Text alignment='center' color='subdued'>No threat actor data in the selected period</Text>
+                        </Box>
+                    )}
+                </Box>
+            }
+            title="Threat Actor Activity"
+            titleToolTip="Timeline showing the number of active threat actors detected over time"
+            linkText="View threat details"
+            linkUrl="/dashboard/protection/threat-dashboard"
+        />
+    );
+
+    const hasSeverityData = Object.keys(threatSeverityData).length > 0 && Object.values(threatSeverityData).some(item => item.text > 0);
+
+    const threatSeverityComponent = (
+        <InfoCard
+            component={
+                <div style={{ marginTop: "20px" }}>
+                    {hasSeverityData ? (
+                        <ChartypeComponent
+                            data={threatSeverityData}
+                            navUrl="/dashboard/protection/threat-dashboard"
+                            isNormal={true}
+                            boxHeight={'250px'}
+                            chartOnLeft={true}
+                            dataTableWidth="250px"
+                            pieInnerSize="50%"
+                        />
+                    ) : (
+                        <Box minHeight="250px">
+                            <Text alignment='center' color='subdued'>No threat severity data available</Text>
+                        </Box>
+                    )}
+                </div>
+            }
+            title="Threats by Severity"
+            titleToolTip="Distribution of detected threats categorized by severity level"
+            linkText="View all threats"
+            linkUrl="/dashboard/protection/threat-dashboard"
+        />
+    );
+
+    const hasCategoryData = threatCategoryData[0] && Array.isArray(threatCategoryData[0].data) && threatCategoryData[0].data.length > 0;
+
+    const threatCategoryComponent = (
+        <InfoCard
+            component={
+                <Box>
+                    {hasCategoryData ? (
+                        <StackedChart
+                            type='column'
+                            color={observeFunc.getColorForSensitiveData('CRITICAL')}
+                            height="280"
+                            data={threatCategoryData}
+                            yAxisTitle="Number of Threats"
+                            width={40}
+                            showGridLines={true}
+                            customXaxis={{
+                                categories: threatCategoryData[0].data.map(item => item[0])
+                            }}
+                        />
+                    ) : (
+                        <Box minHeight="280px" paddingBlockStart="8">
+                            <Text alignment='center' color='subdued'>No threat category data available</Text>
+                        </Box>
+                    )}
+                </Box>
+            }
+            title="Top Threat Categories"
+            titleToolTip="Most common types of security threats detected across your APIs"
+            linkText="View all categories"
+            linkUrl="/dashboard/protection/threat-dashboard"
+        />
+    );
+
     let gridComponents = showTestingComponents ?
         [
             {id: 'critical-apis', component: criticalUnsecuredAPIsOverTime},
             {id: 'vulnerable-apis', component: vulnerableApisBySeverityComponent},
             {id: 'critical-findings', component: criticalFindings},
+            {id: 'threat-timeline', component: threatActorsTimelineComponent},
+            {id: 'threat-severity', component: threatSeverityComponent},
+            {id: 'threat-categories', component: threatCategoryComponent},
             {id: 'risk-score', component: apisByRiskscoreComponent},
             {id: 'access-type', component: apisByAccessTypeComponent},
             {id: 'auth-type', component: apisByAuthTypeComponent},
@@ -1326,6 +1540,9 @@ function HomeDashboard() {
             {id: 'critical-apis', component: criticalUnsecuredAPIsOverTime},
             {id: 'vulnerable-apis', component: vulnerableApisBySeverityComponent},
             {id: 'critical-findings', component: criticalFindings},
+            {id: 'threat-timeline', component: threatActorsTimelineComponent},
+            {id: 'threat-severity', component: threatSeverityComponent},
+            {id: 'threat-categories', component: threatCategoryComponent},
             {id: 'api-type', component: apisByTypeComponent},
         ]
 

@@ -60,8 +60,6 @@ import java.util.concurrent.TimeUnit;
 
 import static com.akto.util.Constants.ID;
 import static com.akto.util.Constants.ONE_DAY_TIMESTAMP;
-import com.akto.dao.ApiInfoDao;
-import com.akto.dto.ApiInfo.ApiInfoKey;
 
 public class IssuesAction extends UserAction {
 
@@ -180,7 +178,7 @@ public class IssuesAction extends UserAction {
         try {
             List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
             if(collectionIds != null) {
-                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+                pipeline.add(Aggregates.match(Filters.in(TestingRunIssuesDao.instance.getFilterKeyString(), collectionIds)));
             }
         } catch(Exception e){
         }
@@ -263,7 +261,7 @@ public class IssuesAction extends UserAction {
         try {
             collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
             if(collectionIds != null) {
-                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+                pipeline.add(Aggregates.match(Filters.in(TestingRunIssuesDao.instance.getFilterKeyString(), collectionIds)));
             }
         } catch(Exception e){
         }
@@ -273,7 +271,7 @@ public class IssuesAction extends UserAction {
 
         pipeline.add(openIssuesMatchStage);
         if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            pipeline.add(Aggregates.match(Filters.in(TestingRunIssuesDao.instance.getFilterKeyString(), collectionIds)));
         }
         openIssuesCountDayWise = new ArrayList<>();
         filterIssuesDataByTimeRange(daysBetween, pipeline, openIssuesCountDayWise);
@@ -281,7 +279,7 @@ public class IssuesAction extends UserAction {
 
         pipeline.add(criticalIssuesMatchStage);
         if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            pipeline.add(Aggregates.match(Filters.in(TestingRunIssuesDao.instance.getFilterKeyString(), collectionIds)));
         }
         criticalIssuesCountDayWise = new ArrayList<>();
         filterIssuesDataByTimeRange(daysBetween, pipeline, criticalIssuesCountDayWise);
@@ -308,11 +306,13 @@ public class IssuesAction extends UserAction {
         List<Bson> pipeline = new ArrayList<>();
 
         Bson notIncludedCollections = UsageMetricCalculator.excludeDemosAndDeactivated(HistoricalData.API_COLLECTION_ID);
+
         Bson filter = Filters.and(
                 notIncludedCollections,
                 Filters.gte("time", startEpoch),
                 Filters.lte("time", endTimeStamp)
         );
+
         pipeline.add(Aggregates.match(filter));
 
         historicalData = new ArrayList<>();

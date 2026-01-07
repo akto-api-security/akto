@@ -663,18 +663,34 @@ public class CustomDataTypeAction extends UserAction{
                         try {
                             HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
                             boolean skip1=false, skip2=false, skip3=false, skip4=false;
+                            boolean skip5 = false;
                             try {
                                 skip1 = forHeaders(httpResponseParams.getHeaders(), customDataType, apiKey, aktoDataType);
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb(e, "Error in recalculating data type for response headers for " + apiKey.toString());
+                            }
+                            try {
                                 skip2 = forHeaders(httpResponseParams.requestParams.getHeaders(), customDataType, apiKey, aktoDataType);
                             } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb(e, "Error in recalculating data type for request headers for " + apiKey.toString());
                             }
                             try {
                                 skip3 = forPayload(httpResponseParams.getPayload(), customDataType, apiKey, aktoDataType);
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb(e, "Error in recalculating data type for response payload for " + apiKey.toString());
+                            }
+                            try {
                                 skip4 = forPayload(httpResponseParams.requestParams.getPayload(), customDataType, apiKey, aktoDataType);
                             } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb(e, "Error in recalculating data type for request payload for " + apiKey.toString());
                             }
-                            String key = skip1 + " " + skip2 + " " + skip3 + " " + skip4 + " " + sampleData.getId().toString();
-                            if ((skip1 || skip2 || skip3 || skip4) && !foundSet.contains(key)) {
+                            try {
+                                skip5 = forQueryParams(httpResponseParams.requestParams.getURL(), customDataType, apiKey, aktoDataType);
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb(e, "Error in recalculating data type for request query params for " + apiKey.toString());
+                            }
+                            String key = skip1 + " " + skip2 + " " + skip3 + " " + skip4 + " " + skip5 + " " + sampleData.getId().toString();
+                            if ((skip1 || skip2 || skip3 || skip4 || skip5) && !foundSet.contains(key)) {
                                 foundSet.add(key);
                                 responses.add(httpResponseParams);
                             }
@@ -759,7 +775,8 @@ public class CustomDataTypeAction extends UserAction{
                     boolean skip2 = ( customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_HEADER) ) ? forHeaders(httpResponseParams.requestParams.getHeaders(), customDataType, apiKey, aktoDataType) : false;
                     boolean skip3 = ( customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_PAYLOAD) ) ? forPayload(httpResponseParams.getPayload(), customDataType, apiKey, aktoDataType) : false;
                     boolean skip4 = ( customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_PAYLOAD) ) ? forPayload(httpResponseParams.requestParams.getPayload(), customDataType, apiKey, aktoDataType) : false;
-                    skip = skip1 || skip2 || skip3 || skip4;
+                    boolean skip5 = ( customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_PAYLOAD) ) ? forQueryParams(httpResponseParams.requestParams.getURL(), customDataType, apiKey, aktoDataType) : false;
+                    skip = skip1 || skip2 || skip3 || skip4 || skip5;
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -793,6 +810,45 @@ public class CustomDataTypeAction extends UserAction{
                     this.customSubTypeMatches.add(customSubTypeMatch);
                 }
             }
+        }
+        return matchFound;
+    }
+
+    public boolean forQueryParams(String url, CustomDataType customDataType, Key apiKey, AktoDataType aktoDataType) {
+        if (url == null || url.isEmpty()) {
+            return false;
+        }
+        boolean matchFound = false;
+        try {
+            String[] split = url.split("\\?");
+            if (split.length == 2) {
+                String[] urlParams = split[1].split("&");
+                for (String urlParam : urlParams) {
+                    String[] param = urlParam.split("=", 2);
+                    if (param.length == 2) {
+                        String paramName = param[0];
+                        String paramValue = param[1];
+
+                        boolean result = false;
+                        if(aktoDataType != null){
+                            SingleTypeInfo.SubType subType = aktoDataType.toSubType();
+                            result = KeyTypes.matchesSubType(subType, paramName, paramValue) != null;
+                        }else{
+                            result = customDataType.validate(paramValue, paramName);
+                        }
+
+                        if (result) {
+                            matchFound = true;
+                            CustomSubTypeMatch customSubTypeMatch = new CustomSubTypeMatch(
+                                    apiKey.getApiCollectionId(), apiKey.url, apiKey.method.name(), paramName, paramValue
+                            );
+                            this.customSubTypeMatches.add(customSubTypeMatch);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error processing query params in custom data type check");
         }
         return matchFound;
     }

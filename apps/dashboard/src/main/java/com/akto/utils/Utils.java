@@ -626,18 +626,6 @@ public class Utils {
         return riskScore;
     }
 
-    public static float getRiskScoreValueFromSeverityScore(float severityScore) {
-        if (severityScore >= 100) {
-            return 2;
-        } else if (severityScore >= 10) {
-            return 1;
-        } else if (severityScore > 0) {
-            return (float) 0.5;
-        } else {
-            return 0;
-        }
-    }
-
     public static void deleteApis(List<Key> toBeDeleted) {
 
         String id = "_id.";

@@ -28,6 +28,10 @@ public class ComplianceMapping {
         return new ComplianceMapping(complianceInfo.getMapComplianceToListClauses(), complianceInfo.getAuthor(), complianceInfo.getId(), complianceInfo.getHash());
     }
 
+    public static ComplianceMapping createFromThreatInfo(com.akto.dto.threat_detection.ThreatComplianceInfo threatComplianceInfo) {
+        return new ComplianceMapping(threatComplianceInfo.getMapComplianceToListClauses(), threatComplianceInfo.getAuthor(), threatComplianceInfo.getId(), threatComplianceInfo.getHash());
+    }
+
     public Map<String,List<String>> getMapComplianceToListClauses() {
         return this.mapComplianceToListClauses;
     }

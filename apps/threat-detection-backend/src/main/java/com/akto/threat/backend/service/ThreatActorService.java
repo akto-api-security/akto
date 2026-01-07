@@ -26,6 +26,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Fe
 import com.akto.ProtoMessageUtils;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.dao.MaliciousEventDao;
+import com.akto.threat.backend.utils.ThreatUtils;
 import com.akto.threat.backend.db.ActorInfoModel;
 import com.akto.threat.backend.dto.RateLimitConfigDTO;
 import com.akto.util.ThreatDetectionConstants;
@@ -209,17 +210,13 @@ public class ThreatActorService {
     }
 
 
-    public ListThreatActorResponse listThreatActors(String accountId, ListThreatActorsRequest request) {
+    public ListThreatActorResponse listThreatActors(String accountId, ListThreatActorsRequest request, String contextSource) {
         int skip = request.hasSkip() ? request.getSkip() : 0;
         int limit = request.getLimit();
         Map<String, Integer> sort = request.getSortMap();
 
         ListThreatActorsRequest.Filter filter = request.getFilter();
         Document match = new Document();
-
-        if(filter.getLatestAttackList() == null || filter.getLatestAttackList().isEmpty()) {
-            return ListThreatActorResponse.newBuilder().build();
-        }
 
         // Apply filters
         if (!filter.getActorsList().isEmpty()) match.append("actor", new Document("$in", filter.getActorsList()));
@@ -231,6 +228,12 @@ public class ThreatActorService {
         }
         if (request.getStartTs() != 0 && request.getEndTs() != 0) {
             match.append("detectedAt", new Document("$gte", request.getStartTs()).append("$lte", request.getEndTs()));
+        }
+
+        // Apply simple context filter (only for ENDPOINT and AGENTIC)
+        Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+        if (!contextFilter.isEmpty()) {
+            match.putAll(contextFilter);
         }
 
         List<Document> pipeline = new ArrayList<>();
@@ -276,8 +279,15 @@ public class ThreatActorService {
             String actorId = doc.getString("_id");
             List<ActivityData> activityDataList = new ArrayList<>();
 
+            // Build activity query with filtering
+            Document activityQuery = new Document("actor", actorId);
+
+            if (!contextFilter.isEmpty()) {
+                activityQuery.putAll(contextFilter);
+            }
+
             try (MongoCursor<MaliciousEventDto> cursor2 = maliciousEventDao.getCollection(accountId)
-                    .find(Filters.eq("actor", actorId))
+                    .find(activityQuery)
                     .sort(Sorts.descending("detectedAt"))
                     .limit(40)
                     .cursor()) {
@@ -310,11 +320,7 @@ public class ThreatActorService {
         return ListThreatActorResponse.newBuilder().addAllActors(actors).setTotal(total).build();
     }
 
-  public DailyActorsCountResponse getDailyActorCounts(String accountId, long startTs, long endTs, List<String> latestAttackList) {
-
-    if(latestAttackList == null || latestAttackList.isEmpty()) {
-        return DailyActorsCountResponse.newBuilder().build();
-    }
+  public DailyActorsCountResponse getDailyActorCounts(String accountId, long startTs, long endTs, List<String> latestAttackList, String contextSource) {
 
     List<DailyActorsCountResponse.ActorsCount> actors = new ArrayList<>();
         List<Document> pipeline = new ArrayList<>();
@@ -330,6 +336,13 @@ public class ThreatActorService {
         if (startTs > 0) {
             matchConditions.get("detectedAt", Document.class).append("$gte", startTs);
         }
+
+    // Apply simple context filter (only for ENDPOINT and AGENTIC)
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    if (!contextFilter.isEmpty()) {
+        matchConditions.putAll(contextFilter);
+    }
+
         pipeline.add(new Document("$match", matchConditions));
     
         pipeline.add(new Document("$project", 
@@ -443,11 +456,7 @@ public class ThreatActorService {
             .build();
   }
 
-  public ThreatActivityTimelineResponse getThreatActivityTimeline(String accountId, long startTs, long endTs, List<String> latestAttackList) {
-
-    if(latestAttackList == null || latestAttackList.isEmpty()) {
-        return ThreatActivityTimelineResponse.newBuilder().build();
-    }
+  public ThreatActivityTimelineResponse getThreatActivityTimeline(String accountId, long startTs, long endTs, List<String> latestAttackList, String contextSource) {
 
         List<ThreatActivityTimelineResponse.ActivityTimeline> timeline = new ArrayList<>();
         // long sevenDaysInSeconds = TimeUnit.DAYS.toSeconds(7);
@@ -463,6 +472,12 @@ public class ThreatActorService {
 
       // Stage 1: Match documents within the startTs and endTs range
       match.append("detectedAt", new Document("$gte", startTs).append("$lte", endTs));
+
+    // Apply simple context filter (only for ENDPOINT and AGENTIC)
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    if (!contextFilter.isEmpty()) {
+        match.putAll(contextFilter);
+    }
 
       List<Document> pipeline = Arrays.asList(
         new Document("$match", match),
@@ -585,17 +600,13 @@ public class ThreatActorService {
   }
 
   public ThreatActorByCountryResponse getThreatActorByCountry(
-      String accountId, ThreatActorByCountryRequest request) {
+      String accountId, ThreatActorByCountryRequest request, String contextSource) {
 
-      if(request.getLatestAttackList() == null || request.getLatestAttackList().isEmpty()) {
-          return ThreatActorByCountryResponse.newBuilder().build();
-      }
+      List<Document> pipeline = new ArrayList<>();
 
-    List<Document> pipeline = new ArrayList<>();
+      Document match = new Document();
 
-    Document match = new Document();
-
-      if(request.getLatestAttackList() != null && !request.getLatestAttackList().isEmpty()) {
+      if (!request.getLatestAttackList().isEmpty()) {
           match.append("filterId", new Document("$in", request.getLatestAttackList()));
       }
 
@@ -605,6 +616,12 @@ public class ThreatActorService {
           match.append("detectedAt",
               new Document("$gte", request.getStartTs())
                   .append("$lte", request.getEndTs()));
+    }
+
+    // Apply simple context filter (only for ENDPOINT and AGENTIC)
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    if (!contextFilter.isEmpty()) {
+        match.putAll(contextFilter);
     }
 
   pipeline.add(new Document("$match", match));
@@ -692,7 +709,7 @@ public class ThreatActorService {
       }
 
   public FetchTopNDataResponse fetchTopNData(
-      String accountId, long startTs, long endTs, List<String> latestAttackList, int limit) {
+      String accountId, long startTs, long endTs, List<String> latestAttackList, int limit, String contextSource) {
 
     List<Document> pipeline = new ArrayList<>();
 
@@ -709,6 +726,13 @@ public class ThreatActorService {
             if (endTs > 0) tsRange.append("$lte", endTs);
             match.append("detectedAt", tsRange);
         }
+
+        // Apply simple context filter (only for ENDPOINT and AGENTIC)
+        Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+        if (!contextFilter.isEmpty()) {
+            match.putAll(contextFilter);
+        }
+
         if (!match.isEmpty()) {
             pipeline.add(new Document("$match", match));
         }

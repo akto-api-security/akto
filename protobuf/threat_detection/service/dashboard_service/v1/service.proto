@@ -56,6 +56,9 @@ message ListMaliciousRequestsRequest {
       optional string label = 10;  // Common values: "threat", "guardrail"
       repeated string hosts = 11;  // Host header values for filtering
       optional string latest_api_orig_regex = 12 [json_name = "latestApiOrigRegex"];
+      repeated int32 api_collection_id = 13;  // Filter by API collection IDs
+      repeated string method = 14;  // Filter by HTTP methods (GET, POST, etc.)
+      optional bool sort_by_severity = 15;  // Sort results by severity (CRITICAL > HIGH > MEDIUM > LOW)
     }
 
     // The number of alerts to return

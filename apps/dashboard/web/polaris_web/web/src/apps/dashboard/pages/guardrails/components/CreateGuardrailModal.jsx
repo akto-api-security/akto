@@ -17,20 +17,18 @@ import PersistStore from '../../../../main/PersistStore';
 import {
     PolicyDetailsStep,
     PolicyDetailsConfig,
-    ContentFiltersStep,
-    ContentFiltersConfig,
-    DeniedTopicsStep,
-    DeniedTopicsConfig,
-    WordFiltersStep,
-    WordFiltersConfig,
+    ContentPolicyStep,
+    ContentPolicyConfig,
+    LanguageSafetyStep,
+    LanguageSafetyConfig,
     SensitiveInfoStep,
     SensitiveInfoConfig,
-    LlmPromptStep,
-    LlmPromptConfig,
-    BasePromptStep,
-    BasePromptConfig,
-    ExternalModelStep,
-    ExternalModelConfig,
+    CodeDetectionStep,
+    CodeDetectionConfig,
+    CustomGuardrailsStep,
+    CustomGuardrailsConfig,
+    UsageGuardrailsStep,
+    UsageGuardrailsConfig,
     ServerSettingsStep,
     ServerSettingsConfig
 } from './steps';
@@ -46,7 +44,11 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [blockedMessage, setBlockedMessage] = useState("");
     const [applyToResponses, setApplyToResponses] = useState(false);
 
-    // Step 2: Content filters
+    // Step 2: Content & Policy Guardrails
+    const [enablePromptAttacks, setEnablePromptAttacks] = useState(false);
+    const [promptAttackLevel, setPromptAttackLevel] = useState("high");
+    const [enableDeniedTopics, setEnableDeniedTopics] = useState(false);
+    const [deniedTopics, setDeniedTopics] = useState([]);
     const [enableHarmfulCategories, setEnableHarmfulCategories] = useState(false);
     const [harmfulCategoriesSettings, setHarmfulCategoriesSettings] = useState({
         hate: "HIGH",
@@ -56,37 +58,50 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         misconduct: "HIGH",
         useForResponses: false
     });
-    const [enablePromptAttacks, setEnablePromptAttacks] = useState(false);
-    const [promptAttackLevel, setPromptAttackLevel] = useState("HIGH");
+    const [enableBasePromptRule, setEnableBasePromptRule] = useState(false);
+    const [basePromptConfidenceScore, setBasePromptConfidenceScore] = useState(0.5);
 
-    // Step 3: Denied topics
-    const [deniedTopics, setDeniedTopics] = useState([]);
-
-    // Step 4: Word filters
+    // Step 3: Language Safety & Abuse Guardrails
+    const [enableGibberishDetection, setEnableGibberishDetection] = useState(false);
+    const [gibberishConfidenceScore, setGibberishConfidenceScore] = useState(0.7);
+    const [enableSentiment, setEnableSentiment] = useState(false);
+    const [sentimentConfidenceScore, setSentimentConfidenceScore] = useState(0.7);
     const [wordFilters, setWordFilters] = useState({
         profanity: false,
         custom: []
     });
     const [newCustomWord, setNewCustomWord] = useState("");
 
-    // Step 5: Sensitive information filters
+    // Step 4: Sensitive Information Guardrails
+    const [enablePiiTypes, setEnablePiiTypes] = useState(false);
     const [piiTypes, setPiiTypes] = useState([]);
+    const [enableRegexPatterns, setEnableRegexPatterns] = useState(false);
     const [regexPatterns, setRegexPatterns] = useState([]);
     const [newRegexPattern, setNewRegexPattern] = useState("");
+    const [enableSecrets, setEnableSecrets] = useState(false);
+    const [secretsConfidenceScore, setSecretsConfidenceScore] = useState(0.7);
+    const [enableAnonymize, setEnableAnonymize] = useState(false);
+    const [anonymizeConfidenceScore, setAnonymizeConfidenceScore] = useState(0.7);
 
-    // Step 6: LLM prompt based rule
+    // Step 5: Advanced Code Detection Filters
+    const [enableCodeFilter, setEnableCodeFilter] = useState(false);
+    const [codeFilterLevel, setCodeFilterLevel] = useState("high");
+    const [enableBanCode, setEnableBanCode] = useState(false);
+    const [banCodeConfidenceScore, setBanCodeConfidenceScore] = useState(0.7);
+
+    // Step 6: Custom Guardrails
+    const [enableLlmPrompt, setEnableLlmPrompt] = useState(false);
     const [llmPrompt, setLlmPrompt] = useState("");
     const [llmConfidenceScore, setLlmConfidenceScore] = useState(0.5);
-
-    // Step 7: Base Prompt Based Validation (AI Agents)
-    const [enableBasePromptRule, setEnableBasePromptRule] = useState(false);
-    const [basePromptConfidenceScore, setBasePromptConfidenceScore] = useState(0.5);
-
-    // Step 8: External model based evaluation
+    const [enableExternalModel, setEnableExternalModel] = useState(false);
     const [url, setUrl] = useState("");
-    const [confidenceScore, setConfidenceScore] = useState(25); // Start with 25 (first checkpoint)
+    const [confidenceScore, setConfidenceScore] = useState(25);
 
-    // Step 9: Server settings
+    // Step 7: Usage based Guardrails
+    const [enableTokenLimit, setEnableTokenLimit] = useState(false);
+    const [tokenLimitConfidenceScore, setTokenLimitConfidenceScore] = useState(0.7);
+
+    // Step 8: Server settings
     const [selectedMcpServers, setSelectedMcpServers] = useState([]);
     const [selectedAgentServers, setSelectedAgentServers] = useState([]);
     const [applyOnResponse, setApplyOnResponse] = useState(false);
@@ -105,26 +120,47 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         // Step 1
         name,
         blockedMessage,
+        description,
         // Step 2
-        enableHarmfulCategories,
         enablePromptAttacks,
-        // Step 3
+        promptAttackLevel,
+        enableDeniedTopics,
         deniedTopics,
-        // Step 4
-        wordFilters,
-        // Step 5
-        piiTypes,
-        regexPatterns,
-        // Step 6
-        llmPrompt,
-        llmConfidenceScore,
-        // Step 7
+        enableHarmfulCategories,
+        harmfulCategoriesSettings,
         enableBasePromptRule,
         basePromptConfidenceScore,
-        // Step 8
+        // Step 3
+        enableGibberishDetection,
+        gibberishConfidenceScore,
+        enableSentiment,
+        sentimentConfidenceScore,
+        wordFilters,
+        // Step 4
+        enablePiiTypes,
+        piiTypes,
+        enableRegexPatterns,
+        regexPatterns,
+        enableSecrets,
+        secretsConfidenceScore,
+        enableAnonymize,
+        anonymizeConfidenceScore,
+        // Step 5
+        enableCodeFilter,
+        codeFilterLevel,
+        enableBanCode,
+        banCodeConfidenceScore,
+        // Step 6
+        enableLlmPrompt,
+        llmPrompt,
+        llmConfidenceScore,
+        enableExternalModel,
         url,
         confidenceScore,
-        // Step 9
+        // Step 7
+        enableTokenLimit,
+        tokenLimitConfidenceScore,
+        // Step 8
         selectedMcpServers,
         selectedAgentServers,
         mcpServers,
@@ -144,22 +180,16 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 ...PolicyDetailsConfig.validate(storedStateData)
             },
             {
-                number: ContentFiltersConfig.number,
-                title: ContentFiltersConfig.title,
-                summary: ContentFiltersConfig.getSummary(storedStateData),
-                ...ContentFiltersConfig.validate(storedStateData)
+                number: ContentPolicyConfig.number,
+                title: ContentPolicyConfig.title,
+                summary: ContentPolicyConfig.getSummary(storedStateData),
+                ...ContentPolicyConfig.validate(storedStateData)
             },
             {
-                number: DeniedTopicsConfig.number,
-                title: DeniedTopicsConfig.title,
-                summary: DeniedTopicsConfig.getSummary(storedStateData),
-                ...DeniedTopicsConfig.validate(storedStateData)
-            },
-            {
-                number: WordFiltersConfig.number,
-                title: WordFiltersConfig.title,
-                summary: WordFiltersConfig.getSummary(storedStateData),
-                ...WordFiltersConfig.validate(storedStateData)
+                number: LanguageSafetyConfig.number,
+                title: LanguageSafetyConfig.title,
+                summary: LanguageSafetyConfig.getSummary(storedStateData),
+                ...LanguageSafetyConfig.validate(storedStateData)
             },
             {
                 number: SensitiveInfoConfig.number,
@@ -168,22 +198,22 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 ...SensitiveInfoConfig.validate(storedStateData)
             },
             {
-                number: LlmPromptConfig.number,
-                title: LlmPromptConfig.title,
-                summary: LlmPromptConfig.getSummary(storedStateData),
-                ...LlmPromptConfig.validate(storedStateData)
+                number: CodeDetectionConfig.number,
+                title: CodeDetectionConfig.title,
+                summary: CodeDetectionConfig.getSummary(storedStateData),
+                ...CodeDetectionConfig.validate(storedStateData)
             },
             {
-                number: BasePromptConfig.number,
-                title: BasePromptConfig.title,
-                summary: BasePromptConfig.getSummary(storedStateData),
-                ...BasePromptConfig.validate(storedStateData)
+                number: CustomGuardrailsConfig.number,
+                title: CustomGuardrailsConfig.title,
+                summary: CustomGuardrailsConfig.getSummary(storedStateData),
+                ...CustomGuardrailsConfig.validate(storedStateData)
             },
             {
-                number: ExternalModelConfig.number,
-                title: ExternalModelConfig.title,
-                summary: ExternalModelConfig.getSummary(storedStateData),
-                ...ExternalModelConfig.validate(storedStateData)
+                number: UsageGuardrailsConfig.number,
+                title: UsageGuardrailsConfig.title,
+                summary: UsageGuardrailsConfig.getSummary(storedStateData),
+                ...UsageGuardrailsConfig.validate(storedStateData)
             },
             {
                 number: ServerSettingsConfig.number,
@@ -228,7 +258,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 );
                 return hasMcpEnvType;
             })
-            .sort((a, b) => (b.startTs || 0) - (a.startTs || 0)) // Sort by creation time, latest first
+            .sort((a, b) => (b.startTs || 0) - (a.startTs || 0))
             .map(collection => ({
                 label: collection.displayName,
                 value: collection.id.toString()
@@ -241,7 +271,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 );
                 return hasGenAiEnvType;
             })
-            .sort((a, b) => (b.startTs || 0) - (a.startTs || 0)) // Sort by creation time, latest first
+            .sort((a, b) => (b.startTs || 0) - (a.startTs || 0))
             .map(collection => ({
                 label: collection.displayName,
                 value: collection.id.toString()
@@ -262,8 +292,11 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setDescription("");
         setBlockedMessage("");
         setApplyToResponses(false);
-        setEnableHarmfulCategories(false);
         setEnablePromptAttacks(false);
+        setPromptAttackLevel("high");
+        setEnableDeniedTopics(false);
+        setDeniedTopics([]);
+        setEnableHarmfulCategories(false);
         setHarmfulCategoriesSettings({
             hate: "HIGH",
             insults: "HIGH",
@@ -272,22 +305,38 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             misconduct: "HIGH",
             useForResponses: false
         });
-        setPromptAttackLevel("HIGH");
-        setDeniedTopics([]);
+        setEnableBasePromptRule(false);
+        setBasePromptConfidenceScore(0.5);
+        setEnableGibberishDetection(false);
+        setGibberishConfidenceScore(0.7);
+        setEnableSentiment(false);
+        setSentimentConfidenceScore(0.7);
         setWordFilters({
             profanity: false,
             custom: []
         });
         setNewCustomWord("");
+        setEnablePiiTypes(false);
         setPiiTypes([]);
+        setEnableRegexPatterns(false);
         setRegexPatterns([]);
         setNewRegexPattern("");
+        setEnableSecrets(false);
+        setSecretsConfidenceScore(0.7);
+        setEnableAnonymize(false);
+        setAnonymizeConfidenceScore(0.7);
+        setEnableCodeFilter(false);
+        setCodeFilterLevel("high");
+        setEnableBanCode(false);
+        setBanCodeConfidenceScore(0.7);
+        setEnableLlmPrompt(false);
         setLlmPrompt("");
         setLlmConfidenceScore(0.5);
-        setEnableBasePromptRule(false);
-        setBasePromptConfidenceScore(0.5);
+        setEnableExternalModel(false);
         setUrl("");
         setConfidenceScore(25);
+        setEnableTokenLimit(false);
+        setTokenLimitConfidenceScore(0.7);
         setSelectedMcpServers([]);
         setSelectedAgentServers([]);
         setApplyOnResponse(false);
@@ -315,11 +364,23 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             }
             if (policy.contentFiltering.promptAttacks) {
                 setEnablePromptAttacks(true);
-                setPromptAttackLevel(policy.contentFiltering.promptAttacks.level || "HIGH");
+                const level = policy.contentFiltering.promptAttacks.level || "high";
+                setPromptAttackLevel(level.toLowerCase());
+            }
+            if (policy.contentFiltering.code) {
+                setEnableCodeFilter(true);
+                if (typeof policy.contentFiltering.code === 'object' && policy.contentFiltering.code.level) {
+                    const level = policy.contentFiltering.code.level || "high";
+                    setCodeFilterLevel(level.toLowerCase());
+                } else {
+                    setCodeFilterLevel("high");
+                }
             }
         }
         
         // Denied topics
+        const hasDeniedTopics = policy.deniedTopics && policy.deniedTopics.length > 0;
+        setEnableDeniedTopics(hasDeniedTopics);
         setDeniedTopics(policy.deniedTopics || []);
         
         // Word filters
@@ -329,27 +390,34 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         });
         
         // PII filters
+        const hasPiiTypes = policy.piiTypes && policy.piiTypes.length > 0;
+        setEnablePiiTypes(hasPiiTypes);
         setPiiTypes(policy.piiTypes || []);
         
-        // Regex patterns - prefer V2 format with behavior, fallback to old format
+        // Regex patterns
+        let hasRegexPatterns = false;
         if (policy.regexPatternsV2 && policy.regexPatternsV2.length > 0) {
+            hasRegexPatterns = true;
             setRegexPatterns(policy.regexPatternsV2);
         } else if (policy.regexPatterns && policy.regexPatterns.length > 0) {
-            // Convert old format to new format with default behavior
+            hasRegexPatterns = true;
             const convertedPatterns = policy.regexPatterns.map(pattern => ({
                 pattern: pattern,
-                behavior: "block" // Default behavior for old data
+                behavior: "block"
             }));
             setRegexPatterns(convertedPatterns);
         } else {
             setRegexPatterns([]);
         }
+        setEnableRegexPatterns(hasRegexPatterns);
 
         // LLM prompt
         if (policy.llmRule) {
+            setEnableLlmPrompt(policy.llmRule.enabled || !!policy.llmRule.userPrompt);
             setLlmPrompt(policy.llmRule.userPrompt || "");
             setLlmConfidenceScore(policy.llmRule.confidenceScore !== undefined ? policy.llmRule.confidenceScore : 0.5);
         } else {
+            setEnableLlmPrompt(false);
             setLlmPrompt("");
             setLlmConfidenceScore(0.5);
         }
@@ -363,9 +431,36 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
             setBasePromptConfidenceScore(0.5);
         }
 
+        // Gibberish Detection
+        if (policy.gibberishDetection) {
+            setEnableGibberishDetection(policy.gibberishDetection.enabled || false);
+            setGibberishConfidenceScore(policy.gibberishDetection.confidenceScore !== undefined ? policy.gibberishDetection.confidenceScore : 0.7);
+        } else {
+            setEnableGibberishDetection(false);
+            setGibberishConfidenceScore(0.7);
+        }
+
+        // Helper function for scanner state
+        const setScannerState = (detection, setEnabled, setConfidence) => {
+            if (detection) {
+                setEnabled(detection.enabled || false);
+                setConfidence(detection.confidenceScore !== undefined ? detection.confidenceScore : 0.7);
+            } else {
+                setEnabled(false);
+                setConfidence(0.7);
+            }
+        };
+
+        setScannerState(policy.anonymizeDetection, setEnableAnonymize, setAnonymizeConfidenceScore);
+        setScannerState(policy.banCodeDetection, setEnableBanCode, setBanCodeConfidenceScore);
+        setScannerState(policy.secretsDetection, setEnableSecrets, setSecretsConfidenceScore);
+        setScannerState(policy.sentimentDetection, setEnableSentiment, setSentimentConfidenceScore);
+        setScannerState(policy.tokenLimitDetection, setEnableTokenLimit, setTokenLimitConfidenceScore);
+
         // External model based evaluation
+        const hasExternalModel = !!policy.url;
+        setEnableExternalModel(hasExternalModel);
         setUrl(policy.url || "");
-        // Map existing confidence score to nearest checkpoint
         const existingScore = policy.confidenceScore || policy.riskScore || 25;
         const checkpoints = [25, 50, 75, 100];
         const nearestCheckpoint = checkpoints.reduce((prev, curr) =>
@@ -373,16 +468,14 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         );
         setConfidenceScore(nearestCheckpoint);
 
-        // Server settings - prefer V2 format with names, fallback to old format
+        // Server settings
         if (policy.selectedMcpServersV2 && policy.selectedMcpServersV2.length > 0) {
-            // Extract IDs from V2 format for form population
             setSelectedMcpServers(policy.selectedMcpServersV2.map(server => server.id));
         } else {
             setSelectedMcpServers(policy.selectedMcpServers || []);
         }
 
         if (policy.selectedAgentServersV2 && policy.selectedAgentServersV2.length > 0) {
-            // Extract IDs from V2 format for form population
             setSelectedAgentServers(policy.selectedAgentServersV2.map(server => server.id));
         } else {
             setSelectedAgentServers(policy.selectedAgentServers || []);
@@ -413,7 +506,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         try {
             // Transform selectedMcpServers and selectedAgentServers to include both ID and name
             const transformedMcpServers = selectedMcpServers
-                .filter(serverId => serverId) // Filter out empty values
+                .filter(serverId => serverId)
                 .map(serverId => {
                     const server = mcpServers.find(s => s.value === serverId || s.value === serverId.toString());
                     return {
@@ -423,7 +516,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 });
 
             const transformedAgentServers = selectedAgentServers
-                .filter(serverId => serverId) // Filter out empty values  
+                .filter(serverId => serverId)
                 .map(serverId => {
                     const server = agentServers.find(s => s.value === serverId || s.value === serverId.toString());
                     return {
@@ -439,22 +532,22 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 applyToResponses,
                 contentFilters: {
                     harmfulCategories: enableHarmfulCategories ? harmfulCategoriesSettings : null,
-                    promptAttacks: enablePromptAttacks ? { level: promptAttackLevel } : null
+                    promptAttacks: enablePromptAttacks ? { level: promptAttackLevel.toUpperCase() } : null,
+                    code: enableCodeFilter ? { level: codeFilterLevel.toUpperCase() } : null
                 },
                 deniedTopics,
                 wordFilters,
                 piiFilters: piiTypes,
-                // Save in both old and new formats for backward compatibility
                 regexPatterns: regexPatterns
-                    .filter(r => r && r.pattern) // Ensure valid regex objects
-                    .map(r => r.pattern), // Old format (just patterns)
+                    .filter(r => r && r.pattern)
+                    .map(r => r.pattern),
                 regexPatternsV2: regexPatterns
-                    .filter(r => r && r.pattern && r.behavior) // Ensure valid regex objects with behavior
+                    .filter(r => r && r.pattern && r.behavior)
                     .map(r => ({
                         pattern: r.pattern,
-                        behavior: r.behavior.toLowerCase() // Ensure consistent case
-                    })), // New format (with behavior)
-                ...(llmPrompt && llmPrompt.trim() ? {
+                        behavior: r.behavior.toLowerCase()
+                    })),
+                ...(enableLlmPrompt && llmPrompt && llmPrompt.trim() ? {
                     llmRule: {
                         enabled: true,
                         userPrompt: llmPrompt.trim(),
@@ -467,17 +560,41 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         confidenceScore: basePromptConfidenceScore
                     }
                 } : {}),
-                url: url || null,
-                confidenceScore: confidenceScore,
-                selectedMcpServers: selectedMcpServers, // Old format (just IDs)
-                selectedAgentServers: selectedAgentServers, // Old format (just IDs)
-                selectedMcpServersV2: transformedMcpServers, // New format (with names)
-                selectedAgentServersV2: transformedAgentServers, // New format (with names)
+                gibberishDetection: {
+                    enabled: enableGibberishDetection,
+                    confidenceScore: gibberishConfidenceScore
+                },
+                anonymizeDetection: {
+                    enabled: enableAnonymize,
+                    confidenceScore: anonymizeConfidenceScore
+                },
+                banCodeDetection: {
+                    enabled: enableBanCode,
+                    confidenceScore: banCodeConfidenceScore
+                },
+                secretsDetection: {
+                    enabled: enableSecrets,
+                    confidenceScore: secretsConfidenceScore
+                },
+                sentimentDetection: {
+                    enabled: enableSentiment,
+                    confidenceScore: sentimentConfidenceScore
+                },
+                tokenLimitDetection: {
+                    enabled: enableTokenLimit,
+                    confidenceScore: tokenLimitConfidenceScore
+                },
+                url: enableExternalModel ? (url || null) : null,
+                confidenceScore: enableExternalModel ? confidenceScore : null,
+                selectedMcpServers: selectedMcpServers,
+                selectedAgentServers: selectedAgentServers,
+                selectedMcpServersV2: transformedMcpServers,
+                selectedAgentServersV2: transformedAgentServers,
                 applyOnResponse,
                 applyOnRequest,
-                // Add edit mode information
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
             };
+
             
             await onSave(guardrailData);
             handleClose();
@@ -502,7 +619,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     }, [currentStep]);
 
     const handleStepClick = (stepNumber) => {
-        // Toggle collapse if clicking on already open step
         if (stepNumber === currentStep) {
             setCurrentStep(null);
         } else {
@@ -613,72 +729,105 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 );
             case 2:
                 return (
-                    <ContentFiltersStep
-                        enableHarmfulCategories={enableHarmfulCategories}
-                        setEnableHarmfulCategories={setEnableHarmfulCategories}
-                        harmfulCategoriesSettings={harmfulCategoriesSettings}
-                        setHarmfulCategoriesSettings={setHarmfulCategoriesSettings}
+                    <ContentPolicyStep
                         enablePromptAttacks={enablePromptAttacks}
                         setEnablePromptAttacks={setEnablePromptAttacks}
                         promptAttackLevel={promptAttackLevel}
                         setPromptAttackLevel={setPromptAttackLevel}
-                    />
-                );
-            case 3:
-                return (
-                    <DeniedTopicsStep
+                        enableDeniedTopics={enableDeniedTopics}
+                        setEnableDeniedTopics={setEnableDeniedTopics}
                         deniedTopics={deniedTopics}
                         setDeniedTopics={setDeniedTopics}
-                    />
-                );
-            case 4:
-                return (
-                    <WordFiltersStep
-                        wordFilters={wordFilters}
-                        setWordFilters={setWordFilters}
-                        newCustomWord={newCustomWord}
-                        setNewCustomWord={setNewCustomWord}
-                    />
-                );
-            case 5:
-                return (
-                    <SensitiveInfoStep
-                        piiTypes={piiTypes}
-                        setPiiTypes={setPiiTypes}
-                        regexPatterns={regexPatterns}
-                        setRegexPatterns={setRegexPatterns}
-                        newRegexPattern={newRegexPattern}
-                        setNewRegexPattern={setNewRegexPattern}
-                    />
-                );
-            case 6:
-                return (
-                    <LlmPromptStep
-                        llmRule={llmPrompt}
-                        setLlmRule={setLlmPrompt}
-                        llmConfidenceScore={llmConfidenceScore}
-                        setLlmConfidenceScore={setLlmConfidenceScore}
-                    />
-                );
-            case 7:
-                return (
-                    <BasePromptStep
+                        enableHarmfulCategories={enableHarmfulCategories}
+                        setEnableHarmfulCategories={setEnableHarmfulCategories}
+                        harmfulCategoriesSettings={harmfulCategoriesSettings}
+                        setHarmfulCategoriesSettings={setHarmfulCategoriesSettings}
                         enableBasePromptRule={enableBasePromptRule}
                         setEnableBasePromptRule={setEnableBasePromptRule}
                         basePromptConfidenceScore={basePromptConfidenceScore}
                         setBasePromptConfidenceScore={setBasePromptConfidenceScore}
                     />
                 );
-            case 8:
+            case 3:
                 return (
-                    <ExternalModelStep
+                    <LanguageSafetyStep
+                        enableGibberishDetection={enableGibberishDetection}
+                        setEnableGibberishDetection={setEnableGibberishDetection}
+                        gibberishConfidenceScore={gibberishConfidenceScore}
+                        setGibberishConfidenceScore={setGibberishConfidenceScore}
+                        enableSentiment={enableSentiment}
+                        setEnableSentiment={setEnableSentiment}
+                        sentimentConfidenceScore={sentimentConfidenceScore}
+                        setSentimentConfidenceScore={setSentimentConfidenceScore}
+                        wordFilters={wordFilters}
+                        setWordFilters={setWordFilters}
+                        newCustomWord={newCustomWord}
+                        setNewCustomWord={setNewCustomWord}
+                    />
+                );
+            case 4:
+                return (
+                    <SensitiveInfoStep
+                        enablePiiTypes={enablePiiTypes}
+                        setEnablePiiTypes={setEnablePiiTypes}
+                        piiTypes={piiTypes}
+                        setPiiTypes={setPiiTypes}
+                        enableRegexPatterns={enableRegexPatterns}
+                        setEnableRegexPatterns={setEnableRegexPatterns}
+                        regexPatterns={regexPatterns}
+                        setRegexPatterns={setRegexPatterns}
+                        newRegexPattern={newRegexPattern}
+                        setNewRegexPattern={setNewRegexPattern}
+                        enableSecrets={enableSecrets}
+                        setEnableSecrets={setEnableSecrets}
+                        secretsConfidenceScore={secretsConfidenceScore}
+                        setSecretsConfidenceScore={setSecretsConfidenceScore}
+                        enableAnonymize={enableAnonymize}
+                        setEnableAnonymize={setEnableAnonymize}
+                        anonymizeConfidenceScore={anonymizeConfidenceScore}
+                        setAnonymizeConfidenceScore={setAnonymizeConfidenceScore}
+                    />
+                );
+            case 5:
+                return (
+                    <CodeDetectionStep
+                        enableCodeFilter={enableCodeFilter}
+                        setEnableCodeFilter={setEnableCodeFilter}
+                        codeFilterLevel={codeFilterLevel}
+                        setCodeFilterLevel={setCodeFilterLevel}
+                        enableBanCode={enableBanCode}
+                        setEnableBanCode={setEnableBanCode}
+                        banCodeConfidenceScore={banCodeConfidenceScore}
+                        setBanCodeConfidenceScore={setBanCodeConfidenceScore}
+                    />
+                );
+            case 6:
+                return (
+                    <CustomGuardrailsStep
+                        enableLlmPrompt={enableLlmPrompt}
+                        setEnableLlmPrompt={setEnableLlmPrompt}
+                        llmRule={llmPrompt}
+                        setLlmRule={setLlmPrompt}
+                        llmConfidenceScore={llmConfidenceScore}
+                        setLlmConfidenceScore={setLlmConfidenceScore}
+                        enableExternalModel={enableExternalModel}
+                        setEnableExternalModel={setEnableExternalModel}
                         url={url}
                         setUrl={setUrl}
                         confidenceScore={confidenceScore}
                         setConfidenceScore={setConfidenceScore}
                     />
                 );
-            case 9:
+            case 7:
+                return (
+                    <UsageGuardrailsStep
+                        enableTokenLimit={enableTokenLimit}
+                        setEnableTokenLimit={setEnableTokenLimit}
+                        tokenLimitConfidenceScore={tokenLimitConfidenceScore}
+                        setTokenLimitConfidenceScore={setTokenLimitConfidenceScore}
+                    />
+                );
+            case 8:
                 return (
                     <ServerSettingsStep
                         selectedMcpServers={selectedMcpServers}
@@ -721,7 +870,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     };
 
     const getPrimaryAction = () => {
-        // Check if all steps are valid
         const allStepsValid = steps.every(step => step.isValid);
 
             return {

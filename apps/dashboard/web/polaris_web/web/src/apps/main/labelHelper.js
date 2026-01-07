@@ -1,5 +1,6 @@
 import { labelMap } from "./labelHelperMap"
 import PersistStore from "./PersistStore";
+import func from "@/util/func";
 
 /**
  * Maps a label to its category-specific version.
@@ -8,7 +9,17 @@ import PersistStore from "./PersistStore";
  * @returns {string} - Transformed label for that category
  */
 export function mapLabel(value, category) {
-  return labelMap?.[category]?.[value] || value
+  // For demo accounts: apply special Argus/Atlas label mappings
+  if (func.isDemoAccount() && (category === CATEGORY_AGENTIC_SECURITY || category === CATEGORY_ENDPOINT_SECURITY)) {
+    // Demo-specific label mappings
+    if (value === "Quick Start") return "Connectors";
+    if (value === "API Discovery") return "Agentic AI Discovery";
+    if (value === "API Testing") return "AI Red Teaming";
+    if (value === "Threat Detection") return "Guardrails";
+  }
+
+  // Apply standard label mappings for all accounts and categories
+  return labelMap?.[category]?.[value] || value;
 }
 
 export const CATEGORY_MCP_SECURITY = 'MCP Security';
@@ -16,6 +27,7 @@ export const CATEGORY_GEN_AI = 'Gen AI';
 export const CATEGORY_API_SECURITY = 'API Security';
 export const CATEGORY_AGENTIC_SECURITY = 'Agentic Security';
 export const CATEGORY_DAST = 'DAST';
+export const CATEGORY_ENDPOINT_SECURITY = 'Endpoint Security';
 
 export function getDashboardCategory() {
   try {
@@ -48,4 +60,8 @@ export function isAgenticSecurityCategory() {
 
 export function isDastCategory() {
   return isCategory(CATEGORY_DAST);
+}
+
+export function isEndpointSecurityCategory() {
+  return func.isDemoAccount() && isCategory(CATEGORY_ENDPOINT_SECURITY);
 }

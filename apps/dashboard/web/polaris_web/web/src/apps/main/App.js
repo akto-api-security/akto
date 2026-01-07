@@ -35,6 +35,8 @@ import PromptHardening from "../dashboard/pages/prompt_hardening/PromptHardening
 import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
 import IssuesPage from "../dashboard/pages/issues/IssuesPage/IssuesPage";
 import CompliancePage from "../dashboard/pages/issues/IssuesPage/CompliancePage";
+import ThreatCompliancePage from "../dashboard/pages/issues/IssuesPage/ThreatCompliancePage";
+import ThreatsPage from "../dashboard/pages/issues/IssuesPage/ThreatsPage";
 import QuickStart from "../dashboard/pages/quick_start/QuickStart";
 import AgentTeam from "../dashboard/pages/agent_team/AgentTeam";
 import Webhooks from "../dashboard/pages/settings/integrations/webhooks/Webhooks";
@@ -75,6 +77,7 @@ import TokenValidator from "./TokenValidator"
 import {TableContextProvider} from "@/apps/dashboard/components/tables/TableContext";
 import VulnerabilityReport from "../dashboard/pages/testing/vulnerability_report/VulnerabilityReport";
 import ThreatDetectionPage from "../dashboard/pages/threat_detection/ThreatDetectionPage";
+import ThreatReport from "../dashboard/pages/threat_detection/threat_report/ThreatReport";
 
 import {PollingProvider} from "./PollingProvider";
 import Help from "../dashboard/pages/settings/help_and_support/Help";
@@ -97,6 +100,7 @@ import F5Waf from "../dashboard/pages/settings/integrations/F5Waf";
 import AWSWaf from "../dashboard/pages/settings/integrations/AWSWaf";
 import AgentConfig from "../dashboard/pages/settings/integrations/AgentConfig";
 import AzureBoards from "../dashboard/pages/settings/integrations/AzureBoards";
+import AzureDataExplorer from "../dashboard/pages/settings/integrations/AzureDataExplorer";
 import ServiceNow from "../dashboard/pages/settings/integrations/ServiceNow";
 import DevRev from "../dashboard/pages/settings/integrations/DevRev";
 import McpRegistry from "../dashboard/pages/settings/integrations/McpRegistry";
@@ -250,6 +254,14 @@ const router = createBrowserRouter([
                             {
                                 path: "compliance",
                                 element: <CompliancePage/>
+                            },
+                            {
+                                path: "threat-compliance",
+                                element: <ThreatCompliancePage/>
+                            },
+                            {
+                                path: "threats",
+                                element: <ThreatsPage/>
                             }
                         ]
                     },
@@ -391,6 +403,10 @@ const router = createBrowserRouter([
                     {
                         path: "integrations/azure_boards",
                         element: <AzureBoards/>,
+                    },
+                    {
+                        path: "integrations/adx",
+                        element: <AzureDataExplorer/>,
                     },
                     {
                         path: "integrations/servicenow",
@@ -541,6 +557,10 @@ const router = createBrowserRouter([
             {
                 path: "issues/summary/:reportId",
                 element: <VulnerabilityReport/>
+            },
+            {
+                path: "threat-detection/report/:reportId",
+                element: <ThreatReport/>
             }
         ],
         errorElement: <ErrorComponent/>

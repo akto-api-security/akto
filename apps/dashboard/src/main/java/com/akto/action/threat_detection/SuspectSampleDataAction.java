@@ -28,7 +28,6 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 
-import static com.akto.action.threat_detection.utils.ThreatsUtils.getTemplates;
 import com.akto.action.threat_detection.utils.ThreatDetectionHelper;
 import lombok.Getter;
 import lombok.Setter;
@@ -43,6 +42,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   List<String> ips;
   List<String> urls;
   List<Integer> apiCollectionIds;
+  List<String> method;
   long total;
   Map<String, Integer> sort;
   List<String> severity;
@@ -66,6 +66,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   @Getter @Setter int deletedCount;
   @Getter @Setter List<String> hosts;
   @Getter @Setter String latestApiOrigRegex;
+  @Getter @Setter Boolean sortBySeverity;
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -82,6 +83,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
         String.format("%s/api/dashboard/list_malicious_requests", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
+    post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
 
     Map<String, Object> filter = new HashMap<>();
     if (this.ips != null && !this.ips.isEmpty()) {
@@ -98,6 +100,14 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
     if (this.urls != null && !this.urls.isEmpty()) {
       filter.put("urls", this.urls);
+    }
+
+    if (this.apiCollectionIds != null && !this.apiCollectionIds.isEmpty()) {
+      filter.put("apiCollectionId", this.apiCollectionIds);
+    }
+
+    if (this.method != null && !this.method.isEmpty()) {
+      filter.put("method", this.method);
     }
 
     if(this.types != null && !this.types.isEmpty()){
@@ -120,11 +130,14 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       filter.put("latestApiOrigRegex", this.latestApiOrigRegex);
     }
 
-    List<String> templates = getTemplates(latestAttack);
-    filter.put("latestAttack", templates);
+    filter.put("latestAttack", latestAttack);
 
     if (this.statusFilter != null) {
       filter.put("statusFilter", this.statusFilter);
+    }
+
+    if (this.sortBySeverity != null) {
+      filter.put("sortBySeverity", this.sortBySeverity);
     }
 
     Map<String, Integer> time_range = new HashMap<>();
@@ -256,13 +269,18 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     if (this.urls != null && !this.urls.isEmpty()) {
       filterBuilder.addAllUrls(this.urls);
     }
+    if (this.apiCollectionIds != null && !this.apiCollectionIds.isEmpty()) {
+      filterBuilder.addAllApiCollectionId(this.apiCollectionIds);
+    }
+    if (this.method != null && !this.method.isEmpty()) {
+      filterBuilder.addAllMethod(this.method);
+    }
     if (this.types != null && !this.types.isEmpty()) {
       filterBuilder.addAllTypes(this.types);
     }
-    // Always populate latestAttack with available templates, even if empty
-    List<String> templates = getTemplates(latestAttack);
-    if (!templates.isEmpty()) {
-      filterBuilder.addAllLatestAttack(templates);
+    // Always populate latestAttack, even if empty
+    if (latestAttack != null && !latestAttack.isEmpty()) {
+      filterBuilder.addAllLatestAttack(latestAttack);
     }
     if (this.statusFilter != null) {
       filterBuilder.setStatusFilter(this.statusFilter);
@@ -345,6 +363,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
             String.format("%s/api/dashboard/delete_malicious_events", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
+    post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
 
     DeleteMaliciousEventsRequest.Builder requestBuilder = DeleteMaliciousEventsRequest.newBuilder();
 
@@ -447,6 +466,14 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
   public void setApiCollectionIds(List<Integer> apiCollectionIds) {
     this.apiCollectionIds = apiCollectionIds;
+  }
+
+  public List<String> getMethod() {
+    return method;
+  }
+
+  public void setMethod(List<String> method) {
+    this.method = method;
   }
 
   public long getTotal() {

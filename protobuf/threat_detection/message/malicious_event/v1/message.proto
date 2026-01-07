@@ -27,6 +27,7 @@ message MaliciousEventMessage {
   string label = 16;  // Common values: "threat", "guardrail"
   string host = 17;   // Host header from the request
   string status = 18;
+  string context_source = 19;  // Context source: API, MCP, GEN_AI, AGENTIC, DAST, ENDPOINT
 }
 
 message MaliciousEventKafkaEnvelope {

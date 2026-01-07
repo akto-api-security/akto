@@ -1115,7 +1115,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
             discoveredTimestamp = x.startTs
           }
           let description = apiInfoMap[key] ? apiInfoMap[key]['description'] : ""
-          let lastSeenTs = Math.max(apiInfoMap[key] ? apiInfoMap[key]["lastSeen"] : x.startTs, x.startTs)
+          let lastSeenTs = Math.max(apiInfoMap[key] ? apiInfoMap[key]["lastSeen"] : (x.startTs > 0 ? x.startTs : 0), (x.startTs > 0 ? x.startTs : 0))
           ret[key] = {
               id: x.method + "###" + x.url + "###" + x.apiCollectionId + "###" + Math.random(),
               shadow: x.shadow ? x.shadow : false,
@@ -1153,6 +1153,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
               description: description,
               descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={description} text={description}/></Box>),
               lastTested: apiInfoMap[key] ? apiInfoMap[key]["lastTested"] : 0,
+              isThreatEnabled: apiInfoMap[key] ? apiInfoMap[key]["threatScore"] > 0 : false,
           }
 
       }
@@ -2387,6 +2388,22 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       }
     }
     return placeholders;
+  },
+  /**
+   * Format timestamp for chat messages
+   * @param {number} timestamp - Unix timestamp in seconds
+   * @returns {string} Formatted timestamp string
+   */
+  formatChatTimestamp: (timestamp) => {
+    if (!timestamp) return '';
+    return new Date(timestamp * 1000).toLocaleString('en-US', {
+      month: 'numeric',
+      day: 'numeric',
+      year: '2-digit',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: true
+    });
   }
 }
 
