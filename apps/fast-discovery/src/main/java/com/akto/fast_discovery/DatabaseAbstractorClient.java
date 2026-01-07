@@ -246,6 +246,26 @@ public class DatabaseAbstractorClient {
     }
 
     /**
+     * Ensure api_collection entries exist for given collection IDs.
+     * Creates missing collections automatically.
+     *
+     * @param collectionIds List of collection IDs to ensure exist
+     */
+    public void ensureCollections(List<Integer> collectionIds) throws Exception {
+        if (collectionIds == null || collectionIds.isEmpty()) {
+            return;
+        }
+
+        String endpoint = baseUrl + "/api/ensureApiCollections";
+        loggerMaker.infoAndAddToDb("Fast-discovery: Ensuring " + collectionIds.size() + " collections exist");
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("collectionIdsToEnsure", collectionIds);
+
+        executePost(endpoint, payload);
+    }
+
+    /**
      * Close HTTP client and release resources.
      */
     public void close() throws IOException {

@@ -173,8 +173,22 @@ public class FastDiscoveryConsumer {
         // Convert to BulkUpdates format for api_info
         List<BulkUpdates> apiInfoWrites = buildApiInfoWrites(newApis);
 
+        // Extract unique collection IDs from new APIs
+        List<Integer> collectionIds = new ArrayList<>();
+        for (HttpResponseParams params : newApis.values()) {
+            int collectionId = params.getRequestParams().getApiCollectionId();
+            if (collectionId > 0 && !collectionIds.contains(collectionId)) {
+                collectionIds.add(collectionId);
+            }
+        }
+
         try {
-            // Call database-abstractor HTTP API
+            // Ensure api_collection entries exist first
+            if (!collectionIds.isEmpty()) {
+                dbAbstractorClient.ensureCollections(collectionIds);
+            }
+
+            // Call database-abstractor HTTP API to write APIs
             dbAbstractorClient.bulkWriteSti(stiWrites);
             dbAbstractorClient.bulkWriteApiInfo(apiInfoWrites);
 
