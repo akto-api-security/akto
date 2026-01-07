@@ -48,6 +48,7 @@ import lombok.Setter;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.struts2.interceptor.ServletResponseAware;
+import org.apache.struts2.json.annotations.JSON;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -460,6 +461,11 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
 
 
         return SUCCESS.toUpperCase();
+    }
+
+    @JSON(serialize = false)
+    public int getApiCollectionId() {
+        return apiCollectionId;
     }
 
     public void setApiCollectionId(int apiCollectionId) {
