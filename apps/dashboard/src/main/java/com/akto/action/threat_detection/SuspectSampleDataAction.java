@@ -83,6 +83,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   @Getter @Setter int deletedCount;
   @Getter @Setter List<String> hosts;
   @Getter @Setter String latestApiOrigRegex;
+  @Getter @Setter Boolean sortBySeverity;
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -159,6 +160,10 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
     if (this.statusFilter != null) {
       filter.put("statusFilter", this.statusFilter);
+    }
+
+    if (this.sortBySeverity != null) {
+      filter.put("sortBySeverity", this.sortBySeverity);
     }
 
     Map<String, Integer> time_range = new HashMap<>();

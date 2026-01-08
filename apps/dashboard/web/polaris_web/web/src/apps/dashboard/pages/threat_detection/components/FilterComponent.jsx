@@ -71,8 +71,8 @@ function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals,
             const inc = normalize(includeCategoryNameEquals)
             out = out.filter((t) => getCategory(t) === inc)
         } else if (excludeCategoryNameEquals && excludeCategoryNameEquals.length > 0) {
-            const exc = normalize(excludeCategoryNameEquals)
-            out = out.filter((t) => getCategory(t) !== exc)
+            const excList = excludeCategoryNameEquals.map(normalize)
+            out = out.filter((t) => !excList.includes(getCategory(t)))
         }
         return out
     }

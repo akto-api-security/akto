@@ -351,9 +351,9 @@ const settingFunctions = {
       })
       return devRevInteg
     },
-    fetchDevRevParts: async function(personalAccessToken) {
+    fetchDevRevParts: async function(personalAccessToken, partTypes, partName) {
       let parts = {}
-      await settingRequests.fetchDevRevParts(personalAccessToken).then((resp)=>{
+      await settingRequests.fetchDevRevParts(personalAccessToken, partTypes, partName).then((resp)=>{
         parts = resp.partsIdToNameMap
       })
       return parts
