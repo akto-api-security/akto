@@ -81,25 +81,15 @@ export default function LeftNav() {
             selected: leftNavSelected === "dashboard_reports_compliance",
         })
         reportsSubNavigationItems.push({
-            label: "Threat Compliance",
+            label: "Threat",
             onClick: () => {
-                navigate("/dashboard/reports/threat-compliance");
-                handleSelect("dashboard_reports_threat_compliance");
+                navigate("/dashboard/reports/threat");
+                handleSelect("dashboard_reports_tthreat");
                 setActive("active");
             },
-            selected: leftNavSelected === "dashboard_reports_threat_compliance",
+            selected: leftNavSelected === "dashboard_reports_tthreat",
         })
     }
-
-    reportsSubNavigationItems.push({
-        label: "Threats",
-        onClick: () => {
-            navigate("/dashboard/reports/threats");
-            handleSelect("dashboard_reports_threats");
-            setActive("active");
-        },
-        selected: leftNavSelected === "dashboard_reports_threats",
-    })
 
     const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
 

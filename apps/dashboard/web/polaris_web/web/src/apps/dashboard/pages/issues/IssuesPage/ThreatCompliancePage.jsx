@@ -304,7 +304,7 @@ function ThreatCompliancePage() {
             let apiCollectionIdsFilter = [];
             let matchingUrlFilter = [];
             let typeFilter = [];
-            let latestAttack = calcFilteredThreatFilterIds(complianceView);
+            let latestAttack = [];
             let hostFilter = [];
             let severityFilter = [];
 
@@ -699,7 +699,7 @@ function ThreatCompliancePage() {
             title={
                 <HorizontalStack gap={4}>
                     <TitleWithInfo
-                        titleText={"Threat Compliance Report"}
+                        titleText={"Threat"}
                         tooltipContent={"View detected threats mapped to compliance standards such as OWASP, PCI-DSS, SOC 2, and more."}
                     />
                     <Popover
