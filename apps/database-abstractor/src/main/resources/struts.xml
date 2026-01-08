@@ -289,6 +289,18 @@
             </result>
         </action>
 
+        <action name="api/fetchAllCollections" class="com.akto.action.DbAction" method="fetchAllCollections">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^collections.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchDeactivatedCollections" class="com.akto.action.DbAction" method="fetchDeactivatedCollections">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

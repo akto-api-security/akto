@@ -96,6 +96,7 @@ public class DbAction extends ActionSupport {
     APIConfig apiConfig;
     List<SingleTypeInfo> stis;
     List<Integer> apiCollectionIds;
+    List<Map<String, Object>> collections;
     List<RuntimeFilter> runtimeFilters;
     List<SensitiveParamInfo> sensitiveParamInfos;
     Account account;
@@ -1547,6 +1548,29 @@ public class DbAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
+    }
+
+    /**
+     * Fetch all API collections (id and hostName only).
+     * Used by fast-discovery to pre-populate collection cache on startup.
+     */
+    public String fetchAllCollections() {
+        try {
+            List<ApiCollection> allCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+            collections = new ArrayList<>();
+
+            for (ApiCollection col : allCollections) {
+                Map<String, Object> colData = new HashMap<>();
+                colData.put("id", col.getId());
+                colData.put("hostName", col.getHostName());
+                collections.add(colData);
+            }
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchAllCollections");
+            return Action.ERROR.toUpperCase();
+        }
     }
 
     private static final List<Integer> HIGHER_STI_LIMIT_ACCOUNT_IDS = Arrays.asList(1736798101, 1718042191);
@@ -3415,6 +3439,14 @@ public class DbAction extends ActionSupport {
 
     public void setApiCollectionIds(List<Integer> apiCollectionIds) {
         this.apiCollectionIds = apiCollectionIds;
+    }
+
+    public List<Map<String, Object>> getCollections() {
+        return collections;
+    }
+
+    public void setCollections(List<Map<String, Object>> collections) {
+        this.collections = collections;
     }
 
     public List<RuntimeFilter> getRuntimeFilters() {
