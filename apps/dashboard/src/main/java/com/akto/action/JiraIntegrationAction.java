@@ -11,8 +11,6 @@ import com.akto.dao.testing.BidirectionalSyncSettingsDao;
 import com.akto.dao.testing.RemediationsDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.data_actor.DataActor;
-import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.Config.AktoHostUrlConfig;
 import com.akto.dto.Config.ConfigType;
 import com.akto.dto.AccountSettings;
@@ -137,8 +135,6 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private String description;
     @Setter
     private String labels;
-
-    private DataActor dataActor = DataActorFactory.fetchInstance();
 
 
     public String testIntegration() {
@@ -378,15 +374,6 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                 return Action.ERROR.toUpperCase();
             }
 
-            // Get AccountSettings using dataActor
-            AccountSettings accountSettings = dataActor.fetchAccountSettings();
-
-            if (accountSettings == null) {
-                loggerMaker.errorAndAddToDb("AccountSettings not found, cannot save severity mapping");
-                addActionError("Account settings not found");
-                return Action.ERROR.toUpperCase();
-            }
-
             AccountSettingsDao.instance.updateOne(
                 AccountSettingsDao.generateFilter(),
                 Updates.set(AccountSettings.ISSUE_SEVERITY_TO_JIRA_PRIORITY_MAP, severityToPriorityMap)
@@ -405,7 +392,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         try {
             loggerMaker.infoAndAddToDb("Fetching Jira severity to priority mapping for account: " + Context.accountId.get());
 
-            AccountSettings accountSettings = dataActor.fetchAccountSettings();
+            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
 
             if (accountSettings != null) {
                 this.severityToPriorityMap = accountSettings.getIssueSeverityToJiraPriorityMap();
@@ -1120,7 +1107,6 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
     private BasicDBObject jiraTicketPayloadCreator(JiraMetaData jiraMetaData, TestingRunIssues issue,
         Info info, Remediation remediation) {
-        AccountSettings accountSettings = dataActor.fetchAccountSettings();
 
         String endpoint = jiraMetaData.getEndPointStr().replace("Endpoint - ", "");
         String truncatedEndpoint = endpoint;
@@ -1144,7 +1130,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             contentList.addAll(additionalFields);
         }
 
-        BasicDBObject fields = buildPayloadForJiraTicket(summary, this.projId, this.issueType, contentList,jiraMetaData.getAdditionalIssueFields(), issue.getSeverity(), accountSettings);
+        BasicDBObject fields = buildPayloadForJiraTicket(summary, this.projId, this.issueType, contentList,jiraMetaData.getAdditionalIssueFields(), issue.getSeverity());
         
         // Combine user labels with AKTO_SYNC label
         List<String> labelsList = new ArrayList<>();
@@ -1457,7 +1443,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             return ERROR.toUpperCase();
         }
 
-        AccountSettings accountSettings = dataActor.fetchAccountSettings();
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
 
         try {
             BasicDBList contentList = new BasicDBList();
