@@ -195,7 +195,6 @@ public class DbLayer {
         return ModuleInfoDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
                 Updates.combine(
                         //putting class name because findOneAndUpdate doesn't put class name by default
-                        Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
                         Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType()),
                         Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
                         Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
@@ -203,6 +202,34 @@ public class DbLayer {
                         Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
                         Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived())
                 ), updateOptions);
+    }
+
+    public static void bulkUpdateModuleInfo(List<ModuleInfo> moduleInfoList) {
+        if (moduleInfoList == null || moduleInfoList.isEmpty()) {
+            return;
+        }
+
+        List<WriteModel<ModuleInfo>> bulkUpdates = new ArrayList<>();
+        UpdateOptions updateOptions = new UpdateOptions().upsert(true);
+
+        for (ModuleInfo moduleInfo : moduleInfoList) {
+            Bson filter = Filters.eq(ModuleInfoDao.ID, moduleInfo.getId());
+            Bson updates = Updates.combine(
+                    //putting class name because findOneAndUpdate doesn't put class name by default
+                    Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
+                    Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType().name()),
+                    Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
+                    Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
+                    Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()),
+                    Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
+                    Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()),
+                    Updates.set(ModuleInfo._REBOOT, moduleInfo.isReboot()),
+                    Updates.set(ModuleInfo.DELETE_TOPIC_AND_REBOOT, moduleInfo.isDeleteTopicAndReboot())
+            );
+            bulkUpdates.add(new UpdateOneModel<>(filter, updates, updateOptions));
+        }
+
+        ModuleInfoDao.instance.getMCollection().bulkWrite(bulkUpdates);
     }
 
     public static void updateCidrList(List<String> cidrList) {

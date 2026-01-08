@@ -79,6 +79,17 @@
             </result>
         </action>
 
+        <action name="api/bulkUpdateModuleInfoForHeartbeat" class="com.akto.action.DbAction" method="bulkUpdateModuleInfo">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/updateCidrList" class="com.akto.action.DbAction" method="updateCidrList">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
