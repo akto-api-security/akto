@@ -1,5 +1,7 @@
 package com.akto.fast_discovery;
 
+import com.akto.data_actor.ClientActor;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.fast_discovery.dto.ApiId;

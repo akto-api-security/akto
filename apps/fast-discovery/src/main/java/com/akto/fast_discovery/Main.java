@@ -1,5 +1,7 @@
 package com.akto.fast_discovery;
 
+import com.akto.data_actor.ClientActor;
+import com.akto.dto.ApiCollection;
 import com.akto.log.LoggerMaker;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -8,6 +10,7 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 
 import java.time.Duration;
 import java.util.Collections;
+import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -55,11 +58,28 @@ public class Main {
             loggerMaker.infoAndAddToDb("BloomFilterManager initialized with " +
                     bloomFilter.getEstimatedMemoryUsageMB() + " MB estimated memory");
 
-            // 3. Initialize API Collection Resolver
-            ApiCollectionResolver collectionResolver = new ApiCollectionResolver();
+            // 3. Initialize ClientActor for collection creation
+            ClientActor clientActor = new ClientActor();
+            loggerMaker.infoAndAddToDb("ClientActor initialized");
+
+            // 4. Initialize API Collection Resolver with ClientActor
+            ApiCollectionResolver collectionResolver = new ApiCollectionResolver(clientActor);
             loggerMaker.infoAndAddToDb("ApiCollectionResolver initialized");
 
-            // 4. Initialize Fast Discovery Consumer
+            // 5. Pre-populate collection cache from database
+            loggerMaker.infoAndAddToDb("Pre-populating collection cache...");
+            try {
+                List<ApiCollection> existingCollections = dbAbstractorClient.fetchAllCollections();
+                collectionResolver.prePopulateCollections(existingCollections);
+                loggerMaker.infoAndAddToDb("Collection cache pre-populated with " +
+                    existingCollections.size() + " collections (~" +
+                    (collectionResolver.getCacheSize() * 40 / 1024) + " KB)");
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Failed to pre-populate collections: " + e.getMessage());
+                loggerMaker.infoAndAddToDb("Continuing anyway - collections will be created on-demand");
+            }
+
+            // 6. Initialize Fast Discovery Consumer
             FastDiscoveryConsumer consumer = new FastDiscoveryConsumer(
                     bloomFilter,
                     collectionResolver,
@@ -67,12 +87,12 @@ public class Main {
             );
             loggerMaker.infoAndAddToDb("FastDiscoveryConsumer initialized");
 
-            // 5. Set up Kafka consumer
+            // 7. Set up Kafka consumer
             kafkaConsumer = createKafkaConsumer(config);
             kafkaConsumer.subscribe(Collections.singletonList(config.kafkaTopicName));
             loggerMaker.infoAndAddToDb("Kafka consumer subscribed to topic: " + config.kafkaTopicName);
 
-            // 6. Set up shutdown hook
+            // 8. Set up shutdown hook
             final DatabaseAbstractorClient finalDbClient = dbAbstractorClient;
             final KafkaConsumer<String, String> finalKafkaConsumer = kafkaConsumer;
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -91,7 +111,7 @@ public class Main {
                 loggerMaker.infoAndAddToDb("Fast-Discovery Consumer shut down gracefully");
             }));
 
-            // 7. Start consuming messages
+            // 9. Start consuming messages
             loggerMaker.infoAndAddToDb("Fast-Discovery Consumer started successfully! Beginning to process messages...");
             long totalProcessed = 0;
 
@@ -172,7 +192,7 @@ public class Main {
         config.kafkaMaxPollRecords = Integer.parseInt(getEnv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG", "1000"));
 
         // Database-Abstractor configuration
-        config.dbAbstractorUrl = getEnv("DB_ABSTRACTOR_URL", "http://database-abstractor:9000");
+        config.dbAbstractorUrl = getEnv("DATABASE_ABSTRACTOR_SERVICE_URL", "http://database-abstractor:9000");
         // Note: JWT token (DATABASE_ABSTRACTOR_SERVICE_TOKEN) is read by DatabaseAbstractorClient
 
         // Bloom Filter configuration
