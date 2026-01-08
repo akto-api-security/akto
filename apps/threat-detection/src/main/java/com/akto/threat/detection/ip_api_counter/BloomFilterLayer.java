@@ -16,7 +16,7 @@ import com.google.common.hash.Funnels;
  */
 public class BloomFilterLayer {
 
-    private static final int DATA_RETENTION_MINUTES = 10;
+    private static final int DATA_RETENTION_MINUTES = 15;
 
     private final int expectedInsertions;
     private final double falsePositiveRate;

@@ -5,8 +5,11 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import com.akto.dao.context.Context;
+import com.akto.threat.detection.cache.ApiCountCacheLayer;
 import com.akto.threat.detection.cache.CounterCache;
 import com.akto.threat.detection.constants.RedisKeyInfo;
+
+import io.lettuce.core.RedisClient;
 
 /**
  * Detects IPs enumerating URL/path param values within sliding time windows.
@@ -50,18 +53,19 @@ public class ParamEnumerationDetector {
      * @param cache     Redis cache for CMS persistence
      * @param threshold Number of unique values to trigger detection
      */
-    public static void initialize(CounterCache cache, int threshold) {
-        initialize(cache, threshold, 5);
+    public static void initialize(RedisClient redisClient, int threshold) {
+        initialize(redisClient, threshold, 5);
     }
 
     /**
      * Initialize the singleton instance with custom window size.
      *
-     * @param cache            Redis cache for CMS persistence
+     * @param redisClient      Redis client
      * @param threshold        Number of unique values to trigger detection
      * @param windowSizeMinutes Size of the sliding window in minutes
      */
-    public static void initialize(CounterCache cache, int threshold, int windowSizeMinutes) {
+    public static void initialize(RedisClient redisClient, int threshold, int windowSizeMinutes) {
+        CounterCache cache = redisClient != null ? new ApiCountCacheLayer(redisClient) : null;
         INSTANCE = new ParamEnumerationDetector(cache, threshold, windowSizeMinutes);
         INSTANCE.startScheduledTasks();
     }
