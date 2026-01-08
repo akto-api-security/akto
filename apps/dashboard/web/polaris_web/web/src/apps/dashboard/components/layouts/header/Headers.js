@@ -324,7 +324,7 @@ export default function Header() {
                                             id: "agentic-security",
                                             helpText: func.isDemoAccount() ? "Agentic AI Security for Homegrown AI" : undefined
                                         },
-                                        ...(func.isDemoAccount() ? [{
+                                        ...((func.isDemoAccount() || window.ACTIVE_ACCOUNT === 1767814409 || window.ACTIVE_ACCOUNT === 1767812031) ? [{
                                             value: "Endpoint Security",
                                             label: "Akto ATLAS",
                                             id: "endpoint-security",
