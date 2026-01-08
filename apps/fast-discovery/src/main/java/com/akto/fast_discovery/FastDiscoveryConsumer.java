@@ -2,7 +2,6 @@ package com.akto.fast_discovery;
 
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.bulk_updates.BulkUpdates;
-import com.akto.fast_discovery.dto.ApiExistenceResult;
 import com.akto.fast_discovery.dto.ApiId;
 import com.akto.log.LoggerMaker;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -13,12 +12,11 @@ import java.util.*;
 /**
  * FastDiscoveryConsumer - Main processing component for fast API discovery.
  *
- * Implements three-stage detection pipeline:
+ * Implements two-stage detection pipeline:
  * 1. Parse and Bloom filter check (99% filter rate)
- * 2. Batch database verification
- * 3. HTTP POST to Database-Abstractor
+ * 2. Send to Database-Abstractor → Kafka → MongoDB (upsert handles duplicates)
  *
- * Achieves <1 second latency for new API discovery.
+ * Achieves <500ms latency for new API discovery.
  */
 public class FastDiscoveryConsumer {
 
@@ -94,73 +92,13 @@ public class FastDiscoveryConsumer {
             return;
         }
 
-        // Stage 2: Batch database verification
-        Set<String> existingInDB = checkBatchExistsInDB(candidates.keySet());
-        candidates.keySet().removeAll(existingInDB);
-
-        loggerMaker.infoAndAddToDb("Stage 2: " + existingInDB.size() + " APIs exist in DB, " +
-                candidates.size() + " new APIs to insert");
-
-        if (candidates.isEmpty()) {
-            loggerMaker.infoAndAddToDb("All candidates already exist in database");
-            return;
-        }
-
-        // Stage 3: Send to Database-Abstractor via HTTP POST
+        // Stage 2: Send to Database-Abstractor → Kafka → MongoDB (upsert handles duplicates atomically)
         sendToDbAbstractor(candidates);
 
         long endTime = System.currentTimeMillis();
         long durationMs = endTime - startTime;
         loggerMaker.infoAndAddToDb("Batch processing completed in " + durationMs + "ms, discovered " +
                 candidates.size() + " new APIs");
-    }
-
-    /**
-     * Stage 2: Check which APIs exist in database via database-abstractor HTTP API.
-     */
-    private Set<String> checkBatchExistsInDB(Set<String> apiKeys) {
-        // Convert API keys to API IDs for batch check
-        List<ApiId> apiIdsToCheck = new ArrayList<>();
-        for (String apiKey : apiKeys) {
-            String[] parts = apiKey.split(" ");
-            if (parts.length != 3) {
-                loggerMaker.errorAndAddToDb("Invalid API key format: " + apiKey);
-                continue;
-            }
-
-            try {
-                int apiCollectionId = Integer.parseInt(parts[0]);
-                String url = parts[1];
-                String method = parts[2];
-                apiIdsToCheck.add(new ApiId(apiCollectionId, url, method));
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Failed to parse API key: " + apiKey + " - " + e.getMessage());
-            }
-        }
-
-        // Call database-abstractor HTTP API to check which APIs exist
-        try {
-            List<ApiExistenceResult> results = dbAbstractorClient.checkApisExist(apiIdsToCheck);
-
-            Set<String> existing = new HashSet<>();
-            for (ApiExistenceResult result : results) {
-                if (result.isExists()) {
-                    String apiKey = FastDiscoveryParser.buildApiKey(
-                            result.getApiCollectionId(),
-                            result.getUrl(),
-                            result.getMethod()
-                    );
-                    existing.add(apiKey);
-                }
-            }
-
-            return existing;
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Failed to check API existence: " + e.getMessage());
-            // Return all as existing on error to avoid inserting duplicates
-            // Better to skip insertion than risk duplicate data
-            return apiKeys;
-        }
     }
 
     /**
@@ -241,6 +179,8 @@ public class FastDiscoveryConsumer {
 
     /**
      * Build BulkUpdates for api_info collection.
+     * Uses setOnInsert for most fields to avoid overwriting mini-runtime's enriched data.
+     * Only lastSeen uses set to track most recent occurrence.
      */
     private List<BulkUpdates> buildApiInfoWrites(Map<String, HttpResponseParams> newApis) {
         List<BulkUpdates> writes = new ArrayList<>();
@@ -260,13 +200,15 @@ public class FastDiscoveryConsumer {
             filters.put("_id", id);
 
             // Build updates
+            // Use setOnInsert for most fields to avoid overwriting mini-runtime's richer data
+            // Only lastSeen uses set to update timestamp on every occurrence
             ArrayList<String> updates = new ArrayList<>();
             updates.add(String.format("{\"field\": \"lastSeen\", \"val\": %d, \"op\": \"set\"}", timestamp));
             updates.add(String.format("{\"field\": \"discoveredTimestamp\", \"val\": %d, \"op\": \"setOnInsert\"}", timestamp));
-            updates.add(String.format("{\"field\": \"collectionIds\", \"val\": [%d], \"op\": \"set\"}", apiCollectionId));
-            updates.add("{\"field\": \"allAuthTypesFound\", \"val\": [], \"op\": \"set\"}");
-            updates.add("{\"field\": \"apiAccessTypes\", \"val\": [], \"op\": \"set\"}");
-            updates.add("{\"field\": \"apiType\", \"val\": \"REST\", \"op\": \"set\"}");
+            updates.add(String.format("{\"field\": \"collectionIds\", \"val\": [%d], \"op\": \"setOnInsert\"}", apiCollectionId));
+            updates.add("{\"field\": \"allAuthTypesFound\", \"val\": [], \"op\": \"setOnInsert\"}");
+            updates.add("{\"field\": \"apiAccessTypes\", \"val\": [], \"op\": \"setOnInsert\"}");
+            updates.add("{\"field\": \"apiType\", \"val\": \"REST\", \"op\": \"setOnInsert\"}");
 
             BulkUpdates bulkUpdate = new BulkUpdates(filters, updates);
             writes.add(bulkUpdate);

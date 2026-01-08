@@ -1,7 +1,6 @@
 package com.akto.fast_discovery;
 
 import com.akto.dto.bulk_updates.BulkUpdates;
-import com.akto.fast_discovery.dto.ApiExistenceResult;
 import com.akto.fast_discovery.dto.ApiId;
 import com.akto.log.LoggerMaker;
 import com.google.gson.Gson;
@@ -28,8 +27,8 @@ import java.util.Map;
  * Handles all database operations via HTTP calls to database-abstractor (cyborg service).
  * Supports:
  * - Fetching API IDs for Bloom filter initialization
- * - Batch checking API existence
  * - Bulk writes to single_type_info and api_info collections
+ * - Ensuring api_collection entries exist
  */
 public class DatabaseAbstractorClient {
 
@@ -103,57 +102,6 @@ public class DatabaseAbstractorClient {
 
             loggerMaker.infoAndAddToDb("Fetched " + apiIds.size() + " API IDs");
             return apiIds;
-        }
-    }
-
-    /**
-     * Check if APIs exist in database (batch check).
-     * Calls: POST /api/checkApisExist
-     *
-     * @param apiIds List of API IDs to check
-     * @return List of existence results with exists flag
-     * @throws Exception if HTTP call fails
-     */
-    public List<ApiExistenceResult> checkApisExist(List<ApiId> apiIds) throws Exception {
-        String endpoint = baseUrl + "/api/checkApisExist";
-        loggerMaker.infoAndAddToDb("Checking existence for " + apiIds.size() + " APIs");
-
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("apiIdsToCheck", apiIds);  // Must match server's setter name
-
-        HttpPost request = new HttpPost(endpoint);
-        request.setHeader("Authorization", getAuthToken());
-        request.setHeader("Content-Type", "application/json");
-
-        String jsonPayload = gson.toJson(payload);
-        request.setEntity(new StringEntity(jsonPayload, ContentType.APPLICATION_JSON));
-
-        try (CloseableHttpResponse response = httpClient.execute(request)) {
-            int statusCode = response.getStatusLine().getStatusCode();
-            String responseBody = EntityUtils.toString(response.getEntity());
-
-            if (statusCode >= 400) {
-                throw new Exception("HTTP " + statusCode + ": " + responseBody);
-            }
-
-            // Parse JSON: [{"apiCollectionId": 1, "url": "/api/users", "method": "GET", "exists": true}, ...]
-            // Response is a direct array, not wrapped in an object
-            Type responseType = new TypeToken<List<Map<String, Object>>>(){}.getType();
-            List<Map<String, Object>> resultMaps = gson.fromJson(responseBody, responseType);
-
-            List<ApiExistenceResult> results = new ArrayList<>();
-            for (Map<String, Object> map : resultMaps) {
-                ApiExistenceResult existenceResult = new ApiExistenceResult();
-                existenceResult.setApiCollectionId(((Number) map.get("apiCollectionId")).intValue());
-                existenceResult.setUrl((String) map.get("url"));
-                existenceResult.setMethod((String) map.get("method"));
-                existenceResult.setExists((Boolean) map.get("exists"));
-                results.add(existenceResult);
-            }
-
-            long existingCount = results.stream().filter(ApiExistenceResult::isExists).count();
-            loggerMaker.infoAndAddToDb("Checked " + results.size() + " APIs, " + existingCount + " exist");
-            return results;
         }
     }
 
