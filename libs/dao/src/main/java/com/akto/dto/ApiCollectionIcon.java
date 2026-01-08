@@ -26,19 +26,6 @@ public class ApiCollectionIcon {
     public ApiCollectionIcon() {
     }
 
-    public ApiCollectionIcon(String hostname) {
-        this.id = hostname;
-        this.sourceUrl = generateFaviconUrl(hostname);
-        this.createdAt = Context.now();
-    }
-
-    public ApiCollectionIcon(String hostname, String description) {
-        this.id = hostname;
-        this.description = description;
-        this.sourceUrl = generateFaviconUrl(hostname);
-        this.createdAt = Context.now();
-    }
-
     private String generateFaviconUrl(String url) {
         if (url == null || url.trim().isEmpty()) {
             return null;
@@ -100,7 +87,6 @@ public class ApiCollectionIcon {
         this.description = description;
     }
 
-    // Helper methods
     public boolean isAvailable() {
         return imageData != null && !imageData.trim().isEmpty();
     }
@@ -109,7 +95,6 @@ public class ApiCollectionIcon {
         if (createdAt == 0) return true;
         return (Context.now() - createdAt) > maxAgeSeconds;
     }
-
     public int getCreatedAt() {
         return createdAt;
     }
