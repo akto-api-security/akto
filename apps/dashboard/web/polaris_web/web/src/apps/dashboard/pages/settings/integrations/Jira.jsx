@@ -198,7 +198,6 @@ function Jira() {
     async function fetchSeverityMapping() {
         try {
             const response = await api.fetchSeverityMapping();
-            console.log("Severity Mapping Response:", response);
 
             // Handle response - it might be the map directly or wrapped
             let mapping = {};
@@ -210,11 +209,9 @@ function Jira() {
                 }
             }
 
-            console.log("Parsed Severity Mapping:", mapping);
             actions.setSeverityToPriorityMap(mapping);
             actions.setInitialSeverityMapping(mapping);
         } catch (err) {
-            console.error("Failed to fetch severity mapping", err);
             actions.setSeverityToPriorityMap({});
             actions.setInitialSeverityMapping({});
         }
@@ -228,7 +225,6 @@ function Jira() {
         actions.setIsLoadingPriorities(true);
         try {
             const response = await api.fetchJiraPriorities(baseUrl, userEmail, apiToken);
-            console.log("Jira Priorities Response:", response);
 
             // Handle response - it might be an array directly or wrapped in an object
             let priorities = [];
@@ -244,10 +240,8 @@ function Jira() {
                 }
             }
 
-            console.log("Parsed Priorities:", priorities);
             actions.setJiraPriorities(priorities);
         } catch (err) {
-            console.error("Failed to fetch Jira priorities", err);
             func.setToast(true, true, "Failed to fetch Jira priorities");
             actions.setJiraPriorities([]);
         } finally {
