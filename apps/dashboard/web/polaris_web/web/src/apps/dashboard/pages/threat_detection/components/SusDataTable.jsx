@@ -13,66 +13,82 @@ import { labelMap } from "../../../../main/labelHelperMap";
 import { formatActorId } from "../utils/formatUtils";
 import threatDetectionRequests from "../api";
 import { LABELS } from "../constants";
+import IpReputationScore from "./IpReputationScore";
 
 const resourceName = {
   singular: "activity",
   plural: "activities",
 };
 
-const headers = [
-  {
-    text: "Severity",
-    value: "severityComp",
-    title: "Severity",
-  },
-  {
-    text: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"],
-    value: "endpointComp",
-    title: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"],
-  },
-  {
-    text: "Host",
-    value: "host",
-    title: "Host",
-  },
-  {
-    text: "Threat Actor",
-    value: "actorComp",
-    title: "Actor",
-    filterKey: 'actor'
-  },
-  {
-    text: "Filter",
-    value: "filterId",
-    title: "Attack type",
-  },
-  {
-    text: "Compliance",
-    value: "compliance",
-    title: "Compliance",
-    maxWidth: "200px",
-  },
-  {
-    text: "successfulExploit",
-    value: "successfulComp",
-    title: "Successful Exploit",
-    maxWidth: "90px",
-  },
-  {
-    text: "Collection",
-    value: "apiCollectionName",
-    title: "Collection",
-    maxWidth: "95px",
-    type: CellType.TEXT,
-  },
-  {
-    text: "Discovered",
-    title: "Detected",
-    value: "discoveredTs",
-    type: CellType.TEXT,
-    sortActive: true,
-  },
-];
+const getHeaders = () => {
+  const baseHeaders = [
+    {
+      text: "Severity",
+      value: "severityComp",
+      title: "Severity",
+    },
+    {
+      text: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"],
+      value: "endpointComp",
+      title: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"],
+    },
+    {
+      text: "Host",
+      value: "host",
+      title: "Host",
+    },
+    {
+      text: "Threat Actor",
+      value: "actorComp",
+      title: "Actor",
+      filterKey: 'actor'
+    },
+  ];
+
+  if (func.isDemoAccount()) {
+    baseHeaders.push({
+      text: "Reputation",
+      value: "reputationScore",
+      title: "IP Reputation",
+    });
+  }
+
+  baseHeaders.push(
+    {
+      text: "Filter",
+      value: "filterId",
+      title: "Attack type",
+    },
+    {
+      text: "Compliance",
+      value: "compliance",
+      title: "Compliance",
+      maxWidth: "200px",
+    },
+    {
+      text: "successfulExploit",
+      value: "successfulComp",
+      title: "Successful Exploit",
+      maxWidth: "90px",
+    },
+    {
+      text: "Collection",
+      value: "apiCollectionName",
+      title: "Collection",
+      maxWidth: "95px",
+      type: CellType.TEXT,
+    },
+    {
+      text: "Discovered",
+      title: "Detected",
+      value: "discoveredTs",
+      type: CellType.TEXT,
+      sortActive: true,
+    }
+  );
+
+  return baseHeaders;
+};
 
 const sortOptions = [
   {
@@ -419,7 +435,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     return actions;
   };
 
-
+  const limit = 50;
 
   async function fetchData(
     sortKey,
@@ -484,7 +500,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       startTimestamp,
       endTimestamp,
       latestAttack,
-      50,
+      limit,
       currentTab.toUpperCase(),
       successfulBool,
       label, // Use the label prop (THREAT or GUARDRAIL)
@@ -516,17 +532,17 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         nextUrl = `${location.pathname}?${params.toString()}`;
       }
       
-      return {
+      const rowData = {
         ...x,
         id: x.id,
         actorComp: formatActorId(x.actor),
         host: x.host || "-",
         endpointComp: (
-          <GetPrettifyEndpoint 
-            maxWidth="300px" 
+          <GetPrettifyEndpoint
+            maxWidth="300px"
             method={x.method}
-            url={x.url} 
-            isNew={false} 
+            url={x.url}
+            isNew={false}
           />
         ),
         apiCollectionName: collectionsMap[x.apiCollectionId] || "-",
@@ -559,6 +575,12 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         ) : <Text color="subdued">-</Text>,
         nextUrl: nextUrl
       };
+
+      if (func.isDemoAccount()) {
+        rowData.reputationScore = <IpReputationScore ipAddress={x.actor} />;
+      }
+
+      return rowData;
     });
     setLoading(false);
     return { value: ret, total: total };
@@ -652,11 +674,13 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   }
 
   const key = startTimestamp + endTimestamp;
+  const headers = getHeaders();
+
   return (
     <GithubServerTable
       key={key}
       onRowClick={(data) => rowClicked(data)}
-      pageLimit={50}
+      pageLimit={limit}
       headers={headers}
       resourceName={resourceName}
       sortOptions={sortOptions}
