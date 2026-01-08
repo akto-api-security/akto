@@ -97,7 +97,7 @@ public class ModuleInfo {
         THREAT_DETECTION,
         MCP_ENDPOINT_SHIELD,
         DATA_INGESTION,
-        TRAFFIC_COLLECTORS
+        TRAFFIC_COLLECTOR
     }
 
 }
