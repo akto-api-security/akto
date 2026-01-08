@@ -8,11 +8,13 @@ import func from "../../../../../util/func";
 const reputationScoreCache = new Map();
 
 // Get Badge tone based on score
+// The colors in our dashboard are based on the risk level, 
+// so we invert the tones here based on reputation score.
 const getBadgeTone = (score) => {
-  if (score == "HIGH") return "success"; // High reputation
-  if (score == "MEDIUM") return "warning"; // Medium reputation
-  if (score == "LOW") return "attention"; // Low reputation
-  if (score == "N/A") return "info"; // Not available
+  if (score == "HIGH") return "LOW"; // High reputation
+  if (score == "MEDIUM") return "MEDIUM"; // Medium reputation
+  if (score == "LOW") return "HIGH"; // Low reputation
+  if (score == "N/A") return "LOW"; // Not available
 };
 
 // Check if IP address is valid
@@ -140,9 +142,11 @@ const IpReputationScore = ({ ipAddress }) => {
       {loading && <Spinner size="small" />}
       {!loading && reputationData && (
         <TooltipWithLink content={formatTooltipContent(reputationData)} preferredPosition="above">
-          <Badge status={getBadgeTone(reputationData.score)}>
-            {func.toSentenceCase(reputationData.score)}
-          </Badge>
+          <div key={reputationData.score} className={`badge-wrapper-${getBadgeTone(reputationData.score)}`}>
+              <Badge size="small">
+                {func.toSentenceCase(reputationData.score)}
+              </Badge>
+          </div>
         </TooltipWithLink>
       )}
       {!loading && !reputationData && (
