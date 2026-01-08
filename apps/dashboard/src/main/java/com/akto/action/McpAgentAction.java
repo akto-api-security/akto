@@ -63,7 +63,7 @@ public class McpAgentAction extends UserAction {
             if(isFirstRequest) {
                 this.conversationId = UUID.randomUUID().toString();
             }
-            AgentClient agentClient = new AgentClient(Constants.AKTO_MCP_SERVER);
+            AgentClient agentClient = new AgentClient(Constants.AKTO_MCP_SERVER_URL);
             String contextString = "";
 
             if(metaData != null) {
