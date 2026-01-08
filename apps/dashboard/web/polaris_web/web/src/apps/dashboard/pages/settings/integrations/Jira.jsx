@@ -563,12 +563,12 @@ function Jira() {
                             <TextField maxLength={10} showCharacterCount value={project?.projectId || ""} label="Project key" placeholder={"Project Key"} requiredIndicator
                                 onChange={(val)=> projectKeyChangeHandler(index,val)} />
                             {loadingProjectIndex === index ? (
-                                <HorizontalStack gap="2" align="center">
+                                <div style={{ display: 'flex', alignItems: 'center', margin: '8px 0' }}>
                                     <Spinner size="small" />
-                                    <Text variant="bodyMd" as="span">Loading status mappings...</Text>
-                                </HorizontalStack>
+                                    <Text variant="bodyMd" as="span" style={{ marginLeft: '8px' }}>&nbsp;&nbsp;Loading status mappings...</Text>
+                                    </div>
                             ) : (
-                                <HorizontalStack gap="1" align="center">
+                                <div style={{ display: 'flex', alignItems: 'center' }}>
                                     <Checkbox
                                         disabled={!project?.projectId?.trim()}
                                         checked={project.enableBiDirIntegration}
@@ -579,10 +579,10 @@ function Jira() {
                                         }}
                                         label=""
                                     />
-                                    <Text variant="bodyMd" as="span" color={project?.projectId?.trim() ? undefined : "subdued"}>
+                                    <span style={{ marginLeft: '4px', opacity: project?.projectId?.trim() ? 1 : 0.5 }}>
                                         Enable bi-directional integration
-                                    </Text>
-                                </HorizontalStack>
+                                    </span>
+                                    </div>
                             )}
                             {project.enableBiDirIntegration &&
                                 <VerticalStack gap={3} align='start'>
