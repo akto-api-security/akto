@@ -63,5 +63,5 @@ export function isDastCategory() {
 }
 
 export function isEndpointSecurityCategory() {
-  return func.isDemoAccount() && isCategory(CATEGORY_ENDPOINT_SECURITY);
+  return (func.isDemoAccount() || window.ACTIVE_ACCOUNT === 1767814409 || window.ACTIVE_ACCOUNT === 1767812031) && isCategory(CATEGORY_ENDPOINT_SECURITY);
 }
