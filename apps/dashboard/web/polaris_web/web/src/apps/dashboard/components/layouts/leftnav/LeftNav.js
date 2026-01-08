@@ -133,7 +133,7 @@ export default function LeftNav() {
                 icon: ReportFilledMinor,
                 onClick: () => {
                     handleSelect("dashboard_api_dashboard");
-                    navigate("/dashboard/api-dashboard");
+                    navigate("/dashboard/view");
                     setActive("normal");
                 }
             }] : []),
