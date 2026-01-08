@@ -63,5 +63,5 @@ export function isDastCategory() {
 }
 
 export function isEndpointSecurityCategory() {
-  return func.isDemoAccount() && isCategory(CATEGORY_ENDPOINT_SECURITY);
+  return func.isAtlasArgusAccount() && isCategory(CATEGORY_ENDPOINT_SECURITY);
 }
