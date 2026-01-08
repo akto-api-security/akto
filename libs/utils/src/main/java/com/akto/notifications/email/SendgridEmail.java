@@ -18,6 +18,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -104,7 +105,6 @@ public class SendgridEmail {
         }
 
         List<Map<String, Object>> findings = new ArrayList<>();
-        int serialNumber = 1;
         
         for(Map.Entry<String, Integer> entry : apisAffectedCount.entrySet()) {
             String template = entry.getKey();
@@ -147,7 +147,6 @@ public class SendgridEmail {
             }
             
             Map<String, Object> finding = new HashMap<>();
-            finding.put("sno", serialNumber);
             finding.put("issueName", issueName);
             finding.put("description", description);
             finding.put("apisAffected", apisAffected);
@@ -162,10 +161,42 @@ public class SendgridEmail {
             finding.put("isUnknown", "-".equals(severity));
             
             findings.add(finding);
-            serialNumber++;
+        }
+        
+        // Sort findings by severity: CRITICAL -> HIGH -> MEDIUM -> LOW -> Unknown
+        findings.sort(Comparator.comparingInt(finding -> getSeverityOrder((String) finding.get("severity"))));
+        
+        // Update serial numbers after sorting
+        int serialNumber = 1;
+        for (Map<String, Object> finding : findings) {
+            finding.put("sno", serialNumber++);
         }
         
         personalization.addDynamicTemplateData("findings", findings);
+    }
+    
+    /**
+     * Returns the order value for severity sorting.
+     * Lower values are sorted first.
+     * Order: CRITICAL (1) -> HIGH (2) -> MEDIUM (3) -> LOW (4) -> Unknown (5)
+     */
+    private int getSeverityOrder(String severity) {
+        if (StringUtils.isBlank(severity) || "-".equals(severity)) {
+            return 5; // Unknown severity at the bottom
+        }
+        
+        switch (severity.toUpperCase()) {
+            case "CRITICAL":
+                return 1;
+            case "HIGH":
+                return 2;
+            case "MEDIUM":
+                return 3;
+            case "LOW":
+                return 4;
+            default:
+                return 5; // Unknown severity at the bottom
+        }
     }
 
     public Mail buildTestingRunResultsEmail(TestingAlertData data, String email, String aktoUrl, String userName, Map<String, Integer> apisAffectedCount, Map<String, YamlTemplate> yamlTemplates) {
