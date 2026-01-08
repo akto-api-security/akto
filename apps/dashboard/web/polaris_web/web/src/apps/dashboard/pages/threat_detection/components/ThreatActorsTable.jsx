@@ -110,7 +110,37 @@ const sortOptions = [
 
 function ThreatActorTable({ data, currDateRange, handleRowClick }) {
   const [loading, setLoading] = useState(false);
-  const [filters, setFilters] = useState([]);
+  const [filters, setFilters] = useState([
+    {
+      key: 'actorId',
+      label: 'Actor Id',
+      type: 'select',
+      choices: [],
+      multiple: true
+    },
+    {
+      key: 'latestAttack',
+      label: 'Latest attack sub-category',
+      type: 'select',
+      choices: [],
+      multiple: true
+    },
+    {
+      key: 'country',
+      label: 'Country',
+      type: 'select',
+      choices: [],
+      multiple: true
+    },
+    {
+      key: 'host',
+      label: 'Host',
+      title: 'Host',
+      choices: [],
+      multiple: true,
+      type: 'select',
+    }
+  ]);
 
   const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
@@ -253,18 +283,18 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
 
   async function fillFilters() {
     const res = await api.fetchThreatActorFilters();
-    const attackTypeChoices = res?.latestAttack.map(x => ({
+    const attackTypeChoices = res?.latestAttack?.map(x => ({
       label: x,
       value: x
-    }));
-    const countryChoices = res?.country.map(x => ({
+    })) || [];
+    const countryChoices = res?.country?.map(x => ({
       label: x,
       value: x
-    }));
-    const actorIdChoices = res?.actorId.map(x => ({
+    })) || [];
+    const actorIdChoices = res?.actorId?.map(x => ({
       label: x,
       value: x
-    }));
+    })) || [];
     
     // Extract unique hosts from the fetched data
     let hostChoices = [];
