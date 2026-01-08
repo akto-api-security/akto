@@ -374,12 +374,12 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                 return Action.ERROR.toUpperCase();
             }
 
-            AccountSettingsDao.instance.updateOne(
-                AccountSettingsDao.generateFilter(),
-                Updates.set(AccountSettings.ISSUE_SEVERITY_TO_JIRA_PRIORITY_MAP, severityToPriorityMap)
+            JiraIntegrationDao.instance.updateOne(
+                new BasicDBObject(),
+                Updates.set(JiraIntegration.ISSUE_SEVERITY_TO_PRIORITY_MAP, severityToPriorityMap)
             );
 
-            loggerMaker.infoAndAddToDb("Successfully updated severity to priority mapping in database");
+            loggerMaker.infoAndAddToDb("Successfully updated severity to priority mapping in JiraIntegration");
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error saving severity mapping");
@@ -392,17 +392,17 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         try {
             loggerMaker.infoAndAddToDb("Fetching Jira severity to priority mapping for account: " + Context.accountId.get());
 
-            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
 
-            if (accountSettings != null) {
-                this.severityToPriorityMap = accountSettings.getIssueSeverityToJiraPriorityMap();
+            if (jiraIntegration != null) {
+                this.severityToPriorityMap = jiraIntegration.getIssueSeverityToPriorityMap();
 
                 if (this.severityToPriorityMap == null) {
                     this.severityToPriorityMap = new HashMap<>();
                     loggerMaker.infoAndAddToDb("No existing severity mapping found, initialized empty map");
                 }
             } else {
-                loggerMaker.infoAndAddToDb("AccountSettings not found, initialized empty severity map");
+                loggerMaker.infoAndAddToDb("JiraIntegration not found, initialized empty severity map");
                 this.severityToPriorityMap = new HashMap<>();
             }
 
@@ -705,7 +705,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             Filters.eq(Constants.ID,
                 getRemediationId(jiraMetaData.getTestingIssueId().getTestSubCategory())));
         BasicDBObject fields = jiraTicketPayloadCreator(jiraMetaData, testingRunIssues, yamlTemplate.getInfo(),
-            remediation);
+            remediation, jiraIntegration);
 
         reqPayload.put("fields", fields);
 
@@ -987,7 +987,8 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             BasicDBObject fields = jiraTicketPayloadCreator(jiraMetaData,
                 issuesEligibleForJiraMap.get(issuesId),
                 testSubTypeToInfoMap.get(issuesId.getTestSubCategory()),
-                remediationMap.get(getRemediationId(issuesId.getTestSubCategory())));
+                remediationMap.get(getRemediationId(issuesId.getTestSubCategory())),
+                jiraIntegration);
 
             // Prepare the issue object
             BasicDBObject issueObject = new BasicDBObject();
@@ -1106,7 +1107,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     }
 
     private BasicDBObject jiraTicketPayloadCreator(JiraMetaData jiraMetaData, TestingRunIssues issue,
-        Info info, Remediation remediation) {
+        Info info, Remediation remediation, JiraIntegration jiraIntegration) {
 
         String endpoint = jiraMetaData.getEndPointStr().replace("Endpoint - ", "");
         String truncatedEndpoint = endpoint;
@@ -1130,7 +1131,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             contentList.addAll(additionalFields);
         }
 
-        BasicDBObject fields = buildPayloadForJiraTicket(summary, this.projId, this.issueType, contentList,jiraMetaData.getAdditionalIssueFields(), issue.getSeverity());
+        BasicDBObject fields = buildPayloadForJiraTicket(summary, this.projId, this.issueType, contentList,jiraMetaData.getAdditionalIssueFields(), issue.getSeverity(), jiraIntegration);
         
         // Combine user labels with AKTO_SYNC label
         List<String> labelsList = new ArrayList<>();
@@ -1443,12 +1444,10 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             return ERROR.toUpperCase();
         }
 
-        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-
         try {
             BasicDBList contentList = new BasicDBList();
             contentList.add(buildContentDetails(this.description, null));
-            BasicDBObject fields = buildPayloadForJiraTicket(this.title, this.projId, this.issueType, contentList, null, null, accountSettings);
+            BasicDBObject fields = buildPayloadForJiraTicket(this.title, this.projId, this.issueType, contentList, null, null, jiraIntegration);
             
             // Combine user labels with AKTO_SYNC label
             List<String> labelsList = new ArrayList<>();

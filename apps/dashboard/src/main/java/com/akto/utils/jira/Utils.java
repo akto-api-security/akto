@@ -412,12 +412,38 @@ public class Utils {
         return new Pair<>(jiraBaseUrl + "/browse/" + jiraTicketKey, jiraTicketKey);
     }
 
-    public static BasicDBObject buildPayloadForJiraTicket(String summary, String projectKey, String issueType, BasicDBList contentList, Map<String, Object> additionalIssueFields, Severity severity) {
+    public static BasicDBObject buildPayloadForJiraTicket(String summary, String projectKey, String issueType, BasicDBList contentList, Map<String, Object> additionalIssueFields, Severity severity, JiraIntegration jiraIntegration) {
         BasicDBObject fields = new BasicDBObject();
         fields.put("summary", summary);
         fields.put("project", new BasicDBObject("key", projectKey));
         fields.put("issuetype", new BasicDBObject("id", issueType));
         fields.put("description", new BasicDBObject("type", "doc").append("version", 1).append("content", contentList));
+
+        // Apply severity to priority mapping
+        if (severity != null && jiraIntegration != null) {
+            try {
+                Map<String, String> severityToPriorityMap = jiraIntegration.getIssueSeverityToPriorityMap();
+                loggerMaker.infoAndAddToDb("Severity: " + severity.name() + ", Priority Map: " + severityToPriorityMap, LogDb.DASHBOARD);
+
+                if (severityToPriorityMap != null && !severityToPriorityMap.isEmpty()) {
+                    String priorityId = severityToPriorityMap.get(severity.name());
+                    loggerMaker.infoAndAddToDb("Priority ID from map: " + priorityId + " for severity: " + severity.name(), LogDb.DASHBOARD);
+
+                    if (priorityId != null && !priorityId.isEmpty()) {
+                        fields.put("priority", new BasicDBObject("id", priorityId));
+                        loggerMaker.infoAndAddToDb("Set priority field with ID: " + priorityId, LogDb.DASHBOARD);
+                    } else {
+                        loggerMaker.infoAndAddToDb("Priority ID is null or empty for severity: " + severity.name(), LogDb.DASHBOARD);
+                    }
+                } else {
+                    loggerMaker.infoAndAddToDb("Priority map is null or empty", LogDb.DASHBOARD);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error setting Jira priority from severity mapping");
+            }
+        } else {
+            loggerMaker.infoAndAddToDb("Severity or JiraIntegration is null - Severity: " + severity + ", JiraIntegration: " + jiraIntegration, LogDb.DASHBOARD);
+        }
 
         if (additionalIssueFields != null) {
             try {

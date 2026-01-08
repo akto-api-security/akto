@@ -1,13 +1,11 @@
 package com.akto.jobs.executors;
 
-import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.JiraIntegrationDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dto.AccountSettings;
 import com.akto.dto.Config.AktoHostUrlConfig;
 import com.akto.dto.Config.ConfigType;
 import com.akto.dto.OriginalHttpRequest;
@@ -373,9 +371,9 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         // Apply severity to priority mapping
         if (severity != null) {
             try {
-                AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-                if (accountSettings != null) {
-                    Map<String, String> severityToPriorityMap = accountSettings.getIssueSeverityToJiraPriorityMap();
+                JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+                if (jiraIntegration != null) {
+                    Map<String, String> severityToPriorityMap = jiraIntegration.getIssueSeverityToPriorityMap();
                     if (severityToPriorityMap != null && !severityToPriorityMap.isEmpty()) {
                         String priorityId = severityToPriorityMap.get(severity.name());
                         if (priorityId != null && !priorityId.isEmpty()) {
