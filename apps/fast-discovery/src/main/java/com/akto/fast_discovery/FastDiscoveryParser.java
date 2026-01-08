@@ -41,16 +41,22 @@ public class FastDiscoveryParser {
             // 1. Parse JSON
             Map<String, Object> json = JSON.parseObject(message);
 
-            // 2. Extract request fields
+            // 2. Filter out trigger messages (mini-runtime → database-abstractor)
+            // Trigger messages have "triggerMethod" field (e.g., "bulkWriteSti", "bulkWriteSampleData")
+            if (json.containsKey("triggerMethod")) {
+                return null;  // Skip trigger messages
+            }
+
+            // 3. Extract request fields
             String method = (String) json.get("method");
             String url = (String) json.get("path");
             String type = (String) json.get("type");
 
-            // 3. Parse headers
+            // 4. Parse headers
             Map<String, List<String>> requestHeaders = OriginalHttpRequest.buildHeadersMap(json, "requestHeaders");
             Map<String, List<String>> responseHeaders = OriginalHttpRequest.buildHeadersMap(json, "responseHeaders");
 
-            // 4. Transform payloads
+            // 5. Transform payloads
             String rawRequestPayload = (String) json.get("requestPayload");
             String requestPayload = HttpRequestResponseUtils.rawToJsonString(rawRequestPayload, requestHeaders);
 
@@ -59,7 +65,7 @@ public class FastDiscoveryParser {
             responsePayload = JSONUtils.parseIfJsonP(responsePayload);
             responsePayload = decodeIfGzipEncoding(responsePayload, responseHeaders);
 
-            // 5. Extract metadata
+            // 6. Extract metadata
             String apiCollectionIdStr = json.getOrDefault("akto_vxlan_id", "0").toString();
             int apiCollectionId = 0;
             if (NumberUtils.isDigits(apiCollectionIdStr)) {
@@ -106,12 +112,12 @@ public class FastDiscoveryParser {
                 parentMcpToolNames = new ArrayList<>();
             }
 
-            // 6. Build HttpRequestParams
+            // 7. Build HttpRequestParams
             HttpRequestParams requestParams = new HttpRequestParams(
                     method, url, type, requestHeaders, requestPayload, apiCollectionId
             );
 
-            // 7. Build HttpResponseParams
+            // 8. Build HttpResponseParams
             return new HttpResponseParams(
                     type,
                     statusCode,
