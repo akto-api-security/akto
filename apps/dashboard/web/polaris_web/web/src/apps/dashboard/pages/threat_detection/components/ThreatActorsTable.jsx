@@ -14,66 +14,82 @@ import { useSearchParams } from "react-router-dom";
 import { isAgenticSecurityCategory, isMCPSecurityCategory } from "../../../../main/labelHelper";
 import { labelMap } from "../../../../main/labelHelperMap";
 import { formatActorId } from "../utils/formatUtils";
+import IpReputationScore from "./IpReputationScore";
 
 const resourceName = {
   singular: "actor",
   plural: "actors",
 };
 
-const headers = [
-  {
-    text: "Actor Id",
-    value: "actor",
-    title: "Actor Id",
-  },
-  {
-    text: "Country",
-    title: "Country",
-    value: "country",
-  },
-  {
-    text: "Actor Ip",
-    title: "Actor Ip",
-    value: "latestIp",
-  },
-  {
-    text: "Latest Host",
-    title: "Latest Host",
-    value: "latestHost",
-  },
-  {
-    text: "Latest " + labelMap[PersistStore.getState().dashboardCategory]["API"],
-    title: "Latest " + labelMap[PersistStore.getState().dashboardCategory]["API"],
-    value: "latestApi",
-  },
-  {
-    text: "Latest Attack",
-    title: "Latest Attack",
-    value: "latestAttack",
-  },
-  {
-    text: "Access Type",
-    title: "Access Type",
-    value: "accessType",
-  },
-  {
-    text: "Sensitive Data",
-    title: "Sensitive Data",
-    value: "sensitiveData",
-  },
-  {
-    text: "Status",
-    title: "Status",
-    value: "status",
-  },
-  {
-    text: "Detected at",
-    title: "Detected at",
-    value: "discoveredAt",
-    type: CellType.TEXT,
-    sortActive: true,
-  },
-];
+const getBaseHeaders = () => {
+  const baseHeaders = [
+    {
+      text: "Actor Id",
+      value: "actor",
+      title: "Actor Id",
+    },
+    {
+      text: "Country",
+      title: "Country",
+      value: "country",
+    },
+    {
+      text: "Actor Ip",
+      title: "Actor Ip",
+      value: "latestIp",
+    },
+  ];
+
+  if (func.isDemoAccount()) {
+    baseHeaders.push({
+      text: "Reputation",
+      title: "IP Reputation",
+      value: "reputationScore",
+    });
+  }
+
+  baseHeaders.push(
+    {
+      text: "Latest Host",
+      title: "Latest Host",
+      value: "latestHost",
+    },
+    {
+      text: "Latest " + labelMap[PersistStore.getState().dashboardCategory]["API"],
+      title: "Latest " + labelMap[PersistStore.getState().dashboardCategory]["API"],
+      value: "latestApi",
+    },
+    {
+      text: "Latest Attack",
+      title: "Latest Attack",
+      value: "latestAttack",
+    },
+    {
+      text: "Access Type",
+      title: "Access Type",
+      value: "accessType",
+    },
+    {
+      text: "Sensitive Data",
+      title: "Sensitive Data",
+      value: "sensitiveData",
+    },
+    {
+      text: "Status",
+      title: "Status",
+      value: "status",
+    },
+    {
+      text: "Detected at",
+      title: "Detected at",
+      value: "discoveredAt",
+      type: CellType.TEXT,
+      sortActive: true,
+    }
+  );
+
+  return baseHeaders;
+};
 
 const sortOptions = [
   {
@@ -197,6 +213,10 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
           ),
         };
 
+        if (func.isDemoAccount()) {
+          baseData.reputationScore = <IpReputationScore ipAddress={x.latestApiIp} />;
+        }
+
         // Add actorType only when the column is visible
         if (isMCPSecurityCategory() || isAgenticSecurityCategory()) {
           // Special case: certain IP addresses should have actorType as "MCP Server"
@@ -292,8 +312,8 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
   }, []);
 
   const getHeaders = () => {
-    const baseHeaders = [...headers];
-    
+    const baseHeaders = [...getBaseHeaders()];
+
     if (isMCPSecurityCategory() || isAgenticSecurityCategory()) {
       baseHeaders.unshift({
         text: "Actor Type",

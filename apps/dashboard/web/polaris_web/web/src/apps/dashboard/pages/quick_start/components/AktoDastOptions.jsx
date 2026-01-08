@@ -1,7 +1,8 @@
 import { Box, Checkbox, HorizontalStack, Text, TextField, VerticalStack } from '@shopify/polaris'
 import React, { useState } from 'react'
+import Dropdown from '../../../components/layouts/Dropdown'
 
-const AktoDastOptions = ({ outscopeUrls, setOutscopeUrls, maxPageVisits, setMaxPageVisits, domLoadTimeout, setDomLoadTimeout, waitAfterEvent, setWaitAfterEvent, enableJsRendering, setEnableJsRendering, parseSoapServices, setParseSoapServices, parseRestServices, setParseRestServices, clickExternalLinks, setClickExternalLinks }) => {
+const AktoDastOptions = ({ outscopeUrls, setOutscopeUrls, maxPageVisits, setMaxPageVisits, domLoadTimeout, setDomLoadTimeout, waitAfterEvent, setWaitAfterEvent, enableJsRendering, setEnableJsRendering, parseSoapServices, setParseSoapServices, parseRestServices, setParseRestServices, clickExternalLinks, setClickExternalLinks, crawlingTime, setCrawlingTime }) => {
 
     return (
         <VerticalStack gap={4}>
@@ -41,6 +42,20 @@ const AktoDastOptions = ({ outscopeUrls, setOutscopeUrls, maxPageVisits, setMaxP
                     onChange={(value) => setWaitAfterEvent(value)}
                 />
             </HorizontalStack>
+
+
+            <Dropdown
+                label="Crawling time"
+                menuItems={[
+                    { value: 600, label: "10 minutes", id: "600" },
+                    { value: 3600, label: "60 minutes", id: "3600" },
+                    { value: 86400, label: "1 Day", id: "86400" },
+                    { value: 172800, label: "2 Days", id: "172800" },
+                    { value: 345600, label: "4 Days", id: "345600" }
+                ]}
+                initial={crawlingTime}
+                selected={(val) => setCrawlingTime(val)}
+            />
 
             <VerticalStack gap={2} wrap={false}>
                 <HorizontalStack gap={3} wrap={false}>

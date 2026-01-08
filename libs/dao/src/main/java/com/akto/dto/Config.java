@@ -38,7 +38,7 @@ public abstract class Config {
 
     public enum ConfigType {
         SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, GOOGLE_SAML, AWS_WAF, SPLUNK_SIEM, AKTO_DASHBOARD_HOST_URL, CLOUDFLARE_WAF, RSA_KP, MCP_REGISTRY,
-        SLACK_ALERT_INTERNAL;
+        SLACK_ALERT_INTERNAL, ABUSEIPDB;
     }
 
     public ConfigType configType;
@@ -1070,6 +1070,28 @@ public abstract class Config {
                 this.url = url;
                 this.isDefault = isDefault;
             }
+        }
+    }
+
+    @Getter
+    @Setter
+    @BsonDiscriminator
+    public static class AbuseIPDBConfig extends Config {
+
+        public static final String API_KEY = "apiKey";
+        public static final String CONFIG_ID = ConfigType.ABUSEIPDB.name() + CONFIG_SALT;
+
+        private String apiKey;
+
+        public AbuseIPDBConfig() {
+            this.configType = ConfigType.ABUSEIPDB;
+            this.id = CONFIG_ID;
+        }
+
+        public AbuseIPDBConfig(String apiKey) {
+            this.configType = ConfigType.ABUSEIPDB;
+            this.id = CONFIG_ID;
+            this.apiKey = apiKey;
         }
     }
 }

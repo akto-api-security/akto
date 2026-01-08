@@ -26,6 +26,8 @@ public class DevRevIntegrationAction extends UserAction {
     private String workItemType;
     private String errorMessage;
     private String aktoDashboardHost;
+    private List<String> partTypes;
+    private String partName;
 
     public String addDevRevIntegration() {
         try {
@@ -54,7 +56,7 @@ public class DevRevIntegrationAction extends UserAction {
     public String fetchDevRevParts() {
         try {
             DevRevIntegrationService devRevService = new DevRevIntegrationService(null, personalAccessToken);
-            partsIdToNameMap = devRevService.fetchDevrevProjects();
+            partsIdToNameMap = devRevService.fetchDevrevProjects(partTypes, partName);
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             logger.errorAndAddToDb("Error fetching DevRev projects: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);

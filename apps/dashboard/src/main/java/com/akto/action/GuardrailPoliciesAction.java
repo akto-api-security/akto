@@ -110,6 +110,11 @@ public class GuardrailPoliciesAction extends UserAction {
             updates.add(Updates.set("llmRule", policy.getLlmRule()));
             updates.add(Updates.set("basePromptRule", policy.getBasePromptRule()));
             updates.add(Updates.set("gibberishDetection", policy.getGibberishDetection()));
+            updates.add(Updates.set("anonymizeDetection", policy.getAnonymizeDetection()));
+            updates.add(Updates.set("banCodeDetection", policy.getBanCodeDetection()));
+            updates.add(Updates.set("secretsDetection", policy.getSecretsDetection()));
+            updates.add(Updates.set("sentimentDetection", policy.getSentimentDetection()));
+            updates.add(Updates.set("tokenLimitDetection", policy.getTokenLimitDetection()));
             updates.add(Updates.set("selectedMcpServers", policy.getSelectedMcpServers()));
             updates.add(Updates.set("selectedAgentServers", policy.getSelectedAgentServers()));
             updates.add(Updates.set("selectedMcpServersV2", policy.getSelectedMcpServersV2()));

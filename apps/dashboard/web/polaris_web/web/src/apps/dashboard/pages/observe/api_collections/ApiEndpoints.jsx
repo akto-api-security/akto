@@ -191,17 +191,20 @@ headers.push({
 })
 
 
+// Offset for hidden Issues column in Endpoint Security mode
+const columnOffset = isEndpointSecurityCategory() ? -1 : 0;
+
 const sortOptions = [
     { label: 'Risk Score', value: 'riskScore asc', directionLabel: 'Highest', sortKey: 'riskScore', columnIndex: 2},
     { label: 'Risk Score', value: 'riskScore desc', directionLabel: 'Lowest', sortKey: 'riskScore', columnIndex: 2},
     { label: 'Endpoint', value: 'endpoint asc', directionLabel: 'A-Z', sortKey: 'endpoint', columnIndex: 1 },
     { label: 'Endpoint', value: 'endpoint desc', directionLabel: 'Z-A', sortKey: 'endpoint', columnIndex: 1 },
-    { label: 'Last seen', value: 'lastSeenTs asc', directionLabel: 'Newest', sortKey: 'lastSeenTs', columnIndex: 8 },
-    { label: 'Last seen', value: 'lastSeenTs desc', directionLabel: 'Oldest', sortKey: 'lastSeenTs', columnIndex: 8 },
-    { label: 'Discovered at', value: 'detectedTs asc', directionLabel: 'Newest', sortKey: 'detectedTs', columnIndex: 9 },
-    { label: 'Discovered at', value: 'detectedTs desc', directionLabel: 'Oldest', sortKey: 'detectedTs', columnIndex: 9 },
-    { label: 'Last tested', value: 'lastTested asc', directionLabel: 'Newest', sortKey: 'lastTested', columnIndex: 10 },
-    { label: 'Last tested', value: 'lastTested desc', directionLabel: 'Oldest', sortKey: 'lastTested', columnIndex: 10 },
+    { label: 'Last seen', value: 'lastSeenTs asc', directionLabel: 'Newest', sortKey: 'lastSeenTs', columnIndex: 8 + columnOffset },
+    { label: 'Last seen', value: 'lastSeenTs desc', directionLabel: 'Oldest', sortKey: 'lastSeenTs', columnIndex: 8 + columnOffset },
+    { label: 'Discovered at', value: 'detectedTs asc', directionLabel: 'Newest', sortKey: 'detectedTs', columnIndex: 9 + columnOffset },
+    { label: 'Discovered at', value: 'detectedTs desc', directionLabel: 'Oldest', sortKey: 'detectedTs', columnIndex: 9 + columnOffset },
+    { label: 'Last tested', value: 'lastTested asc', directionLabel: 'Newest', sortKey: 'lastTested', columnIndex: 10 + columnOffset },
+    { label: 'Last tested', value: 'lastTested desc', directionLabel: 'Oldest', sortKey: 'lastTested', columnIndex: 10 + columnOffset },
 ];
 
 

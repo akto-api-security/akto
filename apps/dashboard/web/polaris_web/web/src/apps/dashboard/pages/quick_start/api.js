@@ -170,11 +170,11 @@ const api = {
         })
     },
 
-    initiateCrawler(hostname, username, password, apiKey, dashboardUrl, testRoleHaxId, outscopeUrls) {
+    initiateCrawler(hostname, username, password, apiKey, dashboardUrl, testRoleHaxId, outscopeUrls, crawlingTime) {
         return request({
             url: '/api/initiateCrawler',
             method: 'post',
-            data: {hostname, username, password, apiKey, dashboardUrl, testRoleHaxId, outscopeUrls}
+            data: {hostname, username, password, apiKey, dashboardUrl, testRoleHaxId, outscopeUrls, crawlingTime}
         })
     },
 

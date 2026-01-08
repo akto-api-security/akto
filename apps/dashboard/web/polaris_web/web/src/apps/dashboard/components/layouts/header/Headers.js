@@ -69,7 +69,7 @@ export default function Header() {
     }, [dashboardCategory]);
 
 
-    const logoSrc = dashboardCategory === "Agentic Security" ? "/public/akto-christmas-agentic.svg" : "/public/akto-christmas.svg";
+    const logoSrc = dashboardCategory === "Agentic Security" ? "/public/white_logo.svg" : "/public/akto_name_with_logo.svg";
     const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {};
     const agenticSecurityGranted =
         stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || true
@@ -311,7 +311,7 @@ export default function Header() {
                     <Box paddingInlineStart={3} paddingInlineEnd={3}>
                         <HorizontalStack gap={4} wrap={false}>
                             <div style={{ cursor: 'pointer' }} onClick={() => window.location.href = "/dashboard/observe/inventory"} className='logo'>
-                                <img src={logoSrc} alt="Akto Logo" style={{ maxWidth: '90px' }} />
+                                <img src={logoSrc} alt="Akto Logo" style={{ maxWidth: '78px' }} />
                             </div>
 
                             <Box minWidth='170px'>
@@ -320,11 +320,11 @@ export default function Header() {
                                         { value: "API Security", label: "API Security", id: "api-security" },
                                         {
                                             value: "Agentic Security",
-                                            label: func.isDemoAccount() ? "Akto ARGUS" : "Agentic Security",
+                                            label: func.isAtlasArgusAccount() ? "Akto ARGUS" : "Agentic Security",
                                             id: "agentic-security",
-                                            helpText: func.isDemoAccount() ? "Agentic AI Security for Homegrown AI" : undefined
+                                            helpText: func.isAtlasArgusAccount() ? "Agentic AI Security for Homegrown AI" : undefined
                                         },
-                                        ...(func.isDemoAccount() ? [{
+                                        ...(func.isAtlasArgusAccount() ? [{
                                             value: "Endpoint Security",
                                             label: "Akto ATLAS",
                                             id: "endpoint-security",

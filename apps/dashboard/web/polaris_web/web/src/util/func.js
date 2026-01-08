@@ -2209,6 +2209,9 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   isDemoAccount(){
      return window.ACTIVE_ACCOUNT === 1669322524
   },
+  isAtlasArgusAccount(){
+    return window.ACTIVE_ACCOUNT === 1669322524 || window.ACTIVE_ACCOUNT === 1767814409 || window.ACTIVE_ACCOUNT === 1767812031
+  },
   isSameDateAsToday (givenDate) {
       const today = new Date();
       return (
@@ -2388,6 +2391,22 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       }
     }
     return placeholders;
+  },
+  /**
+   * Format timestamp for chat messages
+   * @param {number} timestamp - Unix timestamp in seconds
+   * @returns {string} Formatted timestamp string
+   */
+  formatChatTimestamp: (timestamp) => {
+    if (!timestamp) return '';
+    return new Date(timestamp * 1000).toLocaleString('en-US', {
+      month: 'numeric',
+      day: 'numeric',
+      year: '2-digit',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: true
+    });
   }
 }
 
