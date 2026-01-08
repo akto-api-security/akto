@@ -1,27 +1,30 @@
 package com.akto.threat.backend.cron;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 import org.bson.conversions.Bson;
 
 import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
-import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.runtime.RuntimeUtil;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
@@ -34,17 +37,30 @@ import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.UpdateManyModel;
-import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
 
-import static com.akto.jobs.utils.Utils.getRiskScoreValueFromSeverityScore;
 import static com.akto.billing.UsageMetricUtils.getFeatureAccessSaas;
 
 public class RiskScoreSyncCron {
     
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private static final LoggerMaker loggerMaker = new LoggerMaker(RiskScoreSyncCron.class, LogDb.THREAT_DETECTION);
+
+    private static URLTemplate isMatchingUrl(int apiCollectionId, String urlFromEvent, String methodFromEvent, Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates){
+        urlFromEvent = ApiInfo.getNormalizedUrl(urlFromEvent);
+        List<URLTemplate> urlTemplates = apiCollectionUrlTemplates.get(apiCollectionId);
+        if(urlTemplates == null || urlTemplates.isEmpty()){
+            return null;
+        }
+        URLMethods.Method method = URLMethods.Method.fromString(methodFromEvent);
+        for(URLTemplate urlTemplate : urlTemplates){
+            if(!urlTemplate.matchTemplate(urlFromEvent, method).equals(URLTemplate.MatchResult.NO_MATCH)){
+                return urlTemplate;
+            }
+        }
+        return null;
+    }
 
     public void setUpRiskScoreSyncCronScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -73,42 +89,51 @@ public class RiskScoreSyncCron {
                             }
                         }
 
-                        float threatScore = 1;
-
-                        List<ApiCollection> apiCollections = ApiCollectionsDao.fetchAllHosts();
-                        Set<Integer> apiCollectionIds = apiCollections.stream().map(ApiCollection::getId).collect(Collectors.toSet());
-
                         // get successful exploits from malicious events in this time range, grouping by host, method, endpoint
                         BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$latestApiCollectionId").append("method", "$latestApiMethod").append("endpoint", "$latestApiEndpoint");
                         List<Bson> pipeline = new ArrayList<>();
                         pipeline.add(Aggregates.sort(Sorts.descending("detectedAt")));
-                        pipeline.add(Aggregates.match(Filters.and(Filters.gte("detectedAt", deltaStarTime), Filters.lte("detectedAt", deltaEndTime), Filters.in("latestApiCollectionId", apiCollectionIds), Filters.eq("successfulExploit", true))));
-                        pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));
+                        pipeline.add(Aggregates.match(Filters.and(Filters.gte("detectedAt", deltaStarTime), Filters.lte("detectedAt", deltaEndTime), Filters.eq("successfulExploit", true))));
+                        pipeline.add(Aggregates.group(groupedId, Accumulators.addToSet("severity", "$severity")));
                         MongoCursor<BasicDBObject> cursor = MaliciousEventDao.instance.getCollection(String.valueOf(accountId)).aggregate(pipeline, BasicDBObject.class).cursor();
-                        List<Bson> filters = new ArrayList<>();
+
+                        Map<String, List<String>> apiInfoKeyToSeverities = new HashMap<>();
+                        Set<Integer> apiCollectionIdsFromEvents = new HashSet<>();
                         while(cursor.hasNext()){
                             BasicDBObject document = cursor.next();
                             BasicDBObject id = (BasicDBObject) document.get("_id");
                             int apiCollectionIdFromDoc = id.getInt("apiCollectionId");
                             String method = id.getString("method");
                             String endpoint = id.getString("endpoint");
-                            if(apiCollectionIds.contains(apiCollectionIdFromDoc)){
-                                filters.add(ApiInfoDao.getFilter(endpoint, method, apiCollectionIdFromDoc));
+                            apiCollectionIdsFromEvents.add(apiCollectionIdFromDoc);
+                            List<String> severities = (List<String>) document.get("severities");
+                            String key = apiCollectionIdFromDoc + ":" + endpoint + ":" + method;
+                            apiInfoKeyToSeverities.put(key, severities);
+                        }
+
+                        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(Filters.in(ApiInfo.ID_API_COLLECTION_ID, apiCollectionIdsFromEvents));
+                        // Build API info metadata structures - always non-null
+                        Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates = new HashMap<>();
+
+                        // Process API infos only if available
+                        RuntimeUtil.fillURLTemplatesMap(apiInfos, null, apiCollectionUrlTemplates);
+                        List<WriteModel<ApiInfo>> updates = new ArrayList<>();
+
+                        for(String apiInfoKey : apiInfoKeyToSeverities.keySet()){
+                            String[] parts = apiInfoKey.split(":");
+                            int apiCollectionId = Integer.parseInt(parts[0]);
+                            String url = parts[1];
+                            String method = parts[2];
+                            URLTemplate urlTemplate = isMatchingUrl(apiCollectionId, url, method, apiCollectionUrlTemplates);
+                            List<String> severities = apiInfoKeyToSeverities.get(apiInfoKey);
+                            float threatScore = MaliciousEventDao.getThreatScoreFromSeverities(severities);
+                            if(urlTemplate != null){
+                                loggerMaker.warnAndAddToDb("Updating risk score for " + urlTemplate.getTemplateString() + " " + urlTemplate.getMethod().name() + " " + apiCollectionId + " to " + threatScore);
+                                Bson filter = ApiInfoDao.getFilter(urlTemplate.getTemplateString(), urlTemplate.getMethod().name(), apiCollectionId);
+                                updates.add(new UpdateManyModel<>(filter, Updates.set(ApiInfo.RISK_SCORE, threatScore)));
                             }
                         }
-
-                        if(filters.isEmpty()){
-                            loggerMaker.warnAndAddToDb("No filters found for account " + accountId);
-                            return;
-                        }
-
-                        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(Filters.or(filters));
-                        List<WriteModel<ApiInfo>> updates = new ArrayList<>();
-                        for(ApiInfo apiInfo: apiInfos){
-                            float riskScoreFromSeverityScore = getRiskScoreValueFromSeverityScore(apiInfo.getSeverityScore());
-                            Float riskScore = ApiInfoDao.getRiskScore(apiInfo, apiInfo.getIsSensitive(), riskScoreFromSeverityScore, true);
-                            updates.add(new UpdateManyModel<>(ApiInfoDao.getFilter(apiInfo.getId()), Updates.combine(Updates.set(ApiInfo.RISK_SCORE, riskScore), Updates.set(ApiInfo.THREAT_SCORE, threatScore)), new UpdateOptions().upsert(false)));
-                        }
+                        
                         if(updates.size() > 0){
                             loggerMaker.warnAndAddToDb("Updating risk score for " + updates.size() + " api infos");
                             ApiInfoDao.instance.bulkWrite(updates, new BulkWriteOptions().ordered(false));
@@ -118,6 +143,6 @@ public class RiskScoreSyncCron {
                     }
                 }, "risk-score-sync-cron");
             }
-        }, 0, 5, TimeUnit.MINUTES);
+        }, 0, 15, TimeUnit.MINUTES);
     }
 }
