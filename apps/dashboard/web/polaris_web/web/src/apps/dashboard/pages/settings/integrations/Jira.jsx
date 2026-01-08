@@ -22,7 +22,8 @@ import Dropdown from "../../../components/layouts/Dropdown";
 import {
   useJiraReducer,
   initialEmptyMapping,
-  aktoStatusForJira
+  aktoStatusForJira,
+  aktoSeverities
 } from './reducers/useJiraReducer';
 
 function Jira() {
@@ -34,7 +35,12 @@ function Jira() {
         existingProjectIds,
         isSaving,
         initialFormData,
-        loadingProjectIndex
+        loadingProjectIndex,
+        jiraPriorities,
+        severityToPriorityMap,
+        initialSeverityMapping,
+        isLoadingPriorities,
+        isSavingSeverityMapping
     } = state;
 
 
@@ -189,9 +195,124 @@ function Jira() {
       });
     }
 
+    async function fetchSeverityMapping() {
+        try {
+            const response = await api.fetchSeverityMapping();
+            console.log("Severity Mapping Response:", response);
+
+            // Handle response - it might be the map directly or wrapped
+            let mapping = {};
+            if (response && typeof response === 'object' && !Array.isArray(response)) {
+                if (response.severityToPriorityMap) {
+                    mapping = response.severityToPriorityMap;
+                } else {
+                    mapping = response;
+                }
+            }
+
+            console.log("Parsed Severity Mapping:", mapping);
+            actions.setSeverityToPriorityMap(mapping);
+            actions.setInitialSeverityMapping(mapping);
+        } catch (err) {
+            console.error("Failed to fetch severity mapping", err);
+            actions.setSeverityToPriorityMap({});
+            actions.setInitialSeverityMapping({});
+        }
+    }
+
+    async function fetchPriorities() {
+        if (!baseUrl?.trim() || !userEmail?.trim() || !apiToken?.trim()) {
+            return;
+        }
+
+        actions.setIsLoadingPriorities(true);
+        try {
+            const response = await api.fetchJiraPriorities(baseUrl, userEmail, apiToken);
+            console.log("Jira Priorities Response:", response);
+
+            // Handle response - it might be an array directly or wrapped in an object
+            let priorities = [];
+            if (Array.isArray(response)) {
+                priorities = response;
+            } else if (response && Array.isArray(response.jiraPriorities)) {
+                priorities = response.jiraPriorities;
+            } else if (response && typeof response === 'object') {
+                // If response is an object, try to get the array from it
+                const values = Object.values(response);
+                if (values.length > 0 && values[0] && typeof values[0] === 'object' && values[0].id && values[0].name) {
+                    priorities = values;
+                }
+            }
+
+            console.log("Parsed Priorities:", priorities);
+            actions.setJiraPriorities(priorities);
+        } catch (err) {
+            console.error("Failed to fetch Jira priorities", err);
+            func.setToast(true, true, "Failed to fetch Jira priorities");
+            actions.setJiraPriorities([]);
+        } finally {
+            actions.setIsLoadingPriorities(false);
+        }
+    }
+
+    async function saveSeverityMapping() {
+        actions.setIsSavingSeverityMapping(true);
+        try {
+            await api.saveSeverityMapping(severityToPriorityMap);
+            func.setToast(true, false, "Severity mapping saved successfully");
+            // Update initial mapping to match current state after successful save
+            actions.setInitialSeverityMapping({...severityToPriorityMap});
+        } catch (err) {
+            func.setToast(true, true, "Failed to save severity mapping");
+        } finally {
+            actions.setIsSavingSeverityMapping(false);
+        }
+    }
+
+    function handleSeverityMappingChange(severity, priorityId) {
+        actions.updateSeverityMapping(severity, priorityId);
+    }
+
+    function getSeverityBadgeColor(severity) {
+        switch(severity) {
+            case 'CRITICAL': return 'critical';
+            case 'HIGH': return 'warning';
+            case 'MEDIUM': return 'attention';
+            case 'LOW': return 'info';
+            default: return 'default';
+        }
+    }
+
+    function hasSeverityMappingChanged() {
+        // Compare current mapping with initial mapping
+        const currentKeys = Object.keys(severityToPriorityMap || {});
+        const initialKeys = Object.keys(initialSeverityMapping || {});
+
+        // If different number of keys, there's a change
+        if (currentKeys.length !== initialKeys.length) {
+            return true;
+        }
+
+        // Check if any value is different
+        for (const key of currentKeys) {
+            if (severityToPriorityMap[key] !== initialSeverityMapping[key]) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     useEffect(() => {
-        fetchJiraInteg()
+        fetchJiraInteg();
+        fetchSeverityMapping();
     }, []);
+
+    useEffect(() => {
+        if (baseUrl && userEmail && apiToken) {
+            fetchPriorities();
+        }
+    }, [baseUrl, userEmail, apiToken]);
 
 
     function transformJiraObject() {
@@ -442,12 +563,12 @@ function Jira() {
                             <TextField maxLength={10} showCharacterCount value={project?.projectId || ""} label="Project key" placeholder={"Project Key"} requiredIndicator
                                 onChange={(val)=> projectKeyChangeHandler(index,val)} />
                             {loadingProjectIndex === index ? (
-                                <div style={{ display: 'flex', alignItems: 'center', margin: '8px 0' }}>
+                                <HorizontalStack gap="2" align="center">
                                     <Spinner size="small" />
-                                    <Text variant="bodyMd" as="span" style={{ marginLeft: '8px' }}>&nbsp;&nbsp;Loading status mappings...</Text>
-                                </div>
+                                    <Text variant="bodyMd" as="span">Loading status mappings...</Text>
+                                </HorizontalStack>
                             ) : (
-                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                <HorizontalStack gap="1" align="center">
                                     <Checkbox
                                         disabled={!project?.projectId?.trim()}
                                         checked={project.enableBiDirIntegration}
@@ -458,10 +579,10 @@ function Jira() {
                                         }}
                                         label=""
                                     />
-                                    <span style={{ marginLeft: '4px', opacity: project?.projectId?.trim() ? 1 : 0.5 }}>
+                                    <Text variant="bodyMd" as="span" color={project?.projectId?.trim() ? undefined : "subdued"}>
                                         Enable bi-directional integration
-                                    </span>
-                                </div>
+                                    </Text>
+                                </HorizontalStack>
                             )}
                             {project.enableBiDirIntegration &&
                                 <VerticalStack gap={3} align='start'>
@@ -620,6 +741,81 @@ function Jira() {
         return !hasFormChanges();
     }
 
+    const SeverityMappingCard = (
+        <Card roundedAbove="sm">
+            <VerticalStack gap={4}>
+                <HorizontalStack align='space-between'>
+                    <Text fontWeight='semibold' variant='headingMd'>Map Severity</Text>
+                    <Button
+                        size='slim'
+                        variant={hasSeverityMappingChanged() ? 'primary' : undefined}
+                        onClick={saveSeverityMapping}
+                        disabled={isSavingSeverityMapping || isLoadingPriorities || !Array.isArray(jiraPriorities) || jiraPriorities.length === 0 || !hasSeverityMappingChanged()}
+                        loading={isSavingSeverityMapping}
+                    >
+                        {isSavingSeverityMapping ? 'Saving...' : 'Save Mapping'}
+                    </Button>
+                </HorizontalStack>
+                {isLoadingPriorities ? (
+                    <HorizontalStack gap="2" align="center">
+                        <Spinner size="small" />
+                        <Text variant="bodyMd" as="span">Loading Jira priorities...</Text>
+                    </HorizontalStack>
+                ) : !Array.isArray(jiraPriorities) || jiraPriorities.length === 0 ? (
+                    <Text variant="bodyMd" color="subdued">
+                        Please configure Jira credentials above to load priorities
+                    </Text>
+                ) : (
+                    <VerticalStack gap={3} align='start'>
+                        <HorizontalStack gap={12}>
+                            <Text fontWeight='semibold' variant='headingXs'>Akto Severity</Text>
+                            <Text fontWeight='semibold' variant='headingXs'>Jira Priority</Text>
+                        </HorizontalStack>
+                        {aktoSeverities.map(severity => {
+                            const priorityOptions = (Array.isArray(jiraPriorities) ? jiraPriorities : []).map(p => ({
+                                label: p.name,
+                                value: p.id
+                            }));
+                            const selectedPriorityId = severityToPriorityMap[severity];
+                            const selectedPriority = (Array.isArray(jiraPriorities) ? jiraPriorities : []).find(p => p.id === selectedPriorityId);
+
+                            // Build display value for the dropdown
+                            let displayValue = "Select Priority";
+                            if (selectedPriority && selectedPriority.name) {
+                                displayValue = selectedPriority.name;
+                            } else if (selectedPriorityId) {
+                                // If we have an ID but can't find the priority, show the ID
+                                displayValue = `Priority (${selectedPriorityId})`;
+                            }
+
+                            return (
+                                <HorizontalStack key={`severity-${severity}`} gap={8}>
+                                    <Box width='82px'>
+                                        <Badge status={getSeverityBadgeColor(severity)}>
+                                            {severity.charAt(0) + severity.slice(1).toLowerCase()}
+                                        </Badge>
+                                    </Box>
+                                    <Dropdown
+                                        id={`severity-${severity}`}
+                                        selected={(value) => {
+                                            handleSeverityMappingChange(severity, value[0]);
+                                        }}
+                                        menuItems={priorityOptions}
+                                        placeholder="Select Jira Priority"
+                                        showSelectedItemLabels={true}
+                                        allowMultiple={false}
+                                        preSelected={selectedPriorityId ? [selectedPriorityId] : []}
+                                        value={displayValue}
+                                    />
+                                </HorizontalStack>
+                            );
+                        })}
+                    </VerticalStack>
+                )}
+            </VerticalStack>
+        </Card>
+    );
+
     const JCard = (
         <LegacyCard
             primaryFooterAction={{
@@ -643,6 +839,8 @@ function Jira() {
                         <Button plain monochrome onClick={() => actions.addProject()}>Add Project</Button>
                     </HorizontalStack>
                     {projects.length !== 0 ? ProjectsCard : null}
+                    <Divider />
+                    {SeverityMappingCard}
                 </VerticalStack>
           </LegacyCard.Section>
           <Divider />

@@ -422,15 +422,26 @@ public class Utils {
         if (severity != null && accountSettings != null) {
             try {
                 Map<String, String> severityToPriorityMap = accountSettings.getIssueSeverityToJiraPriorityMap();
+                loggerMaker.infoAndAddToDb("Severity: " + severity.name() + ", Priority Map: " + severityToPriorityMap, LogDb.DASHBOARD);
+
                 if (severityToPriorityMap != null && !severityToPriorityMap.isEmpty()) {
                     String priorityId = severityToPriorityMap.get(severity.name());
+                    loggerMaker.infoAndAddToDb("Priority ID from map: " + priorityId + " for severity: " + severity.name(), LogDb.DASHBOARD);
+
                     if (priorityId != null && !priorityId.isEmpty()) {
                         fields.put("priority", new BasicDBObject("id", priorityId));
+                        loggerMaker.infoAndAddToDb("Set priority field with ID: " + priorityId, LogDb.DASHBOARD);
+                    } else {
+                        loggerMaker.infoAndAddToDb("Priority ID is null or empty for severity: " + severity.name(), LogDb.DASHBOARD);
                     }
+                } else {
+                    loggerMaker.infoAndAddToDb("Priority map is null or empty", LogDb.DASHBOARD);
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error setting Jira priority from severity mapping");
             }
+        } else {
+            loggerMaker.infoAndAddToDb("Severity or AccountSettings is null - Severity: " + severity + ", AccountSettings: " + accountSettings, LogDb.DASHBOARD);
         }
 
         if (additionalIssueFields != null) {
