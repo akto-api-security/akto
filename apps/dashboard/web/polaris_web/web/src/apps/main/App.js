@@ -140,7 +140,7 @@ const router = createBrowserRouter([
                         element: <AgenticDashboard/>,
                     },
                     {
-                        path: "api-dashboard",
+                        path: "view",
                         element: <AgenticDashboard/>,
                     },
                     {

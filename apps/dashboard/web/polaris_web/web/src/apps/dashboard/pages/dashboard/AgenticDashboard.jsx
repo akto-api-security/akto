@@ -1,6 +1,6 @@
-import { Avatar, Box, Button, Card, DataTable, HorizontalGrid, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Button, Card, DataTable, HorizontalGrid, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
 import { SettingsFilledMinor } from '@shopify/polaris-icons'
-import React, { useEffect, useReducer, useState } from 'react'
+import { useEffect, useReducer, useState, useRef } from 'react'
 import TitleWithInfo from '../../components/shared/TitleWithInfo'
 import DateRangeFilter from '../../components/layouts/DateRangeFilter'
 import { produce } from 'immer'
@@ -11,9 +11,12 @@ import Dropdown from '../../components/layouts/Dropdown'
 import SpinnerCentered from '../../components/progress/SpinnerCentered'
 import LineChart from '../../components/charts/LineChart'
 import "./agentic-dashboard.css"
+import "react-grid-layout/css/styles.css"
+import "react-resizable/css/styles.css"
 import DonutChart from '../../components/shared/DonutChart'
 import SemiCircleProgress from '../../components/shared/SemiCircleProgress'
 import { mapLabel, getDashboardCategory } from '../../../main/labelHelper'
+import { GridLayout } from "react-grid-layout";
 
 const agenticDiscoveryData = {
     "AI Agents": { text: 2000, color: "#7F56D9" },
@@ -243,6 +246,41 @@ const AgenticDashboard = () => {
     const [viewMode, setViewMode] = useState('ciso')
     const [overallStats, setOverallStats] = useState({})
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
+    const [containerWidth, setContainerWidth] = useState(0);
+    const containerRef = useRef(null);
+    const [layout, setLayout] = useState([
+        { i: 'item-0', x: 0, y: 0, w: 12, h: 4, minW: 4, minH: 4, maxH: 4 },   // Line chart
+        { i: 'item-1', x: 0, y: 4, w: 4, h: 3, minW: 4, maxW: 4, minH: 3, maxH: 3 },    // Pie chart 1
+        { i: 'item-2', x: 4, y: 4, w: 4, h: 3, minW: 4, maxW: 4, minH: 3, maxH: 3 },    // Pie chart 2
+        { i: 'item-3', x: 8, y: 4, w: 4, h: 3, minW: 4, maxW: 4, minH: 3, maxH: 3 },    // Pie chart 3
+        { i: 'item-4', x: 0, y: 7, w: 4, h: 3, minW: 4, maxW: 4, minH: 3, maxH: 3 },    // Average Issue Age (fixed)
+        { i: 'item-5', x: 4, y: 7, w: 8, h: 2, minW: 6, minH: 2, maxH: 2 },    // Compliance at Risks
+        { i: 'item-6', x: 0, y: 10, w: 6, h: 4, minW: 4, minH: 4, maxH: 4 },   // Tested vs Non-Tested
+        { i: 'item-7', x: 6, y: 10, w: 6, h: 4, minW: 4, minH: 4, maxH: 4 },   // Open & Resolved Issues
+        { i: 'item-8', x: 0, y: 14, w: 6, h: 4, minW: 4, minH: 4, maxH: 4 },   // Guardrail Requests
+        { i: 'item-9', x: 6, y: 14, w: 6, h: 4, minW: 4, minH: 4, maxH: 4 },   // Open & Resolved Guardrails
+        { i: 'item-10', x: 0, y: 18, w: 6, h: 4, minW: 4, minH: 2 },  // Weakest Areas
+        { i: 'item-11', x: 6, y: 18, w: 6, h: 4, minW: 4, minH: 2 },  // Top APIs with Issues
+        { i: 'item-12', x: 0, y: 22, w: 4, h: 4, minW: 4, minH: 2 },  // Top Requests by Type
+        { i: 'item-13', x: 4, y: 22, w: 4, h: 4, minW: 4, minH: 2 },  // Top Attacked APIs
+        { i: 'item-14', x: 8, y: 22, w: 4, h: 4, minW: 4, minH: 2 }   // Top Bad Actors
+    ])
+
+    useEffect(() => {
+        const updateWidth = () => {
+            if (containerRef.current) {
+                setContainerWidth(containerRef.current.offsetWidth);
+            }
+        };
+
+        const observer = new ResizeObserver(updateWidth);
+        if (containerRef.current) {
+            observer.observe(containerRef.current);
+            updateWidth();
+        }
+
+        return () => observer.disconnect();
+    }, []);
 
     useEffect(() => {
         setLoading(true);
@@ -360,8 +398,8 @@ const AgenticDashboard = () => {
                             {complianceData.map((compliance, idx) => (
                                 <VerticalStack gap={5} inlineAlign='center' align='start'>
                                     <div style={{
-                                        width: '149px',
-                                        height: '136px',
+                                        width: '139px',
+                                        height: '126px',
                                         backgroundImage: `url(${compliance.icon})`,
                                         backgroundRepeat: 'no-repeat',
                                         backgroundPosition: 'center',
@@ -370,14 +408,14 @@ const AgenticDashboard = () => {
 
                                     <Box width='100%'>
                                         <VerticalStack gap={2} align='end' inlineAlign='center'>
-                                            <Text variant='heading2xl' alignment='center' fontWeight='semibold'>
+                                            <Text variant='headingXl' alignment='center' fontWeight='semibold'>
                                                 {compliance.name}
                                             </Text>
                                             <Box width='100%'>
                                                 <HorizontalStack gap={2} align='space-between' blockAlign='center'>
                                                     <div style={{
                                                         flex: 1,
-                                                        height: '6px',
+                                                        height: '5px',
                                                         backgroundColor: '#E5E7EB',
                                                         borderRadius: '3px',
                                                         overflow: 'hidden'
@@ -425,13 +463,13 @@ const AgenticDashboard = () => {
                             </div>
                         </HorizontalStack>
                     </Box>
-                    <Box width='100%' minHeight='280px'>
+                    <Box width='100%' minHeight='210px'>
                         <VerticalStack gap="2" inlineAlign='center' blockAlign="center">
                             <DonutChart
                                 title={subtitle}
                                 subtitle={formattedTotal}
                                 data={graphData}
-                                size={250}
+                                size={200}
                                 pieInnerSize="60%"
                                 invertTextSizes={true}
                             />
@@ -549,9 +587,13 @@ const AgenticDashboard = () => {
         )
     }
 
+    const onLayoutChange = (newLayout) => {
+        setLayout(newLayout);
+    };
+
     const pageComponents = [
         customLineChart(
-            `${window.ACCOUNT_NAME} ${mapLabel('API Security Posture', dashboardCategory)} Over time`,
+            `${func.toSentenceCase(window.ACCOUNT_NAME)} ${mapLabel('API Security Posture', dashboardCategory)} over time`,
             overallStats,
             [
                 { label: mapLabel('API Endpoints Discovered', dashboardCategory), color: '#B692F6' },
@@ -559,95 +601,103 @@ const AgenticDashboard = () => {
                 { label: `${mapLabel('Threat', dashboardCategory)} Requests flagged`, color: '#F3B283' }
             ]
         ),
-
-        <HorizontalGrid key="donut-charts" columns={3} gap={5}>
-            {customPieChart(mapLabel('API Discovery', dashboardCategory), `Total ${mapLabel('APIs', dashboardCategory)}`, agenticDiscoveryData)}
-            {customPieChart("Issues", "Total Issues", agenticIssuesData)}
-            {customPieChart(mapLabel('Threat Detection', dashboardCategory), "Requests Flagged", agenticGuardrailsData)}
-        </HorizontalGrid>,
-
-        <HorizontalGrid key="issue-age-compliance" columns={['oneThird', 'twoThirds']} gap={5}>
-            {averageIssueAgeComp()}
-            {complianceAtRisksComp()}
-        </HorizontalGrid>,
-
-        <HorizontalGrid key="tested-vs-open-issues" columns={2} gap={5}>
-            {customLineChart(
-                `Tested vs Non-Tested ${mapLabel('APIs', dashboardCategory)}`,
-                testedVsNonTestedData,
-                [
-                    { label: 'Non-Tested', color: '#D72C0D' },
-                    { label: 'Tested', color: '#9E77ED' }
-                ]
-            )}
-            {customLineChart(
-                "Open & Resolved Issues",
-                openResolvedIssuesData,
-                [
-                    { label: 'Open Issues', color: '#D72C0D' },
-                    { label: 'Resolved Issues', color: '#9E77ED' }
-                ]
-            )}
-        </HorizontalGrid>,
-
-        <HorizontalGrid key="guardrail-charts" columns={2} gap={5}>
-            {customLineChart(
-                `${mapLabel('Threat', dashboardCategory)} Requests over time`,
-                guardrailRequestsData,
-                [
-                    { label: 'Flagged Requests', color: '#D72C0D' },
-                    { label: 'Safe Requests', color: '#47B881' }
-                ]
-            )}
-            {customLineChart(
-                `Open & Resolved ${mapLabel('Threat', dashboardCategory)}s`,
-                openResolvedGuardrailsData,
-                [
-                    { label: 'Open Issues', color: '#D72C0D' },
-                    { label: 'Resolved Issues', color: '#9E77ED' }
-                ]
-            )}
-        </HorizontalGrid>,
-
-        <HorizontalGrid key="data-tables-1" columns={2} gap={5}>
-            {customDataTable("Weakest Areas by Failing Percentage", weakestAreasData)}
-            {customDataTable(`Top ${mapLabel('APIs', dashboardCategory)} with Critical & High Issues`, topAgenticComponentsData)}
-        </HorizontalGrid>,
-
-        <HorizontalGrid key="data-tables-2" columns={3} gap={5}>
-            {customDataTable("Top Requests by Type", topRequestsByTypeData)}
-            {customDataTable(`Top Attacked ${mapLabel('APIs', dashboardCategory)}`, topAttackedComponentsData, false)}
-            {customDataTable("Top Bad Actors", topBadActorsData, false)}
-        </HorizontalGrid>,
+        customPieChart(mapLabel('API Discovery', dashboardCategory), `Total ${mapLabel('APIs', dashboardCategory)}`, agenticDiscoveryData),
+        customPieChart("Issues", "Total Issues", agenticIssuesData),
+        customPieChart(mapLabel('Threat Detection', dashboardCategory), "Requests Flagged", agenticGuardrailsData),
+        averageIssueAgeComp(),
+        complianceAtRisksComp(),
+        customLineChart(
+            `Tested vs Non-Tested ${mapLabel('APIs', dashboardCategory)}`,
+            testedVsNonTestedData,
+            [
+                { label: 'Non-Tested', color: '#D72C0D' },
+                { label: 'Tested', color: '#9E77ED' }
+            ]
+        ),
+        customLineChart(
+            "Open & Resolved Issues",
+            openResolvedIssuesData,
+            [
+                { label: 'Open Issues', color: '#D72C0D' },
+                { label: 'Resolved Issues', color: '#9E77ED' }
+            ]
+        ),
+        customLineChart(
+            `${mapLabel('Threat', dashboardCategory)} Requests over time`,
+            guardrailRequestsData,
+            [
+                { label: 'Flagged Requests', color: '#D72C0D' },
+                { label: 'Safe Requests', color: '#47B881' }
+            ]
+        ),
+        customLineChart(
+            `Open & Resolved ${mapLabel('Threat', dashboardCategory)}s`,
+            openResolvedGuardrailsData,
+            [
+                { label: 'Open Issues', color: '#D72C0D' },
+                { label: 'Resolved Issues', color: '#9E77ED' }
+            ]
+        ),
+        customDataTable("Weakest Areas by Failing Percentage", weakestAreasData),
+        customDataTable(`Top ${mapLabel('APIs', dashboardCategory)} with Critical & High Issues`, topAgenticComponentsData),
+        customDataTable("Top Requests by Type", topRequestsByTypeData),
+        customDataTable(`Top Attacked ${mapLabel('APIs', dashboardCategory)}`, topAttackedComponentsData, false),
+        customDataTable("Top Bad Actors", topBadActorsData, false),
     ]
 
     return (
-        <Box>
-            {loading ? <SpinnerCentered /> : <PageWithMultipleCards
-                fullWidth
-                isFirstPage={true}
-                title={
-                    <HorizontalStack gap={3}>
-                        <TitleWithInfo
-                            titleText="Dashboards"
-                            tooltipContent="Monitor and manage your agentic processes from this centralized dashboard. View real-time status, logs, and performance metrics to ensure optimal operation."
-                            docsUrl="https://docs.akto.io/agentic-ai/agentic-dashboard"
-                        />
-                        <Dropdown
-                            menuItems={[
-                                {label: 'CISO', value: 'ciso'}
-                            ]}
-                            selected={setViewMode}
-                            initial={viewMode}
-                        />
-                    </HorizontalStack>
-                }
-                primaryAction={<Button icon={SettingsFilledMinor} onClick={() => {}}>Owner setting</Button>}
-                secondaryActions={[<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />]}
-
-                components={pageComponents}
-            />}
-        </Box>
+            loading ? <SpinnerCentered /> : (
+                <PageWithMultipleCards
+                    isFirstPage={true}
+                    title={
+                        <HorizontalStack gap={3}>
+                            <TitleWithInfo
+                                titleText="Dashboard"
+                                tooltipContent="Monitor and manage your agentic processes from this centralized dashboard. View real-time status, logs, and performance metrics to ensure optimal operation."
+                                docsUrl="https://docs.akto.io/agentic-ai/agentic-dashboard"
+                            />
+                            <Dropdown
+                                menuItems={[
+                                    {label: 'CISO', value: 'ciso'}
+                                ]}
+                                selected={setViewMode}
+                                initial={viewMode}
+                            />
+                        </HorizontalStack>
+                    }
+                    primaryAction={<Button icon={SettingsFilledMinor} onClick={() => {}}>Owner setting</Button>}
+                    secondaryActions={[<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />]}
+                    components={[
+                        <div key="grid-container" ref={containerRef} style={{ width: '100%' }}>
+                            <GridLayout
+                                width={containerWidth || 1200}
+                                layout={layout}
+                                gridConfig={{
+                                    cols: 12,
+                                    rowHeight: 100,
+                                    margin: [16, 16],
+                                    containerPadding: [0, 0]
+                                }}
+                                dragConfig={{
+                                    enabled: true,
+                                    handle: '.graph-menu'
+                                }}
+                                resizeConfig={{
+                                    enabled: true
+                                }}
+                                compactor={null}
+                                onLayoutChange={onLayoutChange}
+                            >
+                                {pageComponents.map((component, index) => (
+                                    <div key={`item-${index}`}>
+                                        {component}
+                                    </div>
+                                ))}
+                            </GridLayout>
+                        </div>
+                    ]}
+                />
+            )
     )
 }
 
