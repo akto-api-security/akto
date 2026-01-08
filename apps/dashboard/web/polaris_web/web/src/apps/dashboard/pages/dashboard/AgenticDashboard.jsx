@@ -1,5 +1,5 @@
-import { Box, Button, Card, DataTable, HorizontalGrid, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
-import { SettingsFilledMinor } from '@shopify/polaris-icons'
+import { Box, Button, Card, DataTable, HorizontalGrid, HorizontalStack, Text, VerticalStack, Popover, ActionList, Icon } from '@shopify/polaris'
+import { DeleteMinor, SettingsFilledMinor } from '@shopify/polaris-icons'
 import { useEffect, useReducer, useState, useRef } from 'react'
 import TitleWithInfo from '../../components/shared/TitleWithInfo'
 import DateRangeFilter from '../../components/layouts/DateRangeFilter'
@@ -246,9 +246,15 @@ const AgenticDashboard = () => {
     const [viewMode, setViewMode] = useState('ciso')
     const [overallStats, setOverallStats] = useState({})
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
-    const [containerWidth, setContainerWidth] = useState(0);
     const containerRef = useRef(null);
-    const [layout, setLayout] = useState([
+    const [popoverActive, setPopoverActive] = useState(false);
+    const [visibleComponents, setVisibleComponents] = useState([
+        'item-0', 'item-1', 'item-2', 'item-3', 'item-4', 'item-5',
+        'item-6', 'item-7', 'item-8', 'item-9', 'item-10', 'item-11',
+        'item-12', 'item-13', 'item-14'
+    ]);
+
+    const defaultLayout = [
         { i: 'item-0', x: 0, y: 0, w: 12, h: 4, minW: 4, minH: 4, maxH: 4 },   // Line chart
         { i: 'item-1', x: 0, y: 4, w: 4, h: 3, minW: 4, maxW: 4, minH: 3, maxH: 3 },    // Pie chart 1
         { i: 'item-2', x: 4, y: 4, w: 4, h: 3, minW: 4, maxW: 4, minH: 3, maxH: 3 },    // Pie chart 2
@@ -264,23 +270,23 @@ const AgenticDashboard = () => {
         { i: 'item-12', x: 0, y: 22, w: 4, h: 4, minW: 4, minH: 2 },  // Top Requests by Type
         { i: 'item-13', x: 4, y: 22, w: 4, h: 4, minW: 4, minH: 2 },  // Top Attacked APIs
         { i: 'item-14', x: 8, y: 22, w: 4, h: 4, minW: 4, minH: 2 }   // Top Bad Actors
-    ])
+    ];
 
-    useEffect(() => {
-        const updateWidth = () => {
-            if (containerRef.current) {
-                setContainerWidth(containerRef.current.offsetWidth);
-            }
-        };
+    const [layout, setLayout] = useState(defaultLayout)
 
-        const observer = new ResizeObserver(updateWidth);
-        if (containerRef.current) {
-            observer.observe(containerRef.current);
-            updateWidth();
-        }
-
-        return () => observer.disconnect();
-    }, []);
+    const componentHeader = (title, itemId) => (
+        <Box width='100%'>
+            <HorizontalStack blockAlign="center" align='space-between'>
+                <Text variant='headingMd'>{title}</Text>
+                <HorizontalStack gap={2}>
+                    <Button monochrome plain icon={DeleteMinor} onClick={() => removeComponent(itemId)} />
+                    <div className='graph-menu'>
+                        <img src={"/public/MenuVerticalIcon.svg"} alt='graph-menu' />
+                    </div>
+                </HorizontalStack>
+            </HorizontalStack>
+        </Box>
+    )
 
     useEffect(() => {
         setLoading(true);
@@ -342,18 +348,11 @@ const AgenticDashboard = () => {
         setLoading(false);
     }, [dashboardCategory])
 
-    const averageIssueAgeComp = () => {
+    const averageIssueAgeComp = (itemId="") => {
         return (
             <Card>
                 <VerticalStack gap={4} align='space-between'>
-                    <Box width='100%'>
-                        <HorizontalStack blockAlign="center" align='space-between'>
-                            <Text variant='headingMd'>Average Issue Age</Text>
-                            <div className='graph-menu'>
-                                <img src={"/public/MenuVerticalIcon.svg"} alt='graph-menu' />
-                            </div>
-                        </HorizontalStack>
-                    </Box>
+                    {componentHeader('Average Issue Age', itemId)}
 
                     <Box width='100%'>
                         <HorizontalGrid columns={2} gap={4} alignItems='center' blockAlign='center'>
@@ -380,18 +379,11 @@ const AgenticDashboard = () => {
         )
     }
 
-    const complianceAtRisksComp = () => {
+    const complianceAtRisksComp = (itemId="") => {
         return (
             <Card>
                 <VerticalStack gap={4}>
-                    <Box width='100%'>
-                        <HorizontalStack blockAlign="center" align='space-between'>
-                            <Text variant='headingMd'>Compliance at Risks</Text>
-                            <div className='graph-menu'>
-                                <img src={"/public/MenuVerticalIcon.svg"} alt='graph-menu' />
-                            </div>
-                        </HorizontalStack>
-                    </Box>
+                    {componentHeader('Compliance at Risks', itemId)}
 
                     <Box width='100%'>
                         <HorizontalGrid columns={4} gap={5}>
@@ -443,7 +435,7 @@ const AgenticDashboard = () => {
         )
     }
 
-    const customPieChart = (title="", subtitle="", graphData={}) => {
+    const customPieChart = (title="", subtitle="", graphData={}, itemId="") => {
         const total = Object.values(graphData).reduce((sum, item) => sum + item.text, 0)
         const formattedTotal = total.toLocaleString()
 
@@ -455,14 +447,7 @@ const AgenticDashboard = () => {
         return (
             <Card>
                 <VerticalStack gap="4" inlineAlign='start' blockAlign="center">
-                    <Box width='100%'>
-                        <HorizontalStack blockAlign="center" align='space-between'>
-                            <Text variant='headingMd'>{title}</Text>
-                            <div className='graph-menu'>
-                                <img src={"/public/MenuVerticalIcon.svg"} alt='graph-menu' />
-                            </div>
-                        </HorizontalStack>
-                    </Box>
+                    {componentHeader(title, itemId)}
                     <Box width='100%' minHeight='210px'>
                         <VerticalStack gap="2" inlineAlign='center' blockAlign="center">
                             <DonutChart
@@ -494,18 +479,11 @@ const AgenticDashboard = () => {
         </HorizontalStack>
     )
 
-    const customLineChart = (title="", chartData=[], labels=[]) => {
+    const customLineChart = (title="", chartData=[], labels=[], itemId="") => {
         return (
             <Card>
                 <VerticalStack gap="6" inlineAlign='start' blockAlign="center">
-                    <Box width='100%'>
-                        <HorizontalStack blockAlign="center" align='space-between'>
-                                <Text variant='headingMd'>{title}</Text>
-                                <div className='graph-menu'>
-                                    <img src={"/public/MenuVerticalIcon.svg"} alt='graph-menu' />
-                                </div>
-                        </HorizontalStack>
-                    </Box>
+                    {componentHeader(title, itemId)}
 
                     <Box width='100%'>
                         <LineChart
@@ -549,7 +527,7 @@ const AgenticDashboard = () => {
         )
     }
 
-    const customDataTable = (title="", data=[], showSignalIcon=true) => {
+    const customDataTable = (title="", data=[], showSignalIcon=true, itemId="") => {
         const rows = data.map(item => [
             <HorizontalStack gap={3} blockAlign='center'>
                 {showSignalIcon && <img src='/public/menu-graph.svg' alt='growth-icon' />}
@@ -565,14 +543,7 @@ const AgenticDashboard = () => {
         return (
             <Card>
                 <VerticalStack gap="4">
-                    <Box width='100%'>
-                        <HorizontalStack blockAlign="center" align='space-between'>
-                            <Text variant='headingMd'>{title}</Text>
-                            <div className='graph-menu'>
-                                <img src={"/public/MenuVerticalIcon.svg"} alt='graph-menu' />
-                            </div>
-                        </HorizontalStack>
-                    </Box>
+                    {componentHeader(title, itemId)}
 
                     <Box width='100%'>
                         <DataTable
@@ -588,10 +559,62 @@ const AgenticDashboard = () => {
     }
 
     const onLayoutChange = (newLayout) => {
-        setLayout(newLayout);
+        setLayout(prevLayout => {
+            const layoutMap = new Map(newLayout.map(item => [item.i, item]));
+            return defaultLayout.map(defaultItem => {
+                if (layoutMap.has(defaultItem.i)) {
+                    return layoutMap.get(defaultItem.i);
+                }
+                return prevLayout.find(item => item.i === defaultItem.i) || defaultItem;
+            });
+        });
     };
 
-    const pageComponents = [
+    const removeComponent = (itemId) => {
+        setVisibleComponents(prev => prev.filter(id => id !== itemId));
+    };
+
+    const toggleComponent = (itemId) => {
+        setVisibleComponents(prev => {
+            if (prev.includes(itemId)) {
+                return prev.filter(id => id !== itemId);
+            } else {
+                setLayout(prevLayout => {
+                    const existingItem = prevLayout.find(item => item.i === itemId);
+                    if (!existingItem) {
+                        const defaultItem = defaultLayout.find(item => item.i === itemId);
+                        return [...prevLayout, defaultItem];
+                    }
+                    const defaultItem = defaultLayout.find(item => item.i === itemId);
+                    const updatedLayout = prevLayout.map(item =>
+                        item.i === itemId ? { ...defaultItem } : item
+                    );
+                    return updatedLayout;
+                });
+                return [...prev, itemId];
+            }
+        });
+    };
+
+    const componentNames = {
+        'item-0': `${mapLabel('API Security Posture', dashboardCategory)} over time`,
+        'item-1': mapLabel('API Discovery', dashboardCategory),
+        'item-2': 'Issues',
+        'item-3': mapLabel('Threat Detection', dashboardCategory),
+        'item-4': 'Average Issue Age',
+        'item-5': 'Compliance at Risks',
+        'item-6': `Tested vs Non-Tested ${mapLabel('APIs', dashboardCategory)}`,
+        'item-7': 'Open & Resolved Issues',
+        'item-8': `${mapLabel('Threat', dashboardCategory)} Requests over time`,
+        'item-9': `Open & Resolved ${mapLabel('Threat', dashboardCategory)}s`,
+        'item-10': 'Weakest Areas by Failing Percentage',
+        'item-11': `Top ${mapLabel('APIs', dashboardCategory)} with Critical & High Issues`,
+        'item-12': 'Top Requests by Type',
+        'item-13': `Top Attacked ${mapLabel('APIs', dashboardCategory)}`,
+        'item-14': 'Top Bad Actors'
+    };
+
+    const allComponents = [
         customLineChart(
             `${func.toSentenceCase(window.ACCOUNT_NAME)} ${mapLabel('API Security Posture', dashboardCategory)} over time`,
             overallStats,
@@ -599,20 +622,22 @@ const AgenticDashboard = () => {
                 { label: mapLabel('API Endpoints Discovered', dashboardCategory), color: '#B692F6' },
                 { label: `${mapLabel('API', dashboardCategory)} Issues`, color: '#D72C0D' },
                 { label: `${mapLabel('Threat', dashboardCategory)} Requests flagged`, color: '#F3B283' }
-            ]
+            ],
+            'item-0'
         ),
-        customPieChart(mapLabel('API Discovery', dashboardCategory), `Total ${mapLabel('APIs', dashboardCategory)}`, agenticDiscoveryData),
-        customPieChart("Issues", "Total Issues", agenticIssuesData),
-        customPieChart(mapLabel('Threat Detection', dashboardCategory), "Requests Flagged", agenticGuardrailsData),
-        averageIssueAgeComp(),
-        complianceAtRisksComp(),
+        customPieChart(mapLabel('API Discovery', dashboardCategory), `Total ${mapLabel('APIs', dashboardCategory)}`, agenticDiscoveryData, 'item-1'),
+        customPieChart("Issues", "Total Issues", agenticIssuesData, 'item-2'),
+        customPieChart(mapLabel('Threat Detection', dashboardCategory), "Requests Flagged", agenticGuardrailsData, 'item-3'),
+        averageIssueAgeComp('item-4'),
+        complianceAtRisksComp('item-5'),
         customLineChart(
             `Tested vs Non-Tested ${mapLabel('APIs', dashboardCategory)}`,
             testedVsNonTestedData,
             [
                 { label: 'Non-Tested', color: '#D72C0D' },
                 { label: 'Tested', color: '#9E77ED' }
-            ]
+            ],
+            'item-6'
         ),
         customLineChart(
             "Open & Resolved Issues",
@@ -620,7 +645,8 @@ const AgenticDashboard = () => {
             [
                 { label: 'Open Issues', color: '#D72C0D' },
                 { label: 'Resolved Issues', color: '#9E77ED' }
-            ]
+            ],
+            'item-7'
         ),
         customLineChart(
             `${mapLabel('Threat', dashboardCategory)} Requests over time`,
@@ -628,7 +654,8 @@ const AgenticDashboard = () => {
             [
                 { label: 'Flagged Requests', color: '#D72C0D' },
                 { label: 'Safe Requests', color: '#47B881' }
-            ]
+            ],
+            'item-8'
         ),
         customLineChart(
             `Open & Resolved ${mapLabel('Threat', dashboardCategory)}s`,
@@ -636,14 +663,51 @@ const AgenticDashboard = () => {
             [
                 { label: 'Open Issues', color: '#D72C0D' },
                 { label: 'Resolved Issues', color: '#9E77ED' }
-            ]
+            ],
+            'item-9'
         ),
-        customDataTable("Weakest Areas by Failing Percentage", weakestAreasData),
-        customDataTable(`Top ${mapLabel('APIs', dashboardCategory)} with Critical & High Issues`, topAgenticComponentsData),
-        customDataTable("Top Requests by Type", topRequestsByTypeData),
-        customDataTable(`Top Attacked ${mapLabel('APIs', dashboardCategory)}`, topAttackedComponentsData, false),
-        customDataTable("Top Bad Actors", topBadActorsData, false),
+        customDataTable("Weakest Areas by Failing Percentage", weakestAreasData, true, 'item-10'),
+        customDataTable(`Top ${mapLabel('APIs', dashboardCategory)} with Critical & High Issues`, topAgenticComponentsData, true, 'item-11'),
+        customDataTable("Top Requests by Type", topRequestsByTypeData, true, 'item-12'),
+        customDataTable(`Top Attacked ${mapLabel('APIs', dashboardCategory)}`, topAttackedComponentsData, false, 'item-13'),
+        customDataTable("Top Bad Actors", topBadActorsData, false, 'item-14'),
     ]
+
+    const visiblePageComponents = allComponents.filter((_, index) => visibleComponents.includes(`item-${index}`))
+
+    const componentsMenuActivator = (
+        <Button onClick={() => setPopoverActive(!popoverActive)}>
+            Manage Components
+        </Button>
+    );
+
+    const componentsMenu = (
+        <Popover
+            active={popoverActive}
+            activator={componentsMenuActivator}
+            onClose={() => setPopoverActive(false)}
+        >
+            <ActionList
+                items={[
+                    'item-0', 'item-1', 'item-2', 'item-3', 'item-4', 'item-5',
+                    'item-6', 'item-7', 'item-8', 'item-9', 'item-10', 'item-11',
+                    'item-12', 'item-13', 'item-14'
+                ].map(itemId => ({
+                    content: (
+                        <HorizontalStack gap={2} blockAlign='center'>
+                            <input
+                                type="checkbox"
+                                checked={visibleComponents.includes(itemId)}
+                                onChange={() => toggleComponent(itemId)}
+                            />
+                            <Text>{componentNames[itemId]}</Text>
+                        </HorizontalStack>
+                    ),
+                    onAction: () => toggleComponent(itemId)
+                }))}
+            />
+        </Popover>
+    );
 
     return (
             loading ? <SpinnerCentered /> : (
@@ -665,13 +729,17 @@ const AgenticDashboard = () => {
                             />
                         </HorizontalStack>
                     }
-                    primaryAction={<Button icon={SettingsFilledMinor} onClick={() => {}}>Owner setting</Button>}
+                    primaryAction={<HorizontalStack gap={2}>
+                        {componentsMenu}
+                        <Button icon={SettingsFilledMinor} onClick={() => {}}>Owner setting</Button>
+                    </HorizontalStack>}
                     secondaryActions={[<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />]}
                     components={[
                         <div key="grid-container" ref={containerRef} style={{ width: '100%' }}>
                             <GridLayout
-                                width={containerWidth || 1200}
-                                layout={layout}
+                                // TODO: make width responsive
+                                width={1200}
+                                layout={layout.filter(item => visibleComponents.includes(item.i))}
                                 gridConfig={{
                                     cols: 12,
                                     rowHeight: 100,
@@ -688,11 +756,14 @@ const AgenticDashboard = () => {
                                 compactor={null}
                                 onLayoutChange={onLayoutChange}
                             >
-                                {pageComponents.map((component, index) => (
-                                    <div key={`item-${index}`}>
-                                        {component}
-                                    </div>
-                                ))}
+                                {visiblePageComponents.map((component) => {
+                                    const itemId = `item-${allComponents.indexOf(component)}`;
+                                    return (
+                                        <div key={itemId}>
+                                            {component}
+                                        </div>
+                                    );
+                                })}
                             </GridLayout>
                         </div>
                     ]}
