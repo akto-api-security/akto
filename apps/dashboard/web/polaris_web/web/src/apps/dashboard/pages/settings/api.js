@@ -670,11 +670,15 @@ const settingRequests = {
         })
     },
 
-    fetchDevRevParts(personalAccessToken) {
+    fetchDevRevParts(personalAccessToken, partTypes, partName) {
         return request({
             url: '/api/fetchDevRevParts',
             method: 'post',
-            data: { personalAccessToken }
+            data: {
+                personalAccessToken,
+                partTypes: (partTypes && partTypes.length > 0) ? partTypes : null,
+                partName: partName || null
+            }
         })
     },
 

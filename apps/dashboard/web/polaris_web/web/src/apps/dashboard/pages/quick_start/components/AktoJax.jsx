@@ -29,6 +29,7 @@ const AktoJax = () => {
     const [parseSoapServices, setParseSoapServices] = useState(true);
     const [parseRestServices, setParseRestServices] = useState(true);
     const [clickExternalLinks, setClickExternalLinks] = useState(false);
+    const [crawlingTime, setCrawlingTime] = useState(600);
 
     const goToDocs = () => {
         window.open("https://docs.akto.io/dast/akto-dast")
@@ -41,7 +42,7 @@ const AktoJax = () => {
         }
 
         setLoading(true)
-        api.initiateCrawler(hostname, email, password, apiKey, window.location.origin, testRole, outscopeUrls).then((res) => {
+        api.initiateCrawler(hostname, email, password, apiKey, window.location.origin, testRole, outscopeUrls, crawlingTime).then((res) => {
             func.setToast(true, false, "Crawler initiated successfully. Please check your dashboard for updates.")
         }).catch((err) => {
             console.error("Error initiating crawler:", err)
@@ -97,6 +98,8 @@ const AktoJax = () => {
                 setParseRestServices={setParseRestServices}
                 clickExternalLinks={clickExternalLinks}
                 setClickExternalLinks={setClickExternalLinks}
+                crawlingTime={crawlingTime}
+                setCrawlingTime={setCrawlingTime}
             />
 
             <Box paddingBlockStart={3}><Divider /></Box>
