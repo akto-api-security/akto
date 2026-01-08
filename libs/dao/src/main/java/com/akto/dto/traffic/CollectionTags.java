@@ -24,8 +24,7 @@ public class CollectionTags {
 
     public enum TagSource {
         KUBERNETES,
-        USER,
-        ENDPOINT
+        USER
     }
 
     TagSource source;
