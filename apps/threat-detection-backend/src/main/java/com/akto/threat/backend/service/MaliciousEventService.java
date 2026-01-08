@@ -477,6 +477,8 @@ public class MaliciousEventService {
       query.append("status", ThreatDetectionConstants.UNDER_REVIEW);
     } else if (ThreatDetectionConstants.IGNORED.equals(statusFilter)) {
       query.append("status", ThreatDetectionConstants.IGNORED);
+    } else if (ThreatDetectionConstants.TRAINING.equals(statusFilter)) {
+      query.append("status", ThreatDetectionConstants.TRAINING);
     } else if (ThreatDetectionConstants.ACTIVE.equals(statusFilter) || ThreatDetectionConstants.EVENTS_FILTER.equals(statusFilter)) {
       // For Events tab: show null, empty, or ACTIVE status
       List<Document> orConditions = Arrays.asList(
