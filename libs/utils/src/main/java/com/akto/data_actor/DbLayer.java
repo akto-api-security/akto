@@ -442,6 +442,7 @@ public class DbLayer {
 
         Bson updates = Updates.combine(
             Updates.setOnInsert("_id", id),
+            Updates.setOnInsert(ApiCollection.HOST_NAME, host),
             Updates.setOnInsert("startTs", Context.now()),
             Updates.setOnInsert("urls", new HashSet<>()),
             Updates.set("userSetEnvType", vpcId)

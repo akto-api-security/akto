@@ -1,5 +1,6 @@
 package com.akto.fast_discovery;
 
+import com.akto.dto.ApiCollection;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.fast_discovery.dto.ApiId;
 import com.akto.log.LoggerMaker;
@@ -102,6 +103,48 @@ public class DatabaseAbstractorClient {
 
             loggerMaker.infoAndAddToDb("Fetched " + apiIds.size() + " API IDs");
             return apiIds;
+        }
+    }
+
+    /**
+     * Fetch all API collections for pre-population of collection cache.
+     * Calls: GET /api/fetchAllCollections
+     *
+     * Returns only id and hostName fields (minimal data for cache population).
+     *
+     * @return List of API collections
+     * @throws Exception if HTTP call fails
+     */
+    public List<ApiCollection> fetchAllCollections() throws Exception {
+        String endpoint = baseUrl + "/api/fetchAllCollections";
+        loggerMaker.infoAndAddToDb("Fetching all collections from: " + endpoint);
+
+        HttpGet request = new HttpGet(endpoint);
+        request.setHeader("Authorization", getAuthToken());
+
+        try (CloseableHttpResponse response = httpClient.execute(request)) {
+            int statusCode = response.getStatusLine().getStatusCode();
+            String responseBody = EntityUtils.toString(response.getEntity());
+
+            if (statusCode >= 400) {
+                throw new Exception("HTTP " + statusCode + ": " + responseBody);
+            }
+
+            // Parse response: {"collections": [{"id": 123, "hostName": "api.example.com"}, ...]}
+            Type responseType = new TypeToken<Map<String, Object>>(){}.getType();
+            Map<String, Object> result = gson.fromJson(responseBody, responseType);
+            List<Map<String, Object>> collectionsData = (List<Map<String, Object>>) result.get("collections");
+
+            List<ApiCollection> collections = new ArrayList<>();
+            for (Map<String, Object> data : collectionsData) {
+                ApiCollection col = new ApiCollection();
+                col.setId(((Number) data.get("id")).intValue());
+                col.setHostName((String) data.get("hostName"));
+                collections.add(col);
+            }
+
+            loggerMaker.infoAndAddToDb("Fetched " + collections.size() + " collections");
+            return collections;
         }
     }
 
