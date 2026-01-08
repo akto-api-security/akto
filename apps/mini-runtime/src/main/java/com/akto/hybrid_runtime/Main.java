@@ -225,7 +225,7 @@ public class Main {
         customMiniRuntimeServiceName = System.getenv("MINI_RUNTIME_NAME") == null? "Default_" + UUID.randomUUID().toString().substring(0, 4) : System.getenv("MINI_RUNTIME_NAME");
     }
 
-    static private final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(2);
+    static private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
 
     //REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
@@ -463,19 +463,8 @@ public class Main {
         }, 0, TimeUnit.SECONDS);
 
         // Pod heartbeat consumer thread
-        executorService.schedule(new Runnable() {
-            public void run() {
-                String heartbeatTopicName = "akto.daemonset.producer.heartbeats";
-                AktoTrafficCollectorTelemetry telemetry = new AktoTrafficCollectorTelemetry(
-                    kafkaUrl,
-                    groupIdConfig,
-                    maxPollRecordsConfig,
-                    heartbeatTopicName,
-                    dataActor
-                );
-                telemetry.run();
-            }
-        }, 0, TimeUnit.SECONDS);
+        String heartbeatTopicName = "akto.daemonset.producer.heartbeats";
+        new AktoTrafficCollectorTelemetry(kafkaUrl, groupIdConfig, maxPollRecordsConfig, heartbeatTopicName, dataActor).run();
 
         String runMcpJobs = System.getenv("AKTO_RUN_MCP_JOBS");
         boolean shouldRunMcpJobs = true;

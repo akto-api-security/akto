@@ -185,9 +185,9 @@ public class SampleParser {
     public static ModuleInfo parseHeartbeatMessage(String message) throws Exception {
         Map<String, Object> json = gson.fromJson(message, new com.google.gson.reflect.TypeToken<Map<String, Object>>(){}.getType());
 
-        String daemonId = (String) json.getOrDefault("daemonId", null);
+        String daemonId = (String) json.getOrDefault("daemonId", "daemon-0");
         String moduleTypeStr = (String) json.getOrDefault("moduleType", "TRAFFIC_COLLECTOR");
-        String daemonPodName = (String) json.getOrDefault("daemonPodName", null);
+        String daemonPodName = (String) json.getOrDefault("daemonPodName", "akto-tc:pod-0:node-0");
         int timestamp = Integer.parseInt(json.getOrDefault("timestamp", String.valueOf(Context.now())).toString());
 
 

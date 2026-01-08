@@ -16,6 +16,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 
 public class AktoTrafficCollectorTelemetry {
@@ -57,15 +59,18 @@ public class AktoTrafficCollectorTelemetry {
     }
 
     public void run() {
-        try {
-            Context.accountId.set(Context.getActualAccountId());
-            loggerMaker.infoAndAddToDb("Starting pod heartbeat consumer");
+        ExecutorService pollingExecutor = Executors.newSingleThreadExecutor();
+        pollingExecutor.execute(() -> {
+            try {
+                Context.accountId.set(Context.getActualAccountId());
+                loggerMaker.infoAndAddToDb("Starting pod heartbeat consumer");
 
-            runConsumerLoop();
+                runConsumerLoop();
 
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error while starting pod heartbeat consumer");
-        }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error while starting pod heartbeat consumer");
+            }
+        });
     }
 
 
