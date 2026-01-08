@@ -493,5 +493,6 @@ public class DaoInit {
         EndpointShieldLogsDao.instance.createIndicesIfAbsent();
         AgentConversationDao.instance.createIndexIfAbsent();
         AgentConversationResultDao.instance.createIndexIfAbsent();
+        ApiCollectionIconsDao.instance.createIndicesIfAbsent();
     }
 }

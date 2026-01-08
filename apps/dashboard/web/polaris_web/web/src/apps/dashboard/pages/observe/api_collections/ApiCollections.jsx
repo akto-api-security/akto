@@ -47,8 +47,100 @@ const CenterViewType = {
 const API_COLLECTIONS_CACHE_DURATION_SECONDS = 5 * 60; // 5 minutes
 const COLLECTIONS_LAZY_RENDER_THRESHOLD = 100; // Collections count above which we use lazy rendering optimization
 
+
+/**
+ * Cascading domain lookup for UI rendering - tries full hostname first, then removes subdomains
+ * Examples: api.sub.github.com -> try api.sub.github.com -> sub.github.com -> github.com
+ */
+const findDomainWithIconInUI = async (hostName) => {
+    if (!hostName || typeof hostName !== 'string') {
+        return null;
+    }
+    
+    const cleanHostName = hostName.trim().toLowerCase();
+    const parts = cleanHostName.split('.');
+    
+    if (parts.length < 2) {
+        return cleanHostName;
+    }
+    
+    // Try from full hostname down to main domain (last 2 parts)
+    for (let i = 0; i <= parts.length - 2; i++) {
+        const candidateDomain = parts.slice(i).join('.');
+        
+        try {
+            const response = await collectionApi.getIconData(candidateDomain);
+            if (response.iconData && response.iconData.imageData) {
+                // Found icon at this domain level
+                return {
+                    domain: candidateDomain,
+                    iconData: response.iconData
+                };
+            }
+        } catch (error) {
+            // Continue to next level if this one doesn't exist
+            continue;
+        }
+    }
+    
+    // No icon found at any level
+    return null;
+};
+
+// Simple icon component that fetches base64 data with unified fallback
+const CollectionIconRenderer = ({ hostName, displayName, tagsList }) => {
+    const [iconSrc, setIconSrc] = useState(null);
+    const [loaded, setLoaded] = useState(false);
+
+    useEffect(() => {
+        if (!hostName || loaded) return;
+        
+        const fetchIcon = async () => {
+            try {
+                // Use cascading domain lookup to find existing icons in database
+                const result = await findDomainWithIconInUI(hostName);
+                if (result && result.iconData && result.iconData.imageData) {
+                    setIconSrc(`data:${result.iconData.contentType || 'image/png'};base64,${result.iconData.imageData}`);
+                }
+            } catch (error) {
+                console.error('Failed to fetch icon for', hostName);
+            } finally {
+                setLoaded(true);
+            }
+        };
+
+        fetchIcon();
+    }, [hostName, loaded]);
+
+    // If custom icon is found, use it
+    if (iconSrc) {
+        return <img src={iconSrc} alt="icon" style={{width: '24px', height: '24px'}} />;
+    }
+    
+    // Use unified fallback logic for all collection types
+    return <CollectionFallbackIcon tagsList={tagsList} displayName={displayName} />;
+};
+
+// Unified fallback icon component for collections based on types
+const CollectionFallbackIcon = ({ tagsList, displayName }) => {
+    // GenAI collections logic
+    if (tagsList?.some(tag => tag.name === "gen-ai")) {
+        const iconSource = tagsList.some(tag => tag.name === "AI Agent") ? AutomationMajor : MagicMajor;
+        return <Icon source={iconSource} color={"base"} />;
+    }
+    
+    // MCP collections logic  
+    if (tagsList?.some(tag => tag.name === "mcp-server")) {
+        return <img src={MCPIcon} alt="MCP icon" style={{width: '24px', height: '24px'}} />;
+    }
+    
+    // Default fallback based on displayName
+    const defaultIcon = displayName?.toLowerCase().startsWith('mcp') ? MCPIcon : LaptopIcon;
+    return <img src={defaultIcon} alt="default icon" style={{width: '24px', height: '24px'}} />;
+};
+
 const headers = [
-    ...((isMCPSecurityCategory() || isAgenticSecurityCategory()) && func.isDemoAccount() ? [{
+    ...((isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory()) && func.isDemoAccount() ? [{
         title: "",
         text: "",
         value: "iconComp",
@@ -252,10 +344,10 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             discovered: func.prettifyEpoch(c.startTs || 0),
             descriptionComp: (<Box maxWidth="350px"><Text>{c.description}</Text></Box>),
             outOfTestingScopeComp: c.isOutOfTestingScope ? (<Text>Yes</Text>) : (<Text>No</Text>),
-            ...(((isMCPSecurityCategory() || isAgenticSecurityCategory()) && func.isDemoAccount() && tagsList.includes("mcp-server")) ? {
-                iconComp: (<Box><img src={c.displayName?.toLowerCase().startsWith('mcp') ? MCPIcon : LaptopIcon} alt="icon" style={{width: '24px', height: '24px'}} /></Box>)
+            ...(((isAgenticSecurityCategory() || isEndpointSecurityCategory()) && func.isDemoAccount() && tagsList.includes("mcp-server")) ? {
+                iconComp: (<Box><CollectionIconRenderer hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>)
             } : ((isGenAISecurityCategory() || isAgenticSecurityCategory()) && func.isDemoAccount() && tagsList.includes("gen-ai")) ? {
-                iconComp: (<Box><Icon source={tagsList.includes("AI Agent") ? AutomationMajor : MagicMajor} color={"base"}/></Box>)
+                iconComp: (<Box><CollectionIconRenderer hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>)
             } : {})
         };
     })

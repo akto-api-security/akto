@@ -71,4 +71,11 @@ export default {
             data: { missingUrls }
         })
     },
+    getIconData(hostName){
+        return request({
+            url: '/api/getIconData',
+            method: 'post',
+            data: { hostName }
+        })
+    },
 }

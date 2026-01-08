@@ -56,9 +56,22 @@ import com.mongodb.client.model.UpdateOptions;
 import com.opensymphony.xwork2.Action;
 
 import lombok.Setter;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import java.util.Base64;
+import com.akto.util.http_util.CoreHTTPClient;
+import java.io.IOException;
 import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
+import static com.akto.util.Constants.FAVICON_SOURCE_URL;
+
 import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.dto.type.URLMethods;
+import com.akto.dao.ApiCollectionIconsDao;
+import com.akto.dto.ApiCollectionIcon;
 
 public class ApiCollectionsAction extends UserAction {
 
@@ -245,6 +258,17 @@ public class ApiCollectionsAction extends UserAction {
         UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
         this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty(), Projections.exclude("urls"));
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
+        
+        // Start background icon processing for Argus and Atlas collections asynchronously
+        // This runs in a separate thread to not block the main response
+        CompletableFuture.runAsync(() -> {
+            try {
+                processIconsForMcpCollections(this.apiCollections);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error during background icon processing", LogDb.DASHBOARD);
+            }
+        }, iconProcessingExecutor);
+        
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -1674,6 +1698,271 @@ public class ApiCollectionsAction extends UserAction {
 
     public void setResetEnvTypes(boolean resetEnvTypes) {
         this.resetEnvTypes = resetEnvTypes;
+    }
+
+    private Map<String, Object> iconData = new HashMap<>();
+    private String hostName;
+
+    public String fetchIconData() {
+        try {
+            if (hostName == null || hostName.trim().isEmpty()) {
+                this.iconData.put("error", "No hostname provided");
+                return Action.ERROR.toUpperCase();
+            }
+
+            // cascading domain lookup to find the icon till main domain if not found by sub domain
+            String domainToLookup = findDomainWithIcon(hostName.trim());
+            
+            // Try to get icon from database using the found domain
+            ApiCollectionIcon icon = null;
+            if (domainToLookup != null) {
+                icon = ApiCollectionIconsDao.instance.findOne(
+                    Filters.eq("_id", domainToLookup)
+                );
+            }
+
+            if (icon != null && icon.isAvailable()) {
+                this.iconData.put("imageData", icon.getImageData());
+                this.iconData.put("contentType", icon.getContentType());
+                this.iconData.put("faviconUrl", icon.getSourceUrl());
+
+            } else {
+                this.iconData.put("available", false);
+                this.iconData.put("status", icon != null ? "NO_DATA" : "NOT_FOUND");
+            }
+
+            if(this.response == null) {
+                this.response = new BasicDBObject();
+            }
+            this.response.put("iconData", iconData);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error fetching icon data for hostname: " + hostName, LogDb.DASHBOARD);
+            iconData = new HashMap<>();
+            iconData.put("error", "Failed to fetch icon data");
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    public Map<String, Object> getIconData() {
+        return iconData;
+    }
+
+
+    public void setIconData(Map<String, Object> iconData) {
+        this.iconData = iconData;
+    }
+
+    public void setHostName(String hostName) {
+        this.hostName = hostName;
+    }
+
+    public String getHostName() {
+        return hostName;
+    }
+
+    // Static thread pool for background icon processing to avoid creating new threads repeatedly
+    private static final Executor iconProcessingExecutor = Executors.newFixedThreadPool(3);
+    private static final OkHttpClient httpClient = CoreHTTPClient.client.newBuilder().build();
+
+    /**
+     * Cascading domain lookup utility - tries full hostname first, then progressively removes subdomains
+     * Examples: 
+     *   api.sub.github.com -> try api.sub.github.com -> sub.github.com -> github.com
+     *   Returns the first domain that has an icon in the database, or main domain as fallback
+     */
+    private static String findDomainWithIcon(String hostName) {
+        if (hostName == null || hostName.trim().isEmpty()) {
+            return null;
+        }
+        
+        String cleanHostName = hostName.trim().toLowerCase();
+        String[] parts = cleanHostName.split("\\.");
+        
+        if (parts.length < 2) {
+            return cleanHostName;
+        }
+        
+        // Try from full hostname down to main domain (last 2 parts)
+        for (int i = 0; i <= parts.length - 2; i++) {
+            StringBuilder domainBuilder = new StringBuilder();
+            for (int j = i; j < parts.length; j++) {
+                if (j > i) domainBuilder.append(".");
+                domainBuilder.append(parts[j]);
+            }
+            String candidateDomain = domainBuilder.toString();
+            
+            // Check if this domain has an icon
+            if (isIconExists(candidateDomain)) {
+                return candidateDomain;
+            }
+        }
+        
+        // Return main domain (last 2 parts) as fallback for storage
+        return parts[parts.length - 2] + "." + parts[parts.length - 1];
+    }
+
+    /**
+     * Check if icon already exists in the database
+     */
+    private static boolean isIconExists(String domain) {
+        try {
+            ApiCollectionIcon existingIcon = ApiCollectionIconsDao.instance.findOne(
+                Filters.eq("_id", domain)
+            );
+            return existingIcon != null;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error checking if icon exists for domain: " + domain, LogDb.DASHBOARD);
+            return false;
+        }
+    }
+
+    /**
+     * Fetch icon from Google Favicon API with cascading domain fallback and store in database
+     * Tries full hostname first, then progressively removes subdomains until success or TLD reached
+     */
+    private static void fetchAndStoreIconWithCascade(String fullHostname) {
+        if (fullHostname == null || fullHostname.trim().isEmpty()) {
+            return;
+        }
+        
+        String cleanHostName = fullHostname.trim().toLowerCase();
+        String[] parts = cleanHostName.split("\\.");
+        
+        if (parts.length < 2) {
+            // Single part domain, try as-is
+            tryFetchAndStoreIcon(cleanHostName, cleanHostName);
+            return;
+        }
+        
+        // Try from full hostname down to main domain (last 2 parts)
+        for (int i = 0; i <= parts.length - 2; i++) {
+            StringBuilder domainBuilder = new StringBuilder();
+            for (int j = i; j < parts.length; j++) {
+                if (j > i) domainBuilder.append(".");
+                domainBuilder.append(parts[j]);
+            }
+            String candidateDomain = domainBuilder.toString();
+            
+            // Try to fetch icon for this domain level
+            if (tryFetchAndStoreIcon(candidateDomain, fullHostname)) {
+                return; // Success - stop trying other levels
+            }
+        }
+    }
+
+    /**
+     * Try to fetch icon from Google API for a specific domain level
+     * Returns true if successful, false if should try next level
+     */
+    private static boolean tryFetchAndStoreIcon(String domain, String originalHostname) {
+        try {
+            String faviconUrl = FAVICON_SOURCE_URL + domain + "&size=64";
+            
+            Request request = new Request.Builder()
+                    .url(faviconUrl)
+                    .build();
+
+            try (Response response = httpClient.newCall(request).execute()) {
+                if (response.isSuccessful() && response.body() != null) {
+                    byte[] imageBytes = response.body().bytes();
+                    if (imageBytes.length > 0) {
+                        String base64Data = Base64.getEncoder().encodeToString(imageBytes);
+                        
+                        ApiCollectionIcon icon = new ApiCollectionIcon();
+                        icon.setId(domain); // Store with the successful domain level
+                        icon.setImageData(base64Data);
+                        icon.setContentType("image/png");
+                        icon.setSourceUrl(faviconUrl);
+                        icon.setCreatedAt(Context.now()); // Set creation timestamp on first fetch
+                        
+                        ApiCollectionIconsDao.instance.insertOne(icon);
+                        loggerMaker.infoAndAddToDb("Successfully fetched and stored icon for domain: " + domain + " (from hostname: " + originalHostname + ")", LogDb.DASHBOARD);
+                        return true; // Success
+                    }
+                }
+                
+                // Failed at this level - try next level
+                loggerMaker.infoAndAddToDb("No valid icon at domain level: " + domain + ", trying next level", LogDb.DASHBOARD);
+                return false;
+                
+            }
+        } catch (IOException e) {
+            loggerMaker.infoAndAddToDb("IO error for domain: " + domain + ", trying next level", LogDb.DASHBOARD);
+            return false;
+        } catch (Exception e) {
+            loggerMaker.infoAndAddToDb("Error for domain: " + domain + ", trying next level", LogDb.DASHBOARD);
+            return false;
+        }
+    }
+
+    /**
+     * Process all API collections and fetch missing icons for MCP servers
+     */
+    private static void processIconsForMcpCollections(List<ApiCollection> apiCollections) {
+        if (apiCollections == null || apiCollections.isEmpty()) {
+            return;
+        }
+
+        Set<String> hostnamesToProcess = new HashSet<>();
+        
+        // Extract unique full hostnames from MCP server collections
+        for (ApiCollection collection : apiCollections) {
+            if (collection.getTagsList() != null && 
+                collection.getTagsList().stream().anyMatch(tag -> "mcp-server".equals(tag.getKeyName()))) {
+                String hostname = collection.getHostName();
+                if (hostname != null && !hostname.trim().isEmpty()) {
+                    hostnamesToProcess.add(hostname.trim().toLowerCase());
+                }
+            }
+        }
+
+        loggerMaker.infoAndAddToDb("Found " + hostnamesToProcess.size() + " unique hostnames to process for icon fetching", LogDb.DASHBOARD);
+
+        // Process each hostname with cascading logic
+        for (String hostname : hostnamesToProcess) {
+            // Check if any domain level for this hostname already has an icon
+            if (!hasIconAtAnyLevel(hostname)) {
+                // Fetch icon asynchronously with cascading Google API calls
+                CompletableFuture.runAsync(() -> fetchAndStoreIconWithCascade(hostname), iconProcessingExecutor)
+                    .exceptionally(throwable -> {
+                        loggerMaker.errorAndAddToDb((Exception) throwable, "Async error processing icon for hostname: " + hostname, LogDb.DASHBOARD);
+                        return null;
+                    });
+            }
+        }
+    }
+
+    /**
+     * Check if any domain level of the hostname has an icon in database
+     */
+    private static boolean hasIconAtAnyLevel(String hostname) {
+        if (hostname == null || hostname.trim().isEmpty()) {
+            return false;
+        }
+        
+        String cleanHostName = hostname.trim().toLowerCase();
+        String[] parts = cleanHostName.split("\\.");
+        
+        if (parts.length < 2) {
+            return isIconExists(cleanHostName);
+        }
+        
+        // Check from full hostname down to main domain
+        for (int i = 0; i <= parts.length - 2; i++) {
+            StringBuilder domainBuilder = new StringBuilder();
+            for (int j = i; j < parts.length; j++) {
+                if (j > i) domainBuilder.append(".");
+                domainBuilder.append(parts[j]);
+            }
+            String candidateDomain = domainBuilder.toString();
+            
+            if (isIconExists(candidateDomain)) {
+                return true; // Found icon at this level
+            }
+        }
+        
+        return false; // No icon found at any level
     }
 
 }
