@@ -129,7 +129,7 @@ const ChipInputWithAutocomplete = ({
         <VerticalStack gap="1">
             <Text variant="bodyMd" as="label">{label}</Text>
 
-            <div className={`chip-input-wrapper ${containerClassName || ''}`}>
+            <Box position="relative" className={containerClassName}>
                 <Box
                     padding="2"
                     borderWidth="1"
@@ -165,9 +165,9 @@ const ChipInputWithAutocomplete = ({
                 </Box>
 
                 {isFocused && filteredSuggestions.length > 0 && (
-                    <div className={`chip-suggestions-dropdown ${suggestionClassName || ''}`}>
+                    <Box className={`chip-suggestions-dropdown ${suggestionClassName || ''}`}>
                         {filteredSuggestions.map((suggestion, index) => (
-                            <div
+                            <Box
                                 key={suggestion}
                                 className={`chip-suggestion-item ${index === 0 ? 'chip-suggestion-selected' : ''}`}
                                 onMouseDown={(e) => {
@@ -177,11 +177,11 @@ const ChipInputWithAutocomplete = ({
                                 }}
                             >
                                 {suggestion}
-                            </div>
+                            </Box>
                         ))}
-                    </div>
+                    </Box>
                 )}
-            </div>
+            </Box>
 
             {errorMessage && (
                 <Text variant="bodySm" tone="critical">
