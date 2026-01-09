@@ -188,6 +188,7 @@ public class SampleParser {
         String daemonId = (String) json.getOrDefault("daemonId", "daemon-0");
         String moduleTypeStr = (String) json.getOrDefault("moduleType", "TRAFFIC_COLLECTOR");
         String daemonPodName = (String) json.getOrDefault("daemonPodName", "akto-tc:pod-0:node-0");
+        String imageVersion = (String) json.getOrDefault("imageVersion", "k8s-ebpf");
         int timestamp = Integer.parseInt(json.getOrDefault("timestamp", String.valueOf(Context.now())).toString());
 
 
@@ -197,6 +198,7 @@ public class SampleParser {
         moduleInfo.setName(daemonPodName);
         moduleInfo.setLastHeartbeatReceived(timestamp);
         moduleInfo.setStartedTs(timestamp); 
+        moduleInfo.setCurrentVersion(imageVersion);
 
         return moduleInfo;
     }
