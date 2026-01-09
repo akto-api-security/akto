@@ -167,6 +167,10 @@ public class DbActor extends DataActor {
         return allParams;
     }
 
+    public List<com.akto.dto.traffic.Key> fetchAllSampleDataKeys() {
+        return DbLayer.fetchAllSampleDataKeys();
+    }
+
     public List<SensitiveParamInfo> getUnsavedSensitiveParamInfos() {
         return DbLayer.getUnsavedSensitiveParamInfos();
     }

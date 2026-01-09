@@ -74,6 +74,8 @@ public abstract class DataActor {
 
     public abstract List<SingleTypeInfo> fetchAllStis();
 
+    public abstract List<com.akto.dto.traffic.Key> fetchAllSampleDataKeys();
+
     public abstract List<SensitiveParamInfo> getUnsavedSensitiveParamInfos();
 
     public abstract List<CustomDataType> fetchCustomDataTypes();
