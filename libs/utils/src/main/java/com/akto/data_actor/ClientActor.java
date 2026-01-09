@@ -559,6 +559,62 @@ public class ClientActor extends DataActor {
 
         return allStis;
     }
+
+    public List<com.akto.dto.traffic.Key> fetchAllSampleDataKeys() {
+        Map<String, List<String>> headers = buildHeaders();
+        List<com.akto.dto.traffic.Key> allKeys = new ArrayList<>();
+        String lastKeyId = null;
+
+        for (int i = 0; i < 80; i++) {
+            BasicDBObject obj = new BasicDBObject();
+            obj.put("lastKeyId", lastKeyId);
+            OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchSampleDataKeys", "", "POST", obj.toString(), headers, "");
+            try {
+                OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+                String responsePayload = response.getBody();
+                if (response.getStatusCode() != 200 || responsePayload == null) {
+                    loggerMaker.errorAndAddToDb("invalid response in fetchAllSampleDataKeys", LoggerMaker.LogDb.RUNTIME);
+                    return allKeys;
+                }
+                BasicDBObject payloadObj;
+                try {
+                    payloadObj = BasicDBObject.parse(responsePayload);
+                    BasicDBList keyList = (BasicDBList) payloadObj.get("sampleDataKeys");
+                    if (keyList == null || keyList.isEmpty()) break;
+
+                    for (Object keyObj : keyList) {
+                        BasicDBObject obj2 = (BasicDBObject) keyObj;
+                        int apiCollectionId = obj2.getInt("apiCollectionId");
+                        String url_str = obj2.getString("url");
+                        String methodStr = obj2.getString("method");
+                        int responseCode = obj2.getInt("responseCode", -1);
+                        int isHeader = obj2.getInt("isHeader", 0);
+                        int ts = obj2.getInt("ts", 0);
+
+                        com.akto.dto.traffic.Key key = new com.akto.dto.traffic.Key(
+                            apiCollectionId,
+                            url_str,
+                            URLMethods.Method.valueOf(methodStr),
+                            responseCode,
+                            isHeader,
+                            ts
+                        );
+                        allKeys.add(key);
+
+                        // Use compound key for pagination cursor
+                        lastKeyId = apiCollectionId + "_" + url_str + "_" + methodStr;
+                    }
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("error extracting response in fetchAllSampleDataKeys" + e, LoggerMaker.LogDb.RUNTIME);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error in fetchAllSampleDataKeys" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        }
+
+        return allKeys;
+    }
+
     public List<SingleTypeInfo> fetchStiInBatches(int batchCount, int lastStiFetchTs) {
         Map<String, List<String>> headers = buildHeaders();
         List<SingleTypeInfo> allStis = new ArrayList<>();

@@ -319,6 +319,39 @@ public class DbLayer {
         return SingleTypeInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(SingleTypeInfo._VALUES));
     }
 
+    public static List<com.akto.dto.traffic.Key> fetchAllSampleDataKeys() {
+        List<com.akto.dto.traffic.Key> keys = new ArrayList<>();
+        try {
+            com.mongodb.client.FindIterable<org.bson.Document> cursor = SampleDataDao.instance
+                .getMCollection()
+                .withDocumentClass(org.bson.Document.class)
+                .find()
+                .projection(Projections.include("_id"))
+                .batchSize(10000);
+
+            for (org.bson.Document doc : cursor) {
+                org.bson.Document id = (org.bson.Document) doc.get("_id");
+                if (id != null) {
+                    int apiCollectionId = id.getInteger("apiCollectionId", 0);
+                    String url = id.getString("url");
+                    String methodStr = id.getString("method");
+                    int responseCode = id.getInteger("responseCode", -1);
+                    int isHeader = id.getInteger("isHeader", 0);
+                    int ts = id.getInteger("ts", 0);
+
+                    URLMethods.Method method = URLMethods.Method.fromString(methodStr);
+                    com.akto.dto.traffic.Key key = new com.akto.dto.traffic.Key(
+                        apiCollectionId, url, method, responseCode, isHeader, ts
+                    );
+                    keys.add(key);
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return keys;
+    }
+
     public static void updateRuntimeVersion(String fieldName, String version) {
         AccountSettingsDao.instance.updateOne(
                         AccountSettingsDao.generateFilter(),

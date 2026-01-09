@@ -76,6 +76,7 @@ public class APICatalogSync {
     public static boolean mergeAsyncOutside = true;
     public int lastStiFetchTs = 0;
     public BloomFilter<CharSequence> existingAPIsInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
+    public BloomFilter<CharSequence> existingSampleDataInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
     public Map<String, FilterConfig> advancedFilterMap =  new HashMap<>();
 
     private static DataActor dataActor = DataActorFactory.fetchInstance();
@@ -1205,6 +1206,19 @@ public class APICatalogSync {
         this.dbState = build(allParams, existingAPIsInDb);
         loggerMaker.infoAndAddToDb("Done building dbState");
 
+        // Load existing sample data keys into Bloom filter
+        loggerMaker.infoAndAddToDb("Loading existing sample data keys into Bloom filter");
+        try {
+            List<com.akto.dto.traffic.Key> sampleDataKeys = dataActor.fetchAllSampleDataKeys();
+            for (com.akto.dto.traffic.Key key : sampleDataKeys) {
+                String sampleKey = key.getApiCollectionId() + " " + key.getUrl() + " " + key.getMethod();
+                existingSampleDataInDb.put(sampleKey);
+            }
+            loggerMaker.infoAndAddToDb("Loaded " + sampleDataKeys.size() + " sample data keys into Bloom filter");
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error loading sample data keys into Bloom filter: " + e.getMessage());
+        }
+
         // todo: discuss
         //this.sensitiveParamInfoBooleanMap = new HashMap<>();
         List<SensitiveParamInfo> sensitiveParamInfos = dataActor.getUnsavedSensitiveParamInfos();
@@ -1624,9 +1638,11 @@ public class APICatalogSync {
         Map<URLStatic, RequestTemplate> dbStrictURLToMethods = dbCatalog.getStrictURLToMethods();
 
         for(Map.Entry<URLStatic, RequestTemplate> entry: deltaStrictURLToMethods.entrySet()) {
-            if (forceUpdate || !dbStrictURLToMethods.containsKey(entry.getKey())) {
+            String sampleKey = apiCollectionId + " " + entry.getKey().getUrl() + " " + entry.getKey().getMethod();
+            if (forceUpdate || !existingSampleDataInDb.mightContain(sampleKey)) {
                 Key key = new Key(apiCollectionId, entry.getKey().getUrl(), entry.getKey().getMethod(), -1, 0, 0);
                 sampleData.add(new SampleData(key, entry.getValue().removeAllSampleMessage()));
+                existingSampleDataInDb.put(sampleKey);  // Add to Bloom filter after collecting
             }
         }
 
@@ -1634,9 +1650,11 @@ public class APICatalogSync {
         Map<URLTemplate, RequestTemplate> dbTemplateURLToMethods = dbCatalog.getTemplateURLToMethods();
 
         for(Map.Entry<URLTemplate, RequestTemplate> entry: deltaTemplateURLToMethods.entrySet()) {
-            if (forceUpdate || !dbTemplateURLToMethods.containsKey(entry.getKey())) {
+            String sampleKey = apiCollectionId + " " + entry.getKey().getTemplateString() + " " + entry.getKey().getMethod();
+            if (forceUpdate || !existingSampleDataInDb.mightContain(sampleKey)) {
                 Key key = new Key(apiCollectionId, entry.getKey().getTemplateString(), entry.getKey().getMethod(), -1, 0, 0);
                 sampleData.add(new SampleData(key, entry.getValue().removeAllSampleMessage()));
+                existingSampleDataInDb.put(sampleKey);  // Add to Bloom filter after collecting
             }
         }
 
