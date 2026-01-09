@@ -114,7 +114,7 @@ const CollectionIconRenderer = ({ hostName, displayName, tagsList }) => {
 
     // If custom icon is found, use it
     if (iconSrc) {
-        return <img src={iconSrc} alt="icon" style={{width: '24px', height: '24px'}} />;
+        return <img src={iconSrc} alt="icon" style={{width: '20px', height: '20px', borderRadius: '2px'}} />;
     }
     
     // Use unified fallback logic for all collection types
@@ -129,14 +129,14 @@ const CollectionFallbackIcon = ({ tagsList, displayName }) => {
         return <Icon source={iconSource} color={"base"} />;
     }
     
-    // MCP collections logic  
+    // MCP collections logic
     if (tagsList?.some(tag => tag.name === "mcp-server")) {
-        return <img src={MCPIcon} alt="MCP icon" style={{width: '24px', height: '24px'}} />;
+        return <img src={MCPIcon} alt="MCP icon" style={{width: '20px', height: '20px', borderRadius: '2px'}} />;
     }
-    
+
     // Default fallback based on displayName
     const defaultIcon = displayName?.toLowerCase().startsWith('mcp') ? MCPIcon : LaptopIcon;
-    return <img src={defaultIcon} alt="default icon" style={{width: '24px', height: '24px'}} />;
+    return <img src={defaultIcon} alt="default icon" style={{width: '20px', height: '20px', borderRadius: '2px'}} />;
 };
 
 const headers = [
