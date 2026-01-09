@@ -273,7 +273,7 @@ public class SampleDataAnalyser {
                 return false;
             }
 
-            String templateUrl = sampleData.getId().getUrl();
+            String templateUrl = ApiInfo.getNormalizedUrl(sampleData.getId().getUrl());
             String[] templateSegments = templateUrl.split("/");
 
             for (String sampleStr : samples) {
