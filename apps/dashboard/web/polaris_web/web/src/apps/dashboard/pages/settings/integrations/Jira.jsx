@@ -40,7 +40,8 @@ function Jira() {
         severityToPriorityMap,
         initialSeverityMapping,
         isLoadingPriorities,
-        isSavingSeverityMapping
+        isSavingSeverityMapping,
+        isAlreadyIntegrated
     } = state;
 
 
@@ -218,13 +219,14 @@ function Jira() {
     }
 
     async function fetchPriorities() {
-        if (!baseUrl?.trim() || !userEmail?.trim() || !apiToken?.trim()) {
+        // Backend always fetches credentials from database
+        if (!isAlreadyIntegrated) {
             return;
         }
 
         actions.setIsLoadingPriorities(true);
         try {
-            const response = await api.fetchJiraPriorities(baseUrl, userEmail, apiToken);
+            const response = await api.fetchJiraPriorities();
 
             // Handle response - it might be an array directly or wrapped in an object
             let priorities = [];
@@ -303,10 +305,11 @@ function Jira() {
     }, []);
 
     useEffect(() => {
-        if (baseUrl && userEmail && apiToken) {
+        // Fetch priorities from database when Jira is already integrated
+        if (isAlreadyIntegrated) {
             fetchPriorities();
         }
-    }, [baseUrl, userEmail, apiToken]);
+    }, [isAlreadyIntegrated]);
 
 
     function transformJiraObject() {

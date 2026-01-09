@@ -285,6 +285,18 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private List<BasicDBObject> jiraPriorities;
 
     public String fetchJiraPriorities() {
+        // Always fetch credentials from database
+        jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+        if (jiraIntegration == null) {
+            loggerMaker.errorAndAddToDb("Jira integration not found");
+            addActionError("Jira is not integrated. Please integrate Jira first.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        baseUrl = jiraIntegration.getBaseUrl();
+        userEmail = jiraIntegration.getUserEmail();
+        apiToken = jiraIntegration.getApiToken();
+
         loggerMaker.infoAndAddToDb("Fetching Jira priorities from " + baseUrl);
         setApiToken(buildApiToken(apiToken));
         try {

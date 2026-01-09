@@ -300,11 +300,11 @@ const settingRequests = {
         })
     },
 
-    fetchJiraPriorities(baseUrl, userEmail, apiToken) {
+    fetchJiraPriorities() {
         return request({
             url: '/api/jira/fetchPriorities',
             method: 'post',
-            data: {baseUrl, userEmail, apiToken}
+            data: {}
         })
     },
 
