@@ -53,6 +53,7 @@ const transform = {
             // Prepare table data
             threatsTableData.push({
                 id: threat.id || threat._id,
+                refId: threat.refId || '',
                 actor: actor,
                 time: threat.detectedAt ? new Date(threat.detectedAt * 1000).toLocaleString() : '-',
                 timestamp: threat.detectedAt || 0,

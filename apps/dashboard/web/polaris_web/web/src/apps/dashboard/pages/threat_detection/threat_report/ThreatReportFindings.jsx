@@ -8,7 +8,7 @@ const ThreatReportFindings = ({ threatsTableData, severityCount, organizationNam
 
     const handleThreatClick = (threat) => {
         const params = new URLSearchParams({
-            refId: threat.id,
+            refId: threat.refId,
             eventType: 'SINGLE',
             actor: threat.actor,
             filterId: threat.filterId || '',
