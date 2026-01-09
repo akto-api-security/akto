@@ -6,6 +6,8 @@ export const initialEmptyMapping = aktoStatusForJira.reduce((acc, status) => {
   return acc;
 }, {});
 
+export const aktoSeverities = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
+
 const initialState = {
   credentials: {
     baseUrl: '',
@@ -17,7 +19,12 @@ const initialState = {
   isAlreadyIntegrated: false,
   isSaving: false,
   initialFormData: null,
-  loadingProjectIndex: null
+  loadingProjectIndex: null,
+  jiraPriorities: [],
+  severityToPriorityMap: {},
+  initialSeverityMapping: {},
+  isLoadingPriorities: false,
+  isSavingSeverityMapping: false
 };
 
 const ACTION_TYPES = {
@@ -31,7 +38,13 @@ const ACTION_TYPES = {
   SET_IS_SAVING: 'SET_IS_SAVING',
   SET_INITIAL_FORM_DATA: 'SET_INITIAL_FORM_DATA',
   CLEAR_PROJECTS: 'CLEAR_PROJECTS',
-  SET_LOADING_PROJECT_INDEX: 'SET_LOADING_PROJECT_INDEX'
+  SET_LOADING_PROJECT_INDEX: 'SET_LOADING_PROJECT_INDEX',
+  SET_JIRA_PRIORITIES: 'SET_JIRA_PRIORITIES',
+  SET_SEVERITY_TO_PRIORITY_MAP: 'SET_SEVERITY_TO_PRIORITY_MAP',
+  SET_INITIAL_SEVERITY_MAPPING: 'SET_INITIAL_SEVERITY_MAPPING',
+  UPDATE_SEVERITY_MAPPING: 'UPDATE_SEVERITY_MAPPING',
+  SET_IS_LOADING_PRIORITIES: 'SET_IS_LOADING_PRIORITIES',
+  SET_IS_SAVING_SEVERITY_MAPPING: 'SET_IS_SAVING_SEVERITY_MAPPING'
 };
 
 function jiraReducer(state, action) {
@@ -133,6 +146,45 @@ function jiraReducer(state, action) {
         loadingProjectIndex: action.payload
       };
 
+    case ACTION_TYPES.SET_JIRA_PRIORITIES:
+      return {
+        ...state,
+        jiraPriorities: action.payload
+      };
+
+    case ACTION_TYPES.SET_SEVERITY_TO_PRIORITY_MAP:
+      return {
+        ...state,
+        severityToPriorityMap: action.payload
+      };
+
+    case ACTION_TYPES.SET_INITIAL_SEVERITY_MAPPING:
+      return {
+        ...state,
+        initialSeverityMapping: action.payload
+      };
+
+    case ACTION_TYPES.UPDATE_SEVERITY_MAPPING:
+      return {
+        ...state,
+        severityToPriorityMap: {
+          ...state.severityToPriorityMap,
+          ...action.payload
+        }
+      };
+
+    case ACTION_TYPES.SET_IS_LOADING_PRIORITIES:
+      return {
+        ...state,
+        isLoadingPriorities: action.payload
+      };
+
+    case ACTION_TYPES.SET_IS_SAVING_SEVERITY_MAPPING:
+      return {
+        ...state,
+        isSavingSeverityMapping: action.payload
+      };
+
     default:
       return state;
   }
@@ -210,6 +262,48 @@ export function useJiraReducer() {
       dispatch({
         type: ACTION_TYPES.SET_LOADING_PROJECT_INDEX,
         payload: index
+      });
+    },
+
+    setJiraPriorities: (priorities) => {
+      dispatch({
+        type: ACTION_TYPES.SET_JIRA_PRIORITIES,
+        payload: priorities
+      });
+    },
+
+    setSeverityToPriorityMap: (mapping) => {
+      dispatch({
+        type: ACTION_TYPES.SET_SEVERITY_TO_PRIORITY_MAP,
+        payload: mapping
+      });
+    },
+
+    setInitialSeverityMapping: (mapping) => {
+      dispatch({
+        type: ACTION_TYPES.SET_INITIAL_SEVERITY_MAPPING,
+        payload: mapping
+      });
+    },
+
+    updateSeverityMapping: (severity, priorityId) => {
+      dispatch({
+        type: ACTION_TYPES.UPDATE_SEVERITY_MAPPING,
+        payload: { [severity]: priorityId }
+      });
+    },
+
+    setIsLoadingPriorities: (value) => {
+      dispatch({
+        type: ACTION_TYPES.SET_IS_LOADING_PRIORITIES,
+        payload: value
+      });
+    },
+
+    setIsSavingSeverityMapping: (value) => {
+      dispatch({
+        type: ACTION_TYPES.SET_IS_SAVING_SEVERITY_MAPPING,
+        payload: value
       });
     }
   };

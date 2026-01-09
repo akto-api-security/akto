@@ -58,11 +58,17 @@ public class AktoJaxAction extends UserAction {
     private String sourceUrl;
     private String sourceXpath;
     private String buttonText;
+    private int crawlingTime;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AktoJaxAction.class, LogDb.DASHBOARD);
 
     public String initiateCrawler() {
         try {
+            if(crawlingTime < 600 || crawlingTime > 345600) {
+                addActionError("Invalid crawling time");
+                return ERROR.toUpperCase();
+            }
+
             loggerMaker.infoAndAddToDb("Initializing Crawler");
             String url = System.getenv("AKTOJAX_SERVICE_URL") + "/triggerCrawler";
             loggerMaker.infoAndAddToDb("Crawler service url: " + url);
@@ -113,6 +119,7 @@ public class AktoJaxAction extends UserAction {
             requestBody.put("accountId", Context.accountId.get());
             requestBody.put("outscopeUrls", outscopeUrls);
             requestBody.put("crawlId", crawlId);
+            requestBody.put("crawlingTime", crawlingTime);
 
             if(!StringUtils.isEmpty(username) && !StringUtils.isEmpty(password)) {
                 requestBody.put("username", username);
@@ -371,5 +378,13 @@ public class AktoJaxAction extends UserAction {
 
     public void setButtonText(String buttonText) {
         this.buttonText = buttonText;
+    }
+
+    public int getCrawlingTime() {
+        return crawlingTime;
+    }
+
+    public void setCrawlingTime(int crawlingTime) {
+        this.crawlingTime = crawlingTime;
     }
 }
