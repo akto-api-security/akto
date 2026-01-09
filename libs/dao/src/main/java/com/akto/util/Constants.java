@@ -88,4 +88,8 @@ public class Constants {
     public static final String AKTO_ENDPOINT_SOURCE_TAG = "source";
     public static final String AKTO_ENDPOINT_SOURCE_VALUE = "ENDPOINT";
 
+    public static final String LFI_OS_FILES_DATA = "/lfi-os-files.data";
+    public static final String OS_COMMAND_INJECTION_DATA = "/os-command-injection.data";
+    public static final String SSRF_DATA = "/ssrf.data";
+
 }

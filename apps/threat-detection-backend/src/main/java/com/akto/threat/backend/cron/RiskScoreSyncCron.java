@@ -49,10 +49,6 @@ public class RiskScoreSyncCron {
     
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private static final LoggerMaker loggerMaker = new LoggerMaker(RiskScoreSyncCron.class, LogDb.THREAT_DETECTION);
-
-    private static final String LFI_OS_FILES_DATA = "/lfi-os-files.data";
-    private static final String OS_COMMAND_INJECTION_DATA = "/os-command-injection.data";
-    private static final String SSRF_DATA = "/ssrf.data";
     
     private static Trie lfiTrie;
     private static Trie osCommandInjectionTrie;
@@ -60,9 +56,9 @@ public class RiskScoreSyncCron {
 
     static {
         try {
-            lfiTrie = generateTrie(LFI_OS_FILES_DATA);
-            osCommandInjectionTrie = generateTrie(OS_COMMAND_INJECTION_DATA);
-            ssrfTrie = generateTrie(SSRF_DATA);
+            lfiTrie = generateTrie(Constants.LFI_OS_FILES_DATA);
+            osCommandInjectionTrie = generateTrie(Constants.OS_COMMAND_INJECTION_DATA);
+            ssrfTrie = generateTrie(Constants.SSRF_DATA);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error initializing static tries: " + e.getMessage());
         }
