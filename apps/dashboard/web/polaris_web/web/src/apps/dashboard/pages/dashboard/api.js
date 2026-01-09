@@ -212,6 +212,24 @@ const api = {
             method: 'post',
             data
         })
+    },
+
+    saveDashboardLayout: async (dashboardLayout) => {
+        return await request({
+            url: '/api/saveDashboardLayout',
+            method: 'post',
+            data: {
+                dashboardLayout
+            }
+        })
+    },
+
+    fetchDashboardLayout: async () => {
+        return await request({
+            url: '/api/fetchDashboardLayout',
+            method: 'post',
+            data: {}
+        })
     }
 }
 

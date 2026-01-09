@@ -17,6 +17,8 @@ import DonutChart from '../../components/shared/DonutChart'
 import SemiCircleProgress from '../../components/shared/SemiCircleProgress'
 import { mapLabel, getDashboardCategory } from '../../../main/labelHelper'
 import { GridLayout } from "react-grid-layout";
+import api from './api';
+import Store from '../../store';
 
 const agenticDiscoveryData = {
     "AI Agents": { text: 2000, color: "#7F56D9" },
@@ -248,31 +250,128 @@ const AgenticDashboard = () => {
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
     const containerRef = useRef(null);
     const [popoverActive, setPopoverActive] = useState(false);
-    const [visibleComponents, setVisibleComponents] = useState([
-        'item-0', 'item-1', 'item-2', 'item-3', 'item-4', 'item-5',
-        'item-6', 'item-7', 'item-8', 'item-9', 'item-10', 'item-11',
-        'item-12', 'item-13', 'item-14'
-    ]);
+    const setToastConfig = Store(state => state.setToastConfig);
+
+    const defaultVisibleComponents = [
+        'security-posture-chart', 'api-discovery-pie', 'issues-pie', 'threat-detection-pie',
+        'average-issue-age', 'compliance-at-risks', 'tested-vs-non-tested', 'open-resolved-issues',
+        'threat-requests-chart', 'open-resolved-threats', 'weakest-areas', 'top-apis-issues',
+        'top-requests-by-type', 'top-attacked-apis', 'top-bad-actors'
+    ]
+
+    const [visibleComponents, setVisibleComponents] = useState(defaultVisibleComponents);
 
     const defaultLayout = [
-        { i: 'item-0', x: 0, y: 0, w: 12, h: 4, minW: 4, minH: 4, maxH: 4 },   // Line chart
-        { i: 'item-1', x: 0, y: 4, w: 4, h: 3, minW: 4, maxW: 4, minH: 3, maxH: 3 },    // Pie chart 1
-        { i: 'item-2', x: 4, y: 4, w: 4, h: 3, minW: 4, maxW: 4, minH: 3, maxH: 3 },    // Pie chart 2
-        { i: 'item-3', x: 8, y: 4, w: 4, h: 3, minW: 4, maxW: 4, minH: 3, maxH: 3 },    // Pie chart 3
-        { i: 'item-4', x: 0, y: 7, w: 4, h: 3, minW: 4, maxW: 4, minH: 3, maxH: 3 },    // Average Issue Age (fixed)
-        { i: 'item-5', x: 4, y: 7, w: 8, h: 2, minW: 6, minH: 2, maxH: 2 },    // Compliance at Risks
-        { i: 'item-6', x: 0, y: 10, w: 6, h: 4, minW: 4, minH: 4, maxH: 4 },   // Tested vs Non-Tested
-        { i: 'item-7', x: 6, y: 10, w: 6, h: 4, minW: 4, minH: 4, maxH: 4 },   // Open & Resolved Issues
-        { i: 'item-8', x: 0, y: 14, w: 6, h: 4, minW: 4, minH: 4, maxH: 4 },   // Guardrail Requests
-        { i: 'item-9', x: 6, y: 14, w: 6, h: 4, minW: 4, minH: 4, maxH: 4 },   // Open & Resolved Guardrails
-        { i: 'item-10', x: 0, y: 18, w: 6, h: 4, minW: 4, minH: 2 },  // Weakest Areas
-        { i: 'item-11', x: 6, y: 18, w: 6, h: 4, minW: 4, minH: 2 },  // Top APIs with Issues
-        { i: 'item-12', x: 0, y: 22, w: 4, h: 4, minW: 4, minH: 2 },  // Top Requests by Type
-        { i: 'item-13', x: 4, y: 22, w: 4, h: 4, minW: 4, minH: 2 },  // Top Attacked APIs
-        { i: 'item-14', x: 8, y: 22, w: 4, h: 4, minW: 4, minH: 2 }   // Top Bad Actors
+        { i: 'security-posture-chart', x: 0, y: 0, w: 12, h: 4, minW: 4, minH: 4, maxH: 4 },
+        { i: 'api-discovery-pie', x: 0, y: 4, w: 4, h: 3, minW: 4, maxW: 4, minH: 3, maxH: 3 },
+        { i: 'issues-pie', x: 4, y: 4, w: 4, h: 3, minW: 4, maxW: 4, minH: 3, maxH: 3 },
+        { i: 'threat-detection-pie', x: 8, y: 4, w: 4, h: 3, minW: 4, maxW: 4, minH: 3, maxH: 3 },
+        { i: 'average-issue-age', x: 0, y: 7, w: 4, h: 3, minW: 4, maxW: 4, minH: 3, maxH: 3 },
+        { i: 'compliance-at-risks', x: 4, y: 7, w: 8, h: 2, minW: 6, minH: 2, maxH: 2 },
+        { i: 'tested-vs-non-tested', x: 0, y: 10, w: 6, h: 4, minW: 4, minH: 4, maxH: 4 },
+        { i: 'open-resolved-issues', x: 6, y: 10, w: 6, h: 4, minW: 4, minH: 4, maxH: 4 },
+        { i: 'threat-requests-chart', x: 0, y: 14, w: 6, h: 4, minW: 4, minH: 4, maxH: 4 },
+        { i: 'open-resolved-threats', x: 6, y: 14, w: 6, h: 4, minW: 4, minH: 4, maxH: 4 },
+        { i: 'weakest-areas', x: 0, y: 18, w: 6, h: 4, minW: 4, minH: 2 },
+        { i: 'top-apis-issues', x: 6, y: 18, w: 6, h: 4, minW: 4, minH: 2 },
+        { i: 'top-requests-by-type', x: 0, y: 22, w: 4, h: 4, minW: 4, minH: 2 },
+        { i: 'top-attacked-apis', x: 4, y: 22, w: 4, h: 4, minW: 4, minH: 2 },
+        { i: 'top-bad-actors', x: 8, y: 22, w: 4, h: 4, minW: 4, minH: 2 }
     ];
 
     const [layout, setLayout] = useState(defaultLayout)
+    const [savedLayout, setSavedLayout] = useState(null)
+    const [savedVisibleComponents, setSavedVisibleComponents] = useState(null)
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
+    const [layoutLoading, setLayoutLoading] = useState(true)
+
+    useEffect(() => {
+        const loadSavedLayout = async () => {
+            try {
+                const resp = await api.fetchDashboardLayout()
+
+                const layoutString = typeof resp === 'string' ? resp : resp?.dashboardLayout
+
+                if (layoutString && layoutString !== 'null') {
+                    const parsedLayout = JSON.parse(layoutString)
+
+                    if (parsedLayout.layout && parsedLayout.visibleComponents) {
+                        const loadedLayout = parsedLayout.layout
+                        const loadedVisibleComponents = parsedLayout.visibleComponents
+
+                        const defaultLayoutMap = new Map(defaultLayout.map(item => [item.i, item]))
+                        const mergedLayout = loadedLayout.map(item => {
+                            const defaultItem = defaultLayoutMap.get(item.i)
+                            if (defaultItem) {
+                                return {
+                                    ...item,
+                                    minW: defaultItem.minW,
+                                    maxW: defaultItem.maxW,
+                                    minH: defaultItem.minH,
+                                    maxH: defaultItem.maxH
+                                }
+                            }
+                            return item
+                        })
+
+
+                        setLayout(mergedLayout)
+                        setVisibleComponents(loadedVisibleComponents)
+                        setSavedLayout(mergedLayout)
+                        setSavedVisibleComponents(loadedVisibleComponents)
+                    } else {
+                        setSavedLayout(defaultLayout)
+                        setSavedVisibleComponents(defaultVisibleComponents)
+                    }
+                } else {
+                    setSavedLayout(defaultLayout)
+                    setSavedVisibleComponents(defaultVisibleComponents)
+                }
+            } catch (error) {
+                setSavedLayout(defaultLayout)
+                setSavedVisibleComponents(defaultVisibleComponents)
+            } finally {
+                setLayoutLoading(false)
+            }
+        }
+        loadSavedLayout()
+    }, [])
+
+    useEffect(() => {
+        if (savedLayout === null || savedVisibleComponents === null) return
+
+        const layoutChanged = JSON.stringify(layout) !== JSON.stringify(savedLayout)
+        const visibilityChanged = JSON.stringify(visibleComponents) !== JSON.stringify(savedVisibleComponents)
+        setHasUnsavedChanges(layoutChanged || visibilityChanged)
+    }, [layout, visibleComponents, savedLayout, savedVisibleComponents])
+
+    const saveDashboardLayout = async () => {
+        setIsSaving(true)
+        try {
+            const layoutData = {
+                layout,
+                visibleComponents
+            }
+            await api.saveDashboardLayout(JSON.stringify(layoutData))
+            setSavedLayout(layout)
+            setSavedVisibleComponents(visibleComponents)
+            setHasUnsavedChanges(false)
+            setToastConfig({
+                isActive: true,
+                isError: false,
+                message: 'Dashboard layout saved successfully!'
+            })
+        } catch (error) {
+            setToastConfig({
+                isActive: true,
+                isError: true,
+                message: 'Failed to save dashboard layout'
+            })
+        } finally {
+            setIsSaving(false)
+        }
+    }
 
     const componentHeader = (title, itemId) => (
         <Box width='100%'>
@@ -597,25 +696,25 @@ const AgenticDashboard = () => {
     };
 
     const componentNames = {
-        'item-0': `${mapLabel('API Security Posture', dashboardCategory)} over time`,
-        'item-1': mapLabel('API Discovery', dashboardCategory),
-        'item-2': 'Issues',
-        'item-3': mapLabel('Threat Detection', dashboardCategory),
-        'item-4': 'Average Issue Age',
-        'item-5': 'Compliance at Risks',
-        'item-6': `Tested vs Non-Tested ${mapLabel('APIs', dashboardCategory)}`,
-        'item-7': 'Open & Resolved Issues',
-        'item-8': `${mapLabel('Threat', dashboardCategory)} Requests over time`,
-        'item-9': `Open & Resolved ${mapLabel('Threat', dashboardCategory)}s`,
-        'item-10': 'Weakest Areas by Failing Percentage',
-        'item-11': `Top ${mapLabel('APIs', dashboardCategory)} with Critical & High Issues`,
-        'item-12': 'Top Requests by Type',
-        'item-13': `Top Attacked ${mapLabel('APIs', dashboardCategory)}`,
-        'item-14': 'Top Bad Actors'
+        'security-posture-chart': `${mapLabel('API Security Posture', dashboardCategory)} over time`,
+        'api-discovery-pie': mapLabel('API Discovery', dashboardCategory),
+        'issues-pie': 'Issues',
+        'threat-detection-pie': mapLabel('Threat Detection', dashboardCategory),
+        'average-issue-age': 'Average Issue Age',
+        'compliance-at-risks': 'Compliance at Risks',
+        'tested-vs-non-tested': `Tested vs Non-Tested ${mapLabel('APIs', dashboardCategory)}`,
+        'open-resolved-issues': 'Open & Resolved Issues',
+        'threat-requests-chart': `${mapLabel('Threat', dashboardCategory)} Requests over time`,
+        'open-resolved-threats': `Open & Resolved ${mapLabel('Threat', dashboardCategory)}s`,
+        'weakest-areas': 'Weakest Areas by Failing Percentage',
+        'top-apis-issues': `Top ${mapLabel('APIs', dashboardCategory)} with Critical & High Issues`,
+        'top-requests-by-type': 'Top Requests by Type',
+        'top-attacked-apis': `Top Attacked ${mapLabel('APIs', dashboardCategory)}`,
+        'top-bad-actors': 'Top Bad Actors'
     };
 
-    const allComponents = [
-        customLineChart(
+    const allComponentsMap = {
+        'security-posture-chart': customLineChart(
             `${func.toSentenceCase(window.ACCOUNT_NAME)} ${mapLabel('API Security Posture', dashboardCategory)} over time`,
             overallStats,
             [
@@ -623,61 +722,59 @@ const AgenticDashboard = () => {
                 { label: `${mapLabel('API', dashboardCategory)} Issues`, color: '#D72C0D' },
                 { label: `${mapLabel('Threat', dashboardCategory)} Requests flagged`, color: '#F3B283' }
             ],
-            'item-0'
+            'security-posture-chart'
         ),
-        customPieChart(mapLabel('API Discovery', dashboardCategory), `Total ${mapLabel('APIs', dashboardCategory)}`, agenticDiscoveryData, 'item-1'),
-        customPieChart("Issues", "Total Issues", agenticIssuesData, 'item-2'),
-        customPieChart(mapLabel('Threat Detection', dashboardCategory), "Requests Flagged", agenticGuardrailsData, 'item-3'),
-        averageIssueAgeComp('item-4'),
-        complianceAtRisksComp('item-5'),
-        customLineChart(
+        'api-discovery-pie': customPieChart(mapLabel('API Discovery', dashboardCategory), `Total ${mapLabel('APIs', dashboardCategory)}`, agenticDiscoveryData, 'api-discovery-pie'),
+        'issues-pie': customPieChart("Issues", "Total Issues", agenticIssuesData, 'issues-pie'),
+        'threat-detection-pie': customPieChart(mapLabel('Threat Detection', dashboardCategory), "Requests Flagged", agenticGuardrailsData, 'threat-detection-pie'),
+        'average-issue-age': averageIssueAgeComp('average-issue-age'),
+        'compliance-at-risks': complianceAtRisksComp('compliance-at-risks'),
+        'tested-vs-non-tested': customLineChart(
             `Tested vs Non-Tested ${mapLabel('APIs', dashboardCategory)}`,
             testedVsNonTestedData,
             [
                 { label: 'Non-Tested', color: '#D72C0D' },
                 { label: 'Tested', color: '#9E77ED' }
             ],
-            'item-6'
+            'tested-vs-non-tested'
         ),
-        customLineChart(
+        'open-resolved-issues': customLineChart(
             "Open & Resolved Issues",
             openResolvedIssuesData,
             [
                 { label: 'Open Issues', color: '#D72C0D' },
                 { label: 'Resolved Issues', color: '#9E77ED' }
             ],
-            'item-7'
+            'open-resolved-issues'
         ),
-        customLineChart(
+        'threat-requests-chart': customLineChart(
             `${mapLabel('Threat', dashboardCategory)} Requests over time`,
             guardrailRequestsData,
             [
                 { label: 'Flagged Requests', color: '#D72C0D' },
                 { label: 'Safe Requests', color: '#47B881' }
             ],
-            'item-8'
+            'threat-requests-chart'
         ),
-        customLineChart(
+        'open-resolved-threats': customLineChart(
             `Open & Resolved ${mapLabel('Threat', dashboardCategory)}s`,
             openResolvedGuardrailsData,
             [
                 { label: 'Open Issues', color: '#D72C0D' },
                 { label: 'Resolved Issues', color: '#9E77ED' }
             ],
-            'item-9'
+            'open-resolved-threats'
         ),
-        customDataTable("Weakest Areas by Failing Percentage", weakestAreasData, true, 'item-10'),
-        customDataTable(`Top ${mapLabel('APIs', dashboardCategory)} with Critical & High Issues`, topAgenticComponentsData, true, 'item-11'),
-        customDataTable("Top Requests by Type", topRequestsByTypeData, true, 'item-12'),
-        customDataTable(`Top Attacked ${mapLabel('APIs', dashboardCategory)}`, topAttackedComponentsData, false, 'item-13'),
-        customDataTable("Top Bad Actors", topBadActorsData, false, 'item-14'),
-    ]
-
-    const visiblePageComponents = allComponents.filter((_, index) => visibleComponents.includes(`item-${index}`))
+        'weakest-areas': customDataTable("Weakest Areas by Failing Percentage", weakestAreasData, true, 'weakest-areas'),
+        'top-apis-issues': customDataTable(`Top ${mapLabel('APIs', dashboardCategory)} with Critical & High Issues`, topAgenticComponentsData, true, 'top-apis-issues'),
+        'top-requests-by-type': customDataTable("Top Requests by Type", topRequestsByTypeData, true, 'top-requests-by-type'),
+        'top-attacked-apis': customDataTable(`Top Attacked ${mapLabel('APIs', dashboardCategory)}`, topAttackedComponentsData, false, 'top-attacked-apis'),
+        'top-bad-actors': customDataTable("Top Bad Actors", topBadActorsData, false, 'top-bad-actors')
+    }
 
     const componentsMenuActivator = (
         <Button onClick={() => setPopoverActive(!popoverActive)}>
-            Manage Components
+            Manage Widgets
         </Button>
     );
 
@@ -687,25 +784,33 @@ const AgenticDashboard = () => {
             activator={componentsMenuActivator}
             onClose={() => setPopoverActive(false)}
         >
-            <ActionList
-                items={[
-                    'item-0', 'item-1', 'item-2', 'item-3', 'item-4', 'item-5',
-                    'item-6', 'item-7', 'item-8', 'item-9', 'item-10', 'item-11',
-                    'item-12', 'item-13', 'item-14'
-                ].map(itemId => ({
-                    content: (
-                        <HorizontalStack gap={2} blockAlign='center'>
-                            <input
-                                type="checkbox"
-                                checked={visibleComponents.includes(itemId)}
-                                onChange={() => toggleComponent(itemId)}
-                            />
-                            <Text>{componentNames[itemId]}</Text>
-                        </HorizontalStack>
-                    ),
-                    onAction: () => toggleComponent(itemId)
-                }))}
-            />
+            <Box padding={4}>
+                <VerticalStack gap={4}>
+                    <ActionList
+                        items={defaultVisibleComponents.map(itemId => ({
+                            content: (
+                                <HorizontalStack gap={2} blockAlign='center'>
+                                    <input
+                                        type="checkbox"
+                                        checked={visibleComponents.includes(itemId)}
+                                        onChange={() => toggleComponent(itemId)}
+                                    />
+                                    <Text>{componentNames[itemId]}</Text>
+                                </HorizontalStack>
+                            ),
+                            onAction: () => toggleComponent(itemId)
+                        }))}
+                    />
+                    <Button
+                        onClick={saveDashboardLayout}
+                        disabled={!hasUnsavedChanges}
+                        loading={isSaving}
+                        fullWidth
+                    >
+                        Save Layout
+                    </Button>
+                </VerticalStack>
+            </Box>
         </Popover>
     );
 
@@ -736,35 +841,36 @@ const AgenticDashboard = () => {
                     secondaryActions={[<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />]}
                     components={[
                         <div key="grid-container" ref={containerRef} style={{ width: '100%' }}>
-                            <GridLayout
-                                // TODO: make width responsive
-                                width={1200}
-                                layout={layout.filter(item => visibleComponents.includes(item.i))}
-                                gridConfig={{
-                                    cols: 12,
-                                    rowHeight: 100,
-                                    margin: [16, 16],
-                                    containerPadding: [0, 0]
-                                }}
-                                dragConfig={{
-                                    enabled: true,
-                                    handle: '.graph-menu'
-                                }}
-                                resizeConfig={{
-                                    enabled: true
-                                }}
-                                compactor={null}
-                                onLayoutChange={onLayoutChange}
-                            >
-                                {visiblePageComponents.map((component) => {
-                                    const itemId = `item-${allComponents.indexOf(component)}`;
-                                    return (
+                            {layoutLoading ? (
+                                <SpinnerCentered />
+                            ) : (
+                                <GridLayout
+                                    // TODO: make width responsive
+                                    width={1200}
+                                    layout={layout.filter(item => visibleComponents.includes(item.i))}
+                                    gridConfig={{
+                                        cols: 12,
+                                        rowHeight: 100,
+                                        margin: [16, 16],
+                                        containerPadding: [0, 0]
+                                    }}
+                                    dragConfig={{
+                                        enabled: true,
+                                        handle: '.graph-menu'
+                                    }}
+                                    resizeConfig={{
+                                        enabled: true
+                                    }}
+                                    compactor={null}
+                                    onLayoutChange={onLayoutChange}
+                                >
+                                    {visibleComponents.map((itemId) => (
                                         <div key={itemId}>
-                                            {component}
+                                            {allComponentsMap[itemId]}
                                         </div>
-                                    );
-                                })}
-                            </GridLayout>
+                                    ))}
+                                </GridLayout>
+                            )}
                         </div>
                     ]}
                 />

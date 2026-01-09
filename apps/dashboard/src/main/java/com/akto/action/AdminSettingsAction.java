@@ -689,4 +689,32 @@ public class AdminSettingsAction extends UserAction {
     public void setCompulsoryDescription(Map<String, Boolean> compulsoryDescription) {
         this.compulsoryDescription = compulsoryDescription;
     }
+
+    @Setter
+    @Getter
+    private String dashboardLayout;
+
+    public String saveDashboardLayout() {
+        try {
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.DASHBOARD_LAYOUT, this.dashboardLayout)
+            );
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.error("Error saving dashboard layout", e);
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String fetchDashboardLayout() {
+        try {
+            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            this.dashboardLayout = accountSettings != null ? accountSettings.getDashboardLayout() : null;
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.error("Error getting dashboard layout", e);
+            return ERROR.toUpperCase();
+        }
+    }
 }
