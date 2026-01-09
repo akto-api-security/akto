@@ -712,6 +712,21 @@
             </result>
         </action>
 
+        <!-- Mini-Runtime Consumer endpoints -->
+        <action name="api/fetchSampleDataKeys" class="com.akto.action.DbAction" method="fetchSampleDataKeys">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^sampleDataKeys\[\d+\]\..*</param>
+                <param name="wrapWith">sampleDataKeys</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <!-- Fast-Discovery Endpoints -->
         <action name="api/fastDiscoveryBulkWriteSti" class="com.akto.action.DbAction" method="fastDiscoveryBulkWriteSti">
             <interceptor-ref name="json"/>

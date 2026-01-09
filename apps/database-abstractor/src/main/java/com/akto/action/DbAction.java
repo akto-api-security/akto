@@ -4686,6 +4686,17 @@ public class DbAction extends ActionSupport {
         this.apiIds = apiIds;
     }
 
+    // Fields for fetchSampleDataKeys API (Mini-Runtime Consumer)
+    private List<Map<String, Object>> sampleDataKeys;
+
+    public List<Map<String, Object>> getSampleDataKeys() {
+        return sampleDataKeys;
+    }
+
+    public void setSampleDataKeys(List<Map<String, Object>> sampleDataKeys) {
+        this.sampleDataKeys = sampleDataKeys;
+    }
+
     /**
      * Fetch all API IDs for Bloom filter initialization in fast-discovery consumer.
      * Returns lightweight projection: apiCollectionId, url, method only.
@@ -4721,6 +4732,61 @@ public class DbAction extends ActionSupport {
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchApiIds: " + e.toString(), LogDb.DB_ABS);
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    // Field for fetchSampleDataKeys pagination
+    private String lastKeyId;
+
+    public String getLastKeyId() {
+        return lastKeyId;
+    }
+
+    public void setLastKeyId(String lastKeyId) {
+        this.lastKeyId = lastKeyId;
+    }
+
+    /**
+     * Fetch sample data keys for Bloom filter initialization in mini-runtime.
+     * Returns lightweight projection: _id fields only (apiCollectionId, url, method, responseCode, isHeader, ts).
+     * Endpoint: POST /api/fetchSampleDataKeys
+     *
+     * Supports pagination with lastKeyId parameter to handle large datasets.
+     */
+    public String fetchSampleDataKeys() {
+        try {
+            loggerMaker.infoAndAddToDb("Fetching sample data keys for Bloom filter initialization (lastKeyId: " + lastKeyId + ")", LogDb.DB_ABS);
+
+            // Query sample_data collection, projection to only return _id fields
+            com.mongodb.client.FindIterable<org.bson.Document> cursor = SampleDataDao.instance
+                .getMCollection()
+                .withDocumentClass(org.bson.Document.class)
+                .find()
+                .projection(Projections.include("_id"))
+                .limit(10000)
+                .batchSize(10000);
+
+            List<Map<String, Object>> keysList = new ArrayList<>();
+            for (org.bson.Document doc : cursor) {
+                org.bson.Document id = (org.bson.Document) doc.get("_id");
+                if (id != null) {
+                    Map<String, Object> key = new HashMap<>();
+                    key.put("apiCollectionId", id.getInteger("apiCollectionId"));
+                    key.put("url", id.getString("url"));
+                    key.put("method", id.getString("method"));
+                    key.put("responseCode", id.getInteger("responseCode", -1));
+                    key.put("isHeader", id.getInteger("isHeader", 0));
+                    key.put("ts", id.getInteger("ts", 0));
+                    keysList.add(key);
+                }
+            }
+
+            this.sampleDataKeys = keysList;
+            loggerMaker.infoAndAddToDb("Fetched " + keysList.size() + " sample data keys", LogDb.DB_ABS);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchSampleDataKeys: " + e.toString(), LogDb.DB_ABS);
             return Action.ERROR.toUpperCase();
         }
     }
