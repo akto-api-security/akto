@@ -8,23 +8,32 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.ahocorasick.trie.Trie;
 import org.json.JSONObject;
 
 import com.akto.dao.context.Context;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.RawApi;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.type.KeyTypes;
+import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLTemplate;
+import com.akto.threat.detection.cache.AccountConfig;
+import com.akto.threat.detection.cache.AccountConfigurationCache;
+import com.akto.threat.detection.ip_api_counter.ParamEnumerationDetector;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.Utils;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.client9.libinjection.SQLParse;
+import com.akto.util.Pair;
 
 public class ThreatDetector {
 
@@ -36,11 +45,14 @@ public class ThreatDetector {
     public static final String SQL_INJECTION_FILTER_ID = "SQLInjection";
     public static final String OS_COMMAND_INJECTION_FILTER_ID = "OSCommandInjection";
     public static final String SSRF_FILTER_ID = "SSRF";
+    public static final String PARAM_ENUMERATION_FILTER_ID = "ParamEnumeration";
     private static Map<String, Object> varMap = new HashMap<>();
     private Trie lfiTrie;
     private Trie osCommandInjectionTrie;
     private Trie ssrfTrie;
     private static final LoggerMaker logger = new LoggerMaker(ThreatDetector.class, LogDb.THREAT_DETECTION);
+    private static final DataActor dataActor = DataActorFactory.fetchInstance();
+    private static AccountConfig accountConfig = AccountConfigurationCache.getInstance().getConfig(dataActor);
 
     public ThreatDetector() throws Exception {
         lfiTrie = generateTrie(LFI_OS_FILES_DATA);
@@ -82,12 +94,33 @@ public class ThreatDetector {
             if (threatFilter.getId().equals(SSRF_FILTER_ID)) {
                 return isSSRFThreat(httpResponseParams); 
             }
+            if (threatFilter.getId().equals(PARAM_ENUMERATION_FILTER_ID)) {
+                return isParamEnumerationThreat(httpResponseParams);
+            }
             return validateFilterForRequest(threatFilter, rawApi, apiInfoKey);
         } catch (Exception e) {
             logger.errorAndAddToDb(e, "Error in applyFilter " + e.getMessage());
             return false;
         }
 
+    }
+
+    private List<Pair<String, String>> extractParamNameAndValue(HttpResponseParams httpResponseParams) {
+        List<Pair<String, String>> paramNameAndValue = new ArrayList<>();
+        
+        AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
+        Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods = config.getApiInfoUrlToMethods();
+        Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates = config.getApiCollectionUrlTemplates();
+        return paramNameAndValue;
+    }
+
+    public boolean isParamEnumerationThreat(HttpResponseParams httpResponseParams) {
+        String path = httpResponseParams.getRequestParams().getURL();
+        String method = httpResponseParams.getRequestParams().getMethod();
+        return ParamEnumerationDetector.getInstance().recordAndCheck(httpResponseParams.getSourceIP(),
+                httpResponseParams.requestParams.getApiCollectionId(), method,
+                path, "test",
+                "test");
     }
 
     public boolean isSuccessfulExploit(List<FilterConfig> successfulExploitFilters,

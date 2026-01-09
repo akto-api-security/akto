@@ -222,7 +222,7 @@ public class CmsCounterLayerTest {
         // CmsCounterLayer.class.getDeclaredMethod("cleanupOldWindows").setAccessible(true);
         // CmsCounterLayer.class.getDeclaredMethod("cleanupOldWindows").invoke(null);
 
-        CmsCounterLayer.cleanupOldWindows();
+        cmsCounterLayer.cleanupOldWindows();
 
         // Post-cleanup: oldWindow1 and oldWindow2 should be gone
         assertEquals(0, cmsCounterLayer.estimateCount(key, oldWindow1));

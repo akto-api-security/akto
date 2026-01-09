@@ -8,5 +8,6 @@ public class RedisKeyInfo {
     public static final String IP_API_CMS_LAST_UPDATE_TS = "ipApiCmsLastUpdateTs";
     public static final String IP_API_CMS_DATA_PREFIX = "ipApiCmsData";
     public static final String API_DISTRIBUTION_DATA_LAST_SENT_PREFIX = "apiDistributionDataSent";
+    public static final String PARAM_ENUM_CMS_PREFIX = "paramEnumCms";
 
 }
