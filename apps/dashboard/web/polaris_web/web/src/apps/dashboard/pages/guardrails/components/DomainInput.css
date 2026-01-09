@@ -1,0 +1,42 @@
+.domain-input-wrapper {
+    position: relative;
+}
+
+.domain-input-field {
+    flex: 1;
+    min-width: 120px;
+    border: none;
+    outline: none;
+    font-size: 14px;
+    padding: 4px;
+    background: transparent;
+}
+
+.domain-suggestions-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    margin-top: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    background: white;
+    border: 1px solid #c4cdd5;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.domain-suggestion-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background-color 0.1s;
+}
+
+.domain-suggestion-item:hover {
+    background-color: #f4f6f8;
+}
+
+.domain-suggestion-selected {
+    background-color: #e3f2fd;
+}

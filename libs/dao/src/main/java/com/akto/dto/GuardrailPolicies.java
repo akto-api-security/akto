@@ -73,6 +73,10 @@ public class GuardrailPolicies {
     // Step 6: Enhanced Server settings (new format with ID and name)
     private List<SelectedServer> selectedMcpServersV2;
     private List<SelectedServer> selectedAgentServersV2;
+
+    // Target domains for extensions/external services
+    private List<String> targetDomains;
+
     private boolean applyOnResponse;
     private boolean applyOnRequest;
     
