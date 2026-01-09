@@ -11,9 +11,8 @@ export const ServerSettingsConfig = {
     },
 
     getSummary: ({ selectedMcpServers, selectedAgentServers, targetDomains, mcpServers, agentServers, applyOnRequest, applyOnResponse }) => {
-        const summaryParts = [];
-
         if (selectedMcpServers?.length > 0 || selectedAgentServers?.length > 0) {
+            const serverSummary = [];
             if (selectedMcpServers.length > 0) {
                 const mcpNames = selectedMcpServers
                     .map(serverId => {
@@ -22,7 +21,7 @@ export const ServerSettingsConfig = {
                     })
                     .slice(0, 2);
                 const mcpMore = selectedMcpServers.length > 2 ? ` +${selectedMcpServers.length - 2}` : '';
-                summaryParts.push(`MCP: ${mcpNames.join(", ")}${mcpMore}`);
+                serverSummary.push(`MCP: ${mcpNames.join(", ")}${mcpMore}`);
             }
             if (selectedAgentServers.length > 0) {
                 const agentNames = selectedAgentServers
@@ -32,20 +31,26 @@ export const ServerSettingsConfig = {
                     })
                     .slice(0, 2);
                 const agentMore = selectedAgentServers.length > 2 ? ` +${selectedAgentServers.length - 2}` : '';
-                summaryParts.push(`Agent: ${agentNames.join(", ")}${agentMore}`);
+                serverSummary.push(`Agent: ${agentNames.join(", ")}${agentMore}`);
             }
+            const appSettings = (applyOnRequest || applyOnResponse) ?
+                ` - ${applyOnRequest ? 'Req' : ''}${applyOnRequest && applyOnResponse ? '/' : ''}${applyOnResponse ? 'Res' : ''}` : '';
+
+            // Add domain summary if present
+            if (targetDomains?.length > 0) {
+                const domainPreview = targetDomains.slice(0, 2).join(", ");
+                const domainMore = targetDomains.length > 2 ? ` +${targetDomains.length - 2}` : '';
+                return `${serverSummary.join(", ")}, Domains: ${domainPreview}${domainMore}${appSettings}`;
+            }
+
+            return `${serverSummary.join(", ")}${appSettings}`;
         }
 
+        // If only domains are specified
         if (targetDomains?.length > 0) {
             const domainPreview = targetDomains.slice(0, 2).join(", ");
             const domainMore = targetDomains.length > 2 ? ` +${targetDomains.length - 2}` : '';
-            summaryParts.push(`Domains: ${domainPreview}${domainMore}`);
-        }
-
-        if (summaryParts.length > 0) {
-            const appSettings = (applyOnRequest || applyOnResponse) ?
-                ` - ${applyOnRequest ? 'Req' : ''}${applyOnRequest && applyOnResponse ? '/' : ''}${applyOnResponse ? 'Res' : ''}` : '';
-            return `${summaryParts.join(", ")}${appSettings}`;
+            return `Domains: ${domainPreview}${domainMore}`;
         }
 
         return null;

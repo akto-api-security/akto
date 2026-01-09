@@ -277,27 +277,26 @@ function GuardrailPolicies() {
             });
         }
 
-        // Server/Domain configuration details
-        const targetDetails = [];
+        // Server configuration details using effective methods
+        const serverDetails = [];
         const effectiveMcpServers = getEffectiveSelectedMcpServers(policy);
         const effectiveAgentServers = getEffectiveSelectedAgentServers(policy);
 
         if (effectiveMcpServers.length > 0) {
-            targetDetails.push(`${effectiveMcpServers.length} MCP Server${effectiveMcpServers.length > 1 ? 's' : ''}`);
+            serverDetails.push(`${effectiveMcpServers.length} MCP Server${effectiveMcpServers.length > 1 ? 's' : ''}`);
         }
         if (effectiveAgentServers.length > 0) {
-            targetDetails.push(`${effectiveAgentServers.length} Agent Server${effectiveAgentServers.length > 1 ? 's' : ''}`);
+            serverDetails.push(`${effectiveAgentServers.length} Agent Server${effectiveAgentServers.length > 1 ? 's' : ''}`);
+        }
+        if (serverDetails.length > 0) {
+            details.push({ label: "Target Servers", value: serverDetails.join(", ") });
         }
 
         // Add target domains if present
         if (policy.targetDomains && policy.targetDomains.length > 0) {
             const domainPreview = policy.targetDomains.slice(0, 2).join(", ");
             const moreCount = policy.targetDomains.length > 2 ? ` +${policy.targetDomains.length - 2} more` : '';
-            targetDetails.push(`Domains: ${domainPreview}${moreCount}`);
-        }
-
-        if (targetDetails.length > 0) {
-            details.push({ label: "Target Servers/Domains", value: targetDetails.join(", ") });
+            details.push({ label: "Target Domains", value: `${domainPreview}${moreCount}` });
         }
 
         // Application scope
