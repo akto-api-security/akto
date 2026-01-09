@@ -10693,11 +10693,11 @@
             </result>
         </action>
 
-        <action name="api/saveDashboardLayout" class="com.akto.action.AdminSettingsAction" method="saveDashboardLayout">
+        <action name="api/saveDashboardLayout" class="com.akto.action.UserDashboardAction" method="saveDashboardLayout">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="featureLabel">USER_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User saved dashboard layout</param>
             </interceptor-ref>
@@ -10707,7 +10707,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS" type="json">
-                <param name="root">dashboardLayout</param>
+                <param name="root">layout</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -10716,10 +10716,11 @@
             </result>
         </action>
 
-        <action name="api/fetchDashboardLayout" class="com.akto.action.AdminSettingsAction" method="fetchDashboardLayout">
+        <action name="api/fetchDashboardLayout" class="com.akto.action.UserDashboardAction" method="fetchDashboardLayout">
+            <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="featureLabel">USER_ACTIONS</param>
                 <param name="accessType">READ</param>
                 <param name="actionDescription">User fetched dashboard layout</param>
             </interceptor-ref>
@@ -10729,7 +10730,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS" type="json">
-                <param name="root">dashboardLayout</param>
+                <param name="root">layout</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>

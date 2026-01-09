@@ -243,6 +243,7 @@ const topBadActorsData = [
 ]
 
 const AgenticDashboard = () => {
+    const SCREEN_NAME = 'home-main-dashboard';
     const dashboardCategory = getDashboardCategory();
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState('ciso')
@@ -289,9 +290,9 @@ const AgenticDashboard = () => {
     useEffect(() => {
         const loadSavedLayout = async () => {
             try {
-                const resp = await api.fetchDashboardLayout()
+                const resp = await api.fetchDashboardLayout(SCREEN_NAME)
 
-                const layoutString = typeof resp === 'string' ? resp : resp?.dashboardLayout
+                const layoutString = typeof resp === 'string' ? resp : resp?.layout
 
                 if (layoutString && layoutString !== 'null') {
                     const parsedLayout = JSON.parse(layoutString)
@@ -353,7 +354,7 @@ const AgenticDashboard = () => {
                 layout,
                 visibleComponents
             }
-            await api.saveDashboardLayout(JSON.stringify(layoutData))
+            await api.saveDashboardLayout(SCREEN_NAME, JSON.stringify(layoutData))
             setSavedLayout(layout)
             setSavedVisibleComponents(visibleComponents)
             setHasUnsavedChanges(false)
@@ -786,6 +787,14 @@ const AgenticDashboard = () => {
         >
             <Box padding={4}>
                 <VerticalStack gap={4}>
+                    <Button
+                        onClick={saveDashboardLayout}
+                        disabled={!hasUnsavedChanges}
+                        loading={isSaving}
+                        fullWidth
+                    >
+                        Save Layout
+                    </Button>
                     <ActionList
                         items={defaultVisibleComponents.map(itemId => ({
                             content: (
@@ -801,14 +810,6 @@ const AgenticDashboard = () => {
                             onAction: () => toggleComponent(itemId)
                         }))}
                     />
-                    <Button
-                        onClick={saveDashboardLayout}
-                        disabled={!hasUnsavedChanges}
-                        loading={isSaving}
-                        fullWidth
-                    >
-                        Save Layout
-                    </Button>
                 </VerticalStack>
             </Box>
         </Popover>

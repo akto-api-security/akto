@@ -160,11 +160,6 @@ public class AccountSettings {
     private List<String> filterLogPolicy;
     public static final String FILTER_LOG_POLICY = "filterLogPolicy";
 
-    @Getter
-    @Setter
-    private String dashboardLayout;
-    public static final String DASHBOARD_LAYOUT = "dashboardLayout";
-
     public AccountSettings() {
     }
 

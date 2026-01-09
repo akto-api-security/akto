@@ -214,21 +214,24 @@ const api = {
         })
     },
 
-    saveDashboardLayout: async (dashboardLayout) => {
+    saveDashboardLayout: async (screenName, layout) => {
         return await request({
             url: '/api/saveDashboardLayout',
             method: 'post',
             data: {
-                dashboardLayout
+                screenName,
+                layout
             }
         })
     },
 
-    fetchDashboardLayout: async () => {
+    fetchDashboardLayout: async (screenName) => {
         return await request({
             url: '/api/fetchDashboardLayout',
             method: 'post',
-            data: {}
+            data: {
+                screenName
+            }
         })
     }
 }
