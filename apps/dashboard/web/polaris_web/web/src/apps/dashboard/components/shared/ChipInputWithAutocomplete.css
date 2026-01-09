@@ -1,8 +1,8 @@
-.domain-input-wrapper {
+.chip-input-wrapper {
     position: relative;
 }
 
-.domain-input-field {
+.chip-input-field {
     flex: 1;
     min-width: 120px;
     border: none;
@@ -12,7 +12,7 @@
     background: transparent;
 }
 
-.domain-suggestions-dropdown {
+.chip-suggestions-dropdown {
     position: absolute;
     top: 100%;
     left: 0;
@@ -27,16 +27,16 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-.domain-suggestion-item {
+.chip-suggestion-item {
     padding: 8px 12px;
     cursor: pointer;
     transition: background-color 0.1s;
 }
 
-.domain-suggestion-item:hover {
+.chip-suggestion-item:hover {
     background-color: #f4f6f8;
 }
 
-.domain-suggestion-selected {
+.chip-suggestion-selected {
     background-color: #e3f2fd;
 }
