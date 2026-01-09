@@ -408,6 +408,22 @@ public class ApiInfo {
         this.id = id;
     }
 
+    public static String getNormalizedUrl(String url) {
+        if (url == null) {
+            return "";
+        }
+        if (url.contains("?")) {
+            url = url.substring(0, url.indexOf("?"));
+        }
+        if (url.contains("#")) {
+            url = url.substring(0, url.indexOf("#"));
+        }
+        if (url.endsWith("/")) {
+            url = url.substring(0, url.length() - 1);
+        }
+        return url;
+    }
+
     public Set<Set<AuthType>> getAllAuthTypesFound() {
         return allAuthTypesFound;
     }
