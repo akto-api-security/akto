@@ -76,8 +76,6 @@ public class Main {
             .setValueSerializer(Serializer.STRING)
             .build();
 
-            RiskScoreSyncCron riskScoreSyncCron = new RiskScoreSyncCron();
-            riskScoreSyncCron.setUpRiskScoreSyncCronScheduler();
     new FlushMessagesToDB(internalKafkaConfig, threatProtectionMongo).run();
 
     MaliciousEventService maliciousEventService =
@@ -91,6 +89,9 @@ public class Main {
 
     ArchiveOldMaliciousEventsCron cron = new ArchiveOldMaliciousEventsCron(threatProtectionMongo);
     cron.cron();
+
+    RiskScoreSyncCron riskScoreSyncCron = new RiskScoreSyncCron();
+    riskScoreSyncCron.setUpRiskScoreSyncCronScheduler();
     
   }
 

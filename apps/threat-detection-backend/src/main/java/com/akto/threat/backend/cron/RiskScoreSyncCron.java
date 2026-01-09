@@ -1,8 +1,5 @@
 package com.akto.threat.backend.cron;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -15,7 +12,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import org.ahocorasick.trie.Trie;
-import org.ahocorasick.trie.Emit;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.AccountSettingsDao;
@@ -26,7 +22,6 @@ import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.FeatureAccess;
-import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -47,6 +42,8 @@ import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
 
 import static com.akto.billing.UsageMetricUtils.getFeatureAccessSaas;
+import static com.akto.threat_utils.Utils.generateTrie;
+import static com.akto.threat_utils.Utils.isMatchingUrl;
 
 public class RiskScoreSyncCron {
     
@@ -71,82 +68,6 @@ public class RiskScoreSyncCron {
         }
     }
 
-    private static Trie generateTrie(String fileName) throws Exception {
-        Trie.TrieBuilder builder = Trie.builder();
-        try (InputStream is = RiskScoreSyncCron.class.getResourceAsStream(fileName);
-                BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                line = line.trim();
-                if (line.isEmpty() || line.startsWith("#"))
-                    continue;
-                builder.addKeyword(line);
-            }
-        }
-
-        return builder.build();
-    }
-
-    private static String removeThreatPatternsFromUrl(String url) {
-        if (url == null || url.isEmpty()) {
-            return url;
-        }
-
-        String cleanedUrl = url;
-        
-        cleanedUrl = removeMatchesFromText(cleanedUrl, lfiTrie);
-        cleanedUrl = removeMatchesFromText(cleanedUrl, osCommandInjectionTrie);
-        cleanedUrl = removeMatchesFromText(cleanedUrl, ssrfTrie);
-        cleanedUrl = cleanedUrl.replace("//", "/");
-        
-        
-        return cleanedUrl;
-    }
-
-    private static String removeMatchesFromText(String text, Trie trie) {
-        if (trie == null || text == null || text.isEmpty()) {
-            return text;
-        }
-
-        List<Emit> matches = new ArrayList<>();
-        for (Emit emit : trie.parseText(text)) {
-            if (emit != null && emit.getKeyword() != null) {
-                matches.add(emit);
-            }
-        }
-
-        if (matches.isEmpty()) {
-            return text;
-        }
-
-        StringBuilder result = new StringBuilder(text);
-        for (int i = matches.size() - 1; i >= 0; i--) {
-            Emit emit = matches.get(i);
-            int start = emit.getStart();
-            int end = emit.getEnd() + 1;
-            if (start >= 0 && end <= result.length() && start < end) {
-                result.delete(start, end);
-            }
-        }
-
-        return result.toString();
-    }
-
-    private static URLTemplate isMatchingUrl(int apiCollectionId, String urlFromEvent, String methodFromEvent, Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates){
-        urlFromEvent = ApiInfo.getNormalizedUrl(urlFromEvent);
-        urlFromEvent = removeThreatPatternsFromUrl(urlFromEvent);
-        List<URLTemplate> urlTemplates = apiCollectionUrlTemplates.get(apiCollectionId);
-        if(urlTemplates == null || urlTemplates.isEmpty()){
-            return null;
-        }
-        URLMethods.Method method = URLMethods.Method.fromString(methodFromEvent);
-        for(URLTemplate urlTemplate : urlTemplates){
-            if(!urlTemplate.matchTemplate(urlFromEvent, method).equals(URLTemplate.MatchResult.NO_MATCH)){
-                return urlTemplate;
-            }
-        }
-        return null;
-    }
 
     public void setUpRiskScoreSyncCronScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -208,7 +129,7 @@ public class RiskScoreSyncCron {
                             int apiCollectionId = Integer.parseInt(parts[0]);
                             String url = parts[1];
                             String method = parts[2];
-                            URLTemplate urlTemplate = isMatchingUrl(apiCollectionId, url, method, apiCollectionUrlTemplates);
+                            URLTemplate urlTemplate = isMatchingUrl(apiCollectionId, url, method, apiCollectionUrlTemplates, lfiTrie, osCommandInjectionTrie, ssrfTrie);
                             List<String> severities = apiInfoKeyToSeverities.get(apiInfoKey);
                             float threatScore = MaliciousEventDao.getThreatScoreFromSeverities(severities);
                             if(urlTemplate != null){

@@ -1,8 +1,5 @@
 package com.akto.threat.detection.utils;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
@@ -12,7 +9,6 @@ import java.util.Map;
 import org.ahocorasick.trie.Trie;
 import org.json.JSONObject;
 
-import com.akto.dao.context.Context;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.RawApi;
 import com.akto.dto.ApiInfo;
@@ -25,6 +21,8 @@ import com.akto.rules.TestPlugin;
 import com.akto.test_editor.Utils;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.client9.libinjection.SQLParse;
+
+import static com.akto.threat_utils.Utils.generateTrie;
 
 public class ThreatDetector {
 
@@ -46,22 +44,6 @@ public class ThreatDetector {
         lfiTrie = generateTrie(LFI_OS_FILES_DATA);
         osCommandInjectionTrie = generateTrie(OS_COMMAND_INJECTION_DATA);
         ssrfTrie = generateTrie(SSRF_DATA);
-    }
-
-    private Trie generateTrie(String fileName) throws Exception {
-        Trie.TrieBuilder builder = Trie.builder();
-        try (InputStream is = ThreatDetector.class.getResourceAsStream(fileName);
-                BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                line = line.trim();
-                if (line.isEmpty() || line.startsWith("#"))
-                    continue;
-                builder.addKeyword(line);
-            }
-        }
-
-        return builder.build();
     }
 
     public boolean applyFilter(FilterConfig threatFilter, HttpResponseParams httpResponseParams, RawApi rawApi,
