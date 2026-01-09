@@ -256,7 +256,7 @@ const router = createBrowserRouter([
                                 element: <CompliancePage/>
                             },
                             {
-                                path: "threat-compliance",
+                                path: "threat",
                                 element: <ThreatCompliancePage/>
                             }
                         ]

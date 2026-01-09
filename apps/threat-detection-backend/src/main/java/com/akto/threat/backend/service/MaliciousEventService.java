@@ -311,14 +311,43 @@ public class MaliciousEventService {
       query.putAll(contextFilter);
     }
 
+    // Check if sortBySeverity flag is set
+    boolean sortBySeverity = filter.hasSortBySeverity() && filter.getSortBySeverity();
+
     long total = maliciousEventDao.countDocuments(accountId, query);
-    try (MongoCursor<MaliciousEventDto> cursor =
-        maliciousEventDao.getCollection(accountId)
-            .find(query)
-            .sort(new Document("detectedAt", sort.getOrDefault("detectedAt", -1)))
-            .skip(skip)
-            .limit(limit)
-            .cursor()) {
+
+    MongoCursor<MaliciousEventDto> cursor;
+    if (sortBySeverity) {
+      // Use aggregation pipeline for custom severity sorting
+      cursor = maliciousEventDao.getCollection(accountId)
+          .aggregate(Arrays.asList(
+              new Document("$match", query),
+              new Document("$addFields", new Document("severityRank",
+                  new Document("$switch", new Document()
+                      .append("branches", Arrays.asList(
+                          new Document("case", new Document("$eq", Arrays.asList("$severity", "CRITICAL"))).append("then", 1),
+                          new Document("case", new Document("$eq", Arrays.asList("$severity", "HIGH"))).append("then", 2),
+                          new Document("case", new Document("$eq", Arrays.asList("$severity", "MEDIUM"))).append("then", 3),
+                          new Document("case", new Document("$eq", Arrays.asList("$severity", "LOW"))).append("then", 4)
+                      ))
+                      .append("default", 5)
+                  )
+              )),
+              new Document("$sort", new Document("severityRank", 1)),
+              new Document("$skip", skip),
+              new Document("$limit", limit)
+          ))
+          .cursor();
+    } else {
+      cursor = maliciousEventDao.getCollection(accountId)
+          .find(query)
+          .sort(new Document("detectedAt", sort.getOrDefault("detectedAt", -1)))
+          .skip(skip)
+          .limit(limit)
+          .cursor();
+    }
+
+    try {
       List<ListMaliciousRequestsResponse.MaliciousEvent> maliciousEvents = new ArrayList<>();
       while (cursor.hasNext()) {
         MaliciousEventDto evt = cursor.next();
@@ -354,6 +383,10 @@ public class MaliciousEventService {
           .setTotal(total)
           .addAllMaliciousEvents(maliciousEvents)
           .build();
+    } finally {
+      if (cursor != null) {
+        cursor.close();
+      }
     }
   }
 
@@ -444,6 +477,8 @@ public class MaliciousEventService {
       query.append("status", ThreatDetectionConstants.UNDER_REVIEW);
     } else if (ThreatDetectionConstants.IGNORED.equals(statusFilter)) {
       query.append("status", ThreatDetectionConstants.IGNORED);
+    } else if (ThreatDetectionConstants.TRAINING.equals(statusFilter)) {
+      query.append("status", ThreatDetectionConstants.TRAINING);
     } else if (ThreatDetectionConstants.ACTIVE.equals(statusFilter) || ThreatDetectionConstants.EVENTS_FILTER.equals(statusFilter)) {
       // For Events tab: show null, empty, or ACTIVE status
       List<Document> orConditions = Arrays.asList(

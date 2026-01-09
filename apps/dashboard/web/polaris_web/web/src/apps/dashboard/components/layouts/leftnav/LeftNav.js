@@ -22,7 +22,7 @@ import func from "@/util/func";
 import Dropdown from "../Dropdown";
 import SessionStore from "../../../../main/SessionStore";
 import IssuesStore from "../../../pages/issues/issuesStore";
-import { CATEGORY_DAST, mapLabel } from "../../../../main/labelHelper";
+import { CATEGORY_AGENTIC_SECURITY, CATEGORY_DAST, CATEGORY_ENDPOINT_SECURITY, mapLabel } from "../../../../main/labelHelper";
 
 export default function LeftNav() {
     const navigate = useNavigate();
@@ -82,13 +82,13 @@ export default function LeftNav() {
             selected: leftNavSelected === "dashboard_reports_compliance",
         })
         reportsSubNavigationItems.push({
-            label: "Threat Compliance",
+            label: "Threat",
             onClick: () => {
-                navigate("/dashboard/reports/threat-compliance");
-                handleSelect("dashboard_reports_threat_compliance");
+                navigate("/dashboard/reports/threat");
+                handleSelect("dashboard_reports_tthreat");
                 setActive("active");
             },
-            selected: leftNavSelected === "dashboard_reports_threat_compliance",
+            selected: leftNavSelected === "dashboard_reports_tthreat",
         })
     }
 
@@ -191,7 +191,7 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_audit",
                     }] : []),
-                    ...(dashboardCategory === "Endpoint Security" ? [{
+                    ...((dashboardCategory === CATEGORY_ENDPOINT_SECURITY || (dashboardCategory === CATEGORY_AGENTIC_SECURITY && !func.isAtlasArgusAccount())) ? [{
                         label: "Endpoint Shield",
                         onClick: () => {
                             navigate("/dashboard/observe/endpoint-shield");

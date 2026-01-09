@@ -16,6 +16,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy source code
 COPY src/ ./src/
 
+# Copy consumer script
+COPY run_consumer.py .
+RUN chmod +x run_consumer.py
+
 # Create cache directory for HuggingFace models
 RUN mkdir -p /app/.cache/huggingface
 
@@ -25,12 +29,15 @@ ENV PORT=8093
 ENV HF_HOME=/app/.cache/huggingface
 ENV TRANSFORMERS_VERBOSITY=error
 ENV HF_HUB_VERBOSITY=error
+# SERVICE_MODE is controlled by docker-compose (defaults to 'api' if not set)
 
 # Pre-download model (non-fatal if it fails)
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')" || echo "Model pre-download failed, will download on first request."
 
 EXPOSE 8093
 
-# Run uvicorn directly (PORT env var is already set, defaults to 8093)
-CMD ["sh", "-c", "python -m uvicorn src.agent_traffic_analyzer:app --host 0.0.0.0 --port ${PORT:-8093}"]
+# Run either API service or Kafka consumer based on SERVICE_MODE
+# SERVICE_MODE=api: Run FastAPI service (default)
+# SERVICE_MODE=consumer: Run Kafka consumer
+CMD ["sh", "-c", "if [ \"$SERVICE_MODE\" = \"consumer\" ]; then python run_consumer.py; else python -m uvicorn src.api.agent_traffic_analyzer:app --host 0.0.0.0 --port ${PORT:-8093}; fi"]
 

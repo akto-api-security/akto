@@ -7,4 +7,9 @@ numpy<2
 torch>=2.0.0
 huggingface-hub>=0.20.0
 transformers>=4.30.0
+chromadb>=0.4.0
+openai>=1.0.0
+kafka-python>=2.0.2
+requests>=2.31.0
+pytest>=7.4.0
 
