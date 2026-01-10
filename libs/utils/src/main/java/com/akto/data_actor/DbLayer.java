@@ -233,6 +233,40 @@ public class DbLayer {
         ModuleInfoDao.instance.getMCollection().bulkWrite(bulkUpdates);
     }
 
+    public static ModuleInfo updateModuleInfoForHeartbeatV2(ModuleInfo moduleInfo) {
+        try {
+            // Clean up expired heartbeats (older than 6 minutes)
+            int sixMinutesAgo = (int) (System.currentTimeMillis() / 1000) - 360;
+            ModuleInfoDao.instance.getMCollection().deleteMany(
+                Filters.lt(ModuleInfo.LAST_HEARTBEAT_RECEIVED, sixMinutesAgo)
+            );
+        } catch (Exception e) {
+            System.err.println("Failed to clean up expired heartbeats: " + e.getMessage());
+        }
+
+        FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
+        updateOptions.upsert(true);
+        updateOptions.returnDocument(ReturnDocument.AFTER);
+
+        Bson filter = Filters.and(
+            Filters.eq(ModuleInfo.NAME, moduleInfo.getName()),
+            Filters.eq(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType())
+        );
+
+        return ModuleInfoDao.instance.getMCollection().findOneAndUpdate(filter,
+                Updates.combine(
+                        //putting class name because findOneAndUpdate doesn't put class name by default
+                        Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
+                        Updates.set(ID, moduleInfo.getId()),
+                        Updates.set(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType()),
+                        Updates.set(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
+                        Updates.set(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
+                        Updates.set(ModuleInfo.NAME, moduleInfo.getName()),
+                        Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
+                        Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived())
+                ), updateOptions);
+    }
+
     public static void updateCidrList(List<String> cidrList) {
         AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(), Updates.addEachToSet("privateCidrList", cidrList),
