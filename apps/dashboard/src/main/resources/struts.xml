@@ -12725,6 +12725,18 @@
             </result>
         </action>
 
+        <action name="api/replayRestApis" class="com.akto.action.observe.InventoryAction" method="replayRestApis">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/getUniqueHostsTested" class="com.akto.action.ReportAction" method="getUniqueHostsTested">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

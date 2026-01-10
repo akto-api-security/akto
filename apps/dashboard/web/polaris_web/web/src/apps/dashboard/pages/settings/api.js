@@ -862,6 +862,13 @@ const settingRequests = {
             method: 'post',
             data: {moduleIds, deleteTopicAndReboot}
         })
+    },
+    replayApis() {
+        return request({
+            url: '/api/replayRestApis',
+            method: 'post',
+            data: {}
+        })
     }
 }
 

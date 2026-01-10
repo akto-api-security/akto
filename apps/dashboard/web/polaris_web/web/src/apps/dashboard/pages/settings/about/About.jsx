@@ -508,6 +508,18 @@ function About() {
             <ToggleComponent text={"Treat URLs as case insensitive"} onToggle={handleApisCaseInsensitive} initial={toggleCaseSensitiveApis} disabled={window.USER_ROLE !== "ADMIN"}/>
             <ToggleComponent text={"Use akto's testing module"} onToggle={toggleMiniTesting} initial={miniTesting} disabled={window.USER_ROLE !== "ADMIN"}/>
             <ToggleComponent text={"Allow merging on versions"} onToggle={() => setModalOpen(true)} initial={mergingOnVersions} disabled={window.USER_ROLE !== "ADMIN"}/>
+            { window?.USER_NAME?.includes("@akto.io") &&
+                <VerticalStack gap={2}>
+                    <Text color='subdued'>Replay all the APIs</Text>
+                    <Box width='200px'>
+                        <Button onClick={async () => {
+                            await settingRequests.replayApis().then(() => {
+                                func.setToast(true, false, "Replay initiated successfully.")
+                            })
+                        }}>Replay</Button>
+                    </Box>
+                </VerticalStack>
+            }
             {(window?.DASHBOARD_MODE === 'ON_PREM' || window?.USER_NAME?.toLowerCase()?.includes("@akto.io")) &&
                 <VerticalStack gap={2}>
                     <Text>Sample PDF Download</Text>

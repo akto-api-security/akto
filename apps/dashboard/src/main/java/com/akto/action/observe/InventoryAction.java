@@ -11,6 +11,7 @@ import com.akto.dto.CodeAnalysisApiInfo.CodeAnalysisApiInfoKey;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.testing.custom_groups.AllAPIsGroup;
 import com.akto.dto.filter.MergedUrls;
+import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
 import com.akto.dto.type.URLMethods.Method;
@@ -26,6 +27,7 @@ import com.akto.runtime.Main;
 import com.akto.util.Constants;
 import com.akto.util.GroupByTimeRange;
 import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
+import com.akto.utils.jobs.CleanInventory;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
@@ -1306,6 +1308,47 @@ public class InventoryAction extends UserAction {
             e.printStackTrace();
         }
 
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String replayRestApis() {
+        int accountId = Context.accountId.get();
+
+        Runnable replayJob = () -> {
+            Context.accountId.set(accountId);
+            try {
+                loggerMaker.infoAndAddToDb("Starting replay of all sample_data APIs");
+
+                List<SampleData> allSampleData = SampleDataDao.instance.findAll(
+                    Filters.empty(),
+                    Projections.include(Constants.ID)
+                );
+
+                List<Key> sampleDataKeys = new ArrayList<>();
+                for (SampleData sampleData : allSampleData) {
+                    if (sampleData.getId() != null) {
+                        sampleDataKeys.add(sampleData.getId());
+                    }
+                }
+
+                loggerMaker.infoAndAddToDb("Found " + sampleDataKeys.size() + " APIs to replay");
+
+                if (!sampleDataKeys.isEmpty()) {
+                    CleanInventory.moveApisFromSampleData(sampleDataKeys, false);
+                    loggerMaker.infoAndAddToDb("Successfully replayed " + sampleDataKeys.size() + " APIs from sample_data");
+                } else {
+                    loggerMaker.infoAndAddToDb("No APIs found in sample_data to replay");
+                }
+
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error in replayRestApis background job");
+            }
+        };
+
+        new Thread(replayJob).start();
+
+        loggerMaker.infoAndAddToDb("Started background job to replay all REST APIs from sample_data");
 
         return SUCCESS.toUpperCase();
     }
