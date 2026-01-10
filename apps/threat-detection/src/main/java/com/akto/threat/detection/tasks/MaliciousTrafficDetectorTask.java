@@ -654,9 +654,7 @@ public class MaliciousTrafficDetectorTask implements Task {
       host = requestHeaders.get("host").get(0);
     }
     
-    // Get contextSource from Context, default to API if not set
-    CONTEXT_SOURCE contextSourceEnum = Context.contextSource.get();
-    String contextSourceValue = (contextSourceEnum != null) ? contextSourceEnum.name() : CONTEXT_SOURCE.API.name();
+    String contextSourceValue = CONTEXT_SOURCE.API.name();
     
     MaliciousEventMessage maliciousEvent =
         MaliciousEventMessage.newBuilder()
