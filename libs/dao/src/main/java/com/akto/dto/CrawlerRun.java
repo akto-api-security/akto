@@ -25,6 +25,39 @@ public class CrawlerRun {
     public static final String OUT_SCOPE_URLS = "outScopeUrls";
     private String outScopeUrls;
 
+    public static final String STATUS = "status";
+    private CrawlerRunStatus status;
+
+    public static final String MODULE_NAME = "moduleName";
+    private String moduleName;
+
+    public static final String USERNAME = "username";
+    private String username;
+
+    public static final String PASSWORD = "password";
+    private String password;
+
+    public static final String API_KEY = "apiKey";
+    private String apiKey;
+
+    public static final String DASHBOARD_URL = "dashboardUrl";
+    private String dashboardUrl;
+
+    public static final String COLLECTION_ID = "collectionId";
+    private Integer collectionId;
+
+    public static final String ACCOUNT_ID = "accountId";
+    private Integer accountId;
+
+    public static final String ERROR_MESSAGE = "errorMessage";
+    private String errorMessage;
+
+    public static final String COOKIES = "cookies";
+    private Object cookies;
+
+    public static final String CRAWLING_TIME = "crawlingTime";
+    private Integer crawlingTime;
+
     public CrawlerRun() {
     }
 
@@ -37,6 +70,10 @@ public class CrawlerRun {
         this.outScopeUrls = outScopeUrls;
     }
 
+    public enum CrawlerRunStatus {
+        PENDING, RUNNING, COMPLETED, FAILED
+    }
+
     @Override
     public String toString() {
         return "CrawlerRun{" +
@@ -46,6 +83,8 @@ public class CrawlerRun {
                 ", crawlId='" + crawlId + '\'' +
                 ", hostname='" + hostname + '\'' +
                 ", outScopeUrls=" + outScopeUrls +
+                ", status='" + status.name() + '\'' +
+                ", moduleName='" + moduleName + '\'' +
                 '}';
     }
 }

@@ -170,11 +170,19 @@ const api = {
         })
     },
 
-    initiateCrawler(hostname, username, password, apiKey, dashboardUrl, testRoleHaxId, outscopeUrls, crawlingTime) {
+    initiateCrawler(hostname, username, password, apiKey, dashboardUrl, testRoleHaxId, outscopeUrls, crawlingTime, selectedModuleName) {
         return request({
             url: '/api/initiateCrawler',
             method: 'post',
-            data: {hostname, username, password, apiKey, dashboardUrl, testRoleHaxId, outscopeUrls, crawlingTime}
+            data: {hostname, username, password, apiKey, dashboardUrl, testRoleHaxId, outscopeUrls, crawlingTime, selectedModuleName}
+        })
+    },
+
+    fetchAvailableDastModules() {
+        return request({
+            url: '/api/fetchAvailableDastModules',
+            method: 'post',
+            data: {}
         })
     },
 
