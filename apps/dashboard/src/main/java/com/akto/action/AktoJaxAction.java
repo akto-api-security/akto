@@ -2,12 +2,14 @@ package com.akto.action;
 
 import com.akto.ApiRequest;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.ConfigsDao;
 import com.akto.dao.CrawlerRunDao;
 import com.akto.dao.CrawlerUrlDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.Config;
 import com.akto.dto.CrawlerRun;
 import com.akto.dto.CrawlerRun.CrawlerRunStatus;
 import com.akto.dto.CrawlerUrl;
@@ -18,6 +20,8 @@ import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.CollectionTags.TagSource;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.notifications.slack.CrawlerInitiationAlert;
+import com.akto.notifications.slack.SlackAlerts;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
 import com.akto.util.RecordedLoginFlowUtil;
@@ -197,6 +201,55 @@ public class AktoJaxAction extends UserAction {
             crawlerRun.setCrawlingTime(crawlingTime);
 
             CrawlerRunDao.instance.insertOne(crawlerRun);
+
+            // Send Slack alert for crawler initiation
+            try {
+                Config config = ConfigsDao.instance.findOne(
+                    Filters.eq("configType", Config.ConfigType.SLACK_ALERT_INTERNAL.name())
+                );
+
+                if (config != null) {
+                    Config.SlackAlertInternalConfig slackConfig = (Config.SlackAlertInternalConfig) config;
+                    String slackWebhookUrl = slackConfig.getSlackWebhookUrl();
+
+                    if (slackWebhookUrl != null && !slackWebhookUrl.isEmpty()) {
+                        String collectionName = null;
+                        if (collectionId != 0 && apiCollection != null) {
+                            collectionName = apiCollection.getName();
+                        }
+
+                        SlackAlerts crawlerAlert = new CrawlerInitiationAlert(
+                            getSUser().getLogin(),
+                            hostname,
+                            selectedModuleName,
+                            collectionId,
+                            collectionName,
+                            crawlingTime,
+                            outscopeUrls,
+                            crawlId,
+                            Context.now(),
+                            username,
+                            (username != null && !username.isEmpty()) ||
+                            (password != null && !password.isEmpty()) ||
+                            (cookies != null)
+                        );
+
+                        // Send alert directly with webhook URL (async)
+                        final String webhookUrl = slackWebhookUrl;
+                        final String payload = crawlerAlert.toJson();
+                        new Thread(() -> {
+                            try {
+                                com.slack.api.Slack.getInstance().send(webhookUrl, payload);
+                            } catch (Exception ex) {
+                                loggerMaker.errorAndAddToDb("Failed to send Slack alert: " + ex.getMessage());
+                            }
+                        }).start();
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                loggerMaker.errorAndAddToDb("Failed to send Slack alert for crawler initiation: " + e.getMessage());
+            }
 
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
