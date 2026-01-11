@@ -1696,9 +1696,8 @@ public class ApiCollectionsAction extends UserAction {
             
             // Force refresh the cache to get latest data from database
             loggerMaker.infoAndAddToDb("DEBUG: Force refreshing icon cache", LogDb.DASHBOARD);
-            iconCache.forceRefresh();
             
-            Map<IconCache.HostnameDomainKey, String> hostnameToObjectIdCache = iconCache.getHostnameToObjectIdCache();
+            Map<String, String> hostnameToObjectIdCache = iconCache.getHostnameToObjectIdCache();
             Map<String, IconCache.IconData> objectIdToIconDataCache = iconCache.getObjectIdToIconDataCache();
             
             if(this.response == null) {

@@ -1,5 +1,6 @@
 package com.akto.dto;
 
+import com.akto.util.Constants;
 import lombok.Getter;
 import lombok.Setter;
 import org.bson.types.ObjectId;
@@ -42,7 +43,7 @@ public class ApiCollectionIcon {
     // Generate Google Favicon API URL for this domain
     public String getSourceUrl() {
         if (domainName == null) return null;
-        return "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://" + domainName + "&size=64";
+        return Constants.FAVICON_SOURCE_URL + domainName + "&size=64";
     }
 
     // Helper method to check if icon is available

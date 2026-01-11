@@ -7,6 +7,7 @@ import RegistryBadge from "../../../components/shared/RegistryBadge";
 import api from "../api"
 import dashboardApi from "../../dashboard/api"
 import settingRequests from "../../settings/api"
+import IconCacheService from "@/services/IconCacheService"
 import React, { useEffect,useState, useRef } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
@@ -48,38 +49,10 @@ const API_COLLECTIONS_CACHE_DURATION_SECONDS = 5 * 60; // 5 minutes
 const COLLECTIONS_LAZY_RENDER_THRESHOLD = 100; // Collections count above which we use lazy rendering optimization
 
 // Simple icon component that renders fallback icons immediately
-// Cache checking happens in the background via Java IconCache system
-// Global icon caches
-let hostnameToObjectIdCache = {};
-let objectIdToIconDataCache = {};
-let cacheLoadPromise = null;
+// Fresh icon cache service created per page load
 
-// Load both caches once - using promise to prevent multiple calls
-const loadAllIcons = async () => {
-    // If already loading, return the existing promise
-    if (cacheLoadPromise) {
-        return cacheLoadPromise;
-    }
-    
-    // If already loaded, return immediately
-    if (Object.keys(hostnameToObjectIdCache).length > 0) {
-        return Promise.resolve();
-    }
-    
-    // Start loading and store the promise
-    cacheLoadPromise = (async () => {
-        try {
-            const response = await api.getAllIconsCache();
-            if (response && response.hostnameToObjectIdCache && response.objectIdToIconDataCache) {
-                hostnameToObjectIdCache = response.hostnameToObjectIdCache;
-                objectIdToIconDataCache = response.objectIdToIconDataCache;
-            }
-        } catch (error) {
-        }
-    })();
-    
-    return cacheLoadPromise;
-};
+// Create fresh icon service instance for this page load
+const iconCacheService = new IconCacheService();
 
 const CollectionIconRenderer = React.memo(({ hostName, displayName, tagsList }) => {
     const [iconData, setIconData] = React.useState(null);
@@ -91,26 +64,12 @@ const CollectionIconRenderer = React.memo(({ hostName, displayName, tagsList }) 
         let isMounted = true; // Prevent state updates if component unmounts
         const fetchIcon = async () => {
             try {
-                await loadAllIcons();
-                const trimmedHostName = hostName.trim();
-
-                // Step 1: Find matching hostname in hostnameToObjectIdCache
-                let objectId = null;
-                for (const [key, value] of Object.entries(hostnameToObjectIdCache)) {
-                    // key is a string like "(mcp.twilio.com, mcp.twilio.com)"
-                    // Parse it to extract the hostname (first part)
-                    const match = key.match(/^\(([^,]+),/);
-                    if (match && match[1].trim() === trimmedHostName) {
-                        objectId = value;
-                        break;
-                    }
-                }
-                // Step 2: If objectId found, get image data from objectIdToIconDataCache
-                if (objectId && objectIdToIconDataCache[objectId] && isMounted) {
-                    const iconDataObj = objectIdToIconDataCache[objectId];
-                    setIconData(iconDataObj.imageData);
+                const imageData = await iconCacheService.getIconData(hostName);
+                if (imageData && isMounted) {
+                    setIconData(imageData);
                 }
             } catch (error) {
+
             }
         };
 

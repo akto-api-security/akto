@@ -39,10 +39,7 @@ public class ApiCollectionIconsDao extends CommonContextDao<ApiCollectionIcon> {
 
         String[] matchingHostnamesIndex = { ApiCollectionIcon.MATCHING_HOSTNAMES };
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), matchingHostnamesIndex, false);
-
-        String[] imageDataIndex = { ApiCollectionIcon.IMAGE_DATA };
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), imageDataIndex, false);
-
+        
 
     }
 }
