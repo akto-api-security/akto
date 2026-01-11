@@ -257,7 +257,7 @@ public class DbLayer {
                 Updates.combine(
                         //putting class name because findOneAndUpdate doesn't put class name by default
                         Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
-                        Updates.set(ID, moduleInfo.getId()),
+                        Updates.setOnInsert(ID, moduleInfo.getId()),
                         Updates.set(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType()),
                         Updates.set(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
                         Updates.set(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
