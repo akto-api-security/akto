@@ -14,26 +14,17 @@ function AgenticSuggestions({ onSuggestionClick, hide }) {
     };
 
     return (
-        <Box style={{
-            width: '100%',
-            marginBottom: '32px',
-            display: 'flex',
-            justifyContent: 'center',
-            opacity: hide ? 0 : 1,
-            visibility: hide ? 'hidden' : 'visible',
-            transition: 'opacity 0.3s ease, visibility 0.3s ease',
-            pointerEvents: hide ? 'none' : 'auto'
-        }}>
-            <Box style={{ width: '520px' }}>
-                <VerticalStack gap="4">
+        <HorizontalStack align="start">
+        <Box opacity={hide ? 0 : 1} visibility={hide ? 'hidden' : 'visible'} transition="opacity 0.3s ease, visibility 0.3s ease" pointerEvents={hide ? 'none' : 'auto'} paddingInlineEnd={"3"} paddingInlineStart={"3"}>
+            <Box>
+                <VerticalStack gap="1">
                 {suggestions.map((suggestion, index) => (
                     <Box
                         key={index}
-                        paddingBlockEnd="100"
                         style={{ cursor: 'pointer' }}
                         onClick={() => handleClick(suggestion)}
                     >
-                        <HorizontalStack gap="2" blockAlign="center">
+                        <HorizontalStack gap="2">
                             <Box style={{ width: '20px', height: '20px' }}>
                                 <img
                                     src="/public/suggestion.svg"
@@ -43,21 +34,11 @@ function AgenticSuggestions({ onSuggestionClick, hide }) {
                             </Box>
                             <Box>
                                 <Text
-                                    variant="bodySm"
-                                    as="p"
-                                    tone="subdued"
+                                    color="subdued"
+                                    variant="bodyMd"
+                                    fontWeight="regular"
                                 >
-                                    <span style={{
-                                        color: '#6D7175CC',
-                                        fontFamily: 'SF Pro Text, -apple-system, BlinkMacSystemFont, San Francisco, Segoe UI, Roboto, Helvetica Neue, sans-serif',
-                                        fontSize: '12px',
-                                        fontStyle: 'normal',
-                                        fontWeight: 400,
-                                        lineHeight: '16px',
-                                        fontFeatureSettings: "'liga' off, 'clig' off"
-                                    }}>
-                                        {suggestion}
-                                    </span>
+                                    {suggestion}
                                 </Text>
                             </Box>
                         </HorizontalStack>
@@ -66,6 +47,7 @@ function AgenticSuggestions({ onSuggestionClick, hide }) {
                 </VerticalStack>
             </Box>
         </Box>
+        </HorizontalStack>
     );
 }
 

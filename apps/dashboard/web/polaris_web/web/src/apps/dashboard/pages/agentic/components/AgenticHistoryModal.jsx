@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Box, Text, TextField, Icon } from '@shopify/polaris';
+import { Box, Text, TextField, Icon, VerticalStack, HorizontalStack, Button } from '@shopify/polaris';
 import { SearchMinor, DeleteMinor } from '@shopify/polaris-icons';
 import { getConversationsList, clearConversationFromLocal } from '../services/agenticService';
-import RightSidePanel from '../../../components/RightSidePanel';
+import FlyLayout from '../../../components/layouts/FlyLayout';
+import SpinnerCentered from '../../../components/progress/SpinnerCentered';
+import TooltipText from '../../../components/shared/TooltipText';
 
 function AgenticHistoryModal({ isOpen, onClose, onHistoryClick }) {
     const [historyItems, setHistoryItems] = useState([]);
@@ -53,116 +55,76 @@ function AgenticHistoryModal({ isOpen, onClose, onHistoryClick }) {
         onClose();
     };
 
-    return (
-        <RightSidePanel
-            isOpen={isOpen}
-            onClose={onClose}
-            title="History"
-            width="480px"
-        >
-            {/* Search Bar */}
-            <Box style={{
-                marginBottom: '16px',
-                background: '#F1F2F3',
-                borderRadius: '8px',
-                padding: '4px'
-            }}>
-                <TextField
-                    value={searchQuery}
-                    onChange={setSearchQuery}
-                    placeholder="Search history"
-                    autoComplete="off"
-                    prefix={<Icon source={SearchMinor} />}
-                />
-            </Box>
+    const renderHistory = (
+        <Box padding={"3"}>
+            <VerticalStack gap="4">
+                <div className="agentic-history-modal-search">
+                    <TextField
+                        value={searchQuery}
+                        onChange={setSearchQuery}
+                        placeholder="Search history"
+                        autoComplete="off"
+                        prefix={<Icon source={SearchMinor} />}
+                        focused={false}
+                    />
+                </div>
 
-            {/* History List */}
-            <Box>
                 {isLoading ? (
-                    <Box style={{ padding: '40px', textAlign: 'center' }}>
-                        <Text variant="bodyMd" tone="subdued">Loading history...</Text>
-                    </Box>
+                    <SpinnerCentered />
                 ) : filteredItems.length === 0 ? (
-                    <Box style={{ padding: '40px', textAlign: 'center' }}>
-                        <Text variant="bodyMd" tone="subdued">
+                    <HorizontalStack align='center'>
+                        <Text variant="bodyMd" tone="subdued" alignment="center">
                             {searchQuery ? 'No results found' : 'No history yet'}
                         </Text>
-                    </Box>
+                    </HorizontalStack>
                 ) : (
                     <Box>
                         {filteredItems.map((item) => (
                             <Box
                                 key={item.id}
-                                style={{
-                                    padding: '16px',
-                                    borderBottom: '1px solid #E1E3E5',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    transition: 'background 0.2s ease',
-                                    background: hoveredItemId === item.id ? '#F6F6F7' : 'transparent'
-                                }}
+                                padding="3"
+                                borderRadius='2'
                                 onClick={() => handleItemClick(item.id, item.title)}
                                 onMouseEnter={() => setHoveredItemId(item.id)}
                                 onMouseLeave={() => setHoveredItemId(null)}
+                                background={hoveredItemId === item.id ? 'bg-fill-subdued' : ''}
                             >
-                                <Box style={{
-                                    flex: 1,
-                                    paddingRight: '16px',
-                                    overflow: 'hidden'
-                                }}>
-                                    <Text variant="bodySm" fontWeight="medium" as="p">
-                                        <span style={{
-                                            overflow: 'hidden',
-                                            color: '#202223',
-                                            fontFeatureSettings: "'liga' off, 'clig' off",
-                                            textOverflow: 'ellipsis',
-                                            fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, "San Francisco", "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
-                                            fontSize: '12px',
-                                            fontStyle: 'normal',
-                                            fontWeight: 500,
-                                            lineHeight: '16px',
-                                            display: 'block',
-                                            whiteSpace: 'nowrap'
-                                        }}>
-                                            {item.title}
-                                        </span>
-                                    </Text>
-                                </Box>
-                                <Box style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                    <Text variant="bodySm" tone="subdued">
-                                        {item.time}
-                                    </Text>
-                                    {hoveredItemId === item.id && (
-                                        <Box
-                                            onClick={(e) => handleDelete(e, item.id)}
-                                            style={{
-                                                cursor: 'pointer',
-                                                padding: '4px',
-                                                borderRadius: '4px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                transition: 'background 0.2s ease'
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                e.currentTarget.style.background = '#E1E3E5';
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                e.currentTarget.style.background = 'transparent';
-                                            }}
-                                        >
-                                            <Icon source={DeleteMinor} tone="critical" />
-                                        </Box>
-                                    )}
-                                </Box>
+                                <HorizontalStack align='space-between' blockAlign="center">
+                                    <Box maxWidth="300px">
+                                        <TooltipText
+                                            textProps={{ fontWeight: "bold", variant: "bodyMd" }} 
+                                            tooltip={item.title}
+                                            text={item.title}
+                                        />
+                                        {
+                                            hoveredItemId === item.id ? (
+                                                <Button monochrome icon={DeleteMinor} plain
+                                                    onClick={() => handleDelete(item.id)}
+                                                />
+                                            ) : <Text variant="bodyMd" tone="subdued">{item.time}</Text>
+                                        }
+                                    </Box>
+                                </HorizontalStack>
                             </Box>
                         ))}
                     </Box>
                 )}
-            </Box>
-        </RightSidePanel>
+            </VerticalStack>
+        </Box>
+    )
+
+    return (
+        <FlyLayout
+            title={"History"}
+            show={isOpen}
+            setShow={onClose}
+            components={[renderHistory]}
+            loading={false}
+            showDivider={true}
+            newComp={true}
+            isHandleClose={false}
+            width="400px"
+        />
     );
 }
 

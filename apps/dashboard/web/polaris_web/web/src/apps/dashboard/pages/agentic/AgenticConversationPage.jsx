@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Page, Box, Text, Banner, Icon } from '@shopify/polaris';
+import { Page, Box, Button, Text, Banner, HorizontalStack, VerticalStack } from '@shopify/polaris';
 import { ArrowLeftMinor } from '@shopify/polaris-icons';
 import AgenticUserMessage from './components/AgenticUserMessage';
 import AgenticThinkingBox from './components/AgenticThinkingBox';
@@ -238,121 +238,84 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack 
     return (
         <>
             <Page id="agentic-conversation-page" fullWidth>
-                {/* Error Banner */}
-                {error && (
-                    <Box style={{ marginBottom: '16px' }}>
-                        <Banner
-                            title="Error"
-                            tone="critical"
-                            onDismiss={() => setError(null)}
+                <VerticalStack gap="4">
+                    {/* Error Banner */}
+                    {error && (
+                        <Box paddingBlockEnd="4">
+                            <Banner
+                                title="Error"
+                                tone="critical"
+                                onDismiss={() => setError(null)}
+                            >
+                                <p>{error}</p>
+                            </Banner>
+                        </Box>
+                    )}
+
+                    {/* Header with Back and History buttons */}
+                    <HorizontalStack align="space-between" blockAlign="center" gap="3">
+                        <HorizontalStack gap="3" blockAlign="center">
+                            {onBack && (
+                                <Button plain onClick={onBack} icon={ArrowLeftMinor} />
+                            )}
+                            <Text variant="headingLg" as="h1">
+                                {messages[0]?.content || 'Agentic AI Conversation'}
+                            </Text>
+                        </HorizontalStack>
+                        <Button
+                            plain
+                            onClick={() => setShowHistoryModal(true)}
                         >
-                            <p>{error}</p>
-                        </Banner>
-                    </Box>
-                )}
+                            <img src="/public/history.svg" alt="History" style={{ width: '20px', height: '20px' }} />
+                        </Button>
+                    </HorizontalStack>
 
-                {/* Header with Back and History buttons */}
-                <Box style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Box style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        {onBack && (
-                            <Box
-                                onClick={onBack}
-                                style={{
-                                    cursor: 'pointer',
-                                    padding: '8px',
-                                    borderRadius: '8px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    transition: 'background 0.2s ease',
-                                    background: 'transparent'
-                                }}
-                                onMouseEnter={(e) => e.currentTarget.style.background = '#F6F6F7'}
-                                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                            >
-                                <Icon source={ArrowLeftMinor} />
-                            </Box>
-                        )}
-                        <Text variant="headingLg" as="h1">
-                            {messages[0]?.content || 'Agentic AI Conversation'}
-                        </Text>
-                    </Box>
+                    {/* Conversation content */}
                     <Box
-                        onClick={() => setShowHistoryModal(true)}
-                        style={{
-                            cursor: 'pointer',
-                            padding: '8px',
-                            borderRadius: '8px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            transition: 'background 0.2s ease',
-                            background: 'transparent'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = '#F6F6F7'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                        width="520px"
+                        paddingBlockStart="16"
+                        paddingBlockEnd="19"
+                        paddingInlineStart="27"
                     >
-                        <img src="/public/history.svg" alt="History" style={{ width: '20px', height: '20px' }} />
-                    </Box>
-                </Box>
+                        <VerticalStack gap="4" align="start">
+                            {messages.map((message, index) => (
+                                message.type === 'user' ? (
+                                    <AgenticUserMessage key={message.id || index} content={message.content} />
+                                ) : message.isComplete ? (
+                                    <VerticalStack key={message.id || `response-${index}`} gap="2" align="start">
+                                        <AgenticResponseContent
+                                            content={message.content}
+                                            timeTaken={message.timeTaken}
+                                        />
+                                        <AgenticCopyButton content={message.content} />
+                                        {index === messages.length - 1 && !isLoading && !isStreaming && message.suggestions && (
+                                            <AgenticSuggestionsList
+                                                suggestions={message.suggestions}
+                                                onSuggestionClick={(suggestion) => {
+                                                    setFollowUpValue(suggestion);
+                                                    handleFollowUpSubmit(suggestion);
+                                                }}
+                                            />
+                                        )}
+                                    </VerticalStack>
+                                ) : null
+                            ))}
 
-                {/* Conversation content */}
-                <Box
-                    style={{
-                        display: 'flex',
-                        width: '520px',
-                        flexDirection: 'column',
-                        alignItems: 'flex-start',
-                        gap: '16px',
-                        marginTop: '130px',
-                        marginLeft: '218px',
-                        paddingBottom: '150px'
-                    }}
-                >
-                    {messages.map((message, index) => (
-                        message.type === 'user' ? (
-                            <AgenticUserMessage key={message.id || index} content={message.content} />
-                        ) : message.isComplete ? (
-                            <Box
-                                key={message.id || `response-${index}`}
-                                style={{
-                                    width: '100%',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '8px'
-                                }}
-                            >
+                            {/* Loading state */}
+                            {isLoading && (
+                                <AgenticThinkingBox thinkingItems={streamedThinkingItems} />
+                            )}
+
+                            {/* Streaming response */}
+                            {isStreaming && streamedContent && (
                                 <AgenticResponseContent
-                                    content={message.content}
-                                    timeTaken={message.timeTaken}
+                                    content={streamedContent}
+                                    timeTaken={currentTimeTaken}
                                 />
-                                <AgenticCopyButton content={message.content} />
-                                {index === messages.length - 1 && !isLoading && !isStreaming && message.suggestions && (
-                                    <AgenticSuggestionsList
-                                        suggestions={message.suggestions}
-                                        onSuggestionClick={(suggestion) => {
-                                            setFollowUpValue(suggestion);
-                                            handleFollowUpSubmit(suggestion);
-                                        }}
-                                    />
-                                )}
-                            </Box>
-                        ) : null
-                    ))}
-
-                    {/* Loading state */}
-                    {isLoading && (
-                        <AgenticThinkingBox thinkingItems={streamedThinkingItems} />
-                    )}
-
-                    {/* Streaming response */}
-                    {isStreaming && streamedContent && (
-                        <AgenticResponseContent
-                            content={streamedContent}
-                            timeTaken={currentTimeTaken}
-                        />
-                    )}
-                </Box>
+                            )}
+                        </VerticalStack>
+                    </Box>
+                </VerticalStack>
 
                 {/* Fixed follow-up input bar */}
                 <AgenticSearchInput

@@ -73,7 +73,6 @@ const AgenticSearchInput = forwardRef(({
         background: 'linear-gradient(to top, rgba(250, 250, 250, 1) 70%, rgba(250, 250, 250, 0) 100%)',
         zIndex: 100
     } : {
-        marginBottom: '24px',
         display: 'flex',
         justifyContent: 'center'
     };
@@ -109,6 +108,7 @@ const AgenticSearchInput = forwardRef(({
                                 placeholder={placeholder}
                                 autoComplete="off"
                                 borderless
+                                
                             />
                         </Box>
                     <Box

@@ -1,38 +1,24 @@
-import { Box, Text } from '@shopify/polaris';
+import { Box, HorizontalStack, Text } from '@shopify/polaris';
 
 function AgenticUserMessage({ content }) {
     return (
-        <Box
-            style={{
-                width: '100%',
-                display: 'flex',
-                justifyContent: 'flex-end'
-            }}
-        >
+        <HorizontalStack align="end" blockAlign="center">
             <Box
-                style={{
-                    maxWidth: '70%',
-                    padding: '12px 16px',
-                    borderRadius: '12px 12px 4px 12px',
-                    border: '1px solid #C9CCCF',
-                    background: 'rgba(255, 255, 255, 0.40)'
-                }}
+                maxWidth="70%"
+                padding="3"
+                paddingInlineStart="4"
+                paddingInlineEnd="4"
+                borderWidth="1"
+                borderColor="border"
+                background="bg-surface"
+                borderRadius='3'
+                borderRadiusStartEnd='1'
             >
-                <Text variant="bodyMd" as="p">
-                    <span style={{
-                        color: '#202223',
-                        fontFeatureSettings: "'liga' off, 'clig' off",
-                        fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, "San Francisco", "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
-                        fontSize: '12px',
-                        fontStyle: 'normal',
-                        fontWeight: 400,
-                        lineHeight: '16px'
-                    }}>
-                        {content}
-                    </span>
+                <Text variant="bodyMd" as="p" color="subdued">
+                    {content}
                 </Text>
             </Box>
-        </Box>
+        </HorizontalStack>
     );
 }
 

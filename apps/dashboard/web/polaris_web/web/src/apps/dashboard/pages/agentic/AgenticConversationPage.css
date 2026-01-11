@@ -29,16 +29,15 @@
 .ask-ai-route .Polaris-Page {
     min-height: 100vh;
     background: radial-gradient(68.5% 70.87% at 49.29% 41.78%, #FAFAFA 27.4%, #FAFAFA 54.33%, #F9F6FF 69.17%, #FFF 86.54%, #F0FAFF 98.08%);
-    padding: 24px 32px;
-    margin: 0;
     display: flex;
     flex-direction: column;
 }
 
-/* Scoped Box styles for agentic pages */
-.ask-ai-route .Polaris-Page > .Polaris-Box {
-    background: transparent !important;
+.ask-ai-route .Polaris-Page__Content{
+    height: 100%;
+    margin: auto;
 }
+
 
 /* AgenticSearchInput styles */
 .agentic-search-input .Polaris-TextField {
@@ -71,6 +70,19 @@
     box-shadow: none !important;
 }
 
+.agentic-history-modal-search .Polaris-TextField {
+    background: #E4E5E7;
+}
+
+.agentic-history-modal-search .Polaris-TextField__Backdrop::before,
+.agentic-history-modal-search .Polaris-TextField__Backdrop::after {
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.agentic-history-modal-search .Polaris-TextField__Backdrop {
+    background-color: #E4E5E7 !important;
+}
 .shimmer-container {
     position: relative;
     overflow: hidden;

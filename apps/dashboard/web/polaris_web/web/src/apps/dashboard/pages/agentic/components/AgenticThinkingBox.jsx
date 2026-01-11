@@ -1,27 +1,19 @@
-import { Box, Text } from '@shopify/polaris';
+import { Box, HorizontalStack, Text, VerticalStack } from '@shopify/polaris';
 import '../AgenticConversationPage.css';
 
 function AgenticThinkingBox({ thinkingItems }) {
     return (
-        <>
-            <Box
-                style={{
-                    width: '100%',
-                    display: 'flex',
-                    justifyContent: 'flex-start'
-                }}
-            >
-                <Box style={{ width: '100%' }}>
-                    <Box
-                        style={{
-                            padding: '12px 16px',
-                            borderRadius: '12px 12px 12px 0px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '8px',
-                            background: 'transparent'
-                        }}
-                    >
+        <HorizontalStack align="start" blockAlign="start">
+            <Box width="100%">
+                <Box
+                    padding="3"
+                    paddingInlineStart="4"
+                    paddingInlineEnd="4"
+                    background="bg-transparent-active-experimental"
+                    borderRadius='3'
+                    borderRadiusEndStart='0'
+                >
+                    <VerticalStack gap="2">
                         {/* Top text with animation */}
                         <Text variant="bodyMd" as="p">
                             <span className="thinking-text">
@@ -29,30 +21,23 @@ function AgenticThinkingBox({ thinkingItems }) {
                             </span>
                         </Text>
 
-                    {/* List of thinking items */}
-                    <Box style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {thinkingItems.map((item, itemIndex) => (
-                            <Box
-                                key={itemIndex}
-                                style={{
-                                    display: 'flex',
-                                    gap: '7px',
-                                    alignItems: 'flex-start'
-                                }}
-                            >
-                                <Box className="thinking-bullet" />
-                                <Text variant="bodySm" as="p">
-                                    <span className="thinking-item">
-                                        {item}
-                                    </span>
-                                </Text>
-                            </Box>
-                        ))}
-                    </Box>
+                        {/* List of thinking items */}
+                        <VerticalStack gap="2">
+                            {thinkingItems.map((item, itemIndex) => (
+                                <HorizontalStack key={itemIndex} gap="2" blockAlign="start">
+                                    <Box className="thinking-bullet" />
+                                    <Text variant="bodySm" as="p">
+                                        <span className="thinking-item">
+                                            {item}
+                                        </span>
+                                    </Text>
+                                </HorizontalStack>
+                            ))}
+                        </VerticalStack>
+                    </VerticalStack>
                 </Box>
             </Box>
-        </Box>
-        </>
+        </HorizontalStack>
     );
 }
 

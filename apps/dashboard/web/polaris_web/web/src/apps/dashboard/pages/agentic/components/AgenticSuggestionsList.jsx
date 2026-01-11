@@ -1,45 +1,35 @@
-import { Box, Text } from '@shopify/polaris';
+import { Box, Button, HorizontalStack, Text, VerticalStack } from '@shopify/polaris';
 
 function AgenticSuggestionsList({ suggestions, onSuggestionClick }) {
     return (
-        <Box
-            style={{
-                width: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '2px'
-            }}
-        >
+        <VerticalStack gap="0">
             {suggestions.map((suggestion, suggestionIndex) => (
-                <Box
+                <Button
                     key={suggestionIndex}
+                    plain
                     onClick={() => onSuggestionClick(suggestion)}
+                    fullWidth
+                    textAlign="left"
                     style={{
                         padding: '12px 16px',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        transition: 'opacity 0.2s ease'
+                        borderRadius: '8px'
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
-                    onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
                 >
-                    <Box style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Box style={{ width: '20px', height: '20px', flexShrink: 0 }}>
+                    <HorizontalStack gap="2" blockAlign="center">
+                        <Box width="20px" height="20px" flexShrink={0}>
                             <img
                                 src="/public/suggestion.svg"
                                 alt="Suggestion"
                                 style={{ width: '100%', height: '100%', display: 'block' }}
                             />
                         </Box>
-                        <Text variant="bodySm" as="p">
-                            <span style={{ color: 'rgba(109, 113, 117, 0.8)' }}>
-                                {suggestion}
-                            </span>
+                        <Text variant="bodySm" as="p" tone="subdued">
+                            {suggestion}
                         </Text>
-                    </Box>
-                </Box>
+                    </HorizontalStack>
+                </Button>
             ))}
-        </Box>
+        </VerticalStack>
     );
 }
 

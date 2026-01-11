@@ -1,24 +1,12 @@
-import { Box, Text } from '@shopify/polaris';
+import { Box, Text, VerticalStack } from '@shopify/polaris';
 import MarkdownViewer from '../../../components/shared/MarkdownViewer';
 
 function AgenticResponseContent({ content, timeTaken }) {
     return (
-        <Box
-            style={{
-                width: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px'
-            }}
-        >
+        <VerticalStack gap="2" align="start">
             {/* Time taken */}
             {timeTaken && (
-                <Box
-                    style={{
-                        width: '100%',
-                        paddingLeft: '20px'
-                    }}
-                >
+                <Box paddingInlineStart="5">
                     <Text variant="bodySm" as="p" tone="subdued">
                         Thought for {timeTaken} seconds
                     </Text>
@@ -27,14 +15,13 @@ function AgenticResponseContent({ content, timeTaken }) {
 
             {/* Markdown content */}
             <Box
-                style={{
-                    borderRadius: '12px 12px 12px 0px',
-                    background: 'transparent'
-                }}
+                background="bg-transparent-active-experimental"
+                borderRadius='3'
+                borderRadiusEndStart='0'
             >
                 <MarkdownViewer markdown={content} />
             </Box>
-        </Box>
+        </VerticalStack>
     );
 }
 
