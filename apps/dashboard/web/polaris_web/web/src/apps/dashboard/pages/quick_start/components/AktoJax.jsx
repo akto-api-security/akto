@@ -55,10 +55,7 @@ const AktoJax = () => {
             } else if (modules.length > 0) {
                 setSelectedModule(modules[0].value)
             }
-        } catch (err) {
-            console.error("Error fetching DAST modules:", err)
-            func.setToast(true, true, "Failed to fetch available DAST modules")
-        } finally {
+        } catch (err) { } finally {
             setLoadingModules(false)
         }
     }
