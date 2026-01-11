@@ -222,7 +222,7 @@ public class AktoJaxAction extends UserAction {
 
                 if (config != null) {
                     Config.SlackAlertInternalConfig slackConfig = (Config.SlackAlertInternalConfig) config;
-                    String slackWebhookUrl = slackConfig.getSlackWebhookUrl();
+                    String slackWebhookUrl = slackConfig.getDastSlackWebhookUrl();
 
                     if (slackWebhookUrl != null && !slackWebhookUrl.isEmpty()) {
                         String collectionName = null;
