@@ -2,7 +2,6 @@ package com.akto.dao;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollectionIcon;
-import com.akto.util.Constants;
 
 public class ApiCollectionIconsDao extends CommonContextDao<ApiCollectionIcon> {
 
@@ -35,13 +34,15 @@ public class ApiCollectionIconsDao extends CommonContextDao<ApiCollectionIcon> {
             clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
         }
 
+        String[] domainNameIndex = { ApiCollectionIcon.DOMAIN_NAME };
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), domainNameIndex, false);
+
+        String[] matchingHostnamesIndex = { ApiCollectionIcon.MATCHING_HOSTNAMES };
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), matchingHostnamesIndex, false);
+
         String[] imageDataIndex = { ApiCollectionIcon.IMAGE_DATA };
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), imageDataIndex, true);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), imageDataIndex, false);
 
-        String[] createdAtIndex = { ApiCollectionIcon.CREATED_AT };
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), createdAtIndex, true);
 
-        String[] compoundIndex = { Constants.ID, ApiCollectionIcon.IMAGE_DATA };
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), compoundIndex, true);
     }
 }

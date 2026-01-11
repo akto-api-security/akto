@@ -7,7 +7,7 @@ import RegistryBadge from "../../../components/shared/RegistryBadge";
 import api from "../api"
 import dashboardApi from "../../dashboard/api"
 import settingRequests from "../../settings/api"
-import { useEffect,useState, useRef } from "react"
+import React, { useEffect,useState, useRef } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
 import { CircleTickMajor } from '@shopify/polaris-icons';
@@ -47,79 +47,99 @@ const CenterViewType = {
 const API_COLLECTIONS_CACHE_DURATION_SECONDS = 5 * 60; // 5 minutes
 const COLLECTIONS_LAZY_RENDER_THRESHOLD = 100; // Collections count above which we use lazy rendering optimization
 
+// Simple icon component that renders fallback icons immediately
+// Cache checking happens in the background via Java IconCache system
+// Global icon caches
+let hostnameToObjectIdCache = {};
+let objectIdToIconDataCache = {};
+let cacheLoadPromise = null;
 
-/**
- * Cascading domain lookup for UI rendering - tries full hostname first, then removes subdomains
- * Examples: api.sub.github.com -> try api.sub.github.com -> sub.github.com -> github.com
- */
-const findDomainWithIconInUI = async (hostName) => {
-    if (!hostName || typeof hostName !== 'string') {
-        return null;
+// Load both caches once - using promise to prevent multiple calls
+const loadAllIcons = async () => {
+    // If already loading, return the existing promise
+    if (cacheLoadPromise) {
+        return cacheLoadPromise;
     }
     
-    const cleanHostName = hostName.trim().toLowerCase();
-    const parts = cleanHostName.split('.');
-    
-    if (parts.length < 2) {
-        return cleanHostName;
+    // If already loaded, return immediately
+    if (Object.keys(hostnameToObjectIdCache).length > 0) {
+        return Promise.resolve();
     }
     
-    // Try from full hostname down to main domain (last 2 parts)
-    for (let i = 0; i <= parts.length - 2; i++) {
-        const candidateDomain = parts.slice(i).join('.');
-        
+    // Start loading and store the promise
+    cacheLoadPromise = (async () => {
         try {
-            const response = await collectionApi.getIconData(candidateDomain);
-            if (response.iconData && response.iconData.imageData) {
-                // Found icon at this domain level
-                return {
-                    domain: candidateDomain,
-                    iconData: response.iconData
-                };
+            const response = await api.getAllIconsCache();
+            if (response && response.hostnameToObjectIdCache && response.objectIdToIconDataCache) {
+                hostnameToObjectIdCache = response.hostnameToObjectIdCache;
+                objectIdToIconDataCache = response.objectIdToIconDataCache;
             }
         } catch (error) {
-            // Continue to next level if this one doesn't exist
-            continue;
         }
-    }
+    })();
     
-    // No icon found at any level
-    return null;
+    return cacheLoadPromise;
 };
 
-// Simple icon component that fetches base64 data with unified fallback
-const CollectionIconRenderer = ({ hostName, displayName, tagsList }) => {
-    const [iconSrc, setIconSrc] = useState(null);
-    const [loaded, setLoaded] = useState(false);
+const CollectionIconRenderer = React.memo(({ hostName, displayName, tagsList }) => {
+    const [iconData, setIconData] = React.useState(null);
 
-    useEffect(() => {
-        if (!hostName || loaded) return;
-        
+    React.useEffect(() => {
+        if (!hostName || hostName.trim() === '') {
+            return;
+        }
+        let isMounted = true; // Prevent state updates if component unmounts
         const fetchIcon = async () => {
             try {
-                // Use cascading domain lookup to find existing icons in database
-                const result = await findDomainWithIconInUI(hostName);
-                if (result && result.iconData && result.iconData.imageData) {
-                    setIconSrc(`data:${result.iconData.contentType || 'image/png'};base64,${result.iconData.imageData}`);
+                await loadAllIcons();
+                const trimmedHostName = hostName.trim();
+
+                // Step 1: Find matching hostname in hostnameToObjectIdCache
+                let objectId = null;
+                for (const [key, value] of Object.entries(hostnameToObjectIdCache)) {
+                    // key is a string like "(mcp.twilio.com, mcp.twilio.com)"
+                    // Parse it to extract the hostname (first part)
+                    const match = key.match(/^\(([^,]+),/);
+                    if (match && match[1].trim() === trimmedHostName) {
+                        objectId = value;
+                        break;
+                    }
+                }
+                // Step 2: If objectId found, get image data from objectIdToIconDataCache
+                if (objectId && objectIdToIconDataCache[objectId] && isMounted) {
+                    const iconDataObj = objectIdToIconDataCache[objectId];
+                    setIconData(iconDataObj.imageData);
                 }
             } catch (error) {
-                console.error('Failed to fetch icon for', hostName);
-            } finally {
-                setLoaded(true);
             }
         };
 
         fetchIcon();
-    }, [hostName, loaded]);
 
-    // If custom icon is found, use it
-    if (iconSrc) {
-        return <img src={iconSrc} alt="icon" style={{width: '20px', height: '20px', borderRadius: '2px'}} />;
+        // Cleanup function to prevent state updates after unmount
+        return () => {
+            isMounted = false;
+        };
+    }, [hostName]); // Only re-run when hostName changes
+
+    // If we have icon data, display it
+    if (iconData) {
+        return (
+            <img
+                src={`data:image/png;base64,${iconData}`}
+                alt={`${hostName} icon`}
+                style={{width: '20px', height: '20px', borderRadius: '2px'}}
+                onError={() => {
+                    // If the base64 image fails to load, fall back to default icon
+                    setIconData(null);
+                }}
+            />
+        );
     }
-    
-    // Use unified fallback logic for all collection types
+
+    // Fallback to default icons
     return <CollectionFallbackIcon tagsList={tagsList} displayName={displayName} />;
-};
+});
 
 // Unified fallback icon component for collections based on types
 const CollectionFallbackIcon = ({ tagsList, displayName }) => {
@@ -129,11 +149,11 @@ const CollectionFallbackIcon = ({ tagsList, displayName }) => {
         return <Icon source={iconSource} color={"base"} />;
     }
     
-    // MCP collections logic
+    // MCP collections logic  
     if (tagsList?.some(tag => tag.name === "mcp-server")) {
         return <img src={MCPIcon} alt="MCP icon" style={{width: '20px', height: '20px', borderRadius: '2px'}} />;
     }
-
+    
     // Default fallback based on displayName
     const defaultIcon = displayName?.toLowerCase().startsWith('mcp') ? MCPIcon : LaptopIcon;
     return <img src={defaultIcon} alt="default icon" style={{width: '20px', height: '20px', borderRadius: '2px'}} />;
