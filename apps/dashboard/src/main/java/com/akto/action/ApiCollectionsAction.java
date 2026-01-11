@@ -57,8 +57,10 @@ import com.opensymphony.xwork2.Action;
 
 import lombok.Setter;
 import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
+
 import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.dto.type.URLMethods;
+import com.akto.cache.IconCache;
 
 public class ApiCollectionsAction extends UserAction {
 
@@ -245,6 +247,14 @@ public class ApiCollectionsAction extends UserAction {
         UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
         this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty(), Projections.exclude("urls"));
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
+        
+        // Start background icon processing for Argus and Atlas collections asynchronously
+        // This runs in a separate thread to not block the main response
+
+        if(!Context.contextSource.get().equals(CONTEXT_SOURCE.DAST) && !Context.contextSource.get().equals(CONTEXT_SOURCE.API)) {
+            com.akto.util.IconUtils.processIconsForCollections(this.apiCollections);
+        }
+        
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -1674,6 +1684,35 @@ public class ApiCollectionsAction extends UserAction {
 
     public void setResetEnvTypes(boolean resetEnvTypes) {
         this.resetEnvTypes = resetEnvTypes;
+    }
+
+
+    public String fetchAllIconsCache() {
+        try {
+            loggerMaker.infoAndAddToDb("DEBUG: fetchAllIconsCache called", LogDb.DASHBOARD);
+            
+            // Get both caches from IconCache
+            IconCache iconCache = IconCache.getInstance();
+            
+            // Force refresh the cache to get latest data from database
+            loggerMaker.infoAndAddToDb("DEBUG: Force refreshing icon cache", LogDb.DASHBOARD);
+            
+            Map<String, String> hostnameToObjectIdCache = iconCache.getHostnameToObjectIdCache();
+            Map<String, IconCache.IconData> objectIdToIconDataCache = iconCache.getObjectIdToIconDataCache();
+            
+            if(this.response == null) {
+                this.response = new BasicDBObject();
+            }
+            this.response.put("hostnameToObjectIdCache", hostnameToObjectIdCache);
+            this.response.put("objectIdToIconDataCache", objectIdToIconDataCache);
+            
+            loggerMaker.infoAndAddToDb("DEBUG: fetchAllIconsCache returning " + hostnameToObjectIdCache.size() + " hostname mappings and " + objectIdToIconDataCache.size() + " icon data entries", LogDb.DASHBOARD);
+            return Action.SUCCESS.toUpperCase();
+            
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error fetching all icons cache", LogDb.DASHBOARD);
+            return Action.ERROR.toUpperCase();
+        }
     }
 
 }

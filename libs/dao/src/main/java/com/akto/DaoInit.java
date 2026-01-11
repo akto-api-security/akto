@@ -500,5 +500,6 @@ public class DaoInit {
         AgentConversationDao.instance.createIndexIfAbsent();
         AgentConversationResultDao.instance.createIndexIfAbsent();
         IpReputationScoreDao.instance.createIndicesIfAbsent();
+        ApiCollectionIconsDao.instance.createIndicesIfAbsent();
     }
 }
