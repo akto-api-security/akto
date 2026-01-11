@@ -251,8 +251,7 @@ public class ApiCollectionsAction extends UserAction {
         // Start background icon processing for Argus and Atlas collections asynchronously
         // This runs in a separate thread to not block the main response
 
-        if(Context.contextSource.get().equals(CONTEXT_SOURCE.MCP) || Context.contextSource.get().equals(CONTEXT_SOURCE.AGENTIC)
-        || Context.contextSource.get().equals(CONTEXT_SOURCE.GEN_AI) || Context.contextSource.get().equals(CONTEXT_SOURCE.ENDPOINT)) {
+        if(!Context.contextSource.get().equals(CONTEXT_SOURCE.DAST) && !Context.contextSource.get().equals(CONTEXT_SOURCE.API)) {
             com.akto.util.IconUtils.processIconsForCollections(this.apiCollections);
         }
         

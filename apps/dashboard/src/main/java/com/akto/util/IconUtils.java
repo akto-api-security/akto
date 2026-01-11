@@ -44,27 +44,13 @@ public class IconUtils {
         }
 
         IconCache iconCache = IconCache.getInstance();
-        Set<String> hostnamesToProcess = new HashSet<>();
-        
-        // Extract unique full hostnames from collections
-        for (ApiCollection collection : apiCollections) {
-            String hostname = collection.getHostName();
-            if (hostname != null && !hostname.trim().isEmpty()) {
-                hostnamesToProcess.add(hostname.trim().toLowerCase());
-            }
-        }
-
-        loggerMaker.infoAndAddToDb("Found " + hostnamesToProcess.size() + " unique hostnames to process for icon fetching", LogDb.DASHBOARD);
 
         // Process each hostname with cache-first approach
-        for (String hostname : hostnamesToProcess) {
+        for (ApiCollection collection : apiCollections) {
             // First check cache (includes domain-stripping logic)
+            String hostname = collection.getHostName();
             IconCache.IconData cachedIcon = iconCache.getIconData(hostname);
             if (cachedIcon != null) {
-                // Icon found in cache (either exact match or domain match)
-                // If it was a domain match, the cache already added the mapping internally
-                // We should also update the database matchingHostnames array
-                updateDatabaseForDomainMatch(hostname, cachedIcon);
                 continue;
             }
 
@@ -79,39 +65,6 @@ public class IconUtils {
         }
     }
 
-    /**
-     * Update database when a hostname matches an existing domain in cache
-     * Adds the hostname to the matchingHostnames array if not already present
-     */
-    private static void updateDatabaseForDomainMatch(String hostname, IconCache.IconData cachedIcon) {
-        executorService.submit(() -> {
-            try {
-                // Find the database record for this domain
-                ApiCollectionIcon existingIcon = ApiCollectionIconsDao.instance.findOne(
-                    Filters.eq(ApiCollectionIcon.DOMAIN_NAME, cachedIcon.getDomainName())
-                );
-                
-                if (existingIcon != null && existingIcon.getMatchingHostnames() != null) {
-                    if (!existingIcon.getMatchingHostnames().contains(hostname)) {
-                        // Add hostname to matchingHostnames array
-                        ApiCollectionIconsDao.instance.updateOne(
-                            Filters.eq("_id", existingIcon.getId()),
-                            Updates.combine(
-                                Updates.addToSet(ApiCollectionIcon.MATCHING_HOSTNAMES, hostname),
-                                Updates.set(ApiCollectionIcon.UPDATED_AT, Context.now())
-                            )
-                        );
-                        
-                        loggerMaker.infoAndAddToDb("Updated database: added hostname " + hostname + 
-                                                   " to domain " + cachedIcon.getDomainName() + " via cache domain match", LogDb.DASHBOARD);
-                    }
-                }
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error updating database for domain match: hostname=" + hostname + 
-                                            ", domain=" + cachedIcon.getDomainName(), LogDb.DASHBOARD);
-            }
-        });
-    }
 
     /**
      * Fetch icon from Google Favicon API with cascading domain fallback and store in database
