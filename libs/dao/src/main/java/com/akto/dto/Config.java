@@ -680,6 +680,7 @@ public abstract class Config {
     @BsonDiscriminator
     public static class SlackAlertInternalConfig extends Config {
         private String slackWebhookUrl;
+        private String dastSlackWebhookUrl;
 
         public static final String CONFIG_ID = ConfigType.SLACK_ALERT_INTERNAL.name() + CONFIG_SALT;
 
@@ -694,6 +695,14 @@ public abstract class Config {
 
         public void setSlackWebhookUrl(String slackWebhookUrl) {
             this.slackWebhookUrl = slackWebhookUrl;
+        }
+
+        public String getDastSlackWebhookUrl() {
+            return dastSlackWebhookUrl;
+        }
+
+        public void setDastSlackWebhookUrl(String dastSlackWebhookUrl) {
+            this.dastSlackWebhookUrl = dastSlackWebhookUrl;
         }
     }
 
