@@ -73,6 +73,7 @@ public class IssuesAction extends UserAction {
     private Map<String, String> sampleDataVsCurlMap;
     private TestRunIssueStatus statusToBeUpdated;
     private String ignoreReason;
+    private Severity severityToBeUpdated;
     private int skip;
     private int limit;
     private List<TestRunIssueStatus> filterStatus;
@@ -688,6 +689,28 @@ public class IssuesAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String bulkUpdateIssueSeverity() {
+        if (issueIdArray == null || severityToBeUpdated == null) {
+            throw new IllegalStateException();
+        }
+
+        logger.debug("Issue id from db to be updated " + issueIdArray);
+        logger.debug("severity to be updated " + severityToBeUpdated);
+
+        User user = getSUser();
+        String userLogin = user != null ? user.getLogin() : "System";
+
+        Bson update = Updates.combine(
+            Updates.set(TestingRunIssues.KEY_SEVERITY, severityToBeUpdated),
+            Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()),
+            Updates.set(TestingRunIssues.LAST_UPDATED_BY, userLogin)
+        );
+
+        TestingRunIssuesDao.instance.updateMany(Filters.in(ID, issueIdArray), update);
+
+        return SUCCESS.toUpperCase();
+    }
+
     String latestTestingRunSummaryId;
     List<String> issueStatusQuery;
     List<TestingRunResult> testingRunResultList;
@@ -1173,6 +1196,14 @@ public class IssuesAction extends UserAction {
     }
     public String getDescription() {
         return description;
+    }
+
+    public void setSeverityToBeUpdated(Severity severityToBeUpdated) {
+        this.severityToBeUpdated = severityToBeUpdated;
+    }
+
+    public Severity getSeverityToBeUpdated() {
+        return severityToBeUpdated;
     }
 
     public Map<String, String> getIssuesDescriptionMap() {

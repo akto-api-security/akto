@@ -26,6 +26,15 @@
     color: white !important;
 }
 
+/* Severity edit button hover effect */
+.severity-edit-button {
+    transition: opacity 0.2s ease-in-out;
+}
+
+.severity-edit-button:hover {
+    opacity: 0.8;
+}
+
 #remediation-panel  h1 {
   font-size: 1.25rem !important;
   font-weight: 600 !important;

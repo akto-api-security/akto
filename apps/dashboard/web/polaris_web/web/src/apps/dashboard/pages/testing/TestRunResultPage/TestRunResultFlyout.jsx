@@ -5,7 +5,8 @@ import transform from '../transform'
 import SampleDataList from '../../../components/shared/SampleDataList'
 import SampleData from '../../../components/shared/SampleData'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
-import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link } from '@shopify/polaris'
+import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link, ActionList } from '@shopify/polaris'
+import { EditIcon } from '@shopify/polaris-icons'
 import CompulsoryDescriptionModal from "../../issues/components/CompulsoryDescriptionModal.jsx"
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
@@ -59,6 +60,9 @@ function TestRunResultFlyout(props) {
     const [description, setDescription] = useState("")
     const [editDescription, setEditDescription] = useState("")
     const [isEditingDescription, setIsEditingDescription] = useState(false)
+
+    const [severityPopoverActive, setSeverityPopoverActive] = useState(false)
+    const [isHoveringSeverity, setIsHoveringSeverity] = useState(false)
 
     const [vulnerabilityAnalysisError, setVulnerabilityAnalysisError] = useState(null)
     const [refreshFlag, setRefreshFlag] = useState(Date.now().toString())
@@ -140,6 +144,24 @@ function TestRunResultFlyout(props) {
             }
         } catch (err) {
             func.setToast(true, true, "Failed to save description");
+        }
+    }
+
+    const handleSeverityUpdate = async (newSeverity) => {
+        setSeverityPopoverActive(false);
+        try {
+            await issuesApi.bulkUpdateIssueSeverity([issueDetails.id], newSeverity);
+            func.setToast(true, false, `Severity updated to ${newSeverity}`);
+            // Update local state
+            if (typeof props.setIssueDetails === 'function') {
+                props.setIssueDetails({ ...issueDetails, severity: newSeverity });
+            }
+            // Trigger refresh if needed
+            if (typeof props.refreshIssueDetails === 'function') {
+                props.refreshIssueDetails();
+            }
+        } catch (err) {
+            func.setToast(true, true, "Failed to update severity");
         }
     }
 
@@ -424,7 +446,63 @@ function TestRunResultFlyout(props) {
                                     <Button removeUnderline plain monochrome onClick={() => openTest()}>
                                         <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
                                     </Button>
-                                    {(severity && severity?.length > 0) ? (issueDetails?.testRunIssueStatus === 'IGNORED' ? <Badge size='small'>Ignored</Badge> : <Box className={`badge-wrapper-${severity.toUpperCase()}`}><Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge></Box>) : null}
+                                    {(severity && severity?.length > 0) ? (
+                                        issueDetails?.testRunIssueStatus === 'IGNORED' ?
+                                            <Badge size='small'>Ignored</Badge> :
+                                            <div
+                                                onMouseEnter={() => setIsHoveringSeverity(true)}
+                                                onMouseLeave={() => setIsHoveringSeverity(false)}
+                                                style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                            >
+                                                <Popover
+                                                    active={severityPopoverActive}
+                                                    activator={
+                                                        <button
+                                                            onClick={() => setSeverityPopoverActive(!severityPopoverActive)}
+                                                            style={{
+                                                                background: 'none',
+                                                                border: 'none',
+                                                                padding: 0,
+                                                                cursor: 'pointer',
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                gap: '4px'
+                                                            }}
+                                                        >
+                                                            <Box className={`badge-wrapper-${severity.toUpperCase()}`}>
+                                                                <Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge>
+                                                            </Box>
+                                                            {isHoveringSeverity && (
+                                                                <Icon source={EditIcon} tone="base" />
+                                                            )}
+                                                        </button>
+                                                    }
+                                                    onClose={() => setSeverityPopoverActive(false)}
+                                                    autofocusTarget="first-node"
+                                                >
+                                                    <ActionList
+                                                        items={[
+                                                            {
+                                                                content: 'Critical',
+                                                                onAction: () => handleSeverityUpdate('CRITICAL')
+                                                            },
+                                                            {
+                                                                content: 'High',
+                                                                onAction: () => handleSeverityUpdate('HIGH')
+                                                            },
+                                                            {
+                                                                content: 'Medium',
+                                                                onAction: () => handleSeverityUpdate('MEDIUM')
+                                                            },
+                                                            {
+                                                                content: 'Low',
+                                                                onAction: () => handleSeverityUpdate('LOW')
+                                                            }
+                                                        ]}
+                                                    />
+                                                </Popover>
+                                            </div>
+                                    ) : null}
                                 </HorizontalStack>
                                 {owaspMapping.length > 0 ? (
                                     <Link onClick={() => owaspUrl && window.open(owaspUrl, '_blank')}>

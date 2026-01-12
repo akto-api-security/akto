@@ -8,6 +8,7 @@ import { MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris
 import PersistStore from "../../../../main/PersistStore";
 import { ActionList, Button, HorizontalGrid, HorizontalStack, IndexFiltersMode, Popover, TextField, Text, VerticalStack } from "@shopify/polaris";
 import CompulsoryDescriptionModal from "../components/CompulsoryDescriptionModal.jsx";
+import SeverityUpdateModal from "../components/SeverityUpdateModal.jsx";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import { SelectCollectionComponent } from "../../testing/TestRunsPage/TestrunsBannerComponent"
@@ -209,6 +210,10 @@ function IssuesPage() {
         noTimeToFix: false,
         acceptableFix: false
     })
+
+    // Severity update modal states
+    const [severityModalActive, setSeverityModalActive] = useState(false)
+    const [severityModalLoading, setSeverityModalLoading] = useState(false)
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
 
@@ -435,6 +440,27 @@ function IssuesPage() {
         }
     }, [compulsoryDescriptionModal, pendingIgnoreAction]);
 
+    const handleBulkSeverityUpdate = (newSeverity) => {
+        setSeverityModalLoading(true)
+        const items = selectedIssuesItems
+
+        api.bulkUpdateIssueSeverity(items, newSeverity).then((res) => {
+            setToast(true, false, `Severity updated for ${items.length} issue${items.length === 1 ? "" : "s"}`)
+            setSeverityModalActive(false)
+            setSeverityModalLoading(false)
+            resetResourcesSelected()
+            setKey(!key)
+        }).catch((error) => {
+            setToast(true, true, "Failed to update severity")
+            setSeverityModalLoading(false)
+        })
+    }
+
+    const openSeverityUpdateModal = (items) => {
+        setSelectedIssuesItems(items)
+        setSeverityModalActive(true)
+    }
+
     const performBulkIgnoreAction = (items, ignoreReason, description = "") => {
         api.bulkUpdateIssueStatus(items, "IGNORED", ignoreReason, { description }).then((res) => {
             setToast(true, false, `Issue${items.length === 1 ? "" : "s"} ignored${description ? " with description" : ""}`);
@@ -528,6 +554,10 @@ function IssuesPage() {
         }
 
         let issues = [
+            {
+                content: 'Update severity',
+                onAction: () => { openSeverityUpdateModal(items) }
+            },
             {
                 content: 'False positive',
                 key: 'falsePositive',
@@ -1110,6 +1140,14 @@ function IssuesPage() {
                 description={mandatoryDescription}
                 onChangeDescription={setMandatoryDescription}
                 loading={modalLoading}
+            />
+
+            <SeverityUpdateModal
+                open={severityModalActive}
+                onClose={() => setSeverityModalActive(false)}
+                onConfirm={handleBulkSeverityUpdate}
+                loading={severityModalLoading}
+                selectedCount={selectedIssuesItems.length}
             />
         </>
     )
