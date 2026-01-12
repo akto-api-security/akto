@@ -179,13 +179,13 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
     }
     
     public static Float getRiskScore(ApiInfo apiInfo, boolean isSensitive, float riskScoreFromSeverityScore){
-        return getRiskScore(apiInfo, isSensitive, riskScoreFromSeverityScore, apiInfo.getThreatScore() > 0);
+        return getRiskScore(apiInfo, isSensitive, riskScoreFromSeverityScore, apiInfo.getThreatScore());
     }
 
-    public static Float getRiskScore(ApiInfo apiInfo, boolean isSensitive, float riskScoreFromSeverityScore, boolean isThreatDetected){
+    public static Float getRiskScore(ApiInfo apiInfo, boolean isSensitive, float riskScoreFromSeverityScore, float threatScore){
         float riskScore = 0;
         if(apiInfo != null){
-            if((Context.now() - apiInfo.getDiscoveredTimestamp()) <= Constants.ONE_MONTH_TIMESTAMP && !isThreatDetected) {
+            if((Context.now() - apiInfo.getDiscoveredTimestamp()) <= Constants.ONE_MONTH_TIMESTAMP && threatScore == 0) {
                 riskScore += 1;
             }
             if(apiInfo.getApiAccessTypes().contains(ApiAccessType.PUBLIC)){
@@ -195,8 +195,8 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
         if(isSensitive){
             riskScore += 1;
         }
-        if(isThreatDetected){
-            riskScore += 1;
+        if(threatScore > 0){
+            riskScore += threatScore;
         }
         riskScore += riskScoreFromSeverityScore;
         return riskScore;
