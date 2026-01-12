@@ -50,7 +50,10 @@ export default function LeftNav() {
         resetFields();
         await api.goToAccount(selected);
         func.setToast(true, false, `Switched to account ${accounts[selected]}`);
-        window.location.href = '/dashboard/observe/inventory';
+        const redirectPath = func.isAtlasArgusAccount() && dashboardCategory === CATEGORY_AGENTIC_SECURITY
+            ? '/dashboard/observe/endpoints'
+            : '/dashboard/observe/inventory';
+        window.location.href = redirectPath;
     };
 
     const accountOptions = Object.keys(accounts).map(accountId => ({
@@ -138,13 +141,27 @@ export default function LeftNav() {
                 ),
                 icon: InventoryFilledMajor,
                 onClick: () => {
-                    handleSelect("dashboard_observe_inventory");
-                    navigate("/dashboard/observe/inventory");
+                    const targetPath = func.isAtlasArgusAccount() && dashboardCategory === CATEGORY_AGENTIC_SECURITY
+                        ? "/dashboard/observe/endpoints"
+                        : "/dashboard/observe/inventory";
+                    const targetHandle = func.isAtlasArgusAccount() && dashboardCategory === CATEGORY_AGENTIC_SECURITY
+                        ? "dashboard_observe_endpoints"
+                        : "dashboard_observe_inventory";
+                    handleSelect(targetHandle);
+                    navigate(targetPath);
                     setActive("normal");
                 },
                 selected: leftNavSelected.includes("_observe"),
                 subNavigationItems: [
-                    {
+                    ...(func.isAtlasArgusAccount() && dashboardCategory === CATEGORY_AGENTIC_SECURITY ? [{
+                        label: "Endpoints",
+                        onClick: () => {
+                            navigate("/dashboard/observe/endpoints");
+                            handleSelect("dashboard_observe_endpoints");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_observe_endpoints",
+                    }] : [{
                         label: "Collections",
                         onClick: () => {
                             navigate("/dashboard/observe/inventory");
@@ -152,7 +169,7 @@ export default function LeftNav() {
                             setActive("active");
                         },
                         selected: leftNavSelected === "dashboard_observe_inventory",
-                    },
+                    }]),
                     ...(!(func.isDemoAccount() && (dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security")) ? [
                     {
                         label: "Recent Changes",

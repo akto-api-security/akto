@@ -2214,7 +2214,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
      return window.ACTIVE_ACCOUNT === 1669322524
   },
   isAtlasArgusAccount(){
-    return window.ACTIVE_ACCOUNT === 1669322524 || window.ACTIVE_ACCOUNT === 1767814409 || window.ACTIVE_ACCOUNT === 1767812031
+    return this.isDemoAccount() || window.ACTIVE_ACCOUNT === 1767814409 || window.ACTIVE_ACCOUNT === 1767812031
   },
   isSameDateAsToday (givenDate) {
       const today = new Date();
