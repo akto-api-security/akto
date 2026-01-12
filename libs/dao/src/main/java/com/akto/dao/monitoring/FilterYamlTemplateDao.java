@@ -28,7 +28,7 @@ public class FilterYamlTemplateDao extends AccountsContextDao<YamlTemplate> {
     private static final List<String> OLD_MCP_TEMPLATE_IDS = Arrays.asList(
         "MCPGuardrails",
         "AuditPolicy",
-        "McpMaliciousComponent"
+        "MCPMaliciousComponent"
     );
 
     public Map<String, FilterConfig> fetchFilterConfig(
