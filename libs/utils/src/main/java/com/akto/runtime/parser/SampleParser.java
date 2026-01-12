@@ -200,7 +200,7 @@ public class SampleParser {
         moduleInfo.setStartedTs(timestamp); 
         moduleInfo.setCurrentVersion(imageVersion);
 
-        printUrlDebugLog("The moduleInfo will be " + moduleInfo);
+        printUrlDebugLog("The imageVersion will be " + imageVersion);
 
         return moduleInfo;
     }
