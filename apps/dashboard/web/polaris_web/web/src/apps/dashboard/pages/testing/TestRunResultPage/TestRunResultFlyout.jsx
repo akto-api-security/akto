@@ -152,6 +152,13 @@ function TestRunResultFlyout(props) {
         try {
             await issuesApi.bulkUpdateIssueSeverity([issueDetails.id], newSeverity);
             func.setToast(true, false, `Severity updated to ${newSeverity}`);
+
+            // Update issueDetails object
+            issueDetails.severity = newSeverity;
+
+            // Trigger re-render using existing refreshFlag state
+            setRefreshFlag(Date.now().toString());
+
             // Update local state
             if (typeof props.setIssueDetails === 'function') {
                 props.setIssueDetails({ ...issueDetails, severity: newSeverity });
