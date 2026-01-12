@@ -1121,13 +1121,10 @@ public class TestExecutor {
 
                 // If issue exists and was manually updated by a user, use their preferred severity
                 if (existingIssue != null && existingIssue.getLastUpdatedBy() != null &&
-                    !existingIssue.getLastUpdatedBy().isEmpty()) {
+                    !existingIssue.getLastUpdatedBy().isEmpty() &&
+                    testResults.getTestResults() != null && !testResults.getTestResults().isEmpty()) {
 
                     // Get the current severity from test result (before applying user preference)
-                    if (testResults.getTestResults() == null || testResults.getTestResults().isEmpty()) {
-                        loggerMaker.debugAndAddToDb("No test results available for severity check", LogDb.TESTING);
-                        continue;
-                    }
                     Confidence templateDetectedSeverity = testResults.getTestResults().get(0).getConfidence();
 
                     Severity userPreferredSeverity = existingIssue.getSeverity();

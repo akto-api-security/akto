@@ -689,51 +689,85 @@ public class IssuesAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public String bulkUpdateIssueSeverity() {
-        if (issueIdArray == null || severityToBeUpdated == null) {
-            throw new IllegalStateException("issueIdArray and severityToBeUpdated are required");
-        }
-
-        logger.debug("Issue id from db to be updated " + issueIdArray);
-        logger.debug("severity to be updated " + severityToBeUpdated);
-
-        User user = getSUser();
-        String userLogin = user != null ? user.getLogin() : "System";
-
-        Bson update = Updates.combine(
-            Updates.set(TestingRunIssues.KEY_SEVERITY, severityToBeUpdated),
-            Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()),
-            Updates.set(TestingRunIssues.LAST_UPDATED_BY, userLogin)
-        );
-
-        TestingRunIssuesDao.instance.updateMany(Filters.in(ID, issueIdArray), update);
-
-        return SUCCESS.toUpperCase();
-    }
-
     private List<String> testingRunResultHexIds;
 
-    public String bulkUpdateIssueSeverityFromTestResults() {
-        if (testingRunResultHexIds == null || testingRunResultHexIds.isEmpty() || severityToBeUpdated == null) {
-            throw new IllegalStateException("testingRunResultHexIds and severityToBeUpdated are required");
+    public String bulkUpdateIssueSeverity() {
+        // Unified API that accepts either issueIdArray (from Issues page) or testingRunResultHexIds (from Testing page)
+        if (severityToBeUpdated == null) {
+            throw new IllegalStateException("severityToBeUpdated is required");
         }
 
-        logger.debug("Testing run result hex ids to be updated: " + testingRunResultHexIds);
+        // Determine which type of IDs were provided
+        List<ObjectId> testResultIds = new ArrayList<>();
+
+        if (testingRunResultHexIds != null && !testingRunResultHexIds.isEmpty()) {
+            // Called from Testing page with test result IDs directly
+            logger.debug("Testing run result hex ids to be updated: " + testingRunResultHexIds);
+            testResultIds = testingRunResultHexIds.stream()
+                .map(ObjectId::new)
+                .collect(java.util.stream.Collectors.toList());
+        } else if (issueIdArray != null && !issueIdArray.isEmpty()) {
+            // Called from Issues page with issue IDs - need to find matching test results
+            logger.debug("Issue ids to be updated: " + issueIdArray);
+
+            // Build a single filter for all issues using $or to reduce queries
+            List<Bson> issueFilters = new ArrayList<>();
+            for (TestingIssuesId issueId : issueIdArray) {
+                issueFilters.add(Filters.and(
+                    Filters.eq(TestingRunResult.API_INFO_KEY, issueId.getApiInfoKey()),
+                    Filters.eq(TestingRunResult.TEST_SUB_TYPE, issueId.getTestSubCategory())
+                ));
+            }
+
+            Bson combinedFilter = issueFilters.size() == 1 ?
+                issueFilters.get(0) :
+                Filters.or(issueFilters);
+
+            List<TestingRunResult> testResults = new ArrayList<>();
+
+            // Query vulnerable collection once
+            List<TestingRunResult> vulnerableResults = VulnerableTestingRunResultDao.instance.findAll(
+                combinedFilter,
+                Projections.include(Constants.ID)
+            );
+            if (vulnerableResults != null) {
+                testResults.addAll(vulnerableResults);
+            }
+
+            // Query regular collection once
+            List<TestingRunResult> regularResults = TestingRunResultDao.instance.findAll(
+                combinedFilter,
+                Projections.include(Constants.ID)
+            );
+            if (regularResults != null) {
+                testResults.addAll(regularResults);
+            }
+
+            logger.debug("Found " + testResults.size() + " test results matching " + issueIdArray.size() + " issues");
+
+            testResultIds = testResults.stream()
+                .map(TestingRunResult::getId)
+                .collect(java.util.stream.Collectors.toList());
+        } else {
+            throw new IllegalStateException("Either issueIdArray or testingRunResultHexIds must be provided");
+        }
+
+        if (testResultIds.isEmpty()) {
+            logger.warn("No test results found to update");
+            return SUCCESS.toUpperCase();
+        }
+
         logger.debug("Severity to be updated: " + severityToBeUpdated);
 
         try {
-            // Convert hex IDs to ObjectIds
-            List<ObjectId> testRunResultIds = testingRunResultHexIds.stream()
-                .map(ObjectId::new)
-                .collect(java.util.stream.Collectors.toList());
-
-            // Fetch TestingRunResults from both vulnerable and regular collections
-            // First try vulnerable collection
+            // Fetch TestingRunResults with OLD confidence values and summary IDs
             List<TestingRunResult> results = VulnerableTestingRunResultDao.instance.findAll(
-                Filters.in(Constants.ID, testRunResultIds),
+                Filters.in(Constants.ID, testResultIds),
                 Projections.include(
                     TestingRunResult.API_INFO_KEY,
-                    TestingRunResult.TEST_SUB_TYPE
+                    TestingRunResult.TEST_SUB_TYPE,
+                    TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID,
+                    TestingRunResult.TEST_RESULTS
                 )
             );
 
@@ -741,19 +775,21 @@ public class IssuesAction extends UserAction {
             if (results == null || results.isEmpty()) {
                 logger.debug("Not found in vulnerable collection, trying regular collection");
                 results = TestingRunResultDao.instance.findAll(
-                    Filters.in(Constants.ID, testRunResultIds),
+                    Filters.in(Constants.ID, testResultIds),
                     Projections.include(
                         TestingRunResult.API_INFO_KEY,
-                        TestingRunResult.TEST_SUB_TYPE
+                        TestingRunResult.TEST_SUB_TYPE,
+                        TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID,
+                        TestingRunResult.TEST_RESULTS
                     )
                 );
-            } else if (results.size() < testRunResultIds.size()) {
+            } else if (results.size() < testResultIds.size()) {
                 // Some results found in vulnerable collection, get the rest from regular collection
                 logger.debug("Found " + results.size() + " in vulnerable collection, fetching remaining from regular collection");
                 java.util.Set<ObjectId> foundIds = results.stream()
                     .map(TestingRunResult::getId)
                     .collect(java.util.stream.Collectors.toSet());
-                List<ObjectId> remainingIds = testRunResultIds.stream()
+                List<ObjectId> remainingIds = testResultIds.stream()
                     .filter(id -> !foundIds.contains(id))
                     .collect(java.util.stream.Collectors.toList());
 
@@ -762,7 +798,9 @@ public class IssuesAction extends UserAction {
                         Filters.in(Constants.ID, remainingIds),
                         Projections.include(
                             TestingRunResult.API_INFO_KEY,
-                            TestingRunResult.TEST_SUB_TYPE
+                            TestingRunResult.TEST_SUB_TYPE,
+                            TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID,
+                            TestingRunResult.TEST_RESULTS
                         )
                     );
                     if (additionalResults != null && !additionalResults.isEmpty()) {
@@ -778,59 +816,53 @@ public class IssuesAction extends UserAction {
 
             logger.debug("Found " + results.size() + " testing run results");
 
-            // Convert to TestingIssuesId (using Set to avoid duplicates)
-            java.util.Set<TestingIssuesId> issueIds = results.stream()
-                .map(this::getTestingIssueIdFromRunResult)
-                .collect(java.util.stream.Collectors.toSet());
-
-            logger.debug("Converted to " + issueIds.size() + " unique issue IDs");
-            issueIds.forEach(id -> logger.debug("Issue ID: " + id.toString()));
-
-            // Fetch OLD severities and summary IDs BEFORE updating (for incremental count update)
-            List<TestingRunIssues> issuesBeforeUpdate = TestingRunIssuesDao.instance.findAll(
-                Filters.in(Constants.ID, issueIds),
-                Projections.include(
-                    TestingRunIssues.KEY_SEVERITY,
-                    TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID
-                )
-            );
-
-            if (issuesBeforeUpdate == null || issuesBeforeUpdate.isEmpty()) {
-                logger.warn("No matching issues found in testing_run_issues collection for the provided test results");
-                return SUCCESS.toUpperCase();
-            }
-
-            logger.debug("Found " + issuesBeforeUpdate.size() + " existing issues to update");
-
             // Build change tracking map: summaryId -> {severity -> count change}
+            // We calculate deltas based on the OLD confidence values in test results
             Map<ObjectId, Map<Severity, Integer>> summaryChanges = new java.util.HashMap<>();
 
-            for (TestingRunIssues issue : issuesBeforeUpdate) {
-                ObjectId summaryId = issue.getLatestTestingRunSummaryId();
+            // Convert to TestingIssuesId (using Set to avoid duplicates)
+            java.util.Set<TestingIssuesId> issueIds = new java.util.HashSet<>();
+
+            for (TestingRunResult result : results) {
+                // Get summary ID from this test result
+                ObjectId summaryId = result.getTestRunResultSummaryId();
                 if (summaryId == null) {
-                    logger.debug("Issue has no summary ID, skipping count update: " + issue.getId());
+                    logger.warn("Test result has no summaryId: " + result.getId());
                     continue;
                 }
 
-                Severity oldSeverity = issue.getSeverity();
+                // Get OLD severity from test result's confidence field
+                Severity oldSeverity = null;
+                if (result.getTestResults() != null && !result.getTestResults().isEmpty()) {
+                    GenericTestResult testResult = result.getTestResults().get(0);
+                    if (testResult != null && testResult.getConfidence() != null) {
+                        oldSeverity = Severity.valueOf(testResult.getConfidence().toString());
+                    }
+                }
+
                 if (oldSeverity == null) {
-                    logger.debug("Issue has no old severity, skipping: " + issue.getId());
-                    continue;
+                    logger.debug("Test result has no old confidence, skipping count update: " + result.getId());
+                } else if (!oldSeverity.equals(severityToBeUpdated)) {
+                    // Calculate delta for this summary
+                    summaryChanges.putIfAbsent(summaryId, new java.util.HashMap<>());
+                    Map<Severity, Integer> changes = summaryChanges.get(summaryId);
+
+                    // Decrement old severity count
+                    changes.merge(oldSeverity, -1, Integer::sum);
+                    // Increment new severity count
+                    changes.merge(severityToBeUpdated, 1, Integer::sum);
+
+                    logger.debug("Test result " + result.getId() + ": " + oldSeverity + " -> " + severityToBeUpdated + " (summary: " + summaryId.toHexString() + ")");
                 }
 
-                // Initialize nested map if needed
-                summaryChanges.putIfAbsent(summaryId, new java.util.HashMap<>());
-                Map<Severity, Integer> changes = summaryChanges.get(summaryId);
-
-                // Decrement old severity count
-                changes.merge(oldSeverity, -1, Integer::sum);
-                // Increment new severity count
-                changes.merge(severityToBeUpdated, 1, Integer::sum);
+                // Collect issue IDs for updating testing_run_issues
+                issueIds.add(getTestingIssueIdFromRunResult(result));
             }
 
+            logger.debug("Converted to " + issueIds.size() + " unique issue IDs");
             logger.debug("Will update counts for " + summaryChanges.size() + " test run summaries");
 
-            // Update severity (reuse existing logic)
+            // Update severity in testing_run_issues
             User user = getSUser();
             String userLogin = user != null ? user.getLogin() : "System";
 
@@ -847,7 +879,7 @@ public class IssuesAction extends UserAction {
 
             logger.info("Successfully updated severity for " + updateResult.getModifiedCount() + " issues (matched: " + updateResult.getMatchedCount() + ")");
 
-            // Also update the confidence field in TestingRunResult for UI display
+            // Update the confidence field in TestingRunResult for UI display
             TestResult.Confidence confidenceValue = TestResult.Confidence.valueOf(severityToBeUpdated.toString());
             Bson testResultUpdate = Updates.set(
                 TestingRunResult.TEST_RESULTS + ".0." + GenericTestResult._CONFIDENCE,
@@ -856,14 +888,14 @@ public class IssuesAction extends UserAction {
 
             // Update in vulnerable collection
             com.mongodb.client.result.UpdateResult vulnerableUpdateResult = VulnerableTestingRunResultDao.instance.getMCollection().updateMany(
-                Filters.in(Constants.ID, testRunResultIds),
+                Filters.in(Constants.ID, testResultIds),
                 testResultUpdate
             );
             logger.debug("Updated " + vulnerableUpdateResult.getModifiedCount() + " test results in vulnerable collection");
 
             // Update in regular collection
             com.mongodb.client.result.UpdateResult regularUpdateResult = TestingRunResultDao.instance.getMCollection().updateMany(
-                Filters.in(Constants.ID, testRunResultIds),
+                Filters.in(Constants.ID, testResultIds),
                 testResultUpdate
             );
             logger.debug("Updated " + regularUpdateResult.getModifiedCount() + " test results in regular collection");
@@ -874,11 +906,16 @@ public class IssuesAction extends UserAction {
             logger.info("Severity update completed successfully");
 
         } catch (Exception e) {
-            logger.error("Error updating severity from test results: " + e.getMessage(), e);
+            logger.error("Error updating severity: " + e.getMessage(), e);
             throw new RuntimeException("Failed to update severity: " + e.getMessage(), e);
         }
 
         return SUCCESS.toUpperCase();
+    }
+
+    public String bulkUpdateIssueSeverityFromTestResults() {
+        // Delegate to unified API - both methods now use the same implementation
+        return bulkUpdateIssueSeverity();
     }
 
     private void updateSummaryCountsIncrementally(Map<ObjectId, Map<Severity, Integer>> summaryChanges) {

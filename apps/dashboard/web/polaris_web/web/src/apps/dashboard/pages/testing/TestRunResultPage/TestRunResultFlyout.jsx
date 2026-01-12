@@ -456,59 +456,50 @@ function TestRunResultFlyout(props) {
                                     {(severity && severity?.length > 0) ? (
                                         issueDetails?.testRunIssueStatus === 'IGNORED' ?
                                             <Badge size='small'>Ignored</Badge> :
-                                            <div
-                                                onMouseEnter={() => setIsHoveringSeverity(true)}
-                                                onMouseLeave={() => setIsHoveringSeverity(false)}
-                                                style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                                            >
-                                                <Popover
-                                                    active={severityPopoverActive}
-                                                    activator={
-                                                        <button
-                                                            onClick={() => setSeverityPopoverActive(!severityPopoverActive)}
-                                                            style={{
-                                                                background: 'none',
-                                                                border: 'none',
-                                                                padding: 0,
-                                                                cursor: 'pointer',
-                                                                display: 'inline-flex',
-                                                                alignItems: 'center',
-                                                                gap: '4px'
-                                                            }}
-                                                        >
+                                            <Popover
+                                                active={severityPopoverActive}
+                                                activator={
+                                                    <Button
+                                                        plain
+                                                        removeUnderline
+                                                        onClick={() => setSeverityPopoverActive(!severityPopoverActive)}
+                                                        onMouseEnter={() => setIsHoveringSeverity(true)}
+                                                        onMouseLeave={() => setIsHoveringSeverity(false)}
+                                                    >
+                                                        <HorizontalStack gap="1" align="center">
                                                             <Box className={`badge-wrapper-${severity.toUpperCase()}`}>
                                                                 <Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge>
                                                             </Box>
                                                             {isHoveringSeverity && (
                                                                 <Icon source={EditIcon} tone="base" />
                                                             )}
-                                                        </button>
-                                                    }
-                                                    onClose={() => setSeverityPopoverActive(false)}
-                                                    autofocusTarget="first-node"
-                                                >
-                                                    <ActionList
-                                                        items={[
-                                                            {
-                                                                content: 'Critical',
-                                                                onAction: () => handleSeverityUpdate('CRITICAL')
-                                                            },
-                                                            {
-                                                                content: 'High',
-                                                                onAction: () => handleSeverityUpdate('HIGH')
-                                                            },
-                                                            {
-                                                                content: 'Medium',
-                                                                onAction: () => handleSeverityUpdate('MEDIUM')
-                                                            },
-                                                            {
-                                                                content: 'Low',
-                                                                onAction: () => handleSeverityUpdate('LOW')
-                                                            }
-                                                        ]}
-                                                    />
-                                                </Popover>
-                                            </div>
+                                                        </HorizontalStack>
+                                                    </Button>
+                                                }
+                                                onClose={() => setSeverityPopoverActive(false)}
+                                                autofocusTarget="first-node"
+                                            >
+                                                <ActionList
+                                                    items={[
+                                                        {
+                                                            content: 'Critical',
+                                                            onAction: () => handleSeverityUpdate('CRITICAL')
+                                                        },
+                                                        {
+                                                            content: 'High',
+                                                            onAction: () => handleSeverityUpdate('HIGH')
+                                                        },
+                                                        {
+                                                            content: 'Medium',
+                                                            onAction: () => handleSeverityUpdate('MEDIUM')
+                                                        },
+                                                        {
+                                                            content: 'Low',
+                                                            onAction: () => handleSeverityUpdate('LOW')
+                                                        }
+                                                    ]}
+                                                />
+                                            </Popover>
                                     ) : null}
                                 </HorizontalStack>
                                 {owaspMapping.length > 0 ? (
