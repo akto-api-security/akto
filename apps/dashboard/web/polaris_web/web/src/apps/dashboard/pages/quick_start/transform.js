@@ -500,7 +500,7 @@ const agenticShieldObj = {
 const mcpScanObj = {
     icon: '/public/mcp.svg',
     label: "MCP Import",
-    text: "You can use Akto's MCP import to capture traffic and instantly send it to your dashboard for real-time insights.",  
+    text: "You can use Akto's MCP import to capture traffic and instantly send it to your dashboard for real-time insights.",   
     docsUrl: 'https://docs.akto.io/mcp-import',
     key: "MCP_SCAN",
     component : <McpScan/>
@@ -558,7 +558,7 @@ const gcpObj = {
     docsUrl: 'https://docs.akto.io/traffic-connector/mirroring/google-cloud-gcp',
     key: "GCP",
     component: <BannerComponent title="Setup using GCP Mirroring" docsUrl="https://docs.akto.io/traffic-connector/mirroring/google-cloud-gcp"
-            content="Use Google packet mirroring to send duplicate stream of traffic to Akto. No performance impact, only mirrored traffic is used to analyze APIs." />
+                    content="Use Google packet mirroring to send duplicate stream of traffic to Akto. No performance impact, only mirrored traffic is used to analyze APIs." />
 }
 
 const harFileUploadObj = {
@@ -568,7 +568,7 @@ const harFileUploadObj = {
     docsUrl: 'https://docs.akto.io/traffic-connector/manual/har-file-upload',
     key: "HAR",
     component: <BannerComponent title="Upload .har file" docsUrl="https://docs.akto.io/traffic-connector/manual/har-file-upload"
-                content=" You can use this method if you quickly want to try out Akto. Akto can process HAR (Http ARchive) files and populate inventory from it." />
+                    content=" You can use this method if you quickly want to try out Akto. Akto can process HAR (Http ARchive) files and populate inventory from it." />
 }
 
 const kongObj = {
@@ -1580,9 +1580,9 @@ const quickStartFunc = {
         ]
 
        if(func.checkLocal() || func.isLimitedAccount()){
-            return {
-                "Manual": manual
-            }
+           return {
+               "Manual": manual
+           }
        }
 
         let connectors = {}
@@ -1760,19 +1760,19 @@ const quickStartFunc = {
     getDesiredSteps: function(url) {
         const steps = [
             {
-                textComponent: <span>Grab the policy JSON below and navigate to Akto Dashboard's current role by clicking <a target='_blank' href={url}>here</a>.</span>,
+              textComponent: <span>Grab the policy JSON below and navigate to Akto Dashboard's current role by clicking <a target='_blank' href={url}>here</a>.</span>, 
             },
             {
-                text: "We will create an inline policy, navigate to JSON tab and paste the copied JSON here."
+              text: "We will create an inline policy, navigate to JSON tab and paste the copied JSON here."
             },
             {
-                text: "Click on 'Review policy'."
+              text: "Click on 'Review policy'."
             },
             {
-                text: "Now lets name the policy as 'AktoDashboardPolicy'."
+              text: "Now lets name the policy as 'AktoDashboardPolicy'."
             },
             {
-                text: "Finally create the policy by clicking on 'Create policy'."
+              text: "Finally create the policy by clicking on 'Create policy'."
             },
         ]
         return steps
@@ -1790,14 +1790,14 @@ const quickStartFunc = {
         // to add more else if blocks to handle cases where deployment is stuck
         progressBarCopy.value = Math.round(progressPercent);
         return progressBarCopy
-    },
+      },
 
       removeProgressBarAndStatuschecks: function(progressBar) {
         const progressBarCopy = JSON.parse(JSON.stringify(progressBar))
         progressBarCopy.show = false;
         progressBarCopy.value = 0;
         return progressBarCopy
-    }
+      }
 }
 
 export default quickStartFunc
