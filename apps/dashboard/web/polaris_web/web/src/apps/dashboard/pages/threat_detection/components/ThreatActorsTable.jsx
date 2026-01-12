@@ -13,9 +13,8 @@ import { Tooltip } from "@shopify/polaris";
 import { useSearchParams } from "react-router-dom";
 import { isAgenticSecurityCategory, isMCPSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import { labelMap } from "../../../../main/labelHelperMap";
-import { formatActorId } from "../utils/formatUtils";
-import IpReputationScore from "./IpReputationScore";
 import { formatActorId, extractRuleViolated } from "../utils/formatUtils";
+import IpReputationScore from "./IpReputationScore";
 
 const resourceName = {
   singular: "actor",
