@@ -54,7 +54,7 @@ const AuditLogDetails = ({ showDetails, setShowDetails, auditLog }) => {
                 <VerticalStack gap="2">
                     <Text variant="headingSm" alignment="start">More details</Text>
                     <Card padding="2">
-                        <SampleData data={{ message: metadataStr }} editorLanguage="json" minHeight="75px" />
+                        <SampleData data={{ message: metadataStr }} editorLanguage="json" />
                     </Card>
                 </VerticalStack>
             </Box>
