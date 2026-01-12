@@ -126,6 +126,14 @@ export default function LeftNav() {
                     navigate("/dashboard/view");
                     setActive("normal");
                 }
+            }] : dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
+                label: "Dashboard",
+                icon: ReportFilledMinor,
+                onClick: () => {
+                    handleSelect("dashboard_endpoint_security_dashboard");
+                    navigate("/dashboard/endpoint-dashboard");
+                    setActive("normal");
+                }
             }] : []),
             ...(dashboardCategory !== "Endpoint Security" ? [{
                 label: mapLabel("API Security Posture", dashboardCategory),

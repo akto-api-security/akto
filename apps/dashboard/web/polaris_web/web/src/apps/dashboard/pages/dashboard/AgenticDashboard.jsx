@@ -1,5 +1,5 @@
-import { Box, Button, Card, DataTable, HorizontalGrid, HorizontalStack, Text, VerticalStack, Popover, ActionList, Icon } from '@shopify/polaris'
-import { DeleteMinor, SettingsFilledMinor } from '@shopify/polaris-icons'
+import { Box, Button, HorizontalStack, Popover, ActionList, Text, VerticalStack } from '@shopify/polaris'
+import { SettingsFilledMinor } from '@shopify/polaris-icons'
 import { useEffect, useReducer, useState, useRef } from 'react'
 import TitleWithInfo from '../../components/shared/TitleWithInfo'
 import DateRangeFilter from '../../components/layouts/DateRangeFilter'
@@ -9,16 +9,19 @@ import func from '@/util/func'
 import PageWithMultipleCards from '../../components/layouts/PageWithMultipleCards'
 import Dropdown from '../../components/layouts/Dropdown'
 import SpinnerCentered from '../../components/progress/SpinnerCentered'
-import LineChart from '../../components/charts/LineChart'
 import "./agentic-dashboard.css"
 import "react-grid-layout/css/styles.css"
 import "react-resizable/css/styles.css"
-import DonutChart from '../../components/shared/DonutChart'
-import SemiCircleProgress from '../../components/shared/SemiCircleProgress'
 import { mapLabel, getDashboardCategory } from '../../../main/labelHelper'
 import { GridLayout } from "react-grid-layout";
 import api from './api';
 import Store from '../../store';
+import ComponentHeader from './new_components/ComponentHeader'
+import AverageIssueAgeCard from './new_components/AverageIssueAgeCard'
+import ComplianceAtRisksCard from './new_components/ComplianceAtRisksCard'
+import CustomPieChart from './new_components/CustomPieChart'
+import CustomLineChart from './new_components/CustomLineChart'
+import CustomDataTable from './new_components/CustomDataTable'
 
 const agenticDiscoveryData = {
     "AI Agents": { text: 2000, color: "#7F56D9" },
@@ -374,20 +377,6 @@ const AgenticDashboard = () => {
         }
     }
 
-    const componentHeader = (title, itemId) => (
-        <Box width='100%'>
-            <HorizontalStack blockAlign="center" align='space-between'>
-                <Text variant='headingMd'>{title}</Text>
-                <HorizontalStack gap={2}>
-                    <Button monochrome plain icon={DeleteMinor} onClick={() => removeComponent(itemId)} />
-                    <div className='graph-menu'>
-                        <img src={"/public/MenuVerticalIcon.svg"} alt='graph-menu' />
-                    </div>
-                </HorizontalStack>
-            </HorizontalStack>
-        </Box>
-    )
-
     useEffect(() => {
         setLoading(true);
         // fetch data
@@ -448,216 +437,6 @@ const AgenticDashboard = () => {
         setLoading(false);
     }, [dashboardCategory])
 
-    const averageIssueAgeComp = (itemId="") => {
-        return (
-            <Card>
-                <VerticalStack gap={4} align='space-between'>
-                    {componentHeader('Average Issue Age', itemId)}
-
-                    <Box width='100%'>
-                        <HorizontalGrid columns={2} gap={4} alignItems='center' blockAlign='center'>
-                            {issueAgeData.map((issue, idx) => (
-                                <Box key={idx}>
-                                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                                        <SemiCircleProgress
-                                            progress={issue.progress}
-                                            size={140}
-                                            height={110}
-                                            width={180}
-                                            color={issue.color}
-                                            backgroundColor='#F2F4F7'
-                                            centerText={`${issue.days} days`}
-                                            subtitle={issue.label}
-                                        />
-                                    </div>
-                                </Box>
-                            ))}
-                        </HorizontalGrid>
-                    </Box>
-                </VerticalStack>
-            </Card>
-        )
-    }
-
-    const complianceAtRisksComp = (itemId="") => {
-        return (
-            <Card>
-                <VerticalStack gap={4}>
-                    {componentHeader('Compliance at Risks', itemId)}
-
-                    <Box width='100%'>
-                        <HorizontalGrid columns={4} gap={5}>
-                            {complianceData.map((compliance, idx) => (
-                                <VerticalStack gap={5} inlineAlign='center' align='start'>
-                                    <div style={{
-                                        width: '139px',
-                                        height: '126px',
-                                        backgroundImage: `url(${compliance.icon})`,
-                                        backgroundRepeat: 'no-repeat',
-                                        backgroundPosition: 'center',
-                                        backgroundSize: 'contain'
-                                    }} />
-
-                                    <Box width='100%'>
-                                        <VerticalStack gap={2} align='end' inlineAlign='center'>
-                                            <Text variant='headingXl' alignment='center' fontWeight='semibold'>
-                                                {compliance.name}
-                                            </Text>
-                                            <Box width='100%'>
-                                                <HorizontalStack gap={2} align='space-between' blockAlign='center'>
-                                                    <div style={{
-                                                        flex: 1,
-                                                        height: '5px',
-                                                        backgroundColor: '#E5E7EB',
-                                                        borderRadius: '3px',
-                                                        overflow: 'hidden'
-                                                    }}>
-                                                        <div style={{
-                                                            width: `${compliance.percentage}%`,
-                                                            height: '100%',
-                                                            backgroundColor: compliance.color,
-                                                            borderRadius: '3px'
-                                                        }} />
-                                                    </div>
-                                                    <Text variant='bodySm' as='span'>
-                                                        {compliance.percentage}%
-                                                    </Text>
-                                                </HorizontalStack>
-                                            </Box>
-                                        </VerticalStack>
-                                    </Box>
-                                </VerticalStack>
-                            ))}
-                        </HorizontalGrid>
-                    </Box>
-                </VerticalStack>
-            </Card>
-        )
-    }
-
-    const customPieChart = (title="", subtitle="", graphData={}, itemId="") => {
-        const total = Object.values(graphData).reduce((sum, item) => sum + item.text, 0)
-        const formattedTotal = total.toLocaleString()
-
-        const labels = Object.keys(graphData).map(key => ({
-            label: key,
-            color: graphData[key].color
-        }))
-
-        return (
-            <Card>
-                <VerticalStack gap="4" inlineAlign='start' blockAlign="center">
-                    {componentHeader(title, itemId)}
-                    <Box width='100%' minHeight='210px'>
-                        <VerticalStack gap="2" inlineAlign='center' blockAlign="center">
-                            <DonutChart
-                                title={subtitle}
-                                subtitle={formattedTotal}
-                                data={graphData}
-                                size={200}
-                                pieInnerSize="60%"
-                                invertTextSizes={true}
-                            />
-                            {graphCustomLabels(labels)}
-                        </VerticalStack>
-                    </Box>
-                </VerticalStack>
-            </Card>
-        )
-    }
-
-    const graphCustomLabels = (labelsWithColors=[]) => (
-        <HorizontalStack gap={4} align='center' blockAlign='center' wrap>
-            {
-                labelsWithColors.map((labelObj, idx) => (
-                    <HorizontalStack key={`${idx}-${labelObj.label}`} gap={2} blockAlign='center' align='center'>
-                        <div style={{ width: '8px', height: '8px', backgroundColor: labelObj.color || '#3d3d3d', borderRadius: '50%' }} />
-                        <Text variant='bodyMd'>{labelObj.label}</Text>
-                    </HorizontalStack>
-                ))
-            }
-        </HorizontalStack>
-    )
-
-    const customLineChart = (title="", chartData=[], labels=[], itemId="") => {
-        return (
-            <Card>
-                <VerticalStack gap="6" inlineAlign='start' blockAlign="center">
-                    {componentHeader(title, itemId)}
-
-                    <Box width='100%'>
-                        <LineChart
-                            data={chartData}
-                            height={290}
-                            type="line"
-                            text={true}
-                            showGridLines={true}
-                            exportingDisabled={true}
-                            defaultChartOptions={{
-                                xAxis: {
-                                    type: 'datetime',
-                                    dateTimeLabelFormats: {
-                                        day: '%b %e',
-                                        month: '%b',
-                                    },
-                                    title: { text: '' },
-                                    visible: true,
-                                    gridLineWidth: 0
-                                },
-                                yAxis: {
-                                    title: { text: '' },
-                                    gridLineWidth: 1,
-                                    min: 0,
-                                    labels: {
-                                        formatter: function() {
-                                            return this.value.toLocaleString();
-                                        }
-                                    }
-                                },
-                                legend: {
-                                    enabled: false
-                                }
-                            }}
-                        />
-                    </Box>
-
-                    {graphCustomLabels(labels)}
-                </VerticalStack>
-            </Card>
-        )
-    }
-
-    const customDataTable = (title="", data=[], showSignalIcon=true, itemId="") => {
-        const rows = data.map(item => [
-            <HorizontalStack gap={3} blockAlign='center'>
-                {showSignalIcon && <img src='/public/menu-graph.svg' alt='growth-icon' />}
-                <div style={{ maxWidth: '300px', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-                    <Text variant='bodyMd' fontWeight='medium'>{item.name}</Text>
-                </div>
-            </HorizontalStack>,
-            <div style={{color: '#D72C0D'}}>
-                <Text variant='bodyMd' fontWeight='medium'>{item.value}</Text>
-            </div>
-        ])
-
-        return (
-            <Card>
-                <VerticalStack gap="4">
-                    {componentHeader(title, itemId)}
-
-                    <Box width='100%'>
-                        <DataTable
-                            columnContentTypes={['text', 'numeric']}
-                            headings={[]}
-                            rows={rows}
-                            hideScrollIndicator
-                        />
-                    </Box>
-                </VerticalStack>
-            </Card>
-        )
-    }
-
     const onLayoutChange = (newLayout) => {
         setLayout(prevLayout => {
             const layoutMap = new Map(newLayout.map(item => [item.i, item]));
@@ -715,62 +494,123 @@ const AgenticDashboard = () => {
     };
 
     const allComponentsMap = {
-        'security-posture-chart': customLineChart(
-            `${func.toSentenceCase(window.ACCOUNT_NAME)} ${mapLabel('API Security Posture', dashboardCategory)} over time`,
-            overallStats,
-            [
+        'security-posture-chart': <CustomLineChart
+            title={`${func.toSentenceCase(window.ACCOUNT_NAME)} ${mapLabel('API Security Posture', dashboardCategory)} over time`}
+            chartData={overallStats}
+            labels={[
                 { label: mapLabel('API Endpoints Discovered', dashboardCategory), color: '#B692F6' },
                 { label: `${mapLabel('API', dashboardCategory)} Issues`, color: '#D72C0D' },
                 { label: `${mapLabel('Threat', dashboardCategory)} Requests flagged`, color: '#F3B283' }
-            ],
-            'security-posture-chart'
-        ),
-        'api-discovery-pie': customPieChart(mapLabel('API Discovery', dashboardCategory), `Total ${mapLabel('APIs', dashboardCategory)}`, agenticDiscoveryData, 'api-discovery-pie'),
-        'issues-pie': customPieChart("Issues", "Total Issues", agenticIssuesData, 'issues-pie'),
-        'threat-detection-pie': customPieChart(mapLabel('Threat Detection', dashboardCategory), "Requests Flagged", agenticGuardrailsData, 'threat-detection-pie'),
-        'average-issue-age': averageIssueAgeComp('average-issue-age'),
-        'compliance-at-risks': complianceAtRisksComp('compliance-at-risks'),
-        'tested-vs-non-tested': customLineChart(
-            `Tested vs Non-Tested ${mapLabel('APIs', dashboardCategory)}`,
-            testedVsNonTestedData,
-            [
+            ]}
+            itemId='security-posture-chart'
+            onRemoveComponent={removeComponent}
+        />,
+        'api-discovery-pie': <CustomPieChart
+            title={mapLabel('API Discovery', dashboardCategory)}
+            subtitle={`Total ${mapLabel('APIs', dashboardCategory)}`}
+            graphData={agenticDiscoveryData}
+            itemId='api-discovery-pie'
+            onRemoveComponent={removeComponent}
+        />,
+        'issues-pie': <CustomPieChart
+            title="Issues"
+            subtitle="Total Issues"
+            graphData={agenticIssuesData}
+            itemId='issues-pie'
+            onRemoveComponent={removeComponent}
+        />,
+        'threat-detection-pie': <CustomPieChart
+            title={mapLabel('Threat Detection', dashboardCategory)}
+            subtitle="Requests Flagged"
+            graphData={agenticGuardrailsData}
+            itemId='threat-detection-pie'
+            onRemoveComponent={removeComponent}
+        />,
+        'average-issue-age': <AverageIssueAgeCard
+            issueAgeData={issueAgeData}
+            itemId='average-issue-age'
+            onRemoveComponent={removeComponent}
+        />,
+        'compliance-at-risks': <ComplianceAtRisksCard
+            complianceData={complianceData}
+            itemId='compliance-at-risks'
+            onRemoveComponent={removeComponent}
+        />,
+        'tested-vs-non-tested': <CustomLineChart
+            title={`Tested vs Non-Tested ${mapLabel('APIs', dashboardCategory)}`}
+            chartData={testedVsNonTestedData}
+            labels={[
                 { label: 'Non-Tested', color: '#D72C0D' },
                 { label: 'Tested', color: '#9E77ED' }
-            ],
-            'tested-vs-non-tested'
-        ),
-        'open-resolved-issues': customLineChart(
-            "Open & Resolved Issues",
-            openResolvedIssuesData,
-            [
+            ]}
+            itemId='tested-vs-non-tested'
+            onRemoveComponent={removeComponent}
+        />,
+        'open-resolved-issues': <CustomLineChart
+            title="Open & Resolved Issues"
+            chartData={openResolvedIssuesData}
+            labels={[
                 { label: 'Open Issues', color: '#D72C0D' },
                 { label: 'Resolved Issues', color: '#9E77ED' }
-            ],
-            'open-resolved-issues'
-        ),
-        'threat-requests-chart': customLineChart(
-            `${mapLabel('Threat', dashboardCategory)} Requests over time`,
-            guardrailRequestsData,
-            [
+            ]}
+            itemId='open-resolved-issues'
+            onRemoveComponent={removeComponent}
+        />,
+        'threat-requests-chart': <CustomLineChart
+            title={`${mapLabel('Threat', dashboardCategory)} Requests over time`}
+            chartData={guardrailRequestsData}
+            labels={[
                 { label: 'Flagged Requests', color: '#D72C0D' },
                 { label: 'Safe Requests', color: '#47B881' }
-            ],
-            'threat-requests-chart'
-        ),
-        'open-resolved-threats': customLineChart(
-            `Open & Resolved ${mapLabel('Threat', dashboardCategory)}s`,
-            openResolvedGuardrailsData,
-            [
+            ]}
+            itemId='threat-requests-chart'
+            onRemoveComponent={removeComponent}
+        />,
+        'open-resolved-threats': <CustomLineChart
+            title={`Open & Resolved ${mapLabel('Threat', dashboardCategory)}s`}
+            chartData={openResolvedGuardrailsData}
+            labels={[
                 { label: 'Open Issues', color: '#D72C0D' },
                 { label: 'Resolved Issues', color: '#9E77ED' }
-            ],
-            'open-resolved-threats'
-        ),
-        'weakest-areas': customDataTable("Weakest Areas by Failing Percentage", weakestAreasData, true, 'weakest-areas'),
-        'top-apis-issues': customDataTable(`Top ${mapLabel('APIs', dashboardCategory)} with Critical & High Issues`, topAgenticComponentsData, true, 'top-apis-issues'),
-        'top-requests-by-type': customDataTable("Top Requests by Type", topRequestsByTypeData, true, 'top-requests-by-type'),
-        'top-attacked-apis': customDataTable(`Top Attacked ${mapLabel('APIs', dashboardCategory)}`, topAttackedComponentsData, false, 'top-attacked-apis'),
-        'top-bad-actors': customDataTable("Top Bad Actors", topBadActorsData, false, 'top-bad-actors')
+            ]}
+            itemId='open-resolved-threats'
+            onRemoveComponent={removeComponent}
+        />,
+        'weakest-areas': <CustomDataTable
+            title="Weakest Areas by Failing Percentage"
+            data={weakestAreasData}
+            showSignalIcon={true}
+            itemId='weakest-areas'
+            onRemoveComponent={removeComponent}
+        />,
+        'top-apis-issues': <CustomDataTable
+            title={`Top ${mapLabel('APIs', dashboardCategory)} with Critical & High Issues`}
+            data={topAgenticComponentsData}
+            showSignalIcon={true}
+            itemId='top-apis-issues'
+            onRemoveComponent={removeComponent}
+        />,
+        'top-requests-by-type': <CustomDataTable
+            title="Top Requests by Type"
+            data={topRequestsByTypeData}
+            showSignalIcon={true}
+            itemId='top-requests-by-type'
+            onRemoveComponent={removeComponent}
+        />,
+        'top-attacked-apis': <CustomDataTable
+            title={`Top Attacked ${mapLabel('APIs', dashboardCategory)}`}
+            data={topAttackedComponentsData}
+            showSignalIcon={false}
+            itemId='top-attacked-apis'
+            onRemoveComponent={removeComponent}
+        />,
+        'top-bad-actors': <CustomDataTable
+            title="Top Bad Actors"
+            data={topBadActorsData}
+            showSignalIcon={false}
+            itemId='top-bad-actors'
+            onRemoveComponent={removeComponent}
+        />
     }
 
     const componentsMenuActivator = (

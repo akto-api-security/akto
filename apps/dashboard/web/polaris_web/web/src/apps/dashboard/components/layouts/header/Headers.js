@@ -90,7 +90,7 @@ export default function Header() {
             disabled.push("DAST")
         }
         if (endpointSecurityGranted === false) {
-            disabled.push("Endpoint Security")
+            // disabled.push("Endpoint Security")
         }
         return disabled;
     }, [mcpSecurityGranted, agenticSecurityGranted, dastGranted, endpointSecurityGranted]);
@@ -324,7 +324,7 @@ export default function Header() {
                                             id: "agentic-security",
                                             helpText: func.isAtlasArgusAccount() ? "Agentic AI Security for Homegrown AI" : undefined
                                         },
-                                        ...(func.isAtlasArgusAccount() ? [{
+                                        ...(true ? [{
                                             value: "Endpoint Security",
                                             label: "Akto ATLAS",
                                             id: "endpoint-security",
