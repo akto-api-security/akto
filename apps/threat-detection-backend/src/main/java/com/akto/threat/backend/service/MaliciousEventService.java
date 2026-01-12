@@ -377,6 +377,7 @@ public class MaliciousEventService {
                 .setLabel(convertModelLabelToString(evt.getLabel()))
                 .setHost(evt.getHost() != null ? evt.getHost() : "")
                 .setJiraTicketUrl(evt.getJiraTicketUrl() != null ? evt.getJiraTicketUrl() : "")
+                .setSeverity(evt.getSeverity() != null ? evt.getSeverity() : "HIGH")
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()
