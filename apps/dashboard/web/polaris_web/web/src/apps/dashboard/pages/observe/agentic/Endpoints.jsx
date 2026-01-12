@@ -182,6 +182,8 @@ function Endpoints() {
     });
 
     const setAllCollections = PersistStore((state) => state.setAllCollections);
+    const filtersMap = PersistStore((state) => state.filtersMap);
+    const setFiltersMap = PersistStore((state) => state.setFiltersMap);
 
     const groupCollectionsByTag = (collections, sensitiveInfoMap, riskScoreMap, trafficInfoMap) => {
         const groups = {};
@@ -346,22 +348,50 @@ function Endpoints() {
     };
 
     const handleRowClick = (row) => {
+        const targetPageKey = '/dashboard/observe/inventory/';
+        let updatedFiltersMap = { ...filtersMap };
+        
         if (!row.tagKey || !row.tagValue) {
-            navigate('/dashboard/observe/inventory');
+            const allTagValues = data
+                .filter(item => item.tagKey === MCP_CLIENT_TAG_KEY && item.tagValue)
+                .map(item => `${item.tagKey}=${item.tagValue}`);
+            
+            if (allTagValues.length > 0) {
+                updatedFiltersMap[targetPageKey] = {
+                    filters: [{
+                        key: 'envType',
+                        label: func.convertToDisambiguateLabelObj(allTagValues, null, 2),
+                        value: {
+                            values: allTagValues,
+                            negated: true
+                        },
+                        onRemove: () => {}
+                    }],
+                    sort: []
+                };
+            } else {
+                delete updatedFiltersMap[targetPageKey];
+            }
+            setFiltersMap(updatedFiltersMap);
+            setTimeout(() => navigate('/dashboard/observe/inventory'), 0);
             return;
         }
 
-        const targetPageKey = '/dashboard/observe/inventory/';
-        let filtersMap = PersistStore.getState().filtersMap;
-        if (filtersMap !== null && filtersMap.hasOwnProperty(targetPageKey)) {
-            delete filtersMap[targetPageKey];
-            PersistStore.getState().setFiltersMap(filtersMap);
-        }
-
         const filterValue = `${row.tagKey}=${row.tagValue}`;
-        const filters = `envType__${filterValue}`;
-        const navigateUrl = `${window.location.origin}/dashboard/observe/inventory?filters=${encodeURIComponent(filters)}`;
-        window.open(navigateUrl, "_blank");
+        updatedFiltersMap[targetPageKey] = {
+            filters: [{
+                key: 'envType',
+                label: func.convertToDisambiguateLabelObj([filterValue], null, 2),
+                value: {
+                    values: [filterValue],
+                    negated: false
+                },
+                onRemove: () => {}
+            }],
+            sort: []
+        };
+        setFiltersMap(updatedFiltersMap);
+        setTimeout(() => navigate('/dashboard/observe/inventory'), 0);
     };
 
     const summaryItems = [

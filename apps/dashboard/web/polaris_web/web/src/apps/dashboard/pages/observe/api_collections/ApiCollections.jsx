@@ -464,6 +464,20 @@ function ApiCollections(props) {
     const userRole = window.USER_ROLE
 
     const navigate = useNavigate();
+    
+    const checkIsFromEndpoints = () => {
+        if (!isEndpointSecurityCategory()) return false;
+        try {
+            const stack = JSON.parse(sessionStorage.getItem('pathnameStack') || '[]');
+            if (stack.length >= 2) {
+                const previousPath = stack[stack.length - 2];
+                return previousPath === '/dashboard/observe/endpoints';
+            }
+        } catch (e) { /* ignore */ }
+        return false;
+    };
+    const isFromEndpoints = checkIsFromEndpoints();
+    
     const [data, setData] = useState({'all': [], 'hostname':[], 'groups': [], 'custom': [], 'deactivated': [], 'untracked': []})
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
@@ -1477,6 +1491,7 @@ function ApiCollections(props) {
         (centerView === CenterViewType.Table ?
         <GithubSimpleTable
             key={refreshData}
+            filterStateUrl={"/dashboard/observe/inventory/"}
             pageLimit={100}
             data={data[selectedTab]}
             sortOptions={ selectedTab === 'groups' ? [...tempSortOptions, ...sortOptions] : sortOptions}
@@ -1530,7 +1545,8 @@ function ApiCollections(props) {
                 />
             }
             primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={navigateToQueryPage}>Explore mode</Button>}
-            isFirstPage={true}
+            isFirstPage={!isFromEndpoints}
+            backUrl={isFromEndpoints ? "/dashboard/observe/endpoints" : undefined}
             components={components}
             secondaryActions={secondaryActionsComp}
         />

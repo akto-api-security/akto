@@ -187,8 +187,12 @@ export default function Header() {
         LocalStore.getState().setCategoryMap({});
         LocalStore.getState().setSubCategoryMap({});
         SessionStore.getState().setThreatFiltersMap({});
+        PersistStore.getState().setFiltersMap({});
         setDashboardCategory(value);
-        navigate("/dashboard/observe/inventory");
+        const targetPath = func.isAtlasArgusAccount() && value === "Endpoint Security"
+            ? "/dashboard/observe/endpoints"
+            : "/dashboard/observe/inventory";
+        navigate(targetPath);
         navigate(0);
     }
 
