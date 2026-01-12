@@ -39,6 +39,7 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 import WorkflowTestBuilder from "../workflow_test/WorkflowTestBuilder";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 import TooltipText from "../../../components/shared/TooltipText";
+import SeverityUpdateModal from "../../issues/components/SeverityUpdateModal";
 import PersistStore from "../../../../main/PersistStore";
 import TrendChart from "./TrendChart";
 import useTable from "../../../components/tables/TableContext";
@@ -178,6 +179,9 @@ function SingleTestRunPage() {
   const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
   const [copyUpdateTable, setCopyUpdateTable] = useState("");
   const [confirmationModal, setConfirmationModal] = useState(false);
+  const [severityModalActive, setSeverityModalActive] = useState(false);
+  const [severityModalLoading, setSeverityModalLoading] = useState(false);
+  const [selectedTestResultItems, setSelectedTestResultItems] = useState([]);
 
   const tableTabMap = {
     vulnerable: "VULNERABLE",
@@ -549,10 +553,46 @@ function SingleTestRunPage() {
     issuesFunctions.fetchIntegrationCustomFieldsMetadata();
   }, []);
 
+  const handleBulkSeverityUpdate = async (newSeverity) => {
+    setSeverityModalLoading(true);
+
+    try {
+      const hexIds = selectedTestResultItems.flat();
+
+      await api.bulkUpdateIssueSeverityFromTestResults(hexIds, newSeverity);
+
+      func.setToast(true, false, `Severity updated for ${hexIds.length} test result${hexIds.length === 1 ? "" : "s"}`);
+      setSeverityModalActive(false);
+
+      TableStore.getState().setSelectedItems([]);
+      setSelectedTestResultItems([]);
+
+      setUpdateTable(prev => !prev);
+
+    } catch (error) {
+      func.setToast(true, true, "Failed to update severity");
+    } finally {
+      setSeverityModalLoading(false);
+    }
+  };
+
+  const openSeverityUpdateModal = (items) => {
+    setSelectedTestResultItems(items);
+    setSeverityModalActive(true);
+  };
+
   const promotedBulkActions = () => {
     let totalSelectedItemsSet = new Set(TableStore.getState().selectedItems.flat())
 
     return [
+      {
+        content: 'Update severity',
+        onAction: () => {
+          if (totalSelectedItemsSet.size > 0) {
+            openSeverityUpdateModal([...totalSelectedItemsSet]);
+          }
+        },
+      },
       {
         content: `Rerun ${totalSelectedItemsSet.size} test${totalSelectedItemsSet.size === 1 ? '' : 's'}`,
         onAction: () => {
@@ -1199,6 +1239,13 @@ function SingleTestRunPage() {
         components={useComponents}
       />
       <ReRunModal selectedTestRun={selectedTestRun} shouldRefresh={false} />
+      <SeverityUpdateModal
+        open={severityModalActive}
+        onClose={() => setSeverityModalActive(false)}
+        onConfirm={handleBulkSeverityUpdate}
+        loading={severityModalLoading}
+        selectedCount={selectedTestResultItems.length}
+      />
       {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
     </>
   );
