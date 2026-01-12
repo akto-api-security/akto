@@ -1489,7 +1489,7 @@ const quickStartFunc = {
         const vm = [
             dockerObj, tcpObj
         ];
-
+        
         // Source code
         const sourceCode = [
             apiInventoryFromSourceCodeObj, githubObj, gitlabObj, bitbucketObj
@@ -1791,7 +1791,7 @@ const quickStartFunc = {
         progressBarCopy.value = Math.round(progressPercent);
         return progressBarCopy
       },
-
+  
       removeProgressBarAndStatuschecks: function(progressBar) {
         const progressBarCopy = JSON.parse(JSON.stringify(progressBar))
         progressBarCopy.show = false;
