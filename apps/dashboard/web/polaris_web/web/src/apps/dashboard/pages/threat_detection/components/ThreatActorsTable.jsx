@@ -66,7 +66,7 @@ const getBaseHeaders = () => {
       value: "latestAttack",
     },
   );
-  if((isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
+  if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
     baseHeaders.push({
       text: "Rule Violated",
       title: "Rule Violated",

@@ -61,14 +61,14 @@ const getHeaders = () => {
       title: "Attack type",
     });
 
-  if ((isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
-        baseHeaders.push({
-          text: "Rule Violated",
-          value: "ruleViolated",
-          title: "Rule Violated",
-          maxWidth: "200px",
-      });
-    }
+  if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
+    baseHeaders.push({
+      text: "Rule Violated",
+      value: "ruleViolated",
+      title: "Rule Violated",
+      maxWidth: "200px",
+    });
+  }
   baseHeaders.push(
     {
       text: "Compliance",
