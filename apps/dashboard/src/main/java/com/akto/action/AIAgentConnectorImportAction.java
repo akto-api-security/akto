@@ -47,6 +47,10 @@ public class AIAgentConnectorImportAction extends UserAction {
     private String dataverseClientId;
     private String dataverseClientSecret;
 
+    // LiteLLM-specific parameters
+    private String litellmUrl;
+    private String litellmApiKey;
+
     /**
      * Unified method to initiate import for any AI Agent Connector.
      * The connector type is determined by the connectorType parameter.
@@ -69,8 +73,8 @@ public class AIAgentConnectorImportAction extends UserAction {
 
             // Determine recurring interval (use provided value or default)
             int interval = (recurringIntervalSeconds != null && recurringIntervalSeconds > 0)
-                ? recurringIntervalSeconds
-                : DEFAULT_RECURRING_INTERVAL_SECONDS;
+                    ? recurringIntervalSeconds
+                    : DEFAULT_RECURRING_INTERVAL_SECONDS;
 
             // Create entry in per-account jobs collection
             // Convert Map<String, String> config to Map<String, Object> for generic storage
@@ -135,9 +139,9 @@ public class AIAgentConnectorImportAction extends UserAction {
 
             case CONNECTOR_TYPE_COPILOT_STUDIO:
                 if (dataverseEnvironmentUrl == null || dataverseEnvironmentUrl.isEmpty() ||
-                    dataverseTenantId == null || dataverseTenantId.isEmpty() ||
-                    dataverseClientId == null || dataverseClientId.isEmpty() ||
-                    dataverseClientSecret == null || dataverseClientSecret.isEmpty()) {
+                        dataverseTenantId == null || dataverseTenantId.isEmpty() ||
+                        dataverseClientId == null || dataverseClientId.isEmpty() ||
+                        dataverseClientSecret == null || dataverseClientSecret.isEmpty()) {
                     loggerMaker.error("Missing required Copilot Studio Dataverse configuration", LogDb.DASHBOARD);
                     return null;
                 }
@@ -145,6 +149,16 @@ public class AIAgentConnectorImportAction extends UserAction {
                 config.put(CONFIG_DATAVERSE_TENANT_ID, dataverseTenantId);
                 config.put(CONFIG_DATAVERSE_CLIENT_ID, dataverseClientId);
                 config.put(CONFIG_DATAVERSE_CLIENT_SECRET, dataverseClientSecret);
+                break;
+
+            case CONNECTOR_TYPE_LITELLM:
+                if (litellmUrl == null || litellmUrl.isEmpty() || litellmApiKey == null
+                        || litellmApiKey.isEmpty()) {
+                    loggerMaker.error("Missing required LiteLLM configuration", LogDb.DASHBOARD);
+                    return null;
+                }
+                config.put(CONFIG_LITELLM_BASE_URL, litellmUrl);
+                config.put(CONFIG_LITELLM_API_KEY, litellmApiKey);
                 break;
 
             default:
