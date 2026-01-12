@@ -29,9 +29,35 @@ const AktoJax = () => {
     const [parseSoapServices, setParseSoapServices] = useState(true);
     const [parseRestServices, setParseRestServices] = useState(true);
     const [clickExternalLinks, setClickExternalLinks] = useState(false);
+    const [crawlingTime, setCrawlingTime] = useState(600);
+
+    const [availableModules, setAvailableModules] = useState([])
+    const [selectedModule, setSelectedModule] = useState("")
+    const [loadingModules, setLoadingModules] = useState(true)
 
     const goToDocs = () => {
         window.open("https://docs.akto.io/dast/akto-dast")
+    }
+
+    const fetchAvailableModules = async () => {
+        setLoadingModules(true)
+        try {
+            const response = await api.fetchAvailableDastModules()
+            const modules = response.map(module => ({
+                label: module.displayName,
+                value: module.name
+            }))
+            setAvailableModules(modules)
+
+            const defaultModule = response.find(m => m.isDefault)
+            if (defaultModule) {
+                setSelectedModule(defaultModule.name)
+            } else if (modules.length > 0) {
+                setSelectedModule(modules[0].value)
+            }
+        } catch (err) { } finally {
+            setLoadingModules(false)
+        }
     }
 
     const primaryAction = () => {
@@ -41,7 +67,7 @@ const AktoJax = () => {
         }
 
         setLoading(true)
-        api.initiateCrawler(hostname, email, password, apiKey, window.location.origin, testRole, outscopeUrls).then((res) => {
+        api.initiateCrawler(hostname, email, password, apiKey, window.location.origin, testRole, outscopeUrls, crawlingTime, selectedModule).then((res) => {
             func.setToast(true, false, "Crawler initiated successfully. Please check your dashboard for updates.")
         }).catch((err) => {
             console.error("Error initiating crawler:", err)
@@ -68,6 +94,7 @@ const AktoJax = () => {
 
     useEffect(() => {
         fetchTestRoles()
+        fetchAvailableModules()
     }, [])
 
     return (
@@ -97,6 +124,8 @@ const AktoJax = () => {
                 setParseRestServices={setParseRestServices}
                 clickExternalLinks={clickExternalLinks}
                 setClickExternalLinks={setClickExternalLinks}
+                crawlingTime={crawlingTime}
+                setCrawlingTime={setCrawlingTime}
             />
 
             <Box paddingBlockStart={3}><Divider /></Box>
@@ -140,7 +169,18 @@ const AktoJax = () => {
                         />
                     </>
                 }
-                
+
+                {
+                    availableModules.length > 0 &&
+                    <Dropdown
+                        menuItems={availableModules}
+                        label="Select DAST Module"
+                        initial={selectedModule}
+                        selected={(module) => setSelectedModule(module)}
+                        disabled={loadingModules}
+                    />
+                }
+
                 <div style={{height:"20px"}}></div>
 
                 <ButtonGroup>

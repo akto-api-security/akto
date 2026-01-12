@@ -300,6 +300,30 @@ const settingRequests = {
         })
     },
 
+    fetchJiraPriorities() {
+        return request({
+            url: '/api/jira/fetchPriorities',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    saveSeverityMapping(severityToPriorityMap) {
+        return request({
+            url: '/api/jira/saveSeverityMapping',
+            method: 'post',
+            data: {severityToPriorityMap}
+        })
+    },
+
+    fetchSeverityMapping() {
+        return request({
+            url: '/api/jira/fetchSeverityMapping',
+            method: 'post',
+            data: {}
+        })
+    },
+
     addOktaSso(clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri) {
         return request({
             url: '/api/addOktaSso',

@@ -7,6 +7,7 @@ import com.mongodb.client.MongoCollection;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import com.akto.threat.backend.utils.ThreatUtils;
+import com.akto.util.enums.GlobalEnums.Severity;
 
 import java.util.List;
 
@@ -51,5 +52,28 @@ public class MaliciousEventDao extends AccountBasedDao<MaliciousEventDto> {
 
     public void createIndexIfAbsent(String accountId) {
         ThreatUtils.createIndexIfAbsent(accountId, this);
+    }
+
+    public static float getThreatScore(Severity severity) {
+        switch (severity) {
+            case CRITICAL:
+                return 1.0f;
+            case HIGH:
+                return 0.75f;
+            case MEDIUM:
+                return 0.5f;
+            case LOW:
+                return 0.25f;
+            default:
+                return 0.0f;
+        }
+    }
+
+    public static float getThreatScoreFromSeverities(List<String> severities) {
+        float threatScore = 0.0f;
+        for(String severity : severities) {
+            threatScore = Math.max(threatScore, getThreatScore(Severity.valueOf(severity)));
+        }
+        return threatScore;
     }
 }

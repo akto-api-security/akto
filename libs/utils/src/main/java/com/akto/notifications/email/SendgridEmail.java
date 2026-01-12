@@ -1,5 +1,6 @@
 package com.akto.notifications.email;
 
+import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.notifications.data.TestingAlertData;
 import com.akto.onprem.Constants;
 import com.sendgrid.Method;
@@ -16,6 +17,11 @@ import org.slf4j.LoggerFactory;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class SendgridEmail {
 
@@ -92,7 +98,108 @@ public class SendgridEmail {
         return mail;
     }
 
-    public Mail buildTestingRunResultsEmail(TestingAlertData data, String email, String aktoUrl, String userName) {
+    private void buildTemplateWithYamlTemplates(Personalization personalization, Map<String, YamlTemplate> yamlTemplates, Map<String, Integer> apisAffectedCount) {
+        if (yamlTemplates == null || apisAffectedCount == null || yamlTemplates.isEmpty() || apisAffectedCount.isEmpty()) {
+            personalization.addDynamicTemplateData("findings", new ArrayList<>());
+            return;
+        }
+
+        List<Map<String, Object>> findings = new ArrayList<>();
+        
+        for(Map.Entry<String, Integer> entry : apisAffectedCount.entrySet()) {
+            String template = entry.getKey();
+            int apisAffected = entry.getValue();
+            YamlTemplate yamlTemplate = yamlTemplates.get(template);
+            
+            if (yamlTemplate == null || yamlTemplate.getInfo() == null) {
+                continue;
+            }
+            
+            String issueName = yamlTemplate.getInfo().getName();
+            if (StringUtils.isBlank(issueName)) {
+                issueName = template;
+            }
+            
+            String description = yamlTemplate.getInfo().getDescription();
+            if (StringUtils.isBlank(description)) {
+                description = "-";
+            }
+            
+            String severity = yamlTemplate.getInfo().getSeverity();
+            if (StringUtils.isBlank(severity)) {
+                severity = "-";
+            } else {
+                severity = severity.toUpperCase();
+            }
+            
+            String categoryName = "-";
+            if (yamlTemplate.getInfo().getCategory() != null) {
+                String displayName = yamlTemplate.getInfo().getCategory().getDisplayName();
+                String shortName = yamlTemplate.getInfo().getCategory().getShortName();
+                if (StringUtils.isNotBlank(displayName)) {
+                    categoryName = displayName;
+                    if (StringUtils.isNotBlank(shortName)) {
+                        categoryName += " (" + shortName + ")";
+                    }
+                } else if (StringUtils.isNotBlank(yamlTemplate.getInfo().getCategory().getName())) {
+                    categoryName = yamlTemplate.getInfo().getCategory().getName();
+                }
+            }
+            
+            Map<String, Object> finding = new HashMap<>();
+            finding.put("issueName", issueName);
+            finding.put("description", description);
+            finding.put("apisAffected", apisAffected);
+            finding.put("category", categoryName);
+            finding.put("severity", severity);
+            
+            // Add boolean flags for severity to use in Handlebars conditionals
+            finding.put("isCritical", "CRITICAL".equals(severity));
+            finding.put("isHigh", "HIGH".equals(severity));
+            finding.put("isMedium", "MEDIUM".equals(severity));
+            finding.put("isLow", "LOW".equals(severity));
+            finding.put("isUnknown", "-".equals(severity));
+            
+            findings.add(finding);
+        }
+        
+        // Sort findings by severity: CRITICAL -> HIGH -> MEDIUM -> LOW -> Unknown
+        findings.sort(Comparator.comparingInt(finding -> getSeverityOrder((String) finding.get("severity"))));
+        
+        // Update serial numbers after sorting
+        int serialNumber = 1;
+        for (Map<String, Object> finding : findings) {
+            finding.put("sno", serialNumber++);
+        }
+        
+        personalization.addDynamicTemplateData("findings", findings);
+    }
+    
+    /**
+     * Returns the order value for severity sorting.
+     * Lower values are sorted first.
+     * Order: CRITICAL (1) -> HIGH (2) -> MEDIUM (3) -> LOW (4) -> Unknown (5)
+     */
+    private int getSeverityOrder(String severity) {
+        if (StringUtils.isBlank(severity) || "-".equals(severity)) {
+            return 5; // Unknown severity at the bottom
+        }
+        
+        switch (severity.toUpperCase()) {
+            case "CRITICAL":
+                return 1;
+            case "HIGH":
+                return 2;
+            case "MEDIUM":
+                return 3;
+            case "LOW":
+                return 4;
+            default:
+                return 5; // Unknown severity at the bottom
+        }
+    }
+
+    public Mail buildTestingRunResultsEmail(TestingAlertData data, String email, String aktoUrl, String userName, Map<String, Integer> apisAffectedCount, Map<String, YamlTemplate> yamlTemplates) {
         Mail mail = new Mail(); 
         Personalization personalization = new Personalization();
         String templateId = "d-e6ec36c175564acf844c95a704a3051e";
@@ -109,6 +216,10 @@ public class SendgridEmail {
         personalization.addDynamicTemplateData("collection", data.getCollection());
         personalization.addDynamicTemplateData("scanTimeInSeconds", String.valueOf(data.getScanTimeInSeconds()));
         personalization.addDynamicTemplateData("viewOnAktoURL", aktoUrl);
+        
+        // Build and add findings table
+        buildTemplateWithYamlTemplates(personalization, yamlTemplates, apisAffectedCount);
+        
         return mail;
     }
 

@@ -1074,6 +1074,9 @@ parameterizeUrl(x) {
 mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverityMap) {
   const allCollections = PersistStore.getState().allCollections
   const apiGroupsMap = func.mapCollectionIdToName(allCollections.filter(x => x.type === "API_GROUP"))
+  if(Object.keys(idToName).length === 0){
+    idToName = func.mapCollectionIdToName(allCollections)
+  }
 
   let ret = {}
   let apiInfoMap = {}
@@ -1119,6 +1122,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
           ret[key] = {
               id: x.method + "###" + x.url + "###" + x.apiCollectionId + "###" + Math.random(),
               shadow: x.shadow ? x.shadow : false,
+              hostName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
               sensitive: x.sensitive,
               tags: x.tags,
               endpoint: x.url,
@@ -2208,6 +2212,9 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   },
   isDemoAccount(){
      return window.ACTIVE_ACCOUNT === 1669322524
+  },
+  isAtlasArgusAccount(){
+    return window.ACTIVE_ACCOUNT === 1669322524 || window.ACTIVE_ACCOUNT === 1767814409 || window.ACTIVE_ACCOUNT === 1767812031
   },
   isSameDateAsToday (givenDate) {
       const today = new Date();
