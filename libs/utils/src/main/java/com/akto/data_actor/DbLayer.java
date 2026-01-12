@@ -14,6 +14,7 @@ import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
 import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dao.metrics.MetricDataDao;
+import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dao.settings.DataControlSettingsDao;
 import com.akto.dao.testing.config.TestSuiteDao;
@@ -21,6 +22,7 @@ import com.akto.dependency_analyser.DependencyAnalyserUtils;
 import com.akto.dto.*;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.metrics.MetricData;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.testing.config.TestSuites;
@@ -37,7 +39,6 @@ import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.AccessMatrixTaskInfosDao;
 import com.akto.dao.testing.AccessMatrixUrlToRolesDao;
 import com.akto.dao.testing.AgentConversationResultDao;
-import com.akto.dao.AgentTrafficLogDao;
 import com.akto.dao.testing.EndpointLogicalGroupDao;
 import com.akto.dao.testing.LoginFlowStepsDao;
 import com.akto.dao.testing.TestRolesDao;
@@ -1197,6 +1198,50 @@ public class DbLayer {
 
     public static void insertMCPAuditDataLog(McpAuditInfo auditInfo) {
         McpAuditInfoDao.instance.insertOne(auditInfo);
+    }
+
+    public static ModuleInfo updateModuleInfo(ModuleInfo moduleInfo) {
+        FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
+        updateOptions.upsert(true);
+        updateOptions.returnDocument(ReturnDocument.AFTER);
+        return ModuleInfoDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
+                Updates.combine(
+                        //putting class name because findOneAndUpdate doesn't put class name by default
+                        Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
+                        Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType().name()),
+                        Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
+                        Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
+                        Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()),
+                        Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
+                        Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived())
+                ), updateOptions);
+    }
+
+    public static void bulkUpdateModuleInfo(List<ModuleInfo> moduleInfoList) {
+        if (moduleInfoList == null || moduleInfoList.isEmpty()) {
+            return;
+        }
+
+        List<WriteModel<ModuleInfo>> bulkUpdates = new ArrayList<>();
+        UpdateOptions updateOptions = new UpdateOptions().upsert(true);
+
+        for (ModuleInfo moduleInfo : moduleInfoList) {
+            Bson filter = Filters.eq("_id", moduleInfo.getId());
+            Bson updates = Updates.combine(
+                    Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
+                    Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType().name()),
+                    Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
+                    Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
+                    Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()),
+                    Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
+                    Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()),
+                    Updates.set(ModuleInfo._REBOOT, moduleInfo.isReboot()),
+                    Updates.set(ModuleInfo.DELETE_TOPIC_AND_REBOOT, moduleInfo.isDeleteTopicAndReboot())
+            );
+            bulkUpdates.add(new UpdateOneModel<>(filter, updates, updateOptions));
+        }
+
+        ModuleInfoDao.instance.getMCollection().bulkWrite(bulkUpdates);
     }
 
     public static List<McpReconRequest> fetchPendingMcpReconRequests() {

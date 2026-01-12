@@ -255,6 +255,27 @@ public class ClientActor extends DataActor {
         return null;
     }
 
+    @Override
+    public void bulkUpdateModuleInfo(List<ModuleInfo> moduleInfoList) {
+        if (moduleInfoList == null || moduleInfoList.isEmpty()) {
+            return;
+        }
+
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("moduleInfoList", moduleInfoList);
+
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/bulkUpdateModuleInfoForHeartbeat", "", "POST", gson.toJson(obj), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in bulkUpdateModuleInfoForHeartbeat", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error bulk updating heartbeats", LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
     public APIConfig fetchApiConfig(String configName) {
         Map<String, List<String>> headers = buildHeaders();
         String queryParams = "?configName="+configName;

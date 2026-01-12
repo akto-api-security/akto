@@ -216,7 +216,9 @@ public class Main {
         return topicName;
     }
 
+
     private static final String LOG_GROUP_ID = "-log";
+
 
     public static final String customMiniRuntimeServiceName;
     static {
@@ -225,7 +227,8 @@ public class Main {
 
     static private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
-    // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
+
+    //REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
         //String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         String configName = System.getenv("AKTO_CONFIG_NAME");
@@ -458,6 +461,10 @@ public class Main {
                 }
             }
         }, 0, TimeUnit.SECONDS);
+
+        // Pod heartbeat consumer thread
+        String heartbeatTopicName = "akto.daemonset.producer.heartbeats";
+        new AktoTrafficCollectorTelemetry(kafkaUrl, groupIdConfig, maxPollRecordsConfig, heartbeatTopicName, dataActor).run();
 
         String runMcpJobs = System.getenv("AKTO_RUN_MCP_JOBS");
         boolean shouldRunMcpJobs = true;
