@@ -36,7 +36,6 @@ import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
 import IssuesPage from "../dashboard/pages/issues/IssuesPage/IssuesPage";
 import CompliancePage from "../dashboard/pages/issues/IssuesPage/CompliancePage";
 import ThreatCompliancePage from "../dashboard/pages/issues/IssuesPage/ThreatCompliancePage";
-import ThreatsPage from "../dashboard/pages/issues/IssuesPage/ThreatsPage";
 import QuickStart from "../dashboard/pages/quick_start/QuickStart";
 import AgentTeam from "../dashboard/pages/agent_team/AgentTeam";
 import Webhooks from "../dashboard/pages/settings/integrations/webhooks/Webhooks";
@@ -256,12 +255,8 @@ const router = createBrowserRouter([
                                 element: <CompliancePage/>
                             },
                             {
-                                path: "threat-compliance",
+                                path: "threat",
                                 element: <ThreatCompliancePage/>
-                            },
-                            {
-                                path: "threats",
-                                element: <ThreatsPage/>
                             }
                         ]
                     },

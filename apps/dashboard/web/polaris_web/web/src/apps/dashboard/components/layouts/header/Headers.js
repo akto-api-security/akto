@@ -320,11 +320,11 @@ export default function Header() {
                                         { value: "API Security", label: "API Security", id: "api-security" },
                                         {
                                             value: "Agentic Security",
-                                            label: func.isDemoAccount() ? "Akto ARGUS" : "Agentic Security",
+                                            label: func.isAtlasArgusAccount() ? "Akto ARGUS" : "Agentic Security",
                                             id: "agentic-security",
-                                            helpText: func.isDemoAccount() ? "Agentic AI Security for Homegrown AI" : undefined
+                                            helpText: func.isAtlasArgusAccount() ? "Agentic AI Security for Homegrown AI" : undefined
                                         },
-                                        ...(func.isDemoAccount() ? [{
+                                        ...(func.isAtlasArgusAccount() ? [{
                                             value: "Endpoint Security",
                                             label: "Akto ATLAS",
                                             id: "endpoint-security",

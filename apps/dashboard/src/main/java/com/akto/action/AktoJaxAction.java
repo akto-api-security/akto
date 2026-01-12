@@ -2,19 +2,26 @@ package com.akto.action;
 
 import com.akto.ApiRequest;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.ConfigsDao;
 import com.akto.dao.CrawlerRunDao;
 import com.akto.dao.CrawlerUrlDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.Config;
 import com.akto.dto.CrawlerRun;
+import com.akto.dto.CrawlerRun.CrawlerRunStatus;
 import com.akto.dto.CrawlerUrl;
 import com.akto.dto.RecordedLoginFlowInput;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.testing.*;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.CollectionTags.TagSource;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.notifications.slack.CrawlerInitiationAlert;
+import com.akto.notifications.slack.SlackAlerts;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
 import com.akto.util.RecordedLoginFlowUtil;
@@ -58,14 +65,19 @@ public class AktoJaxAction extends UserAction {
     private String sourceUrl;
     private String sourceXpath;
     private String buttonText;
+    private int crawlingTime;
+    private String selectedModuleName;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AktoJaxAction.class, LogDb.DASHBOARD);
 
     public String initiateCrawler() {
         try {
+            if(crawlingTime < 600 || crawlingTime > 345600) { // crawlerTime cannot be < 10 minutes OR crawlerTime cannot be greater than 4 days
+                addActionError("Invalid crawling time");
+                return ERROR.toUpperCase();
+            }
+
             loggerMaker.infoAndAddToDb("Initializing Crawler");
-            String url = System.getenv("AKTOJAX_SERVICE_URL") + "/triggerCrawler";
-            loggerMaker.infoAndAddToDb("Crawler service url: " + url);
 
             URL parsedUrl = new URL(hostname);
             String host = parsedUrl.getHost();
@@ -105,18 +117,8 @@ public class AktoJaxAction extends UserAction {
 
             String crawlId = UUID.randomUUID().toString();
 
-            JSONObject requestBody = new JSONObject();
-            requestBody.put("hostname", hostname);
-            requestBody.put("apiKey", apiKey);
-            requestBody.put("dashboardUrl", dashboardUrl);
-            requestBody.put("collectionId", collectionId);
-            requestBody.put("accountId", Context.accountId.get());
-            requestBody.put("outscopeUrls", outscopeUrls);
-            requestBody.put("crawlId", crawlId);
-
+            Object cookies = null;
             if(!StringUtils.isEmpty(username) && !StringUtils.isEmpty(password)) {
-                requestBody.put("username", username);
-                requestBody.put("password", password);
             } else if(testRoleHaxId != null && !testRoleHaxId.isEmpty()) {
                 TestRoles testRole = TestRolesDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(testRoleHaxId)));
                 AuthMechanism authMechanismForRole = testRole.findDefaultAuthMechanism();
@@ -135,7 +137,7 @@ public class AktoJaxAction extends UserAction {
                         if (parseToken != null) {
                             loggerMaker.infoAndAddToDb("Got the cookies from test role for crawler");
                             BasicDBList allCookies = (BasicDBList) parseToken.get("all_cookies");
-                            requestBody.put("cookies", allCookies);
+                            cookies = allCookies;
                         }
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb("Error while fetching cookies/token from test role using jsonRecording. Error: " + e.getMessage());
@@ -155,7 +157,7 @@ public class AktoJaxAction extends UserAction {
                         List<AuthParam> authParamsToUse = authMechanismForRole.getAuthParamsFromAuthMechanism();
                         AuthParam authParam = authParamsToUse.get(0);
 
-                        requestBody.put("cookies", "Bearer " + authParam.getValue());
+                        cookies = "Bearer " + authParam.getValue();
                     } catch (Exception ex) {
                         addActionError(ex.getMessage());
                         loggerMaker.errorAndAddToDb("Error while fetching cookies/token from test role using loginStepBuilder. Error: " + ex.getMessage());
@@ -164,35 +166,160 @@ public class AktoJaxAction extends UserAction {
                 }
             }
 
-            String reqData = requestBody.toString();
+            // Check if DAST module is available
+            boolean useModuleBasedDast = false;
+            if (selectedModuleName != null && !selectedModuleName.isEmpty()) {
+                ModuleInfo module = ModuleInfoDao.instance.findOne(
+                    Filters.and(
+                        Filters.eq(ModuleInfo.NAME, selectedModuleName),
+                        Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.DAST.name()),
+                        Filters.gte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, Context.now() - 300)
+                    )
+                );
 
-            loggerMaker.infoAndAddToDb("Crawler request data: " + reqData);
+                if (module == null) {
+                    addActionError("Selected DAST module is not available. Please select another module.");
+                    return ERROR.toUpperCase();
+                }
 
-            JsonNode node = ApiRequest.postRequest(new HashMap<>(), url, reqData);
-            String status = node.get("status").textValue();
+                useModuleBasedDast = true;
+            }
 
-            loggerMaker.infoAndAddToDb("Crawler status: " + status);
+            int currentTimestamp = Context.now();
 
-            if(status.equalsIgnoreCase("success")) {
-                int currentTimestamp = Context.now();
+            if (useModuleBasedDast) {
                 CrawlerRun crawlerRun = new CrawlerRun(
+                        getSUser().getLogin(),
+                        currentTimestamp,
+                        0,
+                        crawlId,
+                        hostname,
+                        outscopeUrls
+                );
+                crawlerRun.setStatus(CrawlerRunStatus.PENDING);
+                crawlerRun.setModuleName(selectedModuleName);
+                crawlerRun.setUsername(username);
+                crawlerRun.setPassword(password);
+                crawlerRun.setApiKey(apiKey);
+                crawlerRun.setDashboardUrl(dashboardUrl);
+                crawlerRun.setCollectionId(collectionId);
+                crawlerRun.setAccountId(Context.accountId.get());
+                crawlerRun.setCookies(cookies);
+                crawlerRun.setCrawlingTime(crawlingTime);
+                CrawlerRunDao.instance.insertOne(crawlerRun);
+            } else {
+                // Fallback to internal DAST API
+                initiateInternalCrawl(crawlId, hostname, username, password, apiKey,
+                    dashboardUrl, collectionId, cookies, crawlingTime, outscopeUrls);
+            }
+
+
+            // Send Slack alert for crawler initiation
+            try {
+                Config config = ConfigsDao.instance.findOne(
+                    Filters.eq("configType", Config.ConfigType.SLACK_ALERT_INTERNAL.name())
+                );
+
+                if (config != null) {
+                    Config.SlackAlertInternalConfig slackConfig = (Config.SlackAlertInternalConfig) config;
+                    String slackWebhookUrl = slackConfig.getDastSlackWebhookUrl();
+
+                    if (slackWebhookUrl != null && !slackWebhookUrl.isEmpty()) {
+                        String collectionName = null;
+                        if (collectionId != 0 && apiCollection != null) {
+                            collectionName = apiCollection.getName();
+                        }
+
+                        String moduleNameForAlert = useModuleBasedDast ? selectedModuleName : "Internal DAST (Akto)";
+
+                        SlackAlerts crawlerAlert = new CrawlerInitiationAlert(
+                            getSUser().getLogin(),
+                            hostname,
+                            moduleNameForAlert,
+                            collectionId,
+                            collectionName,
+                            crawlingTime,
+                            outscopeUrls,
+                            crawlId,
+                            Context.now(),
+                            username,
+                            (username != null && !username.isEmpty()) ||
+                            (password != null && !password.isEmpty()) ||
+                            (cookies != null)
+                        );
+
+                        final String webhookUrl = slackWebhookUrl;
+                        final String payload = crawlerAlert.toJson();
+                        new Thread(() -> {
+                            try {
+                                com.slack.api.Slack.getInstance().send(webhookUrl, payload);
+                            } catch (Exception ex) {
+                                loggerMaker.errorAndAddToDb("Failed to send Slack alert: " + ex.getMessage());
+                            }
+                        }).start();
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                loggerMaker.errorAndAddToDb("Failed to send Slack alert for crawler initiation: " + e.getMessage());
+            }
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.error("Error while initiating the Akto crawler. Error: " + e.getMessage());
+            e.printStackTrace();
+            addActionError("Error while initiating the Akto crawler. Error: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    private void initiateInternalCrawl(String crawlId, String hostname, String username,
+                                     String password, String apiKey, String dashboardUrl,
+                                     int collectionId, Object cookies, int crawlingTime,
+                                     String outscopeUrls) throws Exception {
+        String url = System.getenv("AKTOJAX_SERVICE_URL") + "/triggerCrawler";
+        loggerMaker.infoAndAddToDb("Using internal DAST crawler service: " + url);
+
+        JSONObject requestBody = new JSONObject();
+        requestBody.put("hostname", hostname);
+        requestBody.put("apiKey", apiKey);
+        requestBody.put("dashboardUrl", dashboardUrl);
+        requestBody.put("collectionId", collectionId);
+        requestBody.put("accountId", Context.accountId.get());
+        requestBody.put("outscopeUrls", outscopeUrls);
+        requestBody.put("crawlId", crawlId);
+        requestBody.put("crawlingTime", crawlingTime);
+
+        if (!StringUtils.isEmpty(username) && !StringUtils.isEmpty(password)) {
+            requestBody.put("username", username);
+            requestBody.put("password", password);
+        }
+
+        if (cookies != null) {
+            requestBody.put("cookies", cookies);
+        }
+
+        String reqData = requestBody.toString();
+        loggerMaker.infoAndAddToDb("Internal DAST crawler request data: " + reqData);
+
+        JsonNode node = ApiRequest.postRequest(new HashMap<>(), url, reqData);
+        String status = node.get("status").textValue();
+
+        if (status.equalsIgnoreCase("success")) {
+            int currentTimestamp = Context.now();
+            CrawlerRun crawlerRun = new CrawlerRun(
                     getSUser().getLogin(),
                     currentTimestamp,
                     0,
                     crawlId,
                     hostname,
                     outscopeUrls
-                );
-                CrawlerRunDao.instance.insertOne(crawlerRun);
-                return Action.SUCCESS.toUpperCase();
-            } else {
-                return Action.ERROR.toUpperCase();
-            }
-        } catch (Exception e) {
-            loggerMaker.error("Error while initiating the Akto crawler. Error: " + e.getMessage());
-            e.printStackTrace();
-            return Action.ERROR.toUpperCase();
+            );
+
+            CrawlerRunDao.instance.insertOne(crawlerRun);
         }
+
+        loggerMaker.infoAndAddToDb("Internal DAST crawler status: " + status);
     }
 
     public String uploadCrawlerData() {
@@ -243,6 +370,42 @@ public class AktoJaxAction extends UserAction {
             e.printStackTrace();
             return Action.ERROR.toUpperCase();
         }
+    }
+
+
+    private List<Map<String, Object>> availableModules;
+
+    public String fetchAvailableDastModules() {
+        try {
+            int currentTime = Context.now();
+            int cutoffTime = currentTime - 300;
+
+            List<ModuleInfo> activeModules = ModuleInfoDao.instance.findAll(
+                    Filters.and(
+                            Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.DAST.name()),
+                            Filters.gte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, cutoffTime)
+                    )
+            );
+
+            availableModules = new ArrayList<>();
+
+            if (activeModules == null || activeModules.isEmpty()) {
+                loggerMaker.infoAndAddToDb("Available DAST modules not found");
+            } else {
+                for (ModuleInfo module : activeModules) {
+                    Map<String, Object> moduleMap = new HashMap<>();
+                    moduleMap.put("name", module.getName());
+                    moduleMap.put("displayName", module.getName());
+                    moduleMap.put("lastHeartbeat", module.getLastHeartbeatReceived());
+                    moduleMap.put("isDefault", false);
+                    availableModules.add(moduleMap);
+                }
+            }
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching DAST modules: " + e.getMessage());
+        }
+        return Action.SUCCESS.toUpperCase();
     }
 
     public String getHostname() {
@@ -371,5 +534,29 @@ public class AktoJaxAction extends UserAction {
 
     public void setButtonText(String buttonText) {
         this.buttonText = buttonText;
+    }
+
+    public int getCrawlingTime() {
+        return crawlingTime;
+    }
+
+    public void setCrawlingTime(int crawlingTime) {
+        this.crawlingTime = crawlingTime;
+    }
+
+    public String getSelectedModuleName() {
+        return selectedModuleName;
+    }
+
+    public void setSelectedModuleName(String selectedModuleName) {
+        this.selectedModuleName = selectedModuleName;
+    }
+
+    public List<Map<String, Object>> getAvailableModules() {
+        return availableModules;
+    }
+
+    public void setAvailableModules(List<Map<String, Object>> availableModules) {
+        this.availableModules = availableModules;
     }
 }

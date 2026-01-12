@@ -1,8 +1,5 @@
 package com.akto.threat.detection.utils;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
@@ -12,7 +9,6 @@ import java.util.Map;
 import org.ahocorasick.trie.Trie;
 import org.json.JSONObject;
 
-import com.akto.dao.context.Context;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.RawApi;
 import com.akto.dto.ApiInfo;
@@ -24,13 +20,13 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.Utils;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
+import com.akto.util.Constants;
 import com.client9.libinjection.SQLParse;
+
+import static com.akto.threat_utils.Utils.generateTrie;
 
 public class ThreatDetector {
 
-    private static final String LFI_OS_FILES_DATA = "/lfi-os-files.data";
-    private static final String OS_COMMAND_INJECTION_DATA = "/os-command-injection.data";
-    private static final String SSRF_DATA = "/ssrf.data";
     public static final String LFI_FILTER_ID = "LocalFileInclusionLFIRFI";
     public static final String USER_AUTH_MISMATCH_FILTER_ID = "UserAuthMismatch";
     public static final String SQL_INJECTION_FILTER_ID = "SQLInjection";
@@ -43,25 +39,9 @@ public class ThreatDetector {
     private static final LoggerMaker logger = new LoggerMaker(ThreatDetector.class, LogDb.THREAT_DETECTION);
 
     public ThreatDetector() throws Exception {
-        lfiTrie = generateTrie(LFI_OS_FILES_DATA);
-        osCommandInjectionTrie = generateTrie(OS_COMMAND_INJECTION_DATA);
-        ssrfTrie = generateTrie(SSRF_DATA);
-    }
-
-    private Trie generateTrie(String fileName) throws Exception {
-        Trie.TrieBuilder builder = Trie.builder();
-        try (InputStream is = ThreatDetector.class.getResourceAsStream(fileName);
-                BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                line = line.trim();
-                if (line.isEmpty() || line.startsWith("#"))
-                    continue;
-                builder.addKeyword(line);
-            }
-        }
-
-        return builder.build();
+        lfiTrie = generateTrie(Constants.LFI_OS_FILES_DATA);
+        osCommandInjectionTrie = generateTrie(Constants.OS_COMMAND_INJECTION_DATA);
+        ssrfTrie = generateTrie(Constants.SSRF_DATA);
     }
 
     public boolean applyFilter(FilterConfig threatFilter, HttpResponseParams httpResponseParams, RawApi rawApi,
