@@ -20,9 +20,11 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Up
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DeleteMaliciousEventsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DeleteMaliciousEventsResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ToggleArchivalEnabledRequest;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import io.vertx.core.Vertx;
 import io.vertx.ext.web.RequestBody;
 import io.vertx.ext.web.Router;
@@ -30,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.ArrayList;
+import org.apache.commons.lang3.StringUtils;
 
 public class DashboardRouter implements ARouter {
 
@@ -45,6 +48,13 @@ public class DashboardRouter implements ARouter {
         this.dsService = dsService;
         this.threatActorService = threatActorService;
         this.threatApiService = threatApiService;
+    }
+
+    private String getContextSourceHeader(io.vertx.ext.web.RoutingContext ctx) {
+        return StringUtils.defaultIfBlank(
+            ctx.request().getHeader("x-context-source"),
+            CONTEXT_SOURCE.API.name()
+        );
     }
 
     private Map<String, Object> convertProtoFilterToMap(ListMaliciousRequestsRequest.Filter protoFilter) {
@@ -104,6 +114,8 @@ public class DashboardRouter implements ARouter {
         router
             .post("/list_malicious_requests")
             .blockingHandler(ctx -> {
+                String contextSource = getContextSourceHeader(ctx);
+
                 RequestBody reqBody = ctx.body();
                 ListMaliciousRequestsRequest req = ProtoMessageUtils.<
                     ListMaliciousRequestsRequest
@@ -118,7 +130,7 @@ public class DashboardRouter implements ARouter {
                 }
 
                 ProtoMessageUtils.toString(
-                    dsService.listMaliciousRequests(ctx.get("accountId"), req)
+                    dsService.listMaliciousRequests(ctx.get("accountId"), req, contextSource)
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
 
@@ -134,6 +146,8 @@ public class DashboardRouter implements ARouter {
         router
             .post("/list_threat_actors")
             .blockingHandler(ctx -> {
+                String contextSource = getContextSourceHeader(ctx);
+
                 RequestBody reqBody = ctx.body();
                 ListThreatActorsRequest req = ProtoMessageUtils.<
                     ListThreatActorsRequest
@@ -150,7 +164,8 @@ public class DashboardRouter implements ARouter {
                 ProtoMessageUtils.toString(
                     threatActorService.listThreatActors(
                         ctx.get("accountId"),
-                        req
+                        req,
+                        contextSource
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
@@ -158,6 +173,8 @@ public class DashboardRouter implements ARouter {
         router
             .post("/list_threat_apis")
             .blockingHandler(ctx -> {
+                String contextSource = getContextSourceHeader(ctx);
+
                 RequestBody reqBody = ctx.body();
                 ListThreatApiRequest req = ProtoMessageUtils.<
                     ListThreatApiRequest
@@ -172,13 +189,15 @@ public class DashboardRouter implements ARouter {
                 }
 
                 ProtoMessageUtils.toString(
-                    threatApiService.listThreatApis(ctx.get("accountId"), req)
+                    threatApiService.listThreatApis(ctx.get("accountId"), req, contextSource)
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
 
         router
             .post("/get_actors_count_per_country")
             .blockingHandler(ctx -> {
+                String contextSource = getContextSourceHeader(ctx);
+
                 RequestBody reqBody = ctx.body();
                 ThreatActorByCountryRequest req = ProtoMessageUtils.<
                     ThreatActorByCountryRequest
@@ -195,7 +214,8 @@ public class DashboardRouter implements ARouter {
                 ProtoMessageUtils.toString(
                     threatActorService.getThreatActorByCountry(
                         ctx.get("accountId"),
-                        req 
+                        req,
+                        contextSource
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
@@ -232,6 +252,30 @@ public class DashboardRouter implements ARouter {
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
+
+        router
+            .post("/toggle_archival_enabled")
+            .blockingHandler(ctx -> {
+                RequestBody reqBody = ctx.body();
+                ToggleArchivalEnabledRequest req = ProtoMessageUtils.<
+                    ToggleArchivalEnabledRequest
+                >toProtoMessage(
+                    ToggleArchivalEnabledRequest.class,
+                    reqBody.asString()
+                ).orElse(null);
+
+                if (req == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+                ProtoMessageUtils.toString(
+                    threatActorService.toggleArchivalEnabled(
+                        ctx.get("accountId"),
+                        req
+                    )
+                ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
+
         router
             .get("/fetch_filters_for_threat_actors")
             .blockingHandler(ctx -> {
@@ -246,6 +290,8 @@ public class DashboardRouter implements ARouter {
         router
         .post("/get_subcategory_wise_count")
             .blockingHandler(ctx -> {
+                String contextSource = getContextSourceHeader(ctx);
+
                 RequestBody reqBody = ctx.body();
                 ThreatCategoryWiseCountRequest req = ProtoMessageUtils.<
                     ThreatCategoryWiseCountRequest
@@ -262,7 +308,8 @@ public class DashboardRouter implements ARouter {
                 ProtoMessageUtils.toString(
                     threatApiService.getSubCategoryWiseCount(
                         ctx.get("accountId"),
-                        req
+                        req,
+                        contextSource
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
@@ -270,6 +317,8 @@ public class DashboardRouter implements ARouter {
             router
             .post("/get_severity_wise_count")
             .blockingHandler(ctx -> {
+                String contextSource = getContextSourceHeader(ctx);
+
                 RequestBody reqBody = ctx.body();
                 ThreatSeverityWiseCountRequest req = ProtoMessageUtils.<
                     ThreatSeverityWiseCountRequest
@@ -286,7 +335,8 @@ public class DashboardRouter implements ARouter {
                 ProtoMessageUtils.toString(
                     threatApiService.getSeverityWiseCount(
                         ctx.get("accountId"),
-                        req
+                        req,
+                        contextSource
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
@@ -366,6 +416,8 @@ public class DashboardRouter implements ARouter {
         router
             .post("/get_daily_actor_count")
             .blockingHandler(ctx -> {
+                String contextSource = getContextSourceHeader(ctx);
+
                 RequestBody reqBody = ctx.body();
                 DailyActorsCountRequest req = ProtoMessageUtils.<
                 DailyActorsCountRequest
@@ -384,7 +436,8 @@ public class DashboardRouter implements ARouter {
                         ctx.get("accountId"),
                         req.getStartTs(),
                         req.getEndTs(),
-                        req.getLatestAttackList()
+                        req.getLatestAttackList(),
+                        contextSource
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
@@ -392,6 +445,8 @@ public class DashboardRouter implements ARouter {
         router
             .post("/get_threat_activity_timeline")
             .blockingHandler(ctx -> {
+                String contextSource = getContextSourceHeader(ctx);
+
                 RequestBody reqBody = ctx.body();
                 ThreatActivityTimelineRequest req = ProtoMessageUtils.<
                 ThreatActivityTimelineRequest
@@ -410,7 +465,8 @@ public class DashboardRouter implements ARouter {
                         ctx.get("accountId"),
                         req.getStartTs(),
                         req.getEndTs(),
-                        req.getLatestAttackList()
+                        req.getLatestAttackList(),
+                        contextSource
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
@@ -419,6 +475,8 @@ public class DashboardRouter implements ARouter {
             .post("/update_malicious_event_status")
             .blockingHandler(ctx -> {
                 RequestBody reqBody = ctx.body();
+                String contextSource = getContextSourceHeader(ctx);
+
                 UpdateMaliciousEventStatusRequest req = ProtoMessageUtils.<
                     UpdateMaliciousEventStatusRequest
                 >toProtoMessage(
@@ -453,7 +511,8 @@ public class DashboardRouter implements ARouter {
                     eventIds,
                     filterMap,
                     req.getStatus(),
-                    req.getJiraTicketUrl()
+                    req.getJiraTicketUrl(),
+                    contextSource
                 );
 
                 UpdateMaliciousEventStatusResponse resp = UpdateMaliciousEventStatusResponse.newBuilder()
@@ -472,6 +531,8 @@ public class DashboardRouter implements ARouter {
             .post("/delete_malicious_events")
             .blockingHandler(ctx -> {
                 RequestBody reqBody = ctx.body();
+                String contextSource = getContextSourceHeader(ctx);
+
                 DeleteMaliciousEventsRequest req = ProtoMessageUtils.<
                     DeleteMaliciousEventsRequest
                 >toProtoMessage(
@@ -502,7 +563,8 @@ public class DashboardRouter implements ARouter {
                 int deletedCount = dsService.deleteMaliciousEvents(
                     ctx.get("accountId"),
                     eventIds,
-                    filterMap
+                    filterMap,
+                    contextSource
                 );
 
                 DeleteMaliciousEventsResponse resp = DeleteMaliciousEventsResponse.newBuilder()
@@ -520,6 +582,8 @@ public class DashboardRouter implements ARouter {
         router
             .post("/get_top_n_data")
             .blockingHandler(ctx -> {
+                String contextSource = getContextSourceHeader(ctx);
+
                 RequestBody reqBody = ctx.body();
                 FetchTopNDataRequest req = ProtoMessageUtils.<
                 FetchTopNDataRequest
@@ -539,7 +603,8 @@ public class DashboardRouter implements ARouter {
                         req.getStartTs(),
                         req.getEndTs(),
                         req.getLatestAttackList(),
-                        req.getLimit()
+                        req.getLimit(),
+                        contextSource
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });

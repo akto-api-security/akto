@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Divider, HorizontalStack, Modal, Text, Tooltip, VerticalStack, Popover, ActionList } from "@shopify/polaris";
+import { Badge, Box, Button, Divider, HorizontalStack, Modal, Text, Tooltip, VerticalStack, Popover, ActionList, Avatar } from "@shopify/polaris";
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
@@ -14,11 +14,26 @@ import settingFunctions from "../../settings/module";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal";
 import transform from "../../testing/transform";
 import issuesFunctions from "../../issues/module";
+import { GUARDRAIL_SECTIONS } from "../constants/guardrailDescriptions";
+import { isEndpointSecurityCategory } from "../../../../main/labelHelper";
 
 function SampleDetails(props) {
     const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate } = props
     const resolvedThreatFiltersMap = threatFiltersMap || {};
-    let currentTemplateObj = moreInfoData?.templateId ? resolvedThreatFiltersMap[moreInfoData?.templateId] : undefined;
+
+    const useGuardrailDescription = isEndpointSecurityCategory();
+
+    let currentTemplateObj;
+    if (useGuardrailDescription) {
+        // For Atlas guardrails, use structured content
+        currentTemplateObj = {
+            guardrailSections: GUARDRAIL_SECTIONS,
+            testName: moreInfoData?.templateId || "Guardrail Policy",
+            name: moreInfoData?.templateId || "Guardrail Policy"
+        };
+    } else {
+        currentTemplateObj = moreInfoData?.templateId ? resolvedThreatFiltersMap[moreInfoData?.templateId] : undefined;
+    }
 
     let severity = currentTemplateObj?.severity || "HIGH"
     const [remediationText, setRemediationText] = useState("")
@@ -51,7 +66,64 @@ function SampleDetails(props) {
         }
         
     }
-    const overviewComp = (
+    const overviewComp = useGuardrailDescription ? (
+        // Structured view for Argus/Atlas guardrails - show all 7 sections with hierarchy
+        <Box padding={"4"}>
+            <VerticalStack gap={"5"}>
+                {currentTemplateObj?.guardrailSections?.map((section, sectionIdx) => (
+                    <div key={sectionIdx}>
+                        <VerticalStack gap={"3"}>
+                            {/* Main Section Heading (numbered) */}
+                            <Text variant="headingMd" fontWeight="bold">
+                                {sectionIdx + 1}. {section.heading}
+                            </Text>
+
+                            {/* Main Section Description */}
+                            <Text variant="bodyMd">{section.description}</Text>
+
+                            {/* Sub-sections if present */}
+                            {section.subSections && section.subSections.length > 0 && (
+                                <VerticalStack gap={"3"} paddingBlockStart={"2"}>
+                                    {section.subSections.map((subSection, subIdx) => (
+                                        <div key={subIdx}>
+                                            <VerticalStack gap={"2"}>
+                                                {/* Sub-section Heading */}
+                                                <Text variant="headingSm" fontWeight="semibold">
+                                                    {subSection.subHeading}:
+                                                </Text>
+
+                                                {/* Sub-section Description */}
+                                                <Text variant="bodyMd">{subSection.description}</Text>
+
+                                                {/* Items list if present */}
+                                                {subSection.items && subSection.items.length > 0 && (
+                                                    <Box paddingInlineStart={"4"} paddingBlockStart={"1"}>
+                                                        <VerticalStack gap={"2"}>
+                                                            {subSection.items.map((item, itemIdx) => (
+                                                                <Text key={itemIdx} variant="bodyMd">• {item}</Text>
+                                                            ))}
+                                                        </VerticalStack>
+                                                    </Box>
+                                                )}
+                                            </VerticalStack>
+                                        </div>
+                                    ))}
+                                </VerticalStack>
+                            )}
+                        </VerticalStack>
+
+                        {/* Divider between sections (except last) */}
+                        {sectionIdx < currentTemplateObj.guardrailSections.length - 1 && (
+                            <Box paddingBlockStart={"4"}>
+                                <Divider />
+                            </Box>
+                        )}
+                    </div>
+                ))}
+            </VerticalStack>
+        </Box>
+    ) : (
+        // Full view for normal threat detection (existing code)
         <Box padding={"4"}>
             <VerticalStack gap={"5"}>
                 <VerticalStack gap={"2"}>
@@ -67,6 +139,27 @@ function SampleDetails(props) {
                 <VerticalStack gap={"2"}>
                     <Text variant="headingMd">Impact</Text>
                     <Text variant="bodyMd">{currentTemplateObj?.impact || "-"}</Text>
+                </VerticalStack>
+                <Divider />
+                <VerticalStack gap={"2"}>
+                    <Text variant="headingMd">Compliance</Text>
+                    {currentTemplateObj?.compliance?.mapComplianceToListClauses &&
+                     Object.keys(currentTemplateObj.compliance.mapComplianceToListClauses).length > 0 ? (
+                        <HorizontalStack gap={2} wrap>
+                            {Object.keys(currentTemplateObj.compliance.mapComplianceToListClauses).map((complianceName, idx) => (
+                                <HorizontalStack key={idx} gap={1} blockAlign="center">
+                                    <Avatar
+                                        source={func.getComplianceIcon(complianceName)}
+                                        shape="square"
+                                        size="extraSmall"
+                                    />
+                                    <Text>{complianceName}</Text>
+                                </HorizontalStack>
+                            ))}
+                        </HorizontalStack>
+                    ) : (
+                        <Text variant="bodyMd" color="subdued">-</Text>
+                    )}
                 </VerticalStack>
                 <Divider />
             </VerticalStack>
@@ -367,6 +460,12 @@ Reference URL: ${window.location.href}`.trim();
 
             func.setToast(true, false, "Creating Azure Boards Work Item");
 
+            // Extract originalMessage from first attempt data for attachment
+            // For threat activity, orig contains both request and response
+            const originalMessage = data && data.length > 0 && data[0]?.orig 
+                ? (typeof data[0].orig === 'string' ? data[0].orig : JSON.stringify(data[0].orig))
+                : null;
+
             // Call createGeneralAzureBoardsWorkItem API
             const response = await issuesApi.createGeneralAzureBoardsWorkItem({
                 title: workItemTitle,
@@ -377,7 +476,8 @@ Reference URL: ${window.location.href}`.trim();
                 templateId: moreInfoData?.templateId,  // Pass templateId (filterId) from threat policy
                 endpoint: endPointStr,  // Pass endpoint for title formatting
                 aktoDashboardHostName: window.location.origin,
-                customABWorkItemFieldsPayload
+                customABWorkItemFieldsPayload,
+                originalMessage: originalMessage  // Pass request/response data for attachment
             });
 
             if (response?.errorMessage) {

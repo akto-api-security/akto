@@ -300,6 +300,30 @@ const settingRequests = {
         })
     },
 
+    fetchJiraPriorities() {
+        return request({
+            url: '/api/jira/fetchPriorities',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    saveSeverityMapping(severityToPriorityMap) {
+        return request({
+            url: '/api/jira/saveSeverityMapping',
+            method: 'post',
+            data: {severityToPriorityMap}
+        })
+    },
+
+    fetchSeverityMapping() {
+        return request({
+            url: '/api/jira/fetchSeverityMapping',
+            method: 'post',
+            data: {}
+        })
+    },
+
     addOktaSso(clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri) {
         return request({
             url: '/api/addOktaSso',
@@ -607,6 +631,29 @@ const settingRequests = {
         })
     },
 
+    fetchAdxIntegration() {
+        return request({
+            url: '/api/fetchAdxIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addAdxIntegration(clusterEndpoint, databaseName, tenantId, applicationClientId, applicationKey) {
+        return request({
+            url: '/api/addAdxIntegration',
+            method: 'post',
+            data: {clusterEndpoint, databaseName, tenantId, applicationClientId, applicationKey}
+        })
+    },
+    removeAdxIntegration() {
+        return request({
+            url: '/api/removeAdxIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
     fetchServiceNowIntegration() {
         return request({
             url: '/api/fetchServiceNowIntegration',
@@ -634,6 +681,42 @@ const settingRequests = {
     removeServiceNowIntegration() {
         return request({
             url: '/api/removeServiceNowIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchDevRevIntegration() {
+        return request({
+            url: '/api/fetchDevRevIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchDevRevParts(personalAccessToken, partTypes, partName) {
+        return request({
+            url: '/api/fetchDevRevParts',
+            method: 'post',
+            data: {
+                personalAccessToken,
+                partTypes: (partTypes && partTypes.length > 0) ? partTypes : null,
+                partName: partName || null
+            }
+        })
+    },
+
+    addDevRevIntegration(orgUrl, personalAccessToken, partsIdToNameMap) {
+        return request({
+            url: '/api/addDevRevIntegration',
+            method: 'post',
+            data: { orgUrl, personalAccessToken, partsIdToNameMap }
+        })
+    },
+
+    removeDevRevIntegration() {
+        return request({
+            url: '/api/removeDevRevIntegration',
             method: 'post',
             data: {}
         })
@@ -757,6 +840,27 @@ const settingRequests = {
             url: '/api/addMcpRegistryIntegration',
             method: 'post',
             data: {registries}
+        })
+    },
+    updateBlockLogs(blockLogs) {
+        return request({
+            url: '/api/updateBlockLogs',
+            method: 'post',
+            data: {blockLogs}
+        })
+    },
+    updateFilterLogPolicy(filterLogPolicy) {
+        return request({
+            url: '/api/updateFilterLogPolicy',
+            method: 'post',
+            data: {filterLogPolicy}
+        })
+    },
+    rebootModules(moduleIds, deleteTopicAndReboot = false) {
+        return request({
+            url: '/api/rebootModules',
+            method: 'post',
+            data: {moduleIds, deleteTopicAndReboot}
         })
     }
 }

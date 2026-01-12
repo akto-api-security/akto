@@ -16,7 +16,7 @@ import GithubSource from "./components/GithubSource"
 import AktoJax from "./components/AktoJax"  
 import McpScan from "./components/McpScan" 
 import AiAgentScan from "./components/AiAgentScan"
-import { isGenAISecurityCategory, isMCPSecurityCategory, isAgenticSecurityCategory, isDastCategory, isApiSecurityCategory } from "../../../main/labelHelper"
+import { isGenAISecurityCategory, isMCPSecurityCategory, isAgenticSecurityCategory, isDastCategory, isApiSecurityCategory, isEndpointSecurityCategory } from "../../../main/labelHelper"
 import McpRecon from "./components/McpRecon"
 import McpProxy from "./components/McpProxy"
 import AwsLogAccountComponent from "./components/shared/AwsLogAccountComponent"
@@ -24,6 +24,28 @@ import McpGateway from "./McpGateway"
 import AIAgentsGateway from "./AIAgentsGateway"
 import ImpervaImport from "./components/ImpervaImport"
 import BrowserExtension from "./components/BrowserExtension"
+import AIAgentConnectorImport from "./components/AIAgentConnectorImport"
+import CursorHook from "./components/CursorHook"
+import {
+    CONNECTOR_TYPE_N8N,
+    CONNECTOR_NAME_N8N,
+    DESCRIPTION_N8N,
+    DOCS_URL_N8N,
+    INTERVAL_N8N,
+    N8N_FIELDS,
+    CONNECTOR_TYPE_LANGCHAIN,
+    CONNECTOR_NAME_LANGCHAIN,
+    DESCRIPTION_LANGCHAIN,
+    DOCS_URL_LANGCHAIN,
+    INTERVAL_LANGCHAIN,
+    LANGCHAIN_FIELDS,
+    CONNECTOR_TYPE_COPILOT_STUDIO,
+    CONNECTOR_NAME_COPILOT_STUDIO,
+    DESCRIPTION_COPILOT_STUDIO,
+    DOCS_URL_COPILOT_STUDIO,
+    INTERVAL_COPILOT_STUDIO,
+    COPILOT_STUDIO_FIELDS
+} from "./constants/aiAgentConnectorConstants"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -336,28 +358,19 @@ const customAIObj = {
 const awsBedrockObj = {
     icon: '/public/aws_bedrock.svg',
     label: "AWS Bedrock",
-    text: "Import AWS Bedrock AI agents seamlessly into AKTO.",
-    docsUrl: 'https://docs.akto.io/ai-agent-security',
+    text: "Import your AWS Bedrock AI agents, seamlessly into AKTO.",
+    docsUrl: 'https://docs.akto.io/aws-bedrock-agents',
     key: "AWS_BEDROCK",
-    component : <AiAgentScan
-        description="Import your AWS Bedrock AI agents, seamlessly in AKTO."
-        defaultRequestBody={{
-            "modelId": "anthropic.claude-v2",
-            "contentType": "application/json",
-            "accept": "application/json",
-            "body": {
-                "prompt": "\n\nHuman: Why is the sky blue?\n\nAssistant:",
-                "max_tokens_to_sample": 300
-            }
-        }}
-        docsLink='https://docs.akto.io/ai-agent-security'
+    component : <BannerComponent 
+        content="Import your AWS Bedrock AI agents, seamlessly in AKTO."
+        docsUrl='https://docs.akto.io/aws-bedrock-agents'
     />
 }
 
 const aiAgentGlobalProxy = {
     icon: '/public/aws_bedrock.svg',
-    label: "AI Agent Global Proxy",
-    text: "A publicly hosted secure gateway that enforces guardrails and advanced threat protection for all requests to your public AI agents, ensuring safe and compliant communication.",
+    label: "Agentic Proxy",
+    text: "A publicly hosted secure gateway that enforces guardrails and advanced threat protection for all requests to your public AI agents and MCP servers, ensuring safe and compliant communication.",
     docsUrl: 'https://docs.akto.io/akto-agent-proxy',
     key: "AI_AGENT_GLOBAL_PROXY",
     component : <AIAgentsGateway />
@@ -365,8 +378,8 @@ const aiAgentGlobalProxy = {
 
 const aiAgentGateway = {
     icon: '/public/aws_bedrock.svg',
-    label: "AI Agent Gateway",
-    text: "AI agent proxy gateway to be deployed on premise for securing AI agents in your network",
+    label: "Agentic Gateway",
+    text: "Agentic gateway to be deployed on premise for securing AI agents and MCP servers in your network",
     docsUrl: 'https://docs.akto.io/akto-agent-proxy',
     key: "AI_AGENT_GATEWAY",
     component : <AIAgentsGateway />
@@ -857,6 +870,63 @@ const safariExtensionObj = {
     docsUrl: 'https://docs.akto.io/browser-extension',
     component: <BrowserExtension browserName="Safari"/>,
     key: "SAFARI_BROWSER_EXTENSION",
+}
+
+const cursorHookObj = {
+    icon: '/public/cursor-ai.svg',
+    label: "Cursor Hook",
+    text: "IDE-level protection monitoring AI-powered code completions in real-time.",
+    docsUrl: 'https://docs.akto.io/cursor-hook',
+    key: "CURSOR_HOOK",
+    component: <CursorHook/>
+}
+
+const n8nImportObj = {
+    icon: '/public/n8n.svg',
+    label: "N8N",
+    text: "Use our N8N feature to capture traffic and instantly send it to your dashboard for real-time insights.",
+    docsUrl: 'https://docs.akto.io/n8n-import',
+    key: "N8N_IMPORT",
+    component: <AIAgentConnectorImport
+        connectorType={CONNECTOR_TYPE_N8N}
+        connectorName={CONNECTOR_NAME_N8N}
+        description={DESCRIPTION_N8N}
+        fields={N8N_FIELDS}
+        docsUrl={DOCS_URL_N8N}
+        recurringIntervalSeconds={INTERVAL_N8N}
+    />
+}
+
+const langchainImportObj = {
+    icon: '/public/langchain.svg',
+    label: "Langchain",
+    text: "Use our Langchain feature to capture traffic from LangSmith and instantly send it to your dashboard for real-time insights.",
+    docsUrl: 'https://docs.akto.io/langchain-import',
+    key: "LANGCHAIN_IMPORT",
+    component: <AIAgentConnectorImport
+        connectorType={CONNECTOR_TYPE_LANGCHAIN}
+        connectorName={CONNECTOR_NAME_LANGCHAIN}
+        description={DESCRIPTION_LANGCHAIN}
+        fields={LANGCHAIN_FIELDS}
+        docsUrl={DOCS_URL_LANGCHAIN}
+        recurringIntervalSeconds={INTERVAL_LANGCHAIN}
+    />
+}
+
+const copilotStudioImportObj = {
+    icon: '/public/copilot.svg',
+    label: "Copilot Studio",
+    text: "Use our Copilot Studio feature to capture conversation data from Azure Dataverse API and instantly send it to your dashboard for real-time insights.",
+    docsUrl: 'https://docs.akto.io/copilot-studio-import',
+    key: "COPILOT_STUDIO_IMPORT",
+    component: <AIAgentConnectorImport
+        connectorType={CONNECTOR_TYPE_COPILOT_STUDIO}
+        connectorName={CONNECTOR_NAME_COPILOT_STUDIO}
+        description={DESCRIPTION_COPILOT_STUDIO}
+        fields={COPILOT_STUDIO_FIELDS}
+        docsUrl={DOCS_URL_COPILOT_STUDIO}
+        recurringIntervalSeconds={INTERVAL_COPILOT_STUDIO}
+    />
 }
 
 
@@ -1453,18 +1523,19 @@ const quickStartFunc = {
             geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj
         ]
 
-        const aiAgentGateways = [
+        const agenticProxies = [
             aiAgentGlobalProxy, aiAgentGateway
 
         ]
 
         const aiAgentConnectors = [
-            awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj
+            awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
+            n8nImportObj, langchainImportObj, copilotStudioImportObj
         ]
 
         // MCP Scan
         const mcpScan = [
-            mcpScanObj, mcpReconObj, mcpProxyObj, mcpGateway,mcpWrapperObj
+            mcpReconObj, mcpScanObj
         ];
 
         // Akto SDK
@@ -1481,6 +1552,12 @@ const quickStartFunc = {
             chromeExtensionObj, firefoxExtensionObj, safariExtensionObj
         ]
 
+        // Endpoint Agents
+        const endpointAgents = [
+            mcpWrapperObj,
+            cursorHookObj
+        ]
+
        if(func.checkLocal() || func.isLimitedAccount()){
            return {
                "Manual": manual
@@ -1489,35 +1566,62 @@ const quickStartFunc = {
 
         let connectors = {}
 
-        if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
-            connectors["AI Agent Scan"] = aiAgentGateways
-            connectors["AI Agent Security"] = aiAgentConnectors
-            connectors["AI Model Security"] = aiScanConnectors
-            connectors["Browser Extension"] = browserExtensions
-            connectors["Secure Web Networks"] = secureWebNetworks
-        }
-
-        if(isMCPSecurityCategory() || isAgenticSecurityCategory()){
-            connectors["MCP Scan"] = mcpScan
-        }
-
-        if (isDastCategory()) {
+        if(isAgenticSecurityCategory()){
+            if(func.isDemoAccount()){
+                // Argus (Cloud Security) - ONLY these sections (DEMO ONLY)
+                connectors = {
+                    "Agentic Proxies": agenticProxies,
+                    "AI Agent Platforms": aiAgentConnectors,
+                    "AI Model Security": aiScanConnectors,
+                    "MCP": mcpScan,
+                    "Kubernetes": kubernetes,
+                    "API Gateways": apiGateways,
+                    "AWS Services": awsServices,
+                    "GCP Services": gcpServices,
+                    "Azure Services": azureServices,
+                    "Manual": manual,
+                    "Virtual Machines": vm,
+                    "Akto SDK": aktoSdk,
+                }
+            } else {
+                // Non-demo accounts: original Agentic Security structure
+                connectors["AI Agent Scan"] = agenticProxies
+                connectors["AI Agent Security"] = [
+                    awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj,
+                    ibmWatsonxObj, customAgentObj, agenticShieldObj,  // Include agenticShieldObj for non-demo
+                    n8nImportObj, langchainImportObj, copilotStudioImportObj
+                ]
+                connectors["AI Model Security"] = aiScanConnectors
+                connectors["Browser Extension"] = browserExtensions
+                connectors["Secure Web Networks"] = secureWebNetworks
+                connectors["MCP Scan"] = [mcpScanObj, mcpReconObj, mcpProxyObj, mcpGateway, mcpWrapperObj]
+            }
+        } else if (isDastCategory()) {
             connectors["DAST"] = crawler
-        }
-
-        connectors = {
-            "Hybrid SaaS": hybridSaas,
-            ...connectors,
-            "Kubernetes": kubernetes,
-            "API Gateways": apiGateways,
-            "Mirroring": mirroring,
-            "AWS Services": awsServices,
-            "GCP Services": gcpServices,
-            "Azure Services": azureServices,
-            "Manual": manual,
-            "Akto SDK": aktoSdk,
-            "Virtual Machines": vm,
-            "Source Code": sourceCode,
+        } else if(isEndpointSecurityCategory()){
+            // Atlas (Akto Atlas - Endpoint Security) - DEMO ONLY
+            connectors = {
+                "Endpoint Agents": endpointAgents,
+                "Agentic Proxies": agenticProxies,
+                "Browser Extension": browserExtensions,
+                "Secure Web Networks": secureWebNetworks,
+            };
+        } else {
+            // API Security - all categories
+            connectors = {
+                "Hybrid SaaS": hybridSaas,
+                ...connectors,
+                "Kubernetes": kubernetes,
+                "API Gateways": apiGateways,
+                "Mirroring": mirroring,
+                "AWS Services": awsServices,
+                "GCP Services": gcpServices,
+                "Azure Services": azureServices,
+                "Manual": manual,
+                "Akto SDK": aktoSdk,
+                "Virtual Machines": vm,
+                "Source Code": sourceCode,
+            }
         }
 
         return connectors;
@@ -1532,13 +1636,13 @@ const quickStartFunc = {
     getConnectorsList: function () {
 
         if(func.checkLocal() || func.isLimitedAccount()){
-            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj]
+            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj]
         }
 
         // Combine all categories into connectorsList
         let connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj,
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,
@@ -1548,7 +1652,8 @@ const quickStartFunc = {
         if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj,
-                awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj
+                awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
+                n8nImportObj, langchainImportObj, copilotStudioImportObj
             ])
         }
 

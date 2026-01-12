@@ -6,67 +6,89 @@ import { CellType } from "../../../components/tables/rows/GithubRow";
 import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import PersistStore from "../../../../main/PersistStore";
 import func from "../../../../../util/func";
-import { Badge, IndexFiltersMode } from "@shopify/polaris";
+import { Badge, IndexFiltersMode, Avatar, Box, HorizontalStack, Text } from "@shopify/polaris";
 import dayjs from "dayjs";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
 import { formatActorId } from "../utils/formatUtils";
 import threatDetectionRequests from "../api";
 import { LABELS } from "../constants";
+import IpReputationScore from "./IpReputationScore";
 
 const resourceName = {
   singular: "activity",
   plural: "activities",
 };
 
-const headers = [
-  {
-    text: "Severity",
-    value: "severityComp",
-    title: "Severity",
-  },
-  {
-    text: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"],
-    value: "endpointComp",
-    title: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"],
-  },
-  {
-    text: "Host",
-    value: "host",
-    title: "Host",
-  },
-  {
-    text: "Threat Actor",
-    value: "actorComp",
-    title: "Actor",
-    filterKey: 'actor'
-  },
-  {
-    text: "Filter",
-    value: "filterId",
-    title: "Attack type",
-  },
-  {
-    text: "successfulExploit",
-    value: "successfulComp",
-    title: "Successful Exploit",
-    maxWidth: "90px",
-  },
-  {
-    text: "Collection",
-    value: "apiCollectionName",
-    title: "Collection",
-    maxWidth: "95px",
-    type: CellType.TEXT,
-  },
-  {
-    text: "Discovered",
-    title: "Detected",
-    value: "discoveredTs",
-    type: CellType.TEXT,
-    sortActive: true,
-  },
-];
+const getHeaders = () => {
+  const baseHeaders = [
+    {
+      text: "Severity",
+      value: "severityComp",
+      title: "Severity",
+    },
+    {
+      text: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"],
+      value: "endpointComp",
+      title: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"],
+    },
+    {
+      text: "Host",
+      value: "host",
+      title: "Host",
+    },
+    {
+      text: "Threat Actor",
+      value: "actorComp",
+      title: "Actor",
+      filterKey: 'actor'
+    },
+  ];
+
+  if (func.isDemoAccount()) {
+    baseHeaders.push({
+      text: "Reputation",
+      value: "reputationScore",
+      title: "IP Reputation",
+    });
+  }
+
+  baseHeaders.push(
+    {
+      text: "Filter",
+      value: "filterId",
+      title: "Attack type",
+    },
+    {
+      text: "Compliance",
+      value: "compliance",
+      title: "Compliance",
+      maxWidth: "200px",
+    },
+    {
+      text: "successfulExploit",
+      value: "successfulComp",
+      title: "Successful Exploit",
+      maxWidth: "90px",
+    },
+    {
+      text: "Collection",
+      value: "apiCollectionName",
+      title: "Collection",
+      maxWidth: "95px",
+      type: CellType.TEXT,
+    },
+    {
+      text: "Discovered",
+      title: "Detected",
+      value: "discoveredTs",
+      type: CellType.TEXT,
+      sortActive: true,
+    }
+  );
+
+  return baseHeaders;
+};
 
 const sortOptions = [
   {
@@ -103,7 +125,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const [currentFilters, setCurrentFilters] = useState({})
   const [totalFilteredCount, setTotalFilteredCount] = useState(0)
 
-  const tableTabs = [
+  const baseTabs = [
     {
       content: 'Active',
       onAction: () => { setCurrentTab('active') },
@@ -123,6 +145,18 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       index: 2
     }
   ]
+
+  // Check if AGENT_TRAFFIC_LOGS feature is enabled
+  const hasAgentTrafficLogsAccess = func.checkForFeatureSaas('AGENT_TRAFFIC_LOGS');
+  // Add Training Data tab only for guardrail events and if feature is enabled
+  const tableTabs = label === LABELS.GUARDRAIL && hasAgentTrafficLogsAccess
+    ? [...baseTabs, {
+        content: 'Training Data',
+        onAction: () => { setCurrentTab('training'); },
+        id: 'training',
+        index: 3
+      }]
+    : baseTabs
 
   const handleSelectedTab = (selectedIndex) => {
     setLoading(true)
@@ -164,7 +198,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       ignore: { ing: 'ignoring', ed: 'ignored' },
       delete: { ing: 'deleting', ed: 'deleted' },
       markForReview: { ing: 'marking for review', ed: 'marked for review' },
-      removeFromReview: { ing: 'removing from review', ed: 'removed from review' }
+      removeFromReview: { ing: 'removing from review', ed: 'removed from review' },
+      markForTraining: { ing: 'marking for training', ed: 'marked for training' }
     };
 
     const label = actionLabels[operation];
@@ -212,7 +247,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       ignore: { ing: 'ignoring', ed: 'ignored' },
       delete: { ing: 'deleting', ed: 'deleted' },
       markForReview: { ing: 'marking for review', ed: 'marked for review' },
-      removeFromReview: { ing: 'removing from review', ed: 'removed from review' }
+      removeFromReview: { ing: 'removing from review', ed: 'removed from review' },
+      markForTraining: { ing: 'marking for training', ed: 'marked for training' }
     };
 
     const label = actionLabels[operation];
@@ -280,12 +316,24 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const handleBulkDelete = (selectedIds) => handleBulkOperation(selectedIds, 'delete');
   const handleBulkMarkForReview = (selectedIds) => handleBulkOperation(selectedIds, 'markForReview', 'UNDER_REVIEW');
   const handleBulkRemoveFromReview = (selectedIds) => handleBulkOperation(selectedIds, 'removeFromReview', 'ACTIVE');
+  const handleBulkMarkForTraining = async (selectedIds) => {
+    if (!hasAgentTrafficLogsAccess) return;
+    // Execute the bulk operation - backend will handle calling agent-traffic-analyzer
+    await handleBulkOperation(selectedIds, 'markForTraining', 'TRAINING');
+  };
 
   // Simplified filtered operation handlers
   const handleIgnoreAllFiltered = () => handleFilteredOperation('ignore', 'IGNORED');
   const handleDeleteAllFiltered = () => handleFilteredOperation('delete');
   const handleMarkAllFilteredForReview = () => handleFilteredOperation('markForReview', 'UNDER_REVIEW');
   const handleRemoveAllFilteredFromReview = () => handleFilteredOperation('removeFromReview', 'ACTIVE');
+  const handleMarkAllFilteredForTraining = async () => {
+    if (!hasAgentTrafficLogsAccess) {
+      return;
+    }
+    // Execute the filtered operation
+    await handleFilteredOperation('markForTraining', 'TRAINING');
+  };
 
 
   const promotedBulkActions = (selectedIds) => {
@@ -330,7 +378,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
               ignore: handleIgnoreAllFiltered,
               removeFromReview: handleRemoveAllFilteredFromReview,
               reactivate: handleRemoveAllFilteredFromReview,
-              delete: handleDeleteAllFiltered
+              delete: handleDeleteAllFiltered,
+              markForTraining: handleMarkAllFilteredForTraining
             };
             func.showConfirmationModal(message, label, handlers[actionType]);
           } else {
@@ -344,7 +393,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
               ignore: () => handleBulkIgnore(selectedIds),
               removeFromReview: () => handleBulkRemoveFromReview(selectedIds),
               reactivate: () => handleBulkRemoveFromReview(selectedIds),
-              delete: () => handleBulkDelete(selectedIds)
+              delete: () => handleBulkDelete(selectedIds),
+              markForTraining: () => handleBulkMarkForTraining(selectedIds)
             };
             func.showConfirmationModal(message, label, handlers[actionType]);
           }
@@ -356,14 +406,20 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     const tabActions = {
       'active': [
         { label: 'Mark for Review', type: 'markForReview' },
-        { label: 'Ignore', type: 'ignore', validationType: 'ignore', warning: true }
+        { label: 'Ignore', type: 'ignore', validationType: 'ignore', warning: true },
+        ...(label === LABELS.GUARDRAIL && hasAgentTrafficLogsAccess ? [{ label: 'Mark for Training', type: 'markForTraining' }] : [])
       ],
       'under_review': [
         { label: 'Remove from Review', type: 'removeFromReview' },
-        { label: 'Ignore', type: 'ignore', validationType: 'ignore', warning: true }
+        { label: 'Ignore', type: 'ignore', validationType: 'ignore', warning: true },
+        ...(label === LABELS.GUARDRAIL && hasAgentTrafficLogsAccess ? [{ label: 'Mark for Training', type: 'markForTraining' }] : [])
       ],
       'ignored': [
-        { label: 'Reactivate', type: 'reactivate' }
+        { label: 'Reactivate', type: 'reactivate' },
+        ...(label === LABELS.GUARDRAIL && hasAgentTrafficLogsAccess ? [{ label: 'Mark for Training', type: 'markForTraining' }] : [])
+      ],
+      'training': [
+        // No actions for training data - training data cannot be removed
       ]
     };
 
@@ -379,7 +435,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     return actions;
   };
 
-
+  const limit = 50;
 
   async function fetchData(
     sortKey,
@@ -444,7 +500,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       startTimestamp,
       endTimestamp,
       latestAttack,
-      50,
+      limit,
       currentTab.toUpperCase(),
       successfulBool,
       label, // Use the label prop (THREAT or GUARDRAIL)
@@ -458,8 +514,11 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     let total = res.total;
     let ret = res?.maliciousEvents.map((x) => {
       const severity = threatFiltersMap[x?.filterId]?.severity || "HIGH"
-      
-      // Build nextUrl for table navigation (similar to prepareTestRunResult)
+
+      const filterTemplate = threatFiltersMap[x?.filterId];
+      const complianceMap = filterTemplate?.compliance?.mapComplianceToListClauses || {};
+      const complianceList = Object.keys(complianceMap);
+
       let nextUrl = null;
       if (x.refId && x.eventType && x.actor && x.filterId) {
         const params = new URLSearchParams();
@@ -473,17 +532,17 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         nextUrl = `${location.pathname}?${params.toString()}`;
       }
       
-      return {
+      const rowData = {
         ...x,
         id: x.id,
         actorComp: formatActorId(x.actor),
         host: x.host || "-",
         endpointComp: (
-          <GetPrettifyEndpoint 
-            maxWidth="300px" 
+          <GetPrettifyEndpoint
+            maxWidth="300px"
             method={x.method}
-            url={x.url} 
-            isNew={false} 
+            url={x.url}
+            isNew={false}
           />
         ),
         apiCollectionName: collectionsMap[x.apiCollectionId] || "-",
@@ -497,8 +556,31 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
                           <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                       </div>
         ),
+        compliance: complianceList.length > 0 ? (
+          <HorizontalStack wrap={false} gap={1}>
+            {complianceList.slice(0, 2).map((complianceName, idx) =>
+              <Avatar
+                key={idx}
+                source={func.getComplianceIcon(complianceName)}
+                shape="square"
+                size="extraSmall"
+              />
+            )}
+            {complianceList.length > 2 && (
+              <Box>
+                <Badge size="extraSmall">+{complianceList.length - 2}</Badge>
+              </Box>
+            )}
+          </HorizontalStack>
+        ) : <Text color="subdued">-</Text>,
         nextUrl: nextUrl
       };
+
+      if (func.isDemoAccount()) {
+        rowData.reputationScore = <IpReputationScore ipAddress={x.actor} />;
+      }
+
+      return rowData;
     });
     setLoading(false);
     return { value: ret, total: total };
@@ -592,11 +674,13 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   }
 
   const key = startTimestamp + endTimestamp;
+  const headers = getHeaders();
+
   return (
     <GithubServerTable
       key={key}
       onRowClick={(data) => rowClicked(data)}
-      pageLimit={50}
+      pageLimit={limit}
       headers={headers}
       resourceName={resourceName}
       sortOptions={sortOptions}

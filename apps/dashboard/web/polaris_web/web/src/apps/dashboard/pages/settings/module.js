@@ -295,6 +295,27 @@ const settingFunctions = {
       })
       return trafficData
     },
+    fetchAdxIntegration: async function(){
+      let adxInteg = {}
+      await settingRequests.fetchAdxIntegration().then((resp)=>{
+        adxInteg = resp.adxIntegration
+      })
+      return adxInteg
+    },
+    addAdxIntegration: async function(clusterEndpoint, databaseName, tenantId, applicationClientId, applicationKey) {
+        let trafficData = {}
+        await settingRequests.addAdxIntegration(clusterEndpoint, databaseName, tenantId, applicationClientId, applicationKey).then((resp)=>{
+            trafficData = resp
+        })
+        return trafficData
+    },
+    removeAdxIntegration: async function() {
+      let trafficData = {}
+      await settingRequests.removeAdxIntegration().then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
     fetchServiceNowIntegration: async function(){
       let serviceNowInteg = {}
       await settingRequests.fetchServiceNowIntegration().then((resp)=>{
@@ -319,6 +340,34 @@ const settingFunctions = {
     removeServiceNowIntegration: async function() {
       let trafficData = {}
       await settingRequests.removeServiceNowIntegration().then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
+    fetchDevRevIntegration: async function(){
+      let devRevInteg = {}
+      await settingRequests.fetchDevRevIntegration().then((resp)=>{
+        devRevInteg = resp.devrevIntegration
+      })
+      return devRevInteg
+    },
+    fetchDevRevParts: async function(personalAccessToken, partTypes, partName) {
+      let parts = {}
+      await settingRequests.fetchDevRevParts(personalAccessToken, partTypes, partName).then((resp)=>{
+        parts = resp.partsIdToNameMap
+      })
+      return parts
+    },
+    addDevRevIntegration: async function(orgUrl, personalAccessToken, partsMap) {
+      let trafficData = {}
+      await settingRequests.addDevRevIntegration(orgUrl, personalAccessToken, partsMap).then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
+    removeDevRevIntegration: async function() {
+      let trafficData = {}
+      await settingRequests.removeDevRevIntegration().then((resp)=>{
         trafficData = resp
       })
       return trafficData

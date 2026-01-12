@@ -281,7 +281,7 @@ function EndpointShieldMetadataDemo() {
 
     const mcpServersHeaders = [
         createSimpleHeader("Server Name", "serverName"),
-        createSimpleHeader("Server URL", "serverUrl"),
+        createSimpleHeader("Endpoint / Command", "serverUrl"),
         createSimpleHeader("Last Seen", "lastSeenFormatted")
     ];
 

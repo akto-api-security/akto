@@ -22,11 +22,6 @@
         <!-- https://mvnrepository.com/artifact/junit/junit -->
         <dependency>
             <groupId>io.grpc</groupId>
-            <artifactId>grpc-netty-shaded</artifactId>
-            <version>1.68.1</version>
-        </dependency>
-        <dependency>
-            <groupId>io.grpc</groupId>
             <artifactId>grpc-core</artifactId>
             <version>${grpc.version}</version>
         </dependency>
@@ -48,7 +43,7 @@
         <dependency>
             <groupId>com.google.protobuf</groupId>
             <artifactId>protobuf-java</artifactId>
-            <version>4.29.2</version>
+            <version>4.29.3</version>
         </dependency>
         <dependency>
             <groupId>com.google.protobuf</groupId>

@@ -77,7 +77,7 @@
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-servlets</artifactId>
-            <version>9.4.57.v20241219</version>
+            <version>9.4.58.v20250814</version>
         </dependency>
         <dependency>
             <groupId>javax.servlet</groupId>
@@ -173,7 +173,7 @@
         <dependency>
             <groupId>com.sendgrid</groupId>
             <artifactId>sendgrid-java</artifactId>
-            <version>4.7.6</version>
+            <version>4.10.3</version>
         </dependency>
         <dependency>
             <groupId>com.twilio.sdk</groupId>
@@ -184,27 +184,6 @@
             <groupId>com.fasterxml.jackson.dataformat</groupId>
             <artifactId>jackson-dataformat-yaml</artifactId>
             <version>2.15.0</version>
-        </dependency>
-        <!--   clean html     -->
-        <dependency>
-            <groupId>com.googlecode.owasp-java-html-sanitizer</groupId>
-            <artifactId>owasp-java-html-sanitizer</artifactId>
-            <version>20211018.2</version>
-        </dependency>
-        <dependency>
-            <groupId>com.google.api-client</groupId>
-            <artifactId>google-api-client</artifactId>
-            <version>1.23.0</version>
-        </dependency>
-        <dependency>
-            <groupId>com.google.apis</groupId>
-            <artifactId>google-api-services-sheets</artifactId>
-            <version>v4-rev493-1.23.0</version>
-        </dependency>
-        <dependency>
-            <groupId>com.google.apis</groupId>
-            <artifactId>google-api-services-drive</artifactId>
-            <version>v3-rev197-1.25.0</version>
         </dependency>
         <dependency>
             <groupId>io.micrometer</groupId>
@@ -259,7 +238,7 @@
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>wafv2</artifactId>
-            <version>2.32.26</version> <!-- Use latest version -->
+            <version>2.40.9</version> <!-- Use latest version -->
         </dependency>
     </dependencies>
     <build>
@@ -293,7 +272,7 @@
             <plugin>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-maven-plugin</artifactId>
-                <version>9.4.57.v20241219</version>
+                <version>9.4.58.v20250814</version>
                 <configuration>
                     <webAppSourceDirectory>web</webAppSourceDirectory>
                     <webApp>

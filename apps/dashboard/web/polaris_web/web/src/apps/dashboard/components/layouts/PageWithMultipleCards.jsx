@@ -1,6 +1,7 @@
 import {  HorizontalStack,  Page, VerticalStack } from "@shopify/polaris";
 import { useNavigate, useLocation } from "react-router-dom";
 import { learnMoreObject } from "../../../main/onboardingData"
+import { getDashboardCategory, isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../main/labelHelper"
 import LearnPopoverComponent from "./LearnPopoverComponent";
 import func from  "@/util/func"
 import { useEffect, useRef } from "react";
@@ -60,9 +61,11 @@ const PageWithMultipleCards = (props) => {
 
     const learnMoreObj = learnMoreObject.hasOwnProperty(func.transformString(location.pathname)) ? learnMoreObject[func.transformString(location.pathname)] : null
 
+    const showLearnButton = learnMoreObj && !isAgenticSecurityCategory() && !isEndpointSecurityCategory()
+
     const learnMoreComp = (
-        learnMoreObj ?
-        <LearnPopoverComponent learnMoreObj={learnMoreObj} /> : null
+        showLearnButton ?
+            <LearnPopoverComponent learnMoreObj={learnMoreObj} /> : null
     )
 
     const useSecondaryActions = (
@@ -81,8 +84,9 @@ const PageWithMultipleCards = (props) => {
             divider={divider}
         >
             <VerticalStack gap="4">
-                {components?.filter((component) => {
-                    return component
+                {components?.map((component, index) => {
+                    // If component already has a key, return as is, otherwise add index-based key
+                    return component;
                 })}
             </VerticalStack>
         </Page>

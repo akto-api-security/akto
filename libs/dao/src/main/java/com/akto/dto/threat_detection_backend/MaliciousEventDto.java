@@ -28,6 +28,7 @@ public class MaliciousEventDto {
   private Label label;
   private String host;
   private String jiraTicketUrl;
+  private String contextSource;
 
   public enum EventType {
     SINGLE,
@@ -37,7 +38,8 @@ public class MaliciousEventDto {
   public enum Status {
     ACTIVE,
     UNDER_REVIEW,
-    IGNORED
+    IGNORED,
+    TRAINING
   }
 
   public enum Label {
@@ -70,6 +72,7 @@ public class MaliciousEventDto {
     this.host = builder.host;
     this.metadata = builder.metadata;
     this.jiraTicketUrl = builder.jiraTicketUrl;
+    this.contextSource = builder.contextSource;
   }
 
   public static class Builder {
@@ -94,6 +97,7 @@ public class MaliciousEventDto {
     private Label label;
     private String host;
     private String jiraTicketUrl;
+    private String contextSource;
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
       return this;
@@ -196,6 +200,11 @@ public class MaliciousEventDto {
 
     public Builder setJiraTicketUrl(String jiraTicketUrl) {
       this.jiraTicketUrl = jiraTicketUrl;
+      return this;
+    }
+
+    public Builder setContextSource(String contextSource) {
+      this.contextSource = contextSource;
       return this;
     }
 
@@ -382,6 +391,14 @@ public class MaliciousEventDto {
 
   public void setJiraTicketUrl(String jiraTicketUrl) {
     this.jiraTicketUrl = jiraTicketUrl;
+  }
+
+  public String getContextSource() {
+    return contextSource;
+  }
+
+  public void setContextSource(String contextSource) {
+    this.contextSource = contextSource;
   }
 
 }

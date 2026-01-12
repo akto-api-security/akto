@@ -815,6 +815,13 @@ export default {
             data: {apiCollectionId, url, method}
         })
     },
+    async bulkDeMergeApis(apiInfoKeyList){
+        return await request({
+            url: '/api/bulkDeMergeApis',
+            method: 'post',
+            data: {apiInfoKeyList}
+        })
+    },
     async getUserEndpoints(){
         return await request({
             url: '/api/getCustomerEndpoints',
@@ -979,6 +986,13 @@ export default {
             }
         })
         return resp
+    },
+
+    getAllIconsCache(){
+        return request({
+            url: '/api/getAllIconsCache',
+            method: 'get'
+        })
     }
 
 }

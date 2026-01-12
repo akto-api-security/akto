@@ -6,6 +6,7 @@ import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiAccessType;
+import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
@@ -97,6 +98,22 @@ public class Utils {
         return stringList;
     }
 
+    public static String extractHostHeader(HttpResponseParams responseParam) {
+        String host = "";
+        if (responseParam == null || responseParam.getRequestParams() == null) {
+            return host;
+        }
+        Map<String, List<String>> requestHeaders = responseParam.getRequestParams().getHeaders();
+        if (requestHeaders == null) {
+            return host;
+        }
+        List<String> hostValues = requestHeaders.get("host");
+        if (hostValues != null && !hostValues.isEmpty()) {
+            host = hostValues.get(0);
+        }
+        return host;
+    }
+
     public static List<String> extractRegex(String payload, String regex) {
         List<String> matches = new ArrayList<>();
         Pattern pattern = Pattern.compile(regex);
@@ -164,9 +181,26 @@ public class Utils {
         return data;
     }
 
+    private static Object parseNumericString(Object data) {
+        if (!(data instanceof String)) {
+            return data;
+        }
+        String dataStr = (String) data;
+        try {
+            return Integer.parseInt(dataStr);
+        } catch (NumberFormatException e) {
+            try {
+                return Double.parseDouble(dataStr);
+            } catch (NumberFormatException e2) {
+                return data;
+            }
+        }
+    }
+
     public static Boolean applyIneqalityOperation(Object data, Object querySet, String operator) {
         Boolean result = false;
         try {
+            data = parseNumericString(data);
             if (data instanceof Integer) {
                 List<Integer> queryList = (List) querySet;
                 if (queryList == null || queryList.size() == 0) {

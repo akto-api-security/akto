@@ -61,6 +61,7 @@ import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 
 import lombok.Getter;
+import lombok.Setter;
 
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
@@ -98,6 +99,8 @@ public class SaveTestEditorAction extends UserAction {
     private HashMap<String, Integer> testCountMap;
     private String testingRunPlaygroundHexId;
     private State testingRunPlaygroundStatus;
+    @Getter @Setter
+    private String testRoleId;
 
     public String fetchTestingRunResultFromTestingRun() {
         if (testingRunHexId == null) {
@@ -140,6 +143,7 @@ public class SaveTestEditorAction extends UserAction {
             ObjectMapper mapper = new ObjectMapper(YAMLFactory.builder()
             .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
             .disable(YAMLGenerator.Feature.SPLIT_LINES)
+            .enable(YAMLGenerator.Feature.ALWAYS_QUOTE_NUMBERS_AS_STRINGS)
             .build());
             mapper.findAndRegisterModules();
             Map<String, Object> config = mapper.readValue(content, Map.class);
@@ -371,6 +375,7 @@ public class SaveTestEditorAction extends UserAction {
         int lastSampleIndex = sampleDataList.get(0).getSamples().size() - 1;
         
         TestingRunConfig testingRunConfig = new TestingRunConfig();
+        testingRunConfig.setTestRoleId(testRoleId);
         List<String> samples = testingUtil.getSampleMessages().get(infoKey);
         TestingRunResult testingRunResult = Utils.generateFailedRunResultForMessage(null, infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory(), null,samples , null);
         if(testingRunResult == null){

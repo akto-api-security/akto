@@ -10,15 +10,26 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.mongodb.BasicDBObject;
 
+import org.apache.commons.fileupload.FileItemIterator;
+import org.apache.commons.fileupload.FileItemStream;
+import org.apache.commons.fileupload.FileUpload;
+import org.apache.commons.fileupload.RequestContext;
+import org.apache.commons.fileupload.util.Streams;
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.xml.sax.InputSource;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -34,9 +45,11 @@ import static com.akto.dto.OriginalHttpRequest.*;
 public class HttpRequestResponseUtils {
 
     private final static ObjectMapper mapper = new ObjectMapper();
+    private static final Logger logger = LoggerFactory.getLogger(HttpRequestResponseUtils.class);
 
     public static final String FORM_URL_ENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
     public static final String GRPC_CONTENT_TYPE = "application/grpc";
+    public static final String MULTIPART_FORM_DATA_CONTENT_TYPE = "multipart/form-data";
     public static final String TEXT_EVENT_STREAM_CONTENT_TYPE = "text/event-stream";
     public static final String CONTENT_TYPE = "CONTENT-TYPE";
     public static final String APPLICATION_JSON = "application/json";
@@ -99,6 +112,12 @@ public class HttpRequestResponseUtils {
                 return convertFormUrlEncodedToJson(rawRequest);
             } else if (acceptableContentType.equals(GRPC_CONTENT_TYPE)) {
                 return convertGRPCEncodedToJson(rawRequest);
+            } else if (acceptableContentType.equals(MULTIPART_FORM_DATA_CONTENT_TYPE)) {
+                // For multipart, we need the full header value with boundary parameter
+                // getAcceptableContentType() returns only the constant, so get the actual header value
+                String contentTypeHeader = getHeaderValue(requestHeaders, CONTENT_TYPE);
+                String boundary = extractBoundary(contentTypeHeader);
+                return convertMultipartToJson(rawRequest, boundary);
             } else if (acceptableContentType.contains(XML) || acceptableContentType.contains(SOAP) ) {
                 return convertXmlToJson(rawRequest);
             }
@@ -234,7 +253,7 @@ public class HttpRequestResponseUtils {
     }
     
     public static String getAcceptableContentType(Map<String,List<String>> headers) {
-        List<String> acceptableContentTypes = Arrays.asList(JSON_CONTENT_TYPE, FORM_URL_ENCODED_CONTENT_TYPE, GRPC_CONTENT_TYPE, XML, SOAP);
+        List<String> acceptableContentTypes = Arrays.asList(JSON_CONTENT_TYPE, FORM_URL_ENCODED_CONTENT_TYPE, GRPC_CONTENT_TYPE, MULTIPART_FORM_DATA_CONTENT_TYPE, XML, SOAP);
         List<String> contentTypeValues;
         if (headers == null) return null;
         contentTypeValues = headers.get("content-type");
@@ -251,12 +270,20 @@ public class HttpRequestResponseUtils {
     }
     
     public static String convertFormUrlEncodedToJson(String rawRequest) {
+        // Check if the input looks like form-encoded data
+        // Form-encoded data should contain '=' and typically contains '&' or at least one key-value pair
+        if (rawRequest == null || rawRequest.trim().isEmpty() || !rawRequest.contains("=")) {
+            return rawRequest;
+        }
+
         String myStringDecoded = null;
         try {
             myStringDecoded = URLDecoder.decode(rawRequest, "UTF-8");
         } catch (Exception e) {
-            return null;
+            // If decoding fails, return the original string
+            return rawRequest;
         }
+
         String[] parts = myStringDecoded.split("&");
         Map<String,String> valueMap = new HashMap<>();
 
@@ -266,10 +293,17 @@ public class HttpRequestResponseUtils {
                 valueMap.put(keyVal[0], keyVal[1]);
             }
         }
+
+        // If no valid key-value pairs were found, return the original string
+        if (valueMap.isEmpty()) {
+            return rawRequest;
+        }
+
         try {
             return mapper.writeValueAsString(valueMap);
         } catch (Exception e) {
-            return null;
+            // If JSON serialization fails, return the original string
+            return rawRequest;
         }
     }
 
@@ -285,7 +319,7 @@ public class HttpRequestResponseUtils {
                 String tmp = encode(key) + "=" + encode(String.valueOf(jsonObject.get(key))) + "&";
                 formUrlEncoded.append(tmp);
             } catch (Exception e) {
-                e.printStackTrace();
+                logger.error("Error encoding form URL parameter: " + key, e);
             }
         }
 
@@ -303,7 +337,7 @@ public class HttpRequestResponseUtils {
          * Ref: https://www.w3.org/TR/html401/interact/forms.html#h-17.13.4.1
          */
 
-        return URLEncoder.encode(s, java.nio.charset.StandardCharsets.UTF_8.name());
+        return URLEncoder.encode(s, StandardCharsets.UTF_8.name());
                 // .replaceAll("\\+", "%20")
                 // .replaceAll("\\%21", "!")
                 // .replaceAll("\\%27", "'")
@@ -329,7 +363,7 @@ public class HttpRequestResponseUtils {
                         decryptedMap.put("type", GlobalEnums.ENCODING_TYPE.JWT.name());
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    logger.error("Error decoding JWT payload", e);
                 }
             }
             decryptedMap.put("payload", decodedString);
@@ -359,4 +393,190 @@ public class HttpRequestResponseUtils {
 
         return null;
     }
+
+    /**
+     * Extract boundary from Content-Type header
+     * @param contentType Content-Type header value (e.g., "multipart/form-data; boundary=----WebKitFormBoundary...")
+     * @return boundary string or null if not found
+     */
+    public static String extractBoundary(String contentType) {
+        if (contentType == null) return null;
+        // Parse "multipart/form-data; boundary=----WebKitFormBoundary..."
+        String[] parts = contentType.split(";");
+        for (String part : parts) {
+            part = part.trim();
+            if (part.startsWith("boundary=")) {
+                return part.substring("boundary=".length()).trim();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Convert multipart/form-data body to JSON using Apache Commons FileUpload HIGH-LEVEL API
+     * Uses FileItemIterator which handles ALL parsing internally (headers, boundaries, encoding)
+     * 
+     * @param rawRequest The raw multipart body
+     * @param boundary The boundary string from Content-Type header
+     * @return JSON string representation of the multipart data
+     */
+    public static String convertMultipartToJson(String rawRequest, String boundary) {
+        if (boundary == null || rawRequest == null || rawRequest.isEmpty()) {
+            return rawRequest;
+        }
+
+        try {
+            Map<String, Object> result = new LinkedHashMap<>();
+            
+            // Use Apache Commons FileUpload's HIGH-LEVEL API - FileItemIterator
+            // This handles ALL parsing: boundaries, headers, Content-Disposition, encoding, etc.
+            // IMPORTANT: Use ISO-8859-1 to preserve binary data (rawRequest may contain binary bytes)
+            byte[] bodyBytes = rawRequest.getBytes(StandardCharsets.ISO_8859_1);
+            ByteArrayInputStream inputStream = new ByteArrayInputStream(bodyBytes);
+            
+            // Create FileUpload instance with security limits
+            FileUpload fileUpload = new FileUpload();
+            fileUpload.setHeaderEncoding("UTF-8");
+            
+            // Create a custom RequestContext for our byte array
+            RequestContext ctx = new RequestContext() {
+                @Override
+                public String getCharacterEncoding() {
+                    return "UTF-8";
+                }
+                
+                @Override
+                public String getContentType() {
+                    return "multipart/form-data; boundary=" + boundary;
+                }
+                
+                @Override
+                public int getContentLength() {
+                    return bodyBytes.length;
+                }
+                
+                @Override
+                public InputStream getInputStream() {
+                    return inputStream;
+                }
+            };
+            
+            // Use FileItemIterator - handles ALL parsing automatically!
+            FileItemIterator iterator = fileUpload.getItemIterator(ctx);
+            
+            int partCount = 0;
+            while (iterator.hasNext()) {
+                FileItemStream item = iterator.next();
+                partCount++;
+                
+                // Apache Commons automatically parses field name from Content-Disposition!
+                String fieldName = item.getFieldName();
+                
+                if (item.isFormField()) {
+                    // Regular text field - Apache Commons handles encoding
+                    String value = Streams.asString(item.openStream(), "UTF-8");
+                    result.put(fieldName, value);
+                } else {
+                    // File upload - Apache Commons provides filename and content-type!
+                    Map<String, String> fileObj = new LinkedHashMap<>();
+                    fileObj.put("filename", item.getName());  // Automatically parsed!
+                    fileObj.put("contentType", item.getContentType());  // Automatically parsed!
+                    
+                    // Read file content and Base64 encode
+                    ByteArrayOutputStream output = new ByteArrayOutputStream();
+                    InputStream fileStream = item.openStream();
+                    byte[] buffer = new byte[8192];
+                    int bytesRead;
+                    while ((bytesRead = fileStream.read(buffer)) != -1) {
+                        output.write(buffer, 0, bytesRead);
+                    }
+                    fileObj.put("content", Base64.getEncoder().encodeToString(output.toByteArray()));
+                    
+                    result.put(fieldName, fileObj);
+                }
+            }
+
+            // If no parts were found, return empty JSON
+            if (partCount == 0) {
+                logger.warn("Apache Commons FileUpload found 0 parts in multipart request");
+                return "{}";
+            }
+
+            return mapper.writeValueAsString(result);
+        } catch (Exception e) {
+            logger.error("Error converting multipart to JSON using Apache Commons FileUpload: " + e.getMessage(), e);
+            // No fallback - return empty JSON on error
+            return "{}";
+        }
+    }
+
+    /**
+     * Convert JSON back to multipart/form-data format
+     * IMPORTANT: This returns a String but may contain binary data encoded as ISO-8859-1
+     * to preserve byte values. Use getBytes(StandardCharsets.ISO_8859_1) to get the actual bytes.
+     * 
+     * @param jsonBody JSON string
+     * @param boundary Boundary string to use
+     * @return Multipart formatted string (with binary data preserved as ISO-8859-1)
+     */
+    public static String jsonToMultipart(String jsonBody, String boundary) {
+        if (jsonBody == null || boundary == null) {
+            return jsonBody;
+        }
+
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> fields = mapper.readValue(jsonBody, LinkedHashMap.class);
+            
+            // Use ByteArrayOutputStream to handle binary data properly
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            
+            for (Map.Entry<String, Object> entry : fields.entrySet()) {
+                // Write boundary
+                outputStream.write(("--" + boundary + "\r\n").getBytes(StandardCharsets.UTF_8));
+
+                if (entry.getValue() instanceof Map) {
+                    // File upload - handle binary data
+                    @SuppressWarnings("unchecked")
+                    Map<String, String> fileObj = (Map<String, String>) entry.getValue();
+                    String filename = fileObj.get("filename");
+                    String contentType = fileObj.getOrDefault("contentType", "application/octet-stream");
+                    String base64Content = fileObj.get("content");
+
+                    // Write headers
+                    String headers = "Content-Disposition: form-data; name=\"" + 
+                                   entry.getKey() + "\"; filename=\"" + filename + "\"\r\n" +
+                                   "Content-Type: " + contentType + "\r\n\r\n";
+                    outputStream.write(headers.getBytes(StandardCharsets.UTF_8));
+                    
+                    // Decode base64 and write raw bytes (preserves binary data)
+                    if (base64Content != null && !base64Content.isEmpty()) {
+                        byte[] decodedContent = Base64.getDecoder().decode(base64Content);
+                        outputStream.write(decodedContent);
+                    }
+                } else {
+                    // Text field
+                    String headers = "Content-Disposition: form-data; name=\"" + 
+                                   entry.getKey() + "\"\r\n\r\n";
+                    outputStream.write(headers.getBytes(StandardCharsets.UTF_8));
+                    outputStream.write(entry.getValue().toString().getBytes(StandardCharsets.UTF_8));
+                }
+                
+                // Write CRLF after each part
+                outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
+            }
+
+            // Write final boundary
+            outputStream.write(("--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
+            
+            // Convert to string using ISO-8859-1 to preserve all byte values
+            // This is necessary because the result may contain binary data
+            return outputStream.toString("ISO-8859-1");
+            
+        } catch (Exception e) {
+            logger.error("Error converting JSON to multipart", e);
+            return jsonBody;
+        }
+    }
+
 }

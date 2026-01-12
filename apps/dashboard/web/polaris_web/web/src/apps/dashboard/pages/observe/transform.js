@@ -8,7 +8,7 @@ import { SearchMinor, InfoMinor, LockMinor, ClockMinor, PasskeyMinor, LinkMinor,
 import api from "./api";
 import GetPrettifyEndpoint from "./GetPrettifyEndpoint";
 import ShowListInBadge from "../../components/shared/ShowListInBadge";
-import { getDashboardCategory } from "../../../main/labelHelper";
+import { CATEGORY_ENDPOINT_SECURITY, getDashboardCategory } from "../../../main/labelHelper";
 
 const standardHeaders = [
     'accept', 'accept-ch', 'accept-ch-lifetime', 'accept-charset', 'accept-encoding', 'accept-language', 'accept-patch', 'accept-post', 'accept-ranges', 'access-control-allow-credentials', 'access-control-allow-headers', 'access-control-allow-methods', 'access-control-allow-origin', 'access-control-expose-headers', 'access-control-max-age', 'access-control-request-headers', 'access-control-request-method', 'age', 'allow', 'alt-svc', 'alt-used', 'authorization',
@@ -439,8 +439,8 @@ const transform = {
                 {
                     Object.keys(sortedSeverityInfo).length > 0 ? Object.keys(sortedSeverityInfo).map((key,index)=>{
                         return(
-                            <div className={`badge-wrapper-${key}`}>
-                                <Badge size="small" key={index}>{Math.max(sortedSeverityInfo[key], 0).toString()}</Badge>
+                            <div key={`severity-badge-${key}-${index}`} className={`badge-wrapper-${key}`}>
+                                <Badge size="small">{Math.max(sortedSeverityInfo[key], 0).toString()}</Badge>
                             </div>
                         )
                     }):
@@ -662,7 +662,7 @@ const transform = {
         } catch (error) {
             
         }
-        if(category.includes("MCP") || category.includes("Agentic")){
+        if(category.includes("MCP") || category.includes("Agentic") || category === CATEGORY_ENDPOINT_SECURITY){
             try {
                 const [path, tail = ""] = pathUrl.split(/(?=[?#])/); // keep ? or # in tail
                 const newPath = path

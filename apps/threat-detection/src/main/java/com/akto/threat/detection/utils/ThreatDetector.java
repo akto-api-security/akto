@@ -1,32 +1,34 @@
 package com.akto.threat.detection.utils;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.ahocorasick.trie.Trie;
+import org.json.JSONObject;
 
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.RawApi;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.monitoring.FilterConfig;
+import com.akto.dto.type.KeyTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
+import com.akto.test_editor.Utils;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
+import com.akto.util.Constants;
 import com.client9.libinjection.SQLParse;
+
+import static com.akto.threat_utils.Utils.generateTrie;
 
 public class ThreatDetector {
 
-    private static final String LFI_OS_FILES_DATA = "/lfi-os-files.data";
-    private static final String OS_COMMAND_INJECTION_DATA = "/os-command-injection.data";
-    private static final String SSRF_DATA = "/ssrf.data";
     public static final String LFI_FILTER_ID = "LocalFileInclusionLFIRFI";
+    public static final String USER_AUTH_MISMATCH_FILTER_ID = "UserAuthMismatch";
     public static final String SQL_INJECTION_FILTER_ID = "SQLInjection";
     public static final String OS_COMMAND_INJECTION_FILTER_ID = "OSCommandInjection";
     public static final String SSRF_FILTER_ID = "SSRF";
@@ -37,30 +39,17 @@ public class ThreatDetector {
     private static final LoggerMaker logger = new LoggerMaker(ThreatDetector.class, LogDb.THREAT_DETECTION);
 
     public ThreatDetector() throws Exception {
-        lfiTrie = generateTrie(LFI_OS_FILES_DATA);
-        osCommandInjectionTrie = generateTrie(OS_COMMAND_INJECTION_DATA);
-        ssrfTrie = generateTrie(SSRF_DATA);
-    }
-
-    private Trie generateTrie(String fileName) throws Exception {
-        Trie.TrieBuilder builder = Trie.builder();
-        try (InputStream is = ThreatDetector.class.getResourceAsStream(fileName);
-                BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                line = line.trim();
-                if (line.isEmpty() || line.startsWith("#"))
-                    continue;
-                builder.addKeyword(line);
-            }
-        }
-
-        return builder.build();
+        lfiTrie = generateTrie(Constants.LFI_OS_FILES_DATA);
+        osCommandInjectionTrie = generateTrie(Constants.OS_COMMAND_INJECTION_DATA);
+        ssrfTrie = generateTrie(Constants.SSRF_DATA);
     }
 
     public boolean applyFilter(FilterConfig threatFilter, HttpResponseParams httpResponseParams, RawApi rawApi,
             ApiInfoKey apiInfoKey) {
         try {
+            if(threatFilter.getId().equals(USER_AUTH_MISMATCH_FILTER_ID)){
+                return isUserAuthMismatchThreat(httpResponseParams, rawApi);
+            }
             if (threatFilter.getId().equals(LFI_FILTER_ID)) {
                 return isLFiThreat(httpResponseParams);
             }
@@ -195,6 +184,81 @@ public class ThreatDetector {
         }
 
         return ssrfTrie.containsMatch(httpResponseParams.getRequestParams().getPayload());
+    }
+
+    private static final String USER_ID_URL_REGEX = "/users/([^/]+)";
+
+    public boolean isUserAuthMismatchThreat(HttpResponseParams httpResponseParams, RawApi rawApi) {
+        // Early return if not target account or not successful response
+        if (httpResponseParams.getStatusCode() != 200) {
+            return false;
+        }
+
+        if(!Utils.extractHostHeader(httpResponseParams).equalsIgnoreCase("api.stage.store.ignite.harman.com")){
+            return false;
+        }
+
+        // Extract userId from URL
+        String url = httpResponseParams.getRequestParams().getURL();
+        List<String> matches = Utils.extractRegex(url, USER_ID_URL_REGEX);
+        if (matches.isEmpty()) {
+            return false;
+        }
+        String userId = matches.get(0);
+
+        // Find JWT from request headers
+        String jwt = findJwtFromHeaders(httpResponseParams.getRequestParams().getHeaders());
+        if (jwt == null) {
+            return false;
+        }
+
+        // Extract sub claim from JWT
+        String sub = extractSubFromJwt(jwt);
+        if (sub == null) {
+            return false;
+        }
+
+        // Threat detected if sub doesn't match userId
+        return !sub.contains(userId);
+    }
+
+    private String findJwtFromHeaders(Map<String, List<String>> headers) {
+        if (headers == null) {
+            return null;
+        }
+        for (List<String> values : headers.values()) {
+            for (String value : values) {
+                String token = stripBearerPrefix(value);
+                if (KeyTypes.isJWT(token)) {
+                    return token;
+                }
+            }
+        }
+        return null;
+    }
+
+    private String stripBearerPrefix(String value) {
+        if (value != null && value.toLowerCase().startsWith("bearer ")) {
+            return value.substring(7).trim();
+        }
+        return value;
+    }
+
+    private String extractSubFromJwt(String jwt) {
+        try {
+            String[] parts = jwt.split("\\.");
+            if (parts.length != 3) {
+                return null;
+            }
+            String payload = new String(Base64.getUrlDecoder().decode(parts[1]));
+            JSONObject jsonPayload = new JSONObject(payload);
+            if (!jsonPayload.has("sub")) {
+                return null;
+            }
+            return jsonPayload.getString("sub");
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /**

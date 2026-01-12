@@ -13,6 +13,7 @@ import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.TestingInstanceHeartBeatDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.notifications.CustomWebhooksDao;
+import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
@@ -27,6 +28,7 @@ import com.akto.dto.Setup;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.notifications.CustomWebhook;
+import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.CollectionWiseTestingEndpoints;
 import com.akto.dto.testing.CustomTestingEndpoints;
@@ -96,11 +98,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
-import org.springframework.util.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 public class Main {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.TESTING);
@@ -125,7 +130,7 @@ public class Main {
     }
 
     public static void sendSlackAlertForFailedTest(int accountId, String customMessage){
-        if(StringUtils.hasLength(AKTO_SLACK_WEBHOOK)){
+        if(StringUtils.isNotBlank(AKTO_SLACK_WEBHOOK)){
             try {
                 String slackMessage = "Test failed for accountId: " + accountId + "\n with reason and details: " + customMessage;
                 CustomTextAlert customTextAlert = new CustomTextAlert(slackMessage);
@@ -1045,6 +1050,9 @@ public class Main {
                 testingRun.getHexId(),
                 summaryId.toHexString()
         );
+        // get yaml templates for issues
+        Set<String> testSubCategoryList = apisAffectedCount.keySet();
+        Map<String, YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(Filters.in(Constants.ID, testSubCategoryList), Projections.include(YamlTemplate.INFO)).stream().collect(Collectors.toMap(YamlTemplate::getId, Function.identity()));
 
         SlackAlerts apiTestStatusAlert = new APITestStatusAlert(alertData);
 
@@ -1058,13 +1066,16 @@ public class Main {
 
         // check for webhooks here 
         CustomWebhook customWebhook = CustomWebhooksDao.instance.findOne(
-            Filters.eq(CustomWebhook.WEBHOOK_TYPE, CustomWebhook.WebhookType.GMAIL.toString())
+            Filters.and(
+                Filters.eq(CustomWebhook.WEBHOOK_TYPE, CustomWebhook.WebhookType.GMAIL.toString()),
+                Filters.eq("activeStatus", CustomWebhook.ActiveStatus.ACTIVE.toString())
+            )
         );
 
         if(customWebhook != null && customWebhook.getActiveStatus().equals(CustomWebhook.ActiveStatus.ACTIVE)) {
             try {
                 Mail mail = SendgridEmail.getInstance().buildTestingRunResultsEmail(alertData, customWebhook.getUrl(),customWebhook.getDashboardUrl() + "/dashboard/testing/"
-                + alertData.getViewOnAktoURL() + "#vulnerable" , customWebhook.getQueryParams());
+                + alertData.getViewOnAktoURL() + "#vulnerable" , customWebhook.getQueryParams(), apisAffectedCount,yamlTemplates);
                 loggerMaker.infoAndAddToDb("Sending Gmail alert for TestingRunResultSummary: " + summaryId + " to: " + customWebhook.getUrl());
                 SendgridEmail.getInstance().send(mail);
             } catch (Exception e) {

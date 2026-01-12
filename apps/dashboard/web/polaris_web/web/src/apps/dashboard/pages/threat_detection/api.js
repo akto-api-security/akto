@@ -24,7 +24,7 @@ const threatDetectionRequests = {
         })
     },
 
-    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, latestAttack, limit, statusFilter, successfulExploit, label, hosts, latestApiOrigRegex) {
+    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, latestAttack, limit, statusFilter, successfulExploit, label, hosts, latestApiOrigRegex, method = [], sortBySeverity = false) {
         return request({
             url: '/api/fetchSuspectSampleData',
             method: 'post',
@@ -35,15 +35,17 @@ const threatDetectionRequests = {
                 types: types,
                 apiCollectionIds: apiCollectionIds,
                 sort: sort,
-                startTimestamp: startTimestamp,
-                endTimestamp: endTimestamp,
+                ...(startTimestamp !== undefined && startTimestamp !== null ? { startTimestamp } : {}),
+                ...(endTimestamp !== undefined && endTimestamp !== null ? { endTimestamp } : {}),
                 latestAttack: latestAttack || [],
                 limit: limit || 50,
                 statusFilter: statusFilter,
                 ...(typeof successfulExploit === 'boolean' ? { successfulExploit } : {}),
                 ...(label ? { label } : {}),
                 ...(hosts && hosts.length > 0 ? { hosts } : {}),
-                ...(latestApiOrigRegex ? { latestApiOrigRegex } : {})
+                ...(latestApiOrigRegex ? { latestApiOrigRegex } : {}),
+                method: method,
+                ...(typeof sortBySeverity === 'boolean' ? { sortBySeverity } : {})
             }
         })
     },
@@ -99,6 +101,13 @@ const threatDetectionRequests = {
             url: '/api/modifyThreatConfiguration',
             method: 'post',
             data: { threatConfiguration: data}
+        })
+    },
+    toggleArchivalEnabled(enabled) {
+        return request({
+            url: '/api/toggleArchivalEnabled',
+            method: 'post',
+            data: { enabled: enabled }
         })
     },
     fetchThreatCategoryCount(startTs, endTs) {
@@ -194,6 +203,71 @@ const threatDetectionRequests = {
             url: '/api/fetchThreatTopNData',
             method: 'post',
             data: {startTs, endTs, latestAttack: latestAttack || [], limit}
+        })
+    },
+    exportThreatActivityToAdx(startTimestamp, endTimestamp) {
+        return request({
+            url: '/api/exportGuardrailActivityToAdx',
+            method: 'post',
+            data: {
+                startTimestamp: startTimestamp,
+                endTimestamp: endTimestamp,
+                label: 'THREAT'
+            }
+        })
+    },
+    getAdxExportStatus() {
+        return request({
+            url: '/api/getAdxExportStatus',
+            method: 'post',
+            data: {}
+        })
+    },
+    generateThreatReport(filtersForReport, threatIdsForReport) {
+        return request({
+            url: '/api/generateThreatReport',
+            method: 'post',
+            data: {
+                filtersForReport: filtersForReport,
+                threatIdsForReport: threatIdsForReport
+            }
+        })
+    },
+    getThreatReportFilters(reportId) {
+        return request({
+            url: '/api/getThreatReportFilters',
+            method: 'post',
+            data: {
+                generatedReportId: reportId
+            }
+        })
+    },
+    downloadThreatReportPDF(reportId, organizationName, reportDate, reportUrl, username, firstPollRequest) {
+        return request({
+            url: '/api/downloadThreatReportPDF',
+            method: 'post',
+            data: {
+                reportId: reportId,
+                organizationName: organizationName,
+                reportDate: reportDate,
+                reportUrl: reportUrl,
+                username: username,
+                firstPollRequest: firstPollRequest
+            }
+        })
+    },
+    fetchThreatComplianceInfos() {
+        return request({
+            url: '/api/fetchThreatComplianceInfos',
+            method: 'post',
+            data: {}
+        })
+    },
+    getIpReputationScore(ipAddress) {
+        return request({
+            url: '/api/getIpReputationScore',
+            method: 'post',
+            data: { ipAddress }
         })
     }
 }

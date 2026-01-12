@@ -66,6 +66,7 @@ public class Executor {
         Constants.AGENT_BASE_URL
     );
 
+
     public static void modifyRawApiUsingTestRole(String logId, TestingRunConfig testingRunConfig, RawApi sampleRawApi, ApiInfo.ApiInfoKey apiInfoKey){
         if (testingRunConfig != null && StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
             TestRoles role = fetchOrFindTestRole(testingRunConfig.getTestRoleId(), true);
@@ -151,7 +152,8 @@ public class Executor {
         boolean allowAllCombinations = executionListBuilder.isAllowAllCombinations();
 
         String executionType = node.getChildNodes().get(0).getValues().toString();
-        if (executionType.equals("multiple") || executionType.equals("graph")) {
+        boolean isParallelExecution = executionType.equals("parallel");
+        if (executionType.equals("multiple") || executionType.equals("graph") || isParallelExecution) {
             if (executionType.equals("graph")) {
                 List<ApiInfo.ApiInfoKey> apiInfoKeys = new ArrayList<>();
                 apiInfoKeys.add(apiInfoKey);
@@ -160,7 +162,7 @@ public class Executor {
                 memory.setLogId(logId);
             }
             workflowTest = buildWorkflowGraph(reqNodes, sampleRawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
-            result.add(triggerMultiExecution(workflowTest, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode, debug, testLogs, memory, allowAllCombinations));
+            result.add(triggerMultiExecution(workflowTest, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode, debug, testLogs, memory, allowAllCombinations, isParallelExecution));
             yamlTestResult = new YamlTestResult(result, workflowTest);
             
             return yamlTestResult;
@@ -329,7 +331,7 @@ public class Executor {
         }
 
     public MultiExecTestResult triggerMultiExecution(WorkflowTest workflowTest, AuthMechanism authMechanism,
-        List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey, Map<String, Object> varMap, FilterNode validatorNode, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, boolean allowAllCombinations) {
+        List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey, Map<String, Object> varMap, FilterNode validatorNode, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, boolean allowAllCombinations, boolean isParallelExecution) {
         
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         Graph graph = new Graph();
@@ -337,7 +339,8 @@ public class Executor {
         int id = Context.now();
         List<String> executionOrder = new ArrayList<>();
         WorkflowTestResult workflowTestResult = new WorkflowTestResult(id, workflowTest.getId(), new HashMap<>(), null, null);
-        GraphExecutorRequest graphExecutorRequest = new GraphExecutorRequest(graph, graph.getNode("x1"), workflowTest, null, null, varMap, "conditional", workflowTestResult, new HashMap<>(), executionOrder);
+        String executionType = isParallelExecution ? "parallel" : "conditional";
+        GraphExecutorRequest graphExecutorRequest = new GraphExecutorRequest(graph, graph.getNode("x1"), workflowTest, null, null, varMap, executionType, workflowTestResult, new HashMap<>(), executionOrder);
         GraphExecutorResult graphExecutorResult = apiWorkflowExecutor.init(graphExecutorRequest, debug, testLogs, memory, allowAllCombinations);
         return new MultiExecTestResult(graphExecutorResult.getWorkflowTestResult().getNodeResultMap(), graphExecutorResult.getVulnerable(), Confidence.HIGH, graphExecutorRequest.getExecutionOrder());
     }
@@ -685,8 +688,7 @@ public class Executor {
                     }
                     calculatedAuthParams.add(new HardcodedAuthParam(authParam.getWhere(), key, value, authParam.getShowHeader()));
                 } catch (Exception e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
+                    loggerMaker.errorAndAddToDb(e, "SAMPLE_DATA: Error executing code for auth param: " + key, LogDb.TESTING);
                 }
                 
             }
@@ -762,7 +764,45 @@ public class Executor {
                 if (isMcpRequest) {
                     return new ExecutorSingleOperationResp(false, "DDOS is not supported for MCP requests");
                 }
-                return Operations.addHeader(rawApi, Constants.AKTO_ATTACH_FILE , key.toString());
+                
+                String headerValue;
+                
+                if (key instanceof Map) {
+                    Map<String, Object> fileAttachMap = (Map<String, Object>) key;
+                    if (fileAttachMap.isEmpty()) {
+                        return new ExecutorSingleOperationResp(false, "attach_file: Map cannot be empty");
+                    }
+                    
+                    if (fileAttachMap.size() == 1) {
+                        // Single file: use simple format "fieldName::fileUrl"
+                        Map.Entry<String, Object> entry = fileAttachMap.entrySet().iterator().next();
+                        String fieldName = entry.getKey();
+                        String fileUrl = entry.getValue().toString();
+                        headerValue = fieldName + "::" + fileUrl;
+                    } else {
+                        // Multiple files: use JSON array format [{"field":"name","url":"url"},...]
+                        JSONArray filesArray = new JSONArray();
+                        for (Map.Entry<String, Object> entry : fileAttachMap.entrySet()) {
+                            JSONObject fileObj = new JSONObject();
+                            fileObj.put("field", entry.getKey());
+                            fileObj.put("url", entry.getValue().toString());
+                            filesArray.put(fileObj);
+                        }
+                        headerValue = filesArray.toString();
+                    }
+                } else if (key != null && value != null) {
+                    // YAML format: attach_file: {key: fieldName, value: fileUrl}
+                    String fieldName = key.toString();
+                    String fileUrl = value.toString();
+                    headerValue = fieldName + "::" + fileUrl;
+                } else if (key != null) {
+                    // Legacy format: attach_file: fileUrl (key is the URL, no field name)
+                    headerValue = "file::" + key.toString();
+                } else {
+                    return new ExecutorSingleOperationResp(false, "attach_file: Missing file URL");
+                }
+                
+                return Operations.addHeader(rawApi, Constants.AKTO_ATTACH_FILE , headerValue);
 
             case "modify_header":
                 Object epochVal = Utils.getEpochTime(value);

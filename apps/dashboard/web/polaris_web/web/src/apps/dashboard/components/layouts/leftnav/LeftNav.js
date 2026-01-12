@@ -21,7 +21,7 @@ import func from "@/util/func";
 import Dropdown from "../Dropdown";
 import SessionStore from "../../../../main/SessionStore";
 import IssuesStore from "../../../pages/issues/issuesStore";
-import { CATEGORY_DAST, mapLabel } from "../../../../main/labelHelper";
+import { CATEGORY_AGENTIC_SECURITY, CATEGORY_DAST, CATEGORY_ENDPOINT_SECURITY, mapLabel } from "../../../../main/labelHelper";
 
 export default function LeftNav() {
     const navigate = useNavigate();
@@ -80,6 +80,15 @@ export default function LeftNav() {
             },
             selected: leftNavSelected === "dashboard_reports_compliance",
         })
+        reportsSubNavigationItems.push({
+            label: "Threat",
+            onClick: () => {
+                navigate("/dashboard/reports/threat");
+                handleSelect("dashboard_reports_tthreat");
+                setActive("active");
+            },
+            selected: leftNavSelected === "dashboard_reports_tthreat",
+        })
     }
 
     const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
@@ -99,7 +108,7 @@ export default function LeftNav() {
 
                 ) : null
             },
-            {
+            ...(dashboardCategory !== "Endpoint Security" ? [{
                 label: mapLabel("API Security Posture", dashboardCategory),
                 icon: ReportFilledMinor,
                 onClick: () => {
@@ -109,7 +118,7 @@ export default function LeftNav() {
                 },
                 selected: leftNavSelected === "dashboard_home",
                 key: "2",
-            },
+            }] : []),
             {
                 url: "#",
                 label: (
@@ -144,6 +153,7 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_inventory",
                     },
+                    ...(!(func.isDemoAccount() && (dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security")) ? [
                     {
                         label: "Recent Changes",
                         onClick: () => {
@@ -152,7 +162,7 @@ export default function LeftNav() {
                             setActive("active");
                         },
                         selected: leftNavSelected === "dashboard_observe_changes",
-                    },
+                    }] : []),
                     {
                         label: "Sensitive Data",
                         onClick: () => {
@@ -171,7 +181,7 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_dast_progress"
                     }] : []),
-                    ...((dashboardCategory === "MCP Security" || dashboardCategory === "Agentic Security") ? [{
+                    ...((dashboardCategory === "MCP Security" || dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") ? [{
                         label: "Audit Data",
                         onClick: () => {
                             navigate("/dashboard/observe/audit");
@@ -180,7 +190,7 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_audit",
                     }] : []),
-                    ...((dashboardCategory === "MCP Security" || dashboardCategory === "Agentic Security") ? [{
+                    ...((dashboardCategory === CATEGORY_ENDPOINT_SECURITY || (dashboardCategory === CATEGORY_AGENTIC_SECURITY && !func.isAtlasArgusAccount())) ? [{
                         label: "Endpoint Shield",
                         onClick: () => {
                             navigate("/dashboard/observe/endpoint-shield");
@@ -192,7 +202,7 @@ export default function LeftNav() {
                 ],
                 key: "3",
             },
-            {
+            ...(dashboardCategory !== "Endpoint Security" ? [{
                 url: "#",
                 label: (
                     <Text
@@ -255,8 +265,8 @@ export default function LeftNav() {
                     }
                 ],
                 key: "4",
-            },
-            {
+            }] : []),
+            ...(dashboardCategory !== "Endpoint Security" ? [{
                 url: "#",
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
@@ -291,7 +301,7 @@ export default function LeftNav() {
                     },
                 ],
                 key: "5",
-            },
+            }] : []),
             ...(dashboardCategory === "Agentic Security" && func.isDemoAccount() ? [{
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
@@ -307,7 +317,7 @@ export default function LeftNav() {
                 selected: leftNavSelected === "dashboard_prompt_hardening",
                 key: "prompt_hardening",
             }] : []),
-            {
+            ...(dashboardCategory !== "Endpoint Security" ? [{
                 url: "#",
                 label: (
                     <Text
@@ -333,7 +343,7 @@ export default function LeftNav() {
                 selected: leftNavSelected.includes("_reports"),
                 subNavigationItems: reportsSubNavigationItems,
                 key: "6",
-            },
+            }] : []),
             ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted && dashboardCategory !== CATEGORY_DAST  ?  [{
                     label: (
                         <Text variant="bodyMd" fontWeight="medium">
@@ -350,7 +360,7 @@ export default function LeftNav() {
                     url: "#",
                     key: "7",
                     subNavigationItems: [
-                        ...(dashboardCategory === "API Security" ? [{
+                        ...((dashboardCategory === "API Security" || dashboardCategory === "Endpoint Security") ? [{
                             label: "Dashboard",
                             onClick: () => {
                                 navigate("/dashboard/protection/threat-dashboard");
@@ -388,7 +398,7 @@ export default function LeftNav() {
                             selected:
                                 leftNavSelected === "dashboard_threat_api",
                         },
-                        ...(dashboardCategory === "Agentic Security" ? [{
+                        ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") ? [{
                             label: "Guardrail Policies",
                             onClick: () => {
                                 navigate("/dashboard/guardrails/policies");
@@ -397,7 +407,7 @@ export default function LeftNav() {
                             },
                             selected: leftNavSelected === "dashboard_guardrails_policies",
                             }] : []),
-                        {
+                        ...(dashboardCategory !== "Endpoint Security" ? [{
                             label: "Threat Policies",
                             onClick: () => {
                                 navigate("/dashboard/protection/threat-policy");
@@ -406,7 +416,7 @@ export default function LeftNav() {
                             },
                             selected:
                                 leftNavSelected === "dashboard_threat_policy",
-                        }
+                        }] : [])
                     ],
                 }] : []),
             // ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AI_AGENTS?.isGranted && dashboardCategory === "API Security" ? [{
@@ -505,7 +515,7 @@ export default function LeftNav() {
         const exists = items.find(item => item.key === "quick_start")
         if (!exists) {
             items.splice(1, 0, {
-                label: "Quick Start",
+                label: mapLabel("Quick Start", dashboardCategory),
                 icon: AppsFilledMajor,
                 onClick: () => {
                     handleSelect("dashboard_quick_start")

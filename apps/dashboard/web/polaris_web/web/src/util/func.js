@@ -86,6 +86,17 @@ const func = {
     }
     return res
   },
+  capsSnakeToCamel(str) {
+    if (!str) return str;
+    if (str.includes("_")) {
+      return str
+        .toLowerCase()
+        .split('_')
+        .map((word, index) => index === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1))
+        .join('');
+    }
+    return str;
+  },
   nameValidationFunc(nameVal, initialCond){
     let error = ""
     if(nameVal.length === 0 || initialCond){
@@ -1063,6 +1074,9 @@ parameterizeUrl(x) {
 mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverityMap) {
   const allCollections = PersistStore.getState().allCollections
   const apiGroupsMap = func.mapCollectionIdToName(allCollections.filter(x => x.type === "API_GROUP"))
+  if(Object.keys(idToName).length === 0){
+    idToName = func.mapCollectionIdToName(allCollections)
+  }
 
   let ret = {}
   let apiInfoMap = {}
@@ -1104,9 +1118,11 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
             discoveredTimestamp = x.startTs
           }
           let description = apiInfoMap[key] ? apiInfoMap[key]['description'] : ""
+          let lastSeenTs = Math.max(apiInfoMap[key] ? apiInfoMap[key]["lastSeen"] : (x.startTs > 0 ? x.startTs : 0), (x.startTs > 0 ? x.startTs : 0))
           ret[key] = {
               id: x.method + "###" + x.url + "###" + x.apiCollectionId + "###" + Math.random(),
               shadow: x.shadow ? x.shadow : false,
+              hostName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
               sensitive: x.sensitive,
               tags: x.tags,
               endpoint: x.url,
@@ -1116,8 +1132,8 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
               method: x.method,
               color: x.sensitive && x.sensitive.size > 0 ? "#f44336" : "#00bfa5",
               apiCollectionId: x.apiCollectionId,
-              last_seen: apiInfoMap[key] ? (this.prettifyEpoch(apiInfoMap[key]["lastSeen"])) : this.prettifyEpoch(x.startTs),
-              lastSeenTs: apiInfoMap[key] ? apiInfoMap[key]["lastSeen"] : x.startTs,
+              last_seen: this.prettifyEpoch(lastSeenTs),
+              lastSeenTs: lastSeenTs,
               detectedTs: discoveredTimestamp === 0 ? x.startTs : discoveredTimestamp,
               changesCount: x.changesCount,
               changes: x.changesCount && x.changesCount > 0 ? (x.changesCount +" new parameter"+(x.changesCount > 1? "s": "")) : 'No new changes',
@@ -1141,6 +1157,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
               description: description,
               descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={description} text={description}/></Box>),
               lastTested: apiInfoMap[key] ? apiInfoMap[key]["lastTested"] : 0,
+              isThreatEnabled: apiInfoMap[key] ? apiInfoMap[key]["threatScore"] > 0 : false,
           }
 
       }
@@ -2196,6 +2213,9 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   isDemoAccount(){
      return window.ACTIVE_ACCOUNT === 1669322524
   },
+  isAtlasArgusAccount(){
+    return window.ACTIVE_ACCOUNT === 1669322524 || window.ACTIVE_ACCOUNT === 1767814409 || window.ACTIVE_ACCOUNT === 1767812031
+  },
   isSameDateAsToday (givenDate) {
       const today = new Date();
       return (
@@ -2268,7 +2288,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return defaultLabel
   },
   formatCollectionType(type) {
-    return (type?.keyName?.replace(/^(userSetEnvType|envType)/, 'env')?.slice(0, 30) ?? '') + '=' + (type?.value?.slice(0, 30) ?? '')
+    return (type?.keyName?.replace(/^(userSetEnvType|envType)/, 'env')?.slice(0, 50) ?? '') + '=' + (type?.value?.slice(0, 50) ?? '')
   },
   getRecurringContext(periodInSeconds) {
     if (periodInSeconds === 86400) return "Daily"
@@ -2329,6 +2349,68 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   },
   isLimitedAccount(){
     return window?.ACTIVE_ACCOUNT === 1753372418
+  },
+  /**
+   * Validates if a string is a valid URL with http or https protocol
+   * @param {string} url - The URL string to validate
+   * @returns {boolean} True if valid URL, false otherwise
+   */
+  validateUrl: function(url) {
+    if (!url) return false;
+    const urlPattern = /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/;
+    return urlPattern.test(url);
+  },
+  /**
+   * Find all placeholder positions in a text string (e.g., {}, {var}, {variable})
+   * Returns an array of objects with start, end, and phrase properties for highlighting
+   * @param {string} text - The text to search for placeholders
+   * @returns {Array} Array of placeholder objects with {start, end, phrase}
+   */
+  findPlaceholders: function(text) {
+    if (!text) return [];
+    const placeholders = [];
+    // Find all individual {} pairs, including overlapping ones like {{}}
+    // We search from each position to find the nearest closing brace
+    for (let i = 0; i < text.length; i++) {
+      if (text[i] === '{') {
+        // Find the nearest matching closing brace
+        let depth = 1;
+        for (let j = i + 1; j < text.length && depth > 0; j++) {
+          if (text[j] === '{') {
+            depth++;
+          } else if (text[j] === '}') {
+            depth--;
+            if (depth === 0) {
+              // Found a complete placeholder
+              const placeholder = text.substring(i, j + 1);
+              placeholders.push({
+                start: i,
+                end: j + 1,
+                phrase: placeholder
+              });
+              break; // Found the match for this opening brace, move on
+            }
+          }
+        }
+      }
+    }
+    return placeholders;
+  },
+  /**
+   * Format timestamp for chat messages
+   * @param {number} timestamp - Unix timestamp in seconds
+   * @returns {string} Formatted timestamp string
+   */
+  formatChatTimestamp: (timestamp) => {
+    if (!timestamp) return '';
+    return new Date(timestamp * 1000).toLocaleString('en-US', {
+      month: 'numeric',
+      day: 'numeric',
+      year: '2-digit',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: true
+    });
   }
 }
 

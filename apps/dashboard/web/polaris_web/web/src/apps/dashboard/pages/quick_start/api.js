@@ -170,11 +170,19 @@ const api = {
         })
     },
 
-    initiateCrawler(hostname, username, password, apiKey, dashboardUrl, testRoleHaxId, outscopeUrls) {
+    initiateCrawler(hostname, username, password, apiKey, dashboardUrl, testRoleHaxId, outscopeUrls, crawlingTime, selectedModuleName) {
         return request({
             url: '/api/initiateCrawler',
             method: 'post',
-            data: {hostname, username, password, apiKey, dashboardUrl, testRoleHaxId, outscopeUrls}
+            data: {hostname, username, password, apiKey, dashboardUrl, testRoleHaxId, outscopeUrls, crawlingTime, selectedModuleName}
+        })
+    },
+
+    fetchAvailableDastModules() {
+        return request({
+            url: '/api/fetchAvailableDastModules',
+            method: 'post',
+            data: {}
         })
     },
 
@@ -223,6 +231,19 @@ const api = {
             url: '/api/importImpervaSchema',
             method: 'post',
             data: formData,
+        })
+    },
+
+    initiateAIAgentConnectorImport(connectorType, connectorConfig, dataIngestionUrl, recurringIntervalSeconds) {
+        return request({
+            url: '/api/initiateAIAgentConnectorImport',
+            method: 'post',
+            data: {
+                connectorType,
+                dataIngestionUrl,
+                recurringIntervalSeconds,
+                ...connectorConfig
+            }
         })
     },
 

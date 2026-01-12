@@ -14,6 +14,7 @@ public class HostDNSLookup {
         excludeIPs.add("172.31");
         excludeIPs.add("0.0");
         excludeIPs.add("127.0");
+        excludeIPs.add("169.254");
     }
 
     public static boolean isRequestValid (String host) throws UnknownHostException {

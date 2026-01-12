@@ -57,6 +57,9 @@ function About() {
         noTimeToFix: false,
         acceptableFix: false
     })
+    const [blockLogs, setBlockLogs] = useState(false)
+    const [filterLogPolicy, setFilterLogPolicy] = useState([])
+    const [filterLogPolicyText, setFilterLogPolicyText] = useState('')
 
     const setupOptions = settingFunctions.getSetupOptions()
 
@@ -75,7 +78,7 @@ function About() {
         setNewMerging(resp.urlRegexMatchingEnabled)
         setTrafficThreshold(resp.trafficAlertThresholdSeconds)
         setObjectArr(arr)
-        setEnableTelemetry(resp.telemetrySettings.customerEnabled)
+        setEnableTelemetry(resp.telemetrySettings?.customerEnabled || false)
         if (resp.filterHeaderValueMap)
             setTrafficFiltersMap(resp.filterHeaderValueMap)
 
@@ -90,6 +93,10 @@ function About() {
         if(resp?.compulsoryDescription && Object.keys(resp?.compulsoryDescription).length > 0) {
             setCompulsoryDescription(resp.compulsoryDescription)
         }
+        setBlockLogs(resp.blockLogs || false)
+        const policyList = resp.filterLogPolicy || []
+        setFilterLogPolicy(policyList)
+        setFilterLogPolicyText(policyList.join('\n'))
     }
 
     useEffect(()=>{
@@ -396,6 +403,25 @@ function About() {
         }
     }
 
+    const handleBlockLogsToggle = async (val) => {
+        setBlockLogs(val);
+        await settingRequests.updateBlockLogs(val);
+        func.setToast(true, false, "Block logs setting updated successfully.");
+    }
+
+    const handleFilterLogPolicySave = async () => {
+        try {
+            // Convert text to array by splitting on newlines and filtering empty strings
+            const policyList = filterLogPolicyText.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+            const response = await settingRequests.updateFilterLogPolicy(policyList);
+            setFilterLogPolicy(response);
+            setFilterLogPolicyText(response.join('\n'));
+            func.setToast(true, false, "Filter log policy updated successfully.");
+        } catch (error) {
+            func.setToast(true, true, "Failed to update filter log policy.");
+        }
+    }
+
     const compulsoryDescriptionComponent = (
         <VerticalStack gap={4}>
             <Text variant="headingSm">Compulsory Description Settings</Text>
@@ -416,11 +442,50 @@ function About() {
                     disabled={window.USER_ROLE !== 'ADMIN'}
                 />
                 <Checkbox
-                    label="Acceptable Fix - Require description when marking issues as acceptable fix"
+                    label="Acceptable Risk - Require description when marking issues as acceptable risk"
                     checked={compulsoryDescription.acceptableFix}
                     onChange={(checked) => handleCompulsoryToggle('acceptableFix', checked)}
                     disabled={window.USER_ROLE !== 'ADMIN'}
                 />
+            </VerticalStack>
+        </VerticalStack>
+    )
+
+    const logSettingsComponent = (
+        <VerticalStack gap={4}>
+            <Text variant="headingSm">Log Settings</Text>
+            <Text variant="bodyMd" color="subdued">
+                Configure logging behavior and filtering policies for hybrid modules.
+            </Text>
+            <VerticalStack gap={3}>
+                <ToggleComponent
+                    text="Block logs"
+                    onToggle={handleBlockLogsToggle}
+                    initial={blockLogs}
+                    disabled={window.USER_ROLE !== 'ADMIN'}
+                />
+                <VerticalStack gap={2}>
+                    <Text color="subdued">Filter Log Policy</Text>
+                    <Text variant="bodySm" color="subdued">
+                        Enter one filter pattern per line. Each pattern will be used to filter logs.
+                    </Text>
+                    <HorizontalStack gap={2} align="start">
+                        <Box width="400px">
+                            <TextField
+                                value={filterLogPolicyText}
+                                onChange={setFilterLogPolicyText}
+                                placeholder="Enter filter log policy (one per line)"
+                                disabled={window.USER_ROLE !== 'ADMIN'}
+                                multiline={4}
+                            />
+                        </Box>
+                        {window.USER_ROLE === 'ADMIN' && (
+                            <Button onClick={handleFilterLogPolicySave}>
+                                Save
+                            </Button>
+                        )}
+                    </HorizontalStack>
+                </VerticalStack>
             </VerticalStack>
         </VerticalStack>
     )
@@ -605,6 +670,7 @@ function About() {
                                   <ToggleComponent text={"Enable telemetry"} initial={enableTelemetry} onToggle={toggleTelemetry} />
                                   {redundantUrlComp}
                                   {compulsoryDescriptionComponent}
+                                  {logSettingsComponent}
                                   <VerticalStack gap={1}>
                                       <Text color="subdued">Traffic alert threshold</Text>
                                       <Box width='120px'>
@@ -625,8 +691,11 @@ function About() {
                       </div>
                   </LegacyCard.Section>
                   :<LegacyCard.Section title={<Text variant="headingMd">More settings</Text>}>
+                    <VerticalStack gap={5}>
                     {redundantUrlComp}
                     {compulsoryDescriptionComponent}
+                    {logSettingsComponent}
+                    </VerticalStack>
                   </LegacyCard.Section>
               }
             <LegacyCard.Section subdued>
@@ -660,6 +729,7 @@ function About() {
                             type={"partner"}
                         /> : null,
                         <Modal
+                            key="merging-on-versions-modal"
                             open={modalOpen}
                             onClose={() => setModalOpen(false)}
                             title={mergingOnVersions ? "Do not merge on versions" : "Allow merging on versions"}

@@ -73,6 +73,12 @@ public class ApiInfo {
     public static final String PARENT_MCP_TOOL_NAMES = "parentMcpToolNames";
     private List<String> parentMcpToolNames;
 
+    public static final String DETECTED_BASE_PROMPT = "detectedBasePrompt";
+    private String detectedBasePrompt;
+
+    private float threatScore;
+    public static final String THREAT_SCORE = "threatScore";
+
     public enum ApiType {
         REST, GRAPHQL, GRPC, SOAP
     }
@@ -258,6 +264,7 @@ public class ApiInfo {
         this.isSensitive = that.isSensitive || this.isSensitive;
         this.severityScore = this.severityScore + that.severityScore;
         this.riskScore = Math.max(this.riskScore, that.riskScore);
+        this.threatScore = Math.max(this.threatScore, that.threatScore);
 
         if (that.lastCalculatedTime > this.lastCalculatedTime) {
             this.lastCalculatedTime = that.lastCalculatedTime;
@@ -401,6 +408,22 @@ public class ApiInfo {
         this.id = id;
     }
 
+    public static String getNormalizedUrl(String url) {
+        if (url == null) {
+            return "";
+        }
+        if (url.contains("?")) {
+            url = url.substring(0, url.indexOf("?"));
+        }
+        if (url.contains("#")) {
+            url = url.substring(0, url.indexOf("#"));
+        }
+        if (url.endsWith("/")) {
+            url = url.substring(0, url.length() - 1);
+        }
+        return url;
+    }
+
     public Set<Set<AuthType>> getAllAuthTypesFound() {
         return allAuthTypesFound;
     }
@@ -542,5 +565,21 @@ public class ApiInfo {
 
     public void setParentMcpToolNames(List<String> parentMcpToolNames) {
         this.parentMcpToolNames = parentMcpToolNames;
+    }
+
+    public String getDetectedBasePrompt() {
+        return detectedBasePrompt;
+    }
+
+    public void setDetectedBasePrompt(String detectedBasePrompt) {
+        this.detectedBasePrompt = detectedBasePrompt;
+    }
+
+    public void setThreatScore(float threatScore) {
+        this.threatScore = threatScore;
+    }
+
+    public float getThreatScore() {
+        return threatScore;
     }
 }

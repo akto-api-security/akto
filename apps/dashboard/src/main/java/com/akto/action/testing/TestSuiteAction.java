@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import org.springframework.util.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 public class TestSuiteAction extends UserAction {
     private String testSuiteHexId;
@@ -84,7 +84,7 @@ public class TestSuiteAction extends UserAction {
 
     public String modifyTestSuite() {
 
-        if (!StringUtils.hasText(this.testSuiteHexId)) {
+        if (!StringUtils.isNotBlank(this.testSuiteHexId)) {
             addActionError("Invalid test suite id");
             return ERROR.toUpperCase();
         }
@@ -103,7 +103,7 @@ public class TestSuiteAction extends UserAction {
         }
         
         List<Bson> updates = new ArrayList<>();
-        if (StringUtils.hasText(this.testSuiteName)) {
+        if (StringUtils.isNotBlank(this.testSuiteName)) {
             updates.add(Updates.set(TestSuites.NAME, this.testSuiteName));
         }
 

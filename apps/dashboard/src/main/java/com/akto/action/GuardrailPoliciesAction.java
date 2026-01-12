@@ -7,6 +7,7 @@ import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
@@ -18,7 +19,7 @@ import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+
 
 public class GuardrailPoliciesAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(GuardrailPoliciesAction.class, LogDb.DASHBOARD);
@@ -55,13 +56,21 @@ public class GuardrailPoliciesAction extends UserAction {
         }
     }
 
+
     public String createGuardrailPolicy() {
         try {
             User user = getSUser();
             int currentTime = Context.now();
-            
+
+            // Get current context source for this guardrail, default to ENDPOINT if not set
+            CONTEXT_SOURCE contextSource = Context.contextSource.get();
+            if (contextSource == null) {
+                contextSource = CONTEXT_SOURCE.AGENTIC;
+            }
+
             loggerMaker.info("createGuardrailPolicy called with hexId: " + hexId);
             loggerMaker.info("Policy object received: " + (policy != null ? policy.getName() : "null"));
+            loggerMaker.info("Context source for guardrail: " + contextSource);
 
             // Ensure policy object has required timestamps and user info
             if (hexId != null && !hexId.isEmpty()) {
@@ -99,6 +108,13 @@ public class GuardrailPoliciesAction extends UserAction {
             updates.add(Updates.set("regexPatternsV2", policy.getRegexPatternsV2()));
             updates.add(Updates.set("contentFiltering", policy.getContentFiltering()));
             updates.add(Updates.set("llmRule", policy.getLlmRule()));
+            updates.add(Updates.set("basePromptRule", policy.getBasePromptRule()));
+            updates.add(Updates.set("gibberishDetection", policy.getGibberishDetection()));
+            updates.add(Updates.set("anonymizeDetection", policy.getAnonymizeDetection()));
+            updates.add(Updates.set("banCodeDetection", policy.getBanCodeDetection()));
+            updates.add(Updates.set("secretsDetection", policy.getSecretsDetection()));
+            updates.add(Updates.set("sentimentDetection", policy.getSentimentDetection()));
+            updates.add(Updates.set("tokenLimitDetection", policy.getTokenLimitDetection()));
             updates.add(Updates.set("selectedMcpServers", policy.getSelectedMcpServers()));
             updates.add(Updates.set("selectedAgentServers", policy.getSelectedAgentServers()));
             updates.add(Updates.set("selectedMcpServersV2", policy.getSelectedMcpServersV2()));
@@ -108,7 +124,10 @@ public class GuardrailPoliciesAction extends UserAction {
             updates.add(Updates.set("url", policy.getUrl()));
             updates.add(Updates.set("confidenceScore", policy.getConfidenceScore()));
             updates.add(Updates.set("active", policy.isActive()));
-            
+
+            // Set contextSource from current context
+            updates.add(Updates.set("contextSource", contextSource));
+
             // Only set createdBy and createdTimestamp on insert
             updates.add(Updates.setOnInsert("createdBy", user.getLogin()));
             updates.add(Updates.setOnInsert("createdTimestamp", currentTime));

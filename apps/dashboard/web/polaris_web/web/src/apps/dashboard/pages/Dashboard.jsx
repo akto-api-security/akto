@@ -6,6 +6,7 @@ import { useEffect, useState, useRef} from "react";
 import { Frame, Toast, VerticalStack, Banner, Button, Text } from "@shopify/polaris";
 import "./dashboard.css"
 import func from "@/util/func"
+import values from "@/util/values";
 import transform from "./testing/transform";
 import PersistStore from "../../main/PersistStore";
 import LocalStore, { localStorePersistSync } from "../../main/LocalStorageStore";
@@ -178,7 +179,7 @@ function Dashboard() {
     }
 
     const refreshFunc = () => {
-        if (window.USER_NAME.includes("akto.io")){
+        if (values.DISABLED_AUTO_ACCOUNT_REFRESH.includes(window.ACTIVE_ACCOUNT)){
             return;
         }
         if(document.visibilityState === 'hidden'){
@@ -238,7 +239,7 @@ function Dashboard() {
                         })}
                     </VerticalStack>
             </div> : null}
-            {func.checkLocal() && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || location.pathname.includes("onboarding") || location.pathname.includes("summary")) ?<div className="call-banner" style={{marginBottom: "1rem"}}>
+            {func.checkLocal() && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || location.pathname.includes("onboarding") || location.pathname.includes("summary") || location.pathname.includes("report")) ?<div className="call-banner" style={{marginBottom: "1rem"}}>
                 <Banner hideIcon={true}>
                     <Text variant="headingMd">Need a 1:1 experience?</Text>
                     <Button plain monochrome onClick={() => {

@@ -6,6 +6,7 @@ import func from '@/util/func';
 import DropdownSearch from "../../../components/shared/DropdownSearch";
 import { useSearchParams } from "react-router-dom";
 import { updateThreatFiltersStore } from "../utils/threatFilters";
+import SessionStore from "../../../../main/SessionStore";
 
 function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals, titleText, readOnly = false, validateOnSave, showDelete = false }) {
     const[searchParams] = useSearchParams()
@@ -28,6 +29,37 @@ function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals,
             console.error(`Failed to update SessionStore threat filters: ${e?.message}`);
         }
 
+        try {
+            const complianceResp = await api.fetchThreatComplianceInfos();
+            if (complianceResp?.threatComplianceInfos && Array.isArray(complianceResp.threatComplianceInfos)) {
+                const threatComplianceMap = {};
+                complianceResp.threatComplianceInfos.forEach((compliance) => {
+                    threatComplianceMap[compliance._id] = compliance;
+                });
+
+                const currentThreatFiltersMap = SessionStore.getState().threatFiltersMap || {};
+                const updatedThreatFiltersMap = { ...currentThreatFiltersMap };
+
+                Object.keys(updatedThreatFiltersMap).forEach((filterId) => {
+                    const complianceKey = `threat_compliance/${filterId}.conf`;
+                    const compliance = threatComplianceMap[complianceKey];
+
+                    if (compliance) {
+                        updatedThreatFiltersMap[filterId] = {
+                            ...updatedThreatFiltersMap[filterId],
+                            compliance: {
+                                mapComplianceToListClauses: compliance.mapComplianceToListClauses
+                            }
+                        };
+                    }
+                });
+
+                SessionStore.getState().setThreatFiltersMap(updatedThreatFiltersMap);
+            }
+        } catch (e) {
+            console.error(`Failed to fetch and merge threat compliance: ${e?.message}`);
+        }
+
         return categoryFilteredTemplates
     }
 
@@ -39,8 +71,8 @@ function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals,
             const inc = normalize(includeCategoryNameEquals)
             out = out.filter((t) => getCategory(t) === inc)
         } else if (excludeCategoryNameEquals && excludeCategoryNameEquals.length > 0) {
-            const exc = normalize(excludeCategoryNameEquals)
-            out = out.filter((t) => getCategory(t) !== exc)
+            const excList = excludeCategoryNameEquals.map(normalize)
+            out = out.filter((t) => !excList.includes(getCategory(t)))
         }
         return out
     }

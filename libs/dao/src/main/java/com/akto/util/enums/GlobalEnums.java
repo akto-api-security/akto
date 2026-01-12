@@ -156,11 +156,11 @@ public class GlobalEnums {
     }
 
     public enum TicketSource {
-        JIRA, AZURE_BOARDS, SERVICENOW
+        JIRA, AZURE_BOARDS, SERVICENOW, DEVREV
     }
 
     public enum CONTEXT_SOURCE {
-        API, MCP, GEN_AI, AGENTIC, DAST
+        API, MCP, GEN_AI, AGENTIC, DAST, ENDPOINT
     }
 
     /* ********************************************************************** */

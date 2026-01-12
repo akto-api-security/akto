@@ -34,6 +34,7 @@ const transform = {
                 {urls.map((ele,index)=>{
                 const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
                 const jiraKey = ele?.jiraIssueUrl && ele.jiraIssueUrl.length > 0 ?  /[^/]*$/.exec(ele.jiraIssueUrl)[0] : ""
+                const devrevKey = ele?.devrevWorkUrl && ele.devrevWorkUrl.length > 0 ?  /[^/]*$/.exec(ele.devrevWorkUrl)[0] : ""
                 return(
                     <Box padding={"2"} paddingInlineEnd={"4"} paddingInlineStart={"3"} key={index}
                     borderColor="border-subdued" {...borderStyle}>
@@ -64,10 +65,47 @@ const transform = {
                                         </HorizontalStack>
                                     </Tag>
                                 }
+                                {devrevKey &&
+                                    <Tag>
+                                        <HorizontalStack gap={1}>
+                                            <Avatar size="extraSmall" shape='round' source="/public/devrev-ai.svg" />
+                                            <Link url={ele?.devrevWorkUrl} target="_blank">
+                                                <Text>
+                                                    {devrevKey}
+                                              </Text>
+                                            </Link>
+                                        </HorizontalStack>
+                                    </Tag>
+                                }
                             </HorizontalStack>
                         </HorizontalStack>
                     </Box>
                 )
+                })}
+            </td>
+        </tr>
+        )
+    },
+    getThreatCollapsibleRow(urls, handleThreatClick) {
+        return(
+        <tr style={{background: "#FAFBFB", padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
+            <td colSpan={'100%'} style={{padding: '0px !important'}}>
+                {urls.map((urlObj, index) => {
+                    const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth: 1} : {};
+                    return (
+                        <Box key={index} padding={"2"} paddingInlineEnd={"4"} paddingInlineStart={"3"} borderColor="border-subdued" {...borderStyle}>
+                            <HorizontalStack gap={24} wrap={false}>
+                                <Box paddingInlineStart={10}>
+                                    <IssuesCheckbox id={JSON.stringify({ eventId: urlObj.threatData?.eventId || "" })} />
+                                </Box>
+                                <HorizontalStack gap={"4"}>
+                                    <Link monochrome onClick={() => handleThreatClick(urlObj.threatData)} removeUnderline>
+                                        <Text>{urlObj.method} {urlObj.url}</Text>
+                                    </Link>
+                                </HorizontalStack>
+                            </HorizontalStack>
+                        </Box>
+                    );
                 })}
             </td>
         </tr>
@@ -111,7 +149,8 @@ const transform = {
                         url: `${urlObj.method} ${urlObj.url}`,
                         id: urlObj.id,
                         issueDescription: urlObj.issueDescription,
-                        jiraIssueUrl: urlObj.jiraIssueUrl || ""
+                        jiraIssueUrl: urlObj.jiraIssueUrl || "",
+                        devrevWorkUrl: urlObj.devrevWorkUrl || ""
                     })), isCompliancePage)
                 }
             }))

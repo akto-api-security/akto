@@ -28,6 +28,7 @@ function GithubSimpleTable(props) {
         getActions = {props.getActions}
         hasRowActions={props.hasRowActions}
         loading={props.loading}
+        loadingText={props.loadingText}
         selectable = {props.selectable}
         rowClickable={props.rowClickable}
         promotedBulkActions = {props.promotedBulkActions}

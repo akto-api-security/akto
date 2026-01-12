@@ -1,8 +1,9 @@
-import { Badge, Box, Button, Divider, Frame, HorizontalStack, LegacyTabs, Modal, Text, Tooltip, VerticalStack} from "@shopify/polaris"
-import {ChevronUpMinor } from "@shopify/polaris-icons"
+import { Badge, Box, Button, Divider, Frame, HorizontalStack, LegacyTabs, Modal, Text, Tooltip, VerticalStack } from "@shopify/polaris"
+import { ChevronUpMinor } from "@shopify/polaris-icons"
 
 import { useEffect, useRef, useState } from "react";
 import DropdownSearch from "../../../components/shared/DropdownSearch";
+import TitleWithInfo from "../../../components/shared/TitleWithInfo";
 import api from "../../testing/api"
 import testEditorRequests from "../api";
 import func from "@/util/func";
@@ -47,6 +48,8 @@ const SampleApi = () => {
     const defaultRequest = TestEditorStore(state => state.defaultRequest)
     const selectedSampleApi = PersistStore(state => state.selectedSampleApi)
     const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
+    const selectedRole = TestEditorStore(state => state.selectedRole)
+    const setSelectedRole = TestEditorStore(state => state.setSelectedRole)
 
     const tabs = [{ id: 'request', content: 'Request' }, { id: 'response', content: 'Response'}];
     const mapCollectionIdToName = func.mapCollectionIdToName(allCollections)
@@ -55,6 +58,28 @@ const SampleApi = () => {
     const [isChatBotOpen, setIsChatBotOpen] = useState(false)
     const [chatBotModal, setChatBotModal] = useState(false)
     const subCategoryMap = LocalStore(state => state.subCategoryMap)
+    const [testRoles, setTestRoles] = useState([])
+    const [testRolesOptions, setTestRolesOptions] = useState([])
+
+    useEffect(() => {
+        const fetchRoles = async () => {
+            try {
+                const response = await api.fetchTestRoles()
+                if (response && response.testRoles) {
+                    setTestRoles(response.testRoles)
+                    // use hexId as value (consistent with RunTestConfiguration) and name as label
+                    const options = response.testRoles.map(role => ({
+                        label: role.name,
+                        value: role.hexId
+                    }))
+                    setTestRolesOptions(options)
+                }
+            } catch (error) {
+                func.setToast(true, true, "Error fetching test roles");
+            }
+        }
+        fetchRoles()
+    }, [])
 
     useEffect(()=>{
         if(showEmptyLayout) return
@@ -264,7 +289,7 @@ const SampleApi = () => {
 
 
         try {
-            let resp = await testEditorRequests.runTestForTemplate(currentContent,apiKeyInfo,sampleDataList)
+            let resp = await testEditorRequests.runTestForTemplate(currentContent,apiKeyInfo,sampleDataList,selectedRole)
             if(resp.testingRunPlaygroundHexId !== null && resp?.testingRunPlaygroundHexId !== undefined) {
                 await new Promise((resolve) => {
                     let maxAttempts = 100;
@@ -435,7 +460,7 @@ const SampleApi = () => {
             <Modal
                 open={selectApiActive}
                 onClose={toggleSelectApiActive}
-                title="Select sample API"
+                title="Select sample API and Test Role"
                 primaryAction={{
                     id:"save",
                     content: 'Save',
@@ -471,6 +496,27 @@ const SampleApi = () => {
                         setSelected={setCopySelectedApiEndpoint}
                         value={copySelectedApiEndpoint==null ? "No endpoints selected" : func.toMethodUrlString({...func.toMethodUrlObject(copySelectedApiEndpoint), shouldParse: true})}
                         preSelected={[copySelectedApiEndpoint]}
+                    />
+
+                    <br />
+
+                    <DropdownSearch
+                        id={"select-test-role"}
+                        label={
+                            <TitleWithInfo
+                                titleText="Role"
+                                tooltipContent="Roles support is only available in Akto testing module."
+                                textProps={{ variant: 'bodyMd' }}
+                            />
+                        }
+                        placeholder="Select role"
+                        optionsList={testRolesOptions}
+                        setSelected={setSelectedRole}
+                        value={(() => {
+                            const found = testRolesOptions.find(r => r.value === selectedRole)
+                            return found ? found.label : ''
+                        })()}
+                        preSelected={selectedRole ? [selectedRole] : []}
                     />
 
                 </Modal.Section>
