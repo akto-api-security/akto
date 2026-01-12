@@ -13,8 +13,8 @@ import func from "@/util/func"
 import AddOnComponenet from "./components/shared/AddOnComponenet"
 import BitBucketSource from "./components/BitBucketSource"
 import GithubSource from "./components/GithubSource"
-import AktoJax from "./components/AktoJax"  
-import McpScan from "./components/McpScan" 
+import AktoJax from "./components/AktoJax"
+import McpScan from "./components/McpScan"
 import AiAgentScan from "./components/AiAgentScan"
 import { isGenAISecurityCategory, isMCPSecurityCategory, isAgenticSecurityCategory, isDastCategory, isApiSecurityCategory, isEndpointSecurityCategory } from "../../../main/labelHelper"
 import McpRecon from "./components/McpRecon"
@@ -44,7 +44,13 @@ import {
     DESCRIPTION_COPILOT_STUDIO,
     DOCS_URL_COPILOT_STUDIO,
     INTERVAL_COPILOT_STUDIO,
-    COPILOT_STUDIO_FIELDS
+    COPILOT_STUDIO_FIELDS,
+    CONNECTOR_TYPE_LITELLM,
+    CONNECTOR_NAME_LITELLM,
+    DESCRIPTION_LITELLM,
+    DOCS_URL_LITELLM,
+    INTERVAL_LITELLM,
+    LITELLM_FIELDS
 } from "./constants/aiAgentConnectorConstants"
 
 const mirroringObj = {
@@ -220,7 +226,7 @@ const eksObj = {
 const fargateObj = {
     icon: '/public/fargate.svg',
     label: 'AWS Fargate',
-    text: "AWS Fargate allows you to use Amazon ECS to run containers without having to manage servers or clusters of Amazon EC2 instances.", 
+    text: "AWS Fargate allows you to use Amazon ECS to run containers without having to manage servers or clusters of Amazon EC2 instances.",
     docsUrl: 'https://docs.akto.io/traffic-connector/aws-services/aws-fargate',
     component: <FargateSource docsUrl='https://docs.akto.io/traffic-connector/aws-services/aws-fargate' bannerTitle="Setup using Fargate" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/aws-fargate#add-akto-traffic-collector-container"/>,
     key: "FARGATE"
@@ -228,7 +234,7 @@ const fargateObj = {
 const burpObj = {
     icon: '/public/burp.svg',
     label: "Burp Suite",
-    text: "You can deploy Akto on your machine and download Akto's Burp extension to collect API traffic.",   
+    text: "You can deploy Akto on your machine and download Akto's Burp extension to collect API traffic.",
     docsUrl: 'https://docs.akto.io/traffic-connector/manual/burp-suite',
     key: "BURP",
     component : <BurpSource/>
@@ -237,7 +243,7 @@ const burpObj = {
 const aktoJaxObj = {
     icon: '/public/aktojax.svg',
     label: "Akto DAST",
-    text: "You can deploy Akto's DAST on your machine to automatically scan and collect API endpoints and traffic data.",   
+    text: "You can deploy Akto's DAST on your machine to automatically scan and collect API endpoints and traffic data.",
     docsUrl: 'https://docs.akto.io/dast/akto-dast',
     key: "AKTODAST",
     component : <AktoJax />
@@ -494,7 +500,7 @@ const agenticShieldObj = {
 const mcpScanObj = {
     icon: '/public/mcp.svg',
     label: "MCP Import",
-    text: "You can use Akto's MCP import to capture traffic and instantly send it to your dashboard for real-time insights.",   
+    text: "You can use Akto's MCP import to capture traffic and instantly send it to your dashboard for real-time insights.",
     docsUrl: 'https://docs.akto.io/mcp-import',
     key: "MCP_SCAN",
     component : <McpScan/>
@@ -552,7 +558,7 @@ const gcpObj = {
     docsUrl: 'https://docs.akto.io/traffic-connector/mirroring/google-cloud-gcp',
     key: "GCP",
     component: <BannerComponent title="Setup using GCP Mirroring" docsUrl="https://docs.akto.io/traffic-connector/mirroring/google-cloud-gcp"
-                    content="Use Google packet mirroring to send duplicate stream of traffic to Akto. No performance impact, only mirrored traffic is used to analyze APIs." />
+        content="Use Google packet mirroring to send duplicate stream of traffic to Akto. No performance impact, only mirrored traffic is used to analyze APIs." />
 }
 
 const harFileUploadObj = {
@@ -562,7 +568,7 @@ const harFileUploadObj = {
     docsUrl: 'https://docs.akto.io/traffic-connector/manual/har-file-upload',
     key: "HAR",
     component: <BannerComponent title="Upload .har file" docsUrl="https://docs.akto.io/traffic-connector/manual/har-file-upload"
-                    content=" You can use this method if you quickly want to try out Akto. Akto can process HAR (Http ARchive) files and populate inventory from it." />
+        content=" You can use this method if you quickly want to try out Akto. Akto can process HAR (Http ARchive) files and populate inventory from it." />
 }
 
 const kongObj = {
@@ -929,6 +935,21 @@ const copilotStudioImportObj = {
     />
 }
 
+const litellmImportObj = {
+    icon: '/public/litellm.svg',
+    label: "LiteLLM",
+    text: "Use our LiteLLM feature to capture traffic from your LiteLLM proxy and instantly send it to your dashboard for real-time insights.",
+    docsUrl: 'https://docs.akto.io/litellm-import',
+    key: "LITELLM_IMPORT",
+    component: <AIAgentConnectorImport
+        connectorType={CONNECTOR_TYPE_LITELLM}
+        connectorName={CONNECTOR_NAME_LITELLM}
+        description={DESCRIPTION_LITELLM}
+        fields={LITELLM_FIELDS}
+        docsUrl={DOCS_URL_LITELLM}
+        recurringIntervalSeconds={INTERVAL_LITELLM}
+    />
+}
 
 const quick_start_policy_lines= [
     `{`,
@@ -1422,7 +1443,7 @@ const  quick_start_policy_lines_kubernetes = [
 
 const yaml_fargate =[
     `"AKTO_NLB": "<AKTO_NLB_IP>",`,
-    `"AKTO_MONGO_IP": "<AKTO_MONGO_CONN>"`   
+    `"AKTO_MONGO_IP": "<AKTO_MONGO_CONN>"`
 ]
 
 const yaml_kubernetes = [
@@ -1468,7 +1489,7 @@ const quickStartFunc = {
         const vm = [
             dockerObj, tcpObj
         ];
-        
+
         // Source code
         const sourceCode = [
             apiInventoryFromSourceCodeObj, githubObj, gitlabObj, bitbucketObj
@@ -1530,7 +1551,7 @@ const quickStartFunc = {
 
         const aiAgentConnectors = [
             awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
-            n8nImportObj, langchainImportObj, copilotStudioImportObj
+            n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj
         ]
 
         // MCP Scan
@@ -1559,10 +1580,10 @@ const quickStartFunc = {
         ]
 
        if(func.checkLocal() || func.isLimitedAccount()){
-           return {
-               "Manual": manual
-           }
-       }
+            return {
+                "Manual": manual
+            }
+        }
 
         let connectors = {}
 
@@ -1589,7 +1610,7 @@ const quickStartFunc = {
                 connectors["AI Agent Security"] = [
                     awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj,
                     ibmWatsonxObj, customAgentObj, agenticShieldObj,  // Include agenticShieldObj for non-demo
-                    n8nImportObj, langchainImportObj, copilotStudioImportObj
+                    n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj
                 ]
                 connectors["AI Model Security"] = aiScanConnectors
                 connectors["Browser Extension"] = browserExtensions
@@ -1636,13 +1657,13 @@ const quickStartFunc = {
     getConnectorsList: function () {
 
         if(func.checkLocal() || func.isLimitedAccount()){
-            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj]
+            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj]
         }
 
         // Combine all categories into connectorsList
         let connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj,
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,
@@ -1653,7 +1674,7 @@ const quickStartFunc = {
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj,
                 awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
-                n8nImportObj, langchainImportObj, copilotStudioImportObj
+                n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj
             ])
         }
 
@@ -1739,19 +1760,19 @@ const quickStartFunc = {
     getDesiredSteps: function(url) {
         const steps = [
             {
-              textComponent: <span>Grab the policy JSON below and navigate to Akto Dashboard's current role by clicking <a target='_blank' href={url}>here</a>.</span>, 
+                textComponent: <span>Grab the policy JSON below and navigate to Akto Dashboard's current role by clicking <a target='_blank' href={url}>here</a>.</span>,
             },
             {
-              text: "We will create an inline policy, navigate to JSON tab and paste the copied JSON here."
+                text: "We will create an inline policy, navigate to JSON tab and paste the copied JSON here."
             },
             {
-              text: "Click on 'Review policy'."
+                text: "Click on 'Review policy'."
             },
             {
-              text: "Now lets name the policy as 'AktoDashboardPolicy'."
+                text: "Now lets name the policy as 'AktoDashboardPolicy'."
             },
             {
-              text: "Finally create the policy by clicking on 'Create policy'."
+                text: "Finally create the policy by clicking on 'Create policy'."
             },
         ]
         return steps
@@ -1769,14 +1790,14 @@ const quickStartFunc = {
         // to add more else if blocks to handle cases where deployment is stuck
         progressBarCopy.value = Math.round(progressPercent);
         return progressBarCopy
-      },
-  
+    },
+
       removeProgressBarAndStatuschecks: function(progressBar) {
         const progressBarCopy = JSON.parse(JSON.stringify(progressBar))
         progressBarCopy.show = false;
         progressBarCopy.value = 0;
         return progressBarCopy
-      }
+    }
 }
 
 export default quickStartFunc
