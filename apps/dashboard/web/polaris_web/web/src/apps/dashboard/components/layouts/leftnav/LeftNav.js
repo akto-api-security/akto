@@ -50,7 +50,7 @@ export default function LeftNav() {
         resetFields();
         await api.goToAccount(selected);
         func.setToast(true, false, `Switched to account ${accounts[selected]}`);
-        const redirectPath = func.isAtlasArgusAccount() && dashboardCategory === CATEGORY_AGENTIC_SECURITY
+        const redirectPath = func.isAtlasArgusAccount() && dashboardCategory === CATEGORY_ENDPOINT_SECURITY
             ? '/dashboard/observe/endpoints'
             : '/dashboard/observe/inventory';
         window.location.href = redirectPath;
@@ -141,10 +141,10 @@ export default function LeftNav() {
                 ),
                 icon: InventoryFilledMajor,
                 onClick: () => {
-                    const targetPath = func.isAtlasArgusAccount() && dashboardCategory === CATEGORY_AGENTIC_SECURITY
+                    const targetPath = func.isAtlasArgusAccount() && dashboardCategory === CATEGORY_ENDPOINT_SECURITY
                         ? "/dashboard/observe/endpoints"
                         : "/dashboard/observe/inventory";
-                    const targetHandle = func.isAtlasArgusAccount() && dashboardCategory === CATEGORY_AGENTIC_SECURITY
+                    const targetHandle = func.isAtlasArgusAccount() && dashboardCategory === CATEGORY_ENDPOINT_SECURITY
                         ? "dashboard_observe_endpoints"
                         : "dashboard_observe_inventory";
                     handleSelect(targetHandle);
@@ -153,7 +153,7 @@ export default function LeftNav() {
                 },
                 selected: leftNavSelected.includes("_observe"),
                 subNavigationItems: [
-                    ...(func.isAtlasArgusAccount() && dashboardCategory === CATEGORY_AGENTIC_SECURITY ? [{
+                    ...(func.isAtlasArgusAccount() && dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
                         label: "Endpoints",
                         onClick: () => {
                             navigate("/dashboard/observe/endpoints");

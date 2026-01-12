@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { Text, IndexFiltersMode, Badge, Box, Icon } from "@shopify/polaris";
+import { AutomationMajor, MagicMajor } from "@shopify/polaris-icons";
 import { useNavigate } from "react-router-dom";
-import { Text, IndexFiltersMode } from "@shopify/polaris";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
@@ -14,11 +15,90 @@ import func from "@/util/func";
 import transform from "../transform";
 import PersistStore from "../../../../main/PersistStore";
 import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
+import IconCacheService from "@/services/IconCacheService";
+import MCPIcon from "@/assets/MCP_Icon.svg";
+import LaptopIcon from "@/assets/Laptop.svg";
 
 const MCP_CLIENT_TAG_KEY = "mcp-client";
 const UNKNOWN_GROUP = "Unknown";
 
+const iconCacheService = new IconCacheService();
+
+const GroupIconRenderer = React.memo(({ hostName, displayName, tagsList }) => {
+    const [iconData, setIconData] = React.useState(null);
+
+    React.useEffect(() => {
+        if (!hostName || hostName.trim() === '') {
+            return;
+        }
+        let isMounted = true;
+        const fetchIcon = async () => {
+            try {
+                const imageData = await iconCacheService.getIconData(hostName);
+                if (imageData && isMounted) {
+                    setIconData(imageData);
+                }
+            } catch (error) {
+                // Silently fail
+            }
+        };
+
+        fetchIcon();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [hostName]);
+
+    if (iconData) {
+        return (
+            <img
+                src={`data:image/png;base64,${iconData}`}
+                alt={`${hostName} icon`}
+                style={{width: '20px', height: '20px', borderRadius: '2px'}}
+                onError={() => {
+                    setIconData(null);
+                }}
+            />
+        );
+    }
+
+    // Fallback icons
+    if (tagsList?.some(tag => tag.name === "gen-ai")) {
+        const iconSource = tagsList.some(tag => tag.name === "AI Agent") ? AutomationMajor : MagicMajor;
+        return <Icon source={iconSource} color={"base"} />;
+    }
+
+    if (tagsList?.some(tag => tag.name === "mcp-server")) {
+        return <img src={MCPIcon} alt="MCP icon" style={{width: '20px', height: '20px', borderRadius: '2px'}} />;
+    }
+
+    const defaultIcon = displayName?.toLowerCase().startsWith('mcp') ? MCPIcon : LaptopIcon;
+    return <img src={defaultIcon} alt="default icon" style={{width: '20px', height: '20px', borderRadius: '2px'}} />;
+});
+
+const getStatus = (riskScore) => {
+    if(riskScore >= 4.5){
+        return "critical"
+    }else if(riskScore >= 4){
+        return "attention"
+    }else if(riskScore >= 2.5){
+        return "warning"
+    }else if(riskScore > 0){
+        return "info"
+    }else{
+        return "success"
+    }
+};
+
 const headers = [
+    ...((func.isDemoAccount() && (getDashboardCategory() === "Agentic Security" || getDashboardCategory() === "Endpoint Security")) ? [{
+        title: "",
+        text: "",
+        value: "iconComp",
+        isText: CellType.TEXT,
+        boxWidth: '24px'
+    }] : []),
     {
         title: "Endpoint group",
         text: "Endpoint group",
@@ -39,7 +119,7 @@ const headers = [
     },
     {
         title: <HeadingWithTooltip content={<Text variant="bodySm">Maximum risk score of the endpoints in this group</Text>} title="Risk score" />,
-        value: "riskScore",
+        value: "riskScoreComp",
         textValue: "riskScore",
         numericValue: "riskScore",
         text: "Risk Score",
@@ -94,6 +174,7 @@ function Endpoints() {
     const navigate = useNavigate();
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [filters, setFilters] = useState([]);
     const [summaryData, setSummaryData] = useState({
         totalEndpoints: 0,
         totalGroups: 0,
@@ -128,10 +209,16 @@ function Endpoints() {
                     detectedTimestamp: 0,
                     collectionsCount: 0,
                     sensitiveInRespTypes: new Set(),
+                    firstCollection: null,
                 };
             }
 
             groups[groupKey].collections.push(collection);
+
+            if (!groups[groupKey].firstCollection) {
+                groups[groupKey].firstCollection = collection;
+            }
+
             groups[groupKey].urlsCount += collection.urlsCount || 0;
             groups[groupKey].collectionsCount += 1;
 
@@ -151,21 +238,38 @@ function Endpoints() {
             sensitiveTypes.forEach((type) => groups[groupKey].sensitiveInRespTypes.add(type));
         });
 
-        return Object.values(groups).map((group) => ({
-            ...group,
-            id: group.groupName,
-            sensitiveInRespTypes: Array.from(group.sensitiveInRespTypes),
-            sensitiveSubTypesVal: Array.from(group.sensitiveInRespTypes).join(" ") || "-",
-            lastTraffic: func.prettifyEpoch(group.detectedTimestamp),
-            nextUrl: null,
-        }));
+        return Object.values(groups).map((group) => {
+            return {
+                ...group,
+                id: group.groupName,
+                tagKey: group.tagKey,
+                tagValue: group.tagValue,
+                sensitiveInRespTypes: Array.from(group.sensitiveInRespTypes),
+                sensitiveSubTypesVal: Array.from(group.sensitiveInRespTypes).join(" ") || "-",
+                lastTraffic: func.prettifyEpoch(group.detectedTimestamp),
+            };
+        });
     };
 
     const prettifyGroupData = (groups) => {
-        return groups.map((group) => ({
-            ...group,
-            sensitiveSubTypes: transform.prettifySubtypes(group.sensitiveInRespTypes, false),
-        }));
+        return groups.map((group) => {
+            const firstCollection = group.firstCollection;
+
+            return {
+                ...group,
+                iconComp: firstCollection ? (
+                    <Box>
+                        <GroupIconRenderer
+                            hostName={firstCollection.hostName}
+                            displayName={firstCollection.displayName}
+                            tagsList={firstCollection.tagsList}
+                        />
+                    </Box>
+                ) : null,
+                riskScoreComp: <Badge status={getStatus(group.riskScore)} size="small">{group.riskScore}</Badge>,
+                sensitiveSubTypes: transform.prettifySubtypes(group.sensitiveInRespTypes, false),
+            };
+        });
     };
 
     async function fetchData(isMountedRef = { current: true }) {
@@ -237,13 +341,27 @@ function Endpoints() {
         };
     }, []);
 
+    const disambiguateLabel = (key, value) => {
+        return func.convertToDisambiguateLabelObj(value, null, 2);
+    };
+
     const handleRowClick = (row) => {
-        if (row.tagKey && row.tagValue) {
-            const tagParam = encodeURIComponent(`${row.tagKey}=${row.tagValue}`);
-            navigate(`/dashboard/observe/inventory?tagFilter=${tagParam}`);
-        } else {
-            navigate(`/dashboard/observe/inventory?tagFilter=unknown`);
+        if (!row.tagKey || !row.tagValue) {
+            navigate('/dashboard/observe/inventory');
+            return;
         }
+
+        const targetPageKey = '/dashboard/observe/inventory/';
+        let filtersMap = PersistStore.getState().filtersMap;
+        if (filtersMap !== null && filtersMap.hasOwnProperty(targetPageKey)) {
+            delete filtersMap[targetPageKey];
+            PersistStore.getState().setFiltersMap(filtersMap);
+        }
+
+        const filterValue = `${row.tagKey}=${row.tagValue}`;
+        const filters = `envType__${filterValue}`;
+        const navigateUrl = `${window.location.origin}/dashboard/observe/inventory?filters=${encodeURIComponent(filters)}`;
+        window.open(navigateUrl, "_blank");
     };
 
     const summaryItems = [
@@ -267,15 +385,16 @@ function Endpoints() {
             data={data}
             sortOptions={sortOptions}
             resourceName={resourceName}
-            filters={[]}
+            filters={filters}
             headers={headers}
             selectable={false}
             mode={IndexFiltersMode.Default}
             headings={headers}
             useNewRow={true}
             condensedHeight={true}
-            onRowClick={handleRowClick}
+            disambiguateLabel={disambiguateLabel}
             prettifyPageData={(pageData) => pageData}
+            onRowClick={handleRowClick}
         />
     );
 
