@@ -1124,6 +1124,10 @@ public class TestExecutor {
                     !existingIssue.getLastUpdatedBy().isEmpty()) {
 
                     // Get the current severity from test result (before applying user preference)
+                    if (testResults.getTestResults() == null || testResults.getTestResults().isEmpty()) {
+                        loggerMaker.debugAndAddToDb("No test results available for severity check", LogDb.TESTING);
+                        continue;
+                    }
                     Confidence templateDetectedSeverity = testResults.getTestResults().get(0).getConfidence();
 
                     Severity userPreferredSeverity = existingIssue.getSeverity();

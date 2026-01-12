@@ -570,7 +570,7 @@ function SingleTestRunPage() {
       setUpdateTable(prev => !prev);
 
     } catch (error) {
-      func.setToast(true, true, "Failed to update severity");
+      func.setToast(true, true, error.message || "Failed to update severity");
     } finally {
       setSeverityModalLoading(false);
     }

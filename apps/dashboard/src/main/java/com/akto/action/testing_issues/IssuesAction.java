@@ -691,7 +691,7 @@ public class IssuesAction extends UserAction {
 
     public String bulkUpdateIssueSeverity() {
         if (issueIdArray == null || severityToBeUpdated == null) {
-            throw new IllegalStateException();
+            throw new IllegalStateException("issueIdArray and severityToBeUpdated are required");
         }
 
         logger.debug("Issue id from db to be updated " + issueIdArray);
@@ -875,7 +875,7 @@ public class IssuesAction extends UserAction {
 
         } catch (Exception e) {
             logger.error("Error updating severity from test results: " + e.getMessage(), e);
-            throw new RuntimeException("Failed to update severity: " + e.getMessage());
+            throw new RuntimeException("Failed to update severity: " + e.getMessage(), e);
         }
 
         return SUCCESS.toUpperCase();
