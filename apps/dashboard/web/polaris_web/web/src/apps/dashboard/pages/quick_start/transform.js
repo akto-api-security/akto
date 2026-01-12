@@ -13,8 +13,8 @@ import func from "@/util/func"
 import AddOnComponenet from "./components/shared/AddOnComponenet"
 import BitBucketSource from "./components/BitBucketSource"
 import GithubSource from "./components/GithubSource"
-import AktoJax from "./components/AktoJax"
-import McpScan from "./components/McpScan"
+import AktoJax from "./components/AktoJax"  
+import McpScan from "./components/McpScan" 
 import AiAgentScan from "./components/AiAgentScan"
 import { isGenAISecurityCategory, isMCPSecurityCategory, isAgenticSecurityCategory, isDastCategory, isApiSecurityCategory, isEndpointSecurityCategory } from "../../../main/labelHelper"
 import McpRecon from "./components/McpRecon"
@@ -226,7 +226,7 @@ const eksObj = {
 const fargateObj = {
     icon: '/public/fargate.svg',
     label: 'AWS Fargate',
-    text: "AWS Fargate allows you to use Amazon ECS to run containers without having to manage servers or clusters of Amazon EC2 instances.",
+    text: "AWS Fargate allows you to use Amazon ECS to run containers without having to manage servers or clusters of Amazon EC2 instances.", 
     docsUrl: 'https://docs.akto.io/traffic-connector/aws-services/aws-fargate',
     component: <FargateSource docsUrl='https://docs.akto.io/traffic-connector/aws-services/aws-fargate' bannerTitle="Setup using Fargate" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/aws-fargate#add-akto-traffic-collector-container"/>,
     key: "FARGATE"
@@ -234,7 +234,7 @@ const fargateObj = {
 const burpObj = {
     icon: '/public/burp.svg',
     label: "Burp Suite",
-    text: "You can deploy Akto on your machine and download Akto's Burp extension to collect API traffic.",
+    text: "You can deploy Akto on your machine and download Akto's Burp extension to collect API traffic.",   
     docsUrl: 'https://docs.akto.io/traffic-connector/manual/burp-suite',
     key: "BURP",
     component : <BurpSource/>
@@ -243,7 +243,7 @@ const burpObj = {
 const aktoJaxObj = {
     icon: '/public/aktojax.svg',
     label: "Akto DAST",
-    text: "You can deploy Akto's DAST on your machine to automatically scan and collect API endpoints and traffic data.",
+    text: "You can deploy Akto's DAST on your machine to automatically scan and collect API endpoints and traffic data.",   
     docsUrl: 'https://docs.akto.io/dast/akto-dast',
     key: "AKTODAST",
     component : <AktoJax />
@@ -500,7 +500,7 @@ const agenticShieldObj = {
 const mcpScanObj = {
     icon: '/public/mcp.svg',
     label: "MCP Import",
-    text: "You can use Akto's MCP import to capture traffic and instantly send it to your dashboard for real-time insights.",
+    text: "You can use Akto's MCP import to capture traffic and instantly send it to your dashboard for real-time insights.",  
     docsUrl: 'https://docs.akto.io/mcp-import',
     key: "MCP_SCAN",
     component : <McpScan/>
@@ -558,7 +558,7 @@ const gcpObj = {
     docsUrl: 'https://docs.akto.io/traffic-connector/mirroring/google-cloud-gcp',
     key: "GCP",
     component: <BannerComponent title="Setup using GCP Mirroring" docsUrl="https://docs.akto.io/traffic-connector/mirroring/google-cloud-gcp"
-        content="Use Google packet mirroring to send duplicate stream of traffic to Akto. No performance impact, only mirrored traffic is used to analyze APIs." />
+            content="Use Google packet mirroring to send duplicate stream of traffic to Akto. No performance impact, only mirrored traffic is used to analyze APIs." />
 }
 
 const harFileUploadObj = {
@@ -568,7 +568,7 @@ const harFileUploadObj = {
     docsUrl: 'https://docs.akto.io/traffic-connector/manual/har-file-upload',
     key: "HAR",
     component: <BannerComponent title="Upload .har file" docsUrl="https://docs.akto.io/traffic-connector/manual/har-file-upload"
-        content=" You can use this method if you quickly want to try out Akto. Akto can process HAR (Http ARchive) files and populate inventory from it." />
+                content=" You can use this method if you quickly want to try out Akto. Akto can process HAR (Http ARchive) files and populate inventory from it." />
 }
 
 const kongObj = {
@@ -1443,7 +1443,7 @@ const  quick_start_policy_lines_kubernetes = [
 
 const yaml_fargate =[
     `"AKTO_NLB": "<AKTO_NLB_IP>",`,
-    `"AKTO_MONGO_IP": "<AKTO_MONGO_CONN>"`
+    `"AKTO_MONGO_IP": "<AKTO_MONGO_CONN>"`   
 ]
 
 const yaml_kubernetes = [
@@ -1583,7 +1583,7 @@ const quickStartFunc = {
             return {
                 "Manual": manual
             }
-        }
+       }
 
         let connectors = {}
 

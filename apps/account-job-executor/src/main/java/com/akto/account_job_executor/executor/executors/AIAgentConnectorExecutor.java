@@ -40,7 +40,7 @@ public class AIAgentConnectorExecutor extends AccountJobExecutor {
     @Override
     protected void runJob(AccountJob job) throws Exception {
         logger.info("Executing AI Agent Connector job: jobId={}, subType={}",
-                job.getId(), job.getSubType());
+            job.getId(), job.getSubType());
 
         // Extract job configuration
         Map<String, Object> config = job.getConfig();
@@ -152,7 +152,7 @@ public class AIAgentConnectorExecutor extends AccountJobExecutor {
 
         if (connectionString == null && blobUrl == null) {
             throw new Exception("Azure Storage credentials not configured. Set either " +
-                    AZURE_CONNECTION_STRING_ENV + " or " + AZURE_BLOB_URL_ENV + " environment variable");
+                AZURE_CONNECTION_STRING_ENV + " or " + AZURE_BLOB_URL_ENV + " environment variable");
         }
 
         // Download binary from Azure Storage
@@ -199,9 +199,9 @@ public class AIAgentConnectorExecutor extends AccountJobExecutor {
         // The -once flag tells the binary to run one iteration and exit
         String[] args = new String[] { "-once" };
         BinaryExecutor.ExecutionResult result = BinaryExecutor.executeBinary(
-                binaryFile,
-                args,
-                envVars,
+            binaryFile,
+            args,
+            envVars,
             BINARY_TIMEOUT_SECONDS
         );
 
@@ -211,12 +211,12 @@ public class AIAgentConnectorExecutor extends AccountJobExecutor {
         // Check execution result
         if (!result.isSuccess()) {
             String errorMsg = "Binary execution failed with exit code " + result.getExitCode() +
-                    ". Output: " + result.getStdout().substring(0, Math.min(500, result.getStdout().length()));
+                ". Output: " + result.getStdout().substring(0, Math.min(500, result.getStdout().length()));
             logger.error("Binary execution failed: {}", errorMsg);
             throw new Exception(errorMsg);
         }
 
         logger.info("Binary execution successful: binaryName={}, exitCode={}, outputLength={}",
-                binaryName, result.getExitCode(), result.getStdout().length());
+            binaryName, result.getExitCode(), result.getStdout().length());
     }
 }

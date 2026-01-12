@@ -73,8 +73,8 @@ public class AIAgentConnectorImportAction extends UserAction {
 
             // Determine recurring interval (use provided value or default)
             int interval = (recurringIntervalSeconds != null && recurringIntervalSeconds > 0)
-                    ? recurringIntervalSeconds
-                    : DEFAULT_RECURRING_INTERVAL_SECONDS;
+                ? recurringIntervalSeconds
+                : DEFAULT_RECURRING_INTERVAL_SECONDS;
 
             // Create entry in per-account jobs collection
             // Convert Map<String, String> config to Map<String, Object> for generic storage
@@ -139,9 +139,9 @@ public class AIAgentConnectorImportAction extends UserAction {
 
             case CONNECTOR_TYPE_COPILOT_STUDIO:
                 if (dataverseEnvironmentUrl == null || dataverseEnvironmentUrl.isEmpty() ||
-                        dataverseTenantId == null || dataverseTenantId.isEmpty() ||
-                        dataverseClientId == null || dataverseClientId.isEmpty() ||
-                        dataverseClientSecret == null || dataverseClientSecret.isEmpty()) {
+                    dataverseTenantId == null || dataverseTenantId.isEmpty() ||
+                    dataverseClientId == null || dataverseClientId.isEmpty() ||
+                    dataverseClientSecret == null || dataverseClientSecret.isEmpty()) {
                     loggerMaker.error("Missing required Copilot Studio Dataverse configuration", LogDb.DASHBOARD);
                     return null;
                 }
