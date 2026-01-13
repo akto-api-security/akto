@@ -28,7 +28,6 @@ const Logs = () => {
         { label: "Puppeteer", value: "PUPPETEER" },
         { label: "Threat", value: "THREAT_DETECTION" },
         { label: "Data Ingestion", value: "DATA_INGESTION" },
-        { label: "Traffic Collector", value: "TRAFFIC_COLLECTOR" },
     ];
   
     const handleSelectLogGroup = (logGroup) => {
@@ -57,8 +56,7 @@ const Logs = () => {
     }
 
     const fetchModuleInfo = async () => {
-        const filter = { moduleType: logs.logGroup };
-        const response = await settingRequests.fetchModuleInfo(filter);
+        const response = await settingRequests.fetchModuleInfo();
         setModuleInfos(response.moduleInfos || []);
     }
 

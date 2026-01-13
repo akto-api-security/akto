@@ -7,7 +7,6 @@ import com.akto.dao.DashboardLogsDao;
 import com.akto.dao.LogsDao;
 import com.akto.dao.PupeteerLogsDao;
 import com.akto.dao.RuntimeLogsDao;
-import com.akto.dao.TrafficCollectorLogsDao;
 import com.akto.dao.monitoring.EndpointShieldLogsDao;
 import com.akto.dto.monitoring.EndpointShieldLog;
 import com.akto.RuntimeMode;
@@ -94,7 +93,7 @@ public class LoggerMaker  {
     }
 
     public enum LogDb {
-        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, THREAT_DETECTION, PUPPETEER, DATA_INGESTION, ENDPOINT_SHIELD, TRAFFIC_COLLECTOR
+        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, THREAT_DETECTION, PUPPETEER, DATA_INGESTION, ENDPOINT_SHIELD
     }
 
     private static AccountSettings accountSettings = null;
@@ -284,9 +283,6 @@ public class LoggerMaker  {
                 case THREAT_DETECTION:
                     dataActor.insertProtectionLog(log);
                     break;
-                case TRAFFIC_COLLECTOR:
-                    TrafficCollectorLogsDao.instance.insertOne(log);
-                    break;
                 default:
                     break;
             }
@@ -334,9 +330,6 @@ public class LoggerMaker  {
             case ENDPOINT_SHIELD:
                 List<EndpointShieldLog> endpointShieldLogs = EndpointShieldLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP, EndpointShieldLog.AGENT_ID, EndpointShieldLog.DEVICE_ID, EndpointShieldLog.LEVEL));
                 logs = new ArrayList<>(endpointShieldLogs);
-                break;
-            case TRAFFIC_COLLECTOR:
-                logs = TrafficCollectorLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
                 break;
             default:
                 break;
