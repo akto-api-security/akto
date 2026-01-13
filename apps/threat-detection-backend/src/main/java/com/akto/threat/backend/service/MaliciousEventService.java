@@ -351,7 +351,7 @@ public class MaliciousEventService {
       List<ListMaliciousRequestsResponse.MaliciousEvent> maliciousEvents = new ArrayList<>();
       while (cursor.hasNext()) {
         MaliciousEventDto evt = cursor.next();
-        String metadata = evt.getMetadata() != null ? evt.getMetadata() : "";
+        String metadata = ThreatUtils.fetchMetadataString(evt.getMetadata() != null ? evt.getMetadata() : "");
 
         maliciousEvents.add(
             ListMaliciousRequestsResponse.MaliciousEvent.newBuilder()
@@ -377,6 +377,7 @@ public class MaliciousEventService {
                 .setLabel(convertModelLabelToString(evt.getLabel()))
                 .setHost(evt.getHost() != null ? evt.getHost() : "")
                 .setJiraTicketUrl(evt.getJiraTicketUrl() != null ? evt.getJiraTicketUrl() : "")
+                .setSeverity(evt.getSeverity() != null ? evt.getSeverity() : "HIGH")
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()
