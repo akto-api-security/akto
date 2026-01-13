@@ -41,7 +41,10 @@ import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.util.JSONUtils;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.Severity;
+import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.util.enums.LoginFlowEnums;
+import com.akto.dto.test_run_findings.TestingIssuesId;
+import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.alibaba.fastjson2.JSON;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -1099,6 +1102,46 @@ public class TestExecutor {
             Confidence overConfidence = getConfidenceForTests(testConfig, yamlTestTemplate);
             if (overConfidence != null) {
                 testResult.setConfidence(overConfidence);
+            }
+
+            // Check for manual severity overrides from previous test runs
+            if (testResult.isVulnerable()) {
+                try {
+                    TestErrorSource testErrorSource = TestErrorSource.AUTOMATED_TESTING;
+                    String subCategory = testConfig.getInfo().getSubCategory();
+
+                    TestingIssuesId issueId = new TestingIssuesId(apiInfoKey, testErrorSource, subCategory, null);
+
+                    // Query existing issue using dataActor
+                    Set<TestingIssuesId> issueIdSet = new java.util.HashSet<>();
+                    issueIdSet.add(issueId);
+                    List<TestingRunIssues> existingIssues = dataActor.fetchIssuesByIds(issueIdSet);
+
+                    if (existingIssues != null && !existingIssues.isEmpty()) {
+                        TestingRunIssues existingIssue = existingIssues.get(0);
+                        if (existingIssue.getLastUpdatedBy() != null && !existingIssue.getLastUpdatedBy().isEmpty()) {
+                            // User has previously set a severity preference
+                            Severity userPreferredSeverity = existingIssue.getSeverity();
+                            Severity templateDetectedSeverity = testResult.getConfidence();
+
+                            if (userPreferredSeverity != templateDetectedSeverity) {
+                                loggerMaker.infoAndAddToDb(String.format(
+                                    "Overriding template severity %s with user preference %s for issue %s (endpoint: %s %s, test: %s)",
+                                    templateDetectedSeverity, userPreferredSeverity, issueId,
+                                    apiInfoKey.getMethod(), apiInfoKey.getUrl(), subCategory
+                                ), LogDb.TESTING);
+                                testResult.setConfidence(userPreferredSeverity);
+                            } else {
+                                loggerMaker.infoAndAddToDb(String.format(
+                                    "User preference %s matches template severity for issue %s",
+                                    userPreferredSeverity, issueId
+                                ), LogDb.TESTING);
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error checking for manual severity overrides: " + e.getMessage(), LogDb.TESTING);
+                }
             }
         }
 
