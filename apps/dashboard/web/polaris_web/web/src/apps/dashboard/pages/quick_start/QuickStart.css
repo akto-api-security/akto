@@ -79,45 +79,6 @@
     border-radius: 8px;
 }
 
-.endpoint-shield-card-wrapper .Polaris-Card {
-    border-radius: 8px;
-    border: none;
-    background: white;
-}
-
-.endpoint-shield-card {
-    padding: 0;
-}
-
-.endpoint-shield-icon {
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.endpoint-shield-icon .Polaris-Avatar {
-    width: 24px !important;
-    height: 24px !important;
-}
-
-.endpoint-shield-icon .Polaris-Avatar img {
-    width: 24px;
-    height: 24px;
-    object-fit: contain;
-}
-
-.endpoint-shield-description {
-    max-width: 100%;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    line-height: 1.5;
-}
-
 .endpoint-shield-divider {
     width: 1px;
     background-color: #d1d5db;
