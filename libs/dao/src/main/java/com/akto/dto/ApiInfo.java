@@ -19,11 +19,11 @@ public class ApiInfo {
     public static final String ID_METHOD = "_id." + ApiInfoKey.METHOD;
 
     public static final String ALL_AUTH_TYPES_FOUND = "allAuthTypesFound";
-    private Set<Set<AuthType>> allAuthTypesFound;
+    private Set<Set<String>> allAuthTypesFound;
 
     // this annotation makes sure that data is not stored in mongo
     @BsonIgnore
-    private List<AuthType> actualAuthType;
+    private List<String> actualAuthType;
 
     public static final String API_ACCESS_TYPES = "apiAccessTypes";
     private Set<ApiAccessType> apiAccessTypes;
@@ -58,8 +58,32 @@ public class ApiInfo {
     public static final String DETECTED_BASE_PROMPT = "detectedBasePrompt";
     private String detectedBasePrompt;
 
-    public enum AuthType {
-        UNAUTHENTICATED, BASIC, AUTHORIZATION_HEADER, JWT, API_TOKEN, BEARER, CUSTOM, API_KEY, MTLS, SESSION_TOKEN
+    public static class AuthType {
+        public static final String UNAUTHENTICATED = "UNAUTHENTICATED";
+        public static final String BASIC = "BASIC";
+        public static final String AUTHORIZATION_HEADER = "AUTHORIZATION_HEADER";
+        public static final String JWT = "JWT";
+        public static final String API_TOKEN = "API_TOKEN";
+        public static final String BEARER = "BEARER";
+        public static final String CUSTOM = "CUSTOM";
+        public static final String API_KEY = "API_KEY";
+        public static final String MTLS = "MTLS";
+        public static final String SESSION_TOKEN = "SESSION_TOKEN";
+
+        public static boolean isStandardAuthType(String authType) {
+            return authType != null && (
+                authType.equals(UNAUTHENTICATED) ||
+                authType.equals(BASIC) ||
+                authType.equals(AUTHORIZATION_HEADER) ||
+                authType.equals(JWT) ||
+                authType.equals(API_TOKEN) ||
+                authType.equals(BEARER) ||
+                authType.equals(CUSTOM) ||
+                authType.equals(API_KEY) ||
+                authType.equals(MTLS) ||
+                authType.equals(SESSION_TOKEN)
+            );
+        }
     }
 
     public enum ApiAccessType {
@@ -270,9 +294,9 @@ public class ApiInfo {
     }
 
     public void calculateActualAuth() {
-        List<AuthType> result = new ArrayList<>();
-        Set<AuthType> uniqueAuths = new HashSet<>();
-        for (Set<AuthType> authTypes: this.allAuthTypesFound) {
+        List<String> result = new ArrayList<>();
+        Set<String> uniqueAuths = new HashSet<>();
+        for (Set<String> authTypes: this.allAuthTypesFound) {
             if (authTypes.contains(AuthType.UNAUTHENTICATED)) {
                 this.actualAuthType = Collections.singletonList(AuthType.UNAUTHENTICATED);
                 uniqueAuths.add(AuthType.UNAUTHENTICATED);
@@ -283,7 +307,7 @@ public class ApiInfo {
             }
         }
 
-        for (AuthType authType: uniqueAuths) {
+        for (String authType: uniqueAuths) {
             result.add(authType);
         }
 
@@ -319,11 +343,11 @@ public class ApiInfo {
         this.id = id;
     }
 
-    public Set<Set<AuthType>> getAllAuthTypesFound() {
+    public Set<Set<String>> getAllAuthTypesFound() {
         return allAuthTypesFound;
     }
 
-    public void setAllAuthTypesFound(Set<Set<AuthType>> allAuthTypesFound) {
+    public void setAllAuthTypesFound(Set<Set<String>> allAuthTypesFound) {
         this.allAuthTypesFound = allAuthTypesFound;
     }
 
@@ -335,11 +359,11 @@ public class ApiInfo {
         this.apiAccessTypes = apiAccessTypes;
     }
 
-    public List<AuthType> getActualAuthType() {
+    public List<String> getActualAuthType() {
         return actualAuthType;
     }
 
-    public void setActualAuthType(List<AuthType> actualAuthType) {
+    public void setActualAuthType(List<String> actualAuthType) {
         this.actualAuthType = actualAuthType;
     }
 

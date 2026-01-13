@@ -46,7 +46,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.AUTHORIZATION_HEADER);
         Assertions.assertEquals(apiInfo.getAllAuthTypesFound().size(), 1);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
@@ -60,7 +60,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.AUTHORIZATION_HEADER);
         Assertions.assertEquals(apiInfo.getAllAuthTypesFound().size(), 1);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
@@ -74,7 +74,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.BEARER);
         Assertions.assertEquals(apiInfo.getAllAuthTypesFound().size(), 1);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
@@ -88,7 +88,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.AUTHORIZATION_HEADER);
         Assertions.assertEquals(apiInfo.getAllAuthTypesFound().size(), 1);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
@@ -102,7 +102,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.BEARER);
         Assertions.assertEquals(apiInfo.getAllAuthTypesFound().size(), 1);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
@@ -116,7 +116,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.BEARER);
         Assertions.assertEquals(apiInfo.getAllAuthTypesFound().size(), 1);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
@@ -128,13 +128,13 @@ public class AuthPolicyTest extends MongoBasedTest {
         headers.put(AuthPolicy.AUTHORIZATION_HEADER_NAME, Collections.singletonList("Bearer woiefjwoeifw"));
         HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.UNAUTHENTICATED);
         apiInfo.getAllAuthTypesFound().add(s);
         boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertFalse(result);
         Assertions.assertEquals(apiInfo.getAllAuthTypesFound().size(), 2);
-        Set<ApiInfo.AuthType> s2 = new HashSet<>();
+        Set<String> s2 = new HashSet<>();
         s2.add(ApiInfo.AuthType.BEARER);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s2));
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
@@ -148,7 +148,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.BASIC);
         Assertions.assertEquals(apiInfo.getAllAuthTypesFound().size(), 1);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
@@ -162,7 +162,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.BASIC);
         Assertions.assertEquals(apiInfo.getAllAuthTypesFound().size(), 1);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
@@ -176,7 +176,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.BASIC);
         Assertions.assertEquals(apiInfo.getAllAuthTypesFound().size(), 1);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
@@ -190,7 +190,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.JWT);
         Assertions.assertEquals(apiInfo.getAllAuthTypesFound().size(), 1);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
@@ -204,7 +204,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.JWT);
         Assertions.assertEquals(apiInfo.getAllAuthTypesFound().size(), 1);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
@@ -219,7 +219,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.JWT);
         s.add(ApiInfo.AuthType.BASIC);
         Assertions.assertEquals(apiInfo.getAllAuthTypesFound().size(), 1);
@@ -232,7 +232,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         headers.put(AuthPolicy.AUTHORIZATION_HEADER_NAME, Collections.singletonList("Basic woiefjwoeifw"));
         HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.JWT);
         s.add(ApiInfo.AuthType.BASIC);
         apiInfo.getAllAuthTypesFound().add(s);
@@ -255,7 +255,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,authTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.CUSTOM);
         Assertions.assertEquals(apiInfo.getAllAuthTypesFound().size(), 1);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
@@ -283,7 +283,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,authTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.CUSTOM);
         Assertions.assertEquals(apiInfo.getAllAuthTypesFound().size(), 1);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));

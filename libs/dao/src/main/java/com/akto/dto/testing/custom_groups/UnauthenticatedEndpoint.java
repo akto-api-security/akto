@@ -62,7 +62,7 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
         if (apiInfo.getActualAuthType() == null || apiInfo.getActualAuthType().isEmpty()) {
             return false;
         }
-        Set<AuthType> authTypes = new HashSet<>(apiInfo.getActualAuthType());
+        Set<String> authTypes = new HashSet<>(apiInfo.getActualAuthType());
         if (authTypes == null || authTypes.isEmpty()) {
             return false;
         }
@@ -93,8 +93,8 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
         );
 
         Bson unauthenticatedFilter = Filters.in(
-            ApiInfo.ALL_AUTH_TYPES_FOUND, 
-            Collections.singletonList(Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED))
+            ApiInfo.ALL_AUTH_TYPES_FOUND,
+            Collections.singletonList(Collections.singletonList(AuthType.UNAUTHENTICATED))
         );
 
         for(ApiCollection apiCollection: apiCollections){
