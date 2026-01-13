@@ -83,10 +83,6 @@ public class AuthPolicy {
                     String customAuthName = customAuthType.getName();
                     if (customAuthName != null && !customAuthName.trim().isEmpty()) {
                         authTypes.add(customAuthName);
-                    } else {
-                        // Fallback to "CUSTOM" if name is missing (shouldn't happen)
-                        logger.warn("Custom auth type has no name (ID: {}), using fallback CUSTOM", customAuthType.getId());
-                        authTypes.add(ApiInfo.AuthType.CUSTOM);
                     }
                     break;
                 }
