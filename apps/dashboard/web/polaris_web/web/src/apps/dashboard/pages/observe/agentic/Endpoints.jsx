@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Text, IndexFiltersMode, Badge, Box, Icon } from "@shopify/polaris";
-import { AutomationMajor, MagicMajor } from "@shopify/polaris-icons";
+import { Text, IndexFiltersMode, Badge, Box } from "@shopify/polaris";
 import { useNavigate } from "react-router-dom";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
@@ -18,23 +17,49 @@ import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 import IconCacheService from "@/services/IconCacheService";
 import MCPIcon from "@/assets/MCP_Icon.svg";
 import LaptopIcon from "@/assets/Laptop.svg";
+import { formatDisplayName, getDomainForFavicon, getTypeFromTags, findAssetTag, ASSET_TAG_KEYS } from "./mcpClientHelper";
 
-const MCP_CLIENT_TAG_KEY = "mcp-client";
 const UNKNOWN_GROUP = "Unknown";
 
 const iconCacheService = new IconCacheService();
 
-const GroupIconRenderer = React.memo(({ hostName, displayName, tagsList }) => {
+// Use tag for icon lookup (prioritize semantic meaning over hostname)
+const GroupIconRenderer = React.memo(({ hostName, assetTagValue, displayName }) => {
     const [iconData, setIconData] = React.useState(null);
+    const [faviconUrl, setFaviconUrl] = React.useState(null);
 
     React.useEffect(() => {
-        if (!hostName || hostName.trim() === '') {
-            return;
-        }
         let isMounted = true;
         const fetchIcon = async () => {
             try {
-                const imageData = await iconCacheService.getIconData(hostName);
+                let imageData = null;
+                
+                // PRIORITY 1: If we have a known client, use favicon service directly
+                // This ensures "claude" tag shows Claude icon, not Azure icon from hostname
+                if (assetTagValue) {
+                    const domain = getDomainForFavicon(assetTagValue);
+                    if (domain && isMounted) {
+                        setFaviconUrl(iconCacheService.getFaviconUrl(domain));
+                        return; // Use favicon for known clients
+                    }
+                }
+                
+                // PRIORITY 2: For unknown clients, try hostname from backend cache
+                if (hostName && hostName.trim() !== '') {
+                    imageData = await iconCacheService.getIconData(hostName);
+                }
+                
+                // PRIORITY 3: Try keyword search in backend cache
+                if (!imageData && assetTagValue) {
+                    const parts = assetTagValue.toLowerCase().split(/[-_\s]+/);
+                    for (const part of parts) {
+                        if (part.length > 2) {
+                            imageData = await iconCacheService.getIconByKeyword(part);
+                            if (imageData) break;
+                        }
+                    }
+                }
+                
                 if (imageData && isMounted) {
                     setIconData(imageData);
                 }
@@ -48,31 +73,33 @@ const GroupIconRenderer = React.memo(({ hostName, displayName, tagsList }) => {
         return () => {
             isMounted = false;
         };
-    }, [hostName]);
+    }, [hostName, assetTagValue]);
 
+    // Priority 1: Backend cached icon
     if (iconData) {
         return (
             <img
                 src={`data:image/png;base64,${iconData}`}
-                alt={`${hostName} icon`}
+                alt={`${displayName} icon`}
                 style={{width: '20px', height: '20px', borderRadius: '2px'}}
-                onError={() => {
-                    setIconData(null);
-                }}
+                onError={() => setIconData(null)}
             />
         );
     }
 
-    // Fallback icons
-    if (tagsList?.some(tag => tag.name === "gen-ai")) {
-        const iconSource = tagsList.some(tag => tag.name === "AI Agent") ? AutomationMajor : MagicMajor;
-        return <Icon source={iconSource} color={"base"} />;
+    // Priority 2: Favicon from external service
+    if (faviconUrl) {
+        return (
+            <img
+                src={faviconUrl}
+                alt={`${displayName} icon`}
+                style={{width: '20px', height: '20px', borderRadius: '2px'}}
+                onError={() => setFaviconUrl(null)}
+            />
+        );
     }
 
-    if (tagsList?.some(tag => tag.name === "mcp-server")) {
-        return <img src={MCPIcon} alt="MCP icon" style={{width: '20px', height: '20px', borderRadius: '2px'}} />;
-    }
-
+    // Priority 3: Default fallback icon
     const defaultIcon = displayName?.toLowerCase().startsWith('mcp') ? MCPIcon : LaptopIcon;
     return <img src={defaultIcon} alt="default icon" style={{width: '20px', height: '20px', borderRadius: '2px'}} />;
 });
@@ -100,12 +127,29 @@ const headers = [
         boxWidth: '24px'
     }] : []),
     {
-        title: "Endpoint group",
-        text: "Endpoint group",
+        title: "Agentic asset",
+        text: "Agentic asset",
         value: "groupName",
         filterKey: "groupName",
         textValue: "groupName",
         showFilter: true,
+    },
+    {
+        title: "Type",
+        text: "Type",
+        value: "clientType",
+        filterKey: "clientType",
+        textValue: "clientType",
+        showFilter: true,
+        boxWidth: "120px",
+    },
+    {
+        title: "Endpoints",
+        text: "Endpoints",
+        value: "collectionsCount",
+        isText: CellType.TEXT,
+        sortActive: true,
+        boxWidth: "80px",
     },
     {
         title: mapLabel("Total endpoints", getDashboardCategory()),
@@ -123,14 +167,6 @@ const headers = [
         textValue: "riskScore",
         numericValue: "riskScore",
         text: "Risk Score",
-        sortActive: true,
-        boxWidth: "80px",
-    },
-    {
-        title: "Collections count",
-        text: "Collections count",
-        value: "collectionsCount",
-        isText: CellType.TEXT,
         sortActive: true,
         boxWidth: "80px",
     },
@@ -166,8 +202,8 @@ const sortOptions = [
 ];
 
 const resourceName = {
-    singular: "endpoint group",
-    plural: "endpoint groups",
+    singular: "Agentic asset",
+    plural: "Agentic assets",
 };
 
 function Endpoints() {
@@ -192,19 +228,33 @@ function Endpoints() {
             if (collection.deactivated) return;
 
             let groupKey = UNKNOWN_GROUP;
-            const mcpClientTag = collection.envType?.find(
-                (tag) => tag.keyName === MCP_CLIENT_TAG_KEY
-            );
+            let assetTagValue = null;
+            let assetTagKey = null;
+            
+            // Find asset grouping tag (mcp-client, ai-agent, or browser-llm-agent)
+            const assetTag = findAssetTag(collection.envType);
 
-            if (mcpClientTag) {
-                groupKey = mcpClientTag.value;
+            if (assetTag) {
+                groupKey = assetTag.value;
+                assetTagValue = assetTag.value;
+                assetTagKey = assetTag.keyName;
             }
 
+            // Get type from type tags (mcp-server, gen-ai, browser-llm)
+            const clientType = getTypeFromTags(collection.envType);
+
             if (!groups[groupKey]) {
+                // Get formatted display name from the tag value
+                const displayName = assetTagValue 
+                    ? formatDisplayName(assetTagValue)
+                    : UNKNOWN_GROUP;
+
                 groups[groupKey] = {
-                    groupName: groupKey,
-                    tagKey: mcpClientTag ? MCP_CLIENT_TAG_KEY : null,
-                    tagValue: mcpClientTag ? mcpClientTag.value : null,
+                    groupName: displayName,
+                    groupKey: groupKey, // Keep original key for filtering
+                    tagKey: assetTagKey,
+                    tagValue: assetTagValue,
+                    clientType: clientType,
                     collections: [],
                     urlsCount: 0,
                     riskScore: 0,
@@ -243,7 +293,7 @@ function Endpoints() {
         return Object.values(groups).map((group) => {
             return {
                 ...group,
-                id: group.groupName,
+                id: group.groupKey || group.groupName, // Use original key as ID
                 tagKey: group.tagKey,
                 tagValue: group.tagValue,
                 sensitiveInRespTypes: Array.from(group.sensitiveInRespTypes),
@@ -256,18 +306,17 @@ function Endpoints() {
     const prettifyGroupData = (groups) => {
         return groups.map((group) => {
             const firstCollection = group.firstCollection;
-
             return {
                 ...group,
-                iconComp: firstCollection ? (
+                iconComp: (
                     <Box>
                         <GroupIconRenderer
-                            hostName={firstCollection.hostName}
-                            displayName={firstCollection.displayName}
-                            tagsList={firstCollection.tagsList}
+                            hostName={firstCollection?.hostName}
+                            assetTagValue={group.tagValue}
+                            displayName={group.groupName}
                         />
                     </Box>
-                ) : null,
+                ),
                 riskScoreComp: <Badge status={getStatus(group.riskScore)} size="small">{group.riskScore}</Badge>,
                 sensitiveSubTypes: transform.prettifySubtypes(group.sensitiveInRespTypes, false),
             };
@@ -352,8 +401,10 @@ function Endpoints() {
         let updatedFiltersMap = { ...filtersMap };
         
         if (!row.tagKey || !row.tagValue) {
+            // Get all asset tag keys for filtering
+            const assetTagKeys = Object.values(ASSET_TAG_KEYS);
             const allTagValues = data
-                .filter(item => item.tagKey === MCP_CLIENT_TAG_KEY && item.tagValue)
+                .filter(item => assetTagKeys.includes(item.tagKey) && item.tagValue)
                 .map(item => `${item.tagKey}=${item.tagValue}`);
             
             if (allTagValues.length > 0) {
@@ -396,15 +447,11 @@ function Endpoints() {
 
     const summaryItems = [
         {
-            title: mapLabel("Total Endpoints", getDashboardCategory()),
-            data: transform.formatNumberWithCommas(summaryData.totalEndpoints),
-        },
-        {
-            title: "Endpoint Groups",
+            title: "Agentic assets",
             data: transform.formatNumberWithCommas(summaryData.totalGroups),
         },
         {
-            title: mapLabel("Total Collections", getDashboardCategory()),
+            title: "Total endpoints",
             data: transform.formatNumberWithCommas(summaryData.totalCollections),
         },
     ];
@@ -418,7 +465,7 @@ function Endpoints() {
             filters={filters}
             headers={headers}
             selectable={false}
-            mode={IndexFiltersMode.Default}
+            mode={IndexFiltersMode.Filtering}
             headings={headers}
             useNewRow={true}
             condensedHeight={true}

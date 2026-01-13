@@ -38,6 +38,7 @@ import ReactFlow, {
   } from 'react-flow-renderer';
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
 import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isGenAISecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
+import useAgenticFilter from "./useAgenticFilter";
   
 const CenterViewType = {
     Table: 0,
@@ -1033,6 +1034,9 @@ function ApiCollections(props) {
         setAllNodes(svcTosvcGraphNodes.map((x, i) => {return { id: x.id, type: 'default', data: {label: x.id}, position: {x: (100 + 100*i), y: (100 + 100*i)} }}))
     }
 
+    // Use custom hook for Agentic filter detection and summary calculation
+    const { filteredSummaryData, activeFilterTitle } = useAgenticFilter(normalData);
+
     useEffect(() => {
         const isMountedRef = { current: true };
 
@@ -1374,13 +1378,19 @@ function ApiCollections(props) {
         }
     }
 
+    // Use filtered summary data when a filter is active (from Endpoints page navigation)
+    const displaySummary = filteredSummaryData || summaryData;
+    const displayTotalAPIs = filteredSummaryData ? filteredSummaryData.totalEndpoints : totalAPIs;
+
     const summaryItems = [
         {
-            title: mapLabel("Total APIs", getDashboardCategory()),
-            data: transform.formatNumberWithCommas(totalAPIs),
+            title: activeFilterTitle 
+                ? mapLabel("Total Agentic Components", getDashboardCategory())
+                : mapLabel("Total APIs", getDashboardCategory()),
+            data: transform.formatNumberWithCommas(displayTotalAPIs),
         },
     
-        ...(!isEndpointSecurityCategory()
+        ...(!isEndpointSecurityCategory() && !activeFilterTitle
             ? [
                   {
                       title: mapLabel("Critical APIs", getDashboardCategory()),
@@ -1395,10 +1405,25 @@ function ApiCollections(props) {
               ]
             : []),
     
+        ...(activeFilterTitle
+            ? [
+                  {
+                      title: "Agentic Collections",
+                      data: transform.formatNumberWithCommas(
+                          filteredSummaryData?.totalCollections || 0
+                      ),
+                  },
+              ]
+            : []),
+    
         {
-            title: mapLabel("Sensitive in response APIs", getDashboardCategory()),
+            title: activeFilterTitle
+                ? "Sensitive in Response"
+                : mapLabel("Sensitive in response APIs", getDashboardCategory()),
             data: transform.formatNumberWithCommas(
-                summaryData.totalSensitiveEndpoints || 0
+                activeFilterTitle 
+                    ? (filteredSummaryData?.totalSensitiveInResponse || 0)
+                    : (summaryData.totalSensitiveEndpoints || 0)
             ),
         },
     ];
@@ -1535,12 +1560,19 @@ function ApiCollections(props) {
         )
     }
 
+    // Dynamic title based on active filter
+    const pageTitle = activeFilterTitle 
+        ? `Agentic Collections - ${activeFilterTitle}`
+        : mapLabel("API Collections", getDashboardCategory());
+
     return(
         <PageWithMultipleCards
             title={
                 <TitleWithInfo 
-                    tooltipContent={"Akto automatically groups similar APIs into meaningful collections based on their subdomain names. "}
-                    titleText={mapLabel("API Collections", getDashboardCategory())} 
+                    tooltipContent={activeFilterTitle 
+                        ? `Viewing collections filtered by ${activeFilterTitle}`
+                        : "Akto automatically groups similar APIs into meaningful collections based on their subdomain names. "}
+                    titleText={pageTitle} 
                     docsUrl={"https://docs.akto.io/api-inventory/concepts"}
                 />
             }
