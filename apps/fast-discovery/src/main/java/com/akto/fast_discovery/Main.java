@@ -42,12 +42,16 @@ public class Main {
         KafkaConsumer<String, String> kafkaConsumer = null;
 
         try {
-            // 1. Initialize Database-Abstractor HTTP client
-            // JWT token read from DATABASE_ABSTRACTOR_SERVICE_TOKEN environment variable (same as mini-runtime)
-            dbAbstractorClient = new DatabaseAbstractorClient(config.dbAbstractorUrl);
+            // 1. Initialize ClientActor for database operations
+            // Uses DATABASE_ABSTRACTOR_SERVICE_TOKEN environment variable
+            ClientActor clientActor = new ClientActor();
+            loggerMaker.infoAndAddToDb("ClientActor initialized");
+
+            // 2. Initialize DatabaseAbstractorClient (using ClientActor for remote calls)
+            dbAbstractorClient = new DatabaseAbstractorClient(clientActor);
             loggerMaker.infoAndAddToDb("DatabaseAbstractorClient initialized");
 
-            // 2. Initialize Bloom Filter Manager
+            // 3. Initialize Bloom Filter Manager
             BloomFilterManager bloomFilter = new BloomFilterManager(
                     dbAbstractorClient,
                     config.bloomFilterExpectedSize,
@@ -58,11 +62,7 @@ public class Main {
             loggerMaker.infoAndAddToDb("BloomFilterManager initialized with " +
                     bloomFilter.getEstimatedMemoryUsageMB() + " MB estimated memory");
 
-            // 3. Initialize ClientActor for collection creation
-            ClientActor clientActor = new ClientActor();
-            loggerMaker.infoAndAddToDb("ClientActor initialized");
-
-            // 4. Initialize API Collection Resolver with ClientActor
+            // 4. Initialize API Collection Resolver
             ApiCollectionResolver collectionResolver = new ApiCollectionResolver(clientActor);
             loggerMaker.infoAndAddToDb("ApiCollectionResolver initialized");
 
@@ -93,20 +93,12 @@ public class Main {
             loggerMaker.infoAndAddToDb("Kafka consumer subscribed to topic: " + config.kafkaTopicName);
 
             // 8. Set up shutdown hook
-            final DatabaseAbstractorClient finalDbClient = dbAbstractorClient;
             final KafkaConsumer<String, String> finalKafkaConsumer = kafkaConsumer;
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 loggerMaker.infoAndAddToDb("Shutdown signal received, cleaning up...");
                 running.set(false);
                 if (finalKafkaConsumer != null) {
                     finalKafkaConsumer.wakeup();
-                }
-                try {
-                    if (finalDbClient != null) {
-                        finalDbClient.close();
-                    }
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("Error closing database-abstractor client: " + e.getMessage());
                 }
                 loggerMaker.infoAndAddToDb("Fast-Discovery Consumer shut down gracefully");
             }));
@@ -152,13 +144,6 @@ public class Main {
                     loggerMaker.errorAndAddToDb("Error closing Kafka consumer: " + e.getMessage());
                 }
             }
-            if (dbAbstractorClient != null) {
-                try {
-                    dbAbstractorClient.close();
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("Error closing database-abstractor client: " + e.getMessage());
-                }
-            }
         }
     }
 
@@ -191,9 +176,7 @@ public class Main {
         config.kafkaGroupId = getEnv("AKTO_KAFKA_GROUP_ID_CONFIG", "fast-discovery");
         config.kafkaMaxPollRecords = Integer.parseInt(getEnv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG", "1000"));
 
-        // Database-Abstractor configuration
-        config.dbAbstractorUrl = getEnv("DATABASE_ABSTRACTOR_SERVICE_URL", "http://database-abstractor:9000");
-        // Note: JWT token (DATABASE_ABSTRACTOR_SERVICE_TOKEN) is read by DatabaseAbstractorClient
+        // Note: Database-Abstractor configuration (URL and JWT token) is read by ClientActor from environment variables
 
         // Bloom Filter configuration
         config.bloomFilterExpectedSize = Long.parseLong(getEnv("BLOOM_FILTER_EXPECTED_SIZE", "10000000"));
@@ -219,7 +202,6 @@ public class Main {
         loggerMaker.infoAndAddToDb("Kafka Topic: " + config.kafkaTopicName);
         loggerMaker.infoAndAddToDb("Kafka Group ID: " + config.kafkaGroupId);
         loggerMaker.infoAndAddToDb("Kafka Max Poll Records: " + config.kafkaMaxPollRecords);
-        loggerMaker.infoAndAddToDb("Database-Abstractor URL: " + config.dbAbstractorUrl);
         loggerMaker.infoAndAddToDb("Bloom Filter Expected Size: " + config.bloomFilterExpectedSize);
         loggerMaker.infoAndAddToDb("Bloom Filter FPP: " + config.bloomFilterFpp);
         loggerMaker.infoAndAddToDb("===================================");
@@ -233,8 +215,6 @@ public class Main {
         String kafkaTopicName;
         String kafkaGroupId;
         int kafkaMaxPollRecords;
-        String dbAbstractorUrl;
-        // Note: JWT token is NOT stored here - DatabaseAbstractorClient reads it from environment
         long bloomFilterExpectedSize;
         double bloomFilterFpp;
     }

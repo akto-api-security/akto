@@ -1037,6 +1037,59 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public List<ApiInfo.ApiInfoKey> fetchApiIds() {
+        Map<String, List<String>> headers = buildHeaders();
+        List<ApiInfo.ApiInfoKey> apiIds = new ArrayList<>();
+        loggerMaker.infoAndAddToDb("fetchApiIds api called", LoggerMaker.LogDb.RUNTIME);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchApiIds", "", "POST", null, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("invalid response in fetchApiIds", LoggerMaker.LogDb.RUNTIME);
+                return apiIds;
+            }
+            try {
+                // Parse JSON array response
+                com.google.gson.JsonArray apiIdArray = gson.fromJson(responsePayload, com.google.gson.JsonArray.class);
+                for (com.google.gson.JsonElement elem : apiIdArray) {
+                    com.google.gson.JsonObject apiIdObj = elem.getAsJsonObject();
+                    int apiCollectionId = apiIdObj.get("apiCollectionId").getAsInt();
+                    String url = apiIdObj.get("url").getAsString();
+                    String methodStr = apiIdObj.get("method").getAsString();
+                    URLMethods.Method method = URLMethods.Method.fromString(methodStr);
+                    ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
+                    apiIds.add(apiInfoKey);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchApiIds: " + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchApiIds: " + e, LoggerMaker.LogDb.RUNTIME);
+        }
+        return apiIds;
+    }
+
+    public void ensureCollections(List<Integer> collectionIds) {
+        if (collectionIds == null || collectionIds.isEmpty()) {
+            return;
+        }
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("collectionIdsToEnsure", collectionIds);
+        Map<String, List<String>> headers = buildHeaders();
+        String objString = gson.toJson(obj);
+
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/ensureApiCollections", "", "POST", objString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in ensureCollections", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in ensureCollections: " + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
     public List<RuntimeFilter> fetchRuntimeFilters() {
         List<RuntimeFilter> runtimeFilters = new ArrayList<>();
 

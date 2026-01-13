@@ -198,6 +198,15 @@ public class DbActor extends DataActor {
     public void bulkWriteApiInfo(List<ApiInfo> apiInfoList) {
         DbLayer.bulkWriteApiInfo(apiInfoList);
     }
+
+    public List<ApiInfo.ApiInfoKey> fetchApiIds() {
+        return DbLayer.fetchAllApiInfoKeys();
+    }
+
+    public void ensureCollections(List<Integer> collectionIds) {
+        DbLayer.ensureCollections(collectionIds);
+    }
+
     public List<RuntimeFilter> fetchRuntimeFilters() {
         return DbLayer.fetchRuntimeFilters();
     }

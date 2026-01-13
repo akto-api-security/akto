@@ -90,6 +90,10 @@ public abstract class DataActor {
 
     public abstract void bulkWriteApiInfo(List<ApiInfo> apiInfoList);
 
+    public abstract List<ApiInfo.ApiInfoKey> fetchApiIds();
+
+    public abstract void ensureCollections(List<Integer> collectionIds);
+
     public abstract List<RuntimeFilter> fetchRuntimeFilters();
 
     public abstract void updateRuntimeVersion(String fieldName, String version);

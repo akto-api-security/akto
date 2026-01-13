@@ -170,6 +170,36 @@ public class DbLayer {
         List<WriteModel<ApiInfo>> writesForApiInfo = ApiInfoBulkUpdate.getUpdatesForApiInfo(apiInfoList);
         ApiInfoDao.instance.getMCollection().bulkWrite(writesForApiInfo);
     }
+
+    public static List<ApiInfo.ApiInfoKey> fetchAllApiInfoKeys() {
+        com.mongodb.client.FindIterable<ApiInfo> cursor = ApiInfoDao.instance
+            .getMCollection()
+            .find()
+            .projection(Projections.include("_id"))
+            .batchSize(10000);
+
+        List<ApiInfo.ApiInfoKey> apiIds = new ArrayList<>();
+        for (ApiInfo apiInfo : cursor) {
+            if (apiInfo != null && apiInfo.getId() != null) {
+                apiIds.add(apiInfo.getId());
+            }
+        }
+        return apiIds;
+    }
+
+    public static void ensureCollections(List<Integer> collectionIds) {
+        if (collectionIds == null || collectionIds.isEmpty()) {
+            return;
+        }
+        for (Integer collectionId : collectionIds) {
+            ApiCollectionsDao.instance.getMCollection().updateOne(
+                Filters.eq("_id", collectionId),
+                Updates.setOnInsert("_id", collectionId),
+                new UpdateOptions().upsert(true)
+            );
+        }
+    }
+
     public static void bulkWriteSingleTypeInfo(List<WriteModel<SingleTypeInfo>> writesForSingleTypeInfo) {
         BulkWriteResult res = SingleTypeInfoDao.instance.getMCollection().bulkWrite(writesForSingleTypeInfo);
         loggerMaker.debug("bulk write result: del:" + res.getDeletedCount() + " ins:" + res.getInsertedCount() + " match:" + res.getMatchedCount() + " modify:" +res.getModifiedCount());
@@ -322,28 +352,15 @@ public class DbLayer {
     public static List<com.akto.dto.traffic.Key> fetchAllSampleDataKeys() {
         List<com.akto.dto.traffic.Key> keys = new ArrayList<>();
         try {
-            com.mongodb.client.FindIterable<org.bson.Document> cursor = SampleDataDao.instance
+            com.mongodb.client.FindIterable<SampleData> cursor = SampleDataDao.instance
                 .getMCollection()
-                .withDocumentClass(org.bson.Document.class)
                 .find()
                 .projection(Projections.include("_id"))
                 .batchSize(10000);
 
-            for (org.bson.Document doc : cursor) {
-                org.bson.Document id = (org.bson.Document) doc.get("_id");
-                if (id != null) {
-                    int apiCollectionId = id.getInteger("apiCollectionId", 0);
-                    String url = id.getString("url");
-                    String methodStr = id.getString("method");
-                    int responseCode = id.getInteger("responseCode", -1);
-                    int isHeader = id.getInteger("isHeader", 0);
-                    int ts = id.getInteger("ts", 0);
-
-                    URLMethods.Method method = URLMethods.Method.fromString(methodStr);
-                    com.akto.dto.traffic.Key key = new com.akto.dto.traffic.Key(
-                        apiCollectionId, url, method, responseCode, isHeader, ts
-                    );
-                    keys.add(key);
+            for (SampleData sampleData : cursor) {
+                if (sampleData != null && sampleData.getId() != null) {
+                    keys.add(sampleData.getId());
                 }
             }
         } catch (Exception e) {

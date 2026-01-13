@@ -84,11 +84,10 @@ java -jar target/fast-discovery-1.0-SNAPSHOT-jar-with-dependencies.jar
 ## Components
 
 - **Main.java:** Entry point, Kafka consumer setup
-- **FastDiscoveryConsumer.java:** Three-stage detection pipeline
-- **FastDiscoveryParser.java:** Message parsing (~150 lines)
+- **FastDiscoveryConsumer.java:** Three-stage detection pipeline (uses SampleParser for message parsing)
 - **BloomFilterManager.java:** Bloom filter initialization and management
 - **ApiCollectionResolver.java:** Collection ID resolution by hostname
-- **DatabaseAbstractorClient.java:** HTTP client for database-abstractor API
+- **DatabaseAbstractorClient.java:** Wrapper for DataActor (ClientActor/DbActor) for database operations
 - **BulkUpdatesBuilder.java:** Convert to BulkUpdates format
 - **BulkUpdates.java:** DTO for database-abstractor API
 
