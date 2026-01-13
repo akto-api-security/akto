@@ -14,7 +14,7 @@ import settingFunctions from "../../settings/module";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal";
 import transform from "../../testing/transform";
 import issuesFunctions from "../../issues/module";
-import { GUARDRAIL_SECTIONS } from "../constants/guardrailDescriptions";
+import { GUARDRAIL_SECTIONS, GUARDRAIL_REMEDIATION_MARKDOWN } from "../constants/guardrailDescriptions";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 
 function SampleDetails(props) {
@@ -217,11 +217,15 @@ function SampleDetails(props) {
             </Box>)
     }
 
-    const remediationTab = remediationText.length > 0 && {
+    const remediationTab = useGuardrailDescription ? {
+        id: "remediation",
+        content: "Remediation",
+        component: (<MarkdownViewer markdown={GUARDRAIL_REMEDIATION_MARKDOWN}></MarkdownViewer>)
+    } : (remediationText.length > 0 && {
         id: "remediation",
         content: "Remediation",
         component: (<MarkdownViewer markdown={remediationText}></MarkdownViewer>)
-    }
+    })
 
     useEffect(() => {
         fetchRemediationInfo()

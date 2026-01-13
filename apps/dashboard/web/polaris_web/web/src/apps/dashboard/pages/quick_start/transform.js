@@ -475,8 +475,8 @@ const customAgentObj = {
 
 const mcpWrapperObj = {
     icon: '/public/mcp.svg',
-    label: "MCP Endpoint Shield",
-    text: "MCP Endpoint Shield provides runtime security and auto-discovery of local MCP servers configured on your machine, requiring no changes to your setup.",
+    label: "Endpoint Shield",
+    text: "Endpoint Shield provides runtime security and auto-discovery of local MCP servers configured on your machine, requiring no changes to your setup.",
     docsUrl: 'https://docs.akto.io/mcp-endpoint-shield',
     key: "MCP_ENDPOINT_SHIELD",
     component: <AddOnComponenet/>
@@ -1554,7 +1554,6 @@ const quickStartFunc = {
 
         // Endpoint Agents
         const endpointAgents = [
-            mcpWrapperObj,
             cursorHookObj
         ]
 
@@ -1600,11 +1599,16 @@ const quickStartFunc = {
             connectors["DAST"] = crawler
         } else if(isEndpointSecurityCategory()){
             // Atlas (Akto Atlas - Endpoint Security) - DEMO ONLY
+
+            // Add mcpWrapperObj to a hidden array for connector lookup only
+            const hiddenConnectors = [mcpWrapperObj];
+
             connectors = {
                 "Endpoint Agents": endpointAgents,
                 "Agentic Proxies": agenticProxies,
                 "Browser Extension": browserExtensions,
                 "Secure Web Networks": secureWebNetworks,
+                "": hiddenConnectors, // Hidden category for connector lookup
             };
         } else {
             // API Security - all categories
