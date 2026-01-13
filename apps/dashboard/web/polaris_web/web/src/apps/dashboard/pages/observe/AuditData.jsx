@@ -313,7 +313,6 @@ function AuditData() {
                 total = res.total || 0;
             }
         } catch (error) {
-            console.error("Error fetching audit data:", error)
         }
         
         setLoading(false);

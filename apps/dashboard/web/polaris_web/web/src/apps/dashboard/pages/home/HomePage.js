@@ -4,7 +4,6 @@ import LeftNav from "../../components/layouts/leftnav/LeftNav"
 import Store from "../../store";
 import { Outlet } from "react-router-dom";
 import PersistStore from "../../../main/PersistStore";
-import func from "@/util/func";
 import { CATEGORY_AGENTIC_SECURITY } from "../../../main/labelHelper";
 
 function HomePage() {
@@ -12,7 +11,7 @@ function HomePage() {
   const leftNavCollapsed = Store(state => state.leftNavCollapsed)
   const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
 
-  const logoUrl = func.isAtlasArgusAccount() && dashboardCategory === CATEGORY_AGENTIC_SECURITY
+  const logoUrl = dashboardCategory === CATEGORY_AGENTIC_SECURITY
     ? '/dashboard/observe/endpoints'
     : '/dashboard/observe/inventory';
 

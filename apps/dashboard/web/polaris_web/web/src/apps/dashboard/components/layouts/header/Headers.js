@@ -196,7 +196,7 @@ export default function Header() {
         SessionStore.getState().setThreatFiltersMap({});
         PersistStore.getState().setFiltersMap({});
         setDashboardCategory(value);
-        const targetPath = func.isAtlasArgusAccount() && value === "Endpoint Security"
+        const targetPath = value === "Endpoint Security"
             ? "/dashboard/observe/endpoints"
             : "/dashboard/observe/inventory";
         navigate(targetPath);
