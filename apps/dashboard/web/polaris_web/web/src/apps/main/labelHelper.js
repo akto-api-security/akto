@@ -1,6 +1,5 @@
 import { labelMap } from "./labelHelperMap"
 import PersistStore from "./PersistStore";
-import func from "@/util/func";
 
 /**
  * Maps a label to its category-specific version.
@@ -9,15 +8,6 @@ import func from "@/util/func";
  * @returns {string} - Transformed label for that category
  */
 export function mapLabel(value, category) {
-  // For demo accounts: apply special Argus/Atlas label mappings
-  if (func.isDemoAccount() && (category === CATEGORY_AGENTIC_SECURITY || category === CATEGORY_ENDPOINT_SECURITY)) {
-    // Demo-specific label mappings
-    if (value === "Quick Start") return "Connectors";
-    if (value === "API Discovery") return "Agentic AI Discovery";
-    if (value === "API Testing") return "AI Red Teaming";
-    if (value === "Threat Detection") return "Guardrails";
-  }
-
   // Apply standard label mappings for all accounts and categories
   return labelMap?.[category]?.[value] || value;
 }
@@ -63,5 +53,5 @@ export function isDastCategory() {
 }
 
 export function isEndpointSecurityCategory() {
-  return func.isAtlasArgusAccount() && isCategory(CATEGORY_ENDPOINT_SECURITY);
+  return isCategory(CATEGORY_ENDPOINT_SECURITY);
 }
