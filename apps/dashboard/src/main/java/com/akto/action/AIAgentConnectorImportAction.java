@@ -41,9 +41,11 @@ public class AIAgentConnectorImportAction extends UserAction {
     private String langsmithUrl;
     private String langsmithApiKey;
 
-    // Copilot Studio-specific parameters
-    private String appInsightsAppId;
-    private String appInsightsApiKey;
+    // Copilot Studio-specific parameters (Dataverse API)
+    private String dataverseEnvironmentUrl;
+    private String dataverseTenantId;
+    private String dataverseClientId;
+    private String dataverseClientSecret;
 
     /**
      * Unified method to initiate import for any AI Agent Connector.
@@ -132,12 +134,17 @@ public class AIAgentConnectorImportAction extends UserAction {
                 break;
 
             case CONNECTOR_TYPE_COPILOT_STUDIO:
-                if (appInsightsAppId == null || appInsightsAppId.isEmpty() || appInsightsApiKey == null || appInsightsApiKey.isEmpty()) {
-                    loggerMaker.error("Missing required Copilot Studio configuration", LogDb.DASHBOARD);
+                if (dataverseEnvironmentUrl == null || dataverseEnvironmentUrl.isEmpty() ||
+                    dataverseTenantId == null || dataverseTenantId.isEmpty() ||
+                    dataverseClientId == null || dataverseClientId.isEmpty() ||
+                    dataverseClientSecret == null || dataverseClientSecret.isEmpty()) {
+                    loggerMaker.error("Missing required Copilot Studio Dataverse configuration", LogDb.DASHBOARD);
                     return null;
                 }
-                config.put(CONFIG_APPINSIGHTS_APP_ID, appInsightsAppId);
-                config.put(CONFIG_APPINSIGHTS_API_KEY, appInsightsApiKey);
+                config.put(CONFIG_DATAVERSE_ENVIRONMENT_URL, dataverseEnvironmentUrl);
+                config.put(CONFIG_DATAVERSE_TENANT_ID, dataverseTenantId);
+                config.put(CONFIG_DATAVERSE_CLIENT_ID, dataverseClientId);
+                config.put(CONFIG_DATAVERSE_CLIENT_SECRET, dataverseClientSecret);
                 break;
 
             default:

@@ -10,11 +10,12 @@ import { ActorDetails } from "./components/ActorDetails";
 import ThreatWorldMap from "./components/ThreatWorldMap";
 // import ThreatApiSubcategoryCount from "./components/ThreatApiSubcategoryCount";
 
-import { HorizontalGrid, VerticalStack } from "@shopify/polaris";
+import { HorizontalGrid, VerticalStack, Button } from "@shopify/polaris";
 import { ThreatSummary } from "./components/ThreatSummary";
 import ThreatActivityTimeline from "./components/ThreatActivityTimeline";
 import React from "react";
 import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
+import useThreatReportDownload from "../../hooks/useThreatReportDownload";
 
 const ChartComponent = ({ onSubCategoryClick, currDateRange }) => {
     return (
@@ -50,6 +51,14 @@ function ThreatActorPage() {
     produce((draft, action) => func.dateRangeReducer(draft, action)),
     initialVal
   );
+
+  const startTimestamp = parseInt(currDateRange.period.since.getTime()/1000);
+  const endTimestamp = parseInt(currDateRange.period.until.getTime()/1000);
+
+  const { downloadThreatReport } = useThreatReportDownload({
+    startTimestamp,
+    endTimestamp
+  })
 
   useEffect(() => {
   }, []);
@@ -94,6 +103,11 @@ function ThreatActorPage() {
             })
           }
         />
+      }
+      secondaryActions={
+        <Button primary onClick={downloadThreatReport}>
+          Export Threat Report
+        </Button>
       }
       components={components}
     />

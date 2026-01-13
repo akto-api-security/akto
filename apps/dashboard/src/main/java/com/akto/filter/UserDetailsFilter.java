@@ -38,6 +38,7 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import org.apache.commons.lang3.StringUtils;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 
 // This is the first filter which will hit for every request to server
 // First checks if the access token is valid or not (from header)
@@ -92,6 +93,8 @@ public class UserDetailsFilter implements Filter {
         String apiKey = httpServletRequest.getHeader("X-API-KEY");
         String accessToken;
 
+        String accessTokenForMcpRequest = httpServletRequest.getHeader("x-akto-mcp-token");
+
         // if api key present then check if valid api key or not and generate access token
         // else find access token from request header
         boolean apiKeyFlag = apiKey != null;
@@ -112,6 +115,27 @@ public class UserDetailsFilter implements Filter {
             try {
                 Jws<Claims> claims = JwtAuthenticator.authenticate(aktoSessionTokenFromRequest);
                 Context.accountId.set((int) claims.getBody().get("accountId"));
+            } catch (Exception e) {
+                e.printStackTrace();
+                httpServletResponse.sendError(403);
+                return;
+            }
+        }
+
+        if(accessTokenForMcpRequest != null && !accessTokenForMcpRequest.isEmpty()) {
+            try {
+                Jws<Claims> claims = JwtAuthenticator.authenticate(accessTokenForMcpRequest);
+                int accountId = (int) claims.getBody().get("accountId");
+                String contextSource = (String) claims.getBody().get("contextSource");
+                CONTEXT_SOURCE contextSourceEnum = CONTEXT_SOURCE.valueOf(contextSource.toUpperCase());
+                String authRole = (String) claims.getBody().get("auth_role");
+                if(authRole != null && authRole.equalsIgnoreCase("mcp") && contextSourceEnum != null && accountId > 0) {
+                    Context.contextSource.set(contextSourceEnum);
+                    Context.accountId.set(accountId);
+                } else {
+                    httpServletResponse.sendError(403);
+                    return;
+                }
             } catch (Exception e) {
                 e.printStackTrace();
                 httpServletResponse.sendError(403);

@@ -6,6 +6,8 @@ import java.util.Map;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+
 import lombok.NoArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
@@ -56,6 +58,13 @@ public class GuardrailPolicies {
     // Step 7.5: Gibberish Detection - ML-based detection of nonsensical text
     private GibberishDetection gibberishDetection;
 
+    // Step 7.6: Additional Scanner Detections
+    private AnonymizeDetection anonymizeDetection;
+    private BanCodeDetection banCodeDetection;
+    private SecretsDetection secretsDetection;
+    private SentimentDetection sentimentDetection;
+    private TokenLimitDetection tokenLimitDetection;
+
 
     // Step 7: Server and application settings (old format - backward compatibility)
     private List<String> selectedMcpServers;
@@ -73,6 +82,9 @@ public class GuardrailPolicies {
     
     // Step 8: Review and Finish
     private boolean active;
+
+    // Context source - to identify which dashboard created this guardrail
+    private CONTEXT_SOURCE contextSource;
 
     public String getHexId() {
         if (this.id != null) {
@@ -128,7 +140,8 @@ public class GuardrailPolicies {
                            LLMRule llmRule, BasePromptRule basePromptRule, GibberishDetection gibberishDetection,
                            List<String> selectedMcpServers, List<String> selectedAgentServers,
                            List<SelectedServer> selectedMcpServersV2, List<SelectedServer> selectedAgentServersV2,
-                           boolean applyOnResponse, boolean applyOnRequest, String url, double confidenceScore, boolean active) {
+                           boolean applyOnResponse, boolean applyOnRequest, String url, double confidenceScore, boolean active,
+                           CONTEXT_SOURCE contextSource) {
         this.name = name;
         this.description = description;
         this.blockedMessage = blockedMessage;
@@ -156,6 +169,7 @@ public class GuardrailPolicies {
         this.url = url;
         this.confidenceScore = confidenceScore;
         this.active = active;
+        this.contextSource = contextSource;
     }
 
     @Getter
@@ -248,6 +262,72 @@ public class GuardrailPolicies {
         private double confidenceScore;
 
         public GibberishDetection(boolean enabled, double confidenceScore) {
+            this.enabled = enabled;
+            this.confidenceScore = confidenceScore;
+        }
+    }
+
+    // Scanner Detection classes following GibberishDetection pattern
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class AnonymizeDetection {
+        private boolean enabled;
+        private double confidenceScore;
+
+        public AnonymizeDetection(boolean enabled, double confidenceScore) {
+            this.enabled = enabled;
+            this.confidenceScore = confidenceScore;
+        }
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class BanCodeDetection {
+        private boolean enabled;
+        private double confidenceScore;
+
+        public BanCodeDetection(boolean enabled, double confidenceScore) {
+            this.enabled = enabled;
+            this.confidenceScore = confidenceScore;
+        }
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class SecretsDetection {
+        private boolean enabled;
+        private double confidenceScore;
+
+        public SecretsDetection(boolean enabled, double confidenceScore) {
+            this.enabled = enabled;
+            this.confidenceScore = confidenceScore;
+        }
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class SentimentDetection {
+        private boolean enabled;
+        private double confidenceScore;
+
+        public SentimentDetection(boolean enabled, double confidenceScore) {
+            this.enabled = enabled;
+            this.confidenceScore = confidenceScore;
+        }
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class TokenLimitDetection {
+        private boolean enabled;
+        private double confidenceScore;
+
+        public TokenLimitDetection(boolean enabled, double confidenceScore) {
             this.enabled = enabled;
             this.confidenceScore = confidenceScore;
         }

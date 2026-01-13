@@ -227,10 +227,11 @@ function GuardrailPolicies() {
         const details = [];
         
         // Content filtering details
-        if (policy.contentFiltering?.harmfulCategories || policy.contentFiltering?.promptAttacks) {
+        if (policy.contentFiltering?.harmfulCategories || policy.contentFiltering?.promptAttacks || policy.contentFiltering?.code) {
             const filters = [];
             if (policy.contentFiltering.harmfulCategories) filters.push("Harmful Categories");
             if (policy.contentFiltering.promptAttacks) filters.push("Prompt Attacks");
+            if (policy.contentFiltering.code) filters.push("Code Detection");
             details.push({ label: "Content Filters", value: filters.join(", ") });
         }
 
@@ -421,7 +422,7 @@ function GuardrailPolicies() {
 
             // Determine severity based on configuration
             let severity = "Low";
-            if (guardrailData.contentFilters?.harmfulCategories || guardrailData.contentFilters?.promptAttacks) {
+            if (guardrailData.contentFilters?.harmfulCategories || guardrailData.contentFilters?.promptAttacks || guardrailData.contentFilters?.code) {
                 severity = "High";
             } else if (guardrailData.deniedTopics?.length > 0 || guardrailData.piiFilters?.length > 0) {
                 severity = "Medium";
@@ -450,6 +451,12 @@ function GuardrailPolicies() {
                 ...(guardrailData.basePromptRule ? { basePromptRule: guardrailData.basePromptRule } : {}),
                 // Add Gibberish Detection if present (same pattern as llmRule)
                 ...(guardrailData.gibberishDetection ? { gibberishDetection: guardrailData.gibberishDetection } : {}),
+                // Add Advanced Scanner Detections if present
+                ...(guardrailData.anonymizeDetection ? { anonymizeDetection: guardrailData.anonymizeDetection } : {}),
+                ...(guardrailData.banCodeDetection ? { banCodeDetection: guardrailData.banCodeDetection } : {}),
+                ...(guardrailData.secretsDetection ? { secretsDetection: guardrailData.secretsDetection } : {}),
+                ...(guardrailData.sentimentDetection ? { sentimentDetection: guardrailData.sentimentDetection } : {}),
+                ...(guardrailData.tokenLimitDetection ? { tokenLimitDetection: guardrailData.tokenLimitDetection } : {}),
                 applyOnResponse: guardrailData.applyOnResponse || false,
                 applyOnRequest: guardrailData.applyOnRequest || false,
                 url: guardrailData.url || '',

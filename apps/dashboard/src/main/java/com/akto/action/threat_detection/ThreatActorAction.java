@@ -49,6 +49,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   List<DashboardThreatActor> actors;
   List<MaliciousPayloadsResponse> maliciousPayloadsResponses;
   List<ThreatActorPerCountry> actorsCountPerCountry;
+  List<BasicDBObject> threatComplianceInfos;
   int skip;
   static final int LIMIT = 50;
   long total;
@@ -212,9 +213,10 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
                                     smr.getCountry(),
                                     smr.getLatestSubcategory(),
                                     smr.getActivityDataList().stream()
-                                    .map(subData -> new ActivityData(subData.getUrl(), subData.getSeverity(), subData.getSubCategory(), subData.getDetectedAt(), subData.getMethod(), subData.getHost()))
+                                    .map(subData -> new ActivityData(subData.getUrl(), subData.getSeverity(), subData.getSubCategory(), subData.getDetectedAt(), subData.getMethod(), subData.getHost(), subData.getMetadata()))
                                     .collect(Collectors.toList()),
-                                    smr.getLatestApiHost()))
+                                    smr.getLatestApiHost(),
+                                    smr.getLatestMetadata()))
                         .collect(Collectors.toList());
 
                 this.total = m.getTotal();
@@ -270,6 +272,30 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     }
 
     return SUCCESS.toUpperCase();
+  }
+
+  public String fetchThreatComplianceInfos() {
+    try {
+      Bson emptyFilter = Filters.empty();
+      List<com.akto.dto.threat_detection.ThreatComplianceInfo> threatComplianceList =
+          com.akto.dao.threat_detection.ThreatComplianceInfosDao.instance.findAll(emptyFilter);
+
+      this.threatComplianceInfos = new ArrayList<>();
+      for (com.akto.dto.threat_detection.ThreatComplianceInfo threatCompliance : threatComplianceList) {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put(Constants.ID, threatCompliance.getId());
+        obj.put("mapComplianceToListClauses", threatCompliance.getMapComplianceToListClauses());
+        obj.put("author", threatCompliance.getAuthor());
+        obj.put("hash", threatCompliance.getHash());
+        this.threatComplianceInfos.add(obj);
+      }
+
+      loggerMaker.infoAndAddToDb("Fetched " + this.threatComplianceInfos.size() + " threat compliance infos", LogDb.DASHBOARD);
+      return SUCCESS.toUpperCase();
+    } catch (Exception e) {
+      loggerMaker.errorAndAddToDb(e, "Error while fetching threat compliance infos: " + e.getMessage(), LogDb.DASHBOARD);
+      return ERROR.toUpperCase();
+    }
   }
 
     public static Wafv2Client getAwsWafClient(String accessKey, String secretKey, String region) {
@@ -765,5 +791,13 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
 
   public void setSort(Map<String, Integer> sort) {
     this.sort = sort;
+  }
+
+  public List<BasicDBObject> getThreatComplianceInfos() {
+    return threatComplianceInfos;
+  }
+
+  public void setThreatComplianceInfos(List<BasicDBObject> threatComplianceInfos) {
+    this.threatComplianceInfos = threatComplianceInfos;
   }
 }

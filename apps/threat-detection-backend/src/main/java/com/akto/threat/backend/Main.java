@@ -8,7 +8,6 @@ import com.akto.kafka.KafkaConfig;
 import com.akto.kafka.KafkaConsumerConfig;
 import com.akto.kafka.KafkaProducerConfig;
 import com.akto.kafka.Serializer;
-import com.akto.log.LoggerMaker;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.dao.ThreatDetectionDaoInit;
 import com.akto.threat.backend.service.ApiDistributionDataService;
@@ -18,6 +17,7 @@ import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
 import com.akto.threat.backend.tasks.FlushMessagesToDB;
 import com.akto.threat.backend.cron.ArchiveOldMaliciousEventsCron;
+import com.akto.threat.backend.cron.RiskScoreSyncCron;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.ReadPreference;
@@ -29,12 +29,12 @@ import org.bson.codecs.pojo.PojoCodecProvider;
 
 public class Main {
 
-  private static final LoggerMaker logger = new LoggerMaker(Main.class);
 
   public static void main(String[] args) throws Exception {
 
     ConnectionString connectionString =
         new ConnectionString(System.getenv("AKTO_THREAT_PROTECTION_MONGO_CONN"));
+    String dashboardMongoString = System.getenv("AKTO_MONGO_CONN");
     System.out.println("connectionString: " + connectionString);
     CodecRegistry pojoCodecRegistry =
         fromProviders(PojoCodecProvider.builder().automatic(true).build());
@@ -52,7 +52,12 @@ public class Main {
 
     // Initialize legacy DaoInit for AuthenticationInterceptor (ConfigsDao)
     // ConfigsDao uses CommonContextDao which connects to "common" database
-    DaoInit.init(connectionString);
+    if(dashboardMongoString != null && !dashboardMongoString.isEmpty()) {
+        ConnectionString dashboardMongoConnectionString = new ConnectionString(dashboardMongoString);
+        DaoInit.init(dashboardMongoConnectionString, ReadPreference.primary(), WriteConcern.W1);
+    }else {
+        DaoInit.init(connectionString);
+    }
 
     ThreatDetectionDaoInit.init(threatProtectionMongo);
 
@@ -71,7 +76,6 @@ public class Main {
             .setValueSerializer(Serializer.STRING)
             .build();
 
-
     new FlushMessagesToDB(internalKafkaConfig, threatProtectionMongo).run();
 
     MaliciousEventService maliciousEventService =
@@ -85,6 +89,10 @@ public class Main {
 
     ArchiveOldMaliciousEventsCron cron = new ArchiveOldMaliciousEventsCron(threatProtectionMongo);
     cron.cron();
+
+    RiskScoreSyncCron riskScoreSyncCron = new RiskScoreSyncCron();
+    riskScoreSyncCron.setUpRiskScoreSyncCronScheduler();
+    
   }
 
 }

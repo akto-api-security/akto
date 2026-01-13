@@ -300,6 +300,30 @@ const settingRequests = {
         })
     },
 
+    fetchJiraPriorities() {
+        return request({
+            url: '/api/jira/fetchPriorities',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    saveSeverityMapping(severityToPriorityMap) {
+        return request({
+            url: '/api/jira/saveSeverityMapping',
+            method: 'post',
+            data: {severityToPriorityMap}
+        })
+    },
+
+    fetchSeverityMapping() {
+        return request({
+            url: '/api/jira/fetchSeverityMapping',
+            method: 'post',
+            data: {}
+        })
+    },
+
     addOktaSso(clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri) {
         return request({
             url: '/api/addOktaSso',
@@ -607,6 +631,29 @@ const settingRequests = {
         })
     },
 
+    fetchAdxIntegration() {
+        return request({
+            url: '/api/fetchAdxIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addAdxIntegration(clusterEndpoint, databaseName, tenantId, applicationClientId, applicationKey) {
+        return request({
+            url: '/api/addAdxIntegration',
+            method: 'post',
+            data: {clusterEndpoint, databaseName, tenantId, applicationClientId, applicationKey}
+        })
+    },
+    removeAdxIntegration() {
+        return request({
+            url: '/api/removeAdxIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
     fetchServiceNowIntegration() {
         return request({
             url: '/api/fetchServiceNowIntegration',
@@ -647,11 +694,15 @@ const settingRequests = {
         })
     },
 
-    fetchDevRevParts(personalAccessToken) {
+    fetchDevRevParts(personalAccessToken, partTypes, partName) {
         return request({
             url: '/api/fetchDevRevParts',
             method: 'post',
-            data: { personalAccessToken }
+            data: {
+                personalAccessToken,
+                partTypes: (partTypes && partTypes.length > 0) ? partTypes : null,
+                partName: partName || null
+            }
         })
     },
 
@@ -805,11 +856,11 @@ const settingRequests = {
             data: {filterLogPolicy}
         })
     },
-    rebootModules(moduleIds) {
+    rebootModules(moduleIds, deleteTopicAndReboot = false) {
         return request({
             url: '/api/rebootModules',
             method: 'post',
-            data: {moduleIds}
+            data: {moduleIds, deleteTopicAndReboot}
         })
     }
 }

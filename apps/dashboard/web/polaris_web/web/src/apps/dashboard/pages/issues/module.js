@@ -25,13 +25,24 @@ const issuesFunctions = {
         }
     },
     getJiraFieldConfigurations: (field) => {
-        const customFieldURI = field?.schema?.custom || "";
-        const allowedValues = field?.allowedValues || [];
+        let customFieldURI = field?.schema?.custom || "";
+        const allowedValues = Array.isArray(field?.allowedValues) ? field.allowedValues : [];
         const fieldId = field?.fieldId || "";
         const fieldName = field?.name || "";
         const isFieldRequired = field?.required || false;
         const hasDefaultValue = field?.hasDefaultValue || false;
         const defaultValue = field?.defaultValue || null;
+
+        // handle allowed system fields
+        const systemFieldURI = field?.schema?.system || "";
+        if (systemFieldURI && customFieldURI === "") {
+            if (systemFieldURI === "priority") {
+                // treat priority system field as select field
+                customFieldURI = "com.atlassian.jira.plugin.system.customfieldtypes:select";
+
+                allowedValues.forEach(item => { item.value = item.name; })
+            }
+        }
 
         const handleFieldChange = (fieldId, value) => {
             updateDisplayJiraIssueFieldValues(fieldId, value)
@@ -149,9 +160,21 @@ const issuesFunctions = {
                 }
             }
 
+            let formattedFieldValue;
+
+            switch (fieldId) {
+                case "priority":
+                    const priorityValue = fieldCurrentValue?.value;
+                    formattedFieldValue = { name: priorityValue };
+                    break;
+                default:
+                    formattedFieldValue = fieldCurrentValue;
+                    break;  
+            }
+
             acc.push({
                 fieldId: fieldId,
-                fieldValue: fieldCurrentValue
+                fieldValue: formattedFieldValue
             });
             return acc;
         }, []);
