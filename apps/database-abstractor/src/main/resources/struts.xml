@@ -79,6 +79,29 @@
             </result>
         </action>
 
+        <action name="api/bulkUpdateModuleInfoForHeartbeat" class="com.akto.action.DbAction" method="bulkUpdateModuleInfo">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+
+        <action name="api/updateModuleInfoForHeartbeatV2" class="com.akto.action.DbAction" method="updateModuleInfoForHeartbeatV2">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/updateCidrList" class="com.akto.action.DbAction" method="updateCidrList">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -2059,6 +2082,37 @@
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/insertDastLog" class="com.akto.action.DbAction" method="insertDastLog">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchPendingDastJobs" class="com.akto.action.DbAction" method="fetchPendingDastJobs">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="root">crawlerRuns</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+            </result>
+        </action>
+
+        <action name="api/updateDastJobStatus" class="com.akto.action.DbAction" method="updateDastJobStatus">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
             </result>
         </action>
 

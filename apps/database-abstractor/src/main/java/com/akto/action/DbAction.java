@@ -145,6 +145,9 @@ public class DbAction extends ActionSupport {
     @Getter @Setter
     private ModuleInfo moduleInfo;
 
+    @Getter @Setter
+    private List<ModuleInfo> moduleInfoList;
+
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbAction.class, LogDb.DB_ABS);
 
     public List<BulkUpdates> getWritesForTestingRunIssues() {
@@ -423,6 +426,26 @@ public class DbAction extends ActionSupport {
             // TODO: in case of modules with fixed names, reset reboot value, if reboot true;
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in updateModuleInfo " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String bulkUpdateModuleInfo() {
+        try {
+            DbLayer.bulkUpdateModuleInfo(moduleInfoList);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in bulkUpdateModuleInfo " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateModuleInfoForHeartbeatV2() {
+        try {
+            moduleInfo = DbLayer.updateModuleInfoForHeartbeatV2(moduleInfo);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in updateModuleInfoForHeartbeat " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -3195,6 +3218,74 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String insertDastLog() {
+        try {
+            Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+            PupeteerLogsDao.instance.insertOne(dbLog);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertDastLog " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+
+    private List<CrawlerRun> crawlerRuns;
+    private String moduleName;
+    private String crawlId;
+    private String status;
+    private String errorMessage;
+
+    public String fetchPendingDastJobs() {
+        try {
+            crawlerRuns = CrawlerRunDao.instance.findAll(
+                    Filters.and(
+                            Filters.eq(CrawlerRun.MODULE_NAME, moduleName),
+                            Filters.eq(CrawlerRun.STATUS, CrawlerRun.CrawlerRunStatus.PENDING.name())
+                    ),
+                    0, 1,
+                    Sorts.ascending(CrawlerRun.START_TIMESTAMP)
+            );
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetchPendingDastJobs");
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    public String updateDastJobStatus() {
+        try {
+            Bson updates = null;
+            if (status.equals(CrawlerRun.CrawlerRunStatus.RUNNING.name())) {
+                updates = Updates.combine(
+                        Updates.set(CrawlerRun.STATUS, status),
+                        Updates.set(CrawlerRun.START_TIMESTAMP, Context.now())
+                );
+            } else if (status.equals(CrawlerRun.CrawlerRunStatus.COMPLETED.name())) {
+                updates = Updates.combine(
+                        Updates.set(CrawlerRun.STATUS, status),
+                        Updates.set(CrawlerRun.END_TIMESTAMP, Context.now())
+                );
+            } else if (status.equals(CrawlerRun.CrawlerRunStatus.FAILED.name())) {
+                updates = Updates.combine(
+                        Updates.set(CrawlerRun.STATUS, status),
+                        Updates.set(CrawlerRun.END_TIMESTAMP, Context.now()),
+                        Updates.set(CrawlerRun.ERROR_MESSAGE, errorMessage)
+                );
+            }
+
+            CrawlerRunDao.instance.updateOne(
+                    Filters.eq(CrawlerRun.CRAWL_ID, crawlId),
+                    updates
+            );
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in updateDastJobStatus");
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }
@@ -4499,6 +4590,46 @@ public class DbAction extends ActionSupport {
 
     public void setTestedApisMap(Map<String, Integer> testedApisMap) {
         this.testedApisMap = testedApisMap;
+    }
+
+    public List<CrawlerRun> getCrawlerRuns() {
+        return crawlerRuns;
+    }
+
+    public void setCrawlerRuns(List<CrawlerRun> crawlerRuns) {
+        this.crawlerRuns = crawlerRuns;
+    }
+
+    public String getModuleName() {
+        return moduleName;
+    }
+
+    public void setModuleName(String moduleName) {
+        this.moduleName = moduleName;
+    }
+
+    public String getCrawlId() {
+        return crawlId;
+    }
+
+    public void setCrawlId(String crawlId) {
+        this.crawlId = crawlId;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public String getErrorMessage() {
+        return errorMessage;
+    }
+
+    public void setErrorMessage(String errorMessage) {
+        this.errorMessage = errorMessage;
     }
 
     // Fields for fetchApiIds API (Fast-Discovery Consumer)
