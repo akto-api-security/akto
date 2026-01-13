@@ -354,7 +354,7 @@ function AuditData() {
                 Audit Data
               </Text>
             }
-            backUrl="/dashboard/observe"
+            isFirstPage={true}
             primaryAction={primaryActions}
             components = {[
                 <GithubServerTable
