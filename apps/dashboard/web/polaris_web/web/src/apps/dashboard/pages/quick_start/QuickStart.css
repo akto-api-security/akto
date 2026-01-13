@@ -73,16 +73,7 @@
 }
 
 .endpoint-shield-card-wrapper {
-    position: relative;
     padding: 1px;
     background: linear-gradient(135deg, #6200EA 0%, #B37DFF 100%);
     border-radius: 8px;
-}
-
-.endpoint-shield-divider {
-    width: 1px;
-    background-color: #d1d5db;
-    align-self: stretch;
-    min-height: 60px;
-    margin: 0 8px;
 }
