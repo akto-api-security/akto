@@ -6,12 +6,13 @@ const SeveritySelector = ({
     onClose,
     onConfirm,
     selectedCount = 0,
-    pageType = 'test results'
+    pageType = 'test results',
+    disabled = false
 }) => {
     const [selectedSeverity, setSelectedSeverity] = useState(null);
 
     const handleConfirm = () => {
-        if (selectedSeverity) {
+        if (selectedSeverity && !disabled) {
             onConfirm(selectedSeverity);
             onClose();
         }
@@ -57,7 +58,8 @@ const SeveritySelector = ({
             primaryAction={{
                 content: 'Update Severity',
                 onAction: handleConfirm,
-                disabled: !selectedSeverity
+                disabled: !selectedSeverity || disabled,
+                loading: disabled
             }}
             secondaryActions={[
                 {

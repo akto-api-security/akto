@@ -213,6 +213,7 @@ function IssuesPage() {
 
     // Severity update modal states
     const [severityModalActive, setSeverityModalActive] = useState(false)
+    const [severityUpdateInProgress, setSeverityUpdateInProgress] = useState(false)
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
 
@@ -440,10 +441,17 @@ function IssuesPage() {
     }, [compulsoryDescriptionModal, pendingIgnoreAction]);
 
     const handleBulkSeverityUpdate = (newSeverity) => {
+        // Prevent duplicate concurrent updates
+        if (severityUpdateInProgress) {
+            setToast(true, true, "Severity update already in progress")
+            return
+        }
+
         const items = selectedIssuesItems
+        setSeverityUpdateInProgress(true)
 
         api.bulkUpdateIssueSeverity(items, newSeverity).then((res) => {
-            setToast(true, false, `Severity updated for ${items.length} issue${items.length === 1 ? "" : "s"}`)
+            setToast(true, false, `Severity updated for ${items.length} issue${items.length === 1 ? "" : "s"} across all test runs`)
             setSeverityModalActive(false)
 
             // Reset selections
@@ -454,6 +462,8 @@ function IssuesPage() {
         }).catch((error) => {
             setToast(true, true, "Failed to update severity")
             setSeverityModalActive(false)
+        }).finally(() => {
+            setSeverityUpdateInProgress(false)
         })
     }
 
@@ -1149,6 +1159,7 @@ function IssuesPage() {
                 onConfirm={handleBulkSeverityUpdate}
                 selectedCount={selectedIssuesItems.length}
                 pageType="issue"
+                disabled={severityUpdateInProgress}
             />
         </>
     )

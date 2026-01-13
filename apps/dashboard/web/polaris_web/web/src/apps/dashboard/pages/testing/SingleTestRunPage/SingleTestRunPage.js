@@ -181,6 +181,7 @@ function SingleTestRunPage() {
   const [confirmationModal, setConfirmationModal] = useState(false);
   const [severityModalActive, setSeverityModalActive] = useState(false);
   const [selectedTestResultItems, setSelectedTestResultItems] = useState([]);
+  const [severityUpdateInProgress, setSeverityUpdateInProgress] = useState(false);
   const [chartRefreshCounter, setChartRefreshCounter] = useState(0);
 
   const tableTabMap = {
@@ -554,12 +555,19 @@ function SingleTestRunPage() {
   }, []);
 
   const handleBulkSeverityUpdate = async (newSeverity) => {
+    // Prevent duplicate concurrent updates
+    if (severityUpdateInProgress) {
+      func.setToast(true, true, "Severity update already in progress");
+      return;
+    }
+
     const hexIds = selectedTestResultItems.flat();
+    setSeverityUpdateInProgress(true);
 
     try {
       await api.bulkUpdateTestResultsSeverity(hexIds, newSeverity);
 
-      func.setToast(true, false, `Severity updated for ${hexIds.length} test result${hexIds.length === 1 ? "" : "s"}`);
+      func.setToast(true, false, `Severity updated for ${hexIds.length} test result${hexIds.length === 1 ? "" : "s"} across all test runs`);
       setSeverityModalActive(false);
 
       // Trigger refresh:
@@ -574,6 +582,8 @@ function SingleTestRunPage() {
     } catch (error) {
       func.setToast(true, true, error.message || "Failed to update severity");
       setSeverityModalActive(false);
+    } finally {
+      setSeverityUpdateInProgress(false);
     }
   };
 
@@ -1246,6 +1256,7 @@ function SingleTestRunPage() {
         onConfirm={handleBulkSeverityUpdate}
         selectedCount={selectedTestResultItems.length}
         pageType="test result"
+        disabled={severityUpdateInProgress}
       />
       {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
     </>
