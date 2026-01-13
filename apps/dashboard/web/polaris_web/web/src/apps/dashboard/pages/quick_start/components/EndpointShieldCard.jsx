@@ -47,9 +47,9 @@ function EndpointShieldCard({ onInstall, onSeeDocs }) {
     );
 
     return (
-        <div className="endpoint-shield-card-wrapper">
+        <Box className="endpoint-shield-card-wrapper">
             <Card>
-                <div className="endpoint-shield-card">
+                <Box className="endpoint-shield-card">
                     <VerticalStack gap="5">
                         <HorizontalStack gap="3" align="start">
                             <Box padding="2" borderWidth="1" borderColor="border-subdued" borderRadius="2">
@@ -63,11 +63,11 @@ function EndpointShieldCard({ onInstall, onSeeDocs }) {
                             </Box>
                             <VerticalStack gap="2">
                                 <Text variant="headingMd" as="h5">Endpoint Shield</Text>
-                                <div className="endpoint-shield-description">
+                                <Box className="endpoint-shield-description">
                                     <Text variant="bodyMd" color="subdued">
                                         All-in-one protection covering IDEs, browsers, MCP servers, and agent workflows with runtime security and auto-discovery requiring no configuration changes.
                                     </Text>
-                                </div>
+                                </Box>
                             </VerticalStack>
                         </HorizontalStack>
 
@@ -78,9 +78,9 @@ function EndpointShieldCard({ onInstall, onSeeDocs }) {
                             >
                                 <HorizontalStack gap="5" align="start">
                                     {renderIconRow(ideIcons, 'IDEs')}
-                                    <div className="endpoint-shield-divider" />
+                                    <Box className="endpoint-shield-divider" />
                                     {renderIconRow(browserIcons, 'Browsers')}
-                                    <div className="endpoint-shield-divider" />
+                                    <Box className="endpoint-shield-divider" />
                                     {renderIconRow(agenticIcons, 'Agentic Connectors')}
                                 </HorizontalStack>
                             </Box>
@@ -91,9 +91,9 @@ function EndpointShieldCard({ onInstall, onSeeDocs }) {
                             </HorizontalStack>
                         </VerticalStack>
                     </VerticalStack>
-                </div>
+                </Box>
             </Card>
-        </div>
+        </Box>
     );
 }
 
