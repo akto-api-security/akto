@@ -5,6 +5,7 @@ import RegistryBadge from "../../../components/shared/RegistryBadge";
 import api from "../api"
 import dashboardApi from "../../dashboard/api"
 import settingRequests from "../../settings/api"
+import { getResult, getCoreApiPromises, extractCoreData } from "../collectionsDataUtils"
 import { CollectionIcon } from "../../../components/shared/CollectionIcon"
 import React, { useEffect,useState, useRef } from "react"
 import func from "@/util/func"
@@ -600,23 +601,22 @@ function ApiCollections(props) {
             // Build all API promises to run in parallel
             const shouldCallHeavyApis = (now - lastFetchedInfo.lastRiskScoreInfo) >= (5 * 60)
 
+            // Core APIs (0-3) from shared utility + page-specific APIs
             let apiPromises = [
-                api.getAllCollectionsBasic(),  // index 0
-                api.getUserEndpoints(),         // index 1
-                api.getLastTrafficSeen(),            // index 2
-                collectionApi.fetchCountForHostnameDeactivatedCollections(), // index 3
-                collectionApi.fetchCountForUningestedApis(), // index 4
-                collectionApi.fetchUningestedApis(),        // index 5
+                ...getCoreApiPromises(),
+                api.getUserEndpoints(),         // index 4
+                collectionApi.fetchCountForHostnameDeactivatedCollections(), // index 5
+                collectionApi.fetchCountForUningestedApis(), // index 6
+                collectionApi.fetchUningestedApis(),        // index 7
             ];
 
             // Conditionally add coverage API (skip for Endpoint Security)
             if (!isEndpointSecurityCategory()) {
-                apiPromises.push(api.getCoverageInfoForCollections()); // index 6
+                apiPromises.push(api.getCoverageInfoForCollections()); // index 8
             }
 
             if(shouldCallHeavyApis){
-                apiPromises.push(api.getRiskScoreInfo()); // index 6 or 7
-                apiPromises.push(api.getSeverityInfoForCollections()); // index 7 or 8
+                apiPromises.push(api.getSeverityInfoForCollections()); // index 8 or 9
             }
 
             if(userRole === 'ADMIN' && func.checkForRbacFeature()) {
@@ -626,44 +626,36 @@ function ApiCollections(props) {
 
             let results = await Promise.allSettled(apiPromises);
 
-            // Extract collections response (index 0)
-            const apiCollectionsResp = results[0].status === 'fulfilled' ? results[0].value : { apiCollections: [] };
-            // Extract user endpoints (index 1)
-            let hasUserEndpoints = results[1].status === 'fulfilled' ? results[1].value : false;
-
-
-            // Extract metadata responses (with corrected indices)
-            let trafficInfo = results[2].status === 'fulfilled' ? results[2].value : {};
-            let deactivatedCountInfo = results[3].status === 'fulfilled' ? results[3].value : {};
-            let uningestedApiCountInfo = results[4].status === 'fulfilled' ? results[4].value : {};
-            let uningestedApiDetails = results[5].status === 'fulfilled' ? results[5].value : {};
+            // Extract core data using shared utility (indices 0-3)
+            const coreData = extractCoreData(results, 0);
+            
+            // Extract page-specific responses
+            let hasUserEndpoints = getResult(results[4], false);
+            let deactivatedCountInfo = getResult(results[5], {});
+            let uningestedApiCountInfo = getResult(results[6], {});
+            let uningestedApiDetails = getResult(results[7], {});
 
             let coverageInfo = {};
-            let currentIndex = 6;
+            let currentIndex = 8;
 
             // Conditionally extract coverage info (skip for Endpoint Security)
             if (!isEndpointSecurityCategory()) {
-                coverageInfo = results[6].status === 'fulfilled' ? results[6].value : {};
-                currentIndex = 7;
+                coverageInfo = getResult(results[currentIndex], {});
+                currentIndex++;
             }
 
             let riskScoreObj = lastFetchedResp
-            let sensitiveInfo = lastFetchedSensitiveResp
+            let sensitiveInfo = { sensitiveInfoMap: coreData.sensitiveInfoMap, sensitiveUrls: coreData.sensitiveUrlsCount }
             let severityObj = lastFetchedSeverityResp
 
         if(shouldCallHeavyApis){
-            if(results[currentIndex]?.status === "fulfilled"){
-                const res = results[currentIndex].value
-                riskScoreObj = {
-                    criticalUrls: res.criticalEndpointsCount,
-                    riskScoreMap: res.riskScoreOfCollectionsMap
-                }
+            riskScoreObj = {
+                criticalUrls: coreData.criticalEndpointsCount,
+                riskScoreMap: coreData.riskScoreMap
             }
-            currentIndex++;
 
             if(results[currentIndex]?.status === "fulfilled"){
-                const res = results[currentIndex].value
-                severityObj = res
+                severityObj = results[currentIndex].value
             }
             currentIndex++;
 
@@ -673,21 +665,19 @@ function ApiCollections(props) {
             setLastFetchedSeverityResp(severityObj)
         }
         setCoverageMap(coverageInfo)
-        setTrafficMap(trafficInfo)
+        setTrafficMap(coreData.trafficInfoMap)
 
         let usersCollectionList = []
         let userList = []
 
         if(userRole === 'ADMIN' && func.checkForRbacFeature()) {
             if(results[currentIndex]?.status === "fulfilled") {
-                const res = results[currentIndex].value
-                usersCollectionList = res
+                usersCollectionList = results[currentIndex].value
             }
             currentIndex++;
 
             if(results[currentIndex]?.status === "fulfilled") {
-                const res = results[currentIndex].value
-                userList = res
+                userList = results[currentIndex].value
                 if (userList) {
                     userList = userList.filter(x => {
                         if (x?.role === "ADMIN") {
@@ -705,8 +695,9 @@ function ApiCollections(props) {
         const sensitiveInfoMap = sensitiveInfo?.sensitiveInfoMap || {};
         const severityInfoMap = severityObj || {};
         const coverageMap = coverageInfo || {};
-        const trafficInfoMap = trafficInfo || {};
+        const trafficInfoMap = coreData.trafficInfoMap;
         const riskScoreMap = riskScoreObj?.riskScoreMap || {};
+        const apiCollectionsResp = { apiCollections: coreData.collections };
 
         // Guard: Prevent state update after unmount
         if (!isMountedRef.current) {

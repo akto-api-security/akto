@@ -6,9 +6,8 @@ import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTa
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import SummaryCardInfo from "@/apps/dashboard/components/shared/SummaryCardInfo";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
-import api from "../api";
-import dashboardApi from "../../dashboard/api";
 import func from "@/util/func";
+import { fetchCollectionsData } from "../collectionsDataUtils";
 import transform from "../transform";
 import PersistStore from "../../../../main/PersistStore";
 import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
@@ -51,46 +50,20 @@ function Endpoints() {
     async function fetchData(isMountedRef = { current: true }) {
         try {
             setLoading(true);
-
-            const results = await Promise.allSettled([
-                api.getAllCollectionsBasic(),
-                api.getLastTrafficSeen(),
-                api.getRiskScoreInfo(),
-                api.getSensitiveInfoForCollections(),
-                dashboardApi.fetchEndpointsCount(0, 0),
-            ]);
-
-            const apiCollectionsResp = results[0].status === "fulfilled" ? results[0].value : { apiCollections: [] };
-            const trafficInfo = results[1].status === "fulfilled" ? results[1].value : {};
-            const riskScoreResp = results[2].status === "fulfilled" ? results[2].value : {};
-            const sensitiveResp = results[3].status === "fulfilled" ? results[3].value : {};
-            const endpointsResp = results[4].status === "fulfilled" ? results[4].value : {};
+            const { collections, trafficInfoMap, riskScoreMap, sensitiveInfoMap, endpointsCount } = await fetchCollectionsData();
 
             if (!isMountedRef.current) return;
-
-            const collections = apiCollectionsResp.apiCollections || [];
-            const riskScoreMap = riskScoreResp.riskScoreOfCollectionsMap || {};
-            const sensitiveInfoMap = sensitiveResp.sensitiveSubtypesInCollection || {};
-            const trafficInfoMap = trafficInfo || {};
 
             setAllCollections(collections);
 
             const groupedData = groupCollectionsByTag(collections, sensitiveInfoMap, riskScoreMap, trafficInfoMap);
-            const prettifiedData = prettifyGroupData(groupedData);
-
-            setData(prettifiedData);
-
-            const totalEndpoints = collections.reduce(
-                (sum, c) => sum + (c.deactivated ? 0 : c.urlsCount || 0),
-                0
-            );
+            setData(prettifyGroupData(groupedData));
 
             setSummaryData({
-                totalEndpoints: endpointsResp.newCount || totalEndpoints,
+                totalEndpoints: endpointsCount || collections.reduce((sum, c) => sum + (c.deactivated ? 0 : c.urlsCount || 0), 0),
                 totalGroups: groupedData.length,
                 totalCollections: collections.filter((c) => !c.deactivated).length,
             });
-
             setLoading(false);
         } catch {
             setLoading(false);
