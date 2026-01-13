@@ -39,7 +39,6 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 import WorkflowTestBuilder from "../workflow_test/WorkflowTestBuilder";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 import TooltipText from "../../../components/shared/TooltipText";
-import SeverityUpdateModal from "../../issues/components/SeverityUpdateModal";
 import PersistStore from "../../../../main/PersistStore";
 import TrendChart from "./TrendChart";
 import useTable from "../../../components/tables/TableContext";
@@ -57,6 +56,7 @@ import TestingRunEndpointsModal from './TestingRunEndpointsModal';
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 import MarkdownReportGenerator from "../../../components/shared/MarkdownReportGenerator";
 import { saveAs } from 'file-saver';
+import SeveritySelector from '../../issues/components/SeveritySelector';
 
 let sortOptions = [
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 3 },
@@ -180,8 +180,8 @@ function SingleTestRunPage() {
   const [copyUpdateTable, setCopyUpdateTable] = useState("");
   const [confirmationModal, setConfirmationModal] = useState(false);
   const [severityModalActive, setSeverityModalActive] = useState(false);
-  const [severityModalLoading, setSeverityModalLoading] = useState(false);
   const [selectedTestResultItems, setSelectedTestResultItems] = useState([]);
+  const [chartRefreshCounter, setChartRefreshCounter] = useState(0);
 
   const tableTabMap = {
     vulnerable: "VULNERABLE",
@@ -554,25 +554,26 @@ function SingleTestRunPage() {
   }, []);
 
   const handleBulkSeverityUpdate = async (newSeverity) => {
-    setSeverityModalLoading(true);
+    const hexIds = selectedTestResultItems.flat();
 
     try {
-      const hexIds = selectedTestResultItems.flat();
-
-      await api.bulkUpdateIssueSeverityFromTestResults(hexIds, newSeverity);
+      await api.bulkUpdateTestResultsSeverity(hexIds, newSeverity);
 
       func.setToast(true, false, `Severity updated for ${hexIds.length} test result${hexIds.length === 1 ? "" : "s"}`);
       setSeverityModalActive(false);
 
-      TableStore.getState().setSelectedItems([]);
-      setSelectedTestResultItems([]);
-
-      setUpdateTable(prev => !prev);
+      // Trigger refresh:
+      // 1. fetchTestingRunResultSummaries updates testingRunResultSummariesObj
+      //    → triggers useEffect (line 315) → calls setUpdateTable automatically
+      // 2. chartRefreshCounter triggers TrendChart to refetch its data
+      setTimeout(async () => {
+        await fetchTestingRunResultSummaries();
+        setChartRefreshCounter(prev => prev + 1);
+      }, 500);
 
     } catch (error) {
       func.setToast(true, true, error.message || "Failed to update severity");
-    } finally {
-      setSeverityModalLoading(false);
+      setSeverityModalActive(false);
     }
   };
 
@@ -900,7 +901,7 @@ function SingleTestRunPage() {
 
 
   const components = [
-    runningTestsComp, <TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={true} totalVulnerabilities={tableCountObj.vulnerable} />,
+    runningTestsComp, <TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={true} totalVulnerabilities={tableCountObj.vulnerable} refreshTrigger={chartRefreshCounter} />,
     metadataComponent(), loading ? <SpinnerCentered key="loading" /> : (!workflowTest ? resultTable : workflowTestBuilder)];
 
   const openVulnerabilityReport = async (summaryMode = false) => {
@@ -1239,12 +1240,12 @@ function SingleTestRunPage() {
         components={useComponents}
       />
       <ReRunModal selectedTestRun={selectedTestRun} shouldRefresh={false} />
-      <SeverityUpdateModal
+      <SeveritySelector
         open={severityModalActive}
         onClose={() => setSeverityModalActive(false)}
         onConfirm={handleBulkSeverityUpdate}
-        loading={severityModalLoading}
         selectedCount={selectedTestResultItems.length}
+        pageType="test result"
       />
       {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
     </>

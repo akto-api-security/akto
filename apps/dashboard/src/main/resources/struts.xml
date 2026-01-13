@@ -5835,7 +5835,7 @@
             </result>
         </action>
 
-        <action name="api/bulkUpdateIssueSeverity" class="com.akto.action.testing_issues.IssuesAction" method="bulkUpdateIssueSeverity">
+        <action name="api/bulkUpdateIssueSeverity" class="com.akto.action.testing_issues.IssuesAction" method="bulkUpdateSeverityBoth">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -5856,7 +5856,7 @@
             </result>
         </action>
 
-        <action name="api/bulkUpdateIssueSeverityFromTestResults" class="com.akto.action.testing_issues.IssuesAction" method="bulkUpdateIssueSeverityFromTestResults">
+        <action name="api/bulkUpdateTestResultsSeverity" class="com.akto.action.testing_issues.IssuesAction" method="bulkUpdateSeverityBoth">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">

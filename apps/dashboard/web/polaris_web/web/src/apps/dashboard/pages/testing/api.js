@@ -648,9 +648,9 @@ export default {
         })
         return resp
     },
-    async bulkUpdateIssueSeverityFromTestResults(testingRunResultHexIds, severityToBeUpdated) {
+    async bulkUpdateTestResultsSeverity(testingRunResultHexIds, severityToBeUpdated) {
         const resp = await request({
-            url: '/api/bulkUpdateIssueSeverityFromTestResults',
+            url: '/api/bulkUpdateTestResultsSeverity',
             method: 'post',
             data: {
                 testingRunResultHexIds,

@@ -6,9 +6,8 @@ import Store from "../../../store";
 import func from "@/util/func";
 import { MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
-import { ActionList, Button, HorizontalGrid, HorizontalStack, IndexFiltersMode, Popover, TextField, Text, VerticalStack } from "@shopify/polaris";
+import { ActionList, Badge, Box, Button, HorizontalGrid, HorizontalStack, IndexFiltersMode, Popover, TextField, Text } from "@shopify/polaris";
 import CompulsoryDescriptionModal from "../components/CompulsoryDescriptionModal.jsx";
-import SeverityUpdateModal from "../components/SeverityUpdateModal.jsx";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import { SelectCollectionComponent } from "../../testing/TestRunsPage/TestrunsBannerComponent"
@@ -40,6 +39,7 @@ import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import IssuesGraphsGroup from "./IssuesGraphsGroup.jsx";
 import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper.js";
 import MarkdownReportGenerator from "../../../components/shared/MarkdownReportGenerator";
+import SeveritySelector from "../components/SeveritySelector";
 
 
 const sortOptions = [
@@ -213,7 +213,6 @@ function IssuesPage() {
 
     // Severity update modal states
     const [severityModalActive, setSeverityModalActive] = useState(false)
-    const [severityModalLoading, setSeverityModalLoading] = useState(false)
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
 
@@ -441,18 +440,20 @@ function IssuesPage() {
     }, [compulsoryDescriptionModal, pendingIgnoreAction]);
 
     const handleBulkSeverityUpdate = (newSeverity) => {
-        setSeverityModalLoading(true)
         const items = selectedIssuesItems
 
         api.bulkUpdateIssueSeverity(items, newSeverity).then((res) => {
             setToast(true, false, `Severity updated for ${items.length} issue${items.length === 1 ? "" : "s"}`)
             setSeverityModalActive(false)
-            setSeverityModalLoading(false)
+
+            // Reset selections
             resetResourcesSelected()
+
+            // Refresh table data
             setKey(!key)
         }).catch((error) => {
             setToast(true, true, "Failed to update severity")
-            setSeverityModalLoading(false)
+            setSeverityModalActive(false)
         })
     }
 
@@ -1142,12 +1143,12 @@ function IssuesPage() {
                 loading={modalLoading}
             />
 
-            <SeverityUpdateModal
+            <SeveritySelector
                 open={severityModalActive}
                 onClose={() => setSeverityModalActive(false)}
                 onConfirm={handleBulkSeverityUpdate}
-                loading={severityModalLoading}
                 selectedCount={selectedIssuesItems.length}
+                pageType="issue"
             />
         </>
     )
