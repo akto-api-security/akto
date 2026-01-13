@@ -393,6 +393,7 @@ public class ApiInfo {
     /**
      * Checks if the given auth type is a standard predefined type.
      * Custom auth type names (from CustomAuthType.name) return false.
+     * Note: CUSTOM is excluded as it represents the fallback for misconfigured custom types.
      */
     private boolean isStandardAuthType(String authType) {
         return authType.equals(AuthType.UNAUTHENTICATED) ||
@@ -401,7 +402,6 @@ public class ApiInfo {
                authType.equals(AuthType.JWT) ||
                authType.equals(AuthType.API_TOKEN) ||
                authType.equals(AuthType.BEARER) ||
-               authType.equals(AuthType.CUSTOM) ||
                authType.equals(AuthType.API_KEY) ||
                authType.equals(AuthType.MTLS) ||
                authType.equals(AuthType.SESSION_TOKEN);
@@ -466,7 +466,15 @@ public class ApiInfo {
     }
 
     public Set<Set<String>> getAllAuthTypesFound() {
-        return allAuthTypesFound;
+        if (allAuthTypesFound == null) {
+            return null;
+        }
+        // Return defensive copy to prevent external modification
+        Set<Set<String>> copy = new HashSet<>();
+        for (Set<String> authTypeSet : allAuthTypesFound) {
+            copy.add(new HashSet<>(authTypeSet));
+        }
+        return copy;
     }
 
     public void setAllAuthTypesFound(Set<Set<String>> allAuthTypesFound) {

@@ -24,18 +24,18 @@ public class AuthPolicy {
         value = value.trim();
         boolean twoFields = value.split(" ").length == 2;
         if (twoFields && value.substring(0, Math.min(6, value.length())).equalsIgnoreCase("bearer")) {
-            return Collections.<String>singletonList(ApiInfo.AuthType.BEARER);
+            return Collections.singletonList(ApiInfo.AuthType.BEARER);
         } else if (twoFields && value.substring(0, Math.min(5, value.length())).equalsIgnoreCase("basic")) {
-            return Collections.<String>singletonList(ApiInfo.AuthType.BASIC);
+            return Collections.singletonList(ApiInfo.AuthType.BASIC);
         } else if (header.equals(AUTHORIZATION_HEADER_NAME) || header.equals("auth")) {
             // todo: check jwt first and then this
-            return Collections.<String>singletonList(ApiInfo.AuthType.AUTHORIZATION_HEADER);
+            return Collections.singletonList(ApiInfo.AuthType.AUTHORIZATION_HEADER);
         }
         return new ArrayList<>();
     }
 
     public static boolean findAuthType(HttpResponseParams httpResponseParams, ApiInfo apiInfo, RuntimeFilter filter, List<CustomAuthType> customAuthTypes) {
-        Set<Set<String>> allAuthTypesFound = (Set<Set<String>>) (Set<?>) apiInfo.getAllAuthTypesFound();
+        Set<Set<String>> allAuthTypesFound = apiInfo.getAllAuthTypesFound();
         if (allAuthTypesFound == null) allAuthTypesFound = new HashSet<>();
 
         // TODO: from custom api-token
@@ -63,6 +63,7 @@ public class AuthPolicy {
                     authTypes.add(customAuthName);
                 } else {
                     // Fallback to "CUSTOM" if name is missing (shouldn't happen)
+                    logger.warn("Custom auth type has no name (ID: {}), using fallback CUSTOM", customAuthType.getId());
                     authTypes.add(ApiInfo.AuthType.CUSTOM);
                 }
                 break;
@@ -84,6 +85,7 @@ public class AuthPolicy {
                         authTypes.add(customAuthName);
                     } else {
                         // Fallback to "CUSTOM" if name is missing (shouldn't happen)
+                        logger.warn("Custom auth type has no name (ID: {}), using fallback CUSTOM", customAuthType.getId());
                         authTypes.add(ApiInfo.AuthType.CUSTOM);
                     }
                     break;
@@ -138,7 +140,7 @@ public class AuthPolicy {
 
 
         allAuthTypesFound.add(authTypes);
-        apiInfo.setAllAuthTypesFound((Set<Set<String>>) (Set<?>) allAuthTypesFound);
+        apiInfo.setAllAuthTypesFound(allAuthTypesFound);
 
         return returnValue;
     }

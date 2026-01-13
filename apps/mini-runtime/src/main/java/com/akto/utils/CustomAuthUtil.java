@@ -37,10 +37,10 @@ public class CustomAuthUtil {
         );
     }
 
-    private static Set<String> customTypes = new HashSet<>(Collections.singletonList(ApiInfo.AuthType.CUSTOM));
-    private static Set<String> unauthenticatedTypes = new HashSet<>(Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED));
+    private static Set<ApiInfo.AuthType> customTypes = new HashSet<>(Collections.singletonList(ApiInfo.AuthType.CUSTOM));
+    private static Set<ApiInfo.AuthType> unauthenticatedTypes = new HashSet<>(Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED));
 
-    private static Set<Set<String>> addCustomAuth(Set<Set<String>> authTypes) {
+    private static Set<Set<ApiInfo.AuthType>> addCustomAuth(Set<Set<ApiInfo.AuthType>> authTypes) {
 
         // remove unauthenticated and add custom auth type
         authTypes.remove(unauthenticatedTypes);
@@ -52,7 +52,7 @@ public class CustomAuthUtil {
         return authTypes;
     }
 
-    private static Set<Set<String>> addUnauthenticatedIfNoAuth(Set<Set<String>> authTypes) {
+    private static Set<Set<ApiInfo.AuthType>> addUnauthenticatedIfNoAuth(Set<Set<ApiInfo.AuthType>> authTypes) {
 
         if(authTypes.isEmpty()){
             authTypes.add(unauthenticatedTypes);
@@ -81,7 +81,7 @@ public class CustomAuthUtil {
 
         for (ApiInfo apiInfo : apiInfos) {
 
-            Set<Set<String>> authTypes = apiInfo.getAllAuthTypesFound();
+            Set<Set<ApiInfo.AuthType>> authTypes = apiInfo.getAllAuthTypesFound();
             authTypes.remove(new HashSet<>());
 
             boolean foundCustomAuthType = false;
@@ -164,6 +164,6 @@ public class CustomAuthUtil {
          */
         ApiInfoDao.instance.updateMany(new BasicDBObject(),
                 Updates.pull(ALL_AUTH_TYPES_FOUND + ".$[]", new BasicDBObject().append("$in",
-                        new String[] { ApiInfo.AuthType.CUSTOM, ApiInfo.AuthType.UNAUTHENTICATED })));
+                        new String[] { ApiInfo.AuthType.CUSTOM.name(), ApiInfo.AuthType.UNAUTHENTICATED.name() })));
     }
 }
