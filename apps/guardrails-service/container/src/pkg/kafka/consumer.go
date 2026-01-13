@@ -17,7 +17,6 @@ import (
 	"github.com/akto-api-security/guardrails-service/models"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
-	"github.com/akto-api-security/mcp-endpoint-shield/mcp/types"
 	"github.com/segmentio/kafka-go"
 	"github.com/segmentio/kafka-go/sasl/plain"
 	"go.uber.org/zap"
@@ -436,7 +435,7 @@ func (c *Consumer) processBatch(ctx context.Context, batch []models.IngestDataBa
 
 	c.logger.Info("Processing batch from Kafka", zap.Int("size", len(batch)))
 
-	results, err := c.validatorService.ValidateBatch(ctx, batch, string(types.ContextSourceAgentic))
+	results, err := c.validatorService.ValidateBatch(ctx, batch)
 	if err != nil {
 		c.logger.Error("Failed to validate batch", zap.Error(err))
 		return
