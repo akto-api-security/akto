@@ -13,8 +13,7 @@ import transform from "../transform";
 import PersistStore from "../../../../main/PersistStore";
 import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 import { CollectionIcon } from "../../../components/shared/CollectionIcon";
-import { getHeaders, sortOptions, resourceName, INVENTORY_PATH, INVENTORY_FILTER_KEY, ASSET_TAG_KEY_VALUES } from "./constants";
-import { groupCollectionsByTag, createEnvTypeFilter } from "./utils";
+import { getHeaders, sortOptions, resourceName, INVENTORY_PATH, INVENTORY_FILTER_KEY, ASSET_TAG_KEY_VALUES, groupCollectionsByTag, createEnvTypeFilter } from "./constants";
 
 function Endpoints() {
     const navigate = useNavigate();
