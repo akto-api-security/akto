@@ -17,9 +17,16 @@ public class BulkUpdatesToApiInfo {
     /**
      * Convert a single BulkUpdates object to ApiInfo.
      * Only sets fields that are provided in the BulkUpdates.
+     * Initializes required fields to prevent NullPointerExceptions in downstream processing.
      */
     public static ApiInfo convert(BulkUpdates write) {
         ApiInfo apiInfo = new ApiInfo();
+
+        // Initialize required collections to prevent NullPointerExceptions
+        apiInfo.setAllAuthTypesFound(new java.util.HashSet<>());
+        apiInfo.setApiAccessTypes(new java.util.HashSet<>());
+        apiInfo.setViolations(new java.util.HashMap<>());
+
         Map<String, Object> filters = write.getFilters();
 
         // Extract _id (ApiInfoKey)
@@ -46,8 +53,17 @@ public class BulkUpdatesToApiInfo {
                 // Set fields on ApiInfo object based on field name
                 if ("lastSeen".equals(field)) {
                     apiInfo.setLastSeen(valElement.getAsInt());
+                } else if ("collectionIds".equals(field)) {
+                    // Extract collectionIds array
+                    if (valElement.isJsonArray()) {
+                        java.util.List<Integer> collectionIds = new java.util.ArrayList<>();
+                        for (JsonElement elem : valElement.getAsJsonArray()) {
+                            collectionIds.add(elem.getAsInt());
+                        }
+                        apiInfo.setCollectionIds(collectionIds);
+                    }
                 }
-                // Ignore other fields like discoveredTimestamp, collectionIds etc. as they will be handled by upsert logic
+                // Note: discoveredTimestamp is not a field in ApiInfo class, so we skip it
             } catch (Exception e) {
                 // Skip invalid updates
             }

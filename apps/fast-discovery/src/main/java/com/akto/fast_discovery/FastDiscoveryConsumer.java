@@ -169,7 +169,7 @@ public class FastDiscoveryConsumer {
             // Build updates
             ArrayList<String> updates = new ArrayList<>();
             updates.add(String.format("{\"field\": \"timestamp\", \"val\": %d, \"op\": \"set\"}", timestamp));
-            updates.add(String.format("{\"field\": \"collectionIds\", \"val\": [%d], \"op\": \"set\"}", apiCollectionId));
+            updates.add(String.format("{\"field\": \"collectionIds\", \"val\": %d, \"op\": \"setOnInsert\"}", apiCollectionId));
             updates.add("{\"field\": \"count\", \"val\": 1, \"op\": \"set\"}");
 
             BulkUpdates bulkUpdate = new BulkUpdates(filters, updates);
@@ -202,15 +202,10 @@ public class FastDiscoveryConsumer {
             filters.put("_id", id);
 
             // Build updates
-            // Use setOnInsert for most fields to avoid overwriting mini-runtime's richer data
-            // Only lastSeen uses set to update timestamp on every occurrence
+            // Only send essential fields that ApiInfo supports
             ArrayList<String> updates = new ArrayList<>();
             updates.add(String.format("{\"field\": \"lastSeen\", \"val\": %d, \"op\": \"set\"}", timestamp));
-            updates.add(String.format("{\"field\": \"discoveredTimestamp\", \"val\": %d, \"op\": \"setOnInsert\"}", timestamp));
             updates.add(String.format("{\"field\": \"collectionIds\", \"val\": [%d], \"op\": \"setOnInsert\"}", apiCollectionId));
-            updates.add("{\"field\": \"allAuthTypesFound\", \"val\": [], \"op\": \"setOnInsert\"}");
-            updates.add("{\"field\": \"apiAccessTypes\", \"val\": [], \"op\": \"setOnInsert\"}");
-            updates.add("{\"field\": \"apiType\", \"val\": \"REST\", \"op\": \"setOnInsert\"}");
 
             BulkUpdates bulkUpdate = new BulkUpdates(filters, updates);
             writes.add(bulkUpdate);
