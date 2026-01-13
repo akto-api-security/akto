@@ -16,9 +16,9 @@ import (
 	"go.uber.org/zap"
 )
 
-const (
-	ContextSource = types.ContextSourceAgentic
-)
+// const (
+// 	ContextSource = types.ContextSourceAgentic
+// )
 
 // policyCache holds cached policies and their metadata
 type policyCache struct {
@@ -294,7 +294,7 @@ func (s *Service) ValidateRequest(ctx context.Context, payload string, contextSo
 
 	// Create validation context
 	valCtx := &mcp.ValidationContext{
-		ContextSource: ContextSource,
+		ContextSource: types.ContextSource(contextSource),
 	}
 
 	s.logger.Debug("Calling ProcessRequest",
@@ -347,7 +347,7 @@ func (s *Service) ValidateResponse(ctx context.Context, payload string, contextS
 
 	// Create validation context
 	valCtx := &mcp.ValidationContext{
-		ContextSource: ContextSource,
+		ContextSource: types.ContextSource(contextSource),
 	}
 
 	// Use processor's ProcessResponse method with external policies
@@ -374,11 +374,11 @@ func (s *Service) ValidateResponse(ctx context.Context, payload string, contextS
 }
 
 // ValidateBatch validates a batch of request/response pairs
-func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDataBatch) ([]ValidationBatchResult, error) {
+func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDataBatch, contextSource string) ([]ValidationBatchResult, error) {
 	s.logger.Info("Validating batch data", zap.Int("count", len(batchData)))
 
 	// Get cached policies (refreshes if stale)
-	policies, auditPolicies, _, hasAuditRules, err := s.getCachedPolicies(string(ContextSource))
+	policies, auditPolicies, _, hasAuditRules, err := s.getCachedPolicies(string(contextSource))
 	if err != nil {
 		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
@@ -421,7 +421,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 			StatusCode:      statusCode,
 			RequestPayload:  data.RequestPayload,
 			ResponsePayload: data.ResponsePayload,
-			ContextSource:   ContextSource,
+			ContextSource:   types.ContextSource(contextSource),
 			McpServerName:   mcpServerName,
 		}
 
