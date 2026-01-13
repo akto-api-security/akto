@@ -217,7 +217,7 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_audit",
                     }] : []),
-                    ...((dashboardCategory === CATEGORY_ENDPOINT_SECURITY || (dashboardCategory === CATEGORY_AGENTIC_SECURITY && !func.isAtlasArgusAccount())) ? [{
+                    ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
                         label: "Endpoint Shield",
                         onClick: () => {
                             navigate("/dashboard/observe/endpoint-shield");
