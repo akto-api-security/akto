@@ -6,6 +6,7 @@ import com.akto.dao.context.Context;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import org.bson.conversions.Bson;
 
 import java.util.List;
@@ -58,6 +59,11 @@ public class GuardrailPoliciesDao extends AccountsContextDao<GuardrailPolicies> 
         BasicDBObject sort = new BasicDBObject();
         sort.put("createdTimestamp", -1); // descending order (newest first)
         return instance.findAll(filter, skip, limit, sort);
+    }
+
+    public List<GuardrailPolicies> fetchAllGuardrailPoliciesName() {
+        Bson filter = getContextSourceFilter();
+        return instance.findAll(filter, Projections.include("name"));
     }
 
     public long getTotalCount() {
