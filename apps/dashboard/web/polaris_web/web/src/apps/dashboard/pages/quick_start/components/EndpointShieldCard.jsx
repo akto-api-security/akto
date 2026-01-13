@@ -33,15 +33,14 @@ function EndpointShieldCard({ onInstall, onSeeDocs }) {
             <Text variant="bodyMd" as="p" fontWeight="medium" color="subdued">{label}</Text>
             <HorizontalStack gap="2" align="start">
                 {icons.map((item, index) => (
-                    <div key={index} className="endpoint-shield-icon">
-                        <Avatar
-                            customer
-                            size="extraSmall"
-                            name={item.name}
-                            source={item.icon}
-                            shape="square"
-                        />
-                    </div>
+                    <Avatar
+                        key={index}
+                        customer
+                        size="extraSmall"
+                        name={item.name}
+                        source={item.icon}
+                        shape="square"
+                    />
                 ))}
             </HorizontalStack>
         </VerticalStack>
