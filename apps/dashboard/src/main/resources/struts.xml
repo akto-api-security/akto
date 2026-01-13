@@ -5889,6 +5889,50 @@
             </result>
         </action>
 
+        <action name="api/bulkUpdateIssueSeverity" class="com.akto.action.testing_issues.IssuesAction" method="bulkUpdateIssueSeverity">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ISSUES</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">Updated issue severity in bulk</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/bulkUpdateTestResultsSeverity" class="com.akto.action.testing_issues.IssuesAction" method="bulkUpdateTestResultsSeverity">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ISSUES</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">Updated test results severity in bulk</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/createWorkflowTest" class="com.akto.action.testing.WorkflowTestAction" method="createWorkflowTest">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

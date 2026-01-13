@@ -60,6 +60,7 @@ export default function Header() {
             if (window.beamer_config.product_id !== productId || window.beamer_config.filter !== filterTag) {
                 window.beamer_config.product_id = productId;
                 window.beamer_config.filter = filterTag;
+                window.beamer_config.selector = '#beamer-btn';
                 if (window.Beamer) {
                     window.Beamer.destroy();
                     window.Beamer.init();
@@ -67,6 +68,12 @@ export default function Header() {
             }
         }
     }, [dashboardCategory]);
+
+    const handleBeamerClick = useCallback(() => {
+        if (window.Beamer) {
+            window.Beamer.show();
+        }
+    }, []);
 
 
     const logoSrc = dashboardCategory === "Agentic Security" ? "/public/white_logo.svg" : "/public/akto_name_with_logo.svg";
@@ -287,14 +294,11 @@ export default function Header() {
                 </div>
             </div> */}
 
-            <TopBar.Menu
-                activatorContent={
-                    <span id="beamer-btn" className={getColorForIcon()}>
-                        <Icon source={NotificationMajor} />
-                    </span>
-                }
-                actions={[]}
-            />
+            <Button id="beamer-btn" plain monochrome onClick={handleBeamerClick}>
+                <span className={getColorForIcon()}>
+                    <Icon source={NotificationMajor} />
+                </span>
+            </Button>
             <TopBar.Menu
                 activatorContent={
                     <span style={{ cursor: 'pointer' }} onClick={() => navigate("/dashboard/settings/about")}>
@@ -324,16 +328,16 @@ export default function Header() {
                                         { value: "API Security", label: "API Security", id: "api-security" },
                                         {
                                             value: "Agentic Security",
-                                            label: func.isAtlasArgusAccount() ? "Akto ARGUS" : "Agentic Security",
+                                            label: "Akto ARGUS",
                                             id: "agentic-security",
-                                            helpText: func.isAtlasArgusAccount() ? "Agentic AI Security for Homegrown AI" : undefined
+                                            helpText: "Agentic AI Security for Homegrown AI"
                                         },
-                                        ...(func.isAtlasArgusAccount() ? [{
+                                        {
                                             value: "Endpoint Security",
                                             label: "Akto ATLAS",
                                             id: "endpoint-security",
                                             helpText: "Agentic AI Security for Employee Endpoints"
-                                        }] : []),
+                                        },
                                         { value: "DAST", label: "DAST", id: "dast" },
                                     ]}
                                     initial={dropdownInitial}
