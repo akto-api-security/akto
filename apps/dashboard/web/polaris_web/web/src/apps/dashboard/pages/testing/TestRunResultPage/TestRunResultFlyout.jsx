@@ -6,7 +6,7 @@ import SampleDataList from '../../../components/shared/SampleDataList'
 import SampleData from '../../../components/shared/SampleData'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
 import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link, ActionList } from '@shopify/polaris'
-import { EditIcon } from '@shopify/polaris-icons'
+import { EditMinor } from '@shopify/polaris-icons'
 import CompulsoryDescriptionModal from "../../issues/components/CompulsoryDescriptionModal.jsx"
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
@@ -471,7 +471,7 @@ function TestRunResultFlyout(props) {
                                                                 <Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge>
                                                             </Box>
                                                             {isHoveringSeverity && (
-                                                                <Icon source={EditIcon} tone="base" />
+                                                                <Icon source={EditMinor} tone="base" />
                                                             )}
                                                         </HorizontalStack>
                                                     </Button>
