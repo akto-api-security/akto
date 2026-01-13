@@ -119,7 +119,7 @@ const CollectionFallbackIcon = ({ tagsList, displayName }) => {
 };
 
 const headers = [
-    ...((isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory()) && func.isDemoAccount() ? [{
+    ...((isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory()) ? [{
         title: "",
         text: "",
         value: "iconComp",
@@ -326,9 +326,9 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             discovered: func.prettifyEpoch(c.startTs || 0),
             descriptionComp: (<Box maxWidth="350px"><Text>{c.description}</Text></Box>),
             outOfTestingScopeComp: c.isOutOfTestingScope ? (<Text>Yes</Text>) : (<Text>No</Text>),
-            ...(((isAgenticSecurityCategory() || isEndpointSecurityCategory()) && func.isDemoAccount() && tagsList.includes("mcp-server")) ? {
+            ...(((isAgenticSecurityCategory() || isEndpointSecurityCategory()) && tagsList.includes("mcp-server")) ? {
                 iconComp: (<Box><CollectionIconRenderer hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>)
-            } : ((isGenAISecurityCategory() || isAgenticSecurityCategory()) && func.isDemoAccount() && tagsList.includes("gen-ai")) ? {
+            } : ((isGenAISecurityCategory() || isAgenticSecurityCategory()) && tagsList.includes("gen-ai")) ? {
                 iconComp: (<Box><CollectionIconRenderer hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>)
             } : {})
         };

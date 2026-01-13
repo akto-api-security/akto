@@ -1,16 +1,21 @@
-import { Page } from "@shopify/polaris"
+import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import Logs from "./Logs"
+import { Text } from "@shopify/polaris"
 
 
 const HealthLogs = () => {
 
     return (
-        <Page
-            title="Logs"
-            divider
-        >
-            <Logs />
-        </Page>
+        <PageWithMultipleCards
+            divider={true}
+            components={[<Logs key="logs" />]}
+            title={
+                <Text variant='headingLg' truncate>
+                    Logs
+                </Text>
+            }
+            isFirstPage={true}
+        />
     )
 }
 
