@@ -391,7 +391,7 @@ public class AktoPolicyNew {
             List<Bson> subUpdates = new ArrayList<>();
 
             // allAuthTypesFound
-            Set<Set<ApiInfo.AuthType>> allAuthTypesFound = apiInfo.getAllAuthTypesFound();
+            Set<Set<String>> allAuthTypesFound = (Set<Set<String>>) (Set<?>) apiInfo.getAllAuthTypesFound();
             if (allAuthTypesFound.isEmpty()) {
                 // to make sure no field is null (so setting empty objects)
                 subUpdates.add(Updates.setOnInsert(ApiInfo.ALL_AUTH_TYPES_FOUND, new HashSet<>()));

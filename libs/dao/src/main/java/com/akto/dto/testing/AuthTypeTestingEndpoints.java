@@ -44,18 +44,15 @@ public class AuthTypeTestingEndpoints extends TestingEndpoints {
         }
         
         // Check if any of the selected auth types exist in the API's auth types
-        Set<ApiInfo.AuthType> selectedAuthTypes = new HashSet<>();
+        Set<String> selectedAuthTypes = new HashSet<>();
         for (String authTypeStr : authTypes) {
-            try {
-                selectedAuthTypes.add(ApiInfo.AuthType.valueOf(authTypeStr));
-            } catch (IllegalArgumentException e) {
-                // Skip invalid auth types
-            }
+            // No need to parse - just add directly since authTypes are now Strings
+            selectedAuthTypes.add(authTypeStr);
         }
         
         // Check if any set in allAuthTypesFound contains any of our selected auth types
-        for (Set<ApiInfo.AuthType> authTypeSet : apiInfo.getAllAuthTypesFound()) {
-            for (ApiInfo.AuthType authType : authTypeSet) {
+        for (Set<String> authTypeSet : apiInfo.getAllAuthTypesFound()) {
+            for (String authType : authTypeSet) {
                 if (selectedAuthTypes.contains(authType)) {
                     return true;
                 }
@@ -81,11 +78,11 @@ public class AuthTypeTestingEndpoints extends TestingEndpoints {
             return MCollection.noMatchFilter;
         }
 
-        // Convert string auth types to AuthType enum
-        List<ApiInfo.AuthType> authTypeEnums = new ArrayList<>();
+        // Auth types are already strings, no conversion needed
+        List<String> authTypeEnums = new ArrayList<>();
         for (String authTypeStr : authTypes) {
             try {
-                authTypeEnums.add(ApiInfo.AuthType.valueOf(authTypeStr));
+                authTypeEnums.add(authTypeStr);
             } catch (IllegalArgumentException e) {
                 // Skip invalid auth types
             }
@@ -96,14 +93,14 @@ public class AuthTypeTestingEndpoints extends TestingEndpoints {
         }
 
         List<Bson> authTypeFilters = new ArrayList<>();
-        for (ApiInfo.AuthType authType : authTypeEnums) {
+        for (String authType : authTypeEnums) {
             // Nested elemMatch: outer for array-of-arrays, inner for elements in sub-array
             // Java Filters API doesn't support nested elemMatch, so use Document
             authTypeFilters.add(
                 new Document(ApiInfo.ALL_AUTH_TYPES_FOUND,
                     new Document("$elemMatch",
                         new Document("$elemMatch",
-                            new Document("$eq", authType.name())
+                            new Document("$eq", authType)
                         )
                     )
                 )

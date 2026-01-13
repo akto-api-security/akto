@@ -20,22 +20,22 @@ public class AuthPolicy {
     public static final String COOKIE_NAME = "cookie";
     private static final Logger logger = LoggerFactory.getLogger(AuthPolicy.class);
 
-    private static List<ApiInfo.AuthType> findBearerBasicAuth(String header, String value){
+    private static List<String> findBearerBasicAuth(String header, String value){
         value = value.trim();
         boolean twoFields = value.split(" ").length == 2;
         if (twoFields && value.substring(0, Math.min(6, value.length())).equalsIgnoreCase("bearer")) {
-            return Collections.singletonList(ApiInfo.AuthType.BEARER);
+            return Collections.<String>singletonList(ApiInfo.AuthType.BEARER);
         } else if (twoFields && value.substring(0, Math.min(5, value.length())).equalsIgnoreCase("basic")) {
-            return Collections.singletonList(ApiInfo.AuthType.BASIC);
+            return Collections.<String>singletonList(ApiInfo.AuthType.BASIC);
         } else if (header.equals(AUTHORIZATION_HEADER_NAME) || header.equals("auth")) {
             // todo: check jwt first and then this
-            return Collections.singletonList(ApiInfo.AuthType.AUTHORIZATION_HEADER);
+            return Collections.<String>singletonList(ApiInfo.AuthType.AUTHORIZATION_HEADER);
         }
         return new ArrayList<>();
     }
 
     public static boolean findAuthType(HttpResponseParams httpResponseParams, ApiInfo apiInfo, RuntimeFilter filter, List<CustomAuthType> customAuthTypes) {
-        Set<Set<ApiInfo.AuthType>> allAuthTypesFound = apiInfo.getAllAuthTypesFound();
+        Set<Set<String>> allAuthTypesFound = (Set<Set<String>>) (Set<?>) apiInfo.getAllAuthTypesFound();
         if (allAuthTypesFound == null) allAuthTypesFound = new HashSet<>();
 
         // TODO: from custom api-token
@@ -46,7 +46,7 @@ public class AuthPolicy {
         Map<String, List<String>> headers = httpResponseParams.getRequestParams().getHeaders();
         List<String> cookieList = headers.getOrDefault(COOKIE_NAME, new ArrayList<>());
         Map<String,String> cookieMap = parseCookie(cookieList);
-        Set<ApiInfo.AuthType> authTypes = new HashSet<>();
+        Set<String> authTypes = new HashSet<>();
 
         for (CustomAuthType customAuthType : customAuthTypes) {
 
@@ -57,7 +57,14 @@ public class AuthPolicy {
             // Find custom auth type in header and cookie
             List<String> customAuthTypeHeaderKeys = customAuthType.getHeaderKeys();
             if (!headerAndCookieKeys.isEmpty() && !customAuthTypeHeaderKeys.isEmpty() && headerAndCookieKeys.containsAll(customAuthTypeHeaderKeys)) {
-                authTypes.add(ApiInfo.AuthType.CUSTOM);
+                // CRITICAL: Use the custom auth type's NAME directly instead of "CUSTOM"
+                String customAuthName = customAuthType.getName();
+                if (customAuthName != null && !customAuthName.trim().isEmpty()) {
+                    authTypes.add(customAuthName);
+                } else {
+                    // Fallback to "CUSTOM" if name is missing (shouldn't happen)
+                    authTypes.add(ApiInfo.AuthType.CUSTOM);
+                }
                 break;
             }
 
@@ -71,7 +78,14 @@ public class AuthPolicy {
                 } catch (Exception e){
                 }
                 if(flattenedPayload != null && !flattenedPayload.isEmpty() && flattenedPayload.keySet().containsAll(customAuthTypePayloadKeys)){
-                    authTypes.add(ApiInfo.AuthType.CUSTOM);
+                    // CRITICAL: Use the custom auth type's NAME directly instead of "CUSTOM"
+                    String customAuthName = customAuthType.getName();
+                    if (customAuthName != null && !customAuthName.trim().isEmpty()) {
+                        authTypes.add(customAuthName);
+                    } else {
+                        // Fallback to "CUSTOM" if name is missing (shouldn't happen)
+                        authTypes.add(ApiInfo.AuthType.CUSTOM);
+                    }
                     break;
                 }
             }
@@ -124,7 +138,7 @@ public class AuthPolicy {
 
 
         allAuthTypesFound.add(authTypes);
-        apiInfo.setAllAuthTypesFound(allAuthTypesFound);
+        apiInfo.setAllAuthTypesFound((Set<Set<String>>) (Set<?>) allAuthTypesFound);
 
         return returnValue;
     }

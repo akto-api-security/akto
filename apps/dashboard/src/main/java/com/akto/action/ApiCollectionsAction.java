@@ -1149,7 +1149,7 @@ public class ApiCollectionsAction extends UserAction {
         List<ApiInfo> sensitiveEndpoints = ApiInfoDao.instance.findAll(Filters.and(filterQ, Filters.eq(ApiInfo.IS_SENSITIVE, true)));
         for (ApiInfo apiInfo : sensitiveEndpoints) {
             if (apiInfo.getAllAuthTypesFound() != null && !apiInfo.getAllAuthTypesFound().isEmpty()) {
-                for (Set<ApiInfo.AuthType> authType : apiInfo.getAllAuthTypesFound()) {
+                for (Set<String> authType : apiInfo.getAllAuthTypesFound()) {
                     if (authType.contains(ApiInfo.AuthType.UNAUTHENTICATED)) {
                         this.sensitiveUnauthenticatedEndpointsCount++;
                         if (this.showApiInfo) {
