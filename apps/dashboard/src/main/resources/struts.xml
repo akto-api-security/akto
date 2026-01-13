@@ -5841,6 +5841,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ISSUES</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">Updated issue severity in bulk</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5862,6 +5863,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ISSUES</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">Updated test results severity in bulk</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
