@@ -1037,6 +1037,51 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public void fastDiscoveryBulkWriteSingleTypeInfo(List<Object> writesForSti) {
+        bulkWrite(writesForSti, "/fastDiscoveryBulkWriteSti", "writesForSti");
+    }
+
+    public void fastDiscoveryBulkWriteApiInfo(List<ApiInfo> apiInfoList) {
+        ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
+
+        List<ApiInfo> apiInfoBatch = new ArrayList<>();
+        for (int i = 0; i < apiInfoList.size(); i++) {
+            apiInfoBatch.add(apiInfoList.get(i));
+            if (apiInfoBatch.size() % batchWriteLimit == 0) {
+                List<ApiInfo> finalWrites = apiInfoBatch;
+                threadPool.submit(
+                        () -> fastDiscoveryWriteApiInfoBatch(finalWrites)
+                );
+                apiInfoBatch = new ArrayList<>();
+            }
+        }
+        if (apiInfoBatch.size() > 0) {
+            List<ApiInfo> finalWrites = apiInfoBatch;
+            threadPool.submit(
+                    () -> fastDiscoveryWriteApiInfoBatch(finalWrites)
+            );
+        }
+    }
+
+    public void fastDiscoveryWriteApiInfoBatch(List<ApiInfo> writesForApiInfo) {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("apiInfoList", writesForApiInfo);
+
+        String objString = gson.toJson(obj);
+        loggerMaker.info("fast-discovery api info batch" + objString);
+
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fastDiscoveryBulkWriteApiInfo", "", "POST", objString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fastDiscoveryBulkWriteApiInfo", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fastDiscoveryBulkWriteApiInfo" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
     public List<ApiInfo.ApiInfoKey> fetchApiIds() {
         Map<String, List<String>> headers = buildHeaders();
         List<ApiInfo.ApiInfoKey> apiIds = new ArrayList<>();

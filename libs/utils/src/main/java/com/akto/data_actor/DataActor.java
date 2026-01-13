@@ -90,6 +90,10 @@ public abstract class DataActor {
 
     public abstract void bulkWriteApiInfo(List<ApiInfo> apiInfoList);
 
+    public abstract void fastDiscoveryBulkWriteSingleTypeInfo(List<Object> writesForSti);
+
+    public abstract void fastDiscoveryBulkWriteApiInfo(List<ApiInfo> apiInfoList);
+
     public abstract List<ApiInfo.ApiInfoKey> fetchApiIds();
 
     public abstract void ensureCollections(List<Integer> collectionIds);

@@ -66,7 +66,7 @@ public class DatabaseAbstractorClient {
     public void bulkWriteSti(List<BulkUpdates> writes) throws Exception {
         loggerMaker.infoAndAddToDb("Fast-discovery: Bulk writing " + writes.size() + " entries to single_type_info");
         List<Object> writesForSti = new ArrayList<>(writes);
-        dataActor.bulkWriteSingleTypeInfo(writesForSti);
+        dataActor.fastDiscoveryBulkWriteSingleTypeInfo(writesForSti);
     }
 
     /**
@@ -90,7 +90,7 @@ public class DatabaseAbstractorClient {
                 loggerMaker.errorAndAddToDb("Failed to convert BulkUpdates to ApiInfo: " + e.getMessage());
             }
         }
-        dataActor.bulkWriteApiInfo(apiInfoList);
+        dataActor.fastDiscoveryBulkWriteApiInfo(apiInfoList);
     }
 
     /**
