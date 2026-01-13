@@ -1,4 +1,4 @@
-import { Box, Button, HorizontalStack, Popover, ActionList, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Button, HorizontalStack, Popover, ActionList, Text, VerticalStack, Card } from '@shopify/polaris'
 import { SettingsFilledMinor } from '@shopify/polaris-icons'
 import { useEffect, useReducer, useState, useRef } from 'react'
 import TitleWithInfo from '../../components/shared/TitleWithInfo'
@@ -23,238 +23,32 @@ import CustomPieChart from './new_components/CustomPieChart'
 import CustomLineChart from './new_components/CustomLineChart'
 import CustomDataTable from './new_components/CustomDataTable'
 
-const agenticDiscoveryData = {
-    "AI Agents": { text: 2000, color: "#7F56D9" },
-    "MCP Servers": { text: 1500, color: "#9E77ED" },
-    "LLM": { text: 1500, color: "#D6BBFB" }
-}
-
-const agenticIssuesData = {
-    "Critical": { text: 420, color: "#E45357" },
-    "High": { text: 400, color: "#EF864C" },
-    "Medium": { text: 350, color: "#F6C564" },
-    "Low": { text: 250, color: "#E0E0E0" }
-}
-
-const agenticGuardrailsData = {
-    "Critical": { text: 600, color: "#E45357" },
-    "High": { text: 500, color: "#EF864C" },
-    "Medium": { text: 450, color: "#F6C564" },
-    "Low": { text: 450, color: "#E0E0E0" }
-}
-
-const issueAgeData = [
-    { label: 'Critical Issues', days: 12, progress: 40, color: '#D92D20' },
-    { label: 'High Issues', days: 12, progress: 40, color: '#F79009' },
-    { label: 'Medium Issues', days: 17, progress: 57, color: '#8660d8ff' },
-    { label: 'Low Issues', days: 42, progress: 100, color: '#714ec3ff' }
-]
-
-const complianceData = [
-    { name: 'SOC 2', percentage: 70, color: '#D97706', icon: '/public/SOC%202.svg' },
-    { name: 'GDPR', percentage: 10, color: '#7C3AED', icon: '/public/GDPR.svg' },
-    { name: 'ISO 27001', percentage: 50, color: '#DC6803', icon: '/public/ISO%2027001.svg' },
-    { name: 'HIPAA', percentage: 90, color: '#DC2626', icon: '/public/HIPAA.svg' }
-]
-
-const testedVsNonTestedData = [
-    { name: 'Non-Tested',
-        data: [
-            [1704067200000, 2000],
-            [1706745600000, 2200],
-            [1709251200000, 1600],
-            [1711929600000, 2300],
-            [1714521600000, 2000],
-            [1717200000000, 1900],
-            [1719792000000, 2000],
-            [1722470400000, 1400],
-            [1725148800000, 1600],
-            [1727740800000, 1800],
-            [1730419200000, 1700],
-            [1733011200000, 1600]
-        ],
-        color: '#D72C0D'
-    },
-    { name: 'Tested',
-        data: [
-            [1704067200000, 3000],
-            [1706745600000, 4000],
-            [1709251200000, 2600],
-            [1711929600000, 2300],
-            [1714521600000, 1600],
-            [1717200000000, 1400],
-            [1719792000000, 2200],
-            [1722470400000, 1600],
-            [1725148800000, 2100],
-            [1727740800000, 2200],
-            [1730419200000, 2400],
-            [1733011200000, 2700]
-        ],
-        color: '#9E77ED'
-    }
-]
-
-const openResolvedIssuesData = [
-    { name: 'Open Issues',
-        data: [
-            [1704067200000, 2000],
-            [1706745600000, 2200],
-            [1709251200000, 1600],
-            [1711929600000, 2400],
-            [1714521600000, 2000],
-            [1717200000000, 1900],
-            [1719792000000, 2000],
-            [1722470400000, 1300],
-            [1725148800000, 1600],
-            [1727740800000, 1800],
-            [1730419200000, 1700],
-            [1733011200000, 1600]
-        ],
-        color: '#D72C0D'
-    },
-    { name: 'Resolved Issues',
-        data: [
-            [1704067200000, 3000],
-            [1706745600000, 3900],
-            [1709251200000, 2700],
-            [1711929600000, 2300],
-            [1714521600000, 1700],
-            [1717200000000, 1400],
-            [1719792000000, 2300],
-            [1722470400000, 1700],
-            [1725148800000, 2100],
-            [1727740800000, 2200],
-            [1730419200000, 2300],
-            [1733011200000, 2700]
-        ],
-        color: '#9E77ED'
-    }
-]
-
-const guardrailRequestsData = [
-    { name: 'Flagged Requests',
-        data: [
-            [1704067200000, 12000],
-            [1706745600000, 12200],
-            [1709251200000, 11600],
-            [1711929600000, 12200],
-            [1714521600000, 12000],
-            [1717200000000, 11900],
-            [1719792000000, 13200],
-            [1722470400000, 11200],
-            [1725148800000, 12000],
-            [1727740800000, 13500],
-            [1730419200000, 11600],
-            [1733011200000, 11600]
-        ],
-        color: '#D72C0D'
-    },
-    { name: 'Safe Requests',
-        data: [
-            [1704067200000, 13000],
-            [1706745600000, 13900],
-            [1709251200000, 12700],
-            [1711929600000, 12200],
-            [1714521600000, 14000],
-            [1717200000000, 11100],
-            [1719792000000, 13200],
-            [1722470400000, 11900],
-            [1725148800000, 12000],
-            [1727740800000, 15400],
-            [1730419200000, 12400],
-            [1733011200000, 12700]
-        ],
-        color: '#47B881'
-    }
-]
-
-const openResolvedGuardrailsData = [
-    { name: 'Open Issues',
-        data: [
-            [1704067200000, 2000],
-            [1706745600000, 2100],
-            [1709251200000, 1600],
-            [1711929600000, 2400],
-            [1714521600000, 2000],
-            [1717200000000, 1900],
-            [1719792000000, 2000],
-            [1722470400000, 1300],
-            [1725148800000, 1500],
-            [1727740800000, 1700],
-            [1730419200000, 1600],
-            [1733011200000, 1600]
-        ],
-        color: '#D72C0D'
-    },
-    { name: 'Resolved Issues',
-        data: [
-            [1704067200000, 3100],
-            [1706745600000, 3900],
-            [1709251200000, 2700],
-            [1711929600000, 2300],
-            [1714521600000, 2000],
-            [1717200000000, 1300],
-            [1719792000000, 2400],
-            [1722470400000, 1900],
-            [1725148800000, 2100],
-            [1727740800000, 2200],
-            [1730419200000, 2500],
-            [1733011200000, 2700]
-        ],
-        color: '#9E77ED'
-    }
-]
-
-const weakestAreasData = [
-    { name: 'Prompt Injection', value: '64%', color: '#E45357' },
-    { name: 'Memory Poisoning', value: '54.3%', color: '#E45357' },
-    { name: 'Agentic AI Tool Misuse', value: '51%', color: '#E45357' },
-    { name: 'Manipulation', value: '48.5%', color: '#EF864C' },
-    { name: 'System Prompt Leakage', value: '32.3%', color: '#EF864C' }
-]
-
-const topAgenticComponentsData = [
-    { name: 'mcp.chargebee.com', value: '1,160' },
-    { name: '2a27c88357b55e31a56bee74adc33d0f.akto_mcp_server.com', value: '156' },
-    { name: 'playground.chargebee.com', value: '153' },
-    { name: 'docs.chargebee.com', value: '140' },
-    { name: 'api.chargebee.com', value: '92' }
-]
-
-const topRequestsByTypeData = [
-    { name: 'Prompt Injection', value: '64%' },
-    { name: 'Toxic content', value: '54.3%' },
-    { name: 'PII Data Leak', value: '51%' },
-    { name: 'Harmful Content', value: '48.5%' },
-    { name: 'Tool Abuse', value: '32.3%' }
-]
-
-const topAttackedComponentsData = [
-    { name: 'mcp.chargebee.com', value: '24.3k' },
-    { name: '2a27c88357b55e31a56bee74adc33d0f.akto_mcp_server.com', value: '12.3k' },
-    { name: 'playground.chargebee.com', value: '9.2k' },
-    { name: 'docs.chargebee.com', value: '8.2k' },
-    { name: 'apiv2.chargebee.com', value: '800' }
-]
-
-const topBadActorsData = [
-    { name: '107.85.149.128', value: '24.3k' },
-    { name: '136.226.250.200', value: '12.3k' },
-    { name: '45.133.2.112', value: '9.2k' },
-    { name: '165.22.42.240', value: '8.2k' },
-    { name: '192.168.1.254', value: '800' }
-]
-
 const AgenticDashboard = () => {
     const SCREEN_NAME = 'home-main-dashboard';
     const dashboardCategory = getDashboardCategory();
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState('ciso')
-    const [overallStats, setOverallStats] = useState({})
+    const [overallStats, setOverallStats] = useState([])
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
     const containerRef = useRef(null);
     const [popoverActive, setPopoverActive] = useState(false);
     const setToastConfig = Store(state => state.setToastConfig);
+
+    // State for all dashboard data - initialized with empty/default values
+    const [apiDiscoveryData, setApiDiscoveryData] = useState({});
+    const [issuesData, setIssuesData] = useState({});
+    const [threatData, setThreatData] = useState({});
+    const [averageIssueAgeData, setAverageIssueAgeData] = useState([]);
+    const [testedVsNonTestedChartData, setTestedVsNonTestedChartData] = useState([]);
+    const [openResolvedChartData, setOpenResolvedChartData] = useState([]);
+    const [topIssuesByCategory, setTopIssuesByCategory] = useState([]);
+    const [topHostnamesByIssues, setTopHostnamesByIssues] = useState([]);
+    const [topThreatsByCategory, setTopThreatsByCategory] = useState([]);
+    const [topAttackHosts, setTopAttackHosts] = useState([]);
+    const [topBadActors, setTopBadActors] = useState([]);
+    const [complianceData, setComplianceData] = useState([]);
+    const [threatRequestsChartData, setThreatRequestsChartData] = useState([]);
+    const [openResolvedThreatsData, setOpenResolvedThreatsData] = useState([]);
 
     const defaultVisibleComponents = [
         'security-posture-chart', 'api-discovery-pie', 'issues-pie', 'threat-detection-pie',
@@ -378,64 +172,370 @@ const AgenticDashboard = () => {
     }
 
     useEffect(() => {
-        setLoading(true);
-        // fetch data
-        setOverallStats([
-            { name: mapLabel('API Endpoints Discovered', dashboardCategory),
-                data: [
-                    [1704067200000, 36000],
-                    [1706745600000, 46000],
-                    [1709251200000, 30000],
-                    [1711929600000, 20000],
-                    [1714521600000, 16000],
-                    [1717200000000, 15000],
-                    [1719792000000, 27000],
-                    [1722470400000, 19000],
-                    [1725148800000, 24000],
-                    [1727740800000, 25000],
-                    [1730419200000, 28000],
-                    [1733011200000, 32000]
-                ],
-                color: '#B692F6'
-            },
-            { name: `${mapLabel('API', dashboardCategory)} Issues`,
-                data: [
-                    [1704067200000, 24000],
-                    [1706745600000, 26000],
-                    [1709251200000, 18000],
-                    [1711929600000, 27000],
-                    [1714521600000, 23000],
-                    [1717200000000, 22000],
-                    [1719792000000, 21000],
-                    [1722470400000, 15000],
-                    [1725148800000, 21000],
-                    [1727740800000, 20000],
-                    [1730419200000, 19000],
-                    [1733011200000, 19000]
-                ],
-                color: '#D72C0D'
-            },
-            { name: mapLabel('Threat', dashboardCategory) + ' Requests flagged',
-                data: [
-                    [1704067200000, 52000],
-                    [1706745600000, 47000],
-                    [1709251200000, 41000],
-                    [1711929600000, 32000],
-                    [1714521600000, 26000],
-                    [1717200000000, 22000],
-                    [1719792000000, 32000],
-                    [1722470400000, 33000],
-                    [1725148800000, 38000],
-                    [1727740800000, 36000],
-                    [1730419200000, 37000],
-                    [1733011200000, 33000]
-                ],
-                color: '#F3B283'
-            }
-        ])
+        const fetchAllDashboardData = async () => {
+            setLoading(true);
+            try {
+                // Extract timestamps from date range period (same pattern as other components)
+                const getTimeEpoch = (key) => {
+                    if (!currDateRange.period || !currDateRange.period[key]) {
+                        return 0;
+                    }
+                    return Math.floor(Date.parse(currDateRange.period[key]) / 1000);
+                }
+                
+                const startTs = getTimeEpoch("since");
+                const endTs = getTimeEpoch("until");
 
-        setLoading(false);
-    }, [dashboardCategory])
+                // Fetch all consolidated APIs in parallel
+                const [
+                    endpointDiscoveryResponse,
+                    issuesResponse,
+                    testingResponse,
+                    threatResponse
+                ] = await Promise.allSettled([
+                    api.fetchEndpointDiscoveryData(startTs, endTs),
+                    api.fetchIssuesData(startTs, endTs),
+                    api.fetchTestingData(startTs, endTs),
+                    api.fetchThreatData(startTs, endTs)
+                ]);
+
+                // Process Endpoint Discovery Data
+                if (endpointDiscoveryResponse.status === 'fulfilled' && endpointDiscoveryResponse.value) {
+                    const data = endpointDiscoveryResponse.value;
+                    const discoveryStats = data.discoveryStats || {};
+
+                    setApiDiscoveryData({
+                        "Shadow": { text: discoveryStats.shadow || 0, color: "#E45357" },
+                        "Sensitive": { text: discoveryStats.sensitive || 0, color: "#EF864C" },
+                        "No Auth": { text: discoveryStats.noAuth || 0, color: "#F6C564" },
+                        "Normal": { text: discoveryStats.normal || 0, color: "#E0E0E0" }
+                    });
+                } else {
+                    setApiDiscoveryData({});
+                }
+
+                // Process Issues Data
+                if (issuesResponse.status === 'fulfilled' && issuesResponse.value) {
+                    const data = issuesResponse.value;
+
+                    // Issues by Severity
+                    const issuesBySeverity = data.issuesBySeverity || {};
+                    setIssuesData({
+                        "Critical": { text: issuesBySeverity.critical || 0, color: "#E45357" },
+                        "High": { text: issuesBySeverity.high || 0, color: "#EF864C" },
+                        "Medium": { text: issuesBySeverity.medium || 0, color: "#F6C564" },
+                        "Low": { text: issuesBySeverity.low || 0, color: "#E0E0E0" }
+                    });
+
+                    // Average Issue Age
+                    const averageIssueAge = data.averageIssueAge || {};
+                    const maxAge = Math.max(
+                        averageIssueAge.critical || 0,
+                        averageIssueAge.high || 0,
+                        averageIssueAge.medium || 0,
+                        averageIssueAge.low || 0,
+                        42
+                    );
+
+                    setAverageIssueAgeData([
+                        {
+                            label: 'Critical Issues',
+                            days: Math.round(averageIssueAge.critical || 0),
+                            progress: maxAge > 0 ? Math.round(((averageIssueAge.critical || 0) / maxAge) * 100) : 0,
+                            color: '#D92D20'
+                        },
+                        {
+                            label: 'High Issues',
+                            days: Math.round(averageIssueAge.high || 0),
+                            progress: maxAge > 0 ? Math.round(((averageIssueAge.high || 0) / maxAge) * 100) : 0,
+                            color: '#F79009'
+                        },
+                        {
+                            label: 'Medium Issues',
+                            days: Math.round(averageIssueAge.medium || 0),
+                            progress: maxAge > 0 ? Math.round(((averageIssueAge.medium || 0) / maxAge) * 100) : 0,
+                            color: '#8660d8ff'
+                        },
+                        {
+                            label: 'Low Issues',
+                            days: Math.round(averageIssueAge.low || 0),
+                            progress: maxAge > 0 ? Math.round(((averageIssueAge.low || 0) / maxAge) * 100) : 0,
+                            color: '#714ec3ff'
+                        }
+                    ]);
+
+                    // Open & Resolved Issues
+                    const openResolved = data.openResolvedIssues || {};
+                    const openData = transformTimeSeriesData(openResolved.open || []);
+                    const resolvedData = transformTimeSeriesData(openResolved.resolved || []);
+
+                    setOpenResolvedChartData([
+                        {
+                            name: 'Open Issues',
+                            data: openData,
+                            color: '#D72C0D'
+                        },
+                        {
+                            name: 'Resolved Issues',
+                            data: resolvedData,
+                            color: '#9E77ED'
+                        }
+                    ]);
+
+                    // Top Issues by Category
+                    const topIssues = data.topIssuesByCategory || [];
+                    const totalTopIssues = topIssues.reduce((sum, item) => sum + (item.count || 0), 0);
+                    setTopIssuesByCategory(
+                        topIssues.map((item, idx) => ({
+                            name: item._id || `Issue ${idx + 1}`,
+                            value: totalTopIssues > 0 ? `${Math.round(((item.count || 0) / totalTopIssues) * 100)}%` : '0%',
+                            color: idx < 3 ? '#E45357' : '#EF864C'
+                        }))
+                    );
+
+                    // Top Hostnames by Issues
+                    const topHostnames = data.topHostnamesByIssues || [];
+                    setTopHostnamesByIssues(
+                        topHostnames.map((item) => ({
+                            name: item.hostname || 'Unknown',
+                            value: (item.count || 0).toLocaleString()
+                        }))
+                    );
+                } else {
+                    // Set empty defaults if API fails
+                    setIssuesData({});
+                    setAverageIssueAgeData([]);
+                    setOpenResolvedChartData([]);
+                    setTopIssuesByCategory([]);
+                    setTopHostnamesByIssues([]);
+                }
+
+                // Process Testing Data
+                if (testingResponse.status === 'fulfilled' && testingResponse.value) {
+                    const data = testingResponse.value;
+                    const testedVsNonTested = data.testedVsNonTested || {};
+
+                    const testedData = transformTimeSeriesData(testedVsNonTested.tested || []);
+                    const nonTestedData = transformTimeSeriesData(testedVsNonTested.nonTested || []);
+
+                    setTestedVsNonTestedChartData([
+                        {
+                            name: 'Non-Tested',
+                            data: nonTestedData,
+                            color: '#D72C0D'
+                        },
+                        {
+                            name: 'Tested',
+                            data: testedData,
+                            color: '#9E77ED'
+                        }
+                    ]);
+                } else {
+                    setTestedVsNonTestedChartData([]);
+                }
+
+                // Process Threat Data
+                if (threatResponse.status === 'fulfilled' && threatResponse.value) {
+                    const data = threatResponse.value;
+
+                    // Threats by Severity
+                    const threatsBySeverity = data.threatsBySeverity || {};
+                    setThreatData({
+                        "Critical": { text: threatsBySeverity.critical || 0, color: "#E45357" },
+                        "High": { text: threatsBySeverity.high || 0, color: "#EF864C" },
+                        "Medium": { text: threatsBySeverity.medium || 0, color: "#F6C564" },
+                        "Low": { text: threatsBySeverity.low || 0, color: "#E0E0E0" }
+                    });
+
+                    // Threats over time
+                    const threatsOverTime = data.threatsOverTime || [];
+                    const threatRequestsData = transformTimeSeriesData(threatsOverTime);
+                    // For now, threat requests chart shows only flagged requests
+                    // TODO: Add safe requests data when available from API
+                    setThreatRequestsChartData(
+                        threatRequestsData.length > 0 ? [
+                            {
+                                name: 'Flagged Requests',
+                                data: threatRequestsData,
+                                color: '#D72C0D'
+                            }
+                        ] : []
+                    );
+
+                    // Top Threats by Category
+                    const topThreats = data.topThreatsByCategory || [];
+                    const totalTopThreats = topThreats.reduce((sum, item) => sum + (item.count || 0), 0);
+                    setTopThreatsByCategory(
+                        topThreats.map((item, idx) => ({
+                            name: item._id || `Threat ${idx + 1}`,
+                            value: totalTopThreats > 0 ? `${Math.round(((item.count || 0) / totalTopThreats) * 100)}%` : '0%'
+                        }))
+                    );
+
+                    // Top Attack Hosts
+                    const topHosts = data.topAttackHosts || [];
+                    setTopAttackHosts(
+                        topHosts.map((item) => ({
+                            name: item.hostname || item._id || 'Unknown',
+                            value: (item.count || 0).toLocaleString()
+                        }))
+                    );
+
+                    // Top Bad Actors
+                    const topActors = data.topBadActors || [];
+                    setTopBadActors(
+                        topActors.map((item) => ({
+                            name: item.actor || item._id || 'Unknown',
+                            value: (item.count || 0).toLocaleString()
+                        }))
+                    );
+
+                    // Open & Resolved Threats - not available from backend yet
+                    // Set empty array as backend doesn't provide this data
+                    setOpenResolvedThreatsData([]);
+                } else {
+                    // Set empty defaults if API fails
+                    setThreatData({});
+                    setThreatRequestsChartData([]);
+                    setOpenResolvedThreatsData([]);
+                    setTopThreatsByCategory([]);
+                    setTopAttackHosts([]);
+                    setTopBadActors([]);
+                }
+                
+                // Build Security Posture Chart data from all three APIs (after all processing)
+                // This ensures the chart is built even if individual APIs fail
+                let endpointsData = [];
+                if (endpointDiscoveryResponse.status === 'fulfilled' && endpointDiscoveryResponse.value) {
+                    endpointsData = transformTimeSeriesData(endpointDiscoveryResponse.value.endpointsDiscovered || []);
+                }
+                
+                let issuesData = [];
+                if (issuesResponse.status === 'fulfilled' && issuesResponse.value) {
+                    issuesData = transformTimeSeriesData(issuesResponse.value.issuesOverTime || []);
+                }
+                
+                let threatRequestsFlaggedData = [];
+                if (threatResponse.status === 'fulfilled' && threatResponse.value) {
+                    const threatsOverTime = threatResponse.value.threatsOverTime || [];
+                    threatRequestsFlaggedData = transformTimeSeriesData(threatsOverTime);
+                }
+                
+                const overallStatsData = [
+                    {
+                        name: mapLabel('API Endpoints Discovered', dashboardCategory),
+                        data: endpointsData,
+                        color: '#B692F6'
+                    },
+                    {
+                        name: `${mapLabel('API', dashboardCategory)} Issues`,
+                        data: issuesData,
+                        color: '#D72C0D'
+                    },
+                    {
+                        name: mapLabel('Threat', dashboardCategory) + ' Requests flagged',
+                        data: threatRequestsFlaggedData,
+                        color: '#F3B283'
+                    }
+                ];
+                setOverallStats(overallStatsData);
+            } catch (error) {
+                console.error('Error fetching dashboard data:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchAllDashboardData();
+    }, [dashboardCategory, currDateRange])
+
+    const transformTimeSeriesData = (backendData) => {
+        if (!backendData || !Array.isArray(backendData)) {
+            return [];
+        }
+
+        return backendData.map(item => {
+            const id = item._id;
+            let timestamp;
+
+            // Handle different time key formats from backend
+            if (typeof id === 'string') {
+                // New format from Java-based aggregation: "YYYY-MM-DD" (day), "YYYY_M" (month), or "YYYY_W" (week)
+                if (id.includes('-')) {
+                    // Day format: "YYYY-MM-DD"
+                    const date = new Date(id);
+                    timestamp = date.getTime();
+                } else if (id.includes('_')) {
+                    // Month or week format: "YYYY_M" or "YYYY_W"
+                    const parts = id.split('_');
+                    if (parts.length === 2) {
+                        const year = parseInt(parts[0], 10);
+                        const period = parseInt(parts[1], 10);
+                        
+                        if (period <= 12) {
+                            // Month format: "YYYY_M" (e.g., "2025_7" = July 2025)
+                            const date = new Date(Date.UTC(year, period - 1, 1));
+                            timestamp = date.getTime();
+                        } else if (period <= 53) {
+                            // Week format: "YYYY_W" (e.g., "2024_12" = week 12 of 2024)
+                            const date = new Date(Date.UTC(year, 0, 1));
+                            const firstDay = date.getUTCDay();
+                            const offset = firstDay === 0 ? 0 : 7 - firstDay;
+                            date.setUTCDate(date.getUTCDate() + offset + (period - 1) * 7);
+                            timestamp = date.getTime();
+                        } else {
+                            // Fallback: treat as day of year
+                            const date = new Date(Date.UTC(year, 0, period));
+                            timestamp = date.getTime();
+                        }
+                    } else {
+                        timestamp = Date.now();
+                    }
+                } else {
+                    // Try parsing as date string
+                    const date = new Date(id);
+                    timestamp = isNaN(date.getTime()) ? Date.now() : date.getTime();
+                }
+            } else if (id && typeof id === 'object') {
+                // Legacy format: { year: 2024, timePeriod: 1 } for month/week/day grouping
+                const year = id.year || new Date().getFullYear();
+                const timePeriod = id.timePeriod;
+
+                if (typeof timePeriod === 'string' && timePeriod.includes('-')) {
+                    // Day format: "YYYY-MM-DD"
+                    const date = new Date(timePeriod);
+                    timestamp = date.getTime();
+                } else if (typeof timePeriod === 'number') {
+                    // Month/week/day number - calculate timestamp
+                    // Determine if it's month, week, or day based on the value
+                    if (timePeriod <= 12) {
+                        // Likely a month (1-12)
+                        const date = new Date(Date.UTC(year, timePeriod - 1, 1));
+                        timestamp = date.getTime();
+                    } else if (timePeriod <= 53) {
+                        // Likely a week (1-53)
+                        const date = new Date(Date.UTC(year, 0, 1));
+                        const firstDay = date.getUTCDay();
+                        const offset = firstDay === 0 ? 0 : 7 - firstDay;
+                        date.setUTCDate(date.getUTCDate() + offset + (timePeriod - 1) * 7);
+                        timestamp = date.getTime();
+                    } else {
+                        // Likely a day of year (1-365)
+                        const date = new Date(Date.UTC(year, 0, timePeriod));
+                        timestamp = date.getTime();
+                    }
+                } else {
+                    timestamp = Date.now();
+                }
+            } else {
+                // Fallback
+                timestamp = Date.now();
+            }
+
+            const count = item.count || 0;
+            return [timestamp, count];
+        }).sort((a, b) => a[0] - b[0]); // Sort by timestamp
+    }
 
     const onLayoutChange = (newLayout) => {
         setLayout(prevLayout => {
@@ -508,26 +608,26 @@ const AgenticDashboard = () => {
         'api-discovery-pie': <CustomPieChart
             title={mapLabel('API Discovery', dashboardCategory)}
             subtitle={`Total ${mapLabel('APIs', dashboardCategory)}`}
-            graphData={agenticDiscoveryData}
+            graphData={apiDiscoveryData}
             itemId='api-discovery-pie'
             onRemoveComponent={removeComponent}
         />,
         'issues-pie': <CustomPieChart
             title="Issues"
             subtitle="Total Issues"
-            graphData={agenticIssuesData}
+            graphData={issuesData}
             itemId='issues-pie'
             onRemoveComponent={removeComponent}
         />,
         'threat-detection-pie': <CustomPieChart
             title={mapLabel('Threat Detection', dashboardCategory)}
             subtitle="Requests Flagged"
-            graphData={agenticGuardrailsData}
+            graphData={threatData}
             itemId='threat-detection-pie'
             onRemoveComponent={removeComponent}
         />,
         'average-issue-age': <AverageIssueAgeCard
-            issueAgeData={issueAgeData}
+            issueAgeData={averageIssueAgeData}
             itemId='average-issue-age'
             onRemoveComponent={removeComponent}
         />,
@@ -538,7 +638,7 @@ const AgenticDashboard = () => {
         />,
         'tested-vs-non-tested': <CustomLineChart
             title={`Tested vs Non-Tested ${mapLabel('APIs', dashboardCategory)}`}
-            chartData={testedVsNonTestedData}
+            chartData={testedVsNonTestedChartData}
             labels={[
                 { label: 'Non-Tested', color: '#D72C0D' },
                 { label: 'Tested', color: '#9E77ED' }
@@ -548,7 +648,7 @@ const AgenticDashboard = () => {
         />,
         'open-resolved-issues': <CustomLineChart
             title="Open & Resolved Issues"
-            chartData={openResolvedIssuesData}
+            chartData={openResolvedChartData}
             labels={[
                 { label: 'Open Issues', color: '#D72C0D' },
                 { label: 'Resolved Issues', color: '#9E77ED' }
@@ -556,57 +656,87 @@ const AgenticDashboard = () => {
             itemId='open-resolved-issues'
             onRemoveComponent={removeComponent}
         />,
-        'threat-requests-chart': <CustomLineChart
-            title={`${mapLabel('Threat', dashboardCategory)} Requests over time`}
-            chartData={guardrailRequestsData}
-            labels={[
-                { label: 'Flagged Requests', color: '#D72C0D' },
-                { label: 'Safe Requests', color: '#47B881' }
-            ]}
-            itemId='threat-requests-chart'
-            onRemoveComponent={removeComponent}
-        />,
-        'open-resolved-threats': <CustomLineChart
-            title={`Open & Resolved ${mapLabel('Threat', dashboardCategory)}s`}
-            chartData={openResolvedGuardrailsData}
-            labels={[
-                { label: 'Open Issues', color: '#D72C0D' },
-                { label: 'Resolved Issues', color: '#9E77ED' }
-            ]}
-            itemId='open-resolved-threats'
-            onRemoveComponent={removeComponent}
-        />,
+        'threat-requests-chart': (threatRequestsChartData && Array.isArray(threatRequestsChartData) && threatRequestsChartData.length > 0) ? (
+            <CustomLineChart
+                title={`${mapLabel('Threat', dashboardCategory)} Requests over time`}
+                chartData={threatRequestsChartData}
+                labels={[
+                    { label: 'Flagged Requests', color: '#D72C0D' },
+                    { label: 'Safe Requests', color: '#47B881' }
+                ]}
+                itemId='threat-requests-chart'
+                onRemoveComponent={removeComponent}
+            />
+        ) : (
+            <Card>
+                <VerticalStack gap="4">
+                    <ComponentHeader 
+                        title={`${mapLabel('Threat', dashboardCategory)} Requests over time`} 
+                        itemId='threat-requests-chart' 
+                        onRemove={removeComponent} 
+                    />
+                    <Box width='100%' minHeight='290px' display='flex' alignItems='center' justifyContent='center'>
+                        <Text alignment='center' color='subdued'>No threat data available</Text>
+                    </Box>
+                </VerticalStack>
+            </Card>
+        ),
+        'open-resolved-threats': (openResolvedThreatsData && Array.isArray(openResolvedThreatsData) && openResolvedThreatsData.length > 0) ? (
+            <CustomLineChart
+                title={`Open & Resolved ${mapLabel('Threat', dashboardCategory)}s`}
+                chartData={openResolvedThreatsData}
+                labels={[
+                    { label: 'Open Issues', color: '#D72C0D' },
+                    { label: 'Resolved Issues', color: '#9E77ED' }
+                ]}
+                itemId='open-resolved-threats'
+                onRemoveComponent={removeComponent}
+            />
+        ) : (
+            <Card>
+                <VerticalStack gap="4">
+                    <ComponentHeader 
+                        title={`Open & Resolved ${mapLabel('Threat', dashboardCategory)}s`} 
+                        itemId='open-resolved-threats' 
+                        onRemove={removeComponent} 
+                    />
+                    <Box width='100%' minHeight='290px' display='flex' alignItems='center' justifyContent='center'>
+                        <Text alignment='center' color='subdued'>No threat data available</Text>
+                    </Box>
+                </VerticalStack>
+            </Card>
+        ),
         'weakest-areas': <CustomDataTable
-            title="Weakest Areas by Failing Percentage"
-            data={weakestAreasData}
+            title="Top Issues by Category"
+            data={topIssuesByCategory}
             showSignalIcon={true}
             itemId='weakest-areas'
             onRemoveComponent={removeComponent}
         />,
         'top-apis-issues': <CustomDataTable
             title={`Top ${mapLabel('APIs', dashboardCategory)} with Critical & High Issues`}
-            data={topAgenticComponentsData}
+            data={topHostnamesByIssues}
             showSignalIcon={true}
             itemId='top-apis-issues'
             onRemoveComponent={removeComponent}
         />,
         'top-requests-by-type': <CustomDataTable
-            title="Top Requests by Type"
-            data={topRequestsByTypeData}
+            title="Top Threats by Category"
+            data={topThreatsByCategory}
             showSignalIcon={true}
             itemId='top-requests-by-type'
             onRemoveComponent={removeComponent}
         />,
         'top-attacked-apis': <CustomDataTable
             title={`Top Attacked ${mapLabel('APIs', dashboardCategory)}`}
-            data={topAttackedComponentsData}
+            data={topAttackHosts}
             showSignalIcon={false}
             itemId='top-attacked-apis'
             onRemoveComponent={removeComponent}
         />,
         'top-bad-actors': <CustomDataTable
             title="Top Bad Actors"
-            data={topBadActorsData}
+            data={topBadActors}
             showSignalIcon={false}
             itemId='top-bad-actors'
             onRemoveComponent={removeComponent}

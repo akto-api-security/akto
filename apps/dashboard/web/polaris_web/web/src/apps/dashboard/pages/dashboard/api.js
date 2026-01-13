@@ -233,6 +233,52 @@ const api = {
                 screenName
             }
         })
+    },
+
+
+    // Consolidated APIs
+    fetchEndpointDiscoveryData: async (startTimestamp, endTimestamp) => {
+        return await request({
+            url: '/api/fetchEndpointDiscoveryData',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
+    },
+
+    fetchIssuesData: async (startTimestamp, endTimestamp) => {
+        return await request({
+            url: '/api/fetchIssuesData',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
+    },
+
+    fetchTestingData: async (startTimestamp, endTimestamp) => {
+        return await request({
+            url: '/api/fetchTestingData',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
+    },
+
+    fetchThreatData: async (startTimestamp, endTimestamp) => {
+        return await request({
+            url: '/api/fetchThreatData',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
     }
 }
 
