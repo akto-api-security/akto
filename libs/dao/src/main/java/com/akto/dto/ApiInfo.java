@@ -99,8 +99,27 @@ public class ApiInfo {
         public static final String API_KEY = "API_KEY";
         public static final String MTLS = "MTLS";
         public static final String SESSION_TOKEN = "SESSION_TOKEN";
-        
+
         private AuthType() {} // Prevent instantiation
+
+        /**
+         * Returns all standard auth type constants.
+         * Used for testing and demo data generation.
+         */
+        public static String[] getAllStandardTypes() {
+            return new String[]{
+                UNAUTHENTICATED,
+                BASIC,
+                AUTHORIZATION_HEADER,
+                JWT,
+                API_TOKEN,
+                BEARER,
+                CUSTOM,
+                API_KEY,
+                MTLS,
+                SESSION_TOKEN
+            };
+        }
     }
 
     public enum ApiAccessType {

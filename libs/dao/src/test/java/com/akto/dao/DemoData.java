@@ -94,7 +94,7 @@ public class DemoData extends DaoConnect {
             Set<Set<String>> parentAuth = new HashSet<>();
             HashSet<String> childAuth = new HashSet<>();
             parentAuth.add(childAuth);
-            String[] allAuths = {ApiInfo.AuthType.UNAUTHENTICATED, ApiInfo.AuthType.BASIC, ApiInfo.AuthType.JWT, ApiInfo.AuthType.BEARER, ApiInfo.AuthType.CUSTOM};
+            String[] allAuths = ApiInfo.AuthType.getAllStandardTypes();
             int authIndex = ((apiInfoKey.url.hashCode() % allAuths.length) + allAuths.length) % allAuths.length;
             childAuth.add(allAuths[authIndex]);
             apiInfo.setAllAuthTypesFound(parentAuth);
