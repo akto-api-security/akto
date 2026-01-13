@@ -16,6 +16,10 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	ContextSource = types.ContextSourceAgentic
+)
+
 // policyCache holds cached policies and their metadata
 type policyCache struct {
 	policies      []types.Policy
@@ -279,7 +283,7 @@ func (s *Service) ValidateRequest(ctx context.Context, payload string, contextSo
 
 	// Create validation context
 	valCtx := &mcp.ValidationContext{
-		// Add any context information needed
+		ContextSource: ContextSource,
 	}
 
 	s.logger.Debug("Calling ProcessRequest",
@@ -308,8 +312,8 @@ func (s *Service) ValidateRequest(ctx context.Context, payload string, contextSo
 		Allowed:         !processResult.IsBlocked,
 		Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != payload,
 		ModifiedPayload: processResult.ModifiedPayload,
-		Reason:          "", // Extract from BlockedResponse if needed
-		Metadata:        processResult.ParsedData,
+		Reason:          "",                     // TODO: Extract from BlockedResponse when library is updated
+		Metadata:        types.ThreatMetadata{}, // Empty for now - library will populate later
 	}
 
 	s.logger.Info("Request validation completed",
@@ -332,7 +336,7 @@ func (s *Service) ValidateResponse(ctx context.Context, payload string, contextS
 
 	// Create validation context
 	valCtx := &mcp.ValidationContext{
-		// Add any context information needed
+		ContextSource: ContextSource,
 	}
 
 	// Use processor's ProcessResponse method with external policies
@@ -346,8 +350,8 @@ func (s *Service) ValidateResponse(ctx context.Context, payload string, contextS
 		Allowed:         !processResult.IsBlocked,
 		Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != payload,
 		ModifiedPayload: processResult.ModifiedPayload,
-		Reason:          "", // Extract from BlockedResponse if needed
-		Metadata:        processResult.ParsedData,
+		Reason:          "",                     // TODO: Extract from BlockedResponse when library is updated
+		Metadata:        types.ThreatMetadata{}, // Empty for now - library will populate later
 	}
 
 	s.logger.Info("Response validation completed",
@@ -431,8 +435,8 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 					Allowed:         !processResult.IsBlocked,
 					Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != data.RequestPayload,
 					ModifiedPayload: processResult.ModifiedPayload,
-					Reason:          "",
-					Metadata:        processResult.ParsedData,
+					Reason:          "",                     // TODO: Extract from BlockedResponse when library is updated
+					Metadata:        types.ThreatMetadata{}, // Empty for now - library will populate later
 				}
 				result.RequestAllowed = reqResult.Allowed
 				result.RequestModified = reqResult.Modified
@@ -452,8 +456,8 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 					Allowed:         !processResult.IsBlocked,
 					Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != data.ResponsePayload,
 					ModifiedPayload: processResult.ModifiedPayload,
-					Reason:          "",
-					Metadata:        processResult.ParsedData,
+					Reason:          "",                     // TODO: Extract from BlockedResponse when library is updated
+					Metadata:        types.ThreatMetadata{}, // Empty for now - library will populate later
 				}
 				result.ResponseAllowed = respResult.Allowed
 				result.ResponseModified = respResult.Modified
