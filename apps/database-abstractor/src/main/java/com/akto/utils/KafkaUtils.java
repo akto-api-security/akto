@@ -1,6 +1,7 @@
 package com.akto.utils;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -195,7 +196,7 @@ public class KafkaUtils {
     }
 
 
-    private static void parseAndTriggerWrites(String message) throws Exception {
+    public static void parseAndTriggerWrites(String message) throws Exception {
         DbAction dbAction = new DbAction();
         Map<String, Object> json = gson.fromJson(message, Map.class);
         String triggerMethod = (String) json.get("triggerMethod");
@@ -217,7 +218,7 @@ public class KafkaUtils {
                 dbAction.setWritesForSti(bulkWrites);
                 dbAction.bulkWriteSti();
                 break;
-            
+
             case "bulkWriteSampleData":
                 dbAction.setWritesForSampleData(bulkWrites);
                 dbAction.bulkWriteSampleData();
@@ -227,7 +228,7 @@ public class KafkaUtils {
                 dbAction.setWritesForSensitiveSampleData(bulkWrites);
                 dbAction.bulkWriteSensitiveSampleData();
                 break;
-                
+
             case "bulkWriteSensitiveParamInfo":
                 dbAction.setWritesForSensitiveParamInfo(bulkWrites);
                 dbAction.bulkWriteSensitiveParamInfo();
@@ -237,11 +238,12 @@ public class KafkaUtils {
                 dbAction.setWritesForTrafficInfo(bulkWrites);
                 dbAction.bulkWriteTrafficInfo();
                 break;
-            
+
             case "bulkWriteTrafficMetrics":
                 dbAction.setWritesForTrafficMetrics(bulkWrites);
                 dbAction.bulkWriteTrafficMetrics();
                 break;
+
             case "bulkWriteTestingRunIssues":
                 dbAction.setWritesForTestingRunIssues(bulkWrites);
                 dbAction.bulkWriteTestingRunIssues();
@@ -252,9 +254,65 @@ public class KafkaUtils {
                 dbAction.bulkWriteSuspectSampleData();
                 break;
 
+            case "bulkWriteApiInfo":
+                // Convert BulkUpdates to BasicDBObject list for api_info
+                List<BasicDBObject> apiInfoList = convertToApiInfoList(bulkWrites);
+                dbAction.setApiInfoList(apiInfoList);
+                dbAction.bulkWriteApiInfo();
+                break;
+
             default:
                 break;
         }
+    }
+
+    /**
+     * Convert BulkUpdates to BasicDBObject list for api_info writes.
+     * Extracts the _id filters and applies updates to build complete API info objects.
+     */
+    private static List<BasicDBObject> convertToApiInfoList(List<BulkUpdates> bulkWrites) {
+        List<BasicDBObject> apiInfoList = new ArrayList<>();
+
+        for (BulkUpdates write : bulkWrites) {
+            BasicDBObject apiInfo = new BasicDBObject();
+            Map<String, Object> filters = write.getFilters();
+
+            // Extract _id
+            if (filters.containsKey("_id")) {
+                apiInfo.put("id", filters.get("_id"));
+            }
+
+            // Apply updates to create complete ApiInfo object
+            for (String updateStr : write.getUpdates()) {
+                try {
+                    Map<String, Object> update = gson.fromJson(updateStr, Map.class);
+                    String field = (String) update.get("field");
+                    Object value = update.get("val");
+                    if (field != null && value != null) {
+                        // Convert numeric fields from Double to Integer if needed
+                        if ((field.equals("discoveredTimestamp") || field.equals("lastSeen")) && value instanceof Number) {
+                            value = ((Number) value).intValue();
+                        }
+                        // Convert collection IDs from List<Double> to List<Integer>
+                        if (field.equals("collectionIds") && value instanceof List) {
+                            List<Number> numList = (List<Number>) value;
+                            List<Integer> intList = new ArrayList<>();
+                            for (Number num : numList) {
+                                intList.add(num.intValue());
+                            }
+                            value = intList;
+                        }
+                        apiInfo.put(field, value);
+                    }
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Failed to parse update: " + updateStr);
+                }
+            }
+
+            apiInfoList.add(apiInfo);
+        }
+
+        return apiInfoList;
     }
 
     public static Properties configProperties(String kafkaBrokerUrl, String groupIdConfig, int maxPollRecordsConfig) {

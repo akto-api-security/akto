@@ -1405,7 +1405,10 @@ public class DbAction extends ActionSupport {
      */
     public String fetchAllCollections() {
         try {
-            List<ApiCollection> allCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+            List<ApiCollection> allCollections = ApiCollectionsDao.instance.findAll(
+                new BasicDBObject(),
+                Projections.include("_id", "hostName")
+            );
             collections = new ArrayList<>();
 
             for (ApiCollection col : allCollections) {
@@ -4662,30 +4665,8 @@ public class DbAction extends ActionSupport {
     public String fetchApiIds() {
         try {
             loggerMaker.infoAndAddToDb("Fetching all API IDs for Bloom filter initialization", LogDb.DB_ABS);
-
-            // Query api_info collection, projection to only return _id fields
-            // Use withDocumentClass to convert MongoCollection<ApiInfo> to MongoCollection<Document>
-            com.mongodb.client.FindIterable<org.bson.Document> cursor = ApiInfoDao.instance
-                .getMCollection()
-                .withDocumentClass(org.bson.Document.class)
-                .find()
-                .projection(Projections.include("_id.apiCollectionId", "_id.url", "_id.method"))
-                .batchSize(10000);
-
-            List<Map<String, Object>> apiIdsList = new ArrayList<>();
-            for (org.bson.Document doc : cursor) {
-                org.bson.Document id = (org.bson.Document) doc.get("_id");
-                if (id != null) {
-                    Map<String, Object> apiId = new HashMap<>();
-                    apiId.put("apiCollectionId", id.getInteger("apiCollectionId"));
-                    apiId.put("url", id.getString("url"));
-                    apiId.put("method", id.getString("method"));
-                    apiIdsList.add(apiId);
-                }
-            }
-
-            this.apiIds = apiIdsList;
-            loggerMaker.infoAndAddToDb("Fetched " + apiIdsList.size() + " API IDs", LogDb.DB_ABS);
+            this.apiIds = DbLayer.fetchAllApiInfoKeys();
+            loggerMaker.infoAndAddToDb("Fetched " + apiIds.size() + " API IDs", LogDb.DB_ABS);
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchApiIds: " + e.toString(), LogDb.DB_ABS);
@@ -4714,33 +4695,8 @@ public class DbAction extends ActionSupport {
     public String fetchSampleDataKeys() {
         try {
             loggerMaker.infoAndAddToDb("Fetching sample data keys for Bloom filter initialization (lastKeyId: " + lastKeyId + ")", LogDb.DB_ABS);
-
-            // Query sample_data collection, projection to only return _id fields
-            com.mongodb.client.FindIterable<org.bson.Document> cursor = SampleDataDao.instance
-                .getMCollection()
-                .withDocumentClass(org.bson.Document.class)
-                .find()
-                .projection(Projections.include("_id"))
-                .limit(10000)
-                .batchSize(10000);
-
-            List<Map<String, Object>> keysList = new ArrayList<>();
-            for (org.bson.Document doc : cursor) {
-                org.bson.Document id = (org.bson.Document) doc.get("_id");
-                if (id != null) {
-                    Map<String, Object> key = new HashMap<>();
-                    key.put("apiCollectionId", id.getInteger("apiCollectionId"));
-                    key.put("url", id.getString("url"));
-                    key.put("method", id.getString("method"));
-                    key.put("responseCode", id.getInteger("responseCode", -1));
-                    key.put("isHeader", id.getInteger("isHeader", 0));
-                    key.put("ts", id.getInteger("ts", 0));
-                    keysList.add(key);
-                }
-            }
-
-            this.sampleDataKeys = keysList;
-            loggerMaker.infoAndAddToDb("Fetched " + keysList.size() + " sample data keys", LogDb.DB_ABS);
+            this.sampleDataKeys = DbLayer.fetchAllSampleDataKeysAsMaps();
+            loggerMaker.infoAndAddToDb("Fetched " + sampleDataKeys.size() + " sample data keys", LogDb.DB_ABS);
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchSampleDataKeys: " + e.toString(), LogDb.DB_ABS);

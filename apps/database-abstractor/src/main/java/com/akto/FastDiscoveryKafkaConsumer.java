@@ -1,14 +1,8 @@
 package com.akto;
 
-import com.akto.action.DbAction;
-import com.akto.dao.context.Context;
-import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.gson.Gson;
-import com.mongodb.BasicDBObject;
+import com.akto.utils.KafkaUtils;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -32,8 +26,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class FastDiscoveryKafkaConsumer implements Runnable {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(FastDiscoveryKafkaConsumer.class, LogDb.DB_ABS);
-    private static final ObjectMapper mapper = new ObjectMapper();
-    private static final Gson gson = new Gson();
 
     private final KafkaConsumer<String, String> consumer;
     private final AtomicBoolean running;
@@ -147,102 +139,13 @@ public class FastDiscoveryKafkaConsumer implements Runnable {
      */
     private void processMessage(ConsumerRecord<String, String> record) {
         String message = record.value();
-
         try {
-            // Parse message - same format as main consumer
-            Map<String, Object> json = gson.fromJson(message, Map.class);
-            String triggerMethod = (String) json.get("triggerMethod");
-            String payload = (String) json.get("payload");
-            Double accIdDouble = (Double) json.get("accountId");
-            int accountId = accIdDouble.intValue();
-
-            // Set account context
-            Context.accountId.set(accountId);
-
-            // Parse bulk writes
-            List<BulkUpdates> bulkWrites = mapper.readValue(payload, new TypeReference<List<BulkUpdates>>(){});
-
-            // Create DbAction instance for this message
-            DbAction dbAction = new DbAction();
-
-            // Route to appropriate method based on triggerMethod
-            switch (triggerMethod) {
-                case "bulkWriteSti":
-                    dbAction.setWritesForSti(bulkWrites);
-                    // bulkWriteSti() handles both Kafka and direct MongoDB writes
-                    dbAction.bulkWriteSti();
-                    loggerMaker.infoAndAddToDb("FastDiscovery: Wrote " + bulkWrites.size() +
-                        " STI entries for account " + accountId, LogDb.DB_ABS);
-                    break;
-
-                case "bulkWriteApiInfo":
-                    // Convert BulkUpdates to BasicDBObject list for api_info
-                    List<BasicDBObject> apiInfoList = convertToApiInfoList(bulkWrites);
-                    dbAction.setApiInfoList(apiInfoList);
-                    dbAction.bulkWriteApiInfo();
-                    loggerMaker.infoAndAddToDb("FastDiscovery: Wrote " + apiInfoList.size() +
-                        " API info entries for account " + accountId, LogDb.DB_ABS);
-                    break;
-
-                default:
-                    loggerMaker.errorAndAddToDb("Unknown triggerMethod in fast-discovery: " +
-                        triggerMethod, LogDb.DB_ABS);
-                    break;
-            }
+            // Reuse shared message parsing and trigger logic from KafkaUtils
+            KafkaUtils.parseAndTriggerWrites(message);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Failed to process fast-discovery message: " +
                 e.getMessage(), LogDb.DB_ABS);
         }
-    }
-
-    /**
-     * Convert BulkUpdates to BasicDBObject list for api_info writes.
-     * Extracts the _id filters and applies updates to build complete API info objects.
-     */
-    private List<BasicDBObject> convertToApiInfoList(List<BulkUpdates> bulkWrites) {
-        List<BasicDBObject> apiInfoList = new ArrayList<>();
-
-        for (BulkUpdates write : bulkWrites) {
-            BasicDBObject apiInfo = new BasicDBObject();
-            Map<String, Object> filters = write.getFilters();
-
-            // Extract _id
-            if (filters.containsKey("_id")) {
-                apiInfo.put("id", filters.get("_id"));
-            }
-
-            // Apply updates to create complete ApiInfo object
-            for (String updateStr : write.getUpdates()) {
-                try {
-                    Map<String, Object> update = gson.fromJson(updateStr, Map.class);
-                    String field = (String) update.get("field");
-                    Object value = update.get("val");
-                    if (field != null && value != null) {
-                        // Convert numeric fields from Double to Integer if needed
-                        if ((field.equals("discoveredTimestamp") || field.equals("lastSeen")) && value instanceof Number) {
-                            value = ((Number) value).intValue();
-                        }
-                        // Convert collection IDs from List<Double> to List<Integer>
-                        if (field.equals("collectionIds") && value instanceof List) {
-                            List<Number> numList = (List<Number>) value;
-                            List<Integer> intList = new ArrayList<>();
-                            for (Number num : numList) {
-                                intList.add(num.intValue());
-                            }
-                            value = intList;
-                        }
-                        apiInfo.put(field, value);
-                    }
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "Failed to parse update: " + updateStr, LogDb.DB_ABS);
-                }
-            }
-
-            loggerMaker.infoAndAddToDb("Fast-discovery API info object: " + apiInfo.toJson(), LogDb.DB_ABS);
-            apiInfoList.add(apiInfo);
-        }
-
-        return apiInfoList;
     }
 
     public void shutdown() {
