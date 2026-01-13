@@ -6,7 +6,7 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.log.LoggerMaker;
 import com.akto.runtime.RuntimeUtil;
-import com.akto.runtime.utils.CollectionUtils;
+import com.akto.hybrid_parsers.HttpCallParser;
 
 import java.util.List;
 import java.util.Set;
@@ -70,8 +70,8 @@ public class ApiCollectionResolver {
      * @return API collection ID
      */
     public int resolveApiCollectionId(HttpResponseParams httpResponseParam) {
-        // Extract hostname using shared utility
-        String hostName = CollectionUtils.getHostnameForCollection(httpResponseParam);
+        // Extract hostname using shared utility from HttpCallParser
+        String hostName = HttpCallParser.getHostnameForCollection(httpResponseParam);
 
         // Handle special characters in hostname
         if (hostName != null && RuntimeUtil.hasSpecialCharacters(hostName)) {
@@ -85,7 +85,7 @@ public class ApiCollectionResolver {
         int apiCollectionId;
 
         // Check if we should use hostname-based collection
-        if (CollectionUtils.useHostCondition(hostName, httpResponseParam.getSource())) {
+        if (HttpCallParser.useHostCondition(hostName, httpResponseParam.getSource())) {
             // Mode A: Hostname-based collection
             hostName = hostName.toLowerCase().trim();
             String key = "host:" + hostName;
@@ -98,6 +98,7 @@ public class ApiCollectionResolver {
                 int id = hostName.hashCode();
 
                 try {
+                    // Create collection with retry logic (tries id, id+1, id+2, ... up to 100 attempts)
                     apiCollectionId = createCollectionBasedOnHostName(id, hostName, vpcId, tagList);
                     createdCollections.add(key);  // Cache it
 
@@ -116,6 +117,7 @@ public class ApiCollectionResolver {
             String key = "vxlan:" + vxlanId;
 
             if (!createdCollections.contains(key)) {
+                // Create vxlan-based collection
                 createCollectionSimpleForVpc(vxlanId, vpcId, tagList);
                 createdCollections.add(key);  // Cache it
             }
@@ -124,47 +126,6 @@ public class ApiCollectionResolver {
         }
 
         return apiCollectionId;
-    }
-
-    /**
-     * Create hostname-based collection (with hashCode collision handling).
-     * Matches mini-runtime's HttpCallParser.createCollectionBasedOnHostName() logic.
-     *
-     * Tries up to 100 times with incrementing ID to handle hashCode collisions.
-     *
-     * @param id Initial collection ID (hostname.hashCode())
-     * @param host Hostname for the collection
-     * @param vpcId VPC ID from environment variable
-     * @param tags Collection tags
-     * @return Actual collection ID created
-     * @throws Exception if collection creation fails after 100 attempts
-     */
-    private int createCollectionBasedOnHostName(int id, String host, String vpcId, List<CollectionTags> tags) throws Exception {
-        // Try up to 100 times with incrementing ID (handles hashCode collisions)
-        for (int i = 0; i < 100; i++) {
-            int collectionId = id + i;
-            try {
-                clientActor.createCollectionForHostAndVpc(host, collectionId, vpcId, tags);
-                return collectionId;  // Success
-            } catch (Exception e) {
-                if (i == 99) {
-                    throw new Exception("Failed to create collection after 100 attempts: " + e.getMessage());
-                }
-                // hashCode collision, try next ID
-            }
-        }
-        throw new Exception("Unreachable");
-    }
-
-    /**
-     * Create simple vxlanId-based collection.
-     *
-     * @param vxlanId VXLAN ID from Kafka message
-     * @param vpcId VPC ID from environment variable
-     * @param tags Collection tags
-     */
-    private void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags) {
-        clientActor.createCollectionSimpleForVpc(vxlanId, vpcId, tags);
     }
 
     /**
@@ -188,5 +149,45 @@ public class ApiCollectionResolver {
      */
     public int getCacheSize() {
         return createdCollections.size();
+    }
+
+    /**
+     * Create hostname-based collection with retry logic.
+     * Tries id, id+1, id+2, ... up to 100 attempts to handle hash collisions.
+     *
+     * @param id Base collection ID (typically hostname.hashCode())
+     * @param host Hostname for the collection
+     * @param vpcId VPC identifier
+     * @param tags Collection tags
+     * @return Created collection ID
+     * @throws Exception if all 100 attempts fail
+     */
+    private int createCollectionBasedOnHostName(int id, String host, String vpcId, List<CollectionTags> tags) throws Exception {
+        Exception lastException = null;
+
+        for (int i = 0; i < 100; i++) {
+            int collectionId = id + i;
+            try {
+                clientActor.createCollectionForHostAndVpc(host, collectionId, vpcId, tags);
+                return collectionId;
+            } catch (Exception e) {
+                lastException = e;
+                // Try next ID on collision
+            }
+        }
+
+        throw new Exception("Failed to create collection after 100 attempts for host: " + host, lastException);
+    }
+
+    /**
+     * Create vxlan-based collection.
+     * Thin wrapper around clientActor for consistency.
+     *
+     * @param vxlanId VXLAN identifier
+     * @param vpcId VPC identifier
+     * @param tags Collection tags
+     */
+    private void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags) {
+        clientActor.createCollectionSimpleForVpc(vxlanId, vpcId, tags);
     }
 }

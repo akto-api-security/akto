@@ -243,7 +243,7 @@ public class HttpCallParser {
      * @param responseParam The HTTP response parameters
      * @return The hostname to use for collection creation
      */
-    private static String getHostnameForCollection(HttpResponseParams responseParam) {
+    public static String getHostnameForCollection(HttpResponseParams responseParam) {
         // Get base hostname from headers
         String baseHostname = getHeaderValue(responseParam.getRequestParams().getHeaders(), "host");
         if (baseHostname == null || baseHostname.isEmpty()) {

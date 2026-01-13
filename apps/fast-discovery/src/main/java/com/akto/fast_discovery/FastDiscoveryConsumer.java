@@ -4,8 +4,8 @@ import com.akto.data_actor.ClientActor;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.bulk_updates.BulkUpdates;
-import com.akto.fast_discovery.dto.ApiId;
 import com.akto.log.LoggerMaker;
+import com.akto.runtime.parser.SampleParser;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 
@@ -59,7 +59,7 @@ public class FastDiscoveryConsumer {
         for (ConsumerRecord<String, String> record : records) {
             try {
                 // Parse message
-                HttpResponseParams params = FastDiscoveryParser.parseKafkaMessage(record.value());
+                HttpResponseParams params = SampleParser.parseSampleMessage(record.value());
                 if (params == null) {
                     parseErrors++;
                     continue;
@@ -70,10 +70,10 @@ public class FastDiscoveryConsumer {
                 int apiCollectionId = collectionResolver.resolveApiCollectionId(params);
                 params.getRequestParams().setApiCollectionId(apiCollectionId);
 
-                // Normalize URL (strip query params)
-                String url = FastDiscoveryParser.normalizeUrl(params.getRequestParams().getURL());
+                // Normalize URL (strip query params) and build API key
+                String url = normalizeUrl(params.getRequestParams().getURL());
                 String method = params.getRequestParams().getMethod();
-                String apiKey = FastDiscoveryParser.buildApiKey(apiCollectionId, url, method);
+                String apiKey = apiCollectionId + " " + url + " " + method;
 
                 // Bloom filter check
                 if (!bloomFilter.mightContain(apiKey)) {
@@ -152,7 +152,7 @@ public class FastDiscoveryConsumer {
 
         for (HttpResponseParams params : newApis.values()) {
             int apiCollectionId = params.getRequestParams().getApiCollectionId();
-            String url = FastDiscoveryParser.normalizeUrl(params.getRequestParams().getURL());
+            String url = normalizeUrl(params.getRequestParams().getURL());
             String method = params.getRequestParams().getMethod();
 
             // Build filters for single_type_info host header entry (flat structure, not nested under _id)
@@ -190,7 +190,7 @@ public class FastDiscoveryConsumer {
 
         for (HttpResponseParams params : newApis.values()) {
             int apiCollectionId = params.getRequestParams().getApiCollectionId();
-            String url = FastDiscoveryParser.normalizeUrl(params.getRequestParams().getURL());
+            String url = normalizeUrl(params.getRequestParams().getURL());
             String method = params.getRequestParams().getMethod();
 
             // Build filters for api_info
@@ -217,5 +217,20 @@ public class FastDiscoveryConsumer {
         }
 
         return writes;
+    }
+
+    /**
+     * Normalize URL by stripping query parameters.
+     * Example: /api/users?id=123 -> /api/users
+     */
+    private String normalizeUrl(String url) {
+        if (url == null) {
+            return null;
+        }
+        int queryIndex = url.indexOf('?');
+        if (queryIndex != -1) {
+            return url.substring(0, queryIndex);
+        }
+        return url;
     }
 }

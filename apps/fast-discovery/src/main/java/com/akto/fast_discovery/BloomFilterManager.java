@@ -1,6 +1,6 @@
 package com.akto.fast_discovery;
 
-import com.akto.fast_discovery.dto.ApiId;
+import com.akto.dto.ApiInfo;
 import com.akto.log.LoggerMaker;
 import com.google.common.base.Charsets;
 import com.google.common.hash.BloomFilter;
@@ -67,14 +67,13 @@ public class BloomFilterManager {
         long count = 0;
         try {
             // Call database-abstractor endpoint to fetch all API IDs
-            List<ApiId> existingApis = dbAbstractorClient.fetchApiIds();
+            List<ApiInfo.ApiInfoKey> existingApis = dbAbstractorClient.fetchApiIds();
 
-            for (ApiId apiId : existingApis) {
-                String apiKey = FastDiscoveryParser.buildApiKey(
-                        apiId.getApiCollectionId(),
-                        apiId.getUrl(),
-                        apiId.getMethod()
-                );
+            for (ApiInfo.ApiInfoKey apiInfoKey : existingApis) {
+                // Build API key: "apiCollectionId url method"
+                String apiKey = apiInfoKey.getApiCollectionId() + " " +
+                               apiInfoKey.getUrl() + " " +
+                               apiInfoKey.getMethod().name();
                 seenApis.put(apiKey);
                 count++;
 
