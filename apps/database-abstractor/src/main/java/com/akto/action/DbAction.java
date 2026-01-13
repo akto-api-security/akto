@@ -546,8 +546,7 @@ public class DbAction extends ActionSupport {
                 String json = obj.toJson();
                 loggerMaker.infoAndAddToDb("Fast-discovery: Converting JSON to ApiInfo: " + json);
                 ApiInfo apiInfo = objectMapper.readValue(json, ApiInfo.class);
-                loggerMaker.infoAndAddToDb("Fast-discovery: ApiInfo after conversion - discoveredTimestamp=" +
-                    apiInfo.getDiscoveredTimestamp() + ", apiType=" + apiInfo.getApiType());
+                loggerMaker.infoAndAddToDb("Fast-discovery: ApiInfo after conversion - id=" + apiInfo.getId());
                 ApiInfoKey id = apiInfo.getId();
                 
                 // Skip URLs based on validation rules (use 0 for response code as it's not available in ApiInfo)
@@ -4779,6 +4778,9 @@ public class DbAction extends ActionSupport {
      * Convert apiInfoList (BasicDBObject format) back to BulkUpdates format
      * for transmission via Kafka. This is needed because the fast-discovery
      * consumer expects BulkUpdates format in Kafka messages.
+     *
+     * Only converts specific fields needed by fast-discovery to avoid sending
+     * unnecessary default values and ensure correct data types.
      */
     private List<BulkUpdates> convertApiInfoToBulkUpdates(List<BasicDBObject> apiInfoList) {
         List<BulkUpdates> bulkWrites = new ArrayList<>();
@@ -4791,17 +4793,34 @@ public class DbAction extends ActionSupport {
                 filters.put("_id", id);
             }
 
-            // Convert remaining fields to updates
+            // Convert only specific fields to updates for fast-discovery
             ArrayList<String> updates = new ArrayList<>();
-            for (String key : apiInfo.keySet()) {
-                if (!key.equals("id")) {  // Skip id, it's in filters
-                    Object value = apiInfo.get(key);
-                    Map<String, Object> update = new HashMap<>();
-                    update.put("field", key);
-                    update.put("val", value);
-                    update.put("op", "set");
-                    updates.add(new Gson().toJson(update));
-                }
+
+            // lastSeen: always set to current value
+            if (apiInfo.containsKey("lastSeen")) {
+                Map<String, Object> update = new HashMap<>();
+                update.put("field", "lastSeen");
+                update.put("val", apiInfo.get("lastSeen"));
+                update.put("op", "set");
+                updates.add(new Gson().toJson(update));
+            }
+
+            // discoveredTimestamp: only set on insert (if provided)
+            if (apiInfo.containsKey("discoveredTimestamp")) {
+                Map<String, Object> update = new HashMap<>();
+                update.put("field", "discoveredTimestamp");
+                update.put("val", apiInfo.get("discoveredTimestamp"));
+                update.put("op", "setOnInsert");
+                updates.add(new Gson().toJson(update));
+            }
+
+            // collectionIds: keep as array to match mini-runtime format
+            if (apiInfo.containsKey("collectionIds")) {
+                Map<String, Object> update = new HashMap<>();
+                update.put("field", "collectionIds");
+                update.put("val", apiInfo.get("collectionIds"));  // Send as array
+                update.put("op", "setOnInsert");
+                updates.add(new Gson().toJson(update));
             }
 
             bulkWrites.add(new BulkUpdates(filters, updates));

@@ -87,7 +87,19 @@ public class CustomAuthUtil {
                 loggerMaker.infoAndAddToDb("initial auth types " + apiInfo.getId().getUrl() + " authtypes: " + apiInfo.getAllAuthTypesFound(), LogDb.DASHBOARD);
             }
 
+            // Initialize collections if null (can happen with fast-discovery or deserialized objects)
             Set<Set<ApiInfo.AuthType>> authTypes = apiInfo.getAllAuthTypesFound();
+            if (authTypes == null) {
+                authTypes = new HashSet<>();
+                apiInfo.setAllAuthTypesFound(authTypes);
+            }
+            if (apiInfo.getApiAccessTypes() == null) {
+                apiInfo.setApiAccessTypes(new HashSet<>());
+            }
+            if (apiInfo.getViolations() == null) {
+                apiInfo.setViolations(new HashMap<>());
+            }
+
             authTypes.remove(new HashSet<>());
             authTypes.remove(unauthenticatedTypes);
 
