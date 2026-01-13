@@ -164,6 +164,17 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 	return policies, auditPolicies, compiledRules, hasAuditRules, nil
 }
 
+// extractHostHeader extracts the host header value from request headers
+func extractHostHeader(headers map[string]string) string {
+	if host, ok := headers["Host"]; ok {
+		return host
+	}
+	if host, ok := headers["host"]; ok {
+		return host
+	}
+	return ""
+}
+
 // fetchAndParsePolicies fetches policies from database abstractor and parses them
 func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, error) {
 	rawGuardrailPolicies, err := s.dbClient.FetchGuardrailPolicies()
@@ -363,11 +374,11 @@ func (s *Service) ValidateResponse(ctx context.Context, payload string, contextS
 }
 
 // ValidateBatch validates a batch of request/response pairs
-func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDataBatch, contextSource string) ([]ValidationBatchResult, error) {
+func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDataBatch) ([]ValidationBatchResult, error) {
 	s.logger.Info("Validating batch data", zap.Int("count", len(batchData)))
 
 	// Get cached policies (refreshes if stale)
-	policies, auditPolicies, _, hasAuditRules, err := s.getCachedPolicies(contextSource)
+	policies, auditPolicies, _, hasAuditRules, err := s.getCachedPolicies(string(ContextSource))
 	if err != nil {
 		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
@@ -397,6 +408,9 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 			json.Unmarshal([]byte(data.ResponseHeaders), &respHeaders)
 		}
 
+		// Extract host header for McpServerName
+		mcpServerName := extractHostHeader(reqHeaders)
+
 		// Create validation context with actual data
 		valCtx := &mcp.ValidationContext{
 			IP:              data.IP,
@@ -407,6 +421,8 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 			StatusCode:      statusCode,
 			RequestPayload:  data.RequestPayload,
 			ResponsePayload: data.ResponsePayload,
+			ContextSource:   ContextSource,
+			McpServerName:   mcpServerName,
 		}
 
 		var reqResult, respResult *mcp.ValidationResult
