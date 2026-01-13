@@ -324,16 +324,16 @@ export default function Header() {
                                         { value: "API Security", label: "API Security", id: "api-security" },
                                         {
                                             value: "Agentic Security",
-                                            label: func.isAtlasArgusAccount() ? "Akto ARGUS" : "Agentic Security",
+                                            label: "Akto ARGUS",
                                             id: "agentic-security",
-                                            helpText: func.isAtlasArgusAccount() ? "Agentic AI Security for Homegrown AI" : undefined
+                                            helpText: "Agentic AI Security for Homegrown AI"
                                         },
-                                        ...(func.isAtlasArgusAccount() ? [{
+                                        {
                                             value: "Endpoint Security",
                                             label: "Akto ATLAS",
                                             id: "endpoint-security",
                                             helpText: "Agentic AI Security for Employee Endpoints"
-                                        }] : []),
+                                        },
                                         { value: "DAST", label: "DAST", id: "dast" },
                                     ]}
                                     initial={dropdownInitial}
