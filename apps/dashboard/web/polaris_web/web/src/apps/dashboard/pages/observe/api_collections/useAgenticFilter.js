@@ -1,11 +1,7 @@
 import { useState, useEffect } from 'react';
 import PersistStore from '../../../../main/PersistStore';
-import { ASSET_TAG_KEYS, formatDisplayName } from '../agentic/mcpClientHelper';
-
-const FILTER_PAGE_KEY = '/dashboard/observe/inventory/';
-
-// All asset tag keys that can be used for grouping
-const ASSET_TAG_KEY_VALUES = Object.values(ASSET_TAG_KEYS);
+import { formatDisplayName } from '../agentic/mcpClientHelper';
+import { INVENTORY_FILTER_KEY, ASSET_TAG_KEY_VALUES } from '../agentic/constants';
 
 /**
  * Custom hook to detect envType filter from Endpoints page navigation
@@ -21,7 +17,7 @@ const useAgenticFilter = (normalData) => {
     const filtersMap = PersistStore(state => state.filtersMap);
 
     useEffect(() => {
-        const currentPageFilters = filtersMap[FILTER_PAGE_KEY];
+        const currentPageFilters = filtersMap[INVENTORY_FILTER_KEY];
         const envTypeFilter = currentPageFilters?.filters?.find(f => f.key === 'envType');
         
         if (!envTypeFilter || !envTypeFilter.value || normalData.length === 0) {
