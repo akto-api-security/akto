@@ -451,7 +451,7 @@ function ApiCollections(props) {
             const stack = JSON.parse(sessionStorage.getItem('pathnameStack') || '[]');
             if (stack.length >= 2) {
                 const previousPath = stack[stack.length - 2];
-                return previousPath === '/dashboard/observe/endpoints';
+                return previousPath === '/dashboard/observe/agentic-assets';
             }
         } catch (e) { /* ignore */ }
         return false;
@@ -1557,7 +1557,7 @@ function ApiCollections(props) {
             }
             primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={navigateToQueryPage}>Explore mode</Button>}
             isFirstPage={!isFromEndpoints}
-            backUrl={isFromEndpoints ? "/dashboard/observe/endpoints" : undefined}
+            backUrl={isFromEndpoints ? "/dashboard/observe/agentic-assets" : undefined}
             components={components}
             secondaryActions={secondaryActionsComp}
         />

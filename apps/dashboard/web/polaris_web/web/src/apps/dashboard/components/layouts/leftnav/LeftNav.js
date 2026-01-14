@@ -176,10 +176,10 @@ export default function LeftNav() {
                 icon: InventoryFilledMajor,
                 onClick: () => {
                     const targetPath = dashboardCategory === CATEGORY_ENDPOINT_SECURITY
-                        ? "/dashboard/observe/endpoints"
+                        ? "/dashboard/observe/agentic-assets"
                         : "/dashboard/observe/inventory";
                     const targetHandle = dashboardCategory === CATEGORY_ENDPOINT_SECURITY
-                        ? "dashboard_observe_endpoints"
+                        ? "dashboard_observe_agentic_assets"
                         : "dashboard_observe_inventory";
                     handleSelect(targetHandle);
                     navigate(targetPath);
@@ -188,13 +188,13 @@ export default function LeftNav() {
                 selected: leftNavSelected.includes("_observe"),
                 subNavigationItems: [
                     ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
-                        label: "Endpoints",
+                        label: "Agentic assets",
                         onClick: () => {
-                            navigate("/dashboard/observe/endpoints");
-                            handleSelect("dashboard_observe_endpoints");
+                            navigate("/dashboard/observe/agentic-assets");
+                            handleSelect("dashboard_observe_agentic_assets");
                             setActive("active");
                         },
-                        selected: leftNavSelected === "dashboard_observe_endpoints",
+                        selected: leftNavSelected === "dashboard_observe_agentic_assets",
                     }] : [{
                         label: "Collections",
                         onClick: () => {
