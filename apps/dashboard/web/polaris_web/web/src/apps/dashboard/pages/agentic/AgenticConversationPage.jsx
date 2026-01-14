@@ -55,16 +55,14 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
 
                 // Add initial user message
                 const userMessage = {
-                    id: 'conversation_user',
+                    _id: 'conversation_user_' + Date.now(),
                     role: 'user',
-                    content: initialQuery,
-                    timestamp: func.timeNow()
+                    message: initialQuery
                 };
                 setMessages([userMessage]);
 
                 // Process the initial query
-                const currentQuery = followUpValue && followUpValue.length > 0 ? followUpValue : initialQuery;
-                await processQuery(currentQuery);
+                await processQuery(initialQuery);
             } catch (err) {
                 setError('Failed to initialize conversation');
                 console.error(err);
@@ -104,11 +102,22 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
         try {
             setIsLoading(true);
 
-            let res =await sendQuery(convId, query);
+            let res = await sendQuery(query, convId);
             if(res && res.conversationId) {
                 setConversationId(res.conversationId);
             }
-            
+
+            // Add AI response message to the conversation
+            if(res && res.response) {
+                const aiMessage = {
+                    _id: "system_" + Date.now(),
+                    message: res.response,
+                    role: "system",
+                    isComplete: true
+                };
+                setMessages(prev => [...prev, aiMessage]);
+            }
+
             setIsLoading(false);
 
         } catch (err) {
@@ -123,16 +132,15 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
         if (query.trim() && conversationId) {
             // Add user message immediately
             const userMessage = {
-                id: 'u',
-                type: 'user',
-                content: query,
-                timestamp: new Date().toISOString()
+                _id: "user_" + Date.now(),
+                message: query,
+                role: 'user'
             };
             setMessages(prev => [...prev, userMessage]);
             setFollowUpValue('');
 
             // Process the query
-            await processQuery(conversationId, query);
+            await processQuery(query, conversationId);
         }
     };
 
@@ -155,7 +163,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                                 <Button plain onClick={onBack} icon={ArrowLeftMinor} />
                             )}
                             <Text variant="headingLg" as="h1">
-                                {messages[0]?.content || 'Agentic AI Conversation'}
+                                {messages[0]?.message || 'Agentic AI Conversation'}
                             </Text>
                         </HorizontalStack>
                         <Button
