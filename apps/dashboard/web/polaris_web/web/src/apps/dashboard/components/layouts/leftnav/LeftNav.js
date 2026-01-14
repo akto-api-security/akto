@@ -50,10 +50,7 @@ export default function LeftNav() {
         resetFields();
         await api.goToAccount(selected);
         func.setToast(true, false, `Switched to account ${accounts[selected]}`);
-        const redirectPath = dashboardCategory === CATEGORY_ENDPOINT_SECURITY
-            ? '/dashboard/observe/endpoints'
-            : '/dashboard/observe/inventory';
-        window.location.href = redirectPath;
+        window.location.href = '/dashboard/observe/inventory';
     };
 
     const accountOptions = Object.keys(accounts).map(accountId => ({
