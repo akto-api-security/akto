@@ -1,6 +1,5 @@
 package com.akto.action;
 
-import com.akto.ProtoMessageUtils;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
@@ -17,13 +16,8 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.testing.ComplianceMapping;
-import com.akto.dto.type.SingleTypeInfo;
 import com.akto.action.threat_detection.AbstractThreatDetectionAction;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
-import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
-import com.akto.util.http_util.CoreHTTPClient;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import okhttp3.*;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -32,7 +26,6 @@ import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 
@@ -51,8 +44,6 @@ import java.util.Locale;
 public class AgenticDashboardAction extends AbstractThreatDetectionAction {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AgenticDashboardAction.class, LogDb.DASHBOARD);
-    private static final ObjectMapper objectMapper = new ObjectMapper();
-    private static final OkHttpClient httpClient = CoreHTTPClient.client.newBuilder().build();
     private static final int MAX_THREAT_FETCH_LIMIT = 100000; // Large limit to fetch all threats
 
     @Setter
@@ -68,30 +59,25 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
 
     /**
      * Consolidated API: Fetch all endpoint discovery related data
-     * Collection: ApiInfoDao, SingleTypeInfoDao
+     * Collection: ApiInfoDao
+     * Note: Endpoints over time data is fetched via fetchNewEndpointsTrendForHostCollections 
+     * and fetchNewEndpointsTrendForNonHostCollections APIs in InventoryAction
      */
     public String fetchEndpointDiscoveryData() {
         try {
             if (endTimestamp == 0) {
                 endTimestamp = Context.now();
             }
-            long daysBetween = (endTimestamp - startTimestamp) / Constants.ONE_DAY_TIMESTAMP;
-            Set<Integer> demoCollections = getDemoCollections();
-
-            // Fetch API Endpoints Discovered over time
-            List<BasicDBObject> endpointsData = fetchEndpointsOverTime(startTimestamp, endTimestamp, daysBetween, demoCollections);
             
             // Check if contextSource is AGENTIC - if so, return agentic discovery stats
             CONTEXT_SOURCE contextSource = Context.contextSource.get();
             if (contextSource == CONTEXT_SOURCE.AGENTIC) {
                 // Fetch Agentic Discovery Stats (AI Agents, MCP Servers, LLM)
                 BasicDBObject agenticDiscoveryStats = fetchAgenticDiscoveryStatsInternal(startTimestamp, endTimestamp);
-                response.put("endpointsDiscovered", endpointsData);
                 response.put("discoveryStats", agenticDiscoveryStats);
             } else {
                 // Fetch API Discovery Stats (Shadow, Sensitive, No-Auth, Normal)
                 BasicDBObject discoveryStats = fetchApiDiscoveryStatsInternal(startTimestamp, endTimestamp);
-                response.put("endpointsDiscovered", endpointsData);
                 response.put("discoveryStats", discoveryStats);
             }
 
@@ -194,8 +180,7 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             // Fetch all malicious events once within the time range
             List<DashboardMaliciousEvent> allThreats = fetchAllMaliciousEvents(startTimestamp, endTimestamp, demoCollections);
 
-            // Fetch threats over time
-            List<BasicDBObject> threatsOverTime = fetchThreatsOverTimeInternal(startTimestamp, endTimestamp, daysBetween, allThreats);
+            // Note: Threats over time is fetched via getDailyThreatActorsCount API in the frontend
             
             // Fetch threats by severity
             BasicDBObject threatsBySeverity = fetchThreatsBySeverityInternal(allThreats);
@@ -212,7 +197,6 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             // Fetch open and resolved threats
             BasicDBObject openResolvedThreats = fetchOpenResolvedThreatsInternal(startTimestamp, endTimestamp, daysBetween, allThreats);
 
-            response.put("threatsOverTime", threatsOverTime);
             response.put("threatsBySeverity", threatsBySeverity);
             response.put("topThreatsByCategory", topThreatsByCategory);
             response.put("topAttackHosts", topAttackHosts);
@@ -228,53 +212,6 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
     }
 
 
-    private List<BasicDBObject> fetchEndpointsOverTime(int startTimestamp, int endTimestamp, long daysBetween, Set<Integer> demoCollections) {
-        List<BasicDBObject> result = new ArrayList<>();
-        
-        try {
-            // Fetch all SingleTypeInfo records once
-            List<SingleTypeInfo> allRecords = fetchAllSingleTypeInfo(startTimestamp, endTimestamp, demoCollections);
-            
-            // Group by unique endpoint (apiCollectionId, url, method) and get min timestamp
-            Map<String, Integer> endpointFirstSeen = new HashMap<>();
-            for (SingleTypeInfo sti : allRecords) {
-                String endpointKey = sti.getApiCollectionId() + "|" + sti.getUrl() + "|" + sti.getMethod();
-                int timestamp = sti.getTimestamp();
-                
-                if (!endpointFirstSeen.containsKey(endpointKey) || timestamp < endpointFirstSeen.get(endpointKey)) {
-                    endpointFirstSeen.put(endpointKey, timestamp);
-                }
-            }
-            
-            // Filter endpoints that were first seen within the time range
-            List<Integer> firstSeenTimestamps = new ArrayList<>();
-            for (Map.Entry<String, Integer> entry : endpointFirstSeen.entrySet()) {
-                int firstSeen = entry.getValue();
-                if (startTimestamp <= 0) {
-                    // All time: only check upper bound
-                    if (firstSeen <= endTimestamp) {
-                        firstSeenTimestamps.add(firstSeen);
-                    }
-                } else {
-                    // Time range: check both bounds
-                    if (firstSeen >= startTimestamp && firstSeen <= endTimestamp) {
-                        firstSeenTimestamps.add(firstSeen);
-                    }
-                }
-            }
-            
-            // Group by time period in Java
-            Map<String, Long> timePeriodMap = groupByTimePeriod(firstSeenTimestamps, daysBetween);
-            
-            // Convert to result format
-            result = convertTimePeriodMapToResult(timePeriodMap, daysBetween);
-
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error fetching endpoints over time: " + e.getMessage() + ", stack trace: " + java.util.Arrays.toString(e.getStackTrace()));
-        }
-
-        return result;
-    }
 
     private List<BasicDBObject> fetchIssuesOverTime(int startTimestamp, int endTimestamp, long daysBetween, List<TestingRunIssues> allIssues) {
         List<BasicDBObject> result = new ArrayList<>();
@@ -946,35 +883,6 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
     // ========== Threat Detection Collection APIs ==========
 
     /**
-     * Internal method: Fetch threats over time
-     * Collection: MaliciousEventDao
-     */
-    private List<BasicDBObject> fetchThreatsOverTimeInternal(int startTimestamp, int endTimestamp, long daysBetween, List<DashboardMaliciousEvent> allThreats) {
-        List<BasicDBObject> result = new ArrayList<>();
-        
-        try {
-            // Filter threats within the time range
-            // Note: timestamp is long, but we convert to int for time grouping
-            List<Integer> detectedTimestamps = allThreats.stream()
-                .map(DashboardMaliciousEvent::getTimestamp)
-                .filter(time -> time > 0 && time >= startTimestamp && time <= endTimestamp)
-                .map(Long::intValue)
-                .collect(Collectors.toList());
-            
-            // Group by time period in Java
-            Map<String, Long> timePeriodMap = groupByTimePeriod(detectedTimestamps, daysBetween);
-            
-            // Convert to result format
-            result = convertTimePeriodMapToResult(timePeriodMap, daysBetween);
-
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error fetching threats over time: " + e.getMessage());
-        }
-
-        return result;
-    }
-
-    /**
      * Internal method: Fetch total threats by severity
      * Collection: MaliciousEventDao
      */
@@ -1268,212 +1176,21 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
 
     // ========== Data Fetching Helper Methods ==========
 
-    /**
-     * Fetch all SingleTypeInfo records for API endpoints once with filters
-     * Uses aggregation to group by apiCollectionId, url, method and get minimum timestamp
-     * Only fetches host header records which represent actual API endpoints
-     */
-    private List<SingleTypeInfo> fetchAllSingleTypeInfo(int startTimestamp, int endTimestamp, Set<Integer> demoCollections) {
-        List<SingleTypeInfo> result = new ArrayList<>();
-        try {
-            // Get collections to exclude (non-traffic + demo collections + deactivated collections)
-            List<Integer> excludeCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
-            excludeCollectionIds.addAll(demoCollections);
-            excludeCollectionIds.addAll(getDeactivatedCollections());
-
-            // Build aggregation pipeline
-            List<Bson> pipeline = new ArrayList<>();
-
-            // Host header filter - these represent actual API endpoints
-            Bson hostHeaderFilter = SingleTypeInfoDao.filterForHostHeader(0, false);
-            pipeline.add(Aggregates.match(hostHeaderFilter));
-
-            // Exclude non-traffic, demo, and deactivated collections
-            if (!excludeCollectionIds.isEmpty()) {
-                pipeline.add(Aggregates.match(Filters.nin(SingleTypeInfo._API_COLLECTION_ID, excludeCollectionIds)));
-            }
-
-            // Apply RBAC filter
-            try {
-                List<Integer> userCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-                if (userCollectionIds != null && !userCollectionIds.isEmpty()) {
-                    pipeline.add(Aggregates.match(Filters.in("collectionIds", userCollectionIds)));
-                }
-            } catch (Exception e) {
-                // Ignore RBAC errors
-            }
-
-            // Group by apiCollectionId, url, method and get minimum timestamp
-            BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$apiCollectionId")
-                    .append("url", "$url")
-                    .append("method", "$method");
-            pipeline.add(Aggregates.group(groupedId, Accumulators.min("timestamp", "$timestamp")));
-
-            // Filter by timestamp range after grouping (on the grouped minimum timestamp)
-            if (startTimestamp > 0) {
-                pipeline.add(Aggregates.match(Filters.gte("timestamp", startTimestamp)));
-            }
-            pipeline.add(Aggregates.match(Filters.lte("timestamp", endTimestamp)));
-
-            // Execute aggregation
-            MongoCursor<BasicDBObject> cursor = SingleTypeInfoDao.instance.getMCollection()
-                    .aggregate(pipeline, BasicDBObject.class).cursor();
-
-            // Convert results to SingleTypeInfo objects
-            while (cursor.hasNext()) {
-                BasicDBObject doc = cursor.next();
-                BasicDBObject id = (BasicDBObject) doc.get("_id");
-                int apiCollectionId = id.getInt("apiCollectionId");
-                String url = id.getString("url");
-                String method = id.getString("method");
-                int timestamp = doc.getInt("timestamp");
-
-                // Create minimal SingleTypeInfo object with only needed fields
-                SingleTypeInfo sti = new SingleTypeInfo();
-                sti.setApiCollectionId(apiCollectionId);
-                sti.setUrl(url);
-                sti.setMethod(method); // Method is stored as String in SingleTypeInfo
-                sti.setTimestamp(timestamp);
-                result.add(sti);
-            }
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error fetching SingleTypeInfo records: " + e.getMessage());
-        }
-        return result;
-    }
 
     /**
      * Fetch all malicious events from threat-backend service once with filters
-     * Uses the same pattern as AdxIntegrationAction.fetchMaliciousEventsForExport()
+     * Uses the reusable method from AbstractThreatDetectionAction
      */
     private List<DashboardMaliciousEvent> fetchAllMaliciousEvents(int startTimestamp, int endTimestamp, Set<Integer> demoCollections) {
-        List<DashboardMaliciousEvent> result = new ArrayList<>();
-        try {
-            String url = String.format("%s/api/dashboard/list_malicious_requests", this.getBackendUrl());
-            MediaType JSON = MediaType.parse("application/json; charset=utf-8");
-
-            Map<String, Object> filter = new HashMap<>();
-            
-            // Time range filter - match SuspectSampleDataAction pattern exactly
-            Map<String, Integer> time_range = new HashMap<>();
-            if (startTimestamp > 0) {
-                time_range.put("start", startTimestamp);
-            }
-            if (endTimestamp > 0) {
-                time_range.put("end", endTimestamp);
-            }
-            // Always put time_range (even if empty) to match SuspectSampleDataAction pattern
-            filter.put("detected_at_time_range", time_range);
-            
-            // Filter for THREAT label
-            // filter.put("label", "THREAT");
-            
-            // Note: We don't filter by apiCollectionId in the query.
-            // Instead, we fetch all records and filter by collection IDs in memory
-            // to handle RBAC and demo collection exclusions.
-
-            Map<String, Object> body = new HashMap<String, Object>() {
-                {
-                    put("skip", 0);
-                    put("limit", MAX_THREAT_FETCH_LIMIT);
-                    put("sort", new HashMap<String, Integer>() {{ put("detectedAt", -1); }});
-                    put("filter", filter);
-                }
-            };
-
-            String msg = objectMapper.valueToTree(body).toString();
-            
-            // Get context source for logging
-            String contextSourceValue = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
-            
-            // Debug: Log request details
-            loggerMaker.infoAndAddToDb(String.format(
-                "[THREAT_FETCH_DEBUG] Sending request to threat-backend - URL: %s, startTimestamp: %d, endTimestamp: %d, contextSource: %s, filter: %s",
-                url, startTimestamp, endTimestamp, contextSourceValue, msg
-            ));
-            
-            RequestBody requestBody = RequestBody.create(msg, JSON);
-            Request request = new Request.Builder()
-                .url(url)
-                .post(requestBody)
-                .addHeader("Authorization", "Bearer " + this.getApiToken())
-                .addHeader("Content-Type", "application/json")
-                .addHeader("x-context-source", contextSourceValue)
-                .build();
-
-            List<DashboardMaliciousEvent> tempResult = new ArrayList<>();
-            try (Response resp = httpClient.newCall(request).execute()) {
-                int statusCode = resp.code();
-                String responseBody = resp.body() != null ? resp.body().string() : "";
-                
-                // Debug: Log response status and body length
-                loggerMaker.infoAndAddToDb(String.format(
-                    "[THREAT_FETCH_DEBUG] Response received - Status: %d, Response body length: %d",
-                    statusCode, responseBody.length()
-                ));
-
-                ProtoMessageUtils.<ListMaliciousRequestsResponse>toProtoMessage(
-                    ListMaliciousRequestsResponse.class, responseBody
-                ).ifPresent(m -> {
-                    int eventCount = m.getMaliciousEventsList().size();
-                    loggerMaker.infoAndAddToDb(String.format(
-                        "[THREAT_FETCH_DEBUG] Parsed response - Found %d malicious events from backend",
-                        eventCount
-                    ));
-                    
-                    tempResult.addAll(m.getMaliciousEventsList().stream()
-                        .map(smr -> new DashboardMaliciousEvent(
-                            smr.getId(),
-                            smr.getActor(),
-                            smr.getFilterId(),
-                            smr.getEndpoint(),
-                            com.akto.dto.type.URLMethods.Method.fromString(smr.getMethod()),
-                            smr.getApiCollectionId(),
-                            smr.getIp(),
-                            smr.getCountry(),
-                            smr.getDetectedAt(),
-                            smr.getType(),
-                            smr.getRefId(),
-                            smr.getCategory(),
-                            smr.getSubCategory(),
-                            smr.getEventTypeVal(),
-                            smr.getPayload(),
-                            smr.getMetadata(),
-                            smr.getSuccessfulExploit(),
-                            smr.getStatus(),
-                            smr.getLabel(),
-                            smr.getHost(),
-                            smr.getJiraTicketUrl(),
-                            smr.getSeverity()
-                        ))
-                        .collect(Collectors.toList())
-                    );
-                });
-                
-                if (tempResult.isEmpty() && !responseBody.isEmpty()) {
-                    loggerMaker.infoAndAddToDb(String.format(
-                        "[THREAT_FETCH_DEBUG] WARNING: Response body is not empty but no events parsed. Response body (first 500 chars): %s",
-                        responseBody.length() > 500 ? responseBody.substring(0, 500) : responseBody
-                    ));
-                }
-            }
-            
-            // Debug: Log before filtering
-            loggerMaker.infoAndAddToDb(String.format(
-                "[THREAT_FETCH_DEBUG] Before filtering - tempResult size: %d, demoCollections size: %d",
-                tempResult.size(), demoCollections.size()
-            ));
-            
-            // Filter by collection IDs in memory (only demo collection exclusion, no RBAC for threat data)
-            // Note: Similar to SuspectSampleDataAction, we don't apply RBAC filtering for threat data.
-            // Threats are security-related and should be visible regardless of RBAC collection access.
-            result = tempResult.stream()
-                .filter(event -> !demoCollections.contains(event.getApiCollectionId()))
-                .collect(Collectors.toList());
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error fetching malicious events from threat-backend: " + e.getMessage());
-        }
-        return result;
+        // Fetch all malicious events using the base class method
+        List<DashboardMaliciousEvent> allEvents = super.fetchAllMaliciousEvents(startTimestamp, endTimestamp, MAX_THREAT_FETCH_LIMIT, null);
+        
+        // Filter by collection IDs in memory (only demo collection exclusion, no RBAC for threat data)
+        // Note: Similar to SuspectSampleDataAction, we don't apply RBAC filtering for threat data.
+        // Threats are security-related and should be visible regardless of RBAC collection access.
+        return allEvents.stream()
+            .filter(event -> !demoCollections.contains(event.getApiCollectionId()))
+            .collect(Collectors.toList());
     }
 
     /**

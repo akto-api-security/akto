@@ -15,6 +15,9 @@ import "react-resizable/css/styles.css"
 import { mapLabel, getDashboardCategory } from '../../../main/labelHelper'
 import { GridLayout } from "react-grid-layout";
 import api from './api';
+import observeApi from '../observe/api';
+import transform from '../observe/transform';
+import threatApi from '../threat_detection/api';
 import Store from '../../store';
 import ComponentHeader from './new_components/ComponentHeader'
 import AverageIssueAgeCard from './new_components/AverageIssueAgeCard'
@@ -228,7 +231,7 @@ const AgenticDashboard = () => {
 
     useEffect(() => {
         const fetchAllDashboardData = async () => {
-            setLoading(true);
+        setLoading(true);
             try {
                 // Extract timestamps from date range period (same pattern as other components)
                 const getTimeEpoch = (key) => {
@@ -242,16 +245,24 @@ const AgenticDashboard = () => {
                 const endTs = getTimeEpoch("until");
 
                 // Fetch all consolidated APIs in parallel
+                // Note: Endpoints over time is fetched via existing InventoryAction APIs
+                // Threats over time is fetched via getDailyThreatActorsCount API
                 const [
                     endpointDiscoveryResponse,
                     issuesResponse,
                     testingResponse,
-                    threatResponse
+                    threatResponse,
+                    hostTrendResponse,
+                    nonHostTrendResponse,
+                    threatActorsCountResponse
                 ] = await Promise.allSettled([
                     api.fetchEndpointDiscoveryData(startTs, endTs),
                     api.fetchIssuesData(startTs, endTs),
                     api.fetchTestingData(startTs, endTs),
-                    api.fetchThreatData(startTs, endTs)
+                    api.fetchThreatData(startTs, endTs),
+                    observeApi.fetchNewEndpointsTrendForHostCollections(startTs, endTs),
+                    observeApi.fetchNewEndpointsTrendForNonHostCollections(startTs, endTs),
+                    threatApi.getDailyThreatActorsCount(startTs, endTs, [])
                 ]);
 
                 // Process Endpoint Discovery Data
@@ -337,8 +348,8 @@ const AgenticDashboard = () => {
                         {
                             name: 'Open Issues',
                             data: openData,
-                            color: '#D72C0D'
-                        },
+                color: '#D72C0D'
+            },
                         {
                             name: 'Resolved Issues',
                             data: resolvedData,
@@ -431,20 +442,7 @@ const AgenticDashboard = () => {
                         "Low": { text: threatsBySeverity.low || 0, color: "#E0E0E0" }
                     });
 
-                    // Threats over time
-                    const threatsOverTime = data.threatsOverTime || [];
-                    const threatRequestsData = transformTimeSeriesData(threatsOverTime);
-                    // For now, threat requests chart shows only flagged requests
-                    // TODO: Add safe requests data when available from API
-                    setThreatRequestsChartData(
-                        threatRequestsData.length > 0 ? [
-                            {
-                                name: 'Flagged Requests',
-                                data: threatRequestsData,
-                                color: '#D72C0D'
-                            }
-                        ] : []
-                    );
+                    // Threats over time - will be processed from threatActorsCountResponse below
 
                     // Top Threats by Category
                     const topThreats = data.topThreatsByCategory || [];
@@ -500,23 +498,79 @@ const AgenticDashboard = () => {
                     setTopAttackHosts([]);
                     setTopBadActors([]);
                 }
+
+                // Process Threats Over Time from getDailyThreatActorsCount API
+                if (threatActorsCountResponse.status === 'fulfilled' && threatActorsCountResponse.value) {
+                    const actorsCounts = threatActorsCountResponse.value.actorsCounts || [];
+                    // Transform actorsCounts to [timestamp, count] format (same as HomeDashboard.jsx)
+                    // actorsCounts has {ts (seconds), totalActors, criticalActors}
+                    const threatRequestsData = actorsCounts
+                        .sort((a, b) => a.ts - b.ts)
+                        .map(item => [
+                            item.ts * 1000, // Convert seconds to milliseconds
+                            item.totalActors || 0
+                        ]);
+                    setThreatRequestsChartData(
+                        threatRequestsData.length > 0 ? [
+                            {
+                                name: 'Flagged Requests',
+                                data: threatRequestsData,
+                                color: '#D72C0D'
+                            }
+                        ] : []
+                    );
+                } else {
+                    setThreatRequestsChartData([]);
+                }
                 
                 // Build Security Posture Chart data from all three APIs (after all processing)
                 // This ensures the chart is built even if individual APIs fail
                 let endpointsData = [];
-                if (endpointDiscoveryResponse.status === 'fulfilled' && endpointDiscoveryResponse.value) {
-                    endpointsData = transformTimeSeriesData(endpointDiscoveryResponse.value.endpointsDiscovered || []);
+                // Merge host and non-host trend data (same pattern as ApiChanges.jsx)
+                if (hostTrendResponse.status === 'fulfilled' && nonHostTrendResponse.status === 'fulfilled') {
+                    const hostTrend = hostTrendResponse.value?.data?.endpoints || [];
+                    const nonHostTrend = nonHostTrendResponse.value?.data?.endpoints || [];
+                    
+                    // Merge both responses by combining endpoints with same _id (day number)
+                    const mergedArrObj = Object.values([...hostTrend, ...nonHostTrend].reduce((acc, item) => {
+                        acc[item._id] = acc[item._id] || { _id: item._id, count: 0 };
+                        acc[item._id].count += item.count;
+                        return acc;
+                    }, {}));
+                    
+                    // Use the same transform function as ApiChanges.jsx to ensure consistent format
+                    // This fills in missing days and returns [timestamp, count] pairs
+                    const endpointsTrendObj = transform.findNewParametersCountTrend(mergedArrObj, startTs, endTs);
+                    endpointsData = endpointsTrendObj.trend;
                 }
                 
-                let issuesData = [];
+                let issuesDataForChart = [];
                 if (issuesResponse.status === 'fulfilled' && issuesResponse.value) {
-                    issuesData = transformTimeSeriesData(issuesResponse.value.issuesOverTime || []);
+                    const issuesOverTimeRaw = issuesResponse.value.issuesOverTime;
+                    if (issuesOverTimeRaw && Array.isArray(issuesOverTimeRaw)) {
+                        if (issuesOverTimeRaw.length > 0) {
+                            issuesDataForChart = transformTimeSeriesData(issuesOverTimeRaw);
+                        }
+                        // If empty array, keep as empty array (chart will handle empty state)
+                    } else {
+                        // If issuesOverTime is missing or not an array, set to empty array
+                        issuesDataForChart = [];
+                    }
+                } else if (issuesResponse.status === 'rejected') {
+                    // If API call failed, set to empty array
+                    issuesDataForChart = [];
                 }
                 
                 let threatRequestsFlaggedData = [];
-                if (threatResponse.status === 'fulfilled' && threatResponse.value) {
-                    const threatsOverTime = threatResponse.value.threatsOverTime || [];
-                    threatRequestsFlaggedData = transformTimeSeriesData(threatsOverTime);
+                if (threatActorsCountResponse.status === 'fulfilled' && threatActorsCountResponse.value) {
+                    const actorsCounts = threatActorsCountResponse.value.actorsCounts || [];
+                    // Transform actorsCounts to [timestamp, count] format (same as HomeDashboard.jsx)
+                    threatRequestsFlaggedData = actorsCounts
+                        .sort((a, b) => a.ts - b.ts)
+                        .map(item => [
+                            item.ts * 1000, // Convert seconds to milliseconds
+                            item.totalActors || 0
+                        ]);
                 }
                 
                 const overallStatsData = [
@@ -527,7 +581,7 @@ const AgenticDashboard = () => {
                     },
                     {
                         name: `${mapLabel('API', dashboardCategory)} Issues`,
-                        data: issuesData,
+                        data: issuesDataForChart,
                         color: '#D72C0D'
                     },
                     {
@@ -801,8 +855,8 @@ const AgenticDashboard = () => {
                 title={`${mapLabel('Threat', dashboardCategory)} Requests over time`}
                 chartData={threatRequestsChartData}
                 labels={[
-                    { label: 'Flagged Requests', color: '#D72C0D' },
-                    { label: 'Safe Requests', color: '#47B881' }
+                { label: 'Flagged Requests', color: '#D72C0D' },
+                { label: 'Safe Requests', color: '#47B881' }
                 ]}
                 itemId='threat-requests-chart'
                 onRemoveComponent={removeComponent}
