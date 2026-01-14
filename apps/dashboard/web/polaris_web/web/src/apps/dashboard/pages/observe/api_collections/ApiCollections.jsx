@@ -252,12 +252,10 @@ const headers = [
     }] : [])
 ];
 
-// Simple booleans for different dashboard categories
 const isAtlas = isEndpointSecurityCategory()
 const isArgus = isAgenticSecurityCategory()
 const isAtlasArgus = isAtlas || isArgus;
 
-// Define base offsets so you only change them in one place
 const nameColIndex = isAtlasArgus ? 2 : 1;
 const endpointColIndex = isAtlasArgus ? 3 : 2;
 const discoveredColIndex = isArgus ? 10 : (isAtlas ? 8 : 9);
