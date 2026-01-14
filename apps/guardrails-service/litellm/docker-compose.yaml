@@ -1,7 +1,13 @@
+networks:
+  guardrails-network:
+    driver: bridge
+
 services:
   guardrails-service:
     image: aktosecurity/guardrails-service:a-hotfix-fix-docker-guardrails
     restart: always
+    networks:
+      - guardrails-network
     ports:
       - "80:8080"
 
@@ -30,6 +36,8 @@ services:
 
   litellm:
     image: docker.litellm.ai/berriai/litellm:main-stable
+    networks:
+      - guardrails-network
     ports:
       - "4000:4000"
     volumes:
@@ -46,6 +54,7 @@ services:
       - .env
     depends_on:
       - db
+      - guardrails-service
     healthcheck:
       test:
         - CMD-SHELL
@@ -59,6 +68,8 @@ services:
     image: postgres:16
     restart: always
     container_name: litellm_db
+    networks:
+      - guardrails-network
     environment:
       POSTGRES_DB: "${POSTGRES_DB}"
       POSTGRES_USER: "${POSTGRES_USER}"
@@ -75,6 +86,8 @@ services:
 
   prometheus:
     image: prom/prometheus
+    networks:
+      - guardrails-network
     volumes:
       - prometheus_data:/prometheus
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
