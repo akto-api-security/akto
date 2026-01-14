@@ -28,6 +28,8 @@ function Endpoints() {
     const setAllCollections = PersistStore((state) => state.setAllCollections);
     const filtersMap = PersistStore((state) => state.filtersMap);
     const setFiltersMap = PersistStore((state) => state.setFiltersMap);
+    const tableSelectedTab = PersistStore((state) => state.tableSelectedTab);
+    const setTableSelectedTab = PersistStore((state) => state.setTableSelectedTab);
 
     const headers = useMemo(() => getHeaders(), []);
 
@@ -126,8 +128,15 @@ function Endpoints() {
         }
 
         setFiltersMap(updatedFiltersMap);
+        
+        // Always navigate to the hostname tab
+        setTableSelectedTab({
+            ...tableSelectedTab,
+            [INVENTORY_PATH]: "hostname"
+        });
+        
         setTimeout(() => navigate(INVENTORY_PATH), 0);
-    }, [filtersMap, data, setFiltersMap, navigate]);
+    }, [filtersMap, data, setFiltersMap, navigate, tableSelectedTab, setTableSelectedTab]);
 
     const summaryItems = useMemo(() => [
         {
