@@ -9,6 +9,11 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.OrgUtils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryMXBean;
+import java.lang.management.MemoryUsage;
+import java.lang.management.ThreadMXBean;
+import com.sun.management.OperatingSystemMXBean;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -16,8 +21,11 @@ import java.util.concurrent.TimeUnit;
 
 public class AllMetrics {
 
-    public void init(LogDb module, boolean pgMetrics, DataActor dataActor, int accountId) {
+    private String instance_id;
+
+    public void init(LogDb module, boolean pgMetrics, DataActor dataActor, int accountId, String instanceId) {
         this.dataActor = dataActor;
+        this.instance_id = instanceId;
 
         Organization organization = OrgUtils.getOrganizationCached(accountId);
         String orgId = organization.getId();
@@ -63,6 +71,13 @@ public class AllMetrics {
         cyborgCallCount = new SumMetric("CYBORG_CALL_COUNT", 60, accountId, orgId);
         cyborgDataSize = new SumMetric("CYBORG_DATA_SIZE", 60, accountId, orgId);
 
+        // Infrastructure metrics - always initialized
+        cpuUsagePercent = new GaugeMetric("CPU_USAGE_PERCENT", 60, accountId, orgId);
+        heapMemoryUsedMb = new GaugeMetric("HEAP_MEMORY_USED_MB", 60, accountId, orgId);
+        heapMemoryMaxMb = new GaugeMetric("HEAP_MEMORY_MAX_MB", 60, accountId, orgId);
+        nonHeapMemoryUsedMb = new GaugeMetric("NON_HEAP_MEMORY_USED_MB", 60, accountId, orgId);
+        threadCount = new GaugeMetric("THREAD_COUNT", 60, accountId, orgId);
+
         // Any new metric needs to be added here as well.
         metrics = Arrays.asList(runtimeKafkaRecordCount, runtimeKafkaRecordSize, runtimeProcessLatency,
                 postgreSampleDataInsertedCount, postgreSampleDataInsertLatency, mergingJobLatency, mergingJobUrlsUpdatedCount,
@@ -70,12 +85,17 @@ public class AllMetrics {
                 cyborgCallCount, cyborgDataSize, testingRunCount, testingRunLatency, totalSampleDataCount, sampleDataFetchLatency,
                 pgDataSizeInMb, kafkaRecordsLagMax, kafkaRecordsConsumedRate, kafkaFetchAvgLatency,
                 kafkaBytesConsumedRate, cyborgNewApiCount, cyborgTotalApiCount, deltaCatalogNewCount, deltaCatalogTotalCount,
-                cyborgApiPayloadSize, multipleSampleDataFetchLatency, runtimeApiReceivedCount);
+                cyborgApiPayloadSize, multipleSampleDataFetchLatency, runtimeApiReceivedCount,
+                cpuUsagePercent, heapMemoryUsedMb, heapMemoryMaxMb, nonHeapMemoryUsedMb, threadCount);
 
         AllMetrics _this = this;
         executorService.scheduleWithFixedDelay(() -> {
             try {
                 Context.accountId.set(accountId);
+
+                // Collect infrastructure metrics from MXBeans
+                collectInfraMetrics();
+
                 BasicDBList list = new BasicDBList();
                 List<MetricData> metricDataList = new ArrayList<>();
                 for (Metric m : metrics) {
@@ -130,7 +150,6 @@ public class AllMetrics {
 
     private final static LoggerMaker loggerMaker = new LoggerMaker(AllMetrics.class, LogDb.RUNTIME);
     private DataActor dataActor;
-    private static final String instance_id = UUID.randomUUID().toString();
     private Metric runtimeKafkaRecordCount;
     private Metric runtimeKafkaRecordSize;
     private Metric runtimeProcessLatency = null;
@@ -162,6 +181,13 @@ public class AllMetrics {
     private Metric cyborgApiPayloadSize = null;
     private Metric multipleSampleDataFetchLatency = null;
     private Metric runtimeApiReceivedCount = null;
+
+    // Infrastructure metrics (CPU, Memory, Threads)
+    private Metric cpuUsagePercent = null;
+    private Metric heapMemoryUsedMb = null;
+    private Metric heapMemoryMaxMb = null;
+    private Metric nonHeapMemoryUsedMb = null;
+    private Metric threadCount = null;
 
     private List<Metric> metrics = null;
 
@@ -500,6 +526,37 @@ public class AllMetrics {
             float val = getMetric();
             this.value = 0;
             return val;
+        }
+    }
+
+    private void collectInfraMetrics() {
+        try {
+            // CPU metrics
+            OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
+            double cpuLoad = osBean.getProcessCpuLoad();
+            if (cpuLoad >= 0) { // -1 means not available
+                cpuUsagePercent.record((float) (cpuLoad * 100));
+            }
+
+            // Memory metrics
+            MemoryMXBean memoryBean = ManagementFactory.getMemoryMXBean();
+            MemoryUsage heapUsage = memoryBean.getHeapMemoryUsage();
+            MemoryUsage nonHeapUsage = memoryBean.getNonHeapMemoryUsage();
+
+            float heapUsedMb = heapUsage.getUsed() / (1024f * 1024f);
+            float heapMaxMb = heapUsage.getMax() / (1024f * 1024f);
+            float nonHeapUsedMb = nonHeapUsage.getUsed() / (1024f * 1024f);
+
+            heapMemoryUsedMb.record(heapUsedMb);
+            heapMemoryMaxMb.record(heapMaxMb);
+            nonHeapMemoryUsedMb.record(nonHeapUsedMb);
+
+            // Thread metrics
+            ThreadMXBean threadBean = ManagementFactory.getThreadMXBean();
+            threadCount.record(threadBean.getThreadCount());
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error collecting infra metrics: " + e.getMessage(), LogDb.RUNTIME);
         }
     }
 
