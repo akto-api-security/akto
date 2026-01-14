@@ -96,6 +96,7 @@ public class DbAction extends ActionSupport {
     APIConfig apiConfig;
     List<SingleTypeInfo> stis;
     List<Integer> apiCollectionIds;
+    List<Map<String, Object>> collections;
     List<RuntimeFilter> runtimeFilters;
     List<SensitiveParamInfo> sensitiveParamInfos;
     Account account;
@@ -542,7 +543,10 @@ public class DbAction extends ActionSupport {
         try {
             List<ApiInfo> apiInfos = new ArrayList<>();
             for (BasicDBObject obj: apiInfoList) {
-                ApiInfo apiInfo = objectMapper.readValue(obj.toJson(), ApiInfo.class);
+                String json = obj.toJson();
+                loggerMaker.infoAndAddToDb("Fast-discovery: Converting JSON to ApiInfo: " + json);
+                ApiInfo apiInfo = objectMapper.readValue(json, ApiInfo.class);
+                loggerMaker.infoAndAddToDb("Fast-discovery: ApiInfo after conversion - id=" + apiInfo.getId());
                 ApiInfoKey id = apiInfo.getId();
                 
                 // Skip URLs based on validation rules (use 0 for response code as it's not available in ApiInfo)
@@ -1394,6 +1398,32 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    /**
+     * Fetch all API collections (id and hostName only).
+     * Used by fast-discovery to pre-populate collection cache on startup.
+     */
+    public String fetchAllCollections() {
+        try {
+            List<ApiCollection> allCollections = ApiCollectionsDao.instance.findAll(
+                new BasicDBObject(),
+                Projections.include("_id", "hostName")
+            );
+            collections = new ArrayList<>();
+
+            for (ApiCollection col : allCollections) {
+                Map<String, Object> colData = new HashMap<>();
+                colData.put("id", col.getId());
+                colData.put("hostName", col.getHostName());
+                collections.add(colData);
+            }
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchAllCollections");
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
     private static final List<Integer> HIGHER_STI_LIMIT_ACCOUNT_IDS = Arrays.asList(1736798101, 1718042191);
     private static final int STI_LIMIT = 20_000_000;
     private static final int higherStiLimit = Integer.parseInt(System.getenv().getOrDefault("HIGHER_STI_LIMIT", String.valueOf(5_000_000)));
@@ -1551,6 +1581,93 @@ public class DbAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
+    }
+
+    /**
+     * Fast-discovery endpoint to ensure api_collection entries exist for given collection IDs.
+     * Creates missing collections with auto-generated names.
+     * Called by fast-discovery flow to ensure collections exist before APIs are written.
+     */
+    private List<Integer> collectionIdsToEnsure;
+
+    public String ensureApiCollections() {
+        int accountId = Context.accountId.get();
+        try {
+            if (collectionIdsToEnsure == null || collectionIdsToEnsure.isEmpty()) {
+                loggerMaker.infoAndAddToDb("ensureApiCollections: No collection IDs provided", LogDb.DB_ABS);
+                return Action.SUCCESS.toUpperCase();
+            }
+
+            int ensuredCount = 0;
+            for (Integer collectionId : collectionIdsToEnsure) {
+                if (collectionId == null || collectionId == 0) {
+                    continue;
+                }
+
+                // Check if collection already exists
+                ApiCollection existing = ApiCollectionsDao.instance.findOne(Filters.eq("_id", collectionId));
+
+                if (existing == null) {
+                    // Create new collection using findOneAndUpdate with upsert (same pattern as DbLayer)
+                    int now = Context.now();
+                    String name = "Collection " + collectionId;
+
+                    FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
+                    updateOptions.upsert(true);
+                    updateOptions.returnDocument(ReturnDocument.AFTER);
+
+                    Bson updates = Updates.combine(
+                        Updates.setOnInsert("_id", collectionId),
+                        Updates.setOnInsert("name", name),
+                        Updates.setOnInsert("displayName", name),
+                        Updates.setOnInsert("startTs", now),
+                        Updates.setOnInsert("urls", new HashSet<>()),
+                        Updates.setOnInsert("vxlanId", collectionId),
+                        Updates.setOnInsert("deactivated", false),
+                        Updates.setOnInsert("redact", false),
+                        Updates.setOnInsert("automated", false),
+                        Updates.setOnInsert("dastCollection", false),
+                        Updates.setOnInsert("genAICollection", false),
+                        Updates.setOnInsert("guardRailCollection", false),
+                        Updates.setOnInsert("isOutOfTestingScope", false),
+                        Updates.setOnInsert("matchDependencyWithOtherCollections", false),
+                        Updates.setOnInsert("mcpCollection", false),
+                        Updates.setOnInsert("runDependencyAnalyser", false),
+                        Updates.setOnInsert("sampleCollectionsDropped", true)
+                    );
+
+                    try {
+                        ApiCollection result = ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(
+                            Filters.eq("_id", collectionId),
+                            updates,
+                            updateOptions
+                        );
+                        ensuredCount++;
+                        loggerMaker.infoAndAddToDb("Fast-discovery: Created api_collection ID=" + collectionId +
+                            ", name=" + name, LogDb.DB_ABS);
+                    } catch (Exception insertEx) {
+                        loggerMaker.errorAndAddToDb(insertEx, "Fast-discovery: Failed to create collection ID=" +
+                            collectionId + ": " + insertEx.toString(), LogDb.DB_ABS);
+                    }
+                }
+            }
+
+            loggerMaker.infoAndAddToDb("ensureApiCollections: checked=" +
+                collectionIdsToEnsure.size() + ", created=" + ensuredCount, LogDb.DB_ABS);
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in ensureApiCollections: " + e.toString(), LogDb.DB_ABS);
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public void setCollectionIdsToEnsure(List<Integer> collectionIdsToEnsure) {
+        this.collectionIdsToEnsure = collectionIdsToEnsure;
+    }
+
+    public List<Integer> getCollectionIdsToEnsure() {
+        return collectionIdsToEnsure;
     }
 
     // Added to stop ingestion of unwanted logs
@@ -3243,6 +3360,14 @@ public class DbAction extends ActionSupport {
         this.apiCollectionIds = apiCollectionIds;
     }
 
+    public List<Map<String, Object>> getCollections() {
+        return collections;
+    }
+
+    public void setCollections(List<Map<String, Object>> collections) {
+        this.collections = collections;
+    }
+
     public List<RuntimeFilter> getRuntimeFilters() {
         return runtimeFilters;
     }
@@ -4507,5 +4632,200 @@ public class DbAction extends ActionSupport {
 
     public void setErrorMessage(String errorMessage) {
         this.errorMessage = errorMessage;
+    }
+
+    // Fields for fetchApiIds API (Fast-Discovery Consumer)
+    private List<Map<String, Object>> apiIds;
+
+    public List<Map<String, Object>> getApiIds() {
+        return apiIds;
+    }
+
+    public void setApiIds(List<Map<String, Object>> apiIds) {
+        this.apiIds = apiIds;
+    }
+
+    // Fields for fetchSampleDataKeys API (Mini-Runtime Consumer)
+    private List<Map<String, Object>> sampleDataKeys;
+
+    public List<Map<String, Object>> getSampleDataKeys() {
+        return sampleDataKeys;
+    }
+
+    public void setSampleDataKeys(List<Map<String, Object>> sampleDataKeys) {
+        this.sampleDataKeys = sampleDataKeys;
+    }
+
+    /**
+     * Fetch all API IDs for Bloom filter initialization in fast-discovery consumer.
+     * Returns lightweight projection: apiCollectionId, url, method only.
+     * Endpoint: GET /api/fetchApiIds
+     */
+    public String fetchApiIds() {
+        try {
+            loggerMaker.infoAndAddToDb("Fetching all API IDs for Bloom filter initialization", LogDb.DB_ABS);
+            this.apiIds = DbLayer.fetchAllApiInfoKeys();
+            loggerMaker.infoAndAddToDb("Fetched " + apiIds.size() + " API IDs", LogDb.DB_ABS);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchApiIds: " + e.toString(), LogDb.DB_ABS);
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    // Field for fetchSampleDataKeys pagination
+    private String lastKeyId;
+
+    public String getLastKeyId() {
+        return lastKeyId;
+    }
+
+    public void setLastKeyId(String lastKeyId) {
+        this.lastKeyId = lastKeyId;
+    }
+
+    /**
+     * Fetch sample data keys for Bloom filter initialization in mini-runtime.
+     * Returns lightweight projection: _id fields only (apiCollectionId, url, method, responseCode, isHeader, ts).
+     * Endpoint: POST /api/fetchSampleDataKeys
+     *
+     * Supports pagination with lastKeyId parameter to handle large datasets.
+     */
+    public String fetchSampleDataKeys() {
+        try {
+            loggerMaker.infoAndAddToDb("Fetching sample data keys for Bloom filter initialization (lastKeyId: " + lastKeyId + ")", LogDb.DB_ABS);
+            this.sampleDataKeys = DbLayer.fetchAllSampleDataKeysAsMaps();
+            loggerMaker.infoAndAddToDb("Fetched " + sampleDataKeys.size() + " sample data keys", LogDb.DB_ABS);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchSampleDataKeys: " + e.toString(), LogDb.DB_ABS);
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Fast-discovery bulk write to single_type_info collection.
+     * Writes to dedicated fast-discovery Kafka topic: akto.fast-discovery.writes
+     * Endpoint: POST /api/fastDiscoveryBulkWriteSti
+     *
+     * This endpoint is optimized for fast-discovery consumer which only sends
+     * minimal data (host header entries) for quick API discovery.
+     */
+    public String fastDiscoveryBulkWriteSti() {
+        try {
+            int accountId = Context.accountId.get();
+            loggerMaker.infoAndAddToDb("Fast-discovery bulkWriteSti: " + writesForSti.size() +
+                " writes for account " + accountId, LogDb.DB_ABS);
+
+            KafkaUtils kafkaUtils = new KafkaUtils();
+
+            if (kafkaUtils.isWriteEnabled() && kafkaUtils.isFastDiscoveryEnabled()) {
+                // Write to fast-discovery Kafka topic
+                kafkaUtils.insertFastDiscoveryData(writesForSti, "bulkWriteSti", accountId);
+                loggerMaker.infoAndAddToDb("Sent fast-discovery STI writes to Kafka topic: " +
+                    KafkaUtils.getFastDiscoveryTopicName(), LogDb.DB_ABS);
+            } else {
+                // Direct DB write (fallback when Kafka disabled)
+                loggerMaker.infoAndAddToDb("Kafka disabled, writing directly to DB", LogDb.DB_ABS);
+                bulkWriteSti();  // Reuse existing logic
+            }
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fastDiscoveryBulkWriteSti: " + e.toString(), LogDb.DB_ABS);
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Fast-discovery bulk write to api_info collection.
+     * Writes to dedicated fast-discovery Kafka topic: akto.fast-discovery.writes
+     * Endpoint: POST /api/fastDiscoveryBulkWriteApiInfo
+     *
+     * This endpoint is optimized for fast-discovery consumer which only sends
+     * minimal API info data for quick API discovery.
+     */
+    public String fastDiscoveryBulkWriteApiInfo() {
+        try {
+            int accountId = Context.accountId.get();
+            loggerMaker.infoAndAddToDb("Fast-discovery bulkWriteApiInfo: " + apiInfoList.size() +
+                " writes for account " + accountId, LogDb.DB_ABS);
+
+            KafkaUtils kafkaUtils = new KafkaUtils();
+
+            if (kafkaUtils.isWriteEnabled() && kafkaUtils.isFastDiscoveryEnabled()) {
+                // Convert apiInfoList to BulkUpdates format for Kafka message
+                List<BulkUpdates> bulkWrites = convertApiInfoToBulkUpdates(apiInfoList);
+
+                // Write to fast-discovery Kafka topic
+                kafkaUtils.insertFastDiscoveryData(bulkWrites, "bulkWriteApiInfo", accountId);
+                loggerMaker.infoAndAddToDb("Sent fast-discovery API info writes to Kafka topic: " +
+                    KafkaUtils.getFastDiscoveryTopicName(), LogDb.DB_ABS);
+            } else {
+                // Direct DB write (fallback when Kafka disabled)
+                loggerMaker.infoAndAddToDb("Kafka disabled, writing directly to DB", LogDb.DB_ABS);
+                bulkWriteApiInfo();  // Reuse existing logic
+            }
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fastDiscoveryBulkWriteApiInfo: " + e.toString(), LogDb.DB_ABS);
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Convert apiInfoList (BasicDBObject format) back to BulkUpdates format
+     * for transmission via Kafka. This is needed because the fast-discovery
+     * consumer expects BulkUpdates format in Kafka messages.
+     *
+     * Only converts specific fields needed by fast-discovery to avoid sending
+     * unnecessary default values and ensure correct data types.
+     */
+    private List<BulkUpdates> convertApiInfoToBulkUpdates(List<BasicDBObject> apiInfoList) {
+        List<BulkUpdates> bulkWrites = new ArrayList<>();
+
+        for (BasicDBObject apiInfo : apiInfoList) {
+            // Extract _id for filters
+            Map<String, Object> filters = new HashMap<>();
+            Object id = apiInfo.get("id");
+            if (id != null) {
+                filters.put("_id", id);
+            }
+
+            // Convert only specific fields to updates for fast-discovery
+            ArrayList<String> updates = new ArrayList<>();
+
+            // lastSeen: always set to current value
+            if (apiInfo.containsKey("lastSeen")) {
+                Map<String, Object> update = new HashMap<>();
+                update.put("field", "lastSeen");
+                update.put("val", apiInfo.get("lastSeen"));
+                update.put("op", "set");
+                updates.add(new Gson().toJson(update));
+            }
+
+            // discoveredTimestamp: only set on insert (if provided)
+            if (apiInfo.containsKey("discoveredTimestamp")) {
+                Map<String, Object> update = new HashMap<>();
+                update.put("field", "discoveredTimestamp");
+                update.put("val", apiInfo.get("discoveredTimestamp"));
+                update.put("op", "setOnInsert");
+                updates.add(new Gson().toJson(update));
+            }
+
+            // collectionIds: keep as array to match mini-runtime format
+            if (apiInfo.containsKey("collectionIds")) {
+                Map<String, Object> update = new HashMap<>();
+                update.put("field", "collectionIds");
+                update.put("val", apiInfo.get("collectionIds"));  // Send as array
+                update.put("op", "setOnInsert");
+                updates.add(new Gson().toJson(update));
+            }
+
+            bulkWrites.add(new BulkUpdates(filters, updates));
+        }
+
+        return bulkWrites;
     }
 }
