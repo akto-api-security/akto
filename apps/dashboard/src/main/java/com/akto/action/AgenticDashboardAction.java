@@ -4,10 +4,19 @@ import com.akto.ProtoMessageUtils;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dao.testing.sources.TestSourceConfigsDao;
+import com.akto.dao.monitoring.FilterYamlTemplateDao;
+import com.akto.dto.monitoring.FilterConfig;
+import com.akto.dto.test_editor.Info;
+import com.akto.dto.test_editor.Category;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.testing.sources.TestSourceConfig;
+import com.akto.dto.testing.ComplianceMapping;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.action.threat_detection.AbstractThreatDetectionAction;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
@@ -21,7 +30,9 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 
@@ -53,8 +64,6 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
     @Getter
     private BasicDBObject response = new BasicDBObject();
 
-    private final Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
-
     // ========== Consolidated API Methods ==========
 
     /**
@@ -72,11 +81,19 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             // Fetch API Endpoints Discovered over time
             List<BasicDBObject> endpointsData = fetchEndpointsOverTime(startTimestamp, endTimestamp, daysBetween, demoCollections);
             
-            // Fetch API Discovery Stats (Shadow, Sensitive, No-Auth, Normal)
-            BasicDBObject discoveryStats = fetchApiDiscoveryStatsInternal();
-
-            response.put("endpointsDiscovered", endpointsData);
-            response.put("discoveryStats", discoveryStats);
+            // Check if contextSource is AGENTIC - if so, return agentic discovery stats
+            CONTEXT_SOURCE contextSource = Context.contextSource.get();
+            if (contextSource == CONTEXT_SOURCE.AGENTIC) {
+                // Fetch Agentic Discovery Stats (AI Agents, MCP Servers, LLM)
+                BasicDBObject agenticDiscoveryStats = fetchAgenticDiscoveryStatsInternal(startTimestamp, endTimestamp);
+                response.put("endpointsDiscovered", endpointsData);
+                response.put("discoveryStats", agenticDiscoveryStats);
+            } else {
+                // Fetch API Discovery Stats (Shadow, Sensitive, No-Auth, Normal)
+                BasicDBObject discoveryStats = fetchApiDiscoveryStatsInternal(startTimestamp, endTimestamp);
+                response.put("endpointsDiscovered", endpointsData);
+                response.put("discoveryStats", discoveryStats);
+            }
 
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
@@ -98,11 +115,8 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             long daysBetween = (endTimestamp - startTimestamp) / Constants.ONE_DAY_TIMESTAMP;
             Set<Integer> demoCollections = getDemoCollections();
 
-            // Fetch all issues once with maximum range needed (0 to max(currentTime, endTimestamp))
-            // This covers both time-range queries and all-time queries
-            int currentTime = Context.now();
-            int maxEndTimestamp = Math.max(currentTime, endTimestamp);
-            List<TestingRunIssues> allIssues = fetchAllTestingRunIssues(0, maxEndTimestamp, demoCollections);
+            // Fetch all issues once within the time range
+            List<TestingRunIssues> allIssues = fetchAllTestingRunIssues(startTimestamp, endTimestamp, demoCollections);
 
             // Fetch issues over time
             List<BasicDBObject> issuesData = fetchIssuesOverTime(startTimestamp, endTimestamp, daysBetween, allIssues);
@@ -121,6 +135,9 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             
             // Fetch top hostnames by issues
             List<BasicDBObject> topHostnamesByIssues = fetchTopHostnamesByIssuesInternal(allIssues);
+            
+            // Fetch compliance at risks data
+            List<BasicDBObject> complianceAtRisks = fetchComplianceAtRisksInternal(allIssues);
 
             response.put("issuesOverTime", issuesData);
             response.put("issuesBySeverity", issuesBySeverity);
@@ -128,6 +145,7 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             response.put("openResolvedIssues", openResolvedIssues);
             response.put("topIssuesByCategory", topIssuesByCategory);
             response.put("topHostnamesByIssues", topHostnamesByIssues);
+            response.put("complianceAtRisks", complianceAtRisks);
 
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
@@ -173,10 +191,8 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             long daysBetween = (endTimestamp - startTimestamp) / Constants.ONE_DAY_TIMESTAMP;
             Set<Integer> demoCollections = getDemoCollections();
 
-            // Fetch all malicious events once with maximum range needed
-            int currentTime = Context.now();
-            int maxEndTimestamp = Math.max(currentTime, endTimestamp);
-            List<DashboardMaliciousEvent> allThreats = fetchAllMaliciousEvents(0, maxEndTimestamp, demoCollections);
+            // Fetch all malicious events once within the time range
+            List<DashboardMaliciousEvent> allThreats = fetchAllMaliciousEvents(startTimestamp, endTimestamp, demoCollections);
 
             // Fetch threats over time
             List<BasicDBObject> threatsOverTime = fetchThreatsOverTimeInternal(startTimestamp, endTimestamp, daysBetween, allThreats);
@@ -192,12 +208,16 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             
             // Fetch top bad actors
             List<BasicDBObject> topBadActors = fetchTopBadActorsInternal(allThreats);
+            
+            // Fetch open and resolved threats
+            BasicDBObject openResolvedThreats = fetchOpenResolvedThreatsInternal(startTimestamp, endTimestamp, daysBetween, allThreats);
 
             response.put("threatsOverTime", threatsOverTime);
             response.put("threatsBySeverity", threatsBySeverity);
             response.put("topThreatsByCategory", topThreatsByCategory);
             response.put("topAttackHosts", topAttackHosts);
             response.put("topBadActors", topBadActors);
+            response.put("openResolvedThreats", openResolvedThreats);
 
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
@@ -284,13 +304,117 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
     // ========== API Info Collection APIs ==========
 
     /**
+     * Internal method: Fetch Agentic Discovery Stats (AI Agents, MCP Servers, LLM)
+     * Collection: SingleTypeInfoDao
+     * Used when contextSource is AGENTIC
+     */
+    private BasicDBObject fetchAgenticDiscoveryStatsInternal(int startTimestamp, int endTimestamp) {
+        BasicDBObject result = new BasicDBObject();
+        try {
+            Set<Integer> demoCollections = getDemoCollections();
+            Set<Integer> deactivatedCollections = getDeactivatedCollections();
+            
+            // Get MCP collections
+            Set<Integer> mcpCollections = UsageMetricCalculator.getMcpCollections();
+            // Get GenAI collections (AI Agents)
+            Set<Integer> genAiCollections = UsageMetricCalculator.getGenAiCollections();
+            
+            // Calculate counts using SingleTypeInfoDao.fetchEndpointsCount
+            // AI Agents = GenAI endpoint count (excluding MCP and API collections)
+            Set<Integer> aiAgentsExclude = new HashSet<>(mcpCollections);
+            aiAgentsExclude.addAll(UsageMetricCalculator.getApiCollections());
+            aiAgentsExclude.addAll(demoCollections);
+            aiAgentsExclude.addAll(deactivatedCollections);
+            long aiAgentsCount = SingleTypeInfoDao.instance.fetchEndpointsCount(startTimestamp, endTimestamp, aiAgentsExclude, false);
+            
+            // MCP Servers = MCP endpoint count (excluding GenAI and API collections)
+            Set<Integer> mcpServersExclude = new HashSet<>(genAiCollections);
+            mcpServersExclude.addAll(UsageMetricCalculator.getApiCollections());
+            mcpServersExclude.addAll(demoCollections);
+            mcpServersExclude.addAll(deactivatedCollections);
+            long mcpServersCount = SingleTypeInfoDao.instance.fetchEndpointsCount(startTimestamp, endTimestamp, mcpServersExclude, false);
+            
+            // LLM = Count from GenAI collections that are specifically LLM-related
+            // For now, we'll calculate LLM as a subset or use a different approach
+            // LLM could be calculated as endpoints in GenAI collections that are LLM models
+            // For simplicity, we'll use GenAI count minus AI Agents, or calculate separately
+            // Actually, let's calculate LLM as endpoints in GenAI collections that might be LLM-specific
+            // For now, let's set LLM to 0 or calculate it differently - need to check the actual requirement
+            // Based on the design, LLM seems to be a separate category, so let's calculate it
+            // LLM = Total GenAI - AI Agents (if AI Agents is a subset), or we need a different calculation
+            // For now, let's use: LLM = endpoints in GenAI collections that are not in MCP
+            // Actually, looking at the design, it seems like:
+            // - AI Agents = GenAI endpoints (excluding MCP)
+            // - MCP Servers = MCP endpoints (excluding GenAI)
+            // - LLM = might be a separate count or subset
+            // Let's calculate LLM as a separate category - for now, we'll use a placeholder or calculate it
+            // Since we don't have a clear definition, let's set it to 0 for now or calculate it as a subset
+            long llmCount = 0;
+            
+            // Note: RBAC filtering is handled by SingleTypeInfoDao.fetchEndpointsCount internally
+            
+            result.put("aiAgents", aiAgentsCount);
+            result.put("mcpServers", mcpServersCount);
+            result.put("llm", llmCount);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching agentic discovery stats: " + e.getMessage());
+            result.put("aiAgents", 0L);
+            result.put("mcpServers", 0L);
+            result.put("llm", 0L);
+        }
+        return result;
+    }
+
+    /**
      * Internal method: Fetch API discovery stats
      * Collection: ApiInfoDao
+     * Matches the logic from ApiEndpoints.jsx frontend
      */
-    private BasicDBObject fetchApiDiscoveryStatsInternal() {
+    private BasicDBObject fetchApiDiscoveryStatsInternal(int startTimestamp, int endTimestamp) {
         BasicDBObject result = new BasicDBObject();
         try {
             Bson baseFilter = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
+            
+            // Apply time range filter: filter by discoveredTimestamp (or lastSeen if discoveredTimestamp doesn't exist)
+            // This matches the pattern from ApiInfoDao.fetchApiInfoStats
+            // Filter APIs that were discovered (or last seen) within the time range
+            Bson timeFilter;
+            if (startTimestamp > 0) {
+                // Time range: check both bounds
+                timeFilter = Filters.and(
+                    Filters.or(
+                        Filters.and(
+                            Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, true),
+                            Filters.gte(ApiInfo.DISCOVERED_TIMESTAMP, startTimestamp),
+                            Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, endTimestamp)
+                        ),
+                        Filters.and(
+                            Filters.or(
+                                Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, false),
+                                Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, 0)
+                            ),
+                            Filters.gte(ApiInfo.LAST_SEEN, startTimestamp),
+                            Filters.lte(ApiInfo.LAST_SEEN, endTimestamp)
+                        )
+                    )
+                );
+            } else {
+                // All time: only check upper bound (APIs discovered/last seen up to endTimestamp)
+                timeFilter = Filters.or(
+                    Filters.and(
+                        Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, true),
+                        Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, endTimestamp)
+                    ),
+                    Filters.and(
+                        Filters.or(
+                            Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, false),
+                            Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, 0)
+                        ),
+                        Filters.lte(ApiInfo.LAST_SEEN, endTimestamp)
+                    )
+                );
+            }
+            baseFilter = Filters.and(baseFilter, timeFilter);
             
             // Apply RBAC filter
             try {
@@ -302,34 +426,51 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                 // Ignore
             }
 
-            // Shadow APIs: apiCollectionId == AKTO_DISCOVERED_APIS_COLLECTION_ID
-            long shadowCount = ApiInfoDao.instance.count(Filters.and(
-                baseFilter,
-                Filters.eq(ApiInfo.ID_API_COLLECTION_ID, ApiInfoDao.AKTO_DISCOVERED_APIS_COLLECTION_ID)
-            ));
+            // Fetch all APIs once with needed fields to categorize them properly
+            // This matches frontend logic which processes all endpoints in a single pass
+            List<ApiInfo> allApis = ApiInfoDao.instance.findAll(baseFilter, 
+                Projections.include(
+                    ApiInfo.ID_API_COLLECTION_ID,
+                    ApiInfo.IS_SENSITIVE,
+                    ApiInfo.ALL_AUTH_TYPES_FOUND,
+                    ApiInfo.DISCOVERED_TIMESTAMP,
+                    ApiInfo.LAST_SEEN
+                ));
 
-            // Sensitive APIs: isSensitive == true
-            long sensitiveCount = ApiInfoDao.instance.count(Filters.and(
-                baseFilter,
-                Filters.eq(ApiInfo.IS_SENSITIVE, true)
-            ));
+            // Calculate actualAuthType for each API (matches frontend logic)
+            for (ApiInfo api : allApis) {
+                api.calculateActualAuth();
+            }
 
-            // No-Auth APIs: actualAuthType contains UNAUTHENTICATED
-            // Check all APIs and filter those with UNAUTHENTICATED auth type
-            List<ApiInfo> allApis = ApiInfoDao.instance.findAll(baseFilter, Projections.include(ApiInfo.ALL_AUTH_TYPES_FOUND));
-            long noAuthCount = allApis.stream()
-                .filter(api -> {
-                    List<ApiInfo.AuthType> authTypes = api.getActualAuthType();
-                    return authTypes != null && authTypes.contains(ApiInfo.AuthType.UNAUTHENTICATED);
-                })
-                .count();
+            // Categorize APIs (an API can belong to multiple categories)
+            long shadowCount = 0;
+            long sensitiveCount = 0;
+            long noAuthCount = 0;
+            long normalCount = 0;
 
-            // Total APIs
-            long totalCount = ApiInfoDao.instance.count(baseFilter);
-            
-            // Normal APIs = Total - Shadow - Sensitive - NoAuth (with overlap handling)
-            // Note: There may be overlap between categories, so normal is approximate
-            long normalCount = Math.max(0, totalCount - shadowCount - sensitiveCount - noAuthCount);
+            for (ApiInfo api : allApis) {
+                boolean isShadow = api.getId().getApiCollectionId() == ApiInfoDao.AKTO_DISCOVERED_APIS_COLLECTION_ID;
+                boolean isSensitive = api.getIsSensitive();
+                
+                // No-Auth: actualAuthType is null/empty OR contains UNAUTHENTICATED
+                // Matches frontend: obj.auth_type === undefined || obj.auth_type.toLowerCase() === "unauthenticated"
+                List<ApiInfo.AuthType> authTypes = api.getActualAuthType();
+                boolean isNoAuth = (authTypes == null || authTypes.isEmpty()) || 
+                                  (authTypes.contains(ApiInfo.AuthType.UNAUTHENTICATED));
+
+                // Count each category (APIs can be in multiple categories)
+                if (isShadow) shadowCount++;
+                if (isSensitive) sensitiveCount++;
+                if (isNoAuth) noAuthCount++;
+
+                // Normal: NOT (Shadow OR Sensitive OR NoAuth)
+                // Matches frontend logic where normal is the remaining APIs
+                if (!isShadow && !isSensitive && !isNoAuth) {
+                    normalCount++;
+                }
+            }
+
+            long totalCount = allApis.size();
 
             result.put("shadow", shadowCount);
             result.put("sensitive", sensitiveCount);
@@ -355,8 +496,8 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
     private BasicDBObject fetchTestedVsNonTestedApisInternal(int startTimestamp, int endTimestamp, long daysBetween) {
         BasicDBObject result = new BasicDBObject();
         try {
-            // Fetch all ApiInfo records once
-            List<ApiInfo> allApis = fetchAllApiInfo();
+            // Fetch all ApiInfo records once within the time range
+            List<ApiInfo> allApis = fetchAllApiInfo(startTimestamp, endTimestamp);
             
             // Separate tested and non-tested APIs
             List<Integer> testedTimestamps = new ArrayList<>();
@@ -555,12 +696,68 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
         try {
             // Group by testSubCategory in Java
             Map<String, Long> categoryCounts = new HashMap<>();
+            Set<String> testSubCategories = new HashSet<>();
+            Map<String, String> testCategoryFromSourceConfigMap = new HashMap<>();
+            
             for (TestingRunIssues issue : allIssues) {
                 if (issue.getTestRunIssueStatus() == GlobalEnums.TestRunIssueStatus.OPEN) {
-                    String category = issue.getId() != null && issue.getId().getTestSubCategory() != null 
-                        ? issue.getId().getTestSubCategory() 
-                        : "Unknown";
+                    if (issue.getId() == null) continue;
+                    
+                    String category = issue.getId().getTestSubCategory();
+                    if (category == null) {
+                        category = "Unknown";
+                    }
+                    
                     categoryCounts.put(category, categoryCounts.getOrDefault(category, 0L) + 1);
+                    testSubCategories.add(category);
+                    
+                    // Store testCategoryFromSourceConfig for fuzzing tests (those starting with "http")
+                    if (category.startsWith("http") && issue.getId().getTestCategoryFromSourceConfig() != null) {
+                        testCategoryFromSourceConfigMap.put(category, issue.getId().getTestCategoryFromSourceConfig());
+                    }
+                }
+            }
+            
+            // Fetch test names from YamlTemplate and TestSourceConfig
+            Map<String, String> testSubCategoryToNameMap = new HashMap<>();
+            
+            // Separate regular tests and fuzzing tests (those starting with "http")
+            List<String> regularTestSubCategories = new ArrayList<>();
+            List<String> fuzzingTestSubCategories = new ArrayList<>();
+            
+            for (String testSubCategory : testSubCategories) {
+                if (testSubCategory != null && testSubCategory.startsWith("http")) {
+                    fuzzingTestSubCategories.add(testSubCategory);
+                } else {
+                    regularTestSubCategories.add(testSubCategory);
+                }
+            }
+            
+            // Fetch regular test configs from YamlTemplate
+            if (!regularTestSubCategories.isEmpty()) {
+                Bson projection = Projections.include(YamlTemplate.INFO);
+                List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(
+                    Filters.in("_id", regularTestSubCategories), projection);
+                
+                for (YamlTemplate yamlTemplate : yamlTemplates) {
+                    if (yamlTemplate != null && yamlTemplate.getInfo() != null) {
+                        Info info = yamlTemplate.getInfo();
+                        String testName = info.getName();
+                        if (testName != null && !testName.isEmpty()) {
+                            testSubCategoryToNameMap.put(yamlTemplate.getId(), testName);
+                        }
+                    }
+                }
+            }
+            
+            // Fetch fuzzing test configs from TestSourceConfig
+            for (String fuzzingCategory : fuzzingTestSubCategories) {
+                String testCategoryFromSourceConfig = testCategoryFromSourceConfigMap.get(fuzzingCategory);
+                if (testCategoryFromSourceConfig != null) {
+                    TestSourceConfig config = TestSourceConfigsDao.instance.getTestSourceConfig(testCategoryFromSourceConfig);
+                    if (config != null && config.getSubcategory() != null && !config.getSubcategory().isEmpty()) {
+                        testSubCategoryToNameMap.put(fuzzingCategory, config.getSubcategory());
+                    }
                 }
             }
             
@@ -572,7 +769,10 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             
             for (Map.Entry<String, Long> entry : sortedCategories) {
                 BasicDBObject doc = new BasicDBObject();
-                doc.put("_id", entry.getKey());
+                String testSubCategory = entry.getKey();
+                // Use test name if available, otherwise fall back to testSubCategory
+                String displayName = testSubCategoryToNameMap.getOrDefault(testSubCategory, testSubCategory);
+                doc.put("_id", displayName);
                 doc.put("count", entry.getValue());
                 result.add(doc);
             }
@@ -631,6 +831,113 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching top hostnames by issues: " + e.getMessage());
+        }
+        return result;
+    }
+
+    /**
+     * Internal method: Fetch compliance at risks data
+     * Aggregates issues by compliance standards and calculates percentages
+     */
+    private List<BasicDBObject> fetchComplianceAtRisksInternal(List<TestingRunIssues> allIssues) {
+        List<BasicDBObject> result = new ArrayList<>();
+        try {
+            // Map to count issues per compliance standard
+            Map<String, Long> complianceCounts = new HashMap<>();
+            
+            // Collect unique testSubCategories to fetch compliance mappings
+            Set<String> regularTestSubCategories = new HashSet<>();
+            Map<String, String> testSubCategoryToTestCategoryFromSourceConfig = new HashMap<>();
+            
+            for (TestingRunIssues issue : allIssues) {
+                if (issue.getId() == null) continue;
+                
+                String testSubCategory = issue.getId().getTestSubCategory();
+                if (testSubCategory == null || testSubCategory.isEmpty()) continue;
+                
+                if (testSubCategory.startsWith("http")) {
+                    // Fuzzing test - get testCategoryFromSourceConfig
+                    String testCategoryFromSourceConfig = issue.getId().getTestCategoryFromSourceConfig();
+                    if (testCategoryFromSourceConfig != null) {
+                        testSubCategoryToTestCategoryFromSourceConfig.put(testSubCategory, testCategoryFromSourceConfig);
+                    }
+                } else {
+                    // Regular test
+                    regularTestSubCategories.add(testSubCategory);
+                }
+            }
+            
+            // Fetch compliance mappings for regular tests from YamlTemplate
+            Map<String, ComplianceMapping> testSubCategoryToComplianceMap = new HashMap<>();
+            if (!regularTestSubCategories.isEmpty()) {
+                Bson projection = Projections.include(YamlTemplate.INFO);
+                List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(
+                    Filters.in("_id", regularTestSubCategories), projection);
+                
+                for (YamlTemplate yamlTemplate : yamlTemplates) {
+                    if (yamlTemplate != null && yamlTemplate.getInfo() != null) {
+                        Info info = yamlTemplate.getInfo();
+                        ComplianceMapping complianceMapping = info.getCompliance();
+                        if (complianceMapping != null && complianceMapping.getMapComplianceToListClauses() != null) {
+                            testSubCategoryToComplianceMap.put(yamlTemplate.getId(), complianceMapping);
+                        }
+                    }
+                }
+            }
+            
+            // Count issues per compliance standard
+            int totalIssuesWithCompliance = 0;
+            for (TestingRunIssues issue : allIssues) {
+                if (issue.getId() == null) continue;
+                
+                String testSubCategory = issue.getId().getTestSubCategory();
+                if (testSubCategory == null || testSubCategory.isEmpty()) continue;
+                
+                ComplianceMapping complianceMapping = null;
+                
+                if (testSubCategory.startsWith("http")) {
+                    // For fuzzing tests, TestSourceConfig doesn't typically have compliance data
+                    // Skip for now, or we could check if TestSourceConfig has compliance in the future
+                    continue;
+                } else {
+                    // Regular test - get compliance from map
+                    complianceMapping = testSubCategoryToComplianceMap.get(testSubCategory);
+                }
+                
+                if (complianceMapping != null && complianceMapping.getMapComplianceToListClauses() != null) {
+                    Map<String, List<String>> complianceMap = complianceMapping.getMapComplianceToListClauses();
+                    if (!complianceMap.isEmpty()) {
+                        totalIssuesWithCompliance++;
+                        // Count this issue for each compliance standard it belongs to
+                        for (String complianceName : complianceMap.keySet()) {
+                            complianceCounts.put(complianceName, complianceCounts.getOrDefault(complianceName, 0L) + 1);
+                        }
+                    }
+                }
+            }
+            
+            // Calculate percentages and create result objects
+            // Sort by count descending and take top 4 compliances
+            List<Map.Entry<String, Long>> sortedCompliances = complianceCounts.entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .limit(4)
+                .collect(Collectors.toList());
+            
+            for (Map.Entry<String, Long> entry : sortedCompliances) {
+                BasicDBObject complianceObj = new BasicDBObject();
+                complianceObj.put("name", entry.getKey());
+                long count = entry.getValue();
+                // Calculate percentage: (count / totalIssuesWithCompliance) * 100
+                double percentage = totalIssuesWithCompliance > 0 
+                    ? (count * 100.0 / totalIssuesWithCompliance) 
+                    : 0.0;
+                complianceObj.put("percentage", Math.round(percentage * 100.0) / 100.0); // Round to 2 decimal places
+                complianceObj.put("count", count);
+                // Note: color and icon should be handled on frontend based on compliance name
+                result.add(complianceObj);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching compliance at risks: " + e.getMessage());
         }
         return result;
     }
@@ -714,8 +1021,133 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             // Group by filterId (category) in Java
             Map<String, Long> categoryCounts = new HashMap<>();
             for (DashboardMaliciousEvent threat : allThreats) {
-                String category = threat.getFilterId() != null ? threat.getFilterId() : "Unknown";
-                categoryCounts.put(category, categoryCounts.getOrDefault(category, 0L) + 1);
+                String filterId = threat.getFilterId();
+                if (filterId != null && !filterId.isEmpty()) {
+                    categoryCounts.put(filterId, categoryCounts.getOrDefault(filterId, 0L) + 1);
+                }
+            }
+            
+            // Fetch threat filter names from FilterYamlTemplate
+            Map<String, String> filterIdToNameMap = new HashMap<>();
+            try {
+                Map<String, FilterConfig> filterConfigs = FilterYamlTemplateDao.instance.fetchFilterConfig(false, false);
+                loggerMaker.infoAndAddToDb(String.format(
+                    "[THREAT_NAME_DEBUG] Fetched %d filter configs from FilterYamlTemplateDao",
+                    filterConfigs.size()
+                ));
+                
+                // Debug: Log sample filterIds from threats
+                Set<String> threatFilterIds = categoryCounts.keySet();
+                loggerMaker.infoAndAddToDb(String.format(
+                    "[THREAT_NAME_DEBUG] Threat filterIds found in data (first 10): %s",
+                    threatFilterIds.stream().limit(10).collect(Collectors.toList())
+                ));
+                
+                // Debug: Log sample filterIds from configs
+                loggerMaker.infoAndAddToDb(String.format(
+                    "[THREAT_NAME_DEBUG] Filter config IDs available (first 10): %s",
+                    filterConfigs.keySet().stream().limit(10).collect(Collectors.toList())
+                ));
+                
+                for (Map.Entry<String, FilterConfig> entry : filterConfigs.entrySet()) {
+                    String filterId = entry.getKey();
+                    FilterConfig filterConfig = entry.getValue();
+                    
+                    // Debug: Log structure for matching filterIds
+                    if (threatFilterIds.contains(filterId)) {
+                        loggerMaker.infoAndAddToDb(String.format(
+                            "[THREAT_NAME_DEBUG] Processing filterId: %s, filterConfig is null: %s",
+                            filterId, filterConfig == null
+                        ));
+                    }
+                    
+                    if (filterConfig != null && filterConfig.getInfo() != null) {
+                        Info info = filterConfig.getInfo();
+                        
+                        // Debug: Log info structure for matching filterIds
+                        if (threatFilterIds.contains(filterId)) {
+                            loggerMaker.infoAndAddToDb(String.format(
+                                "[THREAT_NAME_DEBUG] FilterId: %s, info.getName(): %s, info.getCategory() is null: %s",
+                                filterId, info.getName(), info.getCategory() == null
+                            ));
+                        }
+                        
+                        // Try to get display name from category, fallback to name, then to filterId
+                        if (info.getCategory() != null) {
+                            Category category = info.getCategory();
+                            String displayName = category.getDisplayName();
+                            String categoryName = category.getName();
+                            
+                            // Debug: Log category structure for matching filterIds
+                            if (threatFilterIds.contains(filterId)) {
+                                loggerMaker.infoAndAddToDb(String.format(
+                                    "[THREAT_NAME_DEBUG] FilterId: %s, category.getName(): %s, category.getDisplayName(): %s",
+                                    filterId, categoryName, displayName
+                                ));
+                            }
+                            
+                            if (displayName != null && !displayName.isEmpty()) {
+                                filterIdToNameMap.put(filterId, displayName);
+                                if (threatFilterIds.contains(filterId)) {
+                                    loggerMaker.infoAndAddToDb(String.format(
+                                        "[THREAT_NAME_DEBUG] Mapped filterId %s to displayName: %s",
+                                        filterId, displayName
+                                    ));
+                                }
+                            } else if (categoryName != null && !categoryName.isEmpty()) {
+                                filterIdToNameMap.put(filterId, categoryName);
+                                if (threatFilterIds.contains(filterId)) {
+                                    loggerMaker.infoAndAddToDb(String.format(
+                                        "[THREAT_NAME_DEBUG] Mapped filterId %s to categoryName: %s",
+                                        filterId, categoryName
+                                    ));
+                                }
+                            }
+                        }
+                        // If no category, try to get name from info
+                        if (!filterIdToNameMap.containsKey(filterId) && info.getName() != null && !info.getName().isEmpty()) {
+                            filterIdToNameMap.put(filterId, info.getName());
+                            if (threatFilterIds.contains(filterId)) {
+                                loggerMaker.infoAndAddToDb(String.format(
+                                    "[THREAT_NAME_DEBUG] Mapped filterId %s to info.getName(): %s",
+                                    filterId, info.getName()
+                                ));
+                            }
+                        }
+                    } else {
+                        if (threatFilterIds.contains(filterId)) {
+                            loggerMaker.infoAndAddToDb(String.format(
+                                "[THREAT_NAME_DEBUG] FilterId %s: filterConfig is null or info is null",
+                                filterId
+                            ));
+                        }
+                    }
+                }
+                
+                // Debug: Log final mapping
+                loggerMaker.infoAndAddToDb(String.format(
+                    "[THREAT_NAME_DEBUG] Final filterIdToNameMap size: %d, mapped filterIds: %s",
+                    filterIdToNameMap.size(),
+                    filterIdToNameMap.keySet().stream().limit(10).collect(Collectors.toList())
+                ));
+                
+                // Debug: Check which threat filterIds have mappings
+                for (String threatFilterId : threatFilterIds) {
+                    if (filterIdToNameMap.containsKey(threatFilterId)) {
+                        loggerMaker.infoAndAddToDb(String.format(
+                            "[THREAT_NAME_DEBUG] Threat filterId %s will be displayed as: %s",
+                            threatFilterId, filterIdToNameMap.get(threatFilterId)
+                        ));
+                    } else {
+                        loggerMaker.infoAndAddToDb(String.format(
+                            "[THREAT_NAME_DEBUG] WARNING: Threat filterId %s has no mapping, will use filterId as-is",
+                            threatFilterId
+                        ));
+                    }
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error fetching threat filter names: " + e.getMessage());
+                e.printStackTrace();
             }
             
             // Sort by count descending and take top 5
@@ -726,7 +1158,41 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             
             for (Map.Entry<String, Long> entry : sortedCategories) {
                 BasicDBObject doc = new BasicDBObject();
-                doc.put("_id", entry.getKey());
+                String filterId = entry.getKey();
+                
+                // Use display name from FilterYamlTemplate if available
+                String displayName = filterIdToNameMap.get(filterId);
+                
+                // If no mapping found, convert filterId to readable name
+                // e.g., "SSRFInParams" -> "SSRF In Params", "DataExfiltrationInParams" -> "Data Exfiltration In Params"
+                if (displayName == null || displayName.isEmpty()) {
+                    // Insert space before capital letters (except the first one)
+                    String readable = filterId.replaceAll("([a-z])([A-Z])", "$1 $2");
+                    // Replace underscores with spaces
+                    readable = readable.replaceAll("_", " ");
+                    // Capitalize first letter of each word
+                    String[] words = readable.split("\\s+");
+                    StringBuilder resultBuilder = new StringBuilder();
+                    for (int i = 0; i < words.length; i++) {
+                        if (i > 0) {
+                            resultBuilder.append(" ");
+                        }
+                        if (!words[i].isEmpty()) {
+                            // Preserve acronyms (all caps) but capitalize first letter of other words
+                            if (words[i].matches("^[A-Z]+$")) {
+                                resultBuilder.append(words[i]);
+                            } else {
+                                resultBuilder.append(words[i].substring(0, 1).toUpperCase());
+                                if (words[i].length() > 1) {
+                                    resultBuilder.append(words[i].substring(1));
+                                }
+                            }
+                        }
+                    }
+                    displayName = resultBuilder.toString();
+                }
+                
+                doc.put("_id", displayName);
                 doc.put("count", entry.getValue());
                 result.add(doc);
             }
@@ -820,12 +1286,65 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
         return result;
     }
 
+    /**
+     * Internal method: Fetch open and resolved threats over time
+     * Collection: MaliciousEventDao
+     */
+    private BasicDBObject fetchOpenResolvedThreatsInternal(int startTimestamp, int endTimestamp, long daysBetween, List<DashboardMaliciousEvent> allThreats) {
+        BasicDBObject result = new BasicDBObject();
+        try {
+            // Separate open (ACTIVE) and resolved (IGNORED/UNDER_REVIEW) threats within the time range
+            List<Integer> openTimestamps = new ArrayList<>();
+            List<Integer> resolvedTimestamps = new ArrayList<>();
+            
+            for (DashboardMaliciousEvent threat : allThreats) {
+                long timestamp = threat.getTimestamp();
+                if (timestamp <= 0 || timestamp < startTimestamp || timestamp > endTimestamp) {
+                    continue;
+                }
+                
+                String status = threat.getStatus();
+                if (status == null) {
+                    status = "ACTIVE"; // Default to ACTIVE if status is null
+                }
+                
+                // ACTIVE status = Open threats
+                if ("ACTIVE".equals(status)) {
+                    openTimestamps.add((int) timestamp);
+                } else {
+                    // IGNORED, UNDER_REVIEW, TRAINING, etc. = Resolved threats
+                    resolvedTimestamps.add((int) timestamp);
+                }
+            }
+            
+            // Group by time period in Java
+            Map<String, Long> openTimePeriodMap = groupByTimePeriod(openTimestamps, daysBetween);
+            Map<String, Long> resolvedTimePeriodMap = groupByTimePeriod(resolvedTimestamps, daysBetween);
+            
+            // Convert to result format
+            List<BasicDBObject> openData = convertTimePeriodMapToResult(openTimePeriodMap, daysBetween);
+            List<BasicDBObject> resolvedData = convertTimePeriodMapToResult(resolvedTimePeriodMap, daysBetween);
+
+            result.put("open", openData);
+            result.put("resolved", resolvedData);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching open/resolved threats: " + e.getMessage());
+            result.put("open", new ArrayList<>());
+            result.put("resolved", new ArrayList<>());
+        }
+        return result;
+    }
+
 
     // ========== Helper Methods ==========
 
+    private Set<Integer> getDeactivatedCollections() {
+        return UsageMetricCalculator.getDeactivated();
+    }
+
     private Set<Integer> getDemoCollections() {
         Set<Integer> demoCollections = new HashSet<>();
-        demoCollections.addAll(deactivatedCollections);
+        demoCollections.addAll(getDeactivatedCollections());
         demoCollections.add(RuntimeListener.LLM_API_COLLECTION_ID);
         demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
 
@@ -840,58 +1359,72 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
 
     /**
      * Fetch all SingleTypeInfo records for API endpoints once with filters
+     * Uses aggregation to group by apiCollectionId, url, method and get minimum timestamp
      * Only fetches host header records which represent actual API endpoints
      */
     private List<SingleTypeInfo> fetchAllSingleTypeInfo(int startTimestamp, int endTimestamp, Set<Integer> demoCollections) {
         List<SingleTypeInfo> result = new ArrayList<>();
         try {
-            // Get collections to exclude (non-traffic + demo collections)
+            // Get collections to exclude (non-traffic + demo collections + deactivated collections)
             List<Integer> excludeCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
             excludeCollectionIds.addAll(demoCollections);
+            excludeCollectionIds.addAll(getDeactivatedCollections());
+
+            // Build aggregation pipeline
+            List<Bson> pipeline = new ArrayList<>();
 
             // Host header filter - these represent actual API endpoints
             Bson hostHeaderFilter = SingleTypeInfoDao.filterForHostHeader(0, false);
-            
-            // Timestamp filter
-            Bson timestampFilter = startTimestamp > 0
-                ? Filters.and(
-                    Filters.gte(SingleTypeInfo._TIMESTAMP, startTimestamp),
-                    Filters.lte(SingleTypeInfo._TIMESTAMP, endTimestamp)
-                  )
-                : Filters.lte(SingleTypeInfo._TIMESTAMP, endTimestamp);
+            pipeline.add(Aggregates.match(hostHeaderFilter));
 
-            // Build base filter
-            List<Bson> filterList = new ArrayList<>();
-            filterList.add(hostHeaderFilter);
-            filterList.add(timestampFilter);
-            
-            // Exclude non-traffic and demo collections
+            // Exclude non-traffic, demo, and deactivated collections
             if (!excludeCollectionIds.isEmpty()) {
-                filterList.add(Filters.nin(SingleTypeInfo._API_COLLECTION_ID, excludeCollectionIds));
+                pipeline.add(Aggregates.match(Filters.nin(SingleTypeInfo._API_COLLECTION_ID, excludeCollectionIds)));
             }
 
             // Apply RBAC filter
             try {
                 List<Integer> userCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
                 if (userCollectionIds != null && !userCollectionIds.isEmpty()) {
-                    filterList.add(Filters.in("collectionIds", userCollectionIds));
+                    pipeline.add(Aggregates.match(Filters.in("collectionIds", userCollectionIds)));
                 }
             } catch (Exception e) {
                 // Ignore RBAC errors
             }
 
-            // Combine all filters and fetch in single query
-            Bson finalFilter = Filters.and(filterList);
-            
-            // Only project fields we need: apiCollectionId, url, method, timestamp
-            Bson projection = Projections.include(
-                "apiCollectionId",
-                "url",
-                "method",
-                "timestamp"
-            );
+            // Group by apiCollectionId, url, method and get minimum timestamp
+            BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$apiCollectionId")
+                    .append("url", "$url")
+                    .append("method", "$method");
+            pipeline.add(Aggregates.group(groupedId, Accumulators.min("timestamp", "$timestamp")));
 
-            result = SingleTypeInfoDao.instance.findAll(finalFilter, projection);
+            // Filter by timestamp range after grouping (on the grouped minimum timestamp)
+            if (startTimestamp > 0) {
+                pipeline.add(Aggregates.match(Filters.gte("timestamp", startTimestamp)));
+            }
+            pipeline.add(Aggregates.match(Filters.lte("timestamp", endTimestamp)));
+
+            // Execute aggregation
+            MongoCursor<BasicDBObject> cursor = SingleTypeInfoDao.instance.getMCollection()
+                    .aggregate(pipeline, BasicDBObject.class).cursor();
+
+            // Convert results to SingleTypeInfo objects
+            while (cursor.hasNext()) {
+                BasicDBObject doc = cursor.next();
+                BasicDBObject id = (BasicDBObject) doc.get("_id");
+                int apiCollectionId = id.getInt("apiCollectionId");
+                String url = id.getString("url");
+                String method = id.getString("method");
+                int timestamp = doc.getInt("timestamp");
+
+                // Create minimal SingleTypeInfo object with only needed fields
+                SingleTypeInfo sti = new SingleTypeInfo();
+                sti.setApiCollectionId(apiCollectionId);
+                sti.setUrl(url);
+                sti.setMethod(method); // Method is stored as String in SingleTypeInfo
+                sti.setTimestamp(timestamp);
+                result.add(sti);
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching SingleTypeInfo records: " + e.getMessage());
         }
@@ -910,7 +1443,7 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
 
             Map<String, Object> filter = new HashMap<>();
             
-            // Time range filter
+            // Time range filter - match SuspectSampleDataAction pattern exactly
             Map<String, Integer> time_range = new HashMap<>();
             if (startTimestamp > 0) {
                 time_range.put("start", startTimestamp);
@@ -918,29 +1451,15 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             if (endTimestamp > 0) {
                 time_range.put("end", endTimestamp);
             }
+            // Always put time_range (even if empty) to match SuspectSampleDataAction pattern
             filter.put("detected_at_time_range", time_range);
             
             // Filter for THREAT label
-            filter.put("label", "THREAT");
+            // filter.put("label", "THREAT");
             
-            // Exclude demo collections via API collection filter
-            try {
-                List<Integer> userCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-                if (userCollectionIds != null && !userCollectionIds.isEmpty()) {
-                    // Remove demo collections from user collection IDs
-                    List<Integer> filteredCollectionIds = userCollectionIds.stream()
-                        .filter(id -> !demoCollections.contains(id))
-                        .collect(Collectors.toList());
-                    if (!filteredCollectionIds.isEmpty()) {
-                        filter.put("apiCollectionId", filteredCollectionIds);
-                    }
-                } else if (!demoCollections.isEmpty()) {
-                    // If no RBAC filter, we can't exclude demo collections via API
-                    // This is a limitation - we'll filter in memory after fetching
-                }
-            } catch (Exception e) {
-                // Ignore RBAC errors
-            }
+            // Note: We don't filter by apiCollectionId in the query.
+            // Instead, we fetch all records and filter by collection IDs in memory
+            // to handle RBAC and demo collection exclusions.
 
             Map<String, Object> body = new HashMap<String, Object>() {
                 {
@@ -952,22 +1471,45 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             };
 
             String msg = objectMapper.valueToTree(body).toString();
+            
+            // Get context source for logging
+            String contextSourceValue = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
+            
+            // Debug: Log request details
+            loggerMaker.infoAndAddToDb(String.format(
+                "[THREAT_FETCH_DEBUG] Sending request to threat-backend - URL: %s, startTimestamp: %d, endTimestamp: %d, contextSource: %s, filter: %s",
+                url, startTimestamp, endTimestamp, contextSourceValue, msg
+            ));
+            
             RequestBody requestBody = RequestBody.create(msg, JSON);
             Request request = new Request.Builder()
                 .url(url)
                 .post(requestBody)
                 .addHeader("Authorization", "Bearer " + this.getApiToken())
                 .addHeader("Content-Type", "application/json")
-                .addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "")
+                .addHeader("x-context-source", contextSourceValue)
                 .build();
 
             List<DashboardMaliciousEvent> tempResult = new ArrayList<>();
             try (Response resp = httpClient.newCall(request).execute()) {
+                int statusCode = resp.code();
                 String responseBody = resp.body() != null ? resp.body().string() : "";
+                
+                // Debug: Log response status and body length
+                loggerMaker.infoAndAddToDb(String.format(
+                    "[THREAT_FETCH_DEBUG] Response received - Status: %d, Response body length: %d",
+                    statusCode, responseBody.length()
+                ));
 
                 ProtoMessageUtils.<ListMaliciousRequestsResponse>toProtoMessage(
                     ListMaliciousRequestsResponse.class, responseBody
                 ).ifPresent(m -> {
+                    int eventCount = m.getMaliciousEventsList().size();
+                    loggerMaker.infoAndAddToDb(String.format(
+                        "[THREAT_FETCH_DEBUG] Parsed response - Found %d malicious events from backend",
+                        eventCount
+                    ));
+                    
                     tempResult.addAll(m.getMaliciousEventsList().stream()
                         .map(smr -> new DashboardMaliciousEvent(
                             smr.getId(),
@@ -996,16 +1538,42 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                         .collect(Collectors.toList())
                     );
                 });
+                
+                if (tempResult.isEmpty() && !responseBody.isEmpty()) {
+                    loggerMaker.infoAndAddToDb(String.format(
+                        "[THREAT_FETCH_DEBUG] WARNING: Response body is not empty but no events parsed. Response body (first 500 chars): %s",
+                        responseBody.length() > 500 ? responseBody.substring(0, 500) : responseBody
+                    ));
+                }
             }
             
-            // Filter out demo collections if not already filtered via API
-            if (!demoCollections.isEmpty()) {
-                result = tempResult.stream()
-                    .filter(event -> !demoCollections.contains(event.getApiCollectionId()))
-                    .collect(Collectors.toList());
-            } else {
-                result = tempResult;
-            }
+            // Debug: Log before filtering
+            loggerMaker.infoAndAddToDb(String.format(
+                "[THREAT_FETCH_DEBUG] Before filtering - tempResult size: %d, demoCollections size: %d",
+                tempResult.size(), demoCollections.size()
+            ));
+            
+            // Filter by collection IDs in memory (only demo collection exclusion, no RBAC for threat data)
+            // Note: Similar to SuspectSampleDataAction, we don't apply RBAC filtering for threat data.
+            // Threats are security-related and should be visible regardless of RBAC collection access.
+            int beforeFilterCount = tempResult.size();
+            
+            // Only filter out demo collections, don't apply RBAC filtering
+            result = tempResult.stream()
+                .filter(event -> !demoCollections.contains(event.getApiCollectionId()))
+                .collect(Collectors.toList());
+            
+            // Debug: Log after filtering
+            loggerMaker.infoAndAddToDb(String.format(
+                "[THREAT_FETCH_DEBUG] After filtering - before: %d, after: %d, filtered out: %d (demo collections only, no RBAC)",
+                beforeFilterCount, result.size(), beforeFilterCount - result.size()
+            ));
+            
+            // Debug: Final result
+            loggerMaker.infoAndAddToDb(String.format(
+                "[THREAT_FETCH_DEBUG] Final result - returning %d malicious events",
+                result.size()
+            ));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching malicious events from threat-backend: " + e.getMessage());
         }
@@ -1018,9 +1586,21 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
     private List<TestingRunIssues> fetchAllTestingRunIssues(int startTimestamp, int endTimestamp, Set<Integer> demoCollections) {
         List<TestingRunIssues> result = new ArrayList<>();
         try {
+            // Build time filter - handle "All time" case (startTimestamp <= 0)
+            Bson timeFilter;
+            if (startTimestamp > 0) {
+                // Time range: check both bounds
+                timeFilter = Filters.and(
+                    Filters.gte(TestingRunIssues.CREATION_TIME, startTimestamp),
+                    Filters.lte(TestingRunIssues.CREATION_TIME, endTimestamp)
+                );
+            } else {
+                // All time: only check upper bound
+                timeFilter = Filters.lte(TestingRunIssues.CREATION_TIME, endTimestamp);
+            }
+            
             Bson baseFilter = Filters.and(
-                Filters.gte(TestingRunIssues.CREATION_TIME, startTimestamp),
-                Filters.lte(TestingRunIssues.CREATION_TIME, endTimestamp),
+                timeFilter,
                 Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, demoCollections)
             );
 
@@ -1044,11 +1624,51 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
 
     /**
      * Fetch all ApiInfo records once with filters
+     * Applies time range filter based on discoveredTimestamp or lastSeen
      */
-    private List<ApiInfo> fetchAllApiInfo() {
+    private List<ApiInfo> fetchAllApiInfo(int startTimestamp, int endTimestamp) {
         List<ApiInfo> result = new ArrayList<>();
         try {
             Bson baseFilter = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
+            
+            // Apply time range filter: filter by discoveredTimestamp (or lastSeen if discoveredTimestamp doesn't exist)
+            Bson timeFilter;
+            if (startTimestamp > 0) {
+                // Time range: check both bounds
+                timeFilter = Filters.and(
+                    Filters.or(
+                        Filters.and(
+                            Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, true),
+                            Filters.gte(ApiInfo.DISCOVERED_TIMESTAMP, startTimestamp),
+                            Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, endTimestamp)
+                        ),
+                        Filters.and(
+                            Filters.or(
+                                Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, false),
+                                Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, 0)
+                            ),
+                            Filters.gte(ApiInfo.LAST_SEEN, startTimestamp),
+                            Filters.lte(ApiInfo.LAST_SEEN, endTimestamp)
+                        )
+                    )
+                );
+            } else {
+                // All time: only check upper bound (APIs discovered/last seen up to endTimestamp)
+                timeFilter = Filters.or(
+                    Filters.and(
+                        Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, true),
+                        Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, endTimestamp)
+                    ),
+                    Filters.and(
+                        Filters.or(
+                            Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, false),
+                            Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, 0)
+                        ),
+                        Filters.lte(ApiInfo.LAST_SEEN, endTimestamp)
+                    )
+                );
+            }
+            baseFilter = Filters.and(baseFilter, timeFilter);
             
             // Apply RBAC filter
             try {
@@ -1076,19 +1696,19 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
         LocalDate date = Instant.ofEpochSecond(timestamp).atZone(ZoneId.systemDefault()).toLocalDate();
         
         if (daysBetween <= 15) {
-            // Day grouping: return "YYYY-MM-DD"
-            return date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            // Day grouping: return "D_YYYY-MM-DD" to explicitly indicate day type
+            return "D_" + date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
         } else if (daysBetween <= 105) {
-            // Week grouping: return week number
+            // Week grouping: return "W_YYYY_W" to explicitly indicate week type
             WeekFields weekFields = WeekFields.of(Locale.getDefault());
             int week = date.get(weekFields.weekOfWeekBasedYear());
             int year = date.get(weekFields.weekBasedYear());
-            return year + "_" + week;
+            return "W_" + year + "_" + week;
         } else {
-            // Month grouping: return month number
+            // Month grouping: return "M_YYYY_M" to explicitly indicate month type
             int year = date.getYear();
             int month = date.getMonthValue();
-            return year + "_" + month;
+            return "M_" + year + "_" + month;
         }
     }
 

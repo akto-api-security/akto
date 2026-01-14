@@ -8,21 +8,24 @@ const ComplianceAtRisksCard = ({ complianceData = [], itemId = "", onRemoveCompo
                 <ComponentHeader title='Compliance at Risks' itemId={itemId} onRemove={onRemoveComponent} />
 
                 <Box width='100%'>
-                    <HorizontalGrid columns={4} gap={5}>
+                    <HorizontalGrid columns={4} gap={3}>
                         {complianceData.map((compliance, idx) => (
-                            <VerticalStack key={idx} gap={5} inlineAlign='center' align='start'>
-                                <div style={{
-                                    width: '180px',
-                                    height: '165px',
-                                    backgroundImage: `url(${compliance.icon})`,
-                                    backgroundRepeat: 'no-repeat',
-                                    backgroundPosition: 'center',
-                                    backgroundSize: 'contain'
-                                }} />
+                            <VerticalStack key={idx} gap={2} align='center' inlineAlign='center'>
+                                <Box width='100%' minHeight='80px' display='flex' alignItems='center' justifyContent='center'>
+                                    <div style={{
+                                        width: '100%',
+                                        maxWidth: '100px',
+                                        height: '80px',
+                                        backgroundImage: `url(${compliance.icon})`,
+                                        backgroundRepeat: 'no-repeat',
+                                        backgroundPosition: 'center',
+                                        backgroundSize: 'contain'
+                                    }} />
+                                </Box>
 
                                 <Box width='100%'>
-                                    <VerticalStack gap={2} align='end' inlineAlign='center'>
-                                        <Text variant='headingXl' alignment='center' fontWeight='semibold'>
+                                    <VerticalStack gap={1} align='center' inlineAlign='center'>
+                                        <Text variant='headingSm' alignment='center' fontWeight='semibold'>
                                             {compliance.name}
                                         </Text>
                                         <Box width='100%'>
@@ -41,7 +44,7 @@ const ComplianceAtRisksCard = ({ complianceData = [], itemId = "", onRemoveCompo
                                                         borderRadius: '3px'
                                                     }} />
                                                 </div>
-                                                <Text variant='bodySm' as='span'>
+                                                <Text variant='bodySm' as='span' fontWeight='medium'>
                                                     {compliance.percentage}%
                                                 </Text>
                                             </HorizontalStack>

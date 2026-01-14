@@ -23,13 +23,68 @@ import CustomPieChart from './new_components/CustomPieChart'
 import CustomLineChart from './new_components/CustomLineChart'
 import CustomDataTable from './new_components/CustomDataTable'
 
+// Helper function to get compliance color based on compliance name
+const getComplianceColor = (complianceName) => {
+    const colorMap = {
+        'SOC 2': '#3B82F6',
+        'GDPR': '#7C3AED',
+        'ISO 27001': '#F97316',
+        'HIPAA': '#06B6D4',
+        'PCI DSS': '#10B981',
+        'PCI-DSS': '#10B981',
+        'NIST 800-53': '#EF4444',
+        'NIST 800-171': '#EF4444',
+        'NIST': '#EF4444',
+        'OWASP': '#F59E0B',
+        'FEDRAMP': '#3B82F6',
+        'CIS CONTROLS': '#3B82F6',
+        'CMMC': '#3B82F6',
+        'FISMA': '#3B82F6',
+        'CSA CCM': '#3B82F6'
+    };
+    return colorMap[complianceName] || '#3B82F6'; // Default color
+};
+
+// Helper function to normalize compliance name for icon lookup
+// Maps compliance names to their exact file names in /public/ folder
+const normalizeComplianceNameForIcon = (complianceName) => {
+    if (!complianceName) return '';
+    
+    // Map common compliance names to their exact file names
+    const complianceIconMap = {
+        "SOC 2": "SOC 2",
+        "GDPR": "GDPR",
+        "ISO 27001": "ISO 27001",
+        "HIPAA": "HIPAA",
+        "PCI DSS": "PCI DSS",
+        "PCI-DSS": "PCI DSS",
+        "NIST 800-53": "NIST 800-53",
+        "NIST 800-171": "NIST 800-171",
+        "NIST": "NIST 800-53", // Default to NIST 800-53 if just "NIST"
+        "OWASP": "OWASP",
+        "FEDRAMP": "FEDRAMP",
+        "CIS CONTROLS": "CIS CONTROLS",
+        "CMMC": "CYBERSECURITY MATURITY MODEL CERTIFICATION (CMMC)",
+        "CYBERSECURITY MATURITY MODEL CERTIFICATION (CMMC)": "CYBERSECURITY MATURITY MODEL CERTIFICATION (CMMC)",
+        "FISMA": "FISMA",
+        "CSA CCM": "CSA CCM",
+        "OWASP LLM": "OWASP LLM",
+        "OWASP Agentic": "OWASP Agentic",
+        "NIST AI Risk Management Framework": "NIST AI Risk Management Framework",
+        "MITRE ATLAS": "MITRE ATLAS"
+    };
+    
+    // Use mapped name if available, otherwise use the provided name as-is
+    return complianceIconMap[complianceName] || complianceName;
+};
+
 const AgenticDashboard = () => {
     const SCREEN_NAME = 'home-main-dashboard';
     const dashboardCategory = getDashboardCategory();
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState('ciso')
     const [overallStats, setOverallStats] = useState([])
-    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[3])
     const containerRef = useRef(null);
     const [popoverActive, setPopoverActive] = useState(false);
     const setToastConfig = Store(state => state.setToastConfig);
@@ -65,7 +120,7 @@ const AgenticDashboard = () => {
         { i: 'issues-pie', x: 4, y: 4, w: 4, h: 3, minW: 4, maxW: 4, minH: 3, maxH: 3 },
         { i: 'threat-detection-pie', x: 8, y: 4, w: 4, h: 3, minW: 4, maxW: 4, minH: 3, maxH: 3 },
         { i: 'average-issue-age', x: 0, y: 7, w: 4, h: 3, minW: 4, maxW: 4, minH: 3, maxH: 3 },
-        { i: 'compliance-at-risks', x: 4, y: 7, w: 8, h: 2, minW: 6, minH: 2, maxH: 2 },
+        { i: 'compliance-at-risks', x: 4, y: 7, w: 8, h: 3, minW: 6, minH: 2, maxH: 3 },
         { i: 'tested-vs-non-tested', x: 0, y: 10, w: 6, h: 4, minW: 4, minH: 4, maxH: 4 },
         { i: 'open-resolved-issues', x: 6, y: 10, w: 6, h: 4, minW: 4, minH: 4, maxH: 4 },
         { i: 'threat-requests-chart', x: 0, y: 14, w: 6, h: 4, minW: 4, minH: 4, maxH: 4 },
@@ -204,12 +259,21 @@ const AgenticDashboard = () => {
                     const data = endpointDiscoveryResponse.value;
                     const discoveryStats = data.discoveryStats || {};
 
-                    setApiDiscoveryData({
-                        "Shadow": { text: discoveryStats.shadow || 0, color: "#E45357" },
-                        "Sensitive": { text: discoveryStats.sensitive || 0, color: "#EF864C" },
-                        "No Auth": { text: discoveryStats.noAuth || 0, color: "#F6C564" },
-                        "Normal": { text: discoveryStats.normal || 0, color: "#E0E0E0" }
-                    });
+                    // Check if contextSource is AGENTIC - show agentic discovery stats
+                    if (dashboardCategory === 'AGENTIC') {
+                        setApiDiscoveryData({
+                            "AI Agents": { text: discoveryStats.aiAgents || 0, color: "#7F56D9" }, // Dark purple
+                            "MCP Servers": { text: discoveryStats.mcpServers || 0, color: "#9E77ED" }, // Medium purple
+                            "LLM": { text: discoveryStats.llm || 0, color: "#D6BBFB" } // Light purple
+                        });
+                    } else {
+                        setApiDiscoveryData({
+                            "Shadow": { text: discoveryStats.shadow || 0, color: "#E45357" },
+                            "Sensitive": { text: discoveryStats.sensitive || 0, color: "#EF864C" },
+                            "No Auth": { text: discoveryStats.noAuth || 0, color: "#F6C564" },
+                            "Normal": { text: discoveryStats.normal || 0, color: "#E0E0E0" }
+                        });
+                    }
                 } else {
                     setApiDiscoveryData({});
                 }
@@ -301,6 +365,25 @@ const AgenticDashboard = () => {
                             value: (item.count || 0).toLocaleString()
                         }))
                     );
+                    
+                    // Process Compliance at Risks data - show top 4 only
+                    const complianceAtRisks = data.complianceAtRisks || [];
+                    setComplianceData(
+                        complianceAtRisks.slice(0, 4).map((item) => {
+                            const complianceName = item.name || 'Unknown';
+                            const normalizedName = normalizeComplianceNameForIcon(complianceName);
+                            // func.getComplianceIcon converts to uppercase, so we need to pass the normalized name
+                            // and then construct the path manually to preserve exact case
+                            const iconPath = normalizedName ? `/public/${normalizedName}.svg` : '';
+                            return {
+                                name: complianceName,
+                                percentage: item.percentage || 0,
+                                count: item.count || 0,
+                                icon: iconPath,
+                                color: getComplianceColor(complianceName) || '#3B82F6'
+                            };
+                        })
+                    );
                 } else {
                     // Set empty defaults if API fails
                     setIssuesData({});
@@ -308,6 +391,7 @@ const AgenticDashboard = () => {
                     setOpenResolvedChartData([]);
                     setTopIssuesByCategory([]);
                     setTopHostnamesByIssues([]);
+                    setComplianceData([]);
                 }
 
                 // Process Testing Data
@@ -390,9 +474,23 @@ const AgenticDashboard = () => {
                         }))
                     );
 
-                    // Open & Resolved Threats - not available from backend yet
-                    // Set empty array as backend doesn't provide this data
-                    setOpenResolvedThreatsData([]);
+                    // Open & Resolved Threats
+                    const openResolvedThreats = data.openResolvedThreats || {};
+                    const openThreatsData = transformTimeSeriesData(openResolvedThreats.open || []);
+                    const resolvedThreatsData = transformTimeSeriesData(openResolvedThreats.resolved || []);
+
+                    setOpenResolvedThreatsData([
+                        {
+                            name: 'Open Threats',
+                            data: openThreatsData,
+                            color: '#D72C0D'
+                        },
+                        {
+                            name: 'Resolved Threats',
+                            data: resolvedThreatsData,
+                            color: '#9E77ED'
+                        }
+                    ]);
                 } else {
                     // Set empty defaults if API fails
                     setThreatData({});
@@ -460,33 +558,75 @@ const AgenticDashboard = () => {
 
             // Handle different time key formats from backend
             if (typeof id === 'string') {
-                // New format from Java-based aggregation: "YYYY-MM-DD" (day), "YYYY_M" (month), or "YYYY_W" (week)
-                if (id.includes('-')) {
-                    // Day format: "YYYY-MM-DD"
+                // New format with explicit type indicators: "D_YYYY-MM-DD" (day), "M_YYYY_M" (month), or "W_YYYY_W" (week)
+                if (id.startsWith('D_')) {
+                    // Day format: "D_YYYY-MM-DD"
+                    const dateStr = id.substring(2); // Remove "D_" prefix
+                    const date = new Date(dateStr);
+                    timestamp = isNaN(date.getTime()) ? Date.now() : date.getTime();
+                } else if (id.startsWith('M_')) {
+                    // Month format: "M_YYYY_M" (e.g., "M_2025_7" = July 2025)
+                    const parts = id.substring(2).split('_'); // Remove "M_" prefix and split
+                    if (parts.length === 2) {
+                        const year = parseInt(parts[0], 10);
+                        const month = parseInt(parts[1], 10);
+                        if (!isNaN(year) && !isNaN(month) && month >= 1 && month <= 12) {
+                            const date = new Date(Date.UTC(year, month - 1, 1));
+                            timestamp = date.getTime();
+                        } else {
+                            timestamp = Date.now();
+                        }
+                    } else {
+                        timestamp = Date.now();
+                    }
+                } else if (id.startsWith('W_')) {
+                    // Week format: "W_YYYY_W" (e.g., "W_2024_12" = week 12 of 2024)
+                    const parts = id.substring(2).split('_'); // Remove "W_" prefix and split
+                    if (parts.length === 2) {
+                        const year = parseInt(parts[0], 10);
+                        const week = parseInt(parts[1], 10);
+                        if (!isNaN(year) && !isNaN(week) && week >= 1 && week <= 53) {
+                            const date = new Date(Date.UTC(year, 0, 1));
+                            const firstDay = date.getUTCDay();
+                            const offset = firstDay === 0 ? 0 : 7 - firstDay;
+                            date.setUTCDate(date.getUTCDate() + offset + (week - 1) * 7);
+                            timestamp = date.getTime();
+                        } else {
+                            timestamp = Date.now();
+                        }
+                    } else {
+                        timestamp = Date.now();
+                    }
+                } else if (id.includes('-') && !id.includes('_')) {
+                    // Legacy day format without prefix: "YYYY-MM-DD" (backward compatibility)
                     const date = new Date(id);
-                    timestamp = date.getTime();
-                } else if (id.includes('_')) {
-                    // Month or week format: "YYYY_M" or "YYYY_W"
+                    timestamp = isNaN(date.getTime()) ? Date.now() : date.getTime();
+                } else if (id.includes('_') && !id.startsWith('D_') && !id.startsWith('M_') && !id.startsWith('W_')) {
+                    // Legacy format without prefix: "YYYY_X" - try to infer type (backward compatibility)
                     const parts = id.split('_');
                     if (parts.length === 2) {
                         const year = parseInt(parts[0], 10);
                         const period = parseInt(parts[1], 10);
                         
-                        if (period <= 12) {
-                            // Month format: "YYYY_M" (e.g., "2025_7" = July 2025)
-                            const date = new Date(Date.UTC(year, period - 1, 1));
-                            timestamp = date.getTime();
-                        } else if (period <= 53) {
-                            // Week format: "YYYY_W" (e.g., "2024_12" = week 12 of 2024)
-                            const date = new Date(Date.UTC(year, 0, 1));
-                            const firstDay = date.getUTCDay();
-                            const offset = firstDay === 0 ? 0 : 7 - firstDay;
-                            date.setUTCDate(date.getUTCDate() + offset + (period - 1) * 7);
-                            timestamp = date.getTime();
+                        if (!isNaN(year) && !isNaN(period)) {
+                            if (period <= 12) {
+                                // Assume month format: "YYYY_M" (e.g., "2025_7" = July 2025)
+                                const date = new Date(Date.UTC(year, period - 1, 1));
+                                timestamp = date.getTime();
+                            } else if (period <= 53) {
+                                // Assume week format: "YYYY_W" (e.g., "2024_12" = week 12 of 2024)
+                                const date = new Date(Date.UTC(year, 0, 1));
+                                const firstDay = date.getUTCDay();
+                                const offset = firstDay === 0 ? 0 : 7 - firstDay;
+                                date.setUTCDate(date.getUTCDate() + offset + (period - 1) * 7);
+                                timestamp = date.getTime();
+                            } else {
+                                // Fallback: treat as day of year
+                                const date = new Date(Date.UTC(year, 0, period));
+                                timestamp = date.getTime();
+                            }
                         } else {
-                            // Fallback: treat as day of year
-                            const date = new Date(Date.UTC(year, 0, period));
-                            timestamp = date.getTime();
+                            timestamp = Date.now();
                         }
                     } else {
                         timestamp = Date.now();
@@ -504,7 +644,7 @@ const AgenticDashboard = () => {
                 if (typeof timePeriod === 'string' && timePeriod.includes('-')) {
                     // Day format: "YYYY-MM-DD"
                     const date = new Date(timePeriod);
-                    timestamp = date.getTime();
+                    timestamp = isNaN(date.getTime()) ? Date.now() : date.getTime();
                 } else if (typeof timePeriod === 'number') {
                     // Month/week/day number - calculate timestamp
                     // Determine if it's month, week, or day based on the value
@@ -577,7 +717,7 @@ const AgenticDashboard = () => {
 
     const componentNames = {
         'security-posture-chart': `${mapLabel('API Security Posture', dashboardCategory)} over time`,
-        'api-discovery-pie': mapLabel('API Discovery', dashboardCategory),
+        'api-discovery-pie': dashboardCategory === 'AGENTIC' ? 'Agentic AI Discovery' : mapLabel('API Discovery', dashboardCategory),
         'issues-pie': 'Issues',
         'threat-detection-pie': mapLabel('Threat Detection', dashboardCategory),
         'average-issue-age': 'Average Issue Age',
@@ -606,8 +746,8 @@ const AgenticDashboard = () => {
             onRemoveComponent={removeComponent}
         />,
         'api-discovery-pie': <CustomPieChart
-            title={mapLabel('API Discovery', dashboardCategory)}
-            subtitle={`Total ${mapLabel('APIs', dashboardCategory)}`}
+            title={dashboardCategory === 'AGENTIC' ? 'Agentic AI Discovery' : mapLabel('API Discovery', dashboardCategory)}
+            subtitle={dashboardCategory === 'AGENTIC' ? 'Total Agentic Components' : `Total ${mapLabel('APIs', dashboardCategory)}`}
             graphData={apiDiscoveryData}
             itemId='api-discovery-pie'
             onRemoveComponent={removeComponent}
@@ -686,8 +826,8 @@ const AgenticDashboard = () => {
                 title={`Open & Resolved ${mapLabel('Threat', dashboardCategory)}s`}
                 chartData={openResolvedThreatsData}
                 labels={[
-                    { label: 'Open Issues', color: '#D72C0D' },
-                    { label: 'Resolved Issues', color: '#9E77ED' }
+                    { label: 'Open Threats', color: '#D72C0D' },
+                    { label: 'Resolved Threats', color: '#9E77ED' }
                 ]}
                 itemId='open-resolved-threats'
                 onRemoveComponent={removeComponent}
