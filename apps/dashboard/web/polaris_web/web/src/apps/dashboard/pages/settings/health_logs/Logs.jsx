@@ -1,10 +1,11 @@
-import { Button, ButtonGroup, LegacyCard, Text, VerticalStack, DataTable, Checkbox, HorizontalStack, RadioButton } from "@shopify/polaris"
+import { Button, ButtonGroup, LegacyCard, Text, VerticalStack, DataTable, Checkbox, HorizontalStack, RadioButton, Modal, Link } from "@shopify/polaris"
 import { useEffect, useState } from "react";
 import settingRequests from "../api";
 import func from "@/util/func";
 import LogsContainer from "./LogsContainer";
 import Dropdown from "../../../components/layouts/Dropdown"
 import { saveAs } from 'file-saver'
+import ModuleEnvConfigComponent from "./ModuleEnvConfig"
 
 const Logs = () => {
     const fiveMins = 1000 * 60 * 5
@@ -18,6 +19,8 @@ const Logs = () => {
     const [ loading, setLoading ] = useState(false)
     const [ moduleInfos, setModuleInfos ] = useState([])
     const [ selectedModules, setSelectedModules ] = useState([])
+    const [ modalActive, setModalActive ] = useState(false)
+    const [ selectedModule, setSelectedModule ] = useState(null)
     const logGroupSelected = logs.logGroup !== ''
     const hasAccess = func.checkUserValidForIntegrations()
 
@@ -128,7 +131,28 @@ const Logs = () => {
         const oneMinuteAgo = Math.floor(Date.now() / 1000) - 60;
         return module.lastHeartbeatReceived >= oneMinuteAgo &&
                module.name &&
-               module.name.startsWith('Default_');
+               (module.name.startsWith('Default_') || module.moduleType === 'TRAFFIC_COLLECTOR');
+    }
+
+    const handleModuleTypeClick = (module) => {
+        setSelectedModule(module);
+        setModalActive(true);
+    }
+
+    const handleModalClose = () => {
+        setModalActive(false);
+        setSelectedModule(null);
+    }
+
+    const handleSaveEnv = async (moduleId, moduleName, envData) => {
+        try {
+            await settingRequests.updateModuleEnvAndReboot(moduleId, moduleName, envData);
+            func.setToast(true, false, "Environment config saved successfully. Module will reboot.");
+            handleModalClose();
+            await fetchModuleInfo();
+        } catch (error) {
+            func.setToast(true, true, "Failed to update environment config");
+        }
     }
 
     // Sort moduleInfos by lastHeartbeatReceived in descending order
@@ -137,9 +161,14 @@ const Logs = () => {
     const moduleInfoRows = sortedModuleInfos.map(module => {
         const isEligible = canRebootModule(module);
         const isSelected = selectedModules.includes(module.id);
+        const isTrafficCollector = module.moduleType === 'TRAFFIC_COLLECTOR';
 
         return [
-            module.moduleType || '-',
+            isTrafficCollector ? (
+                <Link onClick={() => handleModuleTypeClick(module)}>{module.moduleType || '-'}</Link>
+            ) : (
+                module.moduleType || '-'
+            ),
             module.name || '-',
             module.currentVersion || '-',
             func.epochToDateTime(module.startedTs),
@@ -230,6 +259,22 @@ const Logs = () => {
                     />
                 </LegacyCard>
             ) : <></>}
+
+            <Modal
+                open={modalActive}
+                onClose={handleModalClose}
+                title={`Configure ${selectedModule?.moduleType || 'Module'}`}
+                large
+            >
+                <Modal.Section>
+                    <ModuleEnvConfigComponent
+                        title="Environment Variables"
+                        description={`Configure environment variables for ${selectedModule?.name || 'module'}`}
+                        module={selectedModule}
+                        onSaveEnv={handleSaveEnv}
+                    />
+                </Modal.Section>
+            </Modal>
         </VerticalStack>
     )
 }
