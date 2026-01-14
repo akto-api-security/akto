@@ -33,13 +33,6 @@
             </exclusions>
         </dependency>
 
-        <!-- Mini-runtime (for HttpCallParser functions) -->
-        <dependency>
-            <groupId>com.akto.apps.mini-runtime</groupId>
-            <artifactId>mini-runtime</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
         <!-- Kafka (consumer only) -->
         <dependency>
             <groupId>org.apache.kafka</groupId>

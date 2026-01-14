@@ -225,6 +225,14 @@ public class Main {
 
     static private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
+    /**
+     * Check if fast-discovery integration is enabled via environment variable.
+     */
+    private static boolean isFastDiscoveryEnabled() {
+        String enabled = System.getenv("ENABLE_FAST_DISCOVERY");
+        return enabled != null && enabled.equalsIgnoreCase("true");
+    }
+
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
         //String mongoURI = System.getenv("AKTO_MONGO_CONN");;
@@ -243,6 +251,10 @@ public class Main {
         boolean syncImmediately = false;
         boolean fetchAllSTI = true;
         Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
+
+        // Fast-Discovery integration
+        FastDiscoveryService fastDiscoveryService = null;
+        Thread fastDiscoveryThread = null;
 
         boolean isDashboardInstance = false;
         if (isDashboardInstance) {
@@ -283,6 +295,41 @@ public class Main {
 
         initializeRuntime();
 
+        // Fast-Discovery Integration (optional)
+        if (isFastDiscoveryEnabled()) {
+            try {
+                loggerMaker.infoAndAddToDb("Fast-Discovery is ENABLED - initializing...");
+                fastDiscoveryService = new FastDiscoveryService();
+
+                // Initialize synchronously (may take 10-30 seconds for Bloom filter)
+                fastDiscoveryService.initialize();
+
+                // Start in dedicated thread
+                fastDiscoveryThread = new Thread(fastDiscoveryService, "fast-discovery-consumer");
+                fastDiscoveryThread.setDaemon(false); // Non-daemon to participate in shutdown
+
+                // Error isolation: handle uncaught exceptions
+                fastDiscoveryThread.setUncaughtExceptionHandler((t, e) -> {
+                    loggerMaker.errorAndAddToDb("Fast-Discovery thread crashed: " + e.getMessage());
+                    e.printStackTrace();
+                    // Continue without fast-discovery (no auto-restart)
+                });
+
+                fastDiscoveryThread.start();
+                loggerMaker.infoAndAddToDb("Fast-Discovery Service started in background thread");
+
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Failed to initialize Fast-Discovery Service: " + e.getMessage());
+                loggerMaker.infoAndAddToDb("Continuing with mini-runtime only (Fast-Discovery disabled)");
+                e.printStackTrace();
+                // Continue without fast-discovery
+                fastDiscoveryService = null;
+                fastDiscoveryThread = null;
+            }
+        } else {
+            loggerMaker.infoAndAddToDb("Fast-Discovery is DISABLED (ENABLE_FAST_DISCOVERY not set to 'true')");
+        }
+
         String centralKafkaTopicName = AccountSettings.DEFAULT_CENTRAL_KAFKA_TOPIC_NAME;
 
         buildKafka();
@@ -318,8 +365,35 @@ public class Main {
         final Thread mainThread = Thread.currentThread();
         final AtomicBoolean exceptionOnCommitSync = new AtomicBoolean(false);
 
+        // Make fast-discovery variables final for shutdown hook access
+        final FastDiscoveryService finalFastDiscoveryService = fastDiscoveryService;
+        final Thread finalFastDiscoveryThread = fastDiscoveryThread;
+
         Runtime.getRuntime().addShutdownHook(new Thread() {
             public void run() {
+                // Stop Fast-Discovery Service first if running
+                if (finalFastDiscoveryService != null) {
+                    loggerMaker.infoAndAddToDb("Stopping Fast-Discovery Service...");
+                    try {
+                        finalFastDiscoveryService.stop();
+
+                        // Wait up to 10 seconds for fast-discovery to stop
+                        if (finalFastDiscoveryThread != null) {
+                            finalFastDiscoveryThread.join(10000);
+                            if (finalFastDiscoveryThread.isAlive()) {
+                                loggerMaker.errorAndAddToDb("Fast-Discovery thread did not stop within 10 seconds");
+                            } else {
+                                loggerMaker.infoAndAddToDb("Fast-Discovery Service stopped gracefully");
+                            }
+                        }
+                    } catch (InterruptedException e) {
+                        loggerMaker.errorAndAddToDb("Interrupted while waiting for Fast-Discovery to stop");
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("Error stopping Fast-Discovery Service: " + e.getMessage());
+                    }
+                }
+
+                // Stop mini-runtime
                 main.consumer.wakeup();
                 try {
                     if (!exceptionOnCommitSync.get()) {
