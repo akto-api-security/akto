@@ -1,0 +1,134 @@
+package com.akto.metrics;
+
+import com.akto.dao.context.Context;
+import com.akto.data_actor.DataActor;
+import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.dto.monitoring.ModuleInfo.ModuleType;
+import com.akto.kafka.Kafka;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.google.gson.Gson;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+public class ConfigUpdatePoller {
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ConfigUpdatePoller.class, LogDb.RUNTIME);
+    private static final Gson gson = new Gson();
+    private static final long POLL_INTERVAL_SECONDS = 30;
+
+    private final DataActor dataActor;
+    private final String miniRuntimeName;
+    private final Kafka kafkaProducer;
+    private final String configUpdateTopicName;
+    private final ScheduledExecutorService scheduler;
+
+    public ConfigUpdatePoller(DataActor dataActor, String miniRuntimeName, Kafka kafkaProducer, String configUpdateTopicName) {
+        this.dataActor = dataActor;
+        this.miniRuntimeName = miniRuntimeName;
+        this.kafkaProducer = kafkaProducer;
+        this.configUpdateTopicName = configUpdateTopicName;
+        this.scheduler = Executors.newSingleThreadScheduledExecutor();
+        loggerMaker.infoAndAddToDb("ConfigUpdatePoller: Initialized with kafka producer for topic: " + configUpdateTopicName);
+    }
+
+    public void start() {
+        loggerMaker.infoAndAddToDb("Starting config update poller for mini-runtime: " + miniRuntimeName);
+
+        scheduler.scheduleWithFixedDelay(() -> {
+            try {
+                Context.accountId.set(Context.getActualAccountId());
+                pollAndPublishConfigUpdates();
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error in config update poller");
+            }
+        }, 0, POLL_INTERVAL_SECONDS, TimeUnit.SECONDS);
+    }
+
+    private void pollAndPublishConfigUpdates() {
+        try {
+            List<ModuleInfo> moduleInfoList = dataActor.fetchAndUpdateModuleForReboot(
+                    ModuleType.TRAFFIC_COLLECTOR,
+                    miniRuntimeName
+            );
+
+            if (moduleInfoList == null || moduleInfoList.isEmpty()) {
+                return;
+            }
+
+            loggerMaker.infoAndAddToDb("Found " + moduleInfoList.size() + " module(s) with config updates for mini-runtime: " + miniRuntimeName);
+
+            // Collect all daemon IDs
+            List<String> daemonIds = new ArrayList<>();
+            for (ModuleInfo moduleInfo : moduleInfoList) {
+                daemonIds.add(moduleInfo.getId());
+            }
+
+            // Extract envVars from additionalData.env of the first module
+            Map<String, String> envVars = new HashMap<>();
+            if (!moduleInfoList.isEmpty() && moduleInfoList.get(0).getAdditionalData() != null) {
+                Map<String, Object> additionalData = moduleInfoList.get(0).getAdditionalData();
+                Object envObj = additionalData.get("env");
+                if (envObj != null) {
+                    String envJson = gson.toJson(envObj);
+                    try {
+                        java.lang.reflect.Type type = new com.google.gson.reflect.TypeToken<Map<String, String>>(){}.getType();
+                        envVars = gson.fromJson(envJson, type);
+                        if (envVars == null) {
+                            envVars = new HashMap<>();
+                        }
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e, "Error parsing env variables from additionalData");
+                        envVars = new HashMap<>();
+                    }
+                }
+            }
+
+            publishConfigUpdate(daemonIds, envVars);
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error polling and publishing config updates");
+        }
+    }
+
+    private void publishConfigUpdate(List<String> daemonIds, Map<String, String> envVars) {
+        try {
+            if (kafkaProducer == null || !kafkaProducer.producerReady) {
+                loggerMaker.infoAndAddToDb("Kafka producer not ready, will retry in next poll cycle");
+                return;
+            }
+
+            Map<String, Object> configUpdate = new HashMap<>();
+            configUpdate.put("daemonIds", daemonIds);
+            configUpdate.put("env", envVars);
+            configUpdate.put("restartRequired", true);
+            configUpdate.put("timestamp", (long) Context.now());
+
+            String message = gson.toJson(configUpdate);
+            kafkaProducer.send(message, configUpdateTopicName);
+
+            loggerMaker.infoAndAddToDb("Published config update for " + daemonIds.size() + " daemon(s) to topic: " + configUpdateTopicName);
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error publishing config update");
+        }
+    }
+
+    public void stop() {
+        loggerMaker.infoAndAddToDb("Stopping config update poller");
+        scheduler.shutdown();
+        try {
+            if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+                scheduler.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            scheduler.shutdownNow();
+        }
+    }
+}
