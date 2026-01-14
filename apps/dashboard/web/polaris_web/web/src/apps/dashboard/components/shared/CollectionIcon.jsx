@@ -1,12 +1,11 @@
 import React from "react";
-import { Icon } from "@shopify/polaris";
+import { Avatar, Icon } from "@shopify/polaris";
 import { AutomationMajor, MagicMajor } from '@shopify/polaris-icons';
 import IconCacheService from "@/services/IconCacheService";
 import MCPIcon from "@/assets/MCP_Icon.svg";
 import LaptopIcon from "@/assets/Laptop.svg";
 import { getDomainForFavicon } from "../../pages/observe/agentic/mcpClientHelper";
 
-export const ICON_STYLE = { width: '20px', height: '20px', borderRadius: '2px' };
 export const sharedIconCacheService = new IconCacheService();
 export { MCPIcon, LaptopIcon };
 
@@ -32,12 +31,12 @@ const CollectionIcon = React.memo(({ hostName, assetTagValue, displayName, tagsL
         return () => { mounted = false; };
     }, [hostName, assetTagValue]);
 
-    if (iconData) return <img src={`data:image/png;base64,${iconData}`} alt={`${displayName} icon`} style={ICON_STYLE} onError={() => setIconData(null)} />;
-    if (faviconUrl) return <img src={faviconUrl} alt={`${displayName} icon`} style={ICON_STYLE} onError={() => setFaviconUrl(null)} />;
+    if (iconData) return <Avatar source={`data:image/png;base64,${iconData}`} shape="square" size="extraSmall" />;
+    if (faviconUrl) return <Avatar source={faviconUrl} shape="square" size="extraSmall" />;
     
     if (tagsList?.some(t => t.name === "gen-ai")) return <Icon source={tagsList.some(t => t.name === "AI Agent") ? AutomationMajor : MagicMajor} color="base" />;
-    if (tagsList?.some(t => t.name === "mcp-server")) return <img src={MCPIcon} alt="MCP" style={ICON_STYLE} />;
-    return <img src={displayName?.toLowerCase().startsWith('mcp') ? MCPIcon : LaptopIcon} alt="icon" style={ICON_STYLE} />;
+    if (tagsList?.some(t => t.name === "mcp-server")) return <Avatar source={MCPIcon} shape="square" size="extraSmall" />;
+    return <Avatar source={displayName?.toLowerCase().startsWith('mcp') ? MCPIcon : LaptopIcon} shape="square" size="extraSmall" />;
 });
 
 export { CollectionIcon };
