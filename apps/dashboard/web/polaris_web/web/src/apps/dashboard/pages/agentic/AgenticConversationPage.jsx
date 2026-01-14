@@ -229,13 +229,11 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                             <img src="/public/history.svg" alt="History" style={{ width: '20px', height: '20px' }} />
                         </Button>
                     </HorizontalStack>
-                    <Box
-                        paddingBlockStart="16"
-                        paddingBlockEnd="19"
-                        paddingInlineStart="27"
-                        style={{ flex: 1, overflow: 'auto' }}
-                    >
-                        <VerticalStack gap="4" align="start">
+                    <Box style={{ flex: 1, overflow: 'hidden', display: 'flex', justifyContent: 'center' }}>
+                        <Box width="900px" maxWidth="100%" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                            <Box paddingInline="6" style={{ flex: 1, overflowY: 'auto', paddingBottom: '120px' }}>
+                                <Box paddingBlockStart="16" paddingBlockEnd="19">
+                                    <VerticalStack gap="4" align="start">
                             {messages.map((message, index) => (
                                 message.role === 'user' ? (
                                     <AgenticUserMessage key={message._id || index} content={message.message} />
@@ -270,7 +268,10 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                                     timeTaken={currentTimeTaken}
                                 />
                             )} */}
-                        </VerticalStack>
+                                    </VerticalStack>
+                                </Box>
+                            </Box>
+                        </Box>
                     </Box>
                 </VerticalStack>
 
