@@ -8,10 +8,13 @@ export const sendQuery = async (query, conversationId, conversationType) => {
     })
 };
 
-export const clearConversationFromLocal = (conversationId) => {
+export const clearConversationFromLocal = async (conversationId) => {
     try {
-        const key = `agentic_conversation_${conversationId}`;
-        localStorage.removeItem(key);
+        await request({
+            url: '/api/deleteConversationHistory',
+            method: 'post',
+            data: {conversationId}
+        })
     } catch (error) {
         console.error('Error clearing conversation from localStorage:', error);
     }
