@@ -148,6 +148,20 @@ public class McpAgentAction extends UserAction {
         }
     }
 
+    public String deleteConversationHistory() {
+        if(conversationId == null || conversationId.isEmpty()) {
+            addActionError("Conversation ID is required");
+            return ERROR.toUpperCase();
+        }
+        try {
+            AgentConversationDao.instance.deleteAll(Filters.eq("conversationId", conversationId));
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.error("Error deleting conversation history", e);            addActionError("Failed to delete conversation history: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+    }
+
     public String getMessage() { return message; }
     public void setMessage(String message) { this.message = message; }
     public String getConversationId() { return conversationId; }

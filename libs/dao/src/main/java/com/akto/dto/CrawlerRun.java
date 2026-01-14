@@ -3,6 +3,8 @@ package com.akto.dto;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.Map;
+
 @Getter
 @Setter
 public class CrawlerRun {
@@ -57,6 +59,9 @@ public class CrawlerRun {
 
     public static final String CRAWLING_TIME = "crawlingTime";
     private Integer crawlingTime;
+
+    public static final String CUSTOM_HEADERS = "customHeaders";
+    private Map<String, String> customHeaders;
 
     public CrawlerRun() {
     }

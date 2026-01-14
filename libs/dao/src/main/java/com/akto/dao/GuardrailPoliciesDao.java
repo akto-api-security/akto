@@ -6,6 +6,7 @@ import com.akto.dao.context.Context;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import org.bson.conversions.Bson;
 
 import java.util.List;
@@ -60,15 +61,17 @@ public class GuardrailPoliciesDao extends AccountsContextDao<GuardrailPolicies> 
         return instance.findAll(filter, skip, limit, sort);
     }
 
+    public List<GuardrailPolicies> fetchAllGuardrailPoliciesName() {
+        Bson filter = getContextSourceFilter();
+        return instance.findAll(filter, Projections.include("name"));
+    }
+
     public long getTotalCount() {
         Bson filter = getContextSourceFilter();
         return this.getMCollection().countDocuments(filter);
     }
 
     private Bson getContextSourceFilter() {
-        if (!UsersCollectionsList.isDemoAccount()) {
-            return Filters.empty();
-        }
         CONTEXT_SOURCE contextSource = Context.contextSource.get();
 
         if (contextSource == null || contextSource == CONTEXT_SOURCE.AGENTIC) {
