@@ -715,7 +715,77 @@ public class TagMismatchCronTest extends MongoBasedTest {
     }
 
     /**
-     * Test 21: Integration test - collections with matching hostnames should not get tags
+     * Test 21: Tag Removal on Reevaluation - collections that previously had mismatches
+     * but no longer do should have tags-mismatch removed
+     */
+    @Test
+    public void testEvaluateTagsMismatch_RemovesTagsWhenResolved() throws Exception {
+        // Setup: Create 3 ApiCollections with existing tags-mismatch tags
+        List<ApiCollection> collections = Arrays.asList(
+            TagMismatchDataMother.createApiCollectionWithOldMismatchTag(100, "Collection 1"),
+            TagMismatchDataMother.createApiCollectionWithOldMismatchTag(200, "Collection 2"),
+            TagMismatchDataMother.createApiCollectionWithOldMismatchTag(300, "Collection 3")
+        );
+        TagMismatchDataMother.insertApiCollections(collections);
+
+        // Verify all 3 collections have tags-mismatch tag initially
+        for (int collectionId : Arrays.asList(100, 200, 300)) {
+            List<CollectionTags> tags = TagMismatchDataMother.getApiCollectionTags(collectionId);
+            assertNotNull("Collection " + collectionId + " should initially have tags-mismatch tag",
+                TagMismatchDataMother.findTagByKeyName(tags, "tags-mismatch"));
+        }
+
+        // Create SampleData:
+        // Collection 100: Still has mismatch (tag should remain)
+        // Collection 200: No longer has mismatch (tag should be removed)
+        // Collection 300: No longer has mismatch (tag should be removed)
+        List<SampleData> sampleDataList = new ArrayList<>();
+
+        // Collection 100: with mismatch
+        sampleDataList.add(TagMismatchDataMother.createSampleDataWithAllMismatchSamples(
+            100, "GET", "https://server.akto.io/api/test100", 3
+        ));
+
+        // Collection 200: without mismatch
+        sampleDataList.add(TagMismatchDataMother.createSampleDataWithNoMismatchSamples(
+            200, "GET", "https://server.akto.io/api/test200", 3
+        ));
+
+        // Collection 300: without mismatch
+        sampleDataList.add(TagMismatchDataMother.createSampleDataWithNoMismatchSamples(
+            300, "GET", "https://server.akto.io/api/test300", 3
+        ));
+
+        TagMismatchDataMother.insertSampleDataBatch(sampleDataList);
+
+        // Execute cron
+        java.lang.reflect.Method method = TagMismatchCron.class.getDeclaredMethod("evaluateTagsMismatch", int.class);
+        method.setAccessible(true);
+        method.invoke(tagMismatchCron, TEST_ACCOUNT_ID);
+
+        // Verify results:
+        // Collection 100: Should still have tag (still has mismatch)
+        List<CollectionTags> tags100 = TagMismatchDataMother.getApiCollectionTags(100);
+        assertNotNull("Collection 100 should still have tags-mismatch tag (still has mismatch)",
+            TagMismatchDataMother.findTagByKeyName(tags100, "tags-mismatch"));
+
+        // Collection 200: Should NOT have tag (mismatch resolved)
+        List<CollectionTags> tags200 = TagMismatchDataMother.getApiCollectionTags(200);
+        if (tags200 != null) {
+            assertNull("Collection 200 should NOT have tags-mismatch tag (mismatch resolved)",
+                TagMismatchDataMother.findTagByKeyName(tags200, "tags-mismatch"));
+        }
+
+        // Collection 300: Should NOT have tag (mismatch resolved)
+        List<CollectionTags> tags300 = TagMismatchDataMother.getApiCollectionTags(300);
+        if (tags300 != null) {
+            assertNull("Collection 300 should NOT have tags-mismatch tag (mismatch resolved)",
+                TagMismatchDataMother.findTagByKeyName(tags300, "tags-mismatch"));
+        }
+    }
+
+    /**
+     * Test 22: Integration test - collections with matching hostnames should not get tags
      */
     @Test
     public void testEvaluateTagsMismatch_WithHostnameFiltering() throws Exception {

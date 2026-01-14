@@ -292,6 +292,50 @@ public class TagMismatchCron {
     }
 
     /**
+     * Removes tags-mismatch tags from collections that no longer have mismatches.
+     *
+     * @param allCollectionsSeen All collection IDs that were evaluated in this cron run
+     * @param collectionsWithMismatches Collection IDs that currently have mismatches
+     */
+    private void removeTagsFromResolvedCollections(Set<Integer> allCollectionsSeen, Set<Integer> collectionsWithMismatches) {
+        try {
+            // Find collections that were evaluated but don't have mismatches
+            Set<Integer> collectionsToCleanup = new HashSet<>(allCollectionsSeen);
+            collectionsToCleanup.removeAll(collectionsWithMismatches);
+
+            if (collectionsToCleanup.isEmpty()) {
+                loggerMaker.infoAndAddToDb("No collections need tags-mismatch tag removal");
+                return;
+            }
+
+            // Build bulk operations to REMOVE tags-mismatch from these collections
+            List<WriteModel<com.akto.dto.ApiCollection>> pullOperations = new ArrayList<>();
+            for (Integer collectionId : collectionsToCleanup) {
+                Bson filter = Filters.eq("_id", collectionId);
+                Bson pullUpdate = Updates.pull(
+                    com.akto.dto.ApiCollection.TAGS_STRING,
+                    Filters.eq(CollectionTags.KEY_NAME, "tags-mismatch")
+                );
+                pullOperations.add(new UpdateOneModel<>(filter, pullUpdate));
+            }
+
+            // Execute bulk write to remove tags
+            if (!pullOperations.isEmpty()) {
+                ApiCollectionsDao.instance.getMCollection().bulkWrite(pullOperations);
+                loggerMaker.infoAndAddToDb(
+                    String.format("Removed tags-mismatch tag from %d API collections that no longer have mismatches",
+                        collectionsToCleanup.size())
+                );
+            }
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(
+                String.format("Error in removeTagsFromResolvedCollections: %s", e.toString())
+            );
+        }
+    }
+
+    /**
      * Process all SampleData documents for the given account and evaluate tags mismatch.
      * Uses cursor-based pagination with batch size of 1000.
      */
@@ -308,6 +352,10 @@ public class TagMismatchCron {
             int batchSize = 1000;
             int totalProcessed = 0;
             int mismatchCount = 0;
+
+            // Track all collections seen and those with mismatches
+            Set<Integer> allCollectionsSeen = new HashSet<>();
+            Set<Integer> collectionsWithMismatches = new HashSet<>();
 
             // Cursor pagination state
             Integer lastApiCollectionId = null;
@@ -368,12 +416,16 @@ public class TagMismatchCron {
                 for (SampleData sampleData : batch) {
                     totalProcessed++;
 
+                    int collectionId = sampleData.getId().getApiCollectionId();
+                    allCollectionsSeen.add(collectionId);
+
                     List<String> samples = sampleData.getSamples();
                     if (samples != null && !samples.isEmpty()) {
                         boolean mismatch = isTagsMismatch(samples);
                         if (mismatch) {
                             mismatchCount++;
                             mismatchedSamples.add(sampleData);
+                            collectionsWithMismatches.add(collectionId);
                             Key id = sampleData.getId();
                             loggerMaker.infoAndAddToDb(
                                 String.format("Tags mismatch detected - apiCollectionId: %d, method: %s, url: %sd",
@@ -400,6 +452,9 @@ public class TagMismatchCron {
                         totalProcessed, mismatchCount, batchDuration)
                 );
             }
+
+            // Remove tags from collections that no longer have mismatches
+            removeTagsFromResolvedCollections(allCollectionsSeen, collectionsWithMismatches);
 
             long cronDuration = System.currentTimeMillis() - cronStartTime;
             loggerMaker.infoAndAddToDb(

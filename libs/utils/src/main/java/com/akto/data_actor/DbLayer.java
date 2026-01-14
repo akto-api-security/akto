@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -264,6 +265,40 @@ public class DbLayer {
 
         return moduleInfoList != null ? moduleInfoList : new ArrayList<>();
     }
+    
+    public static ModuleInfo updateModuleInfoForHeartbeatV2(ModuleInfo moduleInfo) {
+        try {
+            // Clean up expired heartbeats (older than 6 minutes)
+            int sixMinutesAgo = (int) (System.currentTimeMillis() / 1000) - 360;
+            ModuleInfoDao.instance.getMCollection().deleteMany(
+                Filters.lt(ModuleInfo.LAST_HEARTBEAT_RECEIVED, sixMinutesAgo)
+            );
+        } catch (Exception e) {
+            System.err.println("Failed to clean up expired heartbeats: " + e.getMessage());
+        }
+
+        FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
+        updateOptions.upsert(true);
+        updateOptions.returnDocument(ReturnDocument.AFTER);
+
+        Bson filter = Filters.and(
+            Filters.eq(ModuleInfo.NAME, moduleInfo.getName()),
+            Filters.eq(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType())
+        );
+
+        return ModuleInfoDao.instance.getMCollection().findOneAndUpdate(filter,
+                Updates.combine(
+                        //putting class name because findOneAndUpdate doesn't put class name by default
+                        Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
+                        Updates.setOnInsert(ID, moduleInfo.getId()),
+                        Updates.set(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType()),
+                        Updates.set(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
+                        Updates.set(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
+                        Updates.set(ModuleInfo.NAME, moduleInfo.getName()),
+                        Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
+                        Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived())
+                ), updateOptions);
+    }
 
     public static void updateCidrList(List<String> cidrList) {
         AccountSettingsDao.instance.getMCollection().updateOne(
@@ -283,6 +318,61 @@ public class DbLayer {
 
     public static List<ApiInfo> fetchApiInfos() {
         return ApiInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(ApiInfo.RATELIMITS));
+    }
+
+    /**
+     * Fetch all API IDs (lightweight projection) for Bloom filter initialization.
+     * Returns only apiCollectionId, url, and method fields.
+     */
+    public static List<Map<String, Object>> fetchAllApiInfoKeys() {
+        com.mongodb.client.FindIterable<ApiInfo> cursor = ApiInfoDao.instance
+            .getMCollection()
+            .find()
+            .projection(Projections.include("_id"))
+            .batchSize(10000);
+
+        List<Map<String, Object>> apiIdsList = new ArrayList<>();
+        for (ApiInfo apiInfo : cursor) {
+            if (apiInfo != null && apiInfo.getId() != null) {
+                ApiInfo.ApiInfoKey key = apiInfo.getId();
+                Map<String, Object> apiId = new HashMap<>();
+                apiId.put("apiCollectionId", key.getApiCollectionId());
+                apiId.put("url", key.getUrl());
+                apiId.put("method", key.getMethod().name());
+                apiIdsList.add(apiId);
+            }
+        }
+        return apiIdsList;
+    }
+
+    /**
+     * Fetch all sample data keys (lightweight projection) for Bloom filter initialization.
+     * Returns only _id fields: apiCollectionId, url, method, responseCode, isHeader, ts.
+     * Limited to 10,000 records.
+     */
+    public static List<Map<String, Object>> fetchAllSampleDataKeysAsMaps() {
+        com.mongodb.client.FindIterable<SampleData> cursor = SampleDataDao.instance
+            .getMCollection()
+            .find()
+            .projection(Projections.include("_id"))
+            .limit(10000)
+            .batchSize(10000);
+
+        List<Map<String, Object>> keysList = new ArrayList<>();
+        for (SampleData sampleData : cursor) {
+            if (sampleData != null && sampleData.getId() != null) {
+                com.akto.dto.traffic.Key keyObj = sampleData.getId();
+                Map<String, Object> key = new HashMap<>();
+                key.put("apiCollectionId", keyObj.getApiCollectionId());
+                key.put("url", keyObj.getUrl());
+                key.put("method", keyObj.getMethod().name());
+                key.put("responseCode", keyObj.getResponseCode());
+                key.put("isHeader", keyObj.getBucketStartEpoch());
+                key.put("ts", keyObj.getBucketEndEpoch());
+                keysList.add(key);
+            }
+        }
+        return keysList;
     }
 
     public static List<ApiInfo> fetchApiRateLimits(ApiInfo.ApiInfoKey lastApiInfoKey) {
@@ -814,6 +904,7 @@ public class DbLayer {
 
         Bson updates = Updates.combine(
             Updates.setOnInsert("_id", id),
+            Updates.setOnInsert(ApiCollection.HOST_NAME, host),
             Updates.setOnInsert("startTs", Context.now()),
             Updates.setOnInsert("urls", new HashSet<>())
         );

@@ -1,6 +1,7 @@
 package com.akto.utils;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -69,17 +70,38 @@ public class KafkaUtils {
     public static void main(String[] args) throws Exception {
         try {
             KafkaUtils kafkaUtils = new KafkaUtils();
-            if (kafkaUtils.isReadEnabled()) {
-                kafkaUtils.initKafkaConsumer();
-            }
 
+            // Start Kafka producer if write enabled
             if (kafkaUtils.isWriteEnabled()) {
                 kafkaUtils.initKafkaProducer();
             }
+
+            // Start fast-discovery consumer if enabled
+            if (kafkaUtils.isFastDiscoveryEnabled()) {
+                String brokerUrl = getBrokerUrl();
+                String topicName = getFastDiscoveryTopicName();
+                String groupId = "fast-discovery-consumer";
+                int maxPollRecords = Integer.parseInt(getCachedEnv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
+
+                com.akto.FastDiscoveryKafkaConsumer fastDiscoveryConsumer =
+                    new com.akto.FastDiscoveryKafkaConsumer(
+                        brokerUrl,
+                        topicName,
+                        groupId,
+                        maxPollRecords
+                    );
+                fastDiscoveryConsumer.start();
+                loggerMaker.infoAndAddToDb("Fast-discovery consumer started on topic: " + topicName, LogDb.DB_ABS);
+            }
+
+            // Start main consumer if read enabled (this blocks)
+            if (kafkaUtils.isReadEnabled()) {
+                kafkaUtils.initKafkaConsumer();
+            }
         } catch (Exception e) {
-            // TODO: handle exception
+            loggerMaker.errorAndAddToDb(e, "Error in main: " + e.toString(), LogDb.DB_ABS);
         }
-        
+
     }
 
     public static String getReadTopicName() {
@@ -174,7 +196,7 @@ public class KafkaUtils {
     }
 
 
-    private static void parseAndTriggerWrites(String message) throws Exception {
+    public static void parseAndTriggerWrites(String message) throws Exception {
         DbAction dbAction = new DbAction();
         Map<String, Object> json = gson.fromJson(message, Map.class);
         String triggerMethod = (String) json.get("triggerMethod");
@@ -196,7 +218,7 @@ public class KafkaUtils {
                 dbAction.setWritesForSti(bulkWrites);
                 dbAction.bulkWriteSti();
                 break;
-            
+
             case "bulkWriteSampleData":
                 dbAction.setWritesForSampleData(bulkWrites);
                 dbAction.bulkWriteSampleData();
@@ -206,7 +228,7 @@ public class KafkaUtils {
                 dbAction.setWritesForSensitiveSampleData(bulkWrites);
                 dbAction.bulkWriteSensitiveSampleData();
                 break;
-                
+
             case "bulkWriteSensitiveParamInfo":
                 dbAction.setWritesForSensitiveParamInfo(bulkWrites);
                 dbAction.bulkWriteSensitiveParamInfo();
@@ -216,11 +238,12 @@ public class KafkaUtils {
                 dbAction.setWritesForTrafficInfo(bulkWrites);
                 dbAction.bulkWriteTrafficInfo();
                 break;
-            
+
             case "bulkWriteTrafficMetrics":
                 dbAction.setWritesForTrafficMetrics(bulkWrites);
                 dbAction.bulkWriteTrafficMetrics();
                 break;
+
             case "bulkWriteTestingRunIssues":
                 dbAction.setWritesForTestingRunIssues(bulkWrites);
                 dbAction.bulkWriteTestingRunIssues();
@@ -231,9 +254,65 @@ public class KafkaUtils {
                 dbAction.bulkWriteSuspectSampleData();
                 break;
 
+            case "bulkWriteApiInfo":
+                // Convert BulkUpdates to BasicDBObject list for api_info
+                List<BasicDBObject> apiInfoList = convertToApiInfoList(bulkWrites);
+                dbAction.setApiInfoList(apiInfoList);
+                dbAction.bulkWriteApiInfo();
+                break;
+
             default:
                 break;
         }
+    }
+
+    /**
+     * Convert BulkUpdates to BasicDBObject list for api_info writes.
+     * Extracts the _id filters and applies updates to build complete API info objects.
+     */
+    private static List<BasicDBObject> convertToApiInfoList(List<BulkUpdates> bulkWrites) {
+        List<BasicDBObject> apiInfoList = new ArrayList<>();
+
+        for (BulkUpdates write : bulkWrites) {
+            BasicDBObject apiInfo = new BasicDBObject();
+            Map<String, Object> filters = write.getFilters();
+
+            // Extract _id
+            if (filters.containsKey("_id")) {
+                apiInfo.put("id", filters.get("_id"));
+            }
+
+            // Apply updates to create complete ApiInfo object
+            for (String updateStr : write.getUpdates()) {
+                try {
+                    Map<String, Object> update = gson.fromJson(updateStr, Map.class);
+                    String field = (String) update.get("field");
+                    Object value = update.get("val");
+                    if (field != null && value != null) {
+                        // Convert numeric fields from Double to Integer if needed
+                        if ((field.equals("discoveredTimestamp") || field.equals("lastSeen")) && value instanceof Number) {
+                            value = ((Number) value).intValue();
+                        }
+                        // Convert collection IDs from List<Double> to List<Integer>
+                        if (field.equals("collectionIds") && value instanceof List) {
+                            List<Number> numList = (List<Number>) value;
+                            List<Integer> intList = new ArrayList<>();
+                            for (Number num : numList) {
+                                intList.add(num.intValue());
+                            }
+                            value = intList;
+                        }
+                        apiInfo.put(field, value);
+                    }
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Failed to parse update: " + updateStr);
+                }
+            }
+
+            apiInfoList.add(apiInfo);
+        }
+
+        return apiInfoList;
     }
 
     public static Properties configProperties(String kafkaBrokerUrl, String groupIdConfig, int maxPollRecordsConfig) {
@@ -263,6 +342,90 @@ public class KafkaUtils {
             return false;
         }
         return writeEnabled.equalsIgnoreCase("true");
+    }
+
+    /**
+     * Check if fast-discovery Kafka topic is enabled.
+     * Used by FastDiscoveryKafkaConsumer to determine if it should start.
+     */
+    public boolean isFastDiscoveryEnabled() {
+        String fastDiscoveryEnabled = getCachedEnv("FAST_DISCOVERY_KAFKA_ENABLED");
+        if (fastDiscoveryEnabled == null) {
+            return false;  // Disabled by default
+        }
+        return fastDiscoveryEnabled.equalsIgnoreCase("true");
+    }
+
+    /**
+     * Get the fast-discovery Kafka topic name.
+     * Default: akto.fast-discovery.writes
+     */
+    public static String getFastDiscoveryTopicName() {
+        String topicName = getCachedEnv("FAST_DISCOVERY_KAFKA_TOPIC_NAME");
+        if (topicName == null || topicName.isEmpty()) {
+            return "akto.fast-discovery.writes";  // Default topic name
+        }
+        return topicName;
+    }
+
+    /**
+     * Get broker URL for Kafka connections.
+     */
+    public static String getBrokerUrl() {
+        String kafkaBrokerUrl = getCachedEnv("AKTO_KAFKA_BROKER_URL");
+        String isKubernetes = getCachedEnv("IS_KUBERNETES");
+        if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
+            return "127.0.0.1:29092";
+        }
+        return kafkaBrokerUrl != null ? kafkaBrokerUrl : "localhost:9092";
+    }
+
+    /**
+     * Insert data to fast-discovery Kafka topic.
+     * Used by fastDiscoveryBulkWriteSti and fastDiscoveryBulkWriteApiInfo endpoints.
+     */
+    public void insertFastDiscoveryData(Object data, String triggerMethod, int accountId) {
+        try {
+            String topicName = getFastDiscoveryTopicName();
+            String payloadStr = gson.toJson(data);
+            BasicDBObject obj = new BasicDBObject();
+            obj.put("triggerMethod", triggerMethod);
+            obj.put("payload", payloadStr);
+            obj.put("accountId", accountId);
+            obj.put("source", "fast-discovery");  // Mark source for identification
+
+            kafkaProducer.send(obj.toString(), topicName);
+            loggerMaker.infoAndAddToDb("Sent fast-discovery data to topic: " + topicName, LogDb.DB_ABS);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertFastDiscoveryData: " + e.toString(), LogDb.DB_ABS);
+        }
+    }
+
+    /**
+     * Start FastDiscoveryKafkaConsumer in a background thread.
+     * Called from InitializerListener.contextInitialized() when web app starts.
+     * This runs independently from the main Kafka consumer.
+     */
+    public void startFastDiscoveryConsumer() {
+        try {
+            String brokerUrl = getBrokerUrl();
+            String topicName = getFastDiscoveryTopicName();
+            String groupId = "fast-discovery-consumer";
+            int maxPollRecords = Integer.parseInt(getCachedEnv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
+
+            loggerMaker.infoAndAddToDb("Starting FastDiscoveryKafkaConsumer in background thread...", LogDb.DB_ABS);
+
+            // Create and start consumer in background thread
+            com.akto.FastDiscoveryKafkaConsumer fastDiscoveryConsumer =
+                new com.akto.FastDiscoveryKafkaConsumer(
+                    brokerUrl, topicName, groupId, maxPollRecords
+                );
+
+            fastDiscoveryConsumer.start();  // Spawns daemon thread
+            loggerMaker.infoAndAddToDb("Fast-discovery consumer started on topic: " + topicName, LogDb.DB_ABS);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error starting FastDiscoveryKafkaConsumer: " + e.toString(), LogDb.DB_ABS);
+        }
     }
 
 
