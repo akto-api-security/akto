@@ -9,13 +9,8 @@ import AgenticSuggestionsList from './components/AgenticSuggestionsList';
 import AgenticSearchInput from './components/AgenticSearchInput';
 import AgenticHistoryModal from './components/AgenticHistoryModal';
 import './AgenticConversationPage.css';
-import {
-    sendQuery,
-    streamThinkingItems,
-    streamResponse,
-    getSuggestions,
-    saveConversationToLocal
-} from './services/agenticService';
+import { sendQuery } from './services/agenticService';
+import func from '@/util/func';
 
 function AgenticConversationPage({ initialQuery, existingConversationId, onBack, existingMessages = [] }) {
     // Conversation state
@@ -27,12 +22,6 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
     const [isStreaming, setIsStreaming] = useState(false);
     const [followUpValue, setFollowUpValue] = useState('');
     const [showHistoryModal, setShowHistoryModal] = useState(false);
-
-    // Current response state
-    const [streamedThinkingItems, setStreamedThinkingItems] = useState([]);
-    const [streamedContent, setStreamedContent] = useState('');
-    const [currentTimeTaken, setCurrentTimeTaken] = useState(null);
-    const [currentSuggestions, setCurrentSuggestions] = useState([]);
 
     // Error state
     const [error, setError] = useState(null);
@@ -66,15 +55,16 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
 
                 // Add initial user message
                 const userMessage = {
-                    id: 'e',
-                    type: 'user',
+                    id: 'conversation_user',
+                    role: 'user',
                     content: initialQuery,
-                    timestamp: new Date().toISOString()
+                    timestamp: func.timeNow()
                 };
                 setMessages([userMessage]);
 
                 // Process the initial query
-                // await processQuery(newConversationId, query);
+                const currentQuery = followUpValue && followUpValue.length > 0 ? followUpValue : initialQuery;
+                await processQuery(currentQuery);
             } catch (err) {
                 setError('Failed to initialize conversation');
                 console.error(err);
@@ -84,12 +74,6 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
         initializeConversation();
     }, [initialQuery, existingConversationId]);
 
-    // Save conversation to localStorage whenever messages change
-    useEffect(() => {
-        if (conversationId && messages.length > 0) {
-            saveConversationToLocal(conversationId, messages);
-        }
-    }, [conversationId, messages]);
 
     // Auto-focus input on keypress
     useEffect(() => {
@@ -116,86 +100,17 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
     }, []);
 
     // Process a query and handle streaming
-    const processQuery = async (convId, query) => {
+    const processQuery = async (query, convId) => {
         try {
-            setError(null);
             setIsLoading(true);
-            setStreamedThinkingItems([]);
-            setStreamedContent('');
-            setCurrentTimeTaken(null);
-            setCurrentSuggestions([]);
 
-            // Send query to backend
-            await sendQuery(convId, query);
+            let res =await sendQuery(convId, query);
+            if(res && res.conversationId) {
+                setConversationId(res.conversationId);
+            }
+            
+            setIsLoading(false);
 
-            const startTime = Date.now();
-
-            // Stream thinking items
-            await streamThinkingItems(
-                convId,
-                (thinkingItem) => {
-                    setStreamedThinkingItems(prev => [...prev, thinkingItem]);
-                },
-                () => {
-                    // Thinking complete - but keep loading true until response starts
-                },
-                (err) => {
-                    console.error('Error streaming thinking items:', err);
-                    setError('Failed to process thinking');
-                    setIsLoading(false);
-                }
-            );
-
-            // Stream response content
-            setIsStreaming(true);
-            let isFirstChunk = true;
-            let fullResponseContent = '';
-
-            await streamResponse(
-                convId,
-                (chunk) => {
-                    // On first chunk, stop loading and calculate time
-                    if (isFirstChunk) {
-                        isFirstChunk = false;
-                        setIsLoading(false);
-                        const duration = Math.round((Date.now() - startTime) / 1000);
-                        setCurrentTimeTaken(duration);
-                    }
-
-                    // Handle streaming markdown chunk
-                    if (chunk.type === 'markdown') {
-                        setStreamedContent(prev => prev + chunk.content);
-                        fullResponseContent += chunk.content;
-                    }
-                },
-                async (responseData) => {
-                    // Get suggestions
-                    const suggestions = await getSuggestions(convId);
-                    setCurrentSuggestions(suggestions);
-
-                    // Stop streaming FIRST to prevent double display
-                    setIsStreaming(false);
-
-                    // Then add complete assistant message to history
-                    const assistantMessage = {
-                        id: 'a',
-                        type: 'assistant',
-                        thinkingItems: streamedThinkingItems,
-                        content: fullResponseContent, // Changed from 'response' to 'content'
-                        suggestions: suggestions,
-                        timeTaken: responseData.timeTaken || currentTimeTaken,
-                        timestamp: responseData.timestamp,
-                        isComplete: true
-                    };
-
-                    setMessages(prev => [...prev, assistantMessage]);
-                },
-                (err) => {
-                    console.error('Error streaming response:', err);
-                    setError('Failed to get response');
-                    setIsStreaming(false);
-                }
-            );
         } catch (err) {
             console.error('Error processing query:', err);
             setError('Failed to process your request');
@@ -281,16 +196,16 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
 
                             {/* Loading state */}
                             {isLoading && (
-                                <AgenticThinkingBox thinkingItems={streamedThinkingItems} />
+                                <AgenticThinkingBox thinkingItems={[]} />
                             )}
 
                             {/* Streaming response */}
-                            {isStreaming && streamedContent && (
+                            {/* {isStreaming && streamedContent && (
                                 <AgenticResponseContent
                                     content={streamedContent}
                                     timeTaken={currentTimeTaken}
                                 />
-                            )}
+                            )} */}
                         </VerticalStack>
                     </Box>
                 </VerticalStack>
