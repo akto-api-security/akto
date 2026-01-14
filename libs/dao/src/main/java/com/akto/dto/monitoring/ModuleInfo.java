@@ -21,6 +21,8 @@ public class ModuleInfo {
     private String name;
     public static final String ADDITIONAL_DATA = "additionalData";
     private Map<String, Object> additionalData;
+    public static final String MINI_RUNTIME_NAME = "miniRuntimeName";
+    private String miniRuntimeName;
 
     @Getter @Setter
     private boolean reboot;
@@ -87,6 +89,14 @@ public class ModuleInfo {
 
     public void setAdditionalData(Map<String, Object> additionalData) {
         this.additionalData = additionalData;
+    }
+
+    public String getMiniRuntimeName() {
+        return miniRuntimeName;
+    }
+
+    public void setMiniRuntimeName(String miniRuntimeName) {
+        this.miniRuntimeName = miniRuntimeName;
     }
 
     public enum ModuleType {

@@ -223,6 +223,7 @@ public class DbLayer {
                     Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
                     Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()),
                     Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
+                    Updates.set(ModuleInfo.MINI_RUNTIME_NAME, moduleInfo.getMiniRuntimeName()),
                     Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()),
                     Updates.set(ModuleInfo._REBOOT, moduleInfo.isReboot()),
                     Updates.set(ModuleInfo.DELETE_TOPIC_AND_REBOOT, moduleInfo.isDeleteTopicAndReboot())
@@ -231,6 +232,37 @@ public class DbLayer {
         }
 
         ModuleInfoDao.instance.getMCollection().bulkWrite(bulkUpdates);
+    }
+
+
+    public static List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName) {
+        List<Bson> filters = new ArrayList<>();
+        filters.add(Filters.eq(ModuleInfo._REBOOT, true));
+
+        if (moduleType != null) {
+            filters.add(Filters.eq(ModuleInfo.MODULE_TYPE, moduleType.name()));
+        }
+
+        if (miniRuntimeName != null && !miniRuntimeName.isEmpty()) {
+            filters.add(Filters.eq(ModuleInfo.MINI_RUNTIME_NAME, miniRuntimeName));
+        }
+
+        Bson filter = Filters.and(filters);
+
+        List<ModuleInfo> moduleInfoList = ModuleInfoDao.instance.findAll(filter);
+
+        if (moduleInfoList != null && !moduleInfoList.isEmpty()) {
+            List<String> ids = new ArrayList<>();
+            for (ModuleInfo moduleInfo : moduleInfoList) {
+                ids.add(moduleInfo.getId());
+            }
+
+            Bson updateFilter = Filters.in("_id", ids);
+            Bson updates = Updates.set(ModuleInfo._REBOOT, false);
+            ModuleInfoDao.instance.updateMany(updateFilter, updates);
+        }
+
+        return moduleInfoList != null ? moduleInfoList : new ArrayList<>();
     }
 
     public static void updateCidrList(List<String> cidrList) {
