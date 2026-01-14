@@ -71,3 +71,9 @@
 .right-card .Polaris-Scrollable{
     overflow-x: hidden;
 }
+
+.endpoint-shield-card-wrapper {
+    padding: 1px;
+    background: linear-gradient(135deg, #6200EA 0%, #B37DFF 100%);
+    border-radius: 8px;
+}

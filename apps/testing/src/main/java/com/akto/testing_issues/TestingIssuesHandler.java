@@ -69,10 +69,21 @@ public class TestingIssuesHandler {
                 updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED);
             }
 
+            // Check if severity was manually updated by a user
+            // If lastUpdatedBy is set and not null, it means a user manually changed the severity
+            // In that case, preserve the user's preference and don't overwrite it
+            boolean wasManuallySeverityUpdated = testingRunIssues.getLastUpdatedBy() != null &&
+                                                  !testingRunIssues.getLastUpdatedBy().isEmpty();
+
             // name = cateogry
             String subCategory = runResult.getTestSubType();
 
-            if (subCategory.startsWith("http")) {//TestSourceConfig case
+            if (wasManuallySeverityUpdated) {
+                // Preserve user's manual severity change
+                updateSeverityField = new BsonDocument();
+                loggerMaker.debugAndAddToDb(String.format("Preserving manual severity update for issue %s (last updated by: %s)",
+                    issuesId, testingRunIssues.getLastUpdatedBy()), LogDb.TESTING);
+            } else if (subCategory.startsWith("http")) {//TestSourceConfig case
                 TestSourceConfig config = TestSourceConfigsDao.instance.getTestSourceConfig(runResult.getTestSubType());
                 updateSeverityField = Updates.set(TestingRunIssues.KEY_SEVERITY, config.getSeverity());
             } else {//TestSubCategory case

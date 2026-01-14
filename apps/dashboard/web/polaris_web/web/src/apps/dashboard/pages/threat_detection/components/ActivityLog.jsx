@@ -14,6 +14,8 @@ import {useState} from 'react';
 import GetPrettifyEndpoint from '../../observe/GetPrettifyEndpoint';
 import PersistStore from "../../../../main/PersistStore";
 import { labelMap } from '../../../../main/labelHelperMap';
+import { isAgenticSecurityCategory, isEndpointSecurityCategory } from '../../../../main/labelHelper';
+import { extractRuleViolated } from '../utils/formatUtils';
   
  export const ActivityLog = ({ activityLog, actorDetails }) => {
     const [itemStrings, setItemStrings] = useState([
@@ -71,45 +73,58 @@ import { labelMap } from '../../../../main/labelHelperMap';
   
     const rowMarkup = data.map(
       (
-        {detectedAt, subCategory, url, severity, method, host},
+        {detectedAt, subCategory, url, severity, method, host, metadata},
         index,
-      ) => (
-        <IndexTable.Row
-          onClick={() => handleRowClick(url)}
-          id={`${detectedAt}-${index}`}
-          key={`${detectedAt}-${url}-${index}-${severity}`}
-          position={index}
-        >
-          <IndexTable.Cell>
-            <Text variant="bodyMd" fontWeight="bold" as="span">
-              {detectedAt ? dayjs(detectedAt*1000).format('hh:mm A') : "-"}
-            </Text>
-          </IndexTable.Cell>
-          <IndexTable.Cell>
-            <Text variant="bodyMd" fontWeight="medium" as="span">
-              {subCategory || "-"}
-            </Text>
-          </IndexTable.Cell>
-          <IndexTable.Cell>
-            {severity ? (<div key={severity} className={`badge-wrapper-${severity.toUpperCase()}`}>
-              <Badge status={func.getHexColorForSeverity(severity)}>{func.toSentenceCase(severity)}</Badge>
-            </div>) : "-"}
-          </IndexTable.Cell>
-          <IndexTable.Cell>
-            <Text variant="bodyMd" fontWeight="medium" as="span">
-              {host || "-"}
-            </Text>
-          </IndexTable.Cell>
-          <IndexTable.Cell>
-            <GetPrettifyEndpoint
-                maxWidth={'200px'}
-                method={method || "GET"}
-                url={url}
-                isNew={false}
-            />
-          </IndexTable.Cell>
-        </IndexTable.Row>
-      ),
+      ) => {
+        const ruleViolated = (isAgenticSecurityCategory() || isEndpointSecurityCategory())
+          ? extractRuleViolated(metadata)
+          : null;
+
+        return (
+          <IndexTable.Row
+            onClick={() => handleRowClick(url)}
+            id={`${detectedAt}-${index}`}
+            key={`${detectedAt}-${url}-${index}-${severity}`}
+            position={index}
+          >
+            <IndexTable.Cell>
+              <Text variant="bodyMd" fontWeight="bold" as="span">
+                {detectedAt ? dayjs(detectedAt*1000).format('hh:mm A') : "-"}
+              </Text>
+            </IndexTable.Cell>
+            <IndexTable.Cell>
+              <Text variant="bodyMd" fontWeight="medium" as="span">
+                {subCategory || "-"}
+              </Text>
+            </IndexTable.Cell>
+            {(isAgenticSecurityCategory() || isEndpointSecurityCategory()) && (
+              <IndexTable.Cell>
+                <Text variant="bodyMd" fontWeight="medium" as="span">
+                  {ruleViolated}
+                </Text>
+              </IndexTable.Cell>
+            )}
+            <IndexTable.Cell>
+              {severity ? (<div key={severity} className={`badge-wrapper-${severity.toUpperCase()}`}>
+                <Badge status={func.getHexColorForSeverity(severity)}>{func.toSentenceCase(severity)}</Badge>
+              </div>) : "-"}
+            </IndexTable.Cell>
+            <IndexTable.Cell>
+              <Text variant="bodyMd" fontWeight="medium" as="span">
+                {host || "-"}
+              </Text>
+            </IndexTable.Cell>
+            <IndexTable.Cell>
+              <GetPrettifyEndpoint
+                  maxWidth={'200px'}
+                  method={method || "GET"}
+                  url={url}
+                  isNew={false}
+              />
+            </IndexTable.Cell>
+          </IndexTable.Row>
+        );
+      },
     );
   
     return (
@@ -144,6 +159,7 @@ import { labelMap } from '../../../../main/labelHelperMap';
               headings={[
                   {title: 'Time'},
                   {title: 'Attack type'},
+                  ...((isAgenticSecurityCategory() || isEndpointSecurityCategory()) ? [{title: 'Rule Violated'}] : []),
                   {title: 'Severity'},
                   {title: 'Host'},
                   {title: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"]},
