@@ -247,6 +247,14 @@ function ApiDetails(props) {
         }
     };
 
+    const isRBACError = (error) => {
+        const message = error?.response?.data?.actionErrors[0] || error?.message;
+        if(message?.includes("This role doesn't have access to the feature:") || message?.includes("This feature is not available in your plan.")) {
+            return true;
+        }
+        return false;
+    }
+
     const fetchData = async () => {
         if (showDetails) {
             setLoading(true)
@@ -281,11 +289,6 @@ function ApiDetails(props) {
                     }
                 })
             } catch (error) {
-                if (error?.response?.status === 403 || error?.status === 403) {
-                    setShowForbidden(true);
-                    setLoading(false);
-                    return;
-                }
             }
 
             setTimeout(() => {
@@ -315,7 +318,7 @@ function ApiDetails(props) {
                             const res3 = await api.loadSensitiveParameters(apiCollectionId, endpoint, method)
                             sensitiveData = res3.data.endpoints;
                         } catch (error) {
-                            if (error?.response?.status === 403 || error?.status === 403) {
+                            if (isRBACError(error)) {
                                 setShowForbidden(true);
                                 setLoading(false);
                                 return;
@@ -329,14 +332,14 @@ function ApiDetails(props) {
                     }
                     setSampleData(commonMessages)
                 } catch (error) {
-                    if (error?.response?.status === 403 || error?.status === 403) {
+                    if (isRBACError(error)) {
                         setShowForbidden(true);
                         setLoading(false);
                         return;
                     }
                 }
             } catch (error) {
-                if (error?.response?.status === 403 || error?.status === 403) {
+                if (isRBACError(error)) {
                     setShowForbidden(true);
                     setLoading(false);
                     return;
