@@ -21,11 +21,11 @@ public class ApiInfo {
     public static final String ID_METHOD = "_id." + ApiInfoKey.METHOD;
 
     public static final String ALL_AUTH_TYPES_FOUND = "allAuthTypesFound";
-    private Set<Set<AuthType>> allAuthTypesFound;
+    private Set<Set<String>> allAuthTypesFound;
 
     // this annotation makes sure that data is not stored in mongo
     @BsonIgnore
-    private List<AuthType> actualAuthType;
+    private List<String> actualAuthType;
 
     public static final String API_ACCESS_TYPES = "apiAccessTypes";
     private Set<ApiAccessType> apiAccessTypes;
@@ -51,8 +51,37 @@ public class ApiInfo {
     public static final String PARENT_MCP_TOOL_NAMES = "parentMcpToolNames";
     private List<String> parentMcpToolNames;
 
-    public enum AuthType {
-        UNAUTHENTICATED, BASIC, AUTHORIZATION_HEADER, JWT, API_TOKEN, BEARER, CUSTOM, API_KEY, MTLS, SESSION_TOKEN
+    public static class AuthType {
+        public static final String UNAUTHENTICATED = "UNAUTHENTICATED";
+        public static final String BASIC = "BASIC";
+        public static final String AUTHORIZATION_HEADER = "AUTHORIZATION_HEADER";
+        public static final String JWT = "JWT";
+        public static final String API_TOKEN = "API_TOKEN";
+        public static final String BEARER = "BEARER";
+        public static final String CUSTOM = "CUSTOM";  // Kept for backward compatibility
+        public static final String API_KEY = "API_KEY";
+        public static final String MTLS = "MTLS";
+        public static final String SESSION_TOKEN = "SESSION_TOKEN";
+
+        private AuthType() {} // Prevent instantiation
+    }
+
+    /**
+         * Returns all standard auth type constants.
+         * Used for testing and demo data generation.
+         */
+    public static String[] getAllStandardTypes() {
+        return new String[] {
+            AuthType.UNAUTHENTICATED,
+            AuthType.BASIC,
+            AuthType.AUTHORIZATION_HEADER,
+            AuthType.JWT,
+            AuthType.API_TOKEN,
+            AuthType.BEARER,
+            AuthType.API_KEY,
+            AuthType.MTLS,
+            AuthType.SESSION_TOKEN
+        };
     }
 
     public enum ApiAccessType {
@@ -226,9 +255,9 @@ public class ApiInfo {
     }
 
     public void calculateActualAuth() {
-        List<AuthType> result = new ArrayList<>();
-        Set<AuthType> uniqueAuths = new HashSet<>();
-        for (Set<AuthType> authTypes: this.allAuthTypesFound) {
+        List<String> result = new ArrayList<>();
+        Set<String> uniqueAuths = new HashSet<>();
+        for (Set<String> authTypes: this.allAuthTypesFound) {
             if (authTypes.contains(AuthType.UNAUTHENTICATED)) {
                 this.actualAuthType = Collections.singletonList(AuthType.UNAUTHENTICATED);
                 uniqueAuths.add(AuthType.UNAUTHENTICATED);
@@ -239,7 +268,7 @@ public class ApiInfo {
             }
         }
 
-        for (AuthType authType: uniqueAuths) {
+        for (String authType: uniqueAuths) {
             result.add(authType);
         }
 
@@ -280,11 +309,19 @@ public class ApiInfo {
         this.id = id;
     }
 
-    public Set<Set<AuthType>> getAllAuthTypesFound() {
-        return allAuthTypesFound;
+    public Set<Set<String>> getAllAuthTypesFound() {
+        if (allAuthTypesFound == null) {
+            return null;
+        }
+        // Return defensive copy to prevent external modification
+        Set<Set<String>> copy = new HashSet<>();
+        for (Set<String> authTypeSet : allAuthTypesFound) {
+            copy.add(new HashSet<>(authTypeSet));
+        }
+        return copy;
     }
 
-    public void setAllAuthTypesFound(Set<Set<AuthType>> allAuthTypesFound) {
+    public void setAllAuthTypesFound(Set<Set<String>> allAuthTypesFound) {
         this.allAuthTypesFound = allAuthTypesFound;
     }
 
@@ -296,11 +333,11 @@ public class ApiInfo {
         this.apiAccessTypes = apiAccessTypes;
     }
 
-    public List<AuthType> getActualAuthType() {
+    public List<String> getActualAuthType() {
         return actualAuthType;
     }
 
-    public void setActualAuthType(List<AuthType> actualAuthType) {
+    public void setActualAuthType(List<String> actualAuthType) {
         this.actualAuthType = actualAuthType;
     }
 
