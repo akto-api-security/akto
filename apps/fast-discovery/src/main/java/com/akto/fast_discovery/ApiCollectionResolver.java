@@ -2,12 +2,11 @@ package com.akto.fast_discovery;
 
 import com.akto.data_actor.ClientActor;
 import com.akto.dto.ApiCollection;
-import com.akto.dto.HttpResponseParams;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.log.LoggerMaker;
 import com.akto.runtime.RuntimeUtil;
-import com.akto.hybrid_parsers.HttpCallParser;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -55,77 +54,38 @@ public class ApiCollectionResolver {
     }
 
     /**
-     * Resolve API collection ID from HttpResponseParams.
-     * Matches mini-runtime's HttpCallParser.createApiCollectionId() logic exactly.
-     *
-     * Flow:
-     * 1. Extract hostname from "host" header
-     * 2. Check if hostname-based collection should be used (MIRRORING + valid hostname)
-     * 3. If hostname mode: collectionId = hostname.hashCode()
-     *    Else: collectionId = vxlanId
-     * 4. Create collection if not in cache
-     * 5. Return collectionId
-     *
-     * @param httpResponseParam Parsed HTTP response parameters
-     * @return API collection ID
+     * Hostname-based collection resolution for header-optimized processing.
+     * Assumes source=MIRRORING, no tags, vxlanId=0.
      */
-    public int resolveApiCollectionId(HttpResponseParams httpResponseParam) {
-        // Extract hostname using shared utility from HttpCallParser
-        String hostName = HttpCallParser.getHostnameForCollection(httpResponseParam);
-
-        // Handle special characters in hostname
-        if (hostName != null && RuntimeUtil.hasSpecialCharacters(hostName)) {
-            hostName = "Special_Char_Host";
+    public int resolveApiCollectionIdFromHostname(String hostname) throws Exception {
+        if (hostname == null || hostname.isEmpty()) {
+            throw new IllegalArgumentException("Hostname cannot be null or empty");
         }
 
-        int vxlanId = httpResponseParam.getRequestParams().getApiCollectionId();
+        if (RuntimeUtil.hasSpecialCharacters(hostname)) {
+            hostname = "Special_Char_Host";
+        }
+
+        hostname = hostname.toLowerCase().trim();
+        String key = "host:" + hostname;
+
+        if (createdCollections.contains(key)) {
+            return hostname.hashCode();
+        }
+
+        int id = hostname.hashCode();
         String vpcId = System.getenv("VPC_ID");
-        List<CollectionTags> tagList = CollectionTags.convertTagsFormat(httpResponseParam.getTags());
+        List<CollectionTags> emptyTags = new ArrayList<>();
 
-        int apiCollectionId;
-
-        // Check if we should use hostname-based collection
-        if (HttpCallParser.useHostCondition(hostName, httpResponseParam.getSource())) {
-            // Mode A: Hostname-based collection
-            hostName = hostName.toLowerCase().trim();
-            String key = "host:" + hostName;
-
-            if (createdCollections.contains(key)) {
-                // Collection already created in this session
-                apiCollectionId = hostName.hashCode();
-            } else {
-                // Create new hostname-based collection
-                int id = hostName.hashCode();
-
-                try {
-                    // Create collection with retry logic (tries id, id+1, id+2, ... up to 100 attempts)
-                    apiCollectionId = createCollectionBasedOnHostName(id, hostName, vpcId, tagList);
-                    createdCollections.add(key);  // Cache it
-
-                    loggerMaker.infoAndAddToDb(String.format(
-                        "Created hostname-based collection %d for '%s'", apiCollectionId, hostName));
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "Failed to create collection for host: " + hostName);
-                    // Fallback to vxlanId
-                    createCollectionSimpleForVpc(vxlanId, vpcId, tagList);
-                    createdCollections.add("vxlan:" + vxlanId);
-                    apiCollectionId = vxlanId;
-                }
-            }
-        } else {
-            // Mode B: VxlanId-based collection
-            String key = "vxlan:" + vxlanId;
-
-            if (!createdCollections.contains(key)) {
-                // Create vxlan-based collection
-                createCollectionSimpleForVpc(vxlanId, vpcId, tagList);
-                createdCollections.add(key);  // Cache it
-            }
-
-            apiCollectionId = vxlanId;
+        try {
+            int apiCollectionId = createCollectionBasedOnHostName(id, hostname, vpcId, emptyTags);
+            createdCollections.add(key);
+            loggerMaker.infoAndAddToDb("Created hostname collection " + apiCollectionId + " for '" + hostname + "'");
+            return apiCollectionId;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Failed to create collection: " + hostname);
+            throw e;
         }
-
-        return apiCollectionId;
     }
 
     /**
@@ -177,17 +137,5 @@ public class ApiCollectionResolver {
         }
 
         throw new Exception("Failed to create collection after 100 attempts for host: " + host, lastException);
-    }
-
-    /**
-     * Create vxlan-based collection.
-     * Thin wrapper around clientActor for consistency.
-     *
-     * @param vxlanId VXLAN identifier
-     * @param vpcId VPC identifier
-     * @param tags Collection tags
-     */
-    private void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags) {
-        clientActor.createCollectionSimpleForVpc(vxlanId, vpcId, tags);
     }
 }
