@@ -8,7 +8,6 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.ahocorasick.trie.Trie;
 import org.json.JSONObject;
@@ -22,7 +21,6 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.type.KeyTypes;
-import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLTemplate;
 import com.akto.threat.detection.cache.AccountConfig;
 import com.akto.threat.detection.cache.AccountConfigurationCache;
@@ -105,12 +103,62 @@ public class ThreatDetector {
 
     }
 
-    private List<Pair<String, String>> extractParamNameAndValue(HttpResponseParams httpResponseParams) {
+    List<Pair<String, String>> extractParamNameAndValue(HttpResponseParams httpResponseParams) {
         List<Pair<String, String>> paramNameAndValue = new ArrayList<>();
-        
+
         AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
-        Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods = config.getApiInfoUrlToMethods();
         Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates = config.getApiCollectionUrlTemplates();
+
+        int apiCollectionId = httpResponseParams.requestParams.getApiCollectionId();
+        String url = httpResponseParams.getRequestParams().getURL();
+
+        // Normalize URL: remove query params, fragments, and leading/trailing slashes
+        if (url.contains("?")) {
+            url = url.substring(0, url.indexOf("?"));
+        }
+        if (url.contains("#")) {
+            url = url.substring(0, url.indexOf("#"));
+        }
+        if (url.startsWith("/")) {
+            url = url.substring(1);
+        }
+        if (url.endsWith("/")) {
+            url = url.substring(0, url.length() - 1);
+        }
+
+        // Get templates for this collection
+        List<URLTemplate> urlTemplates = apiCollectionUrlTemplates.get(apiCollectionId);
+        if (urlTemplates == null || urlTemplates.isEmpty()) {
+            return paramNameAndValue;
+        }
+
+        // Find matching template and extract params
+        String[] urlTokens = url.split("/");
+        for (URLTemplate template : urlTemplates) {
+            if (template.matchTokens(urlTokens)) {
+                String[] templateTokens = template.getTokens();
+
+                // Extract params where template token is null (parameterized position)
+                for (int i = 0; i < templateTokens.length && i < urlTokens.length; i++) {
+                    if (templateTokens[i] == null) {
+                        // Param name is the previous static segment, or fallback to type name
+                        String paramName;
+                        if (i > 0 && templateTokens[i - 1] != null) {
+                            paramName = templateTokens[i - 1];
+                        } else {
+                            // Fallback: use the type name if available
+                            paramName = template.getTypes()[i] != null
+                                ? template.getTypes()[i].name()
+                                : "param" + i;
+                        }
+                        String paramValue = urlTokens[i];
+                        paramNameAndValue.add(new Pair<>(paramName, paramValue));
+                    }
+                }
+                break; // Found a match, stop searching
+            }
+        }
+
         return paramNameAndValue;
     }
 
