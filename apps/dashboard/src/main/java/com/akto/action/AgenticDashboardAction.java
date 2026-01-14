@@ -1031,46 +1031,13 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             Map<String, String> filterIdToNameMap = new HashMap<>();
             try {
                 Map<String, FilterConfig> filterConfigs = FilterYamlTemplateDao.instance.fetchFilterConfig(false, false);
-                loggerMaker.infoAndAddToDb(String.format(
-                    "[THREAT_NAME_DEBUG] Fetched %d filter configs from FilterYamlTemplateDao",
-                    filterConfigs.size()
-                ));
-                
-                // Debug: Log sample filterIds from threats
-                Set<String> threatFilterIds = categoryCounts.keySet();
-                loggerMaker.infoAndAddToDb(String.format(
-                    "[THREAT_NAME_DEBUG] Threat filterIds found in data (first 10): %s",
-                    threatFilterIds.stream().limit(10).collect(Collectors.toList())
-                ));
-                
-                // Debug: Log sample filterIds from configs
-                loggerMaker.infoAndAddToDb(String.format(
-                    "[THREAT_NAME_DEBUG] Filter config IDs available (first 10): %s",
-                    filterConfigs.keySet().stream().limit(10).collect(Collectors.toList())
-                ));
                 
                 for (Map.Entry<String, FilterConfig> entry : filterConfigs.entrySet()) {
                     String filterId = entry.getKey();
                     FilterConfig filterConfig = entry.getValue();
                     
-                    // Debug: Log structure for matching filterIds
-                    if (threatFilterIds.contains(filterId)) {
-                        loggerMaker.infoAndAddToDb(String.format(
-                            "[THREAT_NAME_DEBUG] Processing filterId: %s, filterConfig is null: %s",
-                            filterId, filterConfig == null
-                        ));
-                    }
-                    
                     if (filterConfig != null && filterConfig.getInfo() != null) {
                         Info info = filterConfig.getInfo();
-                        
-                        // Debug: Log info structure for matching filterIds
-                        if (threatFilterIds.contains(filterId)) {
-                            loggerMaker.infoAndAddToDb(String.format(
-                                "[THREAT_NAME_DEBUG] FilterId: %s, info.getName(): %s, info.getCategory() is null: %s",
-                                filterId, info.getName(), info.getCategory() == null
-                            ));
-                        }
                         
                         // Try to get display name from category, fallback to name, then to filterId
                         if (info.getCategory() != null) {
@@ -1078,76 +1045,20 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                             String displayName = category.getDisplayName();
                             String categoryName = category.getName();
                             
-                            // Debug: Log category structure for matching filterIds
-                            if (threatFilterIds.contains(filterId)) {
-                                loggerMaker.infoAndAddToDb(String.format(
-                                    "[THREAT_NAME_DEBUG] FilterId: %s, category.getName(): %s, category.getDisplayName(): %s",
-                                    filterId, categoryName, displayName
-                                ));
-                            }
-                            
                             if (displayName != null && !displayName.isEmpty()) {
                                 filterIdToNameMap.put(filterId, displayName);
-                                if (threatFilterIds.contains(filterId)) {
-                                    loggerMaker.infoAndAddToDb(String.format(
-                                        "[THREAT_NAME_DEBUG] Mapped filterId %s to displayName: %s",
-                                        filterId, displayName
-                                    ));
-                                }
                             } else if (categoryName != null && !categoryName.isEmpty()) {
                                 filterIdToNameMap.put(filterId, categoryName);
-                                if (threatFilterIds.contains(filterId)) {
-                                    loggerMaker.infoAndAddToDb(String.format(
-                                        "[THREAT_NAME_DEBUG] Mapped filterId %s to categoryName: %s",
-                                        filterId, categoryName
-                                    ));
-                                }
                             }
                         }
                         // If no category, try to get name from info
                         if (!filterIdToNameMap.containsKey(filterId) && info.getName() != null && !info.getName().isEmpty()) {
                             filterIdToNameMap.put(filterId, info.getName());
-                            if (threatFilterIds.contains(filterId)) {
-                                loggerMaker.infoAndAddToDb(String.format(
-                                    "[THREAT_NAME_DEBUG] Mapped filterId %s to info.getName(): %s",
-                                    filterId, info.getName()
-                                ));
-                            }
                         }
-                    } else {
-                        if (threatFilterIds.contains(filterId)) {
-                            loggerMaker.infoAndAddToDb(String.format(
-                                "[THREAT_NAME_DEBUG] FilterId %s: filterConfig is null or info is null",
-                                filterId
-                            ));
-                        }
-                    }
-                }
-                
-                // Debug: Log final mapping
-                loggerMaker.infoAndAddToDb(String.format(
-                    "[THREAT_NAME_DEBUG] Final filterIdToNameMap size: %d, mapped filterIds: %s",
-                    filterIdToNameMap.size(),
-                    filterIdToNameMap.keySet().stream().limit(10).collect(Collectors.toList())
-                ));
-                
-                // Debug: Check which threat filterIds have mappings
-                for (String threatFilterId : threatFilterIds) {
-                    if (filterIdToNameMap.containsKey(threatFilterId)) {
-                        loggerMaker.infoAndAddToDb(String.format(
-                            "[THREAT_NAME_DEBUG] Threat filterId %s will be displayed as: %s",
-                            threatFilterId, filterIdToNameMap.get(threatFilterId)
-                        ));
-                    } else {
-                        loggerMaker.infoAndAddToDb(String.format(
-                            "[THREAT_NAME_DEBUG] WARNING: Threat filterId %s has no mapping, will use filterId as-is",
-                            threatFilterId
-                        ));
                     }
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error fetching threat filter names: " + e.getMessage());
-                e.printStackTrace();
             }
             
             // Sort by count descending and take top 5
@@ -1556,24 +1467,9 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             // Filter by collection IDs in memory (only demo collection exclusion, no RBAC for threat data)
             // Note: Similar to SuspectSampleDataAction, we don't apply RBAC filtering for threat data.
             // Threats are security-related and should be visible regardless of RBAC collection access.
-            int beforeFilterCount = tempResult.size();
-            
-            // Only filter out demo collections, don't apply RBAC filtering
             result = tempResult.stream()
                 .filter(event -> !demoCollections.contains(event.getApiCollectionId()))
                 .collect(Collectors.toList());
-            
-            // Debug: Log after filtering
-            loggerMaker.infoAndAddToDb(String.format(
-                "[THREAT_FETCH_DEBUG] After filtering - before: %d, after: %d, filtered out: %d (demo collections only, no RBAC)",
-                beforeFilterCount, result.size(), beforeFilterCount - result.size()
-            ));
-            
-            // Debug: Final result
-            loggerMaker.infoAndAddToDb(String.format(
-                "[THREAT_FETCH_DEBUG] Final result - returning %d malicious events",
-                result.size()
-            ));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching malicious events from threat-backend: " + e.getMessage());
         }
