@@ -96,6 +96,16 @@ export default function LeftNav() {
 
     const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
 
+    // Allowed users for Dashboard access
+    const allowedDashboardUsers = [
+        "ankush@akto.io",
+        "shivam@akto.io",
+        "umesh@akto.io",
+        "shivansh@akto.io",
+        "aryan@akto.io"
+    ];
+    const isAllowedDashboardUser = window.USER_NAME && allowedDashboardUsers.includes(window.USER_NAME.toLowerCase());
+
     const navItems = useMemo(() => {
         let items = [
             {
@@ -111,7 +121,7 @@ export default function LeftNav() {
 
                 ) : null
             },
-            ...(dashboardCategory === CATEGORY_AGENTIC_SECURITY ? [{
+            ...(isAllowedDashboardUser && dashboardCategory === CATEGORY_AGENTIC_SECURITY ? [{
                 label: "Dashboard",
                 icon: ReportFilledMinor,
                 onClick: () => {
@@ -121,7 +131,7 @@ export default function LeftNav() {
                 },
                 selected: leftNavSelected === "dashboard_agentic_dashboard",
                 key: "1",
-            }] : dashboardCategory === CATEGORY_API_SECURITY ? [{
+            }] : isAllowedDashboardUser && dashboardCategory === CATEGORY_API_SECURITY ? [{
                 label: "Dashboard",
                 icon: ReportFilledMinor,
                 onClick: () => {
@@ -129,7 +139,7 @@ export default function LeftNav() {
                     navigate("/dashboard/view");
                     setActive("normal");
                 }
-            }] : dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
+            }] : isAllowedDashboardUser && dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
                 label: "Dashboard",
                 icon: ReportFilledMinor,
                 onClick: () => {
