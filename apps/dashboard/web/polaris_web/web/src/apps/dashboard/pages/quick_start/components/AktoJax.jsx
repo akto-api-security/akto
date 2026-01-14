@@ -5,6 +5,7 @@ import PasswordTextField from '../../../components/layouts/PasswordTextField';
 import api from '../api';
 import func from "@/util/func"
 import AktoDastOptions from './AktoDastOptions';
+import CustomHeadersInput from './CustomHeadersInput';
 import Dropdown from '../../../components/layouts/Dropdown';
 import testingApi from '../../testing/api'
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
@@ -30,6 +31,7 @@ const AktoJax = () => {
     const [parseRestServices, setParseRestServices] = useState(true);
     const [clickExternalLinks, setClickExternalLinks] = useState(false);
     const [crawlingTime, setCrawlingTime] = useState(600);
+    const [customHeaders, setCustomHeaders] = useState([]);
 
     const [availableModules, setAvailableModules] = useState([])
     const [selectedModule, setSelectedModule] = useState("")
@@ -66,8 +68,16 @@ const AktoJax = () => {
             return
         }
 
+        // Convert array to Map for backend
+        const customHeadersMap = {};
+        customHeaders.forEach(header => {
+            if (header.key && header.key.trim()) {
+                customHeadersMap[header.key.trim()] = header.value || "";
+            }
+        });
+
         setLoading(true)
-        api.initiateCrawler(hostname, email, password, apiKey, window.location.origin, testRole, outscopeUrls, crawlingTime, selectedModule).then((res) => {
+        api.initiateCrawler(hostname, email, password, apiKey, window.location.origin, testRole, outscopeUrls, crawlingTime, selectedModule, customHeadersMap).then((res) => {
             func.setToast(true, false, "Crawler initiated successfully. Please check your dashboard for updates.")
         }).catch((err) => {
             console.error("Error initiating crawler:", err)
@@ -78,6 +88,7 @@ const AktoJax = () => {
             setEmail('')
             setPassword('')
             setTestRole('')
+            setCustomHeaders([])
         })
     }
 
@@ -126,6 +137,13 @@ const AktoJax = () => {
                 setClickExternalLinks={setClickExternalLinks}
                 crawlingTime={crawlingTime}
                 setCrawlingTime={setCrawlingTime}
+            />
+
+            <Box paddingBlockStart={3}><Divider /></Box>
+
+            <CustomHeadersInput
+                customHeaders={customHeaders}
+                setCustomHeaders={setCustomHeaders}
             />
 
             <Box paddingBlockStart={3}><Divider /></Box>

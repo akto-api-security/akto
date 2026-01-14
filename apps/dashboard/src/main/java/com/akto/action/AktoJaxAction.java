@@ -67,6 +67,7 @@ public class AktoJaxAction extends UserAction {
     private String buttonText;
     private int crawlingTime;
     private String selectedModuleName;
+    private Map<String, String> customHeaders;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AktoJaxAction.class, LogDb.DASHBOARD);
 
@@ -206,6 +207,7 @@ public class AktoJaxAction extends UserAction {
                 crawlerRun.setAccountId(Context.accountId.get());
                 crawlerRun.setCookies(cookies);
                 crawlerRun.setCrawlingTime(crawlingTime);
+                crawlerRun.setCustomHeaders(customHeaders);
                 CrawlerRunDao.instance.insertOne(crawlerRun);
             } else {
                 // Fallback to internal DAST API
@@ -297,6 +299,10 @@ public class AktoJaxAction extends UserAction {
 
         if (cookies != null) {
             requestBody.put("cookies", cookies);
+        }
+
+        if (customHeaders != null && !customHeaders.isEmpty()) {
+            requestBody.put("customHeaders", customHeaders);
         }
 
         String reqData = requestBody.toString();
@@ -558,5 +564,13 @@ public class AktoJaxAction extends UserAction {
 
     public void setAvailableModules(List<Map<String, Object>> availableModules) {
         this.availableModules = availableModules;
+    }
+
+    public Map<String, String> getCustomHeaders() {
+        return customHeaders;
+    }
+
+    public void setCustomHeaders(Map<String, String> customHeaders) {
+        this.customHeaders = customHeaders;
     }
 }

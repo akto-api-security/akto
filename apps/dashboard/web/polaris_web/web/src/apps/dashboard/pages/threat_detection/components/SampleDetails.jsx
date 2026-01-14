@@ -14,24 +14,27 @@ import settingFunctions from "../../settings/module";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal";
 import transform from "../../testing/transform";
 import issuesFunctions from "../../issues/module";
-import { GUARDRAIL_SECTIONS } from "../constants/guardrailDescriptions";
-import { isEndpointSecurityCategory } from "../../../../main/labelHelper";
+import { GUARDRAIL_SECTIONS, GUARDRAIL_REMEDIATION_MARKDOWN } from "../constants/guardrailDescriptions";
+import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 
 function SampleDetails(props) {
     const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate } = props
     const resolvedThreatFiltersMap = threatFiltersMap || {};
 
-    const useGuardrailDescription = isEndpointSecurityCategory();
+    // Determine if we should use hardcoded guardrail descriptions
+    const useGuardrailDescription = isAgenticSecurityCategory() || isEndpointSecurityCategory();
 
+    // Get template object - either from hardcoded data or YAML templates
     let currentTemplateObj;
     if (useGuardrailDescription) {
-        // For Atlas guardrails, use structured content
+        // For Argus/Atlas guardrails, use structured content
         currentTemplateObj = {
             guardrailSections: GUARDRAIL_SECTIONS,
             testName: moreInfoData?.templateId || "Guardrail Policy",
             name: moreInfoData?.templateId || "Guardrail Policy"
         };
     } else {
+        // Normal threat detection - use YAML templates
         currentTemplateObj = moreInfoData?.templateId ? resolvedThreatFiltersMap[moreInfoData?.templateId] : undefined;
     }
 
@@ -214,11 +217,15 @@ function SampleDetails(props) {
             </Box>)
     }
 
-    const remediationTab = remediationText.length > 0 && {
+    const remediationTab = useGuardrailDescription ? {
+        id: "remediation",
+        content: "Remediation",
+        component: (<MarkdownViewer markdown={GUARDRAIL_REMEDIATION_MARKDOWN}></MarkdownViewer>)
+    } : (remediationText.length > 0 && {
         id: "remediation",
         content: "Remediation",
         component: (<MarkdownViewer markdown={remediationText}></MarkdownViewer>)
-    }
+    })
 
     useEffect(() => {
         fetchRemediationInfo()
@@ -651,7 +658,7 @@ Reference URL: ${window.location.href}`.trim();
     const tabsComponent = (
         <LayoutWithTabs
             key={`tabs-comp-${eventId || 'default'}`}
-            tabs={ window.location.href.indexOf("guardrails") > -1 ? [ValuesTab] : [overviewTab, timelineTab, ValuesTab, remediationTab]}
+            tabs={ window.location.href.indexOf("guardrails") > -1 ? [overviewTab, ValuesTab] : [overviewTab, timelineTab, ValuesTab, remediationTab]}
             currTab = {() => {}}
         />
     )
