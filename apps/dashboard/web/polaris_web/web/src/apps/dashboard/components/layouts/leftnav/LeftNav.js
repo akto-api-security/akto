@@ -22,7 +22,7 @@ import func from "@/util/func";
 import Dropdown from "../Dropdown";
 import SessionStore from "../../../../main/SessionStore";
 import IssuesStore from "../../../pages/issues/issuesStore";
-import { CATEGORY_AGENTIC_SECURITY, CATEGORY_DAST, CATEGORY_ENDPOINT_SECURITY, mapLabel } from "../../../../main/labelHelper";
+import { CATEGORY_AGENTIC_SECURITY, CATEGORY_API_SECURITY, CATEGORY_ENDPOINT_SECURITY, CATEGORY_DAST, mapLabel } from "../../../../main/labelHelper";
 
 export default function LeftNav() {
     const navigate = useNavigate();
@@ -51,10 +51,7 @@ export default function LeftNav() {
         resetFields();
         await api.goToAccount(selected);
         func.setToast(true, false, `Switched to account ${accounts[selected]}`);
-        const redirectPath = dashboardCategory === CATEGORY_ENDPOINT_SECURITY
-            ? '/dashboard/observe/endpoints'
-            : '/dashboard/observe/inventory';
-        window.location.href = redirectPath;
+        window.location.href = '/dashboard/observe/inventory';
     };
 
     const accountOptions = Object.keys(accounts).map(accountId => ({
@@ -97,6 +94,16 @@ export default function LeftNav() {
 
     const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
 
+    // Allowed users for Dashboard access
+    const allowedDashboardUsers = [
+        "ankush@akto.io",
+        "shivam@akto.io",
+        "umesh@akto.io",
+        "shivansh@akto.io",
+        "aryan@akto.io"
+    ];
+    const isAllowedDashboardUser = window.USER_NAME && allowedDashboardUsers.includes(window.USER_NAME.toLowerCase());
+
     const navItems = useMemo(() => {
         let items = [
             {
@@ -112,6 +119,33 @@ export default function LeftNav() {
 
                 ) : null
             },
+            ...(isAllowedDashboardUser && dashboardCategory === CATEGORY_AGENTIC_SECURITY ? [{
+                label: "Dashboard",
+                icon: ReportFilledMinor,
+                onClick: () => {
+                    handleSelect("dashboard_agentic_dashboard");
+                    navigate("/dashboard/agentic-dashboard");
+                    setActive("normal");
+                },
+                selected: leftNavSelected === "dashboard_agentic_dashboard",
+                key: "1",
+            }] : isAllowedDashboardUser && dashboardCategory === CATEGORY_API_SECURITY ? [{
+                label: "Dashboard",
+                icon: ReportFilledMinor,
+                onClick: () => {
+                    handleSelect("dashboard_api_dashboard");
+                    navigate("/dashboard/view");
+                    setActive("normal");
+                }
+            }] : isAllowedDashboardUser && dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
+                label: "Dashboard",
+                icon: ReportFilledMinor,
+                onClick: () => {
+                    handleSelect("dashboard_endpoint_security_dashboard");
+                    navigate("/dashboard/endpoint-dashboard");
+                    setActive("normal");
+                }
+            }] : []),
             ...(dashboardCategory !== "Endpoint Security" ? [{
                 label: mapLabel("API Security Posture", dashboardCategory),
                 icon: ReportFilledMinor,
@@ -143,10 +177,10 @@ export default function LeftNav() {
                 icon: InventoryFilledMajor,
                 onClick: () => {
                     const targetPath = dashboardCategory === CATEGORY_ENDPOINT_SECURITY
-                        ? "/dashboard/observe/endpoints"
+                        ? "/dashboard/observe/agentic-assets"
                         : "/dashboard/observe/inventory";
                     const targetHandle = dashboardCategory === CATEGORY_ENDPOINT_SECURITY
-                        ? "dashboard_observe_endpoints"
+                        ? "dashboard_observe_agentic_assets"
                         : "dashboard_observe_inventory";
                     handleSelect(targetHandle);
                     navigate(targetPath);
@@ -155,13 +189,13 @@ export default function LeftNav() {
                 selected: leftNavSelected.includes("_observe"),
                 subNavigationItems: [
                     ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
-                        label: "Endpoints",
+                        label: "Agentic assets",
                         onClick: () => {
-                            navigate("/dashboard/observe/endpoints");
-                            handleSelect("dashboard_observe_endpoints");
+                            navigate("/dashboard/observe/agentic-assets");
+                            handleSelect("dashboard_observe_agentic_assets");
                             setActive("active");
                         },
-                        selected: leftNavSelected === "dashboard_observe_endpoints",
+                        selected: leftNavSelected === "dashboard_observe_agentic_assets",
                     }] : [{
                         label: "Collections",
                         onClick: () => {
@@ -549,7 +583,22 @@ export default function LeftNav() {
         // Add Quick Start navigation item
         const exists = items.find(item => item.key === "quick_start")
         if (!exists) {
-            items.splice(2, 0, {
+            // Find the correct position to insert "Quick Start"
+            // It should be inserted after Dashboard (if present) or after the first navigation item
+            // For akto users: after Dashboard (index 2)
+            // For non-akto users: after "API Security Posture" (if present) or after "API Discovery"
+            let insertIndex = 1; // Default: after Account dropdown
+            
+            // If Dashboard is present (akto users), insert after Dashboard (index 2)
+            if (isAllowedDashboardUser && (
+                dashboardCategory === CATEGORY_AGENTIC_SECURITY ||
+                dashboardCategory === CATEGORY_API_SECURITY ||
+                dashboardCategory === CATEGORY_ENDPOINT_SECURITY
+            )) {
+                insertIndex = 2;
+            }
+            
+            items.splice(insertIndex, 0, {
                 label: mapLabel("Quick Start", dashboardCategory),
                 icon: AppsFilledMajor,
                 onClick: () => {

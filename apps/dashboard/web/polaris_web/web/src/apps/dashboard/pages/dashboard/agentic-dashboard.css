@@ -1,0 +1,24 @@
+.graph-menu {
+    width: 20px;
+    height: 20px;
+    cursor: grab;
+}
+
+.graph-menu:active {
+    cursor: grabbing;
+}
+
+.react-grid-item {
+    box-sizing: border-box;
+}
+
+.react-grid-item > div {
+    height: 100%;
+    width: 100%;
+}
+
+.react-grid-item .Polaris-Box,
+.react-grid-item .Polaris-Card {
+    height: 100%;
+    box-sizing: border-box;
+}

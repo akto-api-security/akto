@@ -55,7 +55,26 @@ const headers = [
         isText: CellType.TEXT,
         boxWidth: '24px'
     }] : []),
-    {
+    ...(isEndpointSecurityCategory() ? [
+        {
+            title: "API Collection name",
+            text: "API Collection name",
+            value: "displayNameComp",
+            filterKey: "splitApiCollectionName",
+            textValue: 'splitApiCollectionName',
+            showFilter: true,
+            titleWithTooltip: <HeadingWithTooltip content="These API groups are computed periodically" title="API Collection name" />
+        },
+        {
+            title: "Endpoint ID",
+            text: "Endpoint ID",
+            value: "endpointId",
+            filterKey: "endpointId",
+            textValue: 'endpointId',
+            showFilter: true,
+            isText: CellType.TEXT,
+        }
+    ] : [{
         title: mapLabel("API collection name", getDashboardCategory()),
         text: mapLabel("API collection name", getDashboardCategory()),
         value: "displayNameComp",
@@ -63,7 +82,7 @@ const headers = [
         textValue: 'displayName',
         showFilter: true,
         titleWithTooltip: <HeadingWithTooltip content="These API groups are computed periodically" title={mapLabel("API collection name", getDashboardCategory())} />
-    },
+    }]),
     {
         title: mapLabel("Total endpoints", getDashboardCategory()),
         text: mapLabel("Total endpoints", getDashboardCategory()),
@@ -185,11 +204,12 @@ const isAtlas = isEndpointSecurityCategory()
 const isArgus = isAgenticSecurityCategory()
 const isAtlasArgus = isAtlas || isArgus;
 
+// For Endpoint Security, we have an extra column (Endpoint ID) after API Collection name
 const nameColIndex = isAtlasArgus ? 2 : 1;
-const endpointColIndex = isAtlasArgus ? 3 : 2;
-const discoveredColIndex = isArgus ? 10 : (isAtlas ? 8 : 9);
-const trafficColIndex = isArgus ? 9 : (isAtlas ? 7 : 8);
-const riskColIndex = isAtlasArgus ? 4 : 3
+const endpointColIndex = isAtlas ? 4 : (isArgus ? 3 : 2);
+const discoveredColIndex = isArgus ? 10 : (isAtlas ? 9 : 9);
+const trafficColIndex = isArgus ? 9 : (isAtlas ? 8 : 8);
+const riskColIndex = isAtlas ? 5 : (isAtlasArgus ? 4 : 3)
 
 const tempSortOptions = [
     { label: 'Name', value: 'customGroupsSort asc', directionLabel: 'A-Z', sortKey: 'customGroupsSort', columnIndex: nameColIndex},
@@ -227,10 +247,22 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             c.disableClick = true
         }
         const tagsList = JSON.stringify(c?.tagsList || "")
+
+        // Split collection name for Endpoint Security category
+        let displayText = c.displayName;
+        let endpointId = '';
+        if (isEndpointSecurityCategory()) {
+            const splitResult = transform.splitCollectionNameForEndpointSecurity(c.displayName);
+            displayText = splitResult.apiCollectionName;
+            endpointId = splitResult.endpointId;
+        }
+
         // Build result object directly without spread operator for better memory efficiency
         return {
             id: c.id,
             displayName: c.displayName,
+            splitApiCollectionName: displayText,
+            endpointId: endpointId,
             hostName: c.hostName,
             type: c.type,
             deactivated: c.deactivated,
@@ -248,7 +280,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             envType: c?.envType?.map(func.formatCollectionType),
             displayNameComp: (
                 <HorizontalStack gap="2" align="start">
-                    <Box maxWidth="30vw"><Text truncate fontWeight="medium">{c.displayName}</Text></Box>
+                    <Box maxWidth="30vw"><Text truncate fontWeight="medium">{displayText}</Text></Box>
                     {c.registryStatus === "available" && <RegistryBadge />}
                 </HorizontalStack>
             ),
@@ -314,11 +346,22 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         });
     }
 
+    // Split collection name for Endpoint Security category
+    let splitApiCollectionName = rawCollection.displayName;
+    let endpointId = '';
+    if (isEndpointSecurityCategory()) {
+        const splitResult = transform.splitCollectionNameForEndpointSecurity(rawCollection.displayName);
+        splitApiCollectionName = splitResult.apiCollectionName;
+        endpointId = splitResult.endpointId;
+    }
+
     // Return minimal object - only fields needed for filtering, sorting, and categorization
     // JSX components will be created on-demand by prettifyPageData
     return {
         id: rawCollection.id,
         displayName: rawCollection.displayName,
+        splitApiCollectionName: splitApiCollectionName,
+        endpointId: endpointId,
         hostName: rawCollection.hostName,
         type: rawCollection.type,
         deactivated: rawCollection.deactivated,
@@ -408,7 +451,7 @@ function ApiCollections(props) {
             const stack = JSON.parse(sessionStorage.getItem('pathnameStack') || '[]');
             if (stack.length >= 2) {
                 const previousPath = stack[stack.length - 2];
-                return previousPath === '/dashboard/observe/endpoints';
+                return previousPath === '/dashboard/observe/agentic-assets';
             }
         } catch (e) { /* ignore */ }
         return false;
@@ -1514,7 +1557,7 @@ function ApiCollections(props) {
             }
             primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={navigateToQueryPage}>Explore mode</Button>}
             isFirstPage={!isFromEndpoints}
-            backUrl={isFromEndpoints ? "/dashboard/observe/endpoints" : undefined}
+            backUrl={isFromEndpoints ? "/dashboard/observe/agentic-assets" : undefined}
             components={components}
             secondaryActions={secondaryActionsComp}
         />

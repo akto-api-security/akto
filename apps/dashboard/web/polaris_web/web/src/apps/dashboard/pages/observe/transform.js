@@ -518,6 +518,9 @@ const transform = {
     },
 
     prettifyCollectionsData(newData, isLoading, selectedTab){
+        const category = getDashboardCategory();
+        const isEndpointSecurity = category === CATEGORY_ENDPOINT_SECURITY;
+
         const prettifyData = newData.map((c)=>{
             // Check if we're in the untracked tab
             const isUntrackedTab = selectedTab === 'untracked';
@@ -540,10 +543,19 @@ const transform = {
 
             const loadingComp = <Text color="subdued" variant="bodyMd">...</Text>
 
+            // Split collection name for Endpoint Security category
+            let splitApiCollectionName = c.displayName;
+            let endpointId = '';
+            if (isEndpointSecurity) {
+                const splitResult = this.splitCollectionNameForEndpointSecurity(c.displayName);
+                splitApiCollectionName = splitResult.apiCollectionName;
+                endpointId = splitResult.endpointId;
+            }
+
             // Create displayNameComp if it doesn't exist (for lazy-loaded items)
             const displayNameComp = c.displayNameComp || (
                 <HorizontalStack gap="2" align="start">
-                    <Box maxWidth="30vw"><Text truncate fontWeight="medium">{c.displayName}</Text></Box>
+                    <Box maxWidth="30vw"><Text truncate fontWeight="medium">{isEndpointSecurity ? splitApiCollectionName : c.displayName}</Text></Box>
                     {c.registryStatus === "available" && <Badge>Registry</Badge>}
                 </HorizontalStack>
             );
@@ -564,6 +576,8 @@ const transform = {
                 id: c.id,
                 nextUrl: '/dashboard/observe/inventory/' + c.id,
                 displayName: c.displayName,
+                splitApiCollectionName: splitApiCollectionName,
+                endpointId: endpointId,
                 displayNameComp: displayNameComp,
                 descriptionComp: descriptionComp,
                 outOfTestingScopeComp: outOfTestingScopeComp,
@@ -882,9 +896,9 @@ const transform = {
                             >
                                 <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
                                     <HorizontalStack gap="2" align="start" blockAlign="center">
-                                        <GetPrettifyEndpoint 
-                                            method={api.method} 
-                                            url={api.url} 
+                                        <GetPrettifyEndpoint
+                                            method={api.method}
+                                            url={api.url}
                                             isNew={false}
                                         />
                                     </HorizontalStack>
@@ -900,6 +914,17 @@ const transform = {
                 </td>
             </tr>
         )
+    },
+
+    splitCollectionNameForEndpointSecurity: (collectionName) => {
+        if (!collectionName || !collectionName.includes('.')) {
+            return { apiCollectionName: collectionName || '', endpointId: '' };
+        }
+        const parts = collectionName.split('.');
+        return {
+            endpointId: parts[0],
+            apiCollectionName: parts.slice(1).join('.')
+        };
     }
 }
 

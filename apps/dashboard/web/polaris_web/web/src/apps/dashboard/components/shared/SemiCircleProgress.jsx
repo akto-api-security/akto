@@ -3,15 +3,15 @@ import HighchartsReact from "highcharts-react-official"
 import Highcharts from "highcharts"
 import { useRef } from "react";
 
-function SemiCircleProgress({progress, size, height, width, title}) {
+function SemiCircleProgress({progress, size, height, width, title, color, centerText, backgroundColor, subtitle}) {
 
     const chartComponentRef = useRef(null)
     const seriesData = [{
         innerSize: '80%',
         name: '',
         data: [
-            {name: 'completed', color: "#6200EA", y: progress},
-            {name: '', y: 100 - progress, color: '#F6F6F7'}
+            {name: 'completed', color: color || "#6200EA", y: progress},
+            {name: '', y: 100 - progress, color: backgroundColor || '#F6F6F7'}
         ]
     }]
     const chartOptions = {
@@ -29,15 +29,27 @@ function SemiCircleProgress({progress, size, height, width, title}) {
         credits:{
             enabled: false,
         },
-        title:{
-            text: progress + '%',
-            y: 0.4*size,
+        title: subtitle ? {
+            text: subtitle,
+            y: 0.3*size,
             style:{
-                fontWeight: 'medium',
-                color: "#344054",
-                fontSize: '14px'
+                fontSize: '12px',
+                color: '#667085',
+                fontWeight: 'normal'
             }
+        } : {
+            text: '',
+            style: { display: 'none' }
         },
+        subtitle: centerText ? {
+            text: centerText,
+            y: 0.5*size,
+            style:{
+                fontSize: '16px',
+                fontWeight: '600',
+                color: "#344054"
+            }
+        } : undefined,
         series: seriesData,
         exporting: {
             enabled: false
