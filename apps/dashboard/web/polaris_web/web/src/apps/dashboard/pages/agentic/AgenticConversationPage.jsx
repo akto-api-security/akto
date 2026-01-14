@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Page, Box, Button, Text, Banner, HorizontalStack, VerticalStack } from '@shopify/polaris';
+import { Page, Box, Button, Text, HorizontalStack, VerticalStack } from '@shopify/polaris';
 import { ArrowLeftMinor } from '@shopify/polaris-icons';
 import AgenticUserMessage from './components/AgenticUserMessage';
 import AgenticThinkingBox from './components/AgenticThinkingBox';
@@ -10,22 +10,17 @@ import AgenticSearchInput from './components/AgenticSearchInput';
 import AgenticHistoryModal from './components/AgenticHistoryModal';
 import './AgenticConversationPage.css';
 import {
-    generateConversationId,
-    generateMessageId,
-    createConversation,
     sendQuery,
     streamThinkingItems,
     streamResponse,
     getSuggestions,
-    saveConversationToLocal,
-    loadConversationFromLocal
+    saveConversationToLocal
 } from './services/agenticService';
 
-function AgenticConversationPage({ initialQuery, existingConversationId, onBack }) {
+function AgenticConversationPage({ initialQuery, existingConversationId, onBack, existingMessages = [] }) {
     // Conversation state
     const [conversationId, setConversationId] = useState(existingConversationId || null);
     const [messages, setMessages] = useState([]);
-    const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
     // UI state
     const [isLoading, setIsLoading] = useState(false);
@@ -50,36 +45,36 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack 
         const initializeConversation = async () => {
             try {
                 // If existingConversationId is provided, load the conversation
-                if (existingConversationId) {
-                    setIsLoadingHistory(true);
-                    const savedConversation = loadConversationFromLocal(existingConversationId);
-
-                    if (savedConversation && savedConversation.messages) {
-                        setMessages(savedConversation.messages);
-                        setConversationId(existingConversationId);
-                    } else {
-                        setError('Conversation not found');
-                    }
-                    setIsLoadingHistory(false);
+                if (existingConversationId && existingMessages.length > 0) {
+                    let messages = [];
+                    existingMessages.forEach((item) => {
+                        messages.push({
+                            _id: "user_" + item.prompt,
+                            message: item.prompt,
+                            role: "user"
+                        })
+                        messages.push({
+                            _id: "system_" + item.response,
+                            message: item.response,
+                            role: "system",
+                            isComplete: true
+                        })
+                    })
+                    setMessages(messages);
                     return;
                 }
 
-                // Otherwise, create new conversation
-                const query = initialQuery || 'Generate an executive report on agentic risks this week';
-                const newConversationId = generateConversationId();
-                setConversationId(newConversationId);
-
                 // Add initial user message
                 const userMessage = {
-                    id: generateMessageId(),
+                    id: 'e',
                     type: 'user',
-                    content: query,
+                    content: initialQuery,
                     timestamp: new Date().toISOString()
                 };
                 setMessages([userMessage]);
 
                 // Process the initial query
-                await processQuery(newConversationId, query);
+                // await processQuery(newConversationId, query);
             } catch (err) {
                 setError('Failed to initialize conversation');
                 console.error(err);
@@ -183,7 +178,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack 
 
                     // Then add complete assistant message to history
                     const assistantMessage = {
-                        id: generateMessageId(),
+                        id: 'a',
                         type: 'assistant',
                         thinkingItems: streamedThinkingItems,
                         content: fullResponseContent, // Changed from 'response' to 'content'
@@ -213,7 +208,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack 
         if (query.trim() && conversationId) {
             // Add user message immediately
             const userMessage = {
-                id: generateMessageId(),
+                id: 'u',
                 type: 'user',
                 content: query,
                 timestamp: new Date().toISOString()
@@ -239,20 +234,6 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack 
         <>
             <Page id="agentic-conversation-page" fullWidth>
                 <VerticalStack gap="4">
-                    {/* Error Banner */}
-                    {error && (
-                        <Box paddingBlockEnd="4">
-                            <Banner
-                                title="Error"
-                                tone="critical"
-                                onDismiss={() => setError(null)}
-                            >
-                                <p>{error}</p>
-                            </Banner>
-                        </Box>
-                    )}
-
-                    {/* Header with Back and History buttons */}
                     <HorizontalStack align="space-between" blockAlign="center" gap="3">
                         <HorizontalStack gap="3" blockAlign="center">
                             {onBack && (
@@ -269,25 +250,22 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack 
                             <img src="/public/history.svg" alt="History" style={{ width: '20px', height: '20px' }} />
                         </Button>
                     </HorizontalStack>
-
-                    {/* Conversation content */}
                     <Box
-                        width="520px"
                         paddingBlockStart="16"
                         paddingBlockEnd="19"
                         paddingInlineStart="27"
+                        style={{ flex: 1, overflow: 'auto' }}
                     >
                         <VerticalStack gap="4" align="start">
                             {messages.map((message, index) => (
-                                message.type === 'user' ? (
-                                    <AgenticUserMessage key={message.id || index} content={message.content} />
+                                message.role === 'user' ? (
+                                    <AgenticUserMessage key={message._id || index} content={message.message} />
                                 ) : message.isComplete ? (
                                     <VerticalStack key={message.id || `response-${index}`} gap="2" align="start">
                                         <AgenticResponseContent
-                                            content={message.content}
-                                            timeTaken={message.timeTaken}
+                                            content={message.message}
                                         />
-                                        <AgenticCopyButton content={message.content} />
+                                        <AgenticCopyButton content={message.message} />
                                         {index === messages.length - 1 && !isLoading && !isStreaming && message.suggestions && (
                                             <AgenticSuggestionsList
                                                 suggestions={message.suggestions}

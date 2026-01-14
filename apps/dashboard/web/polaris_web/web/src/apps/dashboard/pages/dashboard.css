@@ -134,6 +134,9 @@
     --p-color-bg-critical-subdued: #FFF4F4 !important;
     --p-color-bg-caution-subdued: #FFF5EA !important;
     --p-color-bg-info-subdued: #A4E8F2 !important;
+
+    --p-color-bg-magic-subdued-active: #FAFAFA !important;
+    --p-color-bg-app-hover: #F6F6F7 !important;
 }
 
 .Polaris-Page{

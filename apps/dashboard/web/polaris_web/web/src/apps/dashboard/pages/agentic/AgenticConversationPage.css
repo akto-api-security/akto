@@ -29,13 +29,10 @@
 .ask-ai-route .Polaris-Page {
     min-height: 100vh;
     background: radial-gradient(68.5% 70.87% at 49.29% 41.78%, #FAFAFA 27.4%, #FAFAFA 54.33%, #F9F6FF 69.17%, #FFF 86.54%, #F0FAFF 98.08%);
-    display: flex;
-    flex-direction: column;
 }
 
 .ask-ai-route .Polaris-Page__Content{
     height: 100%;
-    margin: auto;
 }
 
 

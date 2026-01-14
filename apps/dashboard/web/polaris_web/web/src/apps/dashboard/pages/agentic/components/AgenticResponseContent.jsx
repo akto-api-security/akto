@@ -2,6 +2,7 @@ import { Box, Text, VerticalStack } from '@shopify/polaris';
 import MarkdownViewer from '../../../components/shared/MarkdownViewer';
 
 function AgenticResponseContent({ content, timeTaken }) {
+    console.log('content', content);
     return (
         <VerticalStack gap="2" align="start">
             {/* Time taken */}

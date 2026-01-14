@@ -1428,7 +1428,7 @@ const transform = {
     }));
     return testingEndpointsApisList;
   },
-  prepareConversationsList(agentConversationResults) {
+  prepareConversationsList(agentConversationResults, isGeneric = false) {
     let conversationsListCopy = []
     let extractedRemediationText = ''
 
@@ -1448,23 +1448,26 @@ const transform = {
 
       // Check if response contains "## ROOT CAUSE ANALYSIS"
       let systemMessage = conversation.response
-      extractedRemediationText = conversation.remediationMessage || "";
+      if(!isGeneric) {
+        extractedRemediationText = conversation.remediationMessage || "";
 
-      if (systemMessage && typeof systemMessage === 'string') {
-        const rootCauseIndex = systemMessage.indexOf('ROOT CAUSE ANALYSIS')
-        if (rootCauseIndex !== -1) {
-          // Extract remediation text (from "## ROOT CAUSE ANALYSIS" to the end)
-          if (!extractedRemediationText) {
-            extractedRemediationText = systemMessage.substring(rootCauseIndex)
+        if (systemMessage && typeof systemMessage === 'string') {
+          const rootCauseIndex = systemMessage.indexOf('ROOT CAUSE ANALYSIS')
+          if (rootCauseIndex !== -1) {
+            // Extract remediation text (from "## ROOT CAUSE ANALYSIS" to the end)
+            if (!extractedRemediationText) {
+              extractedRemediationText = systemMessage.substring(rootCauseIndex)
+            }
+            // Keep only the part before "## ROOT CAUSE ANALYSIS" for the conversation
+            systemMessage = systemMessage.substring(0, rootCauseIndex).trim()
           }
-          // Keep only the part before "## ROOT CAUSE ANALYSIS" for the conversation
-          systemMessage = systemMessage.substring(0, rootCauseIndex).trim()
+        }
+  
+        if (conversation?.validationMessage !== null && conversation?.validationMessage !== undefined && conversation?.validationMessage?.length > 0) {
+          systemMessage += ("\n\n### VALIDATION MESSAGE ###\n" + conversation?.validationMessage);
         }
       }
-
-      if (conversation?.validationMessage !== null && conversation?.validationMessage !== undefined && conversation?.validationMessage?.length > 0) {
-        systemMessage += ("\n\n### VALIDATION MESSAGE ###\n" + conversation?.validationMessage);
-      }
+      
 
       conversationsListCopy.push({
         ...commonObj,

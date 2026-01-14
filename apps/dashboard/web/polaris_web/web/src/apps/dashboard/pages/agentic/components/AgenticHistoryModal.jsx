@@ -1,53 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Box, Text, TextField, Icon, VerticalStack, HorizontalStack, Button } from '@shopify/polaris';
 import { SearchMinor, DeleteMinor } from '@shopify/polaris-icons';
-import { getConversationsList, clearConversationFromLocal } from '../services/agenticService';
+import { clearConversationFromLocal } from '../services/agenticService';
 import FlyLayout from '../../../components/layouts/FlyLayout';
 import SpinnerCentered from '../../../components/progress/SpinnerCentered';
 import TooltipText from '../../../components/shared/TooltipText';
+import func from '@/util/func';
 
-function AgenticHistoryModal({ isOpen, onClose, onHistoryClick }) {
-    const [historyItems, setHistoryItems] = useState([]);
-    const [filteredItems, setFilteredItems] = useState([]);
-    const [searchQuery, setSearchQuery] = useState('');
+function AgenticHistoryModal({ isOpen, onClose, onHistoryClick, historyItems = [], searchQuery = '', onSearchQueryChange, isLoading = false, onDelete }) {
     const [hoveredItemId, setHoveredItemId] = useState(null);
-    const [isLoading, setIsLoading] = useState(false);
-
-    useEffect(() => {
-        if (isOpen) {
-            loadHistory();
-        }
-    }, [isOpen]);
-
-    useEffect(() => {
-        // Filter history based on search query
-        if (searchQuery.trim()) {
-            const filtered = historyItems.filter(item =>
-                item.title.toLowerCase().includes(searchQuery.toLowerCase())
-            );
-            setFilteredItems(filtered);
-        } else {
-            setFilteredItems(historyItems);
-        }
-    }, [searchQuery, historyItems]);
-
-    const loadHistory = async () => {
-        setIsLoading(true);
-        try {
-            const conversations = await getConversationsList(50); // Load more for modal
-            setHistoryItems(conversations);
-            setFilteredItems(conversations);
-        } catch (error) {
-            console.error('Error loading history:', error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
     const handleDelete = (e, conversationId) => {
-        e.stopPropagation(); // Prevent opening conversation when deleting
+        e.stopPropagation();
         clearConversationFromLocal(conversationId);
-        loadHistory(); // Reload after delete
+        if (onDelete) {
+            onDelete(conversationId);
+        }
     };
 
     const handleItemClick = (conversationId, title) => {
@@ -61,7 +28,7 @@ function AgenticHistoryModal({ isOpen, onClose, onHistoryClick }) {
                 <div className="agentic-history-modal-search">
                     <TextField
                         value={searchQuery}
-                        onChange={setSearchQuery}
+                        onChange={onSearchQueryChange}
                         placeholder="Search history"
                         autoComplete="off"
                         prefix={<Icon source={SearchMinor} />}
@@ -71,7 +38,7 @@ function AgenticHistoryModal({ isOpen, onClose, onHistoryClick }) {
 
                 {isLoading ? (
                     <SpinnerCentered />
-                ) : filteredItems.length === 0 ? (
+                ) : historyItems.length === 0 ? (
                     <HorizontalStack align='center'>
                         <Text variant="bodyMd" tone="subdued" alignment="center">
                             {searchQuery ? 'No results found' : 'No history yet'}
@@ -79,7 +46,7 @@ function AgenticHistoryModal({ isOpen, onClose, onHistoryClick }) {
                     </HorizontalStack>
                 ) : (
                     <Box>
-                        {filteredItems.map((item) => (
+                        {historyItems.map((item) => (
                             <Box
                                 key={item.id}
                                 padding="3"
@@ -87,24 +54,23 @@ function AgenticHistoryModal({ isOpen, onClose, onHistoryClick }) {
                                 onClick={() => handleItemClick(item.id, item.title)}
                                 onMouseEnter={() => setHoveredItemId(item.id)}
                                 onMouseLeave={() => setHoveredItemId(null)}
-                                background={hoveredItemId === item.id ? 'bg-fill-subdued' : ''}
+                                background={hoveredItemId === item.id ? "bg-hover" : ''}
                             >
                                 <HorizontalStack align='space-between' blockAlign="center">
-                                    <Box maxWidth="300px">
-                                        <TooltipText
-                                            textProps={{ fontWeight: "bold", variant: "bodyMd" }} 
-                                            tooltip={item.title}
-                                            text={item.title}
-                                        />
-                                        {
-                                            hoveredItemId === item.id ? (
-                                                <Button monochrome icon={DeleteMinor} plain
-                                                    onClick={() => handleDelete(item.id)}
-                                                />
-                                            ) : <Text variant="bodyMd" tone="subdued">{item.time}</Text>
-                                        }
-                                    </Box>
+                                    <TooltipText
+                                        textProps={{ fontWeight: "bold", variant: "bodyMd" }} 
+                                        tooltip={item.title}
+                                        text={item.title}
+                                    />
+                                    {
+                                        hoveredItemId === item.id ? (
+                                            <Button monochrome icon={DeleteMinor} plain
+                                                onClick={(e) => handleDelete(e, item.id)}
+                                            />
+                                        ) : <Text variant="bodyMd" tone="subdued">{func.prettifyEpoch(item.lastUpdatedAt)}</Text>
+                                    }
                                 </HorizontalStack>
+                                
                             </Box>
                         ))}
                     </Box>

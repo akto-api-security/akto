@@ -1,27 +1,6 @@
-// Agentic AI Service - Handles all API communication
-
-// Configuration
+import request from "@/util/request"
 const API_BASE_URL = '/api/agentic'; // Update with your actual API endpoint
 
-/**
- * Generate a unique conversation ID
- */
-export const generateConversationId = () => {
-    return `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-};
-
-/**
- * Generate a unique message ID
- */
-export const generateMessageId = () => {
-    return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-};
-
-/**
- * Create a new conversation
- * @param {string} initialQuery - The first user query
- * @returns {Promise<string>} - Conversation ID
- */
 export const createConversation = async (initialQuery) => {
     try {
         const response = await fetch(`${API_BASE_URL}/conversations`, {
@@ -243,22 +222,6 @@ export const saveConversationToLocal = (conversationId, messages) => {
 };
 
 /**
- * Load conversation from localStorage
- * @param {string} conversationId - The conversation ID
- * @returns {Object|null} - Conversation data or null
- */
-export const loadConversationFromLocal = (conversationId) => {
-    try {
-        const key = `agentic_conversation_${conversationId}`;
-        const data = localStorage.getItem(key);
-        return data ? JSON.parse(data) : null;
-    } catch (error) {
-        console.error('Error loading conversation from localStorage:', error);
-        return null;
-    }
-};
-
-/**
  * Clear conversation from localStorage
  * @param {string} conversationId - The conversation ID
  */
@@ -271,27 +234,10 @@ export const clearConversationFromLocal = (conversationId) => {
     }
 };
 
-/**
- * Get list of recent conversations for history
- * @param {number} limit - Maximum number of conversations to return
- * @returns {Promise<Array>} - Array of conversation summaries
- */
-export const getConversationsList = async (limit = 10) => {
-    try {
-        const response = await fetch(`${API_BASE_URL}/conversations?limit=${limit}`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to get conversations list');
-        }
-
-        return await response.json();
-    } catch (error) {
-        console.error('Error getting conversations list:', error);
-        return [];
-    }
+export const getConversationsList = async (limit = 10, searchQuery = "") => {
+    return await request({
+        url: '/api/fetchHistory',
+        method: 'post',
+        data: {limit, searchQuery}
+    })
 };

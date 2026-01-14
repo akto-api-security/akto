@@ -1,23 +1,7 @@
-import { useState, useEffect } from 'react';
-import { Box, Button, Card, HorizontalGrid, HorizontalStack, Text, VerticalStack } from '@shopify/polaris';
-import { getConversationsList } from '../services/agenticService';
+import { Box, Card, HorizontalGrid, HorizontalStack, Link, Text, VerticalStack } from '@shopify/polaris';
+import func from '@/util/func';
 
-function AgenticHistoryCards({ onHistoryClick, onViewAllClick }) {
-    const [historyItems, setHistoryItems] = useState([]);
-
-    useEffect(() => {
-        const loadHistory = async () => {
-            try {
-                const conversations = await getConversationsList(3); // Get 3 most recent
-                setHistoryItems(conversations);
-            } catch (error) {
-                console.error('Error loading conversation history:', error);
-                setHistoryItems([]);
-            }
-        };
-
-        loadHistory();
-    }, []);
+function AgenticHistoryCards({ historyItems = [], onHistoryClick, onViewAllClick }) {
 
     // Don't render if no history
     if (historyItems.length === 0) {
@@ -32,24 +16,24 @@ function AgenticHistoryCards({ onHistoryClick, onViewAllClick }) {
                         <Text variant="headingSm" as="h2">
                             History
                         </Text>
-                        <Button plain onClick={onViewAllClick}>
-                            <Text variant="bodySm" as="span" tone="interactive">
+                        <Link onClick={onViewAllClick} monochrome>
+                            <Text variant="bodyMd" color='text-primary' as="span" tone="interactive">
                                 View all
                             </Text>
-                        </Button>
+                        </Link>
                     </HorizontalStack>
                 </Box>
 
                 <HorizontalGrid columns={{ xs: 1, sm: 2, md: 3 }} gap="4">
                     {historyItems.map((item) => (
                         <div key={item.id} onClick={() => onHistoryClick(item.id)} style={{ cursor: 'pointer' }}>
-                            <Card>
-                                <VerticalStack gap="8" align="space-between">
+                            <Card  background="bg-magic-subdued-active" padding="3">
+                                <VerticalStack gap="8">
                                     <Text variant="bodySm" fontWeight="medium" as="p">
                                         {item.title}
                                     </Text>
                                     <Text variant="bodyXs" tone="subdued" as="span">
-                                        {item.time}
+                                        {func.prettifyEpoch(item.lastUpdatedAt)}
                                     </Text>
                                 </VerticalStack>
                             </Card>

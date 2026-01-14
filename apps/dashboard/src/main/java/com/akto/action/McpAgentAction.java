@@ -8,14 +8,19 @@ import com.akto.dto.testing.GenericAgentConversation.ConversationType;
 import com.akto.util.Constants;
 import com.akto.util.McpTokenGenerator;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Accumulators;
+import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.BsonField;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
+import org.bson.conversions.Bson;
 
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -106,13 +111,30 @@ public class McpAgentAction extends UserAction {
         try {
             int fetchLimit = limit > 0 ? limit : 5;
 
-            List<GenericAgentConversation> conversations = AgentConversationDao.instance.findAll(
-                Filters.empty(),
-                0,
-                fetchLimit,
-                Sorts.descending("lastUpdatedAt"),
-                Projections.include("title", "conversationId", "prompt", "response", "finalSentPrompt")
-            );
+            List<Bson> pipeline = new ArrayList<>();
+            
+            pipeline.add(Aggregates.sort(Sorts.descending("lastUpdatedAt")));
+            BasicDBObject groupedId = new BasicDBObject("_id", "$conversationId");
+            List<BsonField> groupAccumulators = new ArrayList<>();
+            groupAccumulators.add(Accumulators.first("lastUpdatedAt", "$lastUpdatedAt"));
+            groupAccumulators.add(Accumulators.last("title", "$title"));
+            groupAccumulators.add(Accumulators.sum("tokensUsed", "$tokensUsed"));
+            groupAccumulators.add(Accumulators.push("messages", new BasicDBObject()
+                .append("prompt", "$prompt")
+                .append("response", "$response")
+            ));
+            
+            pipeline.add(Aggregates.group(groupedId, groupAccumulators.toArray(new BsonField[0])));
+            pipeline.add(Aggregates.limit(fetchLimit));
+            MongoCursor<BasicDBObject> cursor = AgentConversationDao.instance.getMCollection()
+                .aggregate(pipeline, BasicDBObject.class)
+                .cursor();
+            
+            List<BasicDBObject> conversations = new ArrayList<>();
+            while (cursor.hasNext()) {
+                BasicDBObject doc = cursor.next();
+                conversations.add(doc);
+            }
 
             BasicDBObject result = new BasicDBObject();
             result.put("history", conversations);
