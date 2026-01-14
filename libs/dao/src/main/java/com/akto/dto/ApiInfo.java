@@ -363,14 +363,7 @@ public class ApiInfo {
     }
 
     public Set<Set<String>> getAllAuthTypesFound() {
-        if(allAuthTypesFound == null){
-            return null;
-        }
-        Set<Set<String>> copy = new HashSet<>();
-        for(Set<String> authSet: allAuthTypesFound){
-            copy.add(new HashSet<>(authSet));
-        }
-        return copy;
+        return allAuthTypesFound;
     }
 
     public void setAllAuthTypesFound(Set<Set<String>> allAuthTypesFound) {
