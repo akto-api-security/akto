@@ -729,7 +729,7 @@ function ApiCollections(props) {
 
         // Process data - OPTIMIZATION: For large datasets (>COLLECTIONS_LAZY_RENDER_THRESHOLD items), store RAW data + transform function
         // Transformation happens on-demand in the table for each page (100 items at a time)
-        const shouldOptimize = finalArr.length > COLLECTIONS_LAZY_RENDER_THRESHOLD;
+        const shouldOptimize = finalArr.length > COLLECTIONS_LAZY_RENDER_THRESHOLD && func.isApiCollectionsCachingEnabled();
 
         let dataObj;
         if (shouldOptimize) {
