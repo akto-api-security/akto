@@ -79,11 +79,6 @@ public class APICatalogSync {
     public BloomFilter<CharSequence> existingSampleDataInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
     public Map<String, FilterConfig> advancedFilterMap =  new HashMap<>();
 
-    // Time window for sample data bloom filter (15 minutes = 900,000 ms)
-    // Aligns with mini-runtime sync cycle to avoid race conditions
-    // Allows new samples to be written every 15 minutes while drastically reducing DB load
-    private static final long SAMPLE_WINDOW_MS = 15 * 60 * 1000;
-
     private static DataActor dataActor = DataActorFactory.fetchInstance();
     public static Set<MergedUrls> mergedUrls;
     private static final ClientLayer clientLayer = new ClientLayer();
@@ -1192,6 +1187,12 @@ public class APICatalogSync {
     public void buildFromDB(boolean calcDiff, boolean fetchAllSTI) {
 
         loggerMaker.infoAndAddToDb("Started building from dB with calcDiff " + calcDiff + " fetchAllSTI: " + fetchAllSTI);
+
+        // Refresh sample data bloom filter every 15 minutes (DB_REFRESH_CYCLE)
+        // This clears the filter to allow new samples and prevents memory leak
+        this.existingSampleDataInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001);
+        loggerMaker.infoAndAddToDb("Refreshed sample data bloom filter");
+
         loggerMaker.infoAndAddToDb("Fetching STIs: " + fetchAllSTI);
         List<SingleTypeInfo> allParams;
         /*
@@ -1210,19 +1211,6 @@ public class APICatalogSync {
         loggerMaker.infoAndAddToDb("Starting building dbState");
         this.dbState = build(allParams, existingAPIsInDb);
         loggerMaker.infoAndAddToDb("Done building dbState");
-
-        // Load existing sample data keys into Bloom filter
-        loggerMaker.infoAndAddToDb("Loading existing sample data keys into Bloom filter");
-        try {
-            List<com.akto.dto.traffic.Key> sampleDataKeys = dataActor.fetchAllSampleDataKeys();
-            for (com.akto.dto.traffic.Key key : sampleDataKeys) {
-                String sampleKey = key.getApiCollectionId() + " " + key.getUrl() + " " + key.getMethod();
-                existingSampleDataInDb.put(sampleKey);
-            }
-            loggerMaker.infoAndAddToDb("Loaded " + sampleDataKeys.size() + " sample data keys into Bloom filter");
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error loading sample data keys into Bloom filter: " + e.getMessage());
-        }
 
         // todo: discuss
         //this.sensitiveParamInfoBooleanMap = new HashMap<>();
@@ -1643,14 +1631,11 @@ public class APICatalogSync {
         Map<URLStatic, RequestTemplate> dbStrictURLToMethods = dbCatalog.getStrictURLToMethods();
 
         for(Map.Entry<URLStatic, RequestTemplate> entry: deltaStrictURLToMethods.entrySet()) {
-            // Calculate current time window (15-minute buckets)
-            long currentWindow = System.currentTimeMillis() / SAMPLE_WINDOW_MS;
-            // Include time window in bloom filter key to allow new samples every 15 minutes
-            String sampleKey = apiCollectionId + " " + entry.getKey().getUrl() + " " + entry.getKey().getMethod() + " " + currentWindow;
+            String sampleKey = apiCollectionId + " " + entry.getKey().getUrl() + " " + entry.getKey().getMethod();
             if (forceUpdate || !existingSampleDataInDb.mightContain(sampleKey)) {
                 Key key = new Key(apiCollectionId, entry.getKey().getUrl(), entry.getKey().getMethod(), -1, 0, 0);
                 sampleData.add(new SampleData(key, entry.getValue().removeAllSampleMessage()));
-                existingSampleDataInDb.put(sampleKey);  // Add to Bloom filter with time window
+                existingSampleDataInDb.put(sampleKey);
             }
         }
 
@@ -1658,14 +1643,11 @@ public class APICatalogSync {
         Map<URLTemplate, RequestTemplate> dbTemplateURLToMethods = dbCatalog.getTemplateURLToMethods();
 
         for(Map.Entry<URLTemplate, RequestTemplate> entry: deltaTemplateURLToMethods.entrySet()) {
-            // Calculate current time window (15-minute buckets)
-            long currentWindow = System.currentTimeMillis() / SAMPLE_WINDOW_MS;
-            // Include time window in bloom filter key to allow new samples every 15 minutes
-            String sampleKey = apiCollectionId + " " + entry.getKey().getTemplateString() + " " + entry.getKey().getMethod() + " " + currentWindow;
+            String sampleKey = apiCollectionId + " " + entry.getKey().getTemplateString() + " " + entry.getKey().getMethod();
             if (forceUpdate || !existingSampleDataInDb.mightContain(sampleKey)) {
                 Key key = new Key(apiCollectionId, entry.getKey().getTemplateString(), entry.getKey().getMethod(), -1, 0, 0);
                 sampleData.add(new SampleData(key, entry.getValue().removeAllSampleMessage()));
-                existingSampleDataInDb.put(sampleKey);  // Add to Bloom filter with time window
+                existingSampleDataInDb.put(sampleKey);
             }
         }
 
