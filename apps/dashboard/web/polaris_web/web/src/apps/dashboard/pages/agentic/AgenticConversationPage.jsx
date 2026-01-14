@@ -9,10 +9,10 @@ import AgenticSuggestionsList from './components/AgenticSuggestionsList';
 import AgenticSearchInput from './components/AgenticSearchInput';
 import AgenticHistoryModal from './components/AgenticHistoryModal';
 import './AgenticConversationPage.css';
-import { sendQuery } from './services/agenticService';
+import { sendQuery, getConversationsList } from './services/agenticService';
 import func from '@/util/func';
 
-function AgenticConversationPage({ initialQuery, existingConversationId, onBack, existingMessages = [] }) {
+function AgenticConversationPage({ initialQuery, existingConversationId, onBack, existingMessages = [], onLoadConversation }) {
     // Conversation state
     const [conversationId, setConversationId] = useState(existingConversationId || null);
     const [messages, setMessages] = useState([]);
@@ -22,6 +22,11 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
     const [isStreaming, setIsStreaming] = useState(false);
     const [followUpValue, setFollowUpValue] = useState('');
     const [showHistoryModal, setShowHistoryModal] = useState(false);
+
+    // History state
+    const [historyItems, setHistoryItems] = useState([]);
+    const [historySearchQuery, setHistorySearchQuery] = useState('');
+    const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
     // Error state
     const [error, setError] = useState(null);
@@ -34,35 +39,41 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
         const initializeConversation = async () => {
             try {
                 // If existingConversationId is provided, load the conversation
-                if (existingConversationId && existingMessages.length > 0) {
-                    let messages = [];
-                    existingMessages.forEach((item) => {
-                        messages.push({
-                            _id: "user_" + item.prompt,
-                            message: item.prompt,
-                            role: "user"
+                if (existingConversationId) {
+                    if (existingMessages.length > 0) {
+                        let messages = [];
+                        existingMessages.forEach((item) => {
+                            messages.push({
+                                _id: "user_" + item.prompt,
+                                message: item.prompt,
+                                role: "user"
+                            })
+                            messages.push({
+                                _id: "system_" + item.response,
+                                message: item.response,
+                                role: "system",
+                                isComplete: true
+                            })
                         })
-                        messages.push({
-                            _id: "system_" + item.response,
-                            message: item.response,
-                            role: "system",
-                            isComplete: true
-                        })
-                    })
-                    setMessages(messages);
+                        setMessages(messages);
+                    }
+                    // Don't call processQuery for existing conversations
                     return;
                 }
 
-                // Add initial user message
-                const userMessage = {
-                    _id: 'conversation_user_' + Date.now(),
-                    role: 'user',
-                    message: initialQuery
-                };
-                setMessages([userMessage]);
+                // Only process new queries when there's an initialQuery and no existingConversationId
+                if (initialQuery) {
+                    // Add initial user message
+                    const userMessage = {
+                        _id: 'conversation_user_' + Date.now(),
+                        role: 'user',
+                        message: initialQuery
+                    };
+                    setMessages([userMessage]);
 
-                // Process the initial query
-                await processQuery(initialQuery);
+                    // Process the initial query
+                    await processQuery(initialQuery);
+                }
             } catch (err) {
                 setError('Failed to initialize conversation');
                 console.error(err);
@@ -72,6 +83,48 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
         initializeConversation();
     }, [initialQuery, existingConversationId]);
 
+
+    // Fetch history when modal opens or search query changes
+    useEffect(() => {
+        const fetchHistory = async () => {
+            if (!showHistoryModal) return;
+
+            setIsHistoryLoading(true);
+            try {
+                const response = await getConversationsList(50, historySearchQuery);
+                console.log('History API response:', response);
+                if (response && response.history) {
+                    const formattedHistory = response.history.map(conv => {
+                        // Get the conversation ID from the nested structure
+                        const conversationId = conv._id?._id || conv._id;
+
+                        // Use the title from the conversation
+                        const title = conv.title || 'Untitled conversation';
+
+                        // Use lastUpdatedAt if available and not 0, otherwise use current time
+                        const lastUpdatedAt = conv.lastUpdatedAt && conv.lastUpdatedAt !== 0
+                            ? conv.lastUpdatedAt
+                            : Date.now();
+
+                        return {
+                            id: conversationId,
+                            title: title,
+                            lastUpdatedAt: lastUpdatedAt
+                        };
+                    });
+                    console.log('Formatted history:', formattedHistory);
+                    setHistoryItems(formattedHistory);
+                }
+            } catch (error) {
+                console.error('Error fetching history:', error);
+                setHistoryItems([]);
+            } finally {
+                setIsHistoryLoading(false);
+            }
+        };
+
+        fetchHistory();
+    }, [showHistoryModal, historySearchQuery]);
 
     // Auto-focus input on keypress
     useEffect(() => {
@@ -145,12 +198,15 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
     };
 
     const handleHistoryClick = (convId, title) => {
-        // Navigate back to main page and load the conversation
-        if (onBack) {
-            onBack();
+        // Load the conversation without page reload
+        if (onLoadConversation) {
+            onLoadConversation(convId);
         }
-        // The main page will handle loading the conversation
-        window.location.href = `/dashboard/ask-ai?conversation=${convId}`;
+    };
+
+    const handleDeleteHistory = (conversationId) => {
+        // Remove the conversation from the history list
+        setHistoryItems(prev => prev.filter(item => item.id !== conversationId));
     };
 
     return (
@@ -234,6 +290,11 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                     isOpen={showHistoryModal}
                     onClose={() => setShowHistoryModal(false)}
                     onHistoryClick={handleHistoryClick}
+                    historyItems={historyItems}
+                    searchQuery={historySearchQuery}
+                    onSearchQueryChange={setHistorySearchQuery}
+                    isLoading={isHistoryLoading}
+                    onDelete={handleDeleteHistory}
                 />
             </Page>
         </>

@@ -21,6 +21,7 @@ function AgenticMainPage() {
     const [historyItems, setHistoryItems] = useState([]);
     const [historySearchQuery, setHistorySearchQuery] = useState('');
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+    const [pendingConversationId, setPendingConversationId] = useState(null);
 
     const handleSearchSubmit = useCallback((query) => {
         setCurrentQuery(query);
@@ -37,6 +38,10 @@ function AgenticMainPage() {
         setLoadConversationId(conversationId); // Load existing conversation
         setCurrentQuery(''); // Clear query for history load
         setShowConversation(true);
+        // Clear the URL query parameter if present
+        const url = new URL(window.location);
+        url.searchParams.delete('conversation');
+        window.history.replaceState({}, '', url);
     }, []);
 
     const handleViewAllClick = useCallback(() => {
@@ -63,10 +68,32 @@ function AgenticMainPage() {
     useEffect(() => {
         if (showHistoryModal) {
             loadHistory(50, historySearchQuery);
-        }else{
+        } else if (pendingConversationId) {
+            // Load more history to find the conversation from URL
+            loadHistory(50, "");
+        } else {
             loadHistory(3, "");
         }
-    }, [showHistoryModal, historySearchQuery, loadHistory]);
+    }, [showHistoryModal, historySearchQuery, pendingConversationId, loadHistory]);
+
+    // Check URL for conversation parameter on mount
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const conversationId = urlParams.get('conversation');
+
+        if (conversationId) {
+            // Set as pending until history is loaded
+            setPendingConversationId(conversationId);
+        }
+    }, []); // Run only on mount
+
+    // Load pending conversation after history is loaded
+    useEffect(() => {
+        if (pendingConversationId && historyItems.length > 0 && !isLoadingHistory) {
+            handleHistoryClick(pendingConversationId);
+            setPendingConversationId(null); // Clear after loading
+        }
+    }, [pendingConversationId, historyItems, isLoadingHistory, handleHistoryClick]);
 
     // If conversation is active, show the conversation page
     if (showConversation) {
@@ -79,6 +106,7 @@ function AgenticMainPage() {
                     setShowConversation(false);
                     setSearchValue(''); // Clear search input when going back
                 }}
+                onLoadConversation={handleHistoryClick}
             />
         );
     }
@@ -101,7 +129,7 @@ function AgenticMainPage() {
                         />
                     </VerticalStack>    
                     <AgenticHistoryCards
-                        historyItems={historyItems}
+                        historyItems={historyItems.slice(0, 3)}
                         onHistoryClick={handleHistoryClick}
                         onViewAllClick={handleViewAllClick}
                     />
