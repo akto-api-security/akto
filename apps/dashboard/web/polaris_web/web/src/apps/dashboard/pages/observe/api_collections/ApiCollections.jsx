@@ -247,10 +247,22 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             c.disableClick = true
         }
         const tagsList = JSON.stringify(c?.tagsList || "")
+
+        // Split collection name for Endpoint Security category
+        let displayText = c.displayName;
+        let endpointId = '';
+        if (isEndpointSecurityCategory()) {
+            const splitResult = transform.splitCollectionNameForEndpointSecurity(c.displayName);
+            displayText = splitResult.apiCollectionName;
+            endpointId = splitResult.endpointId;
+        }
+
         // Build result object directly without spread operator for better memory efficiency
         return {
             id: c.id,
             displayName: c.displayName,
+            splitApiCollectionName: displayText,
+            endpointId: endpointId,
             hostName: c.hostName,
             type: c.type,
             deactivated: c.deactivated,
@@ -268,7 +280,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             envType: c?.envType?.map(func.formatCollectionType),
             displayNameComp: (
                 <HorizontalStack gap="2" align="start">
-                    <Box maxWidth="30vw"><Text truncate fontWeight="medium">{c.displayName}</Text></Box>
+                    <Box maxWidth="30vw"><Text truncate fontWeight="medium">{displayText}</Text></Box>
                     {c.registryStatus === "available" && <RegistryBadge />}
                 </HorizontalStack>
             ),
@@ -334,11 +346,22 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         });
     }
 
+    // Split collection name for Endpoint Security category
+    let splitApiCollectionName = rawCollection.displayName;
+    let endpointId = '';
+    if (isEndpointSecurityCategory()) {
+        const splitResult = transform.splitCollectionNameForEndpointSecurity(rawCollection.displayName);
+        splitApiCollectionName = splitResult.apiCollectionName;
+        endpointId = splitResult.endpointId;
+    }
+
     // Return minimal object - only fields needed for filtering, sorting, and categorization
     // JSX components will be created on-demand by prettifyPageData
     return {
         id: rawCollection.id,
         displayName: rawCollection.displayName,
+        splitApiCollectionName: splitApiCollectionName,
+        endpointId: endpointId,
         hostName: rawCollection.hostName,
         type: rawCollection.type,
         deactivated: rawCollection.deactivated,
