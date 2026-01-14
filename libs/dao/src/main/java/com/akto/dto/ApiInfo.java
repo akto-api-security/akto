@@ -84,6 +84,25 @@ public class ApiInfo {
                 authType.equals(SESSION_TOKEN)
             );
         }
+
+        /**
+         * Returns all standard auth type constants.
+         * Used for testing and demo data generation.
+         */
+        public static String[] getAllStandardTypes() {
+            return new String[]{
+                UNAUTHENTICATED,
+                BASIC,
+                AUTHORIZATION_HEADER,
+                JWT,
+                API_TOKEN,
+                BEARER,
+                CUSTOM,
+                API_KEY,
+                MTLS,
+                SESSION_TOKEN
+            };
+        }
     }
 
     public enum ApiAccessType {
@@ -344,7 +363,14 @@ public class ApiInfo {
     }
 
     public Set<Set<String>> getAllAuthTypesFound() {
-        return allAuthTypesFound;
+        if(allAuthTypesFound == null){
+            return null;
+        }
+        Set<Set<String>> copy = new HashSet<>();
+        for(Set<String> authSet: allAuthTypesFound){
+            copy.add(new HashSet<>(authSet));
+        }
+        return copy;
     }
 
     public void setAllAuthTypesFound(Set<Set<String>> allAuthTypesFound) {
