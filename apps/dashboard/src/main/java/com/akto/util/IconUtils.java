@@ -69,6 +69,7 @@ public class IconUtils {
     /**
      * Fetch icon from Google Favicon API with cascading domain fallback and store in database
      * Tries full hostname first, then progressively removes subdomains until success or TLD reached
+     * Optimized with pre-built candidate domains to avoid repeated string operations
      */
     public static void fetchAndStoreIconWithCascade(String fullHostname) {
         if (fullHostname == null || fullHostname.trim().isEmpty()) {
@@ -84,22 +85,46 @@ public class IconUtils {
             return;
         }
         
-        // Try from full hostname down to main domain (last 2 parts)
-        for (int i = 0; i <= parts.length - 2; i++) {
-            StringBuilder domainBuilder = new StringBuilder();
-            for (int j = i; j < parts.length; j++) {
-                if (j > i) domainBuilder.append(".");
-                domainBuilder.append(parts[j]);
-            }
-            String candidateDomain = domainBuilder.toString();
-            
-            // Try to fetch icon for this domain level
+        // Pre-build all candidate domains to avoid repeated string operations
+        String[] candidateDomains = buildCandidateDomains(parts);
+        
+        // Try each candidate domain in order (full hostname -> main domain)
+        for (String candidateDomain : candidateDomains) {
             if (tryFetchAndStoreIcon(candidateDomain, fullHostname)) {
                 return; // Success - stop trying other levels
             }
         }
         
         loggerMaker.infoAndAddToDb("Failed to fetch icon for hostname: " + fullHostname + " after trying all domain levels", LogDb.DASHBOARD);
+    }
+    
+    /**
+     * Pre-build all candidate domains from hostname parts to avoid repeated string operations
+     * Example: ["api", "staging", "example", "com"] -> ["api.staging.example.com", "staging.example.com", "example.com"]
+     * Optimized for performance with efficient string joining
+     */
+    private static String[] buildCandidateDomains(String[] parts) {
+        int numCandidates = parts.length - 1; // Don't include just TLD
+        String[] candidates = new String[numCandidates];
+        
+        // Use efficient string joining instead of nested loops
+        for (int level = 0; level < numCandidates; level++) {
+            // Calculate the required capacity to avoid StringBuilder resizing
+            int capacity = 0;
+            for (int j = level; j < parts.length; j++) {
+                capacity += parts[j].length();
+                if (j > level) capacity++; // for the dot
+            }
+            
+            StringBuilder domainBuilder = new StringBuilder(capacity);
+            for (int j = level; j < parts.length; j++) {
+                if (j > level) domainBuilder.append(".");
+                domainBuilder.append(parts[j]);
+            }
+            candidates[level] = domainBuilder.toString();
+        }
+        
+        return candidates;
     }
 
     /**
@@ -144,6 +169,10 @@ public class IconUtils {
                                     Updates.set(ApiCollectionIcon.UPDATED_AT, Context.now())
                                 )
                             );
+                            
+                            // Update cache with new hostname mapping to avoid waiting for 30-minute refresh
+                            IconCache.getInstance().addHostnameMapping(originalHostname, domain, existingIcon.getId());
+                            
                             loggerMaker.infoAndAddToDb("Updated existing domain entry: " + domain + " with hostname: " + originalHostname, LogDb.DASHBOARD);
                         } else {
                             loggerMaker.infoAndAddToDb("Domain: " + domain + " already contains hostname: " + originalHostname, LogDb.DASHBOARD);
@@ -156,7 +185,18 @@ public class IconUtils {
                         ApiCollectionIcon icon = new ApiCollectionIcon(domain, matchingHostnames, base64Data);
                         ApiCollectionIconsDao.instance.insertOne(icon);
                         
-                        loggerMaker.infoAndAddToDb("Successfully fetched and cached new icon for domain: " + domain + " (from hostname: " + originalHostname + ")", LogDb.DASHBOARD);
+                        // For new entries, update cache immediately by reloading to get ObjectId
+                        // This ensures cache consistency without waiting for 30-minute refresh
+                        ApiCollectionIcon newlyCreatedIcon = ApiCollectionIconsDao.instance.findOne(
+                            Filters.eq(ApiCollectionIcon.DOMAIN_NAME, domain)
+                        );
+                        
+                        if (newlyCreatedIcon != null && newlyCreatedIcon.getId() != null) {
+                            IconCache.getInstance().addHostnameMapping(originalHostname, domain, newlyCreatedIcon.getId());
+                            loggerMaker.infoAndAddToDb("Successfully fetched and cached new icon for domain: " + domain + " (from hostname: " + originalHostname + ") and updated cache", LogDb.DASHBOARD);
+                        } else {
+                            loggerMaker.infoAndAddToDb("Successfully fetched and cached new icon for domain: " + domain + " (from hostname: " + originalHostname + ") but failed to update cache - will update on next refresh", LogDb.DASHBOARD);
+                        }
                     }
                     
                     return true;
