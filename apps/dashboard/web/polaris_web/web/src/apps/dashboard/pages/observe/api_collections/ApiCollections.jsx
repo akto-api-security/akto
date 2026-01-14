@@ -261,9 +261,11 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             discovered: func.prettifyEpoch(c.startTs || 0),
             descriptionComp: (<Box maxWidth="350px"><Text>{c.description}</Text></Box>),
             outOfTestingScopeComp: c.isOutOfTestingScope ? (<Text>Yes</Text>) : (<Text>No</Text>),
-        ...(((isAgenticSecurityCategory() || isEndpointSecurityCategory()) && tagsList.includes("mcp-server")) ? {
+        ...((tagsList.includes("mcp-server")) ? {
             iconComp: (<Box><CollectionIcon hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>)
-        } : ((isGenAISecurityCategory() || isAgenticSecurityCategory()) && tagsList.includes("gen-ai")) ? {
+        } : (tagsList.includes("gen-ai")) ? {
+            iconComp: (<Box><CollectionIcon hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>)
+        } : (tagsList.includes("browser-llm")) ? {
             iconComp: (<Box><CollectionIcon hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>)
         } : {})
         };
