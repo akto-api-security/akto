@@ -55,7 +55,26 @@ const headers = [
         isText: CellType.TEXT,
         boxWidth: '24px'
     }] : []),
-    {
+    ...(isEndpointSecurityCategory() ? [
+        {
+            title: "API Collection name",
+            text: "API Collection name",
+            value: "displayNameComp",
+            filterKey: "splitApiCollectionName",
+            textValue: 'splitApiCollectionName',
+            showFilter: true,
+            titleWithTooltip: <HeadingWithTooltip content="These API groups are computed periodically" title="API Collection name" />
+        },
+        {
+            title: "Endpoint ID",
+            text: "Endpoint ID",
+            value: "endpointId",
+            filterKey: "endpointId",
+            textValue: 'endpointId',
+            showFilter: true,
+            isText: CellType.TEXT,
+        }
+    ] : [{
         title: mapLabel("API collection name", getDashboardCategory()),
         text: mapLabel("API collection name", getDashboardCategory()),
         value: "displayNameComp",
@@ -63,7 +82,7 @@ const headers = [
         textValue: 'displayName',
         showFilter: true,
         titleWithTooltip: <HeadingWithTooltip content="These API groups are computed periodically" title={mapLabel("API collection name", getDashboardCategory())} />
-    },
+    }]),
     {
         title: mapLabel("Total endpoints", getDashboardCategory()),
         text: mapLabel("Total endpoints", getDashboardCategory()),
@@ -185,11 +204,12 @@ const isAtlas = isEndpointSecurityCategory()
 const isArgus = isAgenticSecurityCategory()
 const isAtlasArgus = isAtlas || isArgus;
 
+// For Endpoint Security, we have an extra column (Endpoint ID) after API Collection name
 const nameColIndex = isAtlasArgus ? 2 : 1;
-const endpointColIndex = isAtlasArgus ? 3 : 2;
-const discoveredColIndex = isArgus ? 10 : (isAtlas ? 8 : 9);
-const trafficColIndex = isArgus ? 9 : (isAtlas ? 7 : 8);
-const riskColIndex = isAtlasArgus ? 4 : 3
+const endpointColIndex = isAtlas ? 4 : (isArgus ? 3 : 2);
+const discoveredColIndex = isArgus ? 10 : (isAtlas ? 9 : 9);
+const trafficColIndex = isArgus ? 9 : (isAtlas ? 8 : 8);
+const riskColIndex = isAtlas ? 5 : (isAtlasArgus ? 4 : 3)
 
 const tempSortOptions = [
     { label: 'Name', value: 'customGroupsSort asc', directionLabel: 'A-Z', sortKey: 'customGroupsSort', columnIndex: nameColIndex},
