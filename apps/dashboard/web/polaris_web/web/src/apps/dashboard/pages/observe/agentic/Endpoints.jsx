@@ -171,7 +171,7 @@ function Endpoints() {
     const pageTitle = useMemo(() => (
                 <TitleWithInfo
                     tooltipContent="View API endpoints grouped by tags for better organization and analysis."
-                    titleText={mapLabel("Endpoints", getDashboardCategory())}
+                    titleText={"Agentic assets"}
                     docsUrl="https://docs.akto.io/api-inventory/concepts"
                 />
     ), []);

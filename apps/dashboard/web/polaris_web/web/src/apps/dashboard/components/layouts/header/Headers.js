@@ -197,7 +197,7 @@ export default function Header() {
         PersistStore.getState().setFiltersMap({});
         setDashboardCategory(value);
         const targetPath = value === "Endpoint Security"
-            ? "/dashboard/observe/endpoints"
+            ? "/dashboard/observe/agentic-assets"
             : "/dashboard/observe/inventory";
         navigate(targetPath);
         navigate(0);
