@@ -9,7 +9,7 @@ services:
     networks:
       - guardrails-network
     ports:
-      - "80:8080"
+      - "127.0.0.1:80:8080"
 
     environment:
       # Kafka configuration
@@ -39,7 +39,7 @@ services:
     networks:
       - guardrails-network
     ports:
-      - "4000:4000"
+      - "127.0.0.1:4000:4000"
     volumes:
       - ./config.yaml:/app/config.yaml
       - ./custom_hooks.py:/app/custom_hooks.py
@@ -75,7 +75,7 @@ services:
       POSTGRES_USER: "${POSTGRES_USER}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -92,7 +92,7 @@ services:
       - prometheus_data:/prometheus
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
-      - "9091:9090"
+      - "127.0.0.1:9091:9090"
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
