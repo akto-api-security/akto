@@ -568,7 +568,22 @@ export default function LeftNav() {
 
         const exists = items.find(item => item.key === "quick_start")
         if (!exists) {
-            items.splice(2, 0, {
+            // Find the correct position to insert "Quick Start"
+            // It should be inserted after Dashboard (if present) or after the first navigation item
+            // For akto users: after Dashboard (index 2)
+            // For non-akto users: after "API Security Posture" (if present) or after "API Discovery"
+            let insertIndex = 1; // Default: after Account dropdown
+            
+            // If Dashboard is present (akto users), insert after Dashboard (index 2)
+            if (isAllowedDashboardUser && (
+                dashboardCategory === CATEGORY_AGENTIC_SECURITY ||
+                dashboardCategory === CATEGORY_API_SECURITY ||
+                dashboardCategory === CATEGORY_ENDPOINT_SECURITY
+            )) {
+                insertIndex = 2;
+            }
+            
+            items.splice(insertIndex, 0, {
                 label: mapLabel("Quick Start", dashboardCategory),
                 icon: AppsFilledMajor,
                 onClick: () => {
