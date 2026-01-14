@@ -46,15 +46,17 @@ const findClientInfo = (tagValue) => {
     return null;
 };
 
+const capitalizeWord = (w) => w.toLowerCase() === 'cli' ? 'CLI' : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+
 const formatDisplayName = (tagValue) => {
     if (!tagValue) return 'Unknown';
     const info = findClientInfo(tagValue);
     if (!info) {
-        return tagValue.split(/[-_\s]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+        return tagValue.split(/[-_\s]+/).map(capitalizeWord).join(' ');
     }
     const idx = tagValue.toLowerCase().indexOf(info.keyword);
-    const before = tagValue.substring(0, idx).split(/[-_\s]+/).filter(w => w).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
-    const after = tagValue.substring(idx + info.keyword.length).split(/[-_\s]+/).filter(w => w).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+    const before = tagValue.substring(0, idx).split(/[-_\s]+/).filter(w => w).map(capitalizeWord).join(' ');
+    const after = tagValue.substring(idx + info.keyword.length).split(/[-_\s]+/).filter(w => w).map(capitalizeWord).join(' ');
     return [before, info.displayName, after].filter(p => p).join(' ');
 };
 
