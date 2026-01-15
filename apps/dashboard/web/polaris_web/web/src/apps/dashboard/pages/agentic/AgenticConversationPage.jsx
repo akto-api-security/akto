@@ -3,7 +3,7 @@ import { Page, Box, Button, Text, HorizontalStack, VerticalStack } from '@shopif
 import { ArrowLeftMinor } from '@shopify/polaris-icons';
 import AgenticUserMessage from './components/AgenticUserMessage';
 import AgenticThinkingBox from './components/AgenticThinkingBox';
-import AgenticResponseContent from './components/AgenticResponseContent';
+import AgenticStreamingResponse from './components/AgenticStreamingResponse';
 import AgenticCopyButton from './components/AgenticCopyButton';
 import AgenticSuggestionsList from './components/AgenticSuggestionsList';
 import AgenticSearchInput from './components/AgenticSearchInput';
@@ -16,6 +16,8 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
     // Conversation state
     const [conversationId, setConversationId] = useState(existingConversationId || null);
     const [messages, setMessages] = useState([]);
+    const [completedStreamingMessages, setCompletedStreamingMessages] = useState(new Set());
+    const [isFromHistory, setIsFromHistory] = useState(!!existingConversationId);
 
     // UI state
     const [isLoading, setIsLoading] = useState(false);
@@ -52,7 +54,8 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                                 _id: "system_" + item.response,
                                 message: item.response,
                                 role: "system",
-                                isComplete: true
+                                isComplete: true,
+                                isFromHistory: true
                             })
                         })
                         setMessages(messages);
@@ -166,7 +169,8 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                     _id: "system_" + Date.now(),
                     message: res.response,
                     role: "system",
-                    isComplete: true
+                    isComplete: true,
+                    isFromHistory: false
                 };
                 setMessages(prev => [...prev, aiMessage]);
             }
@@ -209,6 +213,10 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
         setHistoryItems(prev => prev.filter(item => item.id !== conversationId));
     };
 
+    const handleStreamingComplete = (messageId) => {
+        setCompletedStreamingMessages(prev => new Set([...prev, messageId]));
+    };
+
     return (
         <>
             <Page id="agentic-conversation-page" fullWidth>
@@ -239,10 +247,14 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                                     <AgenticUserMessage key={message._id || index} content={message.message} />
                                 ) : message.isComplete ? (
                                     <VerticalStack key={message.id || `response-${index}`} gap="2" align="start">
-                                        <AgenticResponseContent
+                                        <AgenticStreamingResponse
                                             content={message.message}
+                                            onStreamingComplete={() => handleStreamingComplete(message._id)}
+                                            skipStreaming={message.isFromHistory || false}
                                         />
-                                        <AgenticCopyButton content={message.message} />
+                                        {completedStreamingMessages.has(message._id) && (
+                                            <AgenticCopyButton content={message.message} />
+                                        )}
                                         {index === messages.length - 1 && !isLoading && !isStreaming && message.suggestions && (
                                             <AgenticSuggestionsList
                                                 suggestions={message.suggestions}
@@ -285,7 +297,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                     isStreaming={isStreaming}
                     isFixed={true}
                     centerAlign={true}
-                    inputWidth="500px"
+                    inputWidth="600px"
                 />
 
                 {/* History Modal */}

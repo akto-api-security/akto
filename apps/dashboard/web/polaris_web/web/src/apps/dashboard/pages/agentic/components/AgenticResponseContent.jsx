@@ -16,7 +16,7 @@ function AgenticResponseContent({ content, timeTaken }) {
 
             {/* Markdown content */}
             <Box
-                background="bg-transparent-active-experimental"
+                // background="bg-transparent-active-experimental"
                 borderRadius='3'
                 borderRadiusEndStart='0'
             >
