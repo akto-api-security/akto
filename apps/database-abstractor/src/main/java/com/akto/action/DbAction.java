@@ -4667,18 +4667,6 @@ public class DbAction extends ActionSupport {
      */
     public String fetchApiIds() {
         try {
-            if (lastApiInfoKey == null) {
-                loggerMaker.infoAndAddToDb("Fetching first page of API IDs for Bloom filter initialization", LogDb.DB_ABS);
-            } else {
-                loggerMaker.infoAndAddToDb(
-                    String.format("Fetching API IDs page with cursor: collection=%d, method=%s, url=%s",
-                                 lastApiInfoKey.getApiCollectionId(),
-                                 lastApiInfoKey.getMethod(),
-                                 lastApiInfoKey.getUrl()),
-                    LogDb.DB_ABS
-                );
-            }
-
             // Fetch paginated results using cursor
             this.apiIds = DbLayer.fetchAllApiInfoKeys(lastApiInfoKey);
 
@@ -4691,11 +4679,6 @@ public class DbAction extends ActionSupport {
                 URLMethods.Method method = URLMethods.Method.fromString(methodStr);
                 this.lastApiInfoKey = new ApiInfoKey(apiCollectionId, url, method);
             }
-
-            loggerMaker.infoAndAddToDb(
-                String.format("Fetched %d API IDs in this page", apiIds.size()),
-                LogDb.DB_ABS
-            );
 
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
