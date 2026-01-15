@@ -2,23 +2,10 @@ import { useState, useEffect } from "react";
 import func from "@/util/func"
 import { LegacyCard, VerticalStack, Divider, Text, Box, TextField, HorizontalGrid } from "@shopify/polaris";
 
-const ModuleEnvConfigComponent = ({ title, description, module, onSaveEnv }) => {
+const ModuleEnvConfigComponent = ({ title, description, module, allowedEnvFields, onSaveEnv }) => {
     const [envData, setEnvData] = useState({});
     const [initialEnvData, setInitialEnvData] = useState({});
     const [isSaveDisabled, setIsSaveDisabled] = useState(true);
-
-    const envFields = [
-        { key: "AKTO_KAFKA_BROKER_MAL", label: "Kafka Broker MAL" },
-        { key: "AKTO_KAFKA_BROKER_URL", label: "Kafka Broker URL" },
-        { key: "AKTO_TRAFFIC_BATCH_SIZE", label: "Traffic Batch Size" },
-        { key: "AKTO_TRAFFIC_BATCH_TIME_SECS", label: "Traffic Batch Time (Seconds)" },
-        { key: "AKTO_LOG_LEVEL", label: "Log Level" },
-        { key: "DEBUG_URLS", label: "Debug URLs" },
-        { key: "AKTO_K8_METADATA_CAPTURE", label: "K8 Metadata Capture" },
-        { key: "AKTO_THREAT_ENABLED", label: "Threat Enabled" },
-        { key: "AKTO_IGNORE_ENVOY_PROXY_CALLS", label: "Ignore Envoy Proxy Calls" },
-        { key: "AKTO_IGNORE_IP_TRAFFIC", label: "Ignore IP Traffic" },
-    ];
 
     useEffect(() => {
         if (module?.additionalData?.env) {
@@ -73,7 +60,7 @@ const ModuleEnvConfigComponent = ({ title, description, module, onSaveEnv }) => 
             <Divider />
             <LegacyCard.Section>
                 <VerticalStack gap="4">
-                    {envFields.map((field) => {
+                    {allowedEnvFields && allowedEnvFields.map((field) => {
                         const fieldValue = envData[field.key] || "";
                         return (
                             <HorizontalGrid key={field.key} columns={2} gap="4">

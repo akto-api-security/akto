@@ -18,6 +18,7 @@ const Logs = () => {
     })
     const [ loading, setLoading ] = useState(false)
     const [ moduleInfos, setModuleInfos ] = useState([])
+    const [ allowedEnvFields, setAllowedEnvFields ] = useState([])
     const [ selectedModules, setSelectedModules ] = useState([])
     const [ modalActive, setModalActive ] = useState(false)
     const [ selectedModule, setSelectedModule ] = useState(null)
@@ -61,6 +62,7 @@ const Logs = () => {
     const fetchModuleInfo = async () => {
         const response = await settingRequests.fetchModuleInfo();
         setModuleInfos(response.moduleInfos || []);
+        setAllowedEnvFields(response.allowedEnvFields || []);
     }
 
     useEffect(() => {
@@ -165,7 +167,7 @@ const Logs = () => {
 
         return [
             isTrafficCollector ? (
-                <Link onClick={() => handleModuleTypeClick(module)}>{module.moduleType || '-'}</Link>
+                <Link onClick={() => handleModuleTypeClick(module)} removeUnderline>{module.moduleType || '-'}</Link>
             ) : (
                 module.moduleType || '-'
             ),
@@ -271,6 +273,7 @@ const Logs = () => {
                         title="Environment Variables"
                         description={`Configure environment variables for ${selectedModule?.name || 'module'}`}
                         module={selectedModule}
+                        allowedEnvFields={allowedEnvFields}
                         onSaveEnv={handleSaveEnv}
                     />
                 </Modal.Section>
