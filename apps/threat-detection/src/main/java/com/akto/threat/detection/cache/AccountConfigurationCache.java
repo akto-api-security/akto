@@ -124,7 +124,7 @@ public class AccountConfigurationCache {
             Map<String, Set<com.akto.dto.type.URLMethods.Method>> apiInfoUrlToMethods = new HashMap<>();
 
             // Process API infos only if available
-            RuntimeUtil.fillURLTemplatesMap(apiInfos, apiInfoUrlToMethods, apiCollectionUrlTemplates);
+            RuntimeUtil.fillURLTemplatesMap(apiInfos, apiInfoUrlToMethods, apiCollectionUrlTemplates, null);
             // Note: Maps remain empty (not null) if apiInfos is null/empty
 
             this.cachedConfig = new AccountConfig(
