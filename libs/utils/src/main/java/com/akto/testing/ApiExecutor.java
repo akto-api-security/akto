@@ -206,11 +206,105 @@ public class ApiExecutor {
         return responseHeaders;
     }
 
-    public static String replaceHostFromConfig(String url, TestingRunConfig testingRunConfig) {
+    /**
+     * Reverses agent connector hostname transformation.
+     * Detects connector type from domain name keywords and strips first subdomain.
+     */
+    public static String reverseAgentConnectorHostname(OriginalHttpRequest request) {
+        if (request == null) {
+            return request.getUrl();
+        }
+
+        try {
+            String url = request.getUrl();
+            URI uri = new URI(url);
+            String hostname = uri.getHost();
+
+            if (hostname == null || hostname.isEmpty()) {
+                return url;
+            }
+
+            // Convert to lowercase for case-insensitive matching
+            String hostnameLower = hostname.toLowerCase();
+
+            // Detect connector type from domain name keywords
+            String connectorType = null;
+            if (hostnameLower.contains("n8n")) {
+                connectorType = "n8n";
+            } else if (hostnameLower.contains("copilot")) {
+                connectorType = "copilot";
+            } else if (hostnameLower.contains("langsmith")) {
+                connectorType = "langchain";
+            }
+
+            // If no connector detected, return original URL
+            if (connectorType == null) {
+                return url;
+            }
+
+            // Strip first subdomain (agentId/workflowId/botId)
+            String[] parts = hostname.split("\\.");
+
+            // Need at least 3 parts to strip subdomain (e.g., wf123.n8n.example.com)
+            if (parts.length < 3) {
+                loggerMaker.infoAndAddToDb(String.format(
+                    "Detected %s connector but hostname has insufficient parts to strip subdomain: %s",
+                    connectorType, hostname));
+                return url;
+            }
+
+            // Validate first part looks like an ID (alphanumeric, hyphens allowed)
+            String firstPart = parts[0];
+            if (!firstPart.matches("^[a-zA-Z0-9-]+$")) {
+                loggerMaker.infoAndAddToDb(String.format(
+                    "Detected %s connector but first subdomain doesn't look like an ID: %s",
+                    connectorType, firstPart));
+                return url;
+            }
+
+            // Remove first subdomain
+            String[] remainingParts = Arrays.copyOfRange(parts, 1, parts.length);
+            String cleanedHostname = String.join(".", remainingParts);
+
+            // Rebuild URL with cleaned hostname
+            String modifiedUrl = uri.getScheme() + "://" + cleanedHostname;
+            if (uri.getPort() != -1) {
+                modifiedUrl += ":" + uri.getPort();
+            }
+            if (uri.getPath() != null && !uri.getPath().isEmpty()) {
+                modifiedUrl += uri.getPath();
+            }
+            if (uri.getQuery() != null) {
+                modifiedUrl += "?" + uri.getQuery();
+            }
+            if (uri.getFragment() != null) {
+                modifiedUrl += "#" + uri.getFragment();
+            }
+
+            loggerMaker.infoAndAddToDb(String.format(
+                "Reversed %s hostname: %s -> %s", connectorType, hostname, cleanedHostname));
+
+            return modifiedUrl;
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error reversing agent connector hostname: " + e.getMessage());
+            return request.getUrl();
+        }
+    }
+
+    public static String replaceHostFromConfig(String url, TestingRunConfig testingRunConfig, OriginalHttpRequest request) {
+        String modifiedUrl = url;
+
+        // STEP 1: Apply agent connector hostname reversal
+        if (request != null) {
+            modifiedUrl = reverseAgentConnectorHostname(request);
+        }
+
+        // STEP 2: Apply overriddenTestAppUrl
         if (testingRunConfig != null && !StringUtils.isEmpty(testingRunConfig.getOverriddenTestAppUrl())) {
             URI typedUrl = null;
             try {
-                typedUrl = new URI(url);
+                typedUrl = new URI(modifiedUrl);
 
             } catch (URISyntaxException e) {
                 throw new RuntimeException(e);
@@ -223,19 +317,19 @@ public class ApiExecutor {
             try {
                 newHostURI = new URI(newHost);
             } catch (URISyntaxException e) {
-                return url;
+                return modifiedUrl;
             }
 
             try {
                 String newScheme = newHostURI.getScheme() == null ? typedUrl.getScheme() : newHostURI.getScheme();
                 int newPort = newHostURI.getPort() == -1 ? typedUrl.getPort() : newHostURI.getPort();
 
-                url = new URI(newScheme, null, newHostURI.getHost(), newPort, typedUrl.getPath(), typedUrl.getQuery(), typedUrl.getFragment()).toString();
+                modifiedUrl = new URI(newScheme, null, newHostURI.getHost(), newPort, typedUrl.getPath(), typedUrl.getQuery(), typedUrl.getFragment()).toString();
             } catch (URISyntaxException e) {
-                return url;
+                return modifiedUrl;
             }
         }
-        return url;
+        return modifiedUrl;
     }
 
     public static String replacePathFromConfig(String url, TestingRunConfig testingRunConfig) {
@@ -296,7 +390,7 @@ public class ApiExecutor {
             loggerMaker.errorAndAddToDb(e, "error converting req url to absolute " + url);
         }
 
-        return replaceHostFromConfig(url, testingRunConfig);
+        return replaceHostFromConfig(url, testingRunConfig, request);
     }
 
     public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean useTestingRunConfig) throws Exception {
