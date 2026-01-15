@@ -51,6 +51,12 @@ public class UserDetailsFilter implements Filter {
     public static final String LOGIN_URI = "/login";
     public static final String API_URI = "/api";
 
+    private static void setSession(HttpSession session, String username, String signedUp){
+        session.setAttribute("username", username);
+        session.setAttribute("login", Context.now());
+        session.setAttribute("signedUp", signedUp);
+    }
+
     @Override
     public void init(FilterConfig filterConfig) { }
 
@@ -129,9 +135,26 @@ public class UserDetailsFilter implements Filter {
                 String contextSource = (String) claims.getBody().get("contextSource");
                 CONTEXT_SOURCE contextSourceEnum = CONTEXT_SOURCE.valueOf(contextSource.toUpperCase());
                 String authRole = (String) claims.getBody().get("auth_role");
+                String username = (String) claims.getBody().get("username");
+                session = httpServletRequest.getSession(true);
+                if(username == null || username.isEmpty()) {
+                    httpServletResponse.sendError(403);
+                    return;
+                }
                 if(authRole != null && authRole.equalsIgnoreCase("mcp") && contextSourceEnum != null && accountId > 0) {
                     Context.contextSource.set(contextSourceEnum);
                     Context.accountId.set(accountId);
+                    User user = UsersDao.instance.findOne("login", username);
+                    if(user == null) {
+                        httpServletResponse.sendError(403);
+                        return;
+                    }
+                    session.setAttribute("user", user);
+                    session.setAttribute("accountId", accountId);
+                    setSession(session, username, "false");
+                    Context.userId.set(user.getId());
+                    filterChain.doFilter(servletRequest, servletResponse);
+                    return;
                 } else {
                     httpServletResponse.sendError(403);
                     return;
@@ -231,10 +254,7 @@ public class UserDetailsFilter implements Filter {
                 redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
                 return;
             }
-            session = httpServletRequest.getSession(true);
-            session.setAttribute("username", username);
-            session.setAttribute("login", Context.now());
-            session.setAttribute("signedUp", signedUp);
+            setSession(session, username, signedUp);
             logger.debug("New session created");
         }
 

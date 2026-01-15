@@ -115,6 +115,7 @@ import ThreatDashboardPage from "../dashboard/pages/threat_detection/ThreatDashb
 import OpenApiAgentTester from "../dashboard/pages/observe/OpenApiAgentTester";
 import DastProgress from "../dashboard/pages/observe/api_collections/DastProgress.jsx";
 import DastProgressSingle from "../dashboard/pages/observe/api_collections/DastProgressSingle.jsx";
+import AgenticMainPage from "../dashboard/pages/agentic/AgenticMainPage.jsx";
 import Endpoints from "../dashboard/pages/observe/agentic/Endpoints.jsx";
 import AgenticDashboard from "../dashboard/pages/dashboard/AgenticDashboard.jsx";
 import EndpointDashboard from "../dashboard/pages/dashboard/EndpointDashboard.jsx";
@@ -311,6 +312,10 @@ const router = createBrowserRouter([
                                 element: <ConfigureIgnoredEventsPage/>
                             }
                         ]
+                    },
+                    {
+                        path: "ask-ai",
+                        element: <AgenticMainPage/>,
                     },
                     {
                         path: "quick-start",
