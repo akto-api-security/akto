@@ -10,7 +10,9 @@ const AgenticSearchInput = forwardRef(({
     placeholder = "How can I help you today?",
     isStreaming = false,
     isFixed = false,
-    containerStyle = {}
+    containerStyle = {},
+    sidebarWidth = '300px',
+    inputWidth = '520px',
 }, ref) => {
     const [internalValue, setInternalValue] = useState('');
     const inputRef = useRef(null);
@@ -66,12 +68,16 @@ const AgenticSearchInput = forwardRef(({
     const wrapperStyle = isFixed ? {
         position: 'fixed',
         bottom: '0',
-        left: '300px',
+        left: sidebarWidth,
         right: '0',
         paddingTop: '40px',
         paddingBottom: '28px',
         background: 'linear-gradient(to top, rgba(250, 250, 250, 1) 70%, rgba(250, 250, 250, 0) 100%)',
-        zIndex: 100
+        zIndex: 100,
+        display: 'flex',
+        justifyContent: 'center',
+        paddingLeft: '0',
+        paddingRight: '0'
     } : {
         display: 'flex',
         justifyContent: 'center'
@@ -79,8 +85,8 @@ const AgenticSearchInput = forwardRef(({
 
     // Inner container styles
     const innerContainerStyle = isFixed ? {
-        width: '520px',
-        marginLeft: '218px'
+        width: '100%',
+        maxWidth: inputWidth
     } : {};
 
     return (
@@ -93,7 +99,8 @@ const AgenticSearchInput = forwardRef(({
                         style={{
                             display: 'flex',
                             alignItems: 'center',
-                            width: isFixed ? '100%' : '520px',
+                            width: isFixed ? '100%' : inputWidth,
+                            maxWidth: '100%',
                             padding: '8px 12px',
                             borderRadius: '12px',
                             background: '#FFF',
