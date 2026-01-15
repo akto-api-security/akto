@@ -24,12 +24,14 @@ public class ConfigUpdatePoller {
     private static final Gson gson = new Gson();
     private static final long POLL_INTERVAL_SECONDS = 20;
 
+    private final DataActor dataActor;
     private final String miniRuntimeName;
     private final Kafka kafkaProducer;
     private final String configUpdateTopicName;
     private final ScheduledExecutorService scheduler;
 
     public ConfigUpdatePoller(String miniRuntimeName, Kafka kafkaProducer, String configUpdateTopicName) {
+        this.dataActor = DataActorFactory.fetchInstance();
         this.miniRuntimeName = miniRuntimeName;
         this.kafkaProducer = kafkaProducer;
         this.configUpdateTopicName = configUpdateTopicName;
@@ -52,7 +54,6 @@ public class ConfigUpdatePoller {
 
     private void pollAndPublishConfigUpdates() {
         try {
-            DataActor dataActor = DataActorFactory.fetchInstance();
             List<ModuleInfo> moduleInfoList = dataActor.fetchAndUpdateModuleForReboot(
                     ModuleType.TRAFFIC_COLLECTOR,
                     miniRuntimeName
