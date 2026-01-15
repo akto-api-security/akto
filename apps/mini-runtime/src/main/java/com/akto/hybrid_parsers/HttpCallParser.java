@@ -681,7 +681,10 @@ public class HttpCallParser {
         }
     }
 
+    // Agoda-specific tag keys
     private static final String SERVICE_TAG_KEY = "privatecloud.agoda.com/service";
+    private static final String ENVIRONMENT_TAG_KEY = "privatecloud.agoda.com/environment";
+    private static final String COMPONENT_TAG_KEY = "catalog.agoda.com/component";
 
     private String extractServiceTag(String tagsJson) {
         if (tagsJson == null || tagsJson.isEmpty()) {
@@ -867,10 +870,6 @@ public class HttpCallParser {
                 // This prevents race conditions when multiple machines process traffic simultaneously
                 dataActor.addHostNameToServiceTagCollection(collectionId, hostName);
                 cachedHostNames.add(hostName);
-
-                if(Utils.printDebugUrlLog("") || Utils.printDebugHostLog(null) != null) {
-                    loggerMaker.infoAndAddToDb("Updated service-tag collection " + collectionId + " with new host: " + hostName);
-                }
             }
 
             // Reuse existing tag update logic - pass service tag value as hostNameMapKey
@@ -890,15 +889,15 @@ public class HttpCallParser {
             return tagsList;
         }
 
-        // Only apply filtering for account 1736798101
-        // if (Context.getActualAccountId() != 1736798101) {
-        //     return tagsList;
-        // }
+        if (Context.getActualAccountId() != 1736798101) {
+            return tagsList;
+        }
 
-        // Keep only these two keys
+        // Keep only these specific tag keys
         Set<String> allowedKeys = new HashSet<>();
-        allowedKeys.add("privatecloud.agoda.com/service");
-        allowedKeys.add("privatecloud.agoda.com/environment");
+        allowedKeys.add(SERVICE_TAG_KEY);
+        allowedKeys.add(ENVIRONMENT_TAG_KEY);
+        allowedKeys.add(COMPONENT_TAG_KEY);
 
         List<CollectionTags> filteredTags = new ArrayList<>();
         for (CollectionTags tag : tagsList) {
