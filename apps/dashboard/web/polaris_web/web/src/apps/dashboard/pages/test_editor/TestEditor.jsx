@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 
 import { Box, Button, Frame, HorizontalGrid, HorizontalStack, TopBar } from "@shopify/polaris"
@@ -115,7 +115,41 @@ const TestEditor = () => {
         console.log("add test")
     }
 
-    const learnMoreObjEditor = learnMoreObject['dashboard_test_editor']
+    // Get category-specific learn more data
+    // Note: This logic mirrors PageWithMultipleCards.jsx for consistent category handling
+    const learnMoreObjEditor = useMemo(() => {
+        const category = getDashboardCategory()
+        const categoryKey = category?.toLowerCase().replace(/ /g, '_')
+        const pageData = learnMoreObject['dashboard_test_editor']
+
+        if (!pageData) return null
+
+        // Check if category-specific data exists
+        if (pageData[categoryKey] && typeof pageData[categoryKey] === 'object') {
+            const categoryData = pageData[categoryKey]
+            return {
+                title: categoryData.title,
+                description: categoryData.description,
+                docsLink: Array.isArray(categoryData.docsLink) ? categoryData.docsLink : [],
+                videoLink: Array.isArray(categoryData.videoLink) ? categoryData.videoLink : []
+            }
+        }
+
+        // Fallback to root-level data
+        const hasRootDocs = Array.isArray(pageData.docsLink)
+        const hasRootVideos = Array.isArray(pageData.videoLink)
+
+        if (hasRootDocs || hasRootVideos) {
+            return {
+                title: pageData.title,
+                description: pageData.description,
+                docsLink: hasRootDocs ? pageData.docsLink : [],
+                videoLink: hasRootVideos ? pageData.videoLink : []
+            }
+        }
+
+        return null
+    }, []) // Empty dependency array as category and learnMoreObject are stable
 
     const headerComp = (
         <div className="header-css">
@@ -126,7 +160,9 @@ const TestEditor = () => {
                 </HorizontalStack>
             </HorizontalStack>
 
-            <LearnPopoverComponent learnMoreObj={learnMoreObjEditor} />
+            {learnMoreObjEditor && (learnMoreObjEditor.docsLink?.length > 0 || learnMoreObjEditor.videoLink?.length > 0) && (
+                <LearnPopoverComponent learnMoreObj={learnMoreObjEditor} />
+            )}
         </div>
     )
     

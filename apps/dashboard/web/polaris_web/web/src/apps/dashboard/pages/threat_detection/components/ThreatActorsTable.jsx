@@ -40,7 +40,7 @@ const getBaseHeaders = () => {
     },
   ];
 
-  if (func.isDemoAccount()) {
+  if (func.shouldShowIpReputation()) {
     baseHeaders.push({
       text: "Reputation",
       title: "IP Reputation",
@@ -256,7 +256,7 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
           ),
         };
 
-        if (func.isDemoAccount()) {
+        if (func.shouldShowIpReputation()) {
           baseData.reputationScore = <IpReputationScore ipAddress={x.latestApiIp} />;
         }
 

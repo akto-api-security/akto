@@ -1,13 +1,11 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import { Text, Button, IndexFiltersMode, Box, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon} from "@shopify/polaris"
-import MCPIcon from "@/assets/MCP_Icon.svg"
-import LaptopIcon from "@/assets/Laptop.svg"
-import { HideMinor, ViewMinor,FileMinor, AutomationMajor, MagicMajor } from '@shopify/polaris-icons';
+import { HideMinor, ViewMinor,FileMinor } from '@shopify/polaris-icons';
 import RegistryBadge from "../../../components/shared/RegistryBadge";
 import api from "../api"
 import dashboardApi from "../../dashboard/api"
 import settingRequests from "../../settings/api"
-import IconCacheService from "@/services/IconCacheService"
+import { CollectionIcon } from "../../../components/shared/CollectionIcon"
 import React, { useEffect,useState, useRef } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
@@ -38,6 +36,7 @@ import ReactFlow, {
   } from 'react-flow-renderer';
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
 import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isGenAISecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
+import useAgenticFilter from "./useAgenticFilter";
   
 const CenterViewType = {
     Table: 0,
@@ -48,76 +47,6 @@ const CenterViewType = {
 const API_COLLECTIONS_CACHE_DURATION_SECONDS = 5 * 60; // 5 minutes
 const COLLECTIONS_LAZY_RENDER_THRESHOLD = 100; // Collections count above which we use lazy rendering optimization
 
-// Simple icon component that renders fallback icons immediately
-// Fresh icon cache service created per page load
-
-// Create fresh icon service instance for this page load
-const iconCacheService = new IconCacheService();
-
-const CollectionIconRenderer = React.memo(({ hostName, displayName, tagsList }) => {
-    const [iconData, setIconData] = React.useState(null);
-
-    React.useEffect(() => {
-        if (!hostName || hostName.trim() === '') {
-            return;
-        }
-        let isMounted = true; // Prevent state updates if component unmounts
-        const fetchIcon = async () => {
-            try {
-                const imageData = await iconCacheService.getIconData(hostName);
-                if (imageData && isMounted) {
-                    setIconData(imageData);
-                }
-            } catch (error) {
-
-            }
-        };
-
-        fetchIcon();
-
-        // Cleanup function to prevent state updates after unmount
-        return () => {
-            isMounted = false;
-        };
-    }, [hostName]); // Only re-run when hostName changes
-
-    // If we have icon data, display it
-    if (iconData) {
-        return (
-            <img
-                src={`data:image/png;base64,${iconData}`}
-                alt={`${hostName} icon`}
-                style={{width: '20px', height: '20px', borderRadius: '2px'}}
-                onError={() => {
-                    // If the base64 image fails to load, fall back to default icon
-                    setIconData(null);
-                }}
-            />
-        );
-    }
-
-    // Fallback to default icons
-    return <CollectionFallbackIcon tagsList={tagsList} displayName={displayName} />;
-});
-
-// Unified fallback icon component for collections based on types
-const CollectionFallbackIcon = ({ tagsList, displayName }) => {
-    // GenAI collections logic
-    if (tagsList?.some(tag => tag.name === "gen-ai")) {
-        const iconSource = tagsList.some(tag => tag.name === "AI Agent") ? AutomationMajor : MagicMajor;
-        return <Icon source={iconSource} color={"base"} />;
-    }
-    
-    // MCP collections logic  
-    if (tagsList?.some(tag => tag.name === "mcp-server")) {
-        return <img src={MCPIcon} alt="MCP icon" style={{width: '20px', height: '20px', borderRadius: '2px'}} />;
-    }
-    
-    // Default fallback based on displayName
-    const defaultIcon = displayName?.toLowerCase().startsWith('mcp') ? MCPIcon : LaptopIcon;
-    return <img src={defaultIcon} alt="default icon" style={{width: '20px', height: '20px', borderRadius: '2px'}} />;
-};
-
 const headers = [
     ...((isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory()) ? [{
         title: "",
@@ -126,7 +55,26 @@ const headers = [
         isText: CellType.TEXT,
         boxWidth: '24px'
     }] : []),
-    {
+    ...(isEndpointSecurityCategory() ? [
+        {
+            title: "API Collection name",
+            text: "API Collection name",
+            value: "displayNameComp",
+            filterKey: "splitApiCollectionName",
+            textValue: 'splitApiCollectionName',
+            showFilter: true,
+            titleWithTooltip: <HeadingWithTooltip content="These API groups are computed periodically" title="API Collection name" />
+        },
+        {
+            title: "Endpoint ID",
+            text: "Endpoint ID",
+            value: "endpointId",
+            filterKey: "endpointId",
+            textValue: 'endpointId',
+            showFilter: true,
+            isText: CellType.TEXT,
+        }
+    ] : [{
         title: mapLabel("API collection name", getDashboardCategory()),
         text: mapLabel("API collection name", getDashboardCategory()),
         value: "displayNameComp",
@@ -134,7 +82,7 @@ const headers = [
         textValue: 'displayName',
         showFilter: true,
         titleWithTooltip: <HeadingWithTooltip content="These API groups are computed periodically" title={mapLabel("API collection name", getDashboardCategory())} />
-    },
+    }]),
     {
         title: mapLabel("Total endpoints", getDashboardCategory()),
         text: mapLabel("Total endpoints", getDashboardCategory()),
@@ -252,27 +200,34 @@ const headers = [
     }] : [])
 ];
 
-// Offset for hidden columns in Endpoint Security mode
-const columnOffset = isEndpointSecurityCategory() ? -2 : 0;
+const isAtlas = isEndpointSecurityCategory()
+const isArgus = isAgenticSecurityCategory()
+const isAtlasArgus = isAtlas || isArgus;
+
+// For Endpoint Security, we have an extra column (Endpoint ID) after API Collection name
+const nameColIndex = isAtlasArgus ? 2 : 1;
+const endpointColIndex = isAtlas ? 4 : (isArgus ? 3 : 2);
+const discoveredColIndex = isArgus ? 10 : (isAtlas ? 9 : 9);
+const trafficColIndex = isArgus ? 9 : (isAtlas ? 8 : 8);
+const riskColIndex = isAtlas ? 5 : (isAtlasArgus ? 4 : 3)
 
 const tempSortOptions = [
-    { label: 'Name', value: 'customGroupsSort asc', directionLabel: 'A-Z', sortKey: 'customGroupsSort', columnIndex: 1 },
-    { label: 'Name', value: 'customGroupsSort desc', directionLabel: 'Z-A', sortKey: 'customGroupsSort', columnIndex: 1 },
+    { label: 'Name', value: 'customGroupsSort asc', directionLabel: 'A-Z', sortKey: 'customGroupsSort', columnIndex: nameColIndex},
+    { label: 'Name', value: 'customGroupsSort desc', directionLabel: 'Z-A', sortKey: 'customGroupsSort', columnIndex: nameColIndex},
 ]
 
-
 const sortOptions = [
-    { label: 'Endpoints', value: 'urlsCount asc', directionLabel: 'More', sortKey: 'urlsCount', columnIndex: 2 },
-    { label: 'Endpoints', value: 'urlsCount desc', directionLabel: 'Less', sortKey: 'urlsCount' , columnIndex: 2},
+    { label: 'Endpoints', value: 'urlsCount asc', directionLabel: 'More', sortKey: 'urlsCount', columnIndex: endpointColIndex },
+    { label: 'Endpoints', value: 'urlsCount desc', directionLabel: 'Less', sortKey: 'urlsCount', columnIndex: endpointColIndex },
     { label: 'Activity', value: 'deactivatedScore asc', directionLabel: 'Active', sortKey: 'deactivatedRiskScore' },
     { label: 'Activity', value: 'deactivatedScore desc', directionLabel: 'Inactive', sortKey: 'activatedRiskScore' },
-    { label: 'Risk Score', value: 'score asc', directionLabel: 'High risk', sortKey: 'riskScore', columnIndex: 3 },
-    { label: 'Risk Score', value: 'score desc', directionLabel: 'Low risk', sortKey: 'riskScore' , columnIndex: 3},
-    { label: 'Discovered', value: 'discovered asc', directionLabel: 'Recent first', sortKey: 'startTs', columnIndex: 9 + columnOffset },
-    { label: 'Discovered', value: 'discovered desc', directionLabel: 'Oldest first', sortKey: 'startTs' , columnIndex: 9 + columnOffset},
-    { label: 'Last traffic seen', value: 'detected asc', directionLabel: 'Recent first', sortKey: 'detectedTimestamp', columnIndex: 8 + columnOffset },
-    { label: 'Last traffic seen', value: 'detected desc', directionLabel: 'Oldest first', sortKey: 'detectedTimestamp' , columnIndex: 8 + columnOffset},
-  ];        
+    { label: 'Risk Score', value: 'score asc', directionLabel: 'High risk', sortKey: 'riskScore', columnIndex: riskColIndex },
+    { label: 'Risk Score', value: 'score desc', directionLabel: 'Low risk', sortKey: 'riskScore', columnIndex: riskColIndex },
+    { label: 'Discovered', value: 'discovered asc', directionLabel: 'Recent first', sortKey: 'startTs', columnIndex: discoveredColIndex},
+    { label: 'Discovered', value: 'discovered desc', directionLabel: 'Oldest first', sortKey: 'startTs', columnIndex: discoveredColIndex },
+    { label: 'Last traffic seen', value: 'detected asc', directionLabel: 'Recent first', sortKey: 'detectedTimestamp', columnIndex: trafficColIndex },
+    { label: 'Last traffic seen', value: 'detected desc', directionLabel: 'Oldest first', sortKey: 'detectedTimestamp', columnIndex: trafficColIndex },
+];
 
 
 const resourceName = {
@@ -292,10 +247,22 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             c.disableClick = true
         }
         const tagsList = JSON.stringify(c?.tagsList || "")
+
+        // Split collection name for Endpoint Security category
+        let displayText = c.displayName;
+        let endpointId = '';
+        if (isEndpointSecurityCategory()) {
+            const splitResult = transform.splitCollectionNameForEndpointSecurity(c.displayName);
+            displayText = splitResult.apiCollectionName;
+            endpointId = splitResult.endpointId;
+        }
+
         // Build result object directly without spread operator for better memory efficiency
         return {
             id: c.id,
             displayName: c.displayName,
+            splitApiCollectionName: displayText,
+            endpointId: endpointId,
             hostName: c.hostName,
             type: c.type,
             deactivated: c.deactivated,
@@ -313,7 +280,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             envType: c?.envType?.map(func.formatCollectionType),
             displayNameComp: (
                 <HorizontalStack gap="2" align="start">
-                    <Box maxWidth="30vw"><Text truncate fontWeight="medium">{c.displayName}</Text></Box>
+                    <Box maxWidth="30vw"><Text truncate fontWeight="medium">{displayText}</Text></Box>
                     {c.registryStatus === "available" && <RegistryBadge />}
                 </HorizontalStack>
             ),
@@ -326,11 +293,13 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             discovered: func.prettifyEpoch(c.startTs || 0),
             descriptionComp: (<Box maxWidth="350px"><Text>{c.description}</Text></Box>),
             outOfTestingScopeComp: c.isOutOfTestingScope ? (<Text>Yes</Text>) : (<Text>No</Text>),
-            ...(((isAgenticSecurityCategory() || isEndpointSecurityCategory()) && tagsList.includes("mcp-server")) ? {
-                iconComp: (<Box><CollectionIconRenderer hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>)
-            } : ((isGenAISecurityCategory() || isAgenticSecurityCategory()) && tagsList.includes("gen-ai")) ? {
-                iconComp: (<Box><CollectionIconRenderer hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>)
-            } : {})
+        ...((tagsList.includes("mcp-server")) ? {
+            iconComp: (<Box><CollectionIcon hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>)
+        } : (tagsList.includes("gen-ai")) ? {
+            iconComp: (<Box><CollectionIcon hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>)
+        } : (tagsList.includes("browser-llm")) ? {
+            iconComp: (<Box><CollectionIcon hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>)
+        } : {})
         };
     })
 
@@ -377,11 +346,22 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         });
     }
 
+    // Split collection name for Endpoint Security category
+    let splitApiCollectionName = rawCollection.displayName;
+    let endpointId = '';
+    if (isEndpointSecurityCategory()) {
+        const splitResult = transform.splitCollectionNameForEndpointSecurity(rawCollection.displayName);
+        splitApiCollectionName = splitResult.apiCollectionName;
+        endpointId = splitResult.endpointId;
+    }
+
     // Return minimal object - only fields needed for filtering, sorting, and categorization
     // JSX components will be created on-demand by prettifyPageData
     return {
         id: rawCollection.id,
         displayName: rawCollection.displayName,
+        splitApiCollectionName: splitApiCollectionName,
+        endpointId: endpointId,
         hostName: rawCollection.hostName,
         type: rawCollection.type,
         deactivated: rawCollection.deactivated,
@@ -464,6 +444,20 @@ function ApiCollections(props) {
     const userRole = window.USER_ROLE
 
     const navigate = useNavigate();
+    
+    const checkIsFromEndpoints = () => {
+        if (!isEndpointSecurityCategory()) return false;
+        try {
+            const stack = JSON.parse(sessionStorage.getItem('pathnameStack') || '[]');
+            if (stack.length >= 2) {
+                const previousPath = stack[stack.length - 2];
+                return previousPath === '/dashboard/observe/agentic-assets';
+            }
+        } catch (e) { /* ignore */ }
+        return false;
+    };
+    const isFromEndpoints = checkIsFromEndpoints();
+    
     const [data, setData] = useState({'all': [], 'hostname':[], 'groups': [], 'custom': [], 'deactivated': [], 'untracked': []})
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
@@ -778,7 +772,7 @@ function ApiCollections(props) {
 
         // Process data - OPTIMIZATION: For large datasets (>COLLECTIONS_LAZY_RENDER_THRESHOLD items), store RAW data + transform function
         // Transformation happens on-demand in the table for each page (100 items at a time)
-        const shouldOptimize = finalArr.length > COLLECTIONS_LAZY_RENDER_THRESHOLD;
+        const shouldOptimize = finalArr.length > COLLECTIONS_LAZY_RENDER_THRESHOLD && func.isApiCollectionsCachingEnabled();
 
         let dataObj;
         if (shouldOptimize) {
@@ -1018,6 +1012,9 @@ function ApiCollections(props) {
         setAllEdges(svcTosvcGraphEdges.map(x => {return { id: x.id, source: x.source, target: x.target}}))
         setAllNodes(svcTosvcGraphNodes.map((x, i) => {return { id: x.id, type: 'default', data: {label: x.id}, position: {x: (100 + 100*i), y: (100 + 100*i)} }}))
     }
+
+    // Use custom hook for Agentic filter detection and summary calculation
+    const { filteredSummaryData, activeFilterTitle } = useAgenticFilter(normalData);
 
     useEffect(() => {
         const isMountedRef = { current: true };
@@ -1360,13 +1357,19 @@ function ApiCollections(props) {
         }
     }
 
+    // Use filtered summary data when a filter is active (from Endpoints page navigation)
+    const displaySummary = filteredSummaryData || summaryData;
+    const displayTotalAPIs = filteredSummaryData ? filteredSummaryData.totalEndpoints : totalAPIs;
+
     const summaryItems = [
         {
-            title: mapLabel("Total APIs", getDashboardCategory()),
-            data: transform.formatNumberWithCommas(totalAPIs),
+            title: activeFilterTitle 
+                ? mapLabel("Total Agentic Components", getDashboardCategory())
+                : mapLabel("Total APIs", getDashboardCategory()),
+            data: transform.formatNumberWithCommas(displayTotalAPIs),
         },
     
-        ...(!isEndpointSecurityCategory()
+        ...(!isEndpointSecurityCategory() && !activeFilterTitle
             ? [
                   {
                       title: mapLabel("Critical APIs", getDashboardCategory()),
@@ -1381,10 +1384,25 @@ function ApiCollections(props) {
               ]
             : []),
     
+        ...(activeFilterTitle
+            ? [
+                  {
+                      title: "Agentic Collections",
+                      data: transform.formatNumberWithCommas(
+                          filteredSummaryData?.totalCollections || 0
+                      ),
+                  },
+              ]
+            : []),
+    
         {
-            title: mapLabel("Sensitive in response APIs", getDashboardCategory()),
+            title: activeFilterTitle
+                ? "Sensitive in Response"
+                : mapLabel("Sensitive in response APIs", getDashboardCategory()),
             data: transform.formatNumberWithCommas(
-                summaryData.totalSensitiveEndpoints || 0
+                activeFilterTitle 
+                    ? (filteredSummaryData?.totalSensitiveInResponse || 0)
+                    : (summaryData.totalSensitiveEndpoints || 0)
             ),
         },
     ];
@@ -1477,6 +1495,7 @@ function ApiCollections(props) {
         (centerView === CenterViewType.Table ?
         <GithubSimpleTable
             key={refreshData}
+            filterStateUrl={"/dashboard/observe/inventory/"}
             pageLimit={100}
             data={data[selectedTab]}
             sortOptions={ selectedTab === 'groups' ? [...tempSortOptions, ...sortOptions] : sortOptions}
@@ -1520,17 +1539,25 @@ function ApiCollections(props) {
         )
     }
 
+    // Dynamic title based on active filter
+    const pageTitle = activeFilterTitle 
+        ? `Agentic Collections - ${activeFilterTitle}`
+        : mapLabel("API Collections", getDashboardCategory());
+
     return(
         <PageWithMultipleCards
             title={
                 <TitleWithInfo 
-                    tooltipContent={"Akto automatically groups similar APIs into meaningful collections based on their subdomain names. "}
-                    titleText={mapLabel("API Collections", getDashboardCategory())} 
+                    tooltipContent={activeFilterTitle 
+                        ? `Viewing collections filtered by ${activeFilterTitle}`
+                        : "Akto automatically groups similar APIs into meaningful collections based on their subdomain names. "}
+                    titleText={pageTitle} 
                     docsUrl={"https://docs.akto.io/api-inventory/concepts"}
                 />
             }
             primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={navigateToQueryPage}>Explore mode</Button>}
-            isFirstPage={true}
+            isFirstPage={!isFromEndpoints}
+            backUrl={isFromEndpoints ? "/dashboard/observe/agentic-assets" : undefined}
             components={components}
             secondaryActions={secondaryActionsComp}
         />

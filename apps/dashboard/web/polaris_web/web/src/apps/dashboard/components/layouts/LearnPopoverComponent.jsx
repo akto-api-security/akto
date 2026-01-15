@@ -4,21 +4,23 @@ import React, { useState } from 'react'
 
 function LearnPopoverComponent({learnMoreObj}) {
     const [popoverActive,setPopoverActive] = useState(false)
-    if(learnMoreObj){
-        if (learnMoreObj?.docsLink !== undefined) {
-            learnMoreObj.docsLink.forEach((doc) => {
-                doc.prefix = <Box><Icon source={NoteMinor} /></Box>;
-                doc.onAction = () => window.open(doc.value, "_blank")
-            });
-        }
 
-        if (learnMoreObj?.videoLink !== undefined) {
-            learnMoreObj.videoLink.forEach((doc) => {
-                doc.prefix = <Box><Icon source={PlayMinor} /></Box>;
-                doc.onAction = () => window.open(doc.value, "_blank")
-            });
-        }
-    }
+    // Prepare items without mutating original data
+    const docItems = (learnMoreObj?.docsLink || []).map((doc) => ({
+        content: doc.content,
+        value: doc.value,
+        prefix: <Box><Icon source={NoteMinor} /></Box>,
+        onAction: () => window.open(doc.value, "_blank")
+    }));
+
+    const videoItems = (learnMoreObj?.videoLink || []).map((doc) => ({
+        content: doc.content,
+        value: doc.value,
+        prefix: <Box><Icon source={PlayMinor} /></Box>,
+        onAction: () => window.open(doc.value, "_blank")
+    }));
+
+    const allItems = [...docItems, ...videoItems];
 
     return (
         <Popover
@@ -43,7 +45,7 @@ function LearnPopoverComponent({learnMoreObj}) {
                     </Text>
                 </VerticalStack>
             </Box> : null}
-            <ActionList items={[...learnMoreObj?.docsLink, ...learnMoreObj?.videoLink || []]} />
+            <ActionList items={allItems} />
             
         </Popover>
     )

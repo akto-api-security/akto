@@ -97,7 +97,7 @@ export default function Header() {
             disabled.push("DAST")
         }
         if (endpointSecurityGranted === false) {
-            disabled.push("Endpoint Security")
+            // disabled.push("Endpoint Security")
         }
         return disabled;
     }, [mcpSecurityGranted, agenticSecurityGranted, dastGranted, endpointSecurityGranted]);
@@ -194,8 +194,12 @@ export default function Header() {
         LocalStore.getState().setCategoryMap({});
         LocalStore.getState().setSubCategoryMap({});
         SessionStore.getState().setThreatFiltersMap({});
+        PersistStore.getState().setFiltersMap({});
         setDashboardCategory(value);
-        navigate("/dashboard/observe/inventory");
+        const targetPath = value === "Endpoint Security"
+            ? "/dashboard/observe/agentic-assets"
+            : "/dashboard/observe/inventory";
+        navigate(targetPath);
         navigate(0);
     }
 
@@ -324,16 +328,16 @@ export default function Header() {
                                         { value: "API Security", label: "API Security", id: "api-security" },
                                         {
                                             value: "Agentic Security",
-                                            label: func.isAtlasArgusAccount() ? "Akto ARGUS" : "Agentic Security",
+                                            label: "Akto ARGUS",
                                             id: "agentic-security",
-                                            helpText: func.isAtlasArgusAccount() ? "Agentic AI Security for Homegrown AI" : undefined
+                                            helpText: "Agentic AI Security for Homegrown AI"
                                         },
-                                        ...(func.isAtlasArgusAccount() ? [{
+                                        {
                                             value: "Endpoint Security",
                                             label: "Akto ATLAS",
                                             id: "endpoint-security",
                                             helpText: "Agentic AI Security for Employee Endpoints"
-                                        }] : []),
+                                        },
                                         { value: "DAST", label: "DAST", id: "dast" },
                                     ]}
                                     initial={dropdownInitial}

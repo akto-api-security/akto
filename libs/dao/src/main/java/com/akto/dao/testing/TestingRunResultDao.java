@@ -273,6 +273,11 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
 
         fieldNames = new String[]{TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.VULNERABLE, TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
+        // Index for querying by apiInfoKey + testSubType (without testRunResultSummaryId)
+        // Used by bulkUpdateTestResultsSeverity endpoint
+        fieldNames = new String[]{TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
 
     public MongoCollection<Document> getRawCollection() {
