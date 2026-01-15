@@ -261,7 +261,7 @@ public class MergingLogic {
         }
 
         // Check once at collection level whether STRING merging is allowed
-        boolean allowStringMerging = !ApiCollectionsDao.shouldSkipMerging(apiCollection);
+        boolean allowStringMerging = !ApiCollectionsDao.shouldSkipMerging(apiCollection) || !(Context.accountId.get() == 1758525547);
 
         loggerMaker.infoAndAddToDb("allowStringMerging value for collection " + apiCollectionId + " is " + allowStringMerging, LogDb.DB_ABS);
 
