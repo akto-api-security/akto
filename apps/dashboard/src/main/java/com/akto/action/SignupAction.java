@@ -237,7 +237,23 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 }
             }
         }
-        Tokens tokens = Auth0.getInstance().handle(servletRequest, servletResponse);
+        
+        Tokens tokens;
+        try {
+            tokens = Auth0.getInstance().handle(servletRequest, servletResponse);
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Auth0 authentication failed: " + e.getMessage(), LogDb.DASHBOARD);
+            // If Auth0 fails, redirect new users to contact sales
+            servletResponse.sendRedirect("/business-email?contact=true");
+            return ERROR.toUpperCase();
+        }
+        
+        if (tokens == null) {
+            logger.errorAndAddToDb("Auth0 returned null tokens", LogDb.DASHBOARD);
+            servletResponse.sendRedirect("/business-email?contact=true");
+            return ERROR.toUpperCase();
+        }
+        
         String accessToken = tokens.getAccessToken();
         String refreshToken = tokens.getRefreshToken();
         String idToken = tokens.getIdToken();
@@ -1284,27 +1300,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 logger.infoAndAddToDb("[createUserAndRedirect] Creating NEW USER account");
 
                 if (accountId == 0) {
-                    logger.info("[createUserAndRedirect] No accountId from invitation, creating new account");
-                    accountId = AccountAction.createAccountRecord("My account");
-                    logger.infoAndAddToDb("[createUserAndRedirect] Created new accountId: " + accountId);
-
-                    // Create organization for new user
-                    if (DashboardMode.isSaasDeployment()) {
-                        logger.info("[createUserAndRedirect] SaaS deployment, creating organization for new user");
-                        String organizationUUID = UUID.randomUUID().toString();
-
-                        Set<Integer> organizationAccountsSet = new HashSet<Integer>();
-                        organizationAccountsSet.add(accountId);
-
-                        Organization organization = new Organization(organizationUUID, userEmail, userEmail, organizationAccountsSet, false);
-                        OrganizationsDao.instance.insertOne(organization);
-                        logger.infoAndAddToDb(String.format("[createUserAndRedirect] Created organization %s for new user %s", organizationUUID, userEmail));
-
-                        Boolean attemptSyncWithAktoSuccess = OrganizationUtils.syncOrganizationWithAkto(organization);
-                        logger.infoAndAddToDb(String.format("[createUserAndRedirect] Organization %s for new user %s - Akto sync status: %s", organizationUUID, userEmail, attemptSyncWithAktoSuccess));
-                    } else {
-                        logger.info("[createUserAndRedirect] On-prem deployment, skipping organization creation");
-                    }
+                    //redirect to sales page
+                    logger.info("[createUserAndRedirect] No accountId from invitation, redirecting to contact sales page");
+                    servletResponse.sendRedirect("/business-email?contact=true");
+                    return;
                 }
 
                 logger.info("[createUserAndRedirect] Calling UsersDao.instance.insertSignUp to create user record");
@@ -1351,10 +1350,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 return;
             }
 
-
-            logger.infoAndAddToDb("[createUserAndRedirect] Initializing account for new user");
-            user = AccountAction.initializeAccount(userEmail, accountId, "My account",invitationToAccount == 0, invitedRole == null ? RBAC.Role.ADMIN.name() : invitedRole);
-            logger.infoAndAddToDb("[createUserAndRedirect] Account initialized successfully for accountId: " + accountId);
 
             servletRequest.getSession().setAttribute("user", user);
             servletRequest.getSession().setAttribute("accountId", accountId);
