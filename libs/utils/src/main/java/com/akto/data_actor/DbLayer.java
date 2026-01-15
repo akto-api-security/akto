@@ -929,18 +929,6 @@ public class DbLayer {
         );
     }
 
-    // Atomic operation to update tags for service tag collection
-    // Uses $set to replace the entire tagsList
-    public static void updateServiceTagCollectionTags(int collectionId, List<CollectionTags> tagsList) {
-        if (tagsList == null || tagsList.isEmpty()) {
-            return;
-        }
-        ApiCollectionsDao.instance.updateOne(
-            Filters.eq(Constants.ID, collectionId),
-            Updates.set(ApiCollection.TAGS_STRING, tagsList)
-        );
-    }
-
     public static List<TestingRunIssues> fetchIssuesByIds(Set<TestingIssuesId> issuesIds) {
         Bson inQuery = Filters.in("_id", issuesIds.toArray());
         return TestingRunIssuesDao.instance.findAll(inQuery);

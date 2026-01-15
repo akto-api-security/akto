@@ -2791,25 +2791,6 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public void updateServiceTagCollectionTags(int collectionId, List<CollectionTags> tagsList) {
-        Map<String, List<String>> headers = buildHeaders();
-        BasicDBObject obj = new BasicDBObject();
-        obj.put("colId", collectionId);
-        obj.put("tagsList", tagsList);
-        String objString = gson.toJson(obj);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateServiceTagCollectionTags", "", "POST", objString, headers, "");
-        try {
-            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
-            String responsePayload = response.getBody();
-            if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in updateServiceTagCollectionTags", LoggerMaker.LogDb.RUNTIME);
-                return;
-            }
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in updateServiceTagCollectionTags" + e, LoggerMaker.LogDb.RUNTIME);
-        }
-    }
-
     public List<TestingRunIssues> fetchIssuesByIds(Set<TestingIssuesId> issuesIds) {
         Map<String, List<String>> headers = buildHeaders();
         List<TestingRunIssues> issueList = new ArrayList<>();

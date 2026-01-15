@@ -439,10 +439,6 @@ public class DbActor extends DataActor {
         DbLayer.addHostNameToServiceTagCollection(collectionId, hostName);
     }
 
-    public void updateServiceTagCollectionTags(int collectionId, List<CollectionTags> tagsList) {
-        DbLayer.updateServiceTagCollectionTags(collectionId, tagsList);
-    }
-
     public void insertTestingRunResultSummary(TestingRunResultSummary trrs) {
         DbLayer.insertTestingRunResultSummary(trrs);
     }
