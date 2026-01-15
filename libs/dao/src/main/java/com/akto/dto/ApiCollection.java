@@ -94,6 +94,12 @@ public class ApiCollection {
     List<CollectionTags> tagsList;
     public static final String TAGS_STRING = "tagsList";
 
+    List<String> hostNames;
+    public static final String HOST_NAMES = "hostNames";
+
+    String serviceTag;
+    public static final String SERVICE_TAG = "serviceTag";
+
     public ApiCollection() {
     }
 
@@ -398,6 +404,22 @@ public class ApiCollection {
             return this.getTagsList().stream().anyMatch(t -> Constants.AKTO_GEN_AI_TAG.equals(t.getKeyName()));
         }
         return false;
+    }
+
+    public List<String> getHostNames() {
+        return hostNames;
+    }
+
+    public void setHostNames(List<String> hostNames) {
+        this.hostNames = hostNames;
+    }
+
+    public String getServiceTag() {
+        return serviceTag;
+    }
+
+    public void setServiceTag(String serviceTag) {
+        this.serviceTag = serviceTag;
     }
 
 }

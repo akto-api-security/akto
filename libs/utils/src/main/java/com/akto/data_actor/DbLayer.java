@@ -888,6 +888,58 @@ public class DbLayer {
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
     }
 
+    // Atomic operation to add hostname to service tag collection
+    // Uses $addToSet to prevent duplicates and handle concurrent updates from multiple mini-runtime instances
+    public static void addHostNameToServiceTagCollection(int collectionId, String hostName) {
+        if (hostName == null || hostName.isEmpty()) {
+            return;
+        }
+        ApiCollectionsDao.instance.updateOne(
+            Filters.eq(Constants.ID, collectionId),
+            Updates.addToSet(ApiCollection.HOST_NAMES, hostName)
+        );
+    }
+
+    // Atomic operation to update tags for service tag collection
+    // Uses $set to replace the entire tagsList
+    public static void updateServiceTagCollectionTags(int collectionId, List<CollectionTags> tagsList) {
+        if (tagsList == null || tagsList.isEmpty()) {
+            return;
+        }
+        ApiCollectionsDao.instance.updateOne(
+            Filters.eq(Constants.ID, collectionId),
+            Updates.set(ApiCollection.TAGS_STRING, tagsList)
+        );
+    }
+
+    // Similar to createCollectionForHostAndVpc but for service-tag based collections
+    public static void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName) {
+        FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
+        updateOptions.upsert(true);
+
+        Bson updates = Updates.combine(
+            Updates.setOnInsert(Constants.ID, id),
+            Updates.setOnInsert(ApiCollection.NAME, serviceTagValue),
+            Updates.setOnInsert(ApiCollection.START_TS, Context.now()),
+            Updates.setOnInsert(ApiCollection.URLS_STRING, new HashSet<>()),
+            Updates.setOnInsert(ApiCollection.SERVICE_TAG, serviceTagValue),
+            Updates.setOnInsert(ApiCollection.HOST_NAMES, hostNames),
+            Updates.setOnInsert(ApiCollection.REDACT, false),
+            Updates.setOnInsert(ApiCollection.SAMPLE_COLLECTIONS_DROPPED, true),
+            Updates.setOnInsert(ApiCollection.HOST_NAME, hostName)
+        );
+
+        if(tags != null && !tags.isEmpty()) {
+            updates = Updates.combine(updates, Updates.set(ApiCollection.TAGS_STRING, tags));
+        }
+
+        ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(
+            Filters.eq(Constants.ID, id),
+            updates,
+            updateOptions
+        );
+    }
+
     public static void insertRuntimeLog(Log log) {
         RuntimeLogsDao runtimeLogsDao = RuntimeLogsDao.instance;
         cleanupCollectionIfNeeded(runtimeLogsDao.getCollName(), runtimeLogsDao);
