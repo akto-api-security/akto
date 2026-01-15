@@ -2749,7 +2749,67 @@ public class ClientActor extends DataActor {
             return;
         }
     }
-    
+
+    public void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("colId", id);
+        obj.put("serviceTagValue", serviceTagValue);
+        obj.put("hostNames", hostNames);
+        obj.put("tagsList", tags);
+        obj.put("hostName", hostName);
+        String objString = gson.toJson(obj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionForServiceTag", "", "POST", objString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in createCollectionForServiceTag", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in createCollectionForServiceTag" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
+    public void addHostNameToServiceTagCollection(int collectionId, String hostName) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("colId", collectionId);
+        obj.put("hostName", hostName);
+        String objString = gson.toJson(obj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/addHostNameToServiceTagCollection", "", "POST", objString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in addHostNameToServiceTagCollection", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in addHostNameToServiceTagCollection" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
+    public void updateServiceTagCollectionTags(int collectionId, List<CollectionTags> tagsList) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("colId", collectionId);
+        obj.put("tagsList", tagsList);
+        String objString = gson.toJson(obj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateServiceTagCollectionTags", "", "POST", objString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateServiceTagCollectionTags", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in updateServiceTagCollectionTags" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
     public List<TestingRunIssues> fetchIssuesByIds(Set<TestingIssuesId> issuesIds) {
         Map<String, List<String>> headers = buildHeaders();
         List<TestingRunIssues> issueList = new ArrayList<>();

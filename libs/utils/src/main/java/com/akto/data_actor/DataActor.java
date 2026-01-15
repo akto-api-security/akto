@@ -217,6 +217,12 @@ public abstract class DataActor {
 
     public abstract void insertApiCollection(int apiCollectionId, String apiCollectionName);
 
+    public abstract void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName);
+
+    public abstract void addHostNameToServiceTagCollection(int collectionId, String hostName);
+
+    public abstract void updateServiceTagCollectionTags(int collectionId, List<CollectionTags> tagsList);
+
     public abstract List<TestingRunIssues> fetchIssuesByIds(Set<TestingIssuesId> issuesIds);
 
     public abstract List<Integer> fetchDeactivatedCollections();
