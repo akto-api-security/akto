@@ -2,6 +2,7 @@ package com.akto.metrics;
 
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.monitoring.ModuleInfo.ModuleType;
 import com.akto.kafka.Kafka;
@@ -23,14 +24,12 @@ public class ConfigUpdatePoller {
     private static final Gson gson = new Gson();
     private static final long POLL_INTERVAL_SECONDS = 20;
 
-    private final DataActor dataActor;
     private final String miniRuntimeName;
     private final Kafka kafkaProducer;
     private final String configUpdateTopicName;
     private final ScheduledExecutorService scheduler;
 
-    public ConfigUpdatePoller(DataActor dataActor, String miniRuntimeName, Kafka kafkaProducer, String configUpdateTopicName) {
-        this.dataActor = dataActor;
+    public ConfigUpdatePoller(String miniRuntimeName, Kafka kafkaProducer, String configUpdateTopicName) {
         this.miniRuntimeName = miniRuntimeName;
         this.kafkaProducer = kafkaProducer;
         this.configUpdateTopicName = configUpdateTopicName;
@@ -53,6 +52,7 @@ public class ConfigUpdatePoller {
 
     private void pollAndPublishConfigUpdates() {
         try {
+            DataActor dataActor = DataActorFactory.fetchInstance();
             List<ModuleInfo> moduleInfoList = dataActor.fetchAndUpdateModuleForReboot(
                     ModuleType.TRAFFIC_COLLECTOR,
                     miniRuntimeName
@@ -75,18 +75,10 @@ public class ConfigUpdatePoller {
             if (!moduleInfoList.isEmpty() && moduleInfoList.get(0).getAdditionalData() != null) {
                 Map<String, Object> additionalData = moduleInfoList.get(0).getAdditionalData();
                 Object envObj = additionalData.get("env");
-                if (envObj != null) {
-                    String envJson = gson.toJson(envObj);
-                    try {
-                        java.lang.reflect.Type type = new com.google.gson.reflect.TypeToken<Map<String, String>>(){}.getType();
-                        envVars = gson.fromJson(envJson, type);
-                        if (envVars == null) {
-                            envVars = new HashMap<>();
-                        }
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e, "Error parsing env variables from additionalData");
-                        envVars = new HashMap<>();
-                    }
+                if (envObj instanceof Map) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, String> env = (Map<String, String>) envObj;
+                    envVars = env;
                 }
             }
 
@@ -117,18 +109,6 @@ public class ConfigUpdatePoller {
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error publishing config update");
-        }
-    }
-
-    public void stop() {
-        loggerMaker.infoAndAddToDb("Stopping config update poller");
-        scheduler.shutdown();
-        try {
-            if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
-                scheduler.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            scheduler.shutdownNow();
         }
     }
 }

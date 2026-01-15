@@ -488,7 +488,7 @@ public class Main {
 
 
         String configUpdateTopicName = "akto.config.updates";
-        ConfigUpdatePoller configUpdatePoller = new ConfigUpdatePoller(dataActor, customMiniRuntimeServiceName, localKafkaProducer, configUpdateTopicName);
+        ConfigUpdatePoller configUpdatePoller = new ConfigUpdatePoller(customMiniRuntimeServiceName, localKafkaProducer, configUpdateTopicName);
         configUpdatePoller.start();
 
         String runMcpJobs = System.getenv("AKTO_RUN_MCP_JOBS");
