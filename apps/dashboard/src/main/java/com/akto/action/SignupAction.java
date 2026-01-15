@@ -248,12 +248,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             return ERROR.toUpperCase();
         }
         
-        if (tokens == null) {
-            logger.errorAndAddToDb("Auth0 returned null tokens", LogDb.DASHBOARD);
-            servletResponse.sendRedirect("/business-email?contact=true");
-            return ERROR.toUpperCase();
-        }
-        
         String accessToken = tokens.getAccessToken();
         String refreshToken = tokens.getRefreshToken();
         String idToken = tokens.getIdToken();
