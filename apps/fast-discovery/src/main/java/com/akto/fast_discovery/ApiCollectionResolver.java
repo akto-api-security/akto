@@ -1,6 +1,6 @@
 package com.akto.fast_discovery;
 
-import com.akto.data_actor.ClientActor;
+import com.akto.data_actor.DataActor;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.log.LoggerMaker;
@@ -28,11 +28,11 @@ public class ApiCollectionResolver {
     // Uses Set instead of Bloom filter because false positives would cause orphaned APIs
     private final Set<String> createdCollections = ConcurrentHashMap.newKeySet();
 
-    // ClientActor for collection creation (reuses existing database-abstractor APIs)
-    private final ClientActor clientActor;
+    // DataActor for collection creation (reuses existing database APIs)
+    private final DataActor dataActor;
 
-    public ApiCollectionResolver(ClientActor clientActor) {
-        this.clientActor = clientActor;
+    public ApiCollectionResolver(DataActor dataActor) {
+        this.dataActor = dataActor;
     }
 
     /**
@@ -128,7 +128,7 @@ public class ApiCollectionResolver {
         for (int i = 0; i < 100; i++) {
             int collectionId = id + i;
             try {
-                clientActor.createCollectionForHostAndVpc(host, collectionId, vpcId, tags);
+                dataActor.createCollectionForHostAndVpc(host, collectionId, vpcId, tags);
                 return collectionId;
             } catch (Exception e) {
                 lastException = e;

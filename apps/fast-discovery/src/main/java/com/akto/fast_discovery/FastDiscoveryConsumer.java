@@ -1,5 +1,6 @@
 package com.akto.fast_discovery;
 
+import com.akto.data_actor.DataActor;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.log.LoggerMaker;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -21,16 +22,16 @@ public class FastDiscoveryConsumer {
 
     private final BloomFilterManager bloomFilter;
     private final ApiCollectionResolver collectionResolver;
-    private final DatabaseAbstractorClient dbAbstractorClient;
+    private final DataActor dataActor;
 
     public FastDiscoveryConsumer(
             BloomFilterManager bloomFilter,
             ApiCollectionResolver collectionResolver,
-            DatabaseAbstractorClient dbAbstractorClient
+            DataActor dataActor
     ) {
         this.bloomFilter = bloomFilter;
         this.collectionResolver = collectionResolver;
-        this.dbAbstractorClient = dbAbstractorClient;
+        this.dataActor = dataActor;
     }
 
     /**
@@ -119,11 +120,27 @@ public class FastDiscoveryConsumer {
 
         try {
             if (!collectionIds.isEmpty()) {
-                dbAbstractorClient.ensureCollections(collectionIds);
+                loggerMaker.infoAndAddToDb("Fast-discovery: Ensuring " + collectionIds.size() + " collections exist");
+                dataActor.ensureCollections(collectionIds);
             }
 
-            dbAbstractorClient.bulkWriteSti(stiWrites);
-            dbAbstractorClient.bulkWriteApiInfo(apiInfoWrites);
+            loggerMaker.infoAndAddToDb("Fast-discovery: Bulk writing " + stiWrites.size() + " entries to single_type_info");
+            List<Object> writesForSti = new ArrayList<>(stiWrites);
+            dataActor.fastDiscoveryBulkWriteSingleTypeInfo(writesForSti);
+
+            loggerMaker.infoAndAddToDb("Fast-discovery: Bulk writing " + apiInfoWrites.size() + " entries to api_info");
+            List<com.akto.dto.ApiInfo> apiInfoList = new ArrayList<>();
+            for (BulkUpdates write : apiInfoWrites) {
+                try {
+                    com.akto.dto.ApiInfo apiInfo = BulkUpdatesToApiInfo.convert(write);
+                    if (apiInfo != null) {
+                        apiInfoList.add(apiInfo);
+                    }
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Failed to convert BulkUpdates to ApiInfo: " + e.getMessage());
+                }
+            }
+            dataActor.fastDiscoveryBulkWriteApiInfo(apiInfoList);
 
             newApis.keySet().forEach(bloomFilter::add);
 
