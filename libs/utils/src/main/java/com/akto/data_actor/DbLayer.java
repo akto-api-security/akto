@@ -1226,7 +1226,10 @@ public class DbLayer {
         UpdateOptions updateOptions = new UpdateOptions().upsert(true);
 
         for (ModuleInfo moduleInfo : moduleInfoList) {
-            Bson filter = Filters.eq("_id", moduleInfo.getId());
+            Bson filter = Filters.and(
+                Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
+                Filters.eq(ModuleInfo._REBOOT, false)
+            );
             Bson updates = Updates.combine(
                     Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
                     Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType().name()),
@@ -1236,7 +1239,6 @@ public class DbLayer {
                     Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
                     Updates.set(ModuleInfo.MINI_RUNTIME_NAME, moduleInfo.getMiniRuntimeName()),
                     Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()),
-                    Updates.set(ModuleInfo._REBOOT, moduleInfo.isReboot()),
                     Updates.set(ModuleInfo.DELETE_TOPIC_AND_REBOOT, moduleInfo.isDeleteTopicAndReboot())
             );
             bulkUpdates.add(new UpdateOneModel<>(filter, updates, updateOptions));
@@ -1246,18 +1248,15 @@ public class DbLayer {
     }
 
     public static List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName) {
-        List<Bson> filters = new ArrayList<>();
-        filters.add(Filters.eq(ModuleInfo._REBOOT, true));
-
-        if (moduleType != null) {
-            filters.add(Filters.eq(ModuleInfo.MODULE_TYPE, moduleType.name()));
+        if (moduleType == null || miniRuntimeName == null || miniRuntimeName.isEmpty()) {
+            return new ArrayList<>();
         }
 
-        if (miniRuntimeName != null && !miniRuntimeName.isEmpty()) {
-            filters.add(Filters.eq(ModuleInfo.MINI_RUNTIME_NAME, miniRuntimeName));
-        }
-
-        Bson filter = Filters.and(filters);
+        Bson filter = Filters.and(
+            Filters.eq(ModuleInfo._REBOOT, true),
+            Filters.eq(ModuleInfo.MODULE_TYPE, moduleType.name()),
+            Filters.eq(ModuleInfo.MINI_RUNTIME_NAME, miniRuntimeName)
+        );
 
         List<ModuleInfo> moduleInfoList = ModuleInfoDao.instance.findAll(filter);
 

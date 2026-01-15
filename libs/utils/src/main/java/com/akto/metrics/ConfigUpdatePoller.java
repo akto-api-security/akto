@@ -64,10 +64,10 @@ public class ConfigUpdatePoller {
 
             loggerMaker.infoAndAddToDb("Found " + moduleInfoList.size() + " module(s) with config updates for mini-runtime: " + miniRuntimeName);
 
-            // Collect all daemon IDs
-            List<String> daemonIds = new ArrayList<>();
+            // Collect all daemon names
+            List<String> daemonNames = new ArrayList<>();
             for (ModuleInfo moduleInfo : moduleInfoList) {
-                daemonIds.add(moduleInfo.getId());
+                daemonNames.add(moduleInfo.getName());
             }
 
             // Extract envVars from additionalData.env of the first module
@@ -90,14 +90,14 @@ public class ConfigUpdatePoller {
                 }
             }
 
-            publishConfigUpdate(daemonIds, envVars);
+            publishConfigUpdate(daemonNames, envVars);
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error polling and publishing config updates");
         }
     }
 
-    private void publishConfigUpdate(List<String> daemonIds, Map<String, String> envVars) {
+    private void publishConfigUpdate(List<String> daemonNames, Map<String, String> envVars) {
         try {
             if (kafkaProducer == null || !kafkaProducer.producerReady) {
                 loggerMaker.infoAndAddToDb("Kafka producer not ready, will retry in next poll cycle");
@@ -105,15 +105,15 @@ public class ConfigUpdatePoller {
             }
 
             Map<String, Object> configUpdate = new HashMap<>();
-            configUpdate.put("daemonIds", daemonIds);
+            configUpdate.put("messageType", "ENV_RELOAD");
+            configUpdate.put("daemonNames", daemonNames);
             configUpdate.put("env", envVars);
-            configUpdate.put("restartRequired", true);
-            configUpdate.put("timestamp", (long) Context.now());
+            configUpdate.put("timestamp", System.currentTimeMillis());
 
             String message = gson.toJson(configUpdate);
             kafkaProducer.send(message, configUpdateTopicName);
 
-            loggerMaker.infoAndAddToDb("Published config update for " + daemonIds.size() + " daemon(s) to topic: " + configUpdateTopicName);
+            loggerMaker.infoAndAddToDb("Published config update for " + daemonNames.size() + " daemon(s) to topic: " + configUpdateTopicName);
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error publishing config update");
