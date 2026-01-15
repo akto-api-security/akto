@@ -15,6 +15,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 
+import java.net.URI;
 import java.net.URL;
 import java.util.*;
 
@@ -175,7 +176,14 @@ public class RuntimeUtil {
                     apiCollectionUrlTemplates.get(apiCollectionId).add(urlTemplate);
                 }else if(apiInfoKeyToApiInfo != null){
                     // remove host from url
-                    String urlWithoutHost = url.replaceAll("https?://[^/]+", "");
+                    String urlWithoutHost = url;
+                    if(urlWithoutHost.contains("://")){
+                        try {
+                            URI uri = new URI(urlWithoutHost);
+                            urlWithoutHost = uri.getPath();
+                        } catch (Exception e) {
+                        }
+                    }
                     apiInfoKeyToApiInfo.put(apiCollectionId + " " + urlWithoutHost + " " + method.name(), apiInfo.getId());
                 }
             }
