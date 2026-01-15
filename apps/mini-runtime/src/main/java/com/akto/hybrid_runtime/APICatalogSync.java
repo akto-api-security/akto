@@ -1,23 +1,22 @@
 package com.akto.hybrid_runtime;
 
-import com.akto.mcp.McpSchema;
-import com.akto.util.Pair;
+import static com.akto.dto.type.KeyTypes.patternToSubType;
+
 import java.security.interfaces.RSAPublicKey;
-import java.util.regex.Pattern;
 import java.util.*;
 import java.util.Map.Entry;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
+import java.util.regex.Pattern;
 
 import com.akto.PayloadEncodeUtil;
-import com.akto.dao.*;
+import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.SensitiveParamInfoDao;
+import com.akto.dao.SensitiveSampleDataDao;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.bulk_updates.BulkUpdates;
@@ -36,15 +35,15 @@ import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.hybrid_runtime.filter_updates.FilterUpdates;
+import com.akto.hybrid_runtime.policies.AktoPolicyNew;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.mcp.McpSchema;
 import com.akto.metrics.AllMetrics;
 import com.akto.runtime.utils.Utils;
-import com.akto.data_actor.DataActor;
-import com.akto.data_actor.DataActorFactory;
-import com.akto.hybrid_runtime.policies.AktoPolicyNew;
 import com.akto.testing_db_layer_client.ClientLayer;
 import com.akto.types.CappedSet;
+import com.akto.util.Pair;
 import com.akto.util.filter.DictionaryFilter;
 import com.akto.utils.RedactSampleData;
 import com.google.api.client.util.Charsets;
@@ -54,12 +53,11 @@ import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.UpdateResult;
+
 import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.conversions.Bson;
 import org.bson.json.JsonParseException;
 import org.bson.types.ObjectId;
-
-import static com.akto.dto.type.KeyTypes.patternToSubType;
 
 public class APICatalogSync {
 
@@ -76,7 +74,6 @@ public class APICatalogSync {
     public static boolean mergeAsyncOutside = true;
     public int lastStiFetchTs = 0;
     public BloomFilter<CharSequence> existingAPIsInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
-    public BloomFilter<CharSequence> existingSampleDataInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
     public Map<String, FilterConfig> advancedFilterMap =  new HashMap<>();
 
     private static DataActor dataActor = DataActorFactory.fetchInstance();
@@ -1188,12 +1185,6 @@ public class APICatalogSync {
     public void buildFromDB(boolean calcDiff, boolean fetchAllSTI) {
 
         loggerMaker.infoAndAddToDb("Started building from dB with calcDiff " + calcDiff + " fetchAllSTI: " + fetchAllSTI);
-
-        // Refresh sample data bloom filter every 15 minutes (DB_REFRESH_CYCLE)
-        // This clears the filter to allow new samples and prevents memory leak
-        this.existingSampleDataInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001);
-        loggerMaker.infoAndAddToDb("Refreshed sample data bloom filter");
-
         loggerMaker.infoAndAddToDb("Fetching STIs: " + fetchAllSTI);
         List<SingleTypeInfo> allParams;
         /*
@@ -1632,11 +1623,9 @@ public class APICatalogSync {
         Map<URLStatic, RequestTemplate> dbStrictURLToMethods = dbCatalog.getStrictURLToMethods();
 
         for(Map.Entry<URLStatic, RequestTemplate> entry: deltaStrictURLToMethods.entrySet()) {
-            String sampleKey = apiCollectionId + " " + entry.getKey().getUrl() + " " + entry.getKey().getMethod();
-            if (forceUpdate || !existingSampleDataInDb.mightContain(sampleKey)) {
+            if (forceUpdate || !dbStrictURLToMethods.containsKey(entry.getKey())) {
                 Key key = new Key(apiCollectionId, entry.getKey().getUrl(), entry.getKey().getMethod(), -1, 0, 0);
                 sampleData.add(new SampleData(key, entry.getValue().removeAllSampleMessage()));
-                existingSampleDataInDb.put(sampleKey);
             }
         }
 
@@ -1644,11 +1633,9 @@ public class APICatalogSync {
         Map<URLTemplate, RequestTemplate> dbTemplateURLToMethods = dbCatalog.getTemplateURLToMethods();
 
         for(Map.Entry<URLTemplate, RequestTemplate> entry: deltaTemplateURLToMethods.entrySet()) {
-            String sampleKey = apiCollectionId + " " + entry.getKey().getTemplateString() + " " + entry.getKey().getMethod();
-            if (forceUpdate || !existingSampleDataInDb.mightContain(sampleKey)) {
+            if (forceUpdate || !dbTemplateURLToMethods.containsKey(entry.getKey())) {
                 Key key = new Key(apiCollectionId, entry.getKey().getTemplateString(), entry.getKey().getMethod(), -1, 0, 0);
                 sampleData.add(new SampleData(key, entry.getValue().removeAllSampleMessage()));
-                existingSampleDataInDb.put(sampleKey);
             }
         }
 
