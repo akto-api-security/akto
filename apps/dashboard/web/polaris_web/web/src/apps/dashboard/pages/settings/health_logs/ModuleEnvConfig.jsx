@@ -43,8 +43,6 @@ const ModuleEnvConfigComponent = ({ title, description, module, onSaveEnv }) => 
     const handleSave = async () => {
         try {
             await onSaveEnv(module.id, module.name, envData);
-            // Don't show toast here, let parent handle it
-            // func.setToast(true, false, "Environment config saved successfully. Module will reboot.");
             setInitialEnvData({ ...envData });
         } catch (error) {
             func.setToast(true, true, "Error saving environment config");

@@ -107,9 +107,8 @@ public class ModuleInfoAction extends UserAction {
             // Update reboot flag to true for matching modules
             // Use deleteTopicAndReboot flag if specified, otherwise use regular reboot flag
             String rebootField = deleteTopicAndReboot ? ModuleInfo.DELETE_TOPIC_AND_REBOOT : ModuleInfo._REBOOT;
-            System.out.println("rebootField will be : " + rebootField);
-            com.mongodb.client.result.UpdateResult result = ModuleInfoDao.instance.updateMany(rebootFilter, Updates.set(rebootField, true));
-            System.out.println("rebootModules: Matched " + result.getMatchedCount() + " modules, modified " + result.getModifiedCount() + " modules");
+
+            ModuleInfoDao.instance.updateMany(rebootFilter, Updates.set(rebootField, true));
 
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
@@ -143,45 +142,41 @@ public class ModuleInfoAction extends UserAction {
 
     public String updateModuleEnvAndReboot() {
         if (moduleName == null || moduleName.isEmpty()) {
-            System.out.println("updateModuleEnvAndReboot: moduleName is null or empty");
             return ERROR.toUpperCase();
         }
 
         try {
-            System.out.println("updateModuleEnvAndReboot: moduleName=" + moduleName + ", envData=" + envData);
             int deltaTimeForReboot = Context.now() - rebootThresholdSeconds;
 
-            // Find all modules with the given name that received heartbeat in the last threshold minute(s)
+
             Bson moduleFilter = Filters.and(
                 Filters.eq(ModuleInfo.NAME, moduleName),
                 Filters.gte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, deltaTimeForReboot),
                 Filters.ne(ModuleInfo.ADDITIONAL_DATA, null)
             );
 
-            // Update additionalData.env with new environment variables and set reboot flag to true
+
             List<Bson> updates = new ArrayList<>();
 
-            // Update each environment variable in additionalData.env
+
             if (envData != null && !envData.isEmpty()) {
-                // Build the env map
+
                 Map<String, String> envMap = new HashMap<>();
                 for (Map.Entry<String, String> entry : envData.entrySet()) {
                     envMap.put(entry.getKey(), entry.getValue());
                 }
-                // Set the entire env object at once
+
                 updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + ".env", envMap));
             }
 
-            // Always set reboot flag to true
+
             updates.add(Updates.set(ModuleInfo._REBOOT, true));
 
-            // Update all modules with the same name
+
             ModuleInfoDao.instance.updateMany(moduleFilter, Updates.combine(updates));
 
-            System.out.println("updateModuleEnvAndReboot: Success");
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
-            System.out.println("updateModuleEnvAndReboot: Exception - " + e.getMessage());
             e.printStackTrace();
             return ERROR.toUpperCase();
         }
