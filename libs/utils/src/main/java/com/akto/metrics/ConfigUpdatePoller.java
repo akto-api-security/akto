@@ -21,7 +21,7 @@ public class ConfigUpdatePoller {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(ConfigUpdatePoller.class, LogDb.RUNTIME);
     private static final Gson gson = new Gson();
-    private static final long POLL_INTERVAL_SECONDS = 30;
+    private static final long POLL_INTERVAL_SECONDS = 20;
 
     private final DataActor dataActor;
     private final String miniRuntimeName;
