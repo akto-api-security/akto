@@ -724,10 +724,7 @@
         <action name="api/fetchApiIds" class="com.akto.action.DbAction" method="fetchApiIds">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json">
-                <param name="root">apiIds</param>
-                <param name="wrapWith">apiIds</param>
-            </result>
+            <result name="SUCCESS" type="json"/>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>

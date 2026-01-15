@@ -291,14 +291,73 @@ public class DbLayer {
     /**
      * Fetch all API IDs (lightweight projection) for Bloom filter initialization.
      * Returns only apiCollectionId, url, and method fields.
+     *
+     * This is a backward-compatible wrapper that calls the paginated version with null cursor.
      */
     public static List<Map<String, Object>> fetchAllApiInfoKeys() {
+        return fetchAllApiInfoKeys(null);
+    }
+
+    /**
+     * Fetch API info keys with cursor-based pagination (keyset pagination).
+     * Uses the same pattern as fetchApiRateLimits for consistency.
+     *
+     * @param lastApiInfoKey The last API info key from previous page (null for first page)
+     * @return List of API info keys (max 1000 records)
+     */
+    public static List<Map<String, Object>> fetchAllApiInfoKeys(ApiInfo.ApiInfoKey lastApiInfoKey) {
+        // Build filter based on cursor position
+        Bson filters;
+
+        if (lastApiInfoKey != null) {
+            // Cursor-based pagination using compound key comparison
+            // This matches the exact pattern from fetchApiRateLimits (lines 361-376)
+            Bson paginationFilter = Filters.or(
+                // Case 1: apiCollectionId > cursor.apiCollectionId
+                Filters.gt("_id.apiCollectionId", lastApiInfoKey.getApiCollectionId()),
+
+                // Case 2: apiCollectionId = cursor.apiCollectionId AND method > cursor.method
+                Filters.and(
+                    Filters.eq("_id.apiCollectionId", lastApiInfoKey.getApiCollectionId()),
+                    Filters.gt("_id.method", lastApiInfoKey.getMethod())
+                ),
+
+                // Case 3: apiCollectionId = cursor.apiCollectionId AND method = cursor.method AND url > cursor.url
+                Filters.and(
+                    Filters.eq("_id.apiCollectionId", lastApiInfoKey.getApiCollectionId()),
+                    Filters.eq("_id.method", lastApiInfoKey.getMethod()),
+                    Filters.gt("_id.url", lastApiInfoKey.getUrl())
+                )
+            );
+            filters = paginationFilter;
+        } else {
+            // First page: no filter needed
+            filters = Filters.exists("_id");
+        }
+
+        // Sorting order (same as fetchApiRateLimits, lines 386-390)
+        Bson sort = Sorts.orderBy(
+            Sorts.ascending("_id.apiCollectionId"),
+            Sorts.ascending("_id.method"),
+            Sorts.ascending("_id.url")
+        );
+
+        // Projection: only fetch _id field
+        Bson projection = Projections.include("_id");
+
+        // Page size: 1000 records (same as fetchApiRateLimits)
+        int limit = 1000;
+
+        // Execute query
         com.mongodb.client.FindIterable<ApiInfo> cursor = ApiInfoDao.instance
             .getMCollection()
-            .find()
-            .projection(Projections.include("_id"))
-            .batchSize(10000);
+            .find(filters)
+            .projection(projection)
+            .sort(sort)
+            .limit(limit)
+            .batchSize(1000);
 
+        // Convert to list of maps
         List<Map<String, Object>> apiIdsList = new ArrayList<>();
         for (ApiInfo apiInfo : cursor) {
             if (apiInfo != null && apiInfo.getId() != null) {
@@ -310,6 +369,7 @@ public class DbLayer {
                 apiIdsList.add(apiId);
             }
         }
+
         return apiIdsList;
     }
 
