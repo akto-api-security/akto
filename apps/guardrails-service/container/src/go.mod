@@ -68,4 +68,4 @@ require (
 )
 
 // Replace directive to point to the actual location in akto-gateway repository (stdio-header-fix branch)
-replace github.com/akto-api-security/mcp-endpoint-shield => github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260113074832-dd17d790520e
+replace github.com/akto-api-security/mcp-endpoint-shield => github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260114074413-0f2d7a9173d1
