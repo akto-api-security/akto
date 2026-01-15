@@ -253,6 +253,7 @@ public class APICatalogSync {
         Map<URLStatic, RequestTemplate> pendingRequests = createRequestTemplates(aggregator);
         loggerMaker.info("pendingRequests: " + (System.currentTimeMillis() - start));
 
+        int totalApiCount = pendingRequests.size();
         start = System.currentTimeMillis();
         tryWithKnownURLTemplates(pendingRequests, deltaCatalog, dbCatalog, apiCollectionId );
         loggerMaker.info("tryWithKnownURLTemplates: " + (System.currentTimeMillis() - start));
@@ -266,7 +267,7 @@ public class APICatalogSync {
                 pendingRequests.clear();
             }
             AllMetrics.instance.setDeltaCatalogNewCount(pendingRequests.size());
-            AllMetrics.instance.setDeltaCatalogTotalCount(pendingRequests.size());
+            AllMetrics.instance.setDeltaCatalogTotalCount(totalApiCount);
             for (URLStatic pending: pendingRequests.keySet()) {
                 RequestTemplate pendingTemplate = pendingRequests.get(pending);
 
