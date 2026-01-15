@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -23,6 +24,7 @@ public class ConfigUpdatePoller {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ConfigUpdatePoller.class, LogDb.RUNTIME);
     private static final Gson gson = new Gson();
     private static final long POLL_INTERVAL_SECONDS = 20;
+    private static final Random random = new Random();
 
     private final DataActor dataActor;
     private final String miniRuntimeName;
@@ -44,8 +46,16 @@ public class ConfigUpdatePoller {
 
         scheduler.scheduleWithFixedDelay(() -> {
             try {
+                long jitter = random.nextInt(6);
+                if (jitter > 0) {
+                    Thread.sleep(jitter * 1000);
+                }
+
                 Context.accountId.set(Context.getActualAccountId());
                 pollAndPublishConfigUpdates();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                loggerMaker.errorAndAddToDb(e, "Config update poller interrupted");
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error in config update poller");
             }
