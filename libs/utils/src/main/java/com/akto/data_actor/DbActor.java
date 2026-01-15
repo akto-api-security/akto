@@ -431,6 +431,18 @@ public class DbActor extends DataActor {
         DbLayer.insertApiCollection(apiCollectionId, apiCollectionName);
     }
 
+    public void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName) {
+        DbLayer.createCollectionForServiceTag(id, serviceTagValue, hostNames, tags, hostName);
+    }
+
+    public void addHostNameToServiceTagCollection(int collectionId, String hostName) {
+        DbLayer.addHostNameToServiceTagCollection(collectionId, hostName);
+    }
+
+    public void updateServiceTagCollectionTags(int collectionId, List<CollectionTags> tagsList) {
+        DbLayer.updateServiceTagCollectionTags(collectionId, tagsList);
+    }
+
     public void insertTestingRunResultSummary(TestingRunResultSummary trrs) {
         DbLayer.insertTestingRunResultSummary(trrs);
     }

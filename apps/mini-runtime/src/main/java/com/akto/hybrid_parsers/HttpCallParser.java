@@ -77,6 +77,10 @@ public class HttpCallParser {
     private DataActor dataActor = DataActorFactory.fetchInstance();
     private Map<Integer, ApiCollection> apiCollectionsMap = new HashMap<>();
 
+    // Track which hostnames have been added to each service-tag collection to avoid redundant DB calls
+    // Key: collectionId, Value: Set of hostnames already added
+    private Map<Integer, Set<String>> serviceTagCollectionHostNamesCache = new HashMap<>();
+
     // Pre-compiled patterns for better performance
     private static final Pattern IP_ADDRESS_PATTERN = Pattern.compile("\\b\\d{1,3}(?:\\.\\d{1,3}){3}.*");
     private static final String EMPTY_JSON = "{}";
@@ -96,9 +100,18 @@ public class HttpCallParser {
         apiCatalogSync.buildFromDB(false, fetchAllSTI);
         apiCollectionsMap = new HashMap<>();
         apiCollectionIdTagsSyncTimestampMap = new HashMap<>();
+        serviceTagCollectionHostNamesCache = new HashMap<>();
         List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta();
         for (ApiCollection apiCollection: apiCollections) {
             apiCollectionsMap.put(apiCollection.getId(), apiCollection);
+
+            // Initialize cache for service-tag collections with existing hostNames
+            if (apiCollection.getServiceTag() != null) {
+                serviceTagCollectionHostNamesCache.put(
+                    apiCollection.getId(),
+                    new HashSet<>(apiCollection.getHostNames())
+                );
+            }
         }
         if (Context.getActualAccountId() == 1745303931 || Context.getActualAccountId() == 1741069294 || Context.getActualAccountId() == 1749515934 || Context.getActualAccountId() == 1753864648) {
             this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, Main.isOnprem, RuntimeMode.isHybridDeployment(), apiCollectionsMap);
@@ -656,8 +669,32 @@ public class HttpCallParser {
         }
     }
 
+    private static final String SERVICE_TAG_KEY = "privatecloud.agoda.com/service";
+
+    private String extractServiceTag(String tagsJson) {
+        if (tagsJson == null || tagsJson.isEmpty()) {
+            return null;
+        }
+
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            return tagsMap.get(SERVICE_TAG_KEY);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error parsing tags JSON for service tag extraction");
+            return null;
+        }
+    }
+
     public int createApiCollectionId(HttpResponseParams httpResponseParam){
         int apiCollectionId;
+
+        // Check if service tag is present in tags - if yes, use service-tag based collection
+        String serviceTagValue = extractServiceTag(httpResponseParam.getTags());
+        if (serviceTagValue != null && !serviceTagValue.isEmpty()) {
+            return createApiCollectionIdByServiceTag(httpResponseParam, serviceTagValue);
+        }
+
         // Use getHostnameForCollection to get reconstructed hostname for AI agents
         String hostName = getHostnameForCollection(httpResponseParam);
 
@@ -735,6 +772,103 @@ public class HttpCallParser {
             apiCollectionId = vxlanId;
         }
         return apiCollectionId;
+    }
+
+    public int createApiCollectionIdByServiceTag(HttpResponseParams httpResponseParam, String serviceTagValue) {
+        int apiCollectionId;
+        String hostName = getHostnameForCollection(httpResponseParam);
+        String tagsJson = httpResponseParam.getTags();
+
+        // Generate collection ID from service tag value
+        // No need for accountId since each account has its own separate database
+        apiCollectionId = ApiCollection.generateServiceTagCollectionId(serviceTagValue);
+
+        // Check if collection already exists in cache
+        if (apiCollectionsMap.containsKey(apiCollectionId)) {
+            // Update hostNames list if hostname is new
+            updateServiceTagCollectionHostNames(apiCollectionId, hostName, tagsJson);
+            return apiCollectionId;
+        }
+
+        // Collection not in cache - create a dummy collection object and add to cache immediately
+        // This prevents making DB calls for every message before the collection is created
+        // The actual DB upsert will happen only once (first time we see this service tag)
+        try {
+            List<String> hostNamesList = new ArrayList<>();
+            if (hostName != null && !hostName.isEmpty()) {
+                hostNamesList.add(hostName);
+            }
+            List<CollectionTags> tagsList = CollectionTags.convertTagsFormat(tagsJson);
+
+            ApiCollection collection = new ApiCollection(
+                apiCollectionId,
+                serviceTagValue,  // name = service tag value
+                Context.now(),    // startTs
+                new HashSet<>(),  // urls (empty initially)
+                hostName,             // hostName = null for service-tag collections
+                0,                // vxlanId
+                false,            // redact
+                true              // sampleCollectionsDropped
+            );
+            collection.setServiceTag(serviceTagValue);
+            collection.setHostNames(hostNamesList);
+            collection.setTagsList(tagsList);
+
+            // Add to cache FIRST to prevent redundant calls
+            apiCollectionsMap.put(apiCollectionId, collection);
+
+            // Now upsert to DB using existing pattern (safe if already exists)
+            dataActor.createCollectionForServiceTag(apiCollectionId, serviceTagValue, hostNamesList, tagsList, hostName);
+
+            loggerMaker.infoAndAddToDb("Created service-tag collection: " + serviceTagValue
+                + " (ID: " + apiCollectionId + ") for URL: " + httpResponseParam.getRequestParams().getURL());
+
+            // Update hostNames if needed
+            updateServiceTagCollectionHostNames(apiCollectionId, hostName, tagsJson);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error creating service-tag collection for: " + serviceTagValue);
+            // Return vxlanId as fallback on error
+            return httpResponseParam.requestParams.getApiCollectionId();
+        }
+
+        return apiCollectionId;
+    }
+
+    private void updateServiceTagCollectionHostNames(int collectionId, String hostName, String tagsJson) {
+        if (hostName == null || hostName.isEmpty()) {
+            return;
+        }
+
+        try {
+            // Check cache first to avoid redundant DB calls
+            Set<String> cachedHostNames = serviceTagCollectionHostNamesCache.get(collectionId);
+            if (cachedHostNames == null) {
+                cachedHostNames = new HashSet<>();
+                serviceTagCollectionHostNamesCache.put(collectionId, cachedHostNames);
+            }
+
+            // Only make DB call if hostname is not already in cache
+            if (!cachedHostNames.contains(hostName)) {
+                // Use atomic MongoDB $addToSet operation to handle concurrent updates from multiple mini-runtime instances
+                // This prevents race conditions when multiple machines process traffic simultaneously
+                dataActor.addHostNameToServiceTagCollection(collectionId, hostName);
+                cachedHostNames.add(hostName);
+
+                if(Utils.printDebugUrlLog("") || Utils.printDebugHostLog(null) != null) {
+                    loggerMaker.infoAndAddToDb("Updated service-tag collection " + collectionId + " with new host: " + hostName);
+                }
+            }
+
+            // Update tags if changed (tags can change over time, so we still check this)
+            // TODO: Can optimize this later with tag caching if needed
+            List<CollectionTags> newTags = CollectionTags.convertTagsFormat(tagsJson);
+            if (newTags != null && !newTags.isEmpty()) {
+                dataActor.updateServiceTagCollectionTags(collectionId, newTags);
+            }
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error updating hostNames for collection: " + collectionId);
+        }
     }
 
 
