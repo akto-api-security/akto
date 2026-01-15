@@ -839,7 +839,7 @@ const transform = {
       subCategoryMap = LocalStore.getState().subCategoryMap
     }
     Object.keys(resp).forEach((key) => {
-      const objectKey = subCategoryMap[key] ? subCategoryMap[key].superCategory.shortName : key;
+      const objectKey = subCategoryMap[key] ? subCategoryMap[key].superCategory.displayName : key;
       const objectKeyName = subCategoryMap[key] ? subCategoryMap[key].superCategory.name : key;
       if (obj.hasOwnProperty(objectKey)) {
         let tempObj = JSON.parse(JSON.stringify(obj[objectKey]));
