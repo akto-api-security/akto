@@ -681,6 +681,10 @@ public class DbActor extends DataActor {
         return null;
     }
 
+    public void bulkUpdateModuleInfo(List<ModuleInfo> moduleInfoList) {
+        DbLayer.bulkUpdateModuleInfo(moduleInfoList);
+    }
+
     public void insertMCPAuditDataLog(McpAuditInfo auditInfo) {
         DbLayer.insertMCPAuditDataLog(auditInfo);
     }

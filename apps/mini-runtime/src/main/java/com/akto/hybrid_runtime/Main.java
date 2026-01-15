@@ -5,48 +5,48 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 import com.akto.RuntimeMode;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
-import com.akto.usage.OrgUtils;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.hybrid_parsers.HttpCallParser;
+import com.akto.hybrid_runtime.filter_updates.FilterUpdates;
 import com.akto.kafka.Kafka;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
-import com.akto.hybrid_parsers.HttpCallParser;
-import com.akto.hybrid_runtime.filter_updates.FilterUpdates;
-import com.akto.data_actor.DataActor;
-import com.akto.data_actor.DataActorFactory;
 import com.akto.metrics.ModuleInfoWorker;
+// Import protobuf classes
+import com.akto.proto.generated.threat_detection.message.http_response_param.v1.HttpResponseParam;
+import com.akto.proto.generated.threat_detection.message.http_response_param.v1.StringList;
 import com.akto.runtime.parser.SampleParser;
 import com.akto.runtime.utils.Utils;
 import com.akto.testing_db_layer_client.ClientLayer;
+import com.akto.usage.OrgUtils;
 import com.akto.util.DashboardMode;
 import com.google.gson.Gson;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.*;
-import org.apache.kafka.clients.producer.*;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.Metric;
 import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.errors.WakeupException;
-import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
-
-import java.util.concurrent.atomic.AtomicBoolean;
-
-// Import protobuf classes
-import com.akto.proto.generated.threat_detection.message.http_response_param.v1.HttpResponseParam;
-import com.akto.proto.generated.threat_detection.message.http_response_param.v1.StringList;
 
 public class Main {
 
@@ -216,7 +216,9 @@ public class Main {
         return topicName;
     }
 
+
     private static final String LOG_GROUP_ID = "-log";
+
 
     public static final String customMiniRuntimeServiceName;
     static {
@@ -423,6 +425,17 @@ public class Main {
                     MetricName key = entry.getKey();
                     Metric value = entry.getValue();
 
+                    // Only process consumer-level metrics (not per-partition metrics)
+                    // Per-partition metrics have a "partition" tag, consumer-level metrics don't
+                    if (key.tags().containsKey("partition")) {
+                        continue;
+                    }
+
+                    // Also skip per-topic metrics - we only want consumer-level aggregated metrics
+                    if (key.tags().containsKey("topic")) {
+                        continue;
+                    }
+
                     if(key.name().equals("records-lag-max")){
                         double val = value.metricValue().equals(Double.NaN) ? 0d: (double) value.metricValue();
                         AllMetrics.instance.setKafkaRecordsLagMax((float) val);
@@ -521,6 +534,10 @@ public class Main {
                 }
             }
         }, 0, TimeUnit.SECONDS);
+
+        // Pod heartbeat consumer thread
+        String heartbeatTopicName = "akto.daemonset.producer.heartbeats";
+        new AktoTrafficCollectorTelemetry(kafkaUrl, groupIdConfig, maxPollRecordsConfig, heartbeatTopicName, dataActor).run();
 
         String runMcpJobs = System.getenv("AKTO_RUN_MCP_JOBS");
         boolean shouldRunMcpJobs = true;

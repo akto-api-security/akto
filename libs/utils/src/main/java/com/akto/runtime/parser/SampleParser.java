@@ -4,6 +4,7 @@ import static com.akto.runtime.utils.Utils.printL;
 import static com.akto.runtime.utils.Utils.printUrlDebugLog;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -13,6 +14,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.TrafficProducerLog;
 import com.akto.runtime.utils.Utils;
 import com.akto.util.HttpRequestResponseUtils;
@@ -178,6 +180,27 @@ public class SampleParser {
 
         return new TrafficProducerLog(
                 logMessage, source, logType, time);
+    }
+
+    public static ModuleInfo parseHeartbeatMessage(String message) throws Exception {
+        Map<String, Object> json = gson.fromJson(message, new com.google.gson.reflect.TypeToken<Map<String, Object>>(){}.getType());
+
+        String daemonId = (String) json.getOrDefault("daemonId", "daemon-0");
+        String moduleTypeStr = (String) json.getOrDefault("moduleType", "TRAFFIC_COLLECTOR");
+        String daemonPodName = (String) json.getOrDefault("daemonPodName", "akto-tc:pod-0:node-0");
+        String imageVersion = (String) json.getOrDefault("imageVersion", "k8s-ebpf");
+        int timestamp = Integer.parseInt(json.getOrDefault("timestamp", String.valueOf(Context.now())).toString());
+
+
+        ModuleInfo moduleInfo = new ModuleInfo();
+        moduleInfo.setId(daemonId); 
+        moduleInfo.setModuleType(ModuleInfo.ModuleType.valueOf(moduleTypeStr));
+        moduleInfo.setName(daemonPodName);
+        moduleInfo.setLastHeartbeatReceived(timestamp);
+        moduleInfo.setStartedTs(timestamp); 
+        moduleInfo.setCurrentVersion(imageVersion);
+
+        return moduleInfo;
     }
 
 }
