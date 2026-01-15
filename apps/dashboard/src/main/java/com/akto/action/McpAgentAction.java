@@ -2,6 +2,7 @@ package com.akto.action;
 
 import com.akto.agent.AgentClient;
 import com.akto.dao.SampleDataDao;
+import com.akto.dao.context.Context;
 import com.akto.dao.testing.AgentConversationDao;
 import com.akto.dto.testing.GenericAgentConversation;
 import com.akto.dto.testing.GenericAgentConversation.ConversationType;
@@ -52,8 +53,9 @@ public class McpAgentAction extends UserAction {
                 addActionError("Invalid conversation type: " + this.conversationType);
                 return ERROR.toUpperCase();
             }
+            int timeNow = Context.now();
 
-            String accessTokenForRequest = McpTokenGenerator.generateToken();
+            String accessTokenForRequest = McpTokenGenerator.generateToken(getSUser().getLogin());
 
             boolean isFirstRequest = true;
             String storedTitle = null;
@@ -92,6 +94,7 @@ public class McpAgentAction extends UserAction {
 
             GenericAgentConversation responseFromMcpServer = agentClient.getResponseFromMcpServer(message, conversationId, 20000, storedTitle, conversationTypeEnum, accessTokenForRequest, contextString);
             if(responseFromMcpServer != null) {
+                responseFromMcpServer.setCreatedAt(timeNow);
                 AgentConversationDao.instance.insertOne(responseFromMcpServer);
             }
             this.response = new BasicDBObject();

@@ -566,7 +566,7 @@ export default function LeftNav() {
 
         // Add Ask AI navigation item
         const askAiExists = items.find(item => item.key === "ask_ai")
-        if (!askAiExists) {
+        if (!askAiExists && window.USER_NAME.indexOf("@akto.io")) {
             items.splice(1, 0, {
                 label: "Ask Akto",
                 icon: MagicMinor,
