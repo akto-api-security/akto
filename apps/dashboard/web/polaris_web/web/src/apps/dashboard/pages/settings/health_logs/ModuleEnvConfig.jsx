@@ -75,10 +75,6 @@ const ModuleEnvConfigComponent = ({ title, description, module, onSaveEnv }) => 
                 <VerticalStack gap="4">
                     {envFields.map((field) => {
                         const fieldValue = envData[field.key] || "";
-                        // Only show field if it has a value or if we're showing all fields
-                        if (!fieldValue && initialEnvData[field.key] === undefined) {
-                            return null;
-                        }
                         return (
                             <HorizontalGrid key={field.key} columns={2} gap="4">
                                 <Box>
