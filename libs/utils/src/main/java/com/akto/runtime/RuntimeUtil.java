@@ -151,7 +151,7 @@ public class RuntimeUtil {
 
     }
 
-    public static void fillURLTemplatesMap(List<ApiInfo> apiInfos, Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods, Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates){
+    public static void fillURLTemplatesMap(List<ApiInfo> apiInfos, Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods, Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates, Map<String, ApiInfo.ApiInfoKey> apiInfoKeyToApiInfo){
         if (apiInfos != null && !apiInfos.isEmpty()) {
             for (ApiInfo apiInfo : apiInfos) {
                 String url = apiInfo.getId().getUrl();
@@ -173,6 +173,10 @@ public class RuntimeUtil {
                     }
 
                     apiCollectionUrlTemplates.get(apiCollectionId).add(urlTemplate);
+                }else if(apiInfoKeyToApiInfo != null){
+                    // remove host from url
+                    String urlWithoutHost = url.replaceAll("https?://[^/]+", "");
+                    apiInfoKeyToApiInfo.put(apiCollectionId + " " + urlWithoutHost + " " + method.name(), apiInfo.getId());
                 }
             }
         }
