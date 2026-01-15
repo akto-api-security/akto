@@ -458,7 +458,7 @@ export default function LeftNav() {
                             },
                             selected: leftNavSelected === "dashboard_guardrails_policies",
                             }] : []),
-                        ...(dashboardCategory !== "Endpoint Security" ? [{
+                        ...(dashboardCategory === "API" ? [{
                             label: "Threat Policies",
                             onClick: () => {
                                 navigate("/dashboard/protection/threat-policy");
