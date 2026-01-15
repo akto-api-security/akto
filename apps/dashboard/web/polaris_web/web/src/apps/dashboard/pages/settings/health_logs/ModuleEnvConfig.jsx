@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import func from "@/util/func"
-import { LegacyCard, VerticalStack, Divider, Text, Box, TextField, HorizontalGrid } from "@shopify/polaris";
+import { LegacyCard, VerticalStack, Divider, Text, Box, TextField, HorizontalGrid, ButtonGroup, Button } from "@shopify/polaris";
 
 const ModuleEnvConfigComponent = ({ title, description, module, allowedEnvFields, onSaveEnv }) => {
     const [envData, setEnvData] = useState({});
@@ -62,18 +62,44 @@ const ModuleEnvConfigComponent = ({ title, description, module, allowedEnvFields
                 <VerticalStack gap="4">
                     {allowedEnvFields && allowedEnvFields.map((field) => {
                         const fieldValue = envData[field.key] || "";
+                        const isBoolean = field.type === "boolean";
+
                         return (
                             <HorizontalGrid key={field.key} columns={2} gap="4">
                                 <Box>
                                     <Text variant="bodyMd" as="p" fontWeight="medium">
                                         {field.label}
                                     </Text>
+                                    {field.helpText && (
+                                        <Text variant="bodySm" color="subdued">
+                                            {field.helpText}
+                                        </Text>
+                                    )}
                                 </Box>
-                                <TextField
-                                    value={fieldValue}
-                                    onChange={(value) => handleInputChange(field.key, value)}
-                                    placeholder={`Enter ${field.label}`}
-                                />
+                                {isBoolean ? (
+                                    <ButtonGroup segmented>
+                                        <Button
+                                            size="slim"
+                                            onClick={() => handleInputChange(field.key, "true")}
+                                            pressed={fieldValue === "true" || fieldValue === true}
+                                        >
+                                            True
+                                        </Button>
+                                        <Button
+                                            size="slim"
+                                            onClick={() => handleInputChange(field.key, "false")}
+                                            pressed={fieldValue === "false" || fieldValue === false || !fieldValue}
+                                        >
+                                            False
+                                        </Button>
+                                    </ButtonGroup>
+                                ) : (
+                                    <TextField
+                                        value={fieldValue}
+                                        onChange={(value) => handleInputChange(field.key, value)}
+                                        placeholder={`Enter ${field.label}`}
+                                    />
+                                )}
                             </HorizontalGrid>
                         );
                     })}

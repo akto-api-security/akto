@@ -130,8 +130,8 @@ const Logs = () => {
     }
 
     const canRebootModule = (module) => {
-        const oneMinuteAgo = Math.floor(Date.now() / 1000) - 60;
-        return module.lastHeartbeatReceived >= oneMinuteAgo &&
+        const twoMinutesAgo = Math.floor(Date.now() / 1000) - 120;
+        return module.lastHeartbeatReceived >= twoMinutesAgo &&
                module.name &&
                (module.name.startsWith('Default_') || module.moduleType === 'TRAFFIC_COLLECTOR');
     }

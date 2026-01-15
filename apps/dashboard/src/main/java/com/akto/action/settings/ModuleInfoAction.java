@@ -41,7 +41,7 @@ public class ModuleInfoAction extends UserAction {
     }
 
     private static final int heartbeatThresholdSeconds = 5 * 60; // 5 minutes
-    private static final int rebootThresholdSeconds = 60; // 1 minute
+    private static final int rebootThresholdSeconds = 2 * 60; // 2 minutes
     private static final String _DEFAULT_PREFIX_REGEX_STRING = "^Default_";
 
     // Whitelist of environment variables that are safe to expose to frontend
@@ -51,7 +51,7 @@ public class ModuleInfoAction extends UserAction {
         put("AKTO_TRAFFIC_BATCH_SIZE", "Traffic Batch Size");
         put("AKTO_TRAFFIC_BATCH_TIME_SECS", "Traffic Batch Time (Seconds)");
         put("AKTO_LOG_LEVEL", "Log Level");
-        put("DEBUG_URLS", "Debug URLs");
+        put("DEBUG_URLS", "Debug URLs (url1,url2,url3)");
         put("AKTO_K8_METADATA_CAPTURE", "K8 Metadata Capture");
         put("AKTO_THREAT_ENABLED", "Threat Enabled");
         put("AKTO_IGNORE_ENVOY_PROXY_CALLS", "Ignore Envoy Proxy Calls");
@@ -94,6 +94,7 @@ public class ModuleInfoAction extends UserAction {
             Map<String, String> field = new HashMap<>();
             field.put("key", entry.getKey());
             field.put("label", entry.getValue());
+            field.put("type", getFieldType(entry.getKey()));
             allowedEnvFields.add(field);
         }
 
@@ -102,6 +103,16 @@ public class ModuleInfoAction extends UserAction {
 
     public List<Map<String, String>> getAllowedEnvFields() {
         return allowedEnvFields;
+    }
+
+    private String getFieldType(String key) {
+        if (key.equals("AKTO_IGNORE_ENVOY_PROXY_CALLS") ||
+            key.equals("AKTO_IGNORE_IP_TRAFFIC") ||
+            key.equals("AKTO_K8_METADATA_CAPTURE") ||
+            key.equals("AKTO_THREAT_ENABLED")) {
+            return "boolean";
+        }
+        return "text";
     }
 
     private void filterEnvironmentVariables(List<ModuleInfo> modules) {
@@ -209,6 +220,10 @@ public class ModuleInfoAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        if (envData == null || envData.isEmpty()) {
+            return SUCCESS.toUpperCase();
+        }
+
         try {
             int deltaTimeForReboot = Context.now() - rebootThresholdSeconds;
 
@@ -222,19 +237,13 @@ public class ModuleInfoAction extends UserAction {
 
             List<Bson> updates = new ArrayList<>();
 
-
-            if (envData != null && !envData.isEmpty()) {
-                // Update each environment variable individually to preserve other env vars
-                // Only allow whitelisted keys for security
-                for (Map.Entry<String, String> entry : envData.entrySet()) {
-                    if (ALLOWED_ENV_KEYS_MAP.containsKey(entry.getKey())) {
-                        updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + ".env." + entry.getKey(), entry.getValue()));
-                    } else {
-                        System.out.println("Rejected attempt to update non-whitelisted env key: " + entry.getKey());
-                    }
+            // Update each environment variable individually to preserve other env vars
+            // Only allow whitelisted keys for security
+            for (Map.Entry<String, String> entry : envData.entrySet()) {
+                if (ALLOWED_ENV_KEYS_MAP.containsKey(entry.getKey())) {
+                    updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + ".env." + entry.getKey(), entry.getValue()));
                 }
             }
-
 
             updates.add(Updates.set(ModuleInfo._REBOOT, true));
 
