@@ -46,7 +46,7 @@ const getHeaders = () => {
     },
   ];
 
-  if (func.isDemoAccount()) {
+  if (func.shouldShowIpReputation()) {
     baseHeaders.push({
       text: "Reputation",
       value: "reputationScore",
@@ -592,7 +592,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         nextUrl: nextUrl
       };
 
-      if (func.isDemoAccount()) {
+      if (func.shouldShowIpReputation()) {
         rowData.reputationScore = <IpReputationScore ipAddress={x.actor} />;
       }
 
