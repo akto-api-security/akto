@@ -1,5 +1,6 @@
 package com.akto.fast_discovery;
 
+import com.akto.data_actor.DataActor;
 import com.akto.dto.ApiInfo;
 import com.akto.log.LoggerMaker;
 import com.google.common.base.Charsets;
@@ -11,7 +12,7 @@ import java.util.List;
 /**
  * BloomFilterManager - Manages Bloom filter for fast API duplicate detection.
  *
- * Initializes Bloom filter by loading existing APIs from database-abstractor API.
+ * Initializes Bloom filter by loading existing APIs from database via DataActor.
  * Provides O(1) probabilistic membership check with configurable false positive rate.
  *
  * Memory usage: ~120MB for 10M APIs at 1% FPP.
@@ -23,17 +24,17 @@ public class BloomFilterManager {
     private BloomFilter<CharSequence> seenApis;
     private final long expectedSize;
     private final double falsePositiveRate;
-    private final DatabaseAbstractorClient dbAbstractorClient;
+    private final DataActor dataActor;
 
     /**
      * Constructor with custom configuration.
      *
-     * @param dbAbstractorClient HTTP client for database-abstractor
+     * @param dataActor          Data access layer (ClientActor or DbActor)
      * @param expectedSize       Expected number of APIs (default: 10,000,000)
      * @param falsePositiveRate  False positive probability (default: 0.01 = 1%)
      */
-    public BloomFilterManager(DatabaseAbstractorClient dbAbstractorClient, long expectedSize, double falsePositiveRate) {
-        this.dbAbstractorClient = dbAbstractorClient;
+    public BloomFilterManager(DataActor dataActor, long expectedSize, double falsePositiveRate) {
+        this.dataActor = dataActor;
         this.expectedSize = expectedSize;
         this.falsePositiveRate = falsePositiveRate;
     }
@@ -41,8 +42,8 @@ public class BloomFilterManager {
     /**
      * Constructor with default configuration.
      */
-    public BloomFilterManager(DatabaseAbstractorClient dbAbstractorClient) {
-        this(dbAbstractorClient, 10_000_000L, 0.01);
+    public BloomFilterManager(DataActor dataActor) {
+        this(dataActor, 10_000_000L, 0.01);
     }
 
     /**
@@ -63,11 +64,13 @@ public class BloomFilterManager {
                 falsePositiveRate
         );
 
-        // Load existing APIs via database-abstractor HTTP API
+        // Load existing APIs via DataActor (ClientActor or DbActor)
         long count = 0;
         try {
-            // Call database-abstractor endpoint to fetch all API IDs
-            List<ApiInfo.ApiInfoKey> existingApis = dbAbstractorClient.fetchApiIds();
+            // Fetch all API IDs via DataActor
+            loggerMaker.infoAndAddToDb("Fetching API IDs");
+            List<ApiInfo.ApiInfoKey> existingApis = dataActor.fetchApiIds();
+            loggerMaker.infoAndAddToDb("Fetched " + existingApis.size() + " API IDs");
 
             for (ApiInfo.ApiInfoKey apiInfoKey : existingApis) {
                 // Build API key: "apiCollectionId url method"

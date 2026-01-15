@@ -1,6 +1,8 @@
 package com.akto.fast_discovery;
 
-import com.akto.data_actor.ClientActor;
+import com.akto.RuntimeMode;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiCollection;
 import com.akto.log.LoggerMaker;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -18,7 +20,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Main - Entry point for Fast-Discovery Consumer.
  *
  * Sets up Kafka consumer and initializes all components:
- * - DatabaseAbstractorClient (HTTP client)
+ * - DataActor (ClientActor for hybrid mode, DbActor for normal mode)
  * - BloomFilterManager (duplicate detection)
  * - ApiCollectionResolver (collection ID resolution)
  * - FastDiscoveryConsumer (processing pipeline)
@@ -38,22 +40,19 @@ public class Main {
         logConfig(config);
 
         // Initialize components
-        DatabaseAbstractorClient dbAbstractorClient = null;
         KafkaConsumer<String, String> kafkaConsumer = null;
 
         try {
-            // 1. Initialize ClientActor for database operations
-            // Uses DATABASE_ABSTRACTOR_SERVICE_TOKEN environment variable
-            ClientActor clientActor = new ClientActor();
-            loggerMaker.infoAndAddToDb("ClientActor initialized");
+            // 1. Initialize DataActor for database operations
+            // Uses DataActorFactory to choose between ClientActor (hybrid) or DbActor (normal)
+            DataActor dataActor = DataActorFactory.fetchInstance();
+            boolean isHybrid = RuntimeMode.isHybridDeployment();
+            loggerMaker.infoAndAddToDb("DataActor initialized: " +
+                (isHybrid ? "ClientActor (hybrid mode - HTTP calls)" : "DbActor (normal mode - direct MongoDB)"));
 
-            // 2. Initialize DatabaseAbstractorClient (using ClientActor for remote calls)
-            dbAbstractorClient = new DatabaseAbstractorClient(clientActor);
-            loggerMaker.infoAndAddToDb("DatabaseAbstractorClient initialized");
-
-            // 3. Initialize Bloom Filter Manager
+            // 2. Initialize Bloom Filter Manager
             BloomFilterManager bloomFilter = new BloomFilterManager(
-                    dbAbstractorClient,
+                    dataActor,
                     config.bloomFilterExpectedSize,
                     config.bloomFilterFpp
             );
@@ -62,14 +61,16 @@ public class Main {
             loggerMaker.infoAndAddToDb("BloomFilterManager initialized with " +
                     bloomFilter.getEstimatedMemoryUsageMB() + " MB estimated memory");
 
-            // 4. Initialize API Collection Resolver
-            ApiCollectionResolver collectionResolver = new ApiCollectionResolver(clientActor);
+            // 3. Initialize API Collection Resolver
+            ApiCollectionResolver collectionResolver = new ApiCollectionResolver(dataActor);
             loggerMaker.infoAndAddToDb("ApiCollectionResolver initialized");
 
-            // 5. Pre-populate collection cache from database
+            // 4. Pre-populate collection cache from database
             loggerMaker.infoAndAddToDb("Pre-populating collection cache...");
             try {
-                List<ApiCollection> existingCollections = dbAbstractorClient.fetchAllCollections();
+                loggerMaker.infoAndAddToDb("Fetching all collections");
+                List<ApiCollection> existingCollections = dataActor.fetchAllApiCollections();
+                loggerMaker.infoAndAddToDb("Fetched " + existingCollections.size() + " collections");
                 collectionResolver.prePopulateCollections(existingCollections);
                 loggerMaker.infoAndAddToDb("Collection cache pre-populated with " +
                     existingCollections.size() + " collections (~" +
@@ -79,11 +80,11 @@ public class Main {
                 loggerMaker.infoAndAddToDb("Continuing anyway - collections will be created on-demand");
             }
 
-            // 6. Initialize Fast Discovery Consumer
+            // 5. Initialize Fast Discovery Consumer
             FastDiscoveryConsumer consumer = new FastDiscoveryConsumer(
                     bloomFilter,
                     collectionResolver,
-                    dbAbstractorClient
+                    dataActor
             );
             loggerMaker.infoAndAddToDb("FastDiscoveryConsumer initialized");
 
