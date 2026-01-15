@@ -229,8 +229,8 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                             <img src="/public/history.svg" alt="History" style={{ width: '20px', height: '20px' }} />
                         </Button>
                     </HorizontalStack>
-                    <Box style={{ flex: 1, overflow: 'hidden', display: 'flex', justifyContent: 'center' }}>
-                        <Box width="900px" maxWidth="100%" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                        <Box style={{ flex: 1, overflow: 'hidden', display: 'flex', justifyContent: 'center', maxWidth: '100%' }}>
+                        <Box style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '500px', maxWidth: '500px' }}>
                             <Box paddingInline="6" style={{ flex: 1, overflowY: 'auto', paddingBottom: '120px' }}>
                                 <Box paddingBlockStart="16" paddingBlockEnd="19">
                                     <VerticalStack gap="4" align="start">
