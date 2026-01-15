@@ -2213,6 +2213,12 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   isDemoAccount(){
      return window.ACTIVE_ACCOUNT === 1669322524
   },
+
+  shouldShowIpReputation() {
+    return window.ACTIVE_ACCOUNT === 1669322524 || window.ACTIVE_ACCOUNT === 1767812031 || window.ACTIVE_ACCOUNT === 1767814409
+  },
+
+  
   isSameDateAsToday (givenDate) {
       const today = new Date();
       return (
