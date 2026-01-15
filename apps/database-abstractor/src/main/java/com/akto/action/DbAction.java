@@ -198,6 +198,9 @@ public class DbAction extends ActionSupport {
     String host;
     int colId;
     int accountId;
+    String serviceTagValue;
+    List<String> hostNames;
+    String hostName;
     BasicDBObject log;
     boolean isHybridSaas;
     Setup setup;
@@ -2729,6 +2732,36 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String createCollectionForServiceTag() {
+        try {
+            DbLayer.createCollectionForServiceTag(colId, serviceTagValue, hostNames, tagsList, hostName);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in createCollectionForServiceTag " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String addHostNameToServiceTagCollection() {
+        try {
+            DbLayer.addHostNameToServiceTagCollection(colId, hostName);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in addHostNameToServiceTagCollection " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateServiceTagCollectionTags() {
+        try {
+            DbLayer.updateServiceTagCollectionTags(colId, checkTagsNeedUpdates(tagsList, colId));
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in updateServiceTagCollectionTags " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String fetchEndpointsInCollectionUsingHost() {
         try {
             apiInfoList = DbLayer.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip, deltaPeriodValue);
@@ -3442,6 +3475,30 @@ public class DbAction extends ActionSupport {
 
     public void setColId(int colId) {
         this.colId = colId;
+    }
+
+    public String getServiceTagValue() {
+        return serviceTagValue;
+    }
+
+    public void setServiceTagValue(String serviceTagValue) {
+        this.serviceTagValue = serviceTagValue;
+    }
+
+    public List<String> getHostNames() {
+        return hostNames;
+    }
+
+    public void setHostNames(List<String> hostNames) {
+        this.hostNames = hostNames;
+    }
+
+    public String getHostName() {
+        return hostName;
+    }
+
+    public void setHostName(String hostName) {
+        this.hostName = hostName;
     }
 
     public int getAccountId() {

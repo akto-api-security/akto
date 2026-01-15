@@ -1475,6 +1475,45 @@
             </result>
         </action>
 
+        <action name="api/createCollectionForServiceTag" class="com.akto.action.DbAction" method="createCollectionForServiceTag">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/addHostNameToServiceTagCollection" class="com.akto.action.DbAction" method="addHostNameToServiceTagCollection">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/updateServiceTagCollectionTags" class="com.akto.action.DbAction" method="updateServiceTagCollectionTags">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchEndpointsInCollectionUsingHost" class="com.akto.action.DbAction" method="fetchEndpointsInCollectionUsingHost">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
