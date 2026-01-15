@@ -148,6 +148,12 @@ public class DbAction extends ActionSupport {
     @Getter @Setter
     private List<ModuleInfo> moduleInfoList;
 
+    @Getter @Setter
+    private ModuleInfo.ModuleType moduleType;
+
+    @Getter @Setter
+    private String miniRuntimeName;
+
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbAction.class, LogDb.DB_ABS);
 
     public List<BulkUpdates> getWritesForTestingRunIssues() {
@@ -444,6 +450,16 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchAndUpdateModuleForReboot() {
+        try {
+            moduleInfoList = DbLayer.fetchAndUpdateModuleForReboot(moduleType, miniRuntimeName);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetchAndUpdateModuleForReboot " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+    
     public String updateModuleInfoForHeartbeatV2() {
         try {
             moduleInfo = DbLayer.updateModuleInfoForHeartbeatV2(moduleInfo);

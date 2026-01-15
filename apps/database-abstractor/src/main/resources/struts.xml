@@ -90,6 +90,18 @@
             </result>
         </action>
 
+        <action name="api/fetchAndUpdateModuleForReboot" class="com.akto.action.DbAction" method="fetchAndUpdateModuleForReboot">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="root">moduleInfoList</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
 
         <action name="api/updateModuleInfoForHeartbeatV2" class="com.akto.action.DbAction" method="updateModuleInfoForHeartbeatV2">
             <interceptor-ref name="json"/>
