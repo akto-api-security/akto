@@ -46,7 +46,6 @@ public class Main {
 
         // Load configuration
         Config config = loadConfiguration();
-        logConfig(config);
 
         // Initialize components
         KafkaConsumer<String, String> kafkaConsumer = null;
@@ -104,13 +103,8 @@ public class Main {
                 }
             }
 
-            int sizeKB = hostnameToCollectionId.size() * 40 / 1024;
-            loggerMaker.infoAndAddToDb(String.format(
-                "Built cache with %d hostname → collectionId mappings (~%d KB)",
-                hostnameToCollectionId.size(), sizeKB));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Failed to build hostname cache: " + e.getMessage());
-            loggerMaker.infoAndAddToDb("Continuing with empty cache - collections will be created on-demand");
         }
 
         return hostnameToCollectionId;
@@ -286,20 +280,6 @@ public class Main {
         config.bloomFilterFpp = Double.parseDouble(System.getenv().getOrDefault("BLOOM_FILTER_FPP", "0.01"));
 
         return config;
-    }
-
-    /**
-     * Log configuration (redact sensitive values).
-     */
-    private static void logConfig(Config config) {
-        loggerMaker.infoAndAddToDb("=== Fast-Discovery Configuration ===");
-        loggerMaker.infoAndAddToDb("Kafka Broker: " + config.kafkaBrokerUrl);
-        loggerMaker.infoAndAddToDb("Kafka Topic: " + config.kafkaTopicName);
-        loggerMaker.infoAndAddToDb("Kafka Group ID: " + config.kafkaGroupId);
-        loggerMaker.infoAndAddToDb("Kafka Max Poll Records: " + config.kafkaMaxPollRecords);
-        loggerMaker.infoAndAddToDb("Bloom Filter Expected Size: " + config.bloomFilterExpectedSize);
-        loggerMaker.infoAndAddToDb("Bloom Filter FPP: " + config.bloomFilterFpp);
-        loggerMaker.infoAndAddToDb("===================================");
     }
 
     /**

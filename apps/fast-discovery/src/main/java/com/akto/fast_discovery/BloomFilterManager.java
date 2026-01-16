@@ -53,7 +53,6 @@ public class BloomFilterManager {
      * WARNING: This method may take 10-30 seconds depending on number of existing APIs.
      */
     public void initialize() {
-        loggerMaker.infoAndAddToDb("Initializing Bloom filter with expectedSize=" + expectedSize + ", FPP=" + falsePositiveRate);
         long startTime = System.currentTimeMillis();
 
         // Create Bloom filter
@@ -67,10 +66,7 @@ public class BloomFilterManager {
         // Load existing APIs via DataActor (ClientActor or DbActor)
         long count = 0;
         try {
-            // Fetch all API IDs via DataActor
-            loggerMaker.infoAndAddToDb("Fetching API IDs");
             List<ApiInfo.ApiInfoKey> existingApis = dataActor.fetchApiIds();
-            loggerMaker.infoAndAddToDb("Fetched " + existingApis.size() + " API IDs");
 
             for (ApiInfo.ApiInfoKey apiInfoKey : existingApis) {
                 // Build API key: "apiCollectionId url method"
@@ -90,7 +86,6 @@ public class BloomFilterManager {
             long durationSeconds = (endTime - startTime) / 1000;
 
             loggerMaker.infoAndAddToDb("Bloom filter initialized with " + count + " APIs in " + durationSeconds + " seconds");
-            loggerMaker.infoAndAddToDb("Estimated memory usage: ~" + estimateMemoryUsageMB() + " MB");
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Failed to initialize Bloom filter: " + e.getMessage());
@@ -160,17 +155,8 @@ public class BloomFilterManager {
      */
     public void refresh() {
         try {
-            loggerMaker.infoAndAddToDb("Fast-discovery: Refreshing Bloom filter...");
-            long startTime = System.currentTimeMillis();
-
             // Reinitialize - reuses existing initialize() logic
             initialize();
-
-            long durationMs = System.currentTimeMillis() - startTime;
-            loggerMaker.infoAndAddToDb(String.format(
-                "Fast-discovery: Bloom filter refreshed in %dms (%d MB memory)",
-                durationMs, getEstimatedMemoryUsageMB()
-            ));
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Fast-discovery: Failed to refresh Bloom filter: " + e.getMessage());
