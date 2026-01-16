@@ -50,8 +50,9 @@ export default function Header() {
         if (window.beamer_config) {
             const isOnPrem = window.DASHBOARD_MODE === 'ON_PREM';
             const isAgentic = dashboardCategory === 'Agentic Security';
+            const isEndpoint = dashboardCategory === 'Endpoint Security';
 
-            const productId = isAgentic
+            const productId = (isAgentic || isEndpoint)
                 ? (isOnPrem ? 'shUignSe80215' : 'ijUqfdSQ80078')
                 : (isOnPrem ? 'rggteHBr72897' : 'cJtNevEq80216');
 
