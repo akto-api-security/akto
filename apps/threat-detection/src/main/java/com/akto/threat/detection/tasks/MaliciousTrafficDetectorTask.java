@@ -32,6 +32,7 @@ import com.akto.RawApiMetadataFactory;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.data_actor.DataActor;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.api_protection_parse_layer.AggregationRules;
 import com.akto.dto.api_protection_parse_layer.Rule;
@@ -653,6 +654,8 @@ public class MaliciousTrafficDetectorTask implements Task {
       host = requestHeaders.get("host").get(0);
     }
     
+    String contextSourceValue = CONTEXT_SOURCE.API.name();
+    
     MaliciousEventMessage maliciousEvent =
         MaliciousEventMessage.newBuilder()
             .setFilterId(apiFilter.getId())
@@ -673,6 +676,7 @@ public class MaliciousTrafficDetectorTask implements Task {
             .setSuccessfulExploit(maliciousReq.getSuccessfulExploit())
             .setStatus(maliciousReq.getStatus())
             .setHost(host != null ? host : "")
+            .setContextSource(contextSourceValue)
             .build();
     MaliciousEventKafkaEnvelope envelope =
         MaliciousEventKafkaEnvelope.newBuilder()
