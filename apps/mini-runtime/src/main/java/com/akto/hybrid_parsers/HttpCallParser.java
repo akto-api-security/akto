@@ -318,11 +318,11 @@ public class HttpCallParser {
 
         // Modify host header to Kubernetes Service filter
         // TODO: Make this generic or customer specific
-        String serviceName = getHeaderValue(responseParam.getRequestParams().getHeaders(), "x-akto-k8s-privatecloud.agoda.com/service");
-        if (serviceName != null && serviceName.length() > 0){
-            responseParam.getRequestParams().getHeaders().put("host", Arrays.asList(hostName + "-" + serviceName));
-            filterType = FILTER_TYPE.MODIFIED;
-        }
+        // String serviceName = getHeaderValue(responseParam.getRequestParams().getHeaders(), "x-akto-k8s-privatecloud.agoda.com/service");
+        // if (serviceName != null && serviceName.length() > 0){
+        //     responseParam.getRequestParams().getHeaders().put("host", Arrays.asList(hostName + "-" + serviceName));
+        //     filterType = FILTER_TYPE.MODIFIED;
+        // }
 
         // Merge am-pc collections
         if(hostName.contains("am-pc")) {
@@ -882,13 +882,12 @@ public class HttpCallParser {
         }
     }
 
-    // Filter tags to keep only specific keys for account 1736798101
     private List<CollectionTags> filterTagsForAccount(List<CollectionTags> tagsList) {
         if (tagsList == null || tagsList.isEmpty()) {
             return tagsList;
         }
 
-        if (Context.getActualAccountId() != 1736798101) {
+        if (!INPROCESS_ADVANCED_FILTERS_ACCOUNTS.contains(Context.getActualAccountId())) {
             return tagsList;
         }
 
