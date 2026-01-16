@@ -1,5 +1,12 @@
 package com.akto.action;
 
+import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
+
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.CommonTemplateDao;
@@ -37,50 +44,43 @@ import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_collector.TrafficCollectorMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
-import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.APICatalog;
+import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLMethods.Method;
+import com.akto.dto.usage.MetricTypes;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.notifications.slack.APITestStatusAlert;
 import com.akto.notifications.slack.NewIssuesModel;
 import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
-import com.akto.util.enums.GlobalEnums;
-import com.akto.utils.CustomAuthUtil;
-import com.akto.utils.KafkaUtils;
-import com.akto.utils.RedactAlert;
-import com.akto.utils.SampleDataLogs;
-import com.akto.dto.type.URLMethods;
-import com.akto.dto.type.URLMethods.Method;
-import java.util.concurrent.atomic.AtomicInteger;
 import com.akto.testing.TestExecutor;
 import com.akto.trafficFilter.HostFilter;
 import com.akto.trafficFilter.ParamFilter;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.DataInsertionPreChecks;
-import com.akto.dto.usage.MetricTypes;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
+import com.akto.utils.CustomAuthUtil;
+import com.akto.utils.KafkaUtils;
+import com.akto.utils.RedactAlert;
+import com.akto.utils.SampleDataLogs;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.opensymphony.xwork2.Action;
-import com.opensymphony.xwork2.ActionSupport;
-
-import lombok.Getter;
-
+import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
-import lombok.Setter;
+import com.opensymphony.xwork2.Action;
+import com.opensymphony.xwork2.ActionSupport;
+
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import com.google.gson.Gson;
 
-import java.util.*;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
+import lombok.Getter;
+import lombok.Setter;
 
 public class DbAction extends ActionSupport {
     static final ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
@@ -4730,15 +4730,29 @@ public class DbAction extends ActionSupport {
     }
 
     /**
-     * Fetch all API IDs for Bloom filter initialization in fast-discovery consumer.
+     * Fetch API IDs with cursor-based pagination for Bloom filter initialization in fast-discovery consumer.
      * Returns lightweight projection: apiCollectionId, url, method only.
-     * Endpoint: GET /api/fetchApiIds
+     * Uses same pagination pattern as fetchApiRateLimits.
+     * Endpoint: POST /api/fetchApiIds
+     *
+     * @param lastApiInfoKey Cursor for pagination (null for first page)
+     * @return List of API IDs (max 1000 records per page)
      */
     public String fetchApiIds() {
         try {
-            loggerMaker.infoAndAddToDb("Fetching all API IDs for Bloom filter initialization", LogDb.DB_ABS);
-            this.apiIds = DbLayer.fetchAllApiInfoKeys();
-            loggerMaker.infoAndAddToDb("Fetched " + apiIds.size() + " API IDs", LogDb.DB_ABS);
+            // Fetch paginated results using cursor
+            this.apiIds = DbLayer.fetchAllApiInfoKeys(lastApiInfoKey);
+
+            // Update lastApiInfoKey to the last record in the result for next page cursor
+            if (apiIds != null && !apiIds.isEmpty()) {
+                Map<String, Object> lastApiId = apiIds.get(apiIds.size() - 1);
+                int apiCollectionId = (int) lastApiId.get("apiCollectionId");
+                String url = (String) lastApiId.get("url");
+                String methodStr = (String) lastApiId.get("method");
+                URLMethods.Method method = URLMethods.Method.fromString(methodStr);
+                this.lastApiInfoKey = new ApiInfoKey(apiCollectionId, url, method);
+            }
+
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchApiIds: " + e.toString(), LogDb.DB_ABS);

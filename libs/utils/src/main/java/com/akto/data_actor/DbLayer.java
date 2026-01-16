@@ -320,16 +320,92 @@ public class DbLayer {
     }
 
     /**
+     * Page size for cursor-based pagination (used by fetchApiRateLimits and fetchAllApiInfoKeys).
+     */
+    private static final int API_INFO_PAGE_SIZE = 1000;
+
+    /**
+     * Build the standard sort order for ApiInfo cursor-based pagination.
+     * Sorts by compound _id key: apiCollectionId, method, url (all ascending).
+     *
+     * @return Bson sort specification
+     */
+    private static Bson buildApiInfoSortOrder() {
+        return Sorts.orderBy(
+            Sorts.ascending("_id.apiCollectionId"),
+            Sorts.ascending("_id.method"),
+            Sorts.ascending("_id.url")
+        );
+    }
+
+    /**
+     * Build cursor-based pagination filter for ApiInfo compound key (_id).
+     * This is the common pagination logic used by fetchApiRateLimits and fetchAllApiInfoKeys.
+     *
+     * @param lastApiInfoKey The cursor (last record from previous page), null for first page
+     * @return Bson filter for cursor-based pagination
+     */
+    private static Bson buildApiInfoCursorFilter(ApiInfo.ApiInfoKey lastApiInfoKey) {
+        if (lastApiInfoKey == null) {
+            return null;  // No cursor filter needed for first page
+        }
+
+        // Cursor-based pagination using compound key comparison
+        // Returns records where: apiCollectionId > cursor.apiCollectionId
+        //                     OR (apiCollectionId = cursor.apiCollectionId AND method > cursor.method)
+        //                     OR (apiCollectionId = cursor.apiCollectionId AND method = cursor.method AND url > cursor.url)
+        return Filters.or(
+            Filters.gt("_id.apiCollectionId", lastApiInfoKey.getApiCollectionId()),
+            Filters.and(
+                Filters.eq("_id.apiCollectionId", lastApiInfoKey.getApiCollectionId()),
+                Filters.gt("_id.method", lastApiInfoKey.getMethod())
+            ),
+            Filters.and(
+                Filters.eq("_id.apiCollectionId", lastApiInfoKey.getApiCollectionId()),
+                Filters.eq("_id.method", lastApiInfoKey.getMethod()),
+                Filters.gt("_id.url", lastApiInfoKey.getUrl())
+            )
+        );
+    }
+
+    /**
      * Fetch all API IDs (lightweight projection) for Bloom filter initialization.
      * Returns only apiCollectionId, url, and method fields.
+     *
+     * This is a backward-compatible wrapper that calls the paginated version with null cursor.
      */
     public static List<Map<String, Object>> fetchAllApiInfoKeys() {
+        return fetchAllApiInfoKeys(null);
+    }
+
+    /**
+     * Fetch API info keys with cursor-based pagination (keyset pagination).
+     * Uses the same pattern as fetchApiRateLimits for consistency.
+     *
+     * @param lastApiInfoKey The last API info key from previous page (null for first page)
+     * @return List of API info keys (max 1000 records)
+     */
+    public static List<Map<String, Object>> fetchAllApiInfoKeys(ApiInfo.ApiInfoKey lastApiInfoKey) {
+        // Build filter based on cursor position using common helper
+        Bson cursorFilter = buildApiInfoCursorFilter(lastApiInfoKey);
+        Bson filters = (cursorFilter != null) ? cursorFilter : Filters.exists("_id");
+
+        // Use common sort order
+        Bson sort = buildApiInfoSortOrder();
+
+        // Projection: only fetch _id field
+        Bson projection = Projections.include("_id");
+
+        // Execute query with common page size
         com.mongodb.client.FindIterable<ApiInfo> cursor = ApiInfoDao.instance
             .getMCollection()
-            .find()
-            .projection(Projections.include("_id"))
-            .batchSize(10000);
+            .find(filters)
+            .projection(projection)
+            .sort(sort)
+            .limit(API_INFO_PAGE_SIZE)
+            .batchSize(API_INFO_PAGE_SIZE);
 
+        // Convert to list of maps
         List<Map<String, Object>> apiIdsList = new ArrayList<>();
         for (ApiInfo apiInfo : cursor) {
             if (apiInfo != null && apiInfo.getId() != null) {
@@ -341,6 +417,7 @@ public class DbLayer {
                 apiIdsList.add(apiId);
             }
         }
+
         return apiIdsList;
     }
 
@@ -387,40 +464,23 @@ public class DbLayer {
             );
         }
         // Filter for documents that have both rateLimits and rateLimitConfidence fields
-        
-        // Add pagination filter if lastApiInfoKey is provided
-        if (lastApiInfoKey != null) {
-            // Create proper compound key comparison for pagination
-            // This handles the compound _id structure properly
-            Bson paginationFilter = Filters.or(
-                Filters.gt("_id.apiCollectionId", lastApiInfoKey.getApiCollectionId()),
-                Filters.and(
-                    Filters.eq("_id.apiCollectionId", lastApiInfoKey.getApiCollectionId()),
-                    Filters.gt("_id.method", lastApiInfoKey.getMethod())
-                ),
-                Filters.and(
-                    Filters.eq("_id.apiCollectionId", lastApiInfoKey.getApiCollectionId()),
-                    Filters.eq("_id.method", lastApiInfoKey.getMethod()),
-                    Filters.gt("_id.url", lastApiInfoKey.getUrl())
-                )
-            );
+
+        // Add pagination filter using common helper
+        Bson paginationFilter = buildApiInfoCursorFilter(lastApiInfoKey);
+        if (paginationFilter != null) {
             filters = Filters.and(existsFilter, paginationFilter);
+        } else {
+            filters = existsFilter;
         }
 
-        int limit = 1000;
-        
         Bson projection = Projections.fields(
             Projections.include("_id", "rateLimits", "rateLimitConfidence")
         );
-        
-        // Ensure consistent ordering with compound _id sorting
-        Bson sort = Sorts.orderBy(
-            Sorts.ascending("_id.apiCollectionId"),
-            Sorts.ascending("_id.method"), 
-            Sorts.ascending("_id.url")
-        );
-        
-        return ApiInfoDao.instance.findAll(filters, 0 , limit, sort, projection);
+
+        // Use common sort order
+        Bson sort = buildApiInfoSortOrder();
+
+        return ApiInfoDao.instance.findAll(filters, 0, API_INFO_PAGE_SIZE, sort, projection);
     }
     
     public static List<ApiInfo> fetchNonTrafficApiInfos() {
