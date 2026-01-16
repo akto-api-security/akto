@@ -662,6 +662,11 @@ public class DbActor extends DataActor {
         DbLayer.bulkUpdateModuleInfo(moduleInfoList);
     }
 
+    @Override
+    public List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName) {
+        return DbLayer.fetchAndUpdateModuleForReboot(moduleType, miniRuntimeName);
+    }
+
     public void insertMCPAuditDataLog(McpAuditInfo auditInfo) {
         DbLayer.insertMCPAuditDataLog(auditInfo);
     }
