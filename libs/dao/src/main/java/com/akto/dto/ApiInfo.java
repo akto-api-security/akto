@@ -412,7 +412,6 @@ public class ApiInfo {
     /**
      * Checks if the given auth type is a standard predefined type.
      * Custom auth type names (from CustomAuthType.name) return false.
-     * Note: CUSTOM is excluded as it represents the fallback for misconfigured custom types.
      */
     private boolean isStandardAuthType(String authType) {
         return authType.equals(AuthType.UNAUTHENTICATED) ||

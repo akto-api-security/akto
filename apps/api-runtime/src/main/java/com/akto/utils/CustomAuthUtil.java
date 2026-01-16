@@ -85,7 +85,6 @@ public class CustomAuthUtil {
             }
             authTypes.remove(new HashSet<>());
             authTypes.remove(unauthenticatedTypes);
-            // Set the modified authTypes back since getAllAuthTypesFound returns a defensive copy
             apiInfo.setAllAuthTypesFound(authTypes);
 
             SampleData sampleData = SampleDataDao.instance.fetchAllSampleDataForApi(
