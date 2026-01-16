@@ -102,8 +102,9 @@ export const extractServiceName = (hostName) => {
     return parts.slice(2).join('.');
 };
 
-// Group collections by agent identification (mcp-client, ai-agent, browser-llm-agent values)
-// These are the sources that discovered the services (cursor, litellm, gemini, etc.)
+// Group collections by agent identification (mcp-client, ai-agent values)
+// These are the sources that discovered the services (cursor, litellm, etc.)
+// Note: browser-llm-agent is excluded from this grouping
 export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveMap = {}) => {
     const agents = {};
     
@@ -111,6 +112,7 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
         if (c.deactivated) return;
         const assetTag = findAssetTag(c.envType);
         if (!assetTag?.value) return; // Skip collections without agent tag
+        if (assetTag.keyName === ASSET_TAG_KEYS.BROWSER_LLM_AGENT) return; // Skip browser-llm-agent rows
         
         const key = assetTag.value;
         const hostName = c.hostName || c.displayName || c.name;
