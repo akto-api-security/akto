@@ -32,16 +32,6 @@ export const getHeaders = () => {
             shouldMerge: true
         },
         { 
-            title: "Total agentic components", 
-            text: "Total agentic components", 
-            value: "totalAgenticComponents", 
-            isText: CellType.TEXT, 
-            sortActive: true, 
-            boxWidth: "100px",
-            mergeType: (a, b) => (a || 0) + (b || 0),
-            shouldMerge: true
-        },
-        { 
             title: "Risk score", 
             text: "Risk score", 
             value: "riskScoreComp", 
