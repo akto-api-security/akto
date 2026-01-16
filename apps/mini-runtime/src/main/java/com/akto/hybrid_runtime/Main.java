@@ -29,6 +29,7 @@ import com.akto.metrics.ModuleInfoWorker;
 // Import protobuf classes
 import com.akto.proto.generated.threat_detection.message.http_response_param.v1.HttpResponseParam;
 import com.akto.proto.generated.threat_detection.message.http_response_param.v1.StringList;
+import com.akto.metrics.ConfigUpdatePoller;
 import com.akto.runtime.parser.SampleParser;
 import com.akto.runtime.utils.Utils;
 import com.akto.testing_db_layer_client.ClientLayer;
@@ -121,6 +122,7 @@ public class Main {
 
     public static Kafka kafkaProducer = null;
     public static KafkaProducer<String, byte[]> protobufKafkaProducer = null;
+    public static Kafka localKafkaProducer = null;
     
     private static void buildKafka() {
         loggerMaker.info("Building kafka...................");
@@ -174,6 +176,18 @@ public class Main {
             loggerMaker.info("Connected to protobuf kafka producer @ " + Context.now());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error building protobuf kafka producer: " + e.getMessage());
+        }
+    }
+
+    private static void buildLocalKafkaProducer(String kafkaBrokerUrl) {
+        loggerMaker.info("Building local kafka producer...................");
+        int batchSize = AccountSettings.DEFAULT_CENTRAL_KAFKA_BATCH_SIZE;
+        int lingerMS = AccountSettings.DEFAULT_LOCAL_KAFKA_LINGER_MS;
+        try {
+            localKafkaProducer = new Kafka(kafkaBrokerUrl, lingerMS, batchSize, kafkaUsername, kafkaPassword, isKafkaAuthenticationEnabled);
+            loggerMaker.info("Connected to local kafka producer @ " + Context.now() + ", producerReady=" + localKafkaProducer.producerReady);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error building local kafka producer: " + e.getMessage());
         }
     }
 
@@ -377,6 +391,8 @@ public class Main {
 
         buildKafka();
         buildProtobufKafkaProducer(brokerUrlFinal);
+        buildLocalKafkaProducer(kafkaBrokerUrl);
+
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 if (kafkaProducer == null || !kafkaProducer.producerReady) {
@@ -385,6 +401,10 @@ public class Main {
                 // Also check protobuf producer
                 if (protobufKafkaProducer == null) {
                     buildProtobufKafkaProducer(brokerUrlFinal);
+                }
+                // Also check local producer
+                if (localKafkaProducer == null || !localKafkaProducer.producerReady) {
+                    buildLocalKafkaProducer(brokerUrlFinal);
                 }
             }
         }, 5, 5, TimeUnit.MINUTES);
@@ -582,7 +602,12 @@ public class Main {
 
         // Pod heartbeat consumer thread
         String heartbeatTopicName = "akto.daemonset.producer.heartbeats";
-        new AktoTrafficCollectorTelemetry(kafkaUrl, groupIdConfig, maxPollRecordsConfig, heartbeatTopicName, dataActor).run();
+        new AktoTrafficCollectorTelemetry(kafkaUrl, groupIdConfig, maxPollRecordsConfig, heartbeatTopicName, dataActor, customMiniRuntimeServiceName).run();
+
+
+        String configUpdateTopicName = "akto.config.updates";
+        ConfigUpdatePoller configUpdatePoller = new ConfigUpdatePoller(customMiniRuntimeServiceName, localKafkaProducer, configUpdateTopicName);
+        configUpdatePoller.start();
 
         String runMcpJobs = System.getenv("AKTO_RUN_MCP_JOBS");
         boolean shouldRunMcpJobs = true;

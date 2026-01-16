@@ -191,14 +191,26 @@ public class SampleParser {
         String imageVersion = (String) json.getOrDefault("imageVersion", "k8s-ebpf");
         int timestamp = Integer.parseInt(json.getOrDefault("timestamp", String.valueOf(Context.now())).toString());
 
+        Map<String, Object> additionalData = null;
+        if (json.containsKey("additionalData")) {
+            String additionalDataStr = (String) json.get("additionalData");
+            if (additionalDataStr != null && !additionalDataStr.isEmpty()) {
+                try {
+                    additionalData = gson.fromJson(additionalDataStr, new com.google.gson.reflect.TypeToken<Map<String, Object>>(){}.getType());
+                } catch (Exception e) {
+                    // If parsing fails, log and continue without additionalData
+                }
+            }
+        }
 
         ModuleInfo moduleInfo = new ModuleInfo();
-        moduleInfo.setId(daemonId); 
+        moduleInfo.setId(daemonId);
         moduleInfo.setModuleType(ModuleInfo.ModuleType.valueOf(moduleTypeStr));
         moduleInfo.setName(daemonPodName);
         moduleInfo.setLastHeartbeatReceived(timestamp);
-        moduleInfo.setStartedTs(timestamp); 
+        moduleInfo.setStartedTs(timestamp);
         moduleInfo.setCurrentVersion(imageVersion);
+        moduleInfo.setAdditionalData(additionalData);
 
         return moduleInfo;
     }
