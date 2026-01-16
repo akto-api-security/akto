@@ -1330,11 +1330,17 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                             accountId = orgAccounts.iterator().next();
                             logger.infoAndAddToDb("[createUserAndRedirect] Single account organization - linking user to accountId: " + accountId);
                         } else {
-                            // Multiple accounts organization - do nothing, don't create account or link user
-                            // Redirect directly to FreeApp UI to avoid ambiguity about which account to join
-                            logger.infoAndAddToDb("[createUserAndRedirect] Multiple account organization found - redirecting to FreeApp UI without account creation");
-                            servletResponse.sendRedirect("/dashboard");
-                            return;
+                            // Multiple accounts organization - link user to admin's first account
+                            logger.info("[createUserAndRedirect] Multiple account organization found, finding admin user");
+                            
+                            String orgAdminEmail = matchingOrganization.getAdminEmail();
+                            
+                            // Find the admin user in users collection
+                            User adminUser = UsersDao.instance.findOne(Filters.eq(User.LOGIN, orgAdminEmail));
+                            // Get the first account from admin's account array
+                            String firstAdminAccountId = adminUser.getAccounts().keySet().iterator().next();
+                            accountId = Integer.parseInt(firstAdminAccountId);
+                            logger.infoAndAddToDb("[createUserAndRedirect] Multiple account organization - linking user to admin's first accountId: " + accountId);
                         }
                     } else {
                         logger.info("[createUserAndRedirect] No matching organization found by domain, creating new account and organization");
@@ -1360,7 +1366,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                             logger.info("[createUserAndRedirect] On-prem deployment, skipping organization creation");
                         }
 
-                        // Note: If no planType is set on the organization, user will see FreeApp UI as that code is already present
+                        // Note: If no planType is set on the organization, user will see FreeApp UI
                         logger.info("[createUserAndRedirect] Organization created without planType - user will see FreeApp UI");
                     }
                 }
