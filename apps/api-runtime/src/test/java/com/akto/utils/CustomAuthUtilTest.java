@@ -30,8 +30,8 @@ public class CustomAuthUtilTest extends MongoBasedTest{
     @Test
     public void test1(){
         ApiInfo apiInfo =  new ApiInfo(ACCOUNT_ID, "/api", Method.POST);
-        Set<Set<ApiInfo.AuthType>> authTypes = new HashSet<>();
-        Set<ApiInfo.AuthType> types = new HashSet<>();
+        Set<Set<String>> authTypes = new HashSet<>();
+        Set<String> types = new HashSet<>();
         types.add(ApiInfo.AuthType.UNAUTHENTICATED);
         authTypes.add(types);
         apiInfo.setAllAuthTypesFound(authTypes);
@@ -49,7 +49,7 @@ public class CustomAuthUtilTest extends MongoBasedTest{
         SingleTypeInfoDao.instance.insertMany(singleTypeInfos);
         CustomAuthUtil.customAuthTypeUtil(customAuthTypes);
         apiInfo = ApiInfoDao.instance.findOne(ApiInfoDao.getFilter("/api", "POST", ACCOUNT_ID));
-        Set<ApiInfo.AuthType> customTypes = new HashSet<>();
+        Set<String> customTypes = new HashSet<>();
         customTypes.add(ApiInfo.AuthType.CUSTOM);
         assertTrue(apiInfo.getAllAuthTypesFound().contains(customTypes));
     }
