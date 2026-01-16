@@ -88,6 +88,12 @@ public abstract class DataActor {
 
     public abstract void bulkWriteApiInfo(List<ApiInfo> apiInfoList);
 
+    public abstract void fastDiscoveryBulkWriteSingleTypeInfo(List<Object> writesForSti);
+
+    public abstract void fastDiscoveryBulkWriteApiInfo(List<ApiInfo> apiInfoList);
+
+    public abstract List<ApiInfo.ApiInfoKey> fetchApiIds();
+
     public abstract List<RuntimeFilter> fetchRuntimeFilters();
 
     public abstract void updateRuntimeVersion(String fieldName, String version);
@@ -100,6 +106,7 @@ public abstract class DataActor {
 
     public abstract List<ApiCollection> fetchApiCollections();
     public abstract List<ApiCollection> fetchAllApiCollections();
+    public abstract List<ApiCollection> fetchAllCollections();
 
     public abstract void createCollectionSimple(int vxlanId);
 

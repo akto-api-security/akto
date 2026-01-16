@@ -1,0 +1,6 @@
+target/
+dependency-jars/
+*.jar
+*.class
+*.log
+.DS_Store

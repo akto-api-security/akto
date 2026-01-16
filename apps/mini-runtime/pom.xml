@@ -48,6 +48,13 @@
             <artifactId>kafka-clients</artifactId>
             <version>3.0.0</version>
         </dependency>
+        <!-- Fast-discovery (optional embedded service) -->
+        <dependency>
+            <groupId>com.akto.apps.fast-discovery</groupId>
+            <artifactId>fast-discovery</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
         <dependency>
             <groupId>com.google.protobuf</groupId>
             <artifactId>protobuf-java</artifactId>

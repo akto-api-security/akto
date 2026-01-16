@@ -87,6 +87,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import org.json.JSONObject;
 
 public class ClientActor extends DataActor {
@@ -615,6 +618,7 @@ public class ClientActor extends DataActor {
 
         return allStis;
     }
+
     public List<SingleTypeInfo> fetchStiInBatches(int batchCount, int lastStiFetchTs) {
         Map<String, List<String>> headers = buildHeaders();
         List<SingleTypeInfo> allStis = new ArrayList<>();
@@ -1037,6 +1041,182 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public void fastDiscoveryBulkWriteSingleTypeInfo(List<Object> writesForSti) {
+        bulkWrite(writesForSti, "/fastDiscoveryBulkWriteSti", "writesForSti");
+    }
+
+    public void fastDiscoveryBulkWriteApiInfo(List<ApiInfo> apiInfoList) {
+        ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
+
+        List<ApiInfo> apiInfoBatch = new ArrayList<>();
+        for (int i = 0; i < apiInfoList.size(); i++) {
+            apiInfoBatch.add(apiInfoList.get(i));
+            if (apiInfoBatch.size() % batchWriteLimit == 0) {
+                List<ApiInfo> finalWrites = apiInfoBatch;
+                threadPool.submit(
+                        () -> fastDiscoveryWriteApiInfoBatch(finalWrites)
+                );
+                apiInfoBatch = new ArrayList<>();
+            }
+        }
+        if (apiInfoBatch.size() > 0) {
+            List<ApiInfo> finalWrites = apiInfoBatch;
+            threadPool.submit(
+                    () -> fastDiscoveryWriteApiInfoBatch(finalWrites)
+            );
+        }
+    }
+
+    public void fastDiscoveryWriteApiInfoBatch(List<ApiInfo> writesForApiInfo) {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("apiInfoList", writesForApiInfo);
+
+        String objString = gson.toJson(obj);
+        loggerMaker.info("fast-discovery api info batch" + objString);
+
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fastDiscoveryBulkWriteApiInfo", "", "POST", objString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fastDiscoveryBulkWriteApiInfo", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fastDiscoveryBulkWriteApiInfo" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
+    private static final int FETCH_API_IDS_PAGE_SIZE = 1000;  // Must match DbLayer.API_INFO_PAGE_SIZE in cyborg
+
+    /**
+     * Fetch API IDs with cursor-based pagination for Bloom filter initialization.
+     * Uses same pagination pattern as fetchApiRateLimits.
+     * @return List of all API IDs (fetched across multiple paginated calls)
+     */
+    public List<ApiInfo.ApiInfoKey> fetchApiIds() {
+        Map<String, List<String>> headers = buildHeaders();
+        List<ApiInfo.ApiInfoKey> allApiIds = new ArrayList<>();
+
+        ApiInfo.ApiInfoKey lastApiInfoKey = null;  // Cursor starts at null (first page)
+        int pageCount = 0;
+        int totalFetched = 0;
+
+        loggerMaker.infoAndAddToDb("Starting cursor-based pagination for API IDs...", LoggerMaker.LogDb.RUNTIME);
+
+        while (true) {
+            try {
+                pageCount++;
+
+                // Build request body with cursor using Gson (consistent with other methods)
+                String requestBody;
+                if (lastApiInfoKey == null) {
+                    // First page: no cursor
+                    requestBody = "{}";
+                    loggerMaker.infoAndAddToDb("Fetching first page of API IDs", LoggerMaker.LogDb.RUNTIME);
+                } else {
+                    // Subsequent pages: include cursor
+                    BasicDBObject requestObj = new BasicDBObject();
+                    BasicDBObject cursorObj = new BasicDBObject();
+                    cursorObj.put("apiCollectionId", lastApiInfoKey.getApiCollectionId());
+                    cursorObj.put("method", lastApiInfoKey.getMethod().name());
+                    cursorObj.put("url", lastApiInfoKey.getUrl());
+                    requestObj.put("lastApiInfoKey", cursorObj);
+                    requestBody = gson.toJson(requestObj);
+
+                    loggerMaker.infoAndAddToDb(
+                        String.format("Fetching page %d with cursor: collection=%d, method=%s",
+                                     pageCount, lastApiInfoKey.getApiCollectionId(), lastApiInfoKey.getMethod()),
+                        LoggerMaker.LogDb.RUNTIME
+                    );
+                }
+
+                OriginalHttpRequest request = new OriginalHttpRequest(
+                    url + "/fetchApiIds",
+                    "",
+                    "POST",
+                    requestBody,
+                    headers,
+                    ""
+                );
+
+                OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+
+                if (response == null || response.getBody() == null || response.getStatusCode() != 200) {
+                    loggerMaker.errorAndAddToDb("Error fetching API IDs: invalid response", LoggerMaker.LogDb.RUNTIME);
+                    break;
+                }
+
+                // Parse response JSON object
+                JsonObject responseObj = gson.fromJson(response.getBody(), JsonObject.class);
+
+                // Extract apiIds array
+                JsonArray apiIdsPage = responseObj.getAsJsonArray("apiIds");
+
+                if (apiIdsPage == null || apiIdsPage.size() == 0) {
+                    // Empty page means we're done
+                    loggerMaker.infoAndAddToDb("Received empty page, pagination complete", LoggerMaker.LogDb.RUNTIME);
+                    break;
+                }
+
+                // Convert to ApiInfo.ApiInfoKey objects
+                for (JsonElement elem : apiIdsPage) {
+                    try {
+                        JsonObject apiIdObj = elem.getAsJsonObject();
+                        int apiCollectionId = apiIdObj.get("apiCollectionId").getAsInt();
+                        String urlStr = apiIdObj.get("url").getAsString();
+                        String methodStr = apiIdObj.get("method").getAsString();
+                        URLMethods.Method method = URLMethods.Method.fromString(methodStr);
+
+                        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, urlStr, method);
+                        allApiIds.add(apiInfoKey);
+
+                        // Update cursor to last record
+                        lastApiInfoKey = apiInfoKey;
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("Error parsing API ID: " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+                    }
+                }
+
+                totalFetched += apiIdsPage.size();
+
+                loggerMaker.infoAndAddToDb(
+                    String.format("Fetched page %d: %d API IDs (total: %d)",
+                                 pageCount, apiIdsPage.size(), totalFetched),
+                    LoggerMaker.LogDb.RUNTIME
+                );
+
+                // Stop if page is incomplete (< 1000 records means last page)
+                if (apiIdsPage.size() < FETCH_API_IDS_PAGE_SIZE) {
+                    loggerMaker.infoAndAddToDb(
+                        String.format("Received incomplete page (%d < %d), pagination complete",
+                                     apiIdsPage.size(), FETCH_API_IDS_PAGE_SIZE),
+                        LoggerMaker.LogDb.RUNTIME
+                    );
+                    break;
+                }
+
+                // Safety check: prevent infinite loop (same limit as fetchApiRateLimits)
+                if (pageCount >= 100) {  // 100 pages * 1000 = 100K records max
+                    loggerMaker.errorAndAddToDb("Safety limit reached: pageCount >= 100, stopping pagination", LoggerMaker.LogDb.RUNTIME);
+                    break;
+                }
+
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error fetching API IDs page: " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+                break;
+            }
+        }
+
+        loggerMaker.infoAndAddToDb(
+            String.format("Completed cursor-based pagination: %d pages, %d total API IDs loaded",
+                         pageCount, totalFetched),
+            LoggerMaker.LogDb.RUNTIME
+        );
+
+        return allApiIds;
+    }
+
+
     public List<RuntimeFilter> fetchRuntimeFilters() {
         List<RuntimeFilter> runtimeFilters = new ArrayList<>();
 
@@ -1243,6 +1423,40 @@ public class ClientActor extends DataActor {
             loggerMaker.errorAndAddToDb("error in fetchAllApiCollections" + e, LoggerMaker.LogDb.RUNTIME);
         }
         loggerMaker.infoAndAddToDb("fetchAllApiCollections api called size " + apiCollections.size(), LoggerMaker.LogDb.RUNTIME);
+        return apiCollections;
+    }
+
+    public List<ApiCollection> fetchAllCollections() {
+        Map<String, List<String>> headers = buildHeaders();
+        List<ApiCollection> apiCollections = new ArrayList<>();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchAllCollections", "", "GET", null, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("invalid response in fetchAllCollections", LoggerMaker.LogDb.RUNTIME);
+                return apiCollections;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList collectionsList = (BasicDBList) payloadObj.get("collections");
+
+                for (Object obj : collectionsList) {
+                    BasicDBObject colObj = (BasicDBObject) obj;
+                    int id = colObj.getInt("id");
+                    String hostName = colObj.getString("hostName");
+
+                    ApiCollection col = new ApiCollection(id, null, 0, null, null, 0, false, true);
+                    col.setHostName(hostName);
+                    apiCollections.add(col);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchAllCollections" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchAllCollections" + e, LoggerMaker.LogDb.RUNTIME);
+        }
         return apiCollections;
     }
 

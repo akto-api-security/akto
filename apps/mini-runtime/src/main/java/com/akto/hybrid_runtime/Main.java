@@ -5,49 +5,49 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 import com.akto.RuntimeMode;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
-import com.akto.usage.OrgUtils;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.hybrid_parsers.HttpCallParser;
+import com.akto.hybrid_runtime.filter_updates.FilterUpdates;
 import com.akto.kafka.Kafka;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
-import com.akto.hybrid_parsers.HttpCallParser;
-import com.akto.hybrid_runtime.filter_updates.FilterUpdates;
-import com.akto.data_actor.DataActor;
-import com.akto.data_actor.DataActorFactory;
 import com.akto.metrics.ModuleInfoWorker;
+// Import protobuf classes
+import com.akto.proto.generated.threat_detection.message.http_response_param.v1.HttpResponseParam;
+import com.akto.proto.generated.threat_detection.message.http_response_param.v1.StringList;
 import com.akto.metrics.ConfigUpdatePoller;
 import com.akto.runtime.parser.SampleParser;
 import com.akto.runtime.utils.Utils;
 import com.akto.testing_db_layer_client.ClientLayer;
+import com.akto.usage.OrgUtils;
 import com.akto.util.DashboardMode;
 import com.google.gson.Gson;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.*;
-import org.apache.kafka.clients.producer.*;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.Metric;
 import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.errors.WakeupException;
-import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
-
-import java.util.concurrent.atomic.AtomicBoolean;
-
-// Import protobuf classes
-import com.akto.proto.generated.threat_detection.message.http_response_param.v1.HttpResponseParam;
-import com.akto.proto.generated.threat_detection.message.http_response_param.v1.StringList;
 
 public class Main {
 
@@ -241,8 +241,41 @@ public class Main {
 
     static private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
+    /**
+     * Check if fast-discovery integration is enabled via environment variable.
+     */
+    private static boolean isFastDiscoveryEnabled() {
+        String enabled = System.getenv("ENABLE_FAST_DISCOVERY");
+        return enabled != null && enabled.equalsIgnoreCase("true");
+    }
 
-    //REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
+    /**
+     * Find the fast-discovery JAR file.
+     * Looks in common locations relative to mini-runtime JAR.
+     *
+     * @return Path to fast-discovery JAR, or null if not found
+     */
+    private static String findFastDiscoveryJar() {
+        // Try multiple possible locations
+        String[] possiblePaths = {
+            // Maven build location (development)
+            "apps/fast-discovery/target/fast-discovery-1.0-SNAPSHOT-jar-with-dependencies.jar",
+            // Environment variable override
+            System.getenv("FAST_DISCOVERY_JAR_PATH")
+        };
+
+        for (String path : possiblePaths) {
+            if (path != null && new java.io.File(path).exists()) {
+                return path;
+            }
+        }
+
+        loggerMaker.errorAndAddToDb("Fast-discovery JAR not found. Tried locations: " +
+            String.join(", ", possiblePaths));
+        return null;
+    }
+
+    // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
         //String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         String configName = System.getenv("AKTO_CONFIG_NAME");
@@ -260,6 +293,9 @@ public class Main {
         boolean syncImmediately = false;
         boolean fetchAllSTI = true;
         Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
+
+        // Fast-Discovery integration (as child process)
+        Process fastDiscoveryProcess = null;
 
         boolean isDashboardInstance = false;
         if (isDashboardInstance) {
@@ -299,6 +335,57 @@ public class Main {
         dataActor.modifyHybridSaasSetting(RuntimeMode.isHybridDeployment());
 
         initializeRuntime();
+
+        // Fast-Discovery Integration (optional) - Run as separate process
+        if (isFastDiscoveryEnabled()) {
+            try {
+                loggerMaker.infoAndAddToDb("Fast-Discovery is ENABLED - starting as separate process...");
+
+                // Find fast-discovery JAR
+                String fastDiscoveryJar = findFastDiscoveryJar();
+                if (fastDiscoveryJar == null) {
+                    throw new Exception("Fast-discovery JAR not found. Cannot start fast-discovery.");
+                }
+
+                // Build process with environment variables inherited from parent
+                ProcessBuilder processBuilder = new ProcessBuilder(
+                    "java",
+                    "-Xmx512m",  // Limit memory for fast-discovery (lightweight)
+                    "-jar",
+                    fastDiscoveryJar
+                );
+
+                // Inherit all environment variables from mini-runtime
+                processBuilder.environment().putAll(System.getenv());
+
+                // CRITICAL: Override consumer group to ensure fast-discovery uses separate group
+                // Mini-runtime uses: AKTO_KAFKA_GROUP_ID_CONFIG=asdf
+                // Fast-discovery must use: AKTO_KAFKA_GROUP_ID_CONFIG=fast-discovery
+                processBuilder.environment().put("AKTO_KAFKA_GROUP_ID_CONFIG", "fast-discovery");
+
+                // Redirect output to separate log file
+                java.io.File logFile = new java.io.File("/tmp/fast-discovery.log");
+                processBuilder.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile));
+                processBuilder.redirectError(ProcessBuilder.Redirect.appendTo(logFile));
+
+                // Start the process
+                fastDiscoveryProcess = processBuilder.start();
+
+                // Verify process started successfully
+                Thread.sleep(2000); // Wait 2 seconds
+                if (!fastDiscoveryProcess.isAlive()) {
+                    int exitCode = fastDiscoveryProcess.exitValue();
+                    throw new Exception("Fast-discovery process exited immediately with code " + exitCode +
+                        ". Check " + logFile.getAbsolutePath() + " for errors.");
+                }
+
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Failed to start Fast-Discovery process: " + e.getMessage());
+                e.printStackTrace();
+                // Continue without fast-discovery
+                fastDiscoveryProcess = null;
+            }
+        }
 
         String centralKafkaTopicName = AccountSettings.DEFAULT_CENTRAL_KAFKA_TOPIC_NAME;
 
@@ -341,8 +428,39 @@ public class Main {
         final Thread mainThread = Thread.currentThread();
         final AtomicBoolean exceptionOnCommitSync = new AtomicBoolean(false);
 
+        // Make fast-discovery process final for shutdown hook access
+        final Process finalFastDiscoveryProcess = fastDiscoveryProcess;
+
         Runtime.getRuntime().addShutdownHook(new Thread() {
             public void run() {
+                // Stop Fast-Discovery process first if running
+                if (finalFastDiscoveryProcess != null && finalFastDiscoveryProcess.isAlive()) {
+                    try {
+                        // Send SIGTERM (graceful shutdown)
+                        finalFastDiscoveryProcess.destroy();
+
+                        // Wait up to 15 seconds for graceful shutdown
+                        boolean exited = finalFastDiscoveryProcess.waitFor(15, java.util.concurrent.TimeUnit.SECONDS);
+
+                        if (!exited) {
+                            // Force kill if still alive after 15 seconds
+                            loggerMaker.errorAndAddToDb("Fast-Discovery did not stop gracefully within 15 seconds, force killing...");
+                            finalFastDiscoveryProcess.destroyForcibly();
+                            finalFastDiscoveryProcess.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
+                        } else {
+                            int exitCode = finalFastDiscoveryProcess.exitValue();
+                            loggerMaker.infoAndAddToDb("Fast-Discovery process stopped gracefully (exit code: " + exitCode + ")");
+                        }
+                    } catch (InterruptedException e) {
+                        loggerMaker.errorAndAddToDb("Interrupted while waiting for Fast-Discovery to stop");
+                        finalFastDiscoveryProcess.destroyForcibly();
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("Error stopping Fast-Discovery process: " + e.getMessage());
+                        e.printStackTrace();
+                    }
+                }
+
+                // Stop mini-runtime
                 main.consumer.wakeup();
                 try {
                     if (!exceptionOnCommitSync.get()) {
