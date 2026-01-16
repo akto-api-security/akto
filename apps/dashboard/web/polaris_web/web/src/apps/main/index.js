@@ -24,13 +24,21 @@ if (
 
 let free = false;
 const planType = window.PLAN_TYPE?.toLowerCase();
-if (!window.PLAN_TYPE || !ALLOWED_PLANS.includes(planType)) {
+
+// Bypass FreeApp for signup/login related pages
+const signupPages = ['/check-inbox', '/business-email', '/signup', '/sso-login', '/addUserToAccount'];
+const currentPath = window.location.pathname;
+const isSignupPage = signupPages.some(page => currentPath.startsWith(page));
+
+if (!isSignupPage && (!window.PLAN_TYPE || !ALLOWED_PLANS.includes(planType))) {
   free = true;
 }
 
 if (expired) {
 
-  window.mixpanel.track("DASHBOARD_EXPIRED")
+  if (window.mixpanel && window.mixpanel.track) {
+    window.mixpanel.track("DASHBOARD_EXPIRED")
+  }
 
   root.render(
     <AppProvider i18n={en}>
@@ -40,7 +48,9 @@ if (expired) {
 
 } else if (free) {
 
-  window.mixpanel.track("DASHBOARD_FREE")
+  if (window.mixpanel && window.mixpanel.track) {
+    window.mixpanel.track("DASHBOARD_FREE")
+  }
 
   root.render(
     <AppProvider i18n={en}>
