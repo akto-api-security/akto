@@ -3,6 +3,9 @@ package com.akto.action;
 import static com.akto.dao.MCollection.SET;
 import static com.mongodb.client.model.Filters.eq;
 
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+
 import com.akto.dao.AccountsDao;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.CustomRoleDao;
@@ -237,17 +240,8 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 }
             }
         }
-        
-        Tokens tokens;
-        try {
-            tokens = Auth0.getInstance().handle(servletRequest, servletResponse);
-        } catch (Exception e) {
-            logger.errorAndAddToDb("Auth0 authentication failed: " + e.getMessage(), LogDb.DASHBOARD);
-            // If Auth0 fails, redirect new users to contact sales
-            servletResponse.sendRedirect("/business-email?contact=true");
-            return ERROR.toUpperCase();
-        }
-        
+
+        Tokens tokens = Auth0.getInstance().handle(servletRequest, servletResponse);
         String accessToken = tokens.getAccessToken();
         String refreshToken = tokens.getRefreshToken();
         String idToken = tokens.getIdToken();
@@ -1294,10 +1288,82 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 logger.infoAndAddToDb("[createUserAndRedirect] Creating NEW USER account");
 
                 if (accountId == 0) {
-                    //redirect to sales page
-                    logger.info("[createUserAndRedirect] No accountId from invitation, redirecting to contact sales page");
-                    servletResponse.sendRedirect("/business-email?contact=true");
-                    return;
+                    logger.info("[createUserAndRedirect] No accountId from invitation, checking for existing organization by domain matching");
+                    
+                    // Extract domain from user email for domain matching
+                    String userDomain = null;
+                    if (userEmail != null && userEmail.contains("@")) {
+                        userDomain = userEmail.split("@")[1].toLowerCase();
+                        logger.info("[createUserAndRedirect] User domain extracted: " + userDomain);
+                    }
+                    
+                    Organization matchingOrganization = null;
+                    if (userDomain != null && DashboardMode.isSaasDeployment()) {
+                        logger.info("[createUserAndRedirect] Searching for existing organizations with matching domain");
+                        
+                        // Get all organizations and check for domain matches
+                        List<Organization> allOrganizations = OrganizationsDao.instance.findAll(new BasicDBObject());
+                        logger.info("[createUserAndRedirect] Found " + allOrganizations.size() + " organizations to check");
+                        
+                        for (Organization org : allOrganizations) {
+                            if (org.getAdminEmail() != null && org.getAdminEmail().contains("@")) {
+                                String orgAdminDomain = org.getAdminEmail().split("@")[1].toLowerCase();
+                                logger.debug("[createUserAndRedirect] Checking organization admin domain: " + orgAdminDomain + " against user domain: " + userDomain);
+                                
+                                // Use the existing domain matching logic from InviteUserAction
+                                if (InviteUserAction.isSameDomain(userDomain, orgAdminDomain)) {
+                                    matchingOrganization = org;
+                                    logger.infoAndAddToDb("[createUserAndRedirect] Found matching organization: " + org.getId() + " with admin email domain: " + orgAdminDomain);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (matchingOrganization != null) {
+                        logger.infoAndAddToDb("[createUserAndRedirect] Adding user to existing organization: " + matchingOrganization.getId());
+                        
+                        Set<Integer> orgAccounts = matchingOrganization.getAccounts();
+                        logger.info("[createUserAndRedirect] Organization has " + orgAccounts.size() + " account(s)");
+                        
+                        if (orgAccounts.size() == 1) {
+                            // Single account - link user to this account
+                            accountId = orgAccounts.iterator().next();
+                            logger.infoAndAddToDb("[createUserAndRedirect] Single account organization - linking user to accountId: " + accountId);
+                        } else {
+                            // Multiple accounts organization - do nothing, don't create account or link user
+                            // Redirect directly to FreeApp UI to avoid ambiguity about which account to join
+                            logger.infoAndAddToDb("[createUserAndRedirect] Multiple account organization found - redirecting to FreeApp UI without account creation");
+                            servletResponse.sendRedirect("/dashboard");
+                            return;
+                        }
+                    } else {
+                        logger.info("[createUserAndRedirect] No matching organization found by domain, creating new account and organization");
+                        
+                        accountId = AccountAction.createAccountRecord("My account");
+                        logger.infoAndAddToDb("[createUserAndRedirect] Created new accountId: " + accountId);
+
+                        // Create organization for new user
+                        if (DashboardMode.isSaasDeployment()) {
+                            logger.info("[createUserAndRedirect] SaaS deployment, creating organization for new user");
+                            String organizationUUID = UUID.randomUUID().toString();
+
+                            Set<Integer> organizationAccountsSet = new HashSet<Integer>();
+                            organizationAccountsSet.add(accountId);
+
+                            Organization organization = new Organization(organizationUUID, userEmail, userEmail, organizationAccountsSet, false);
+                            OrganizationsDao.instance.insertOne(organization);
+                            logger.infoAndAddToDb(String.format("[createUserAndRedirect] Created organization %s for new user %s", organizationUUID, userEmail));
+
+                            Boolean attemptSyncWithAktoSuccess = OrganizationUtils.syncOrganizationWithAkto(organization);
+                            logger.infoAndAddToDb(String.format("[createUserAndRedirect] Organization %s for new user %s - Akto sync status: %s", organizationUUID, userEmail, attemptSyncWithAktoSuccess));
+                        } else {
+                            logger.info("[createUserAndRedirect] On-prem deployment, skipping organization creation");
+                        }
+                        
+                        // Note: If no planType is set on the organization, user will see FreeApp UI as that code is already present
+                        logger.info("[createUserAndRedirect] Organization created without planType - user will see FreeApp UI");
+                    }
                 }
 
                 logger.info("[createUserAndRedirect] Calling UsersDao.instance.insertSignUp to create user record");
@@ -1344,6 +1410,9 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 return;
             }
 
+            logger.infoAndAddToDb("[createUserAndRedirect] Initializing account for new user");
+            user = AccountAction.initializeAccount(userEmail, accountId, "My account",invitationToAccount == 0, invitedRole == null ? RBAC.Role.ADMIN.name() : invitedRole);
+            logger.infoAndAddToDb("[createUserAndRedirect] Account initialized successfully for accountId: " + accountId);
 
             servletRequest.getSession().setAttribute("user", user);
             servletRequest.getSession().setAttribute("accountId", accountId);

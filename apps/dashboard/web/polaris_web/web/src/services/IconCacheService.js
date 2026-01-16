@@ -2,22 +2,20 @@ import api from "@/apps/dashboard/pages/observe/api"
 
 /**
  * Icon Cache Service
- * Singleton service for efficient icon loading and caching
+ * Loads collection icons from backend once per page load
  */
 class IconCacheService {
     constructor() {
-        // Cache storage - optimized for fast lookups
+        // Cache storage - fresh on each instance
         this.hostnameToObjectIdCache = {};
         this.objectIdToIconDataCache = {};
-        this.hostnameDirectLookup = new Map(); // O(1) hostname lookup optimization
-        
+
         // Single load promise to prevent multiple API calls
         this.loadPromise = null;
-        this.isLoaded = false;
     }
 
     /**
-     * Load icon caches from backend once with optimizations
+     * Load icon caches from backend once
      * @returns {Promise} Promise that resolves when caches are loaded
      */
     async loadAllIcons() {
@@ -27,37 +25,21 @@ class IconCacheService {
         }
         
         // If already loaded, return immediately
-        if (this.isLoaded) {
+        if (Object.keys(this.hostnameToObjectIdCache).length > 0) {
             return Promise.resolve();
         }
-        
-        // Load data from backend with timeout and performance tracking
+
+        // Load data from backend
         this.loadPromise = (async () => {
             try {
-                // Add timeout to prevent hanging
-                const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Icon cache load timeout')), 10000)
-                );
-                
-                const response = await Promise.race([
-                    api.getAllIconsCache(),
-                    timeoutPromise
-                ]);
-                
+                const response = await api.getAllIconsCache();
                 if (response && response.hostnameToObjectIdCache && response.objectIdToIconDataCache) {
                     this.hostnameToObjectIdCache = response.hostnameToObjectIdCache;
                     this.objectIdToIconDataCache = response.objectIdToIconDataCache;
-                    
-                    // Build optimized lookup map for O(1) hostname searches
-                    this.buildHostnameLookupMap();
-                    this.isLoaded = true;
-                    
-
                 }
             } catch (error) {
 
-                // Don't throw to allow graceful fallback
-                this.isLoaded = false;
+                throw error;
             }
         })();
         
@@ -65,25 +47,7 @@ class IconCacheService {
     }
     
     /**
-     * Build optimized hostname lookup map for O(1) access
-     */
-    buildHostnameLookupMap() {
-        this.hostnameDirectLookup.clear();
-        
-        for (const [compositeKey, objectId] of Object.entries(this.hostnameToObjectIdCache)) {
-            // Parse composite key "hostname,domain" to extract hostname
-            const parts = compositeKey.split(',');
-            if (parts.length >= 1) {
-                const hostname = parts[0].trim();
-                if (hostname) {
-                    this.hostnameDirectLookup.set(hostname, objectId);
-                }
-            }
-        }
-    }
-
-    /**
-     * Get icon data for a specific hostname with optimized O(1) lookup
+     * Get icon data for a specific hostname
      * @param {string} hostname - The hostname to get icon for
      * @returns {string|null} Base64 icon data or null if not found
      */
@@ -92,33 +56,35 @@ class IconCacheService {
             return null;
         }
 
-        try {
-            // Ensure caches are loaded with timeout
-            await this.loadAllIcons();
-            
-            if (!this.isLoaded) {
-                return null; // Graceful fallback if cache failed to load
-            }
-            
-            const trimmedHostName = hostname.trim();
+        // Ensure caches are loaded
+        await this.loadAllIcons();
 
-            // O(1) lookup using optimized Map
-            const objectId = this.hostnameDirectLookup.get(trimmedHostName);
-            
-            if (objectId && this.objectIdToIconDataCache[objectId]) {
-                const iconDataObj = this.objectIdToIconDataCache[objectId];
-                
-                // Return imageData only if it's not empty
-                if (iconDataObj.imageData && iconDataObj.imageData.trim() !== '') {
-                    return iconDataObj.imageData;
-                }
+        const trimmedHostName = hostname.trim();
+
+
+        // Find matching hostname in cache
+        let objectId = null;
+        for (const [key, value] of Object.entries(this.hostnameToObjectIdCache)) {
+            // key is a string like "mcp.twilio.com,twilio.com"
+            // Parse it to extract the hostname (first part)
+            const parts = key.split(',');
+
+            if (parts.length >= 1 && parts[0].trim() === trimmedHostName) {
+                objectId = value;
+                break;
             }
-            
-            return null;
-        } catch (error) {
-            console.warn(`Icon lookup failed for hostname: ${hostname}`, error);
-            return null; // Graceful fallback
         }
+
+        if (objectId && this.objectIdToIconDataCache[objectId]) {
+            const iconDataObj = this.objectIdToIconDataCache[objectId];
+            // Return imageData only if it's not empty
+            if (iconDataObj.imageData && iconDataObj.imageData.trim() !== '') {
+                return iconDataObj.imageData;
+            } else {
+                return null;
+            }
+        }
+        return null;
     }
 
     /**
@@ -172,18 +138,5 @@ class IconCacheService {
     }
 }
 
-// Export singleton instance to prevent multiple API calls across components
-let iconCacheServiceInstance = null;
-
-export const getIconCacheService = () => {
-    if (!iconCacheServiceInstance) {
-        iconCacheServiceInstance = new IconCacheService();
-    }
-    return iconCacheServiceInstance;
-};
-
-// Export the class for testing
-export { IconCacheService };
-
-// Export singleton instance as default
-export default getIconCacheService();
+// Export the class, not an instance
+export default IconCacheService;

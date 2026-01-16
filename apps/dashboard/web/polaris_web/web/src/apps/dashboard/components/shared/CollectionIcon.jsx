@@ -1,12 +1,12 @@
 import React from "react";
 import { Avatar, Icon } from "@shopify/polaris";
 import { AutomationMajor, MagicMajor } from '@shopify/polaris-icons';
-import iconCacheService from "@/services/IconCacheService";
+import IconCacheService from "@/services/IconCacheService";
 import MCPIcon from "@/assets/MCP_Icon.svg";
 import LaptopIcon from "@/assets/Laptop.svg";
 import { getDomainForFavicon } from "../../pages/observe/agentic/mcpClientHelper";
 
-export const sharedIconCacheService = iconCacheService;
+export const sharedIconCacheService = new IconCacheService();
 export { MCPIcon, LaptopIcon };
 
 const CollectionIcon = React.memo(({ hostName, assetTagValue, displayName, tagsList }) => {

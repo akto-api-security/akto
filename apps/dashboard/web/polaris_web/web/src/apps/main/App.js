@@ -81,7 +81,6 @@ import Help from "../dashboard/pages/settings/help_and_support/Help";
 import AdvancedTrafficFilters from "../dashboard/pages/settings/traffic-conditions/AdvancedTrafficFilters";
 import GoogleSamlSso from "../dashboard/pages/settings/integrations/sso/GoogleSamlSso";
 import SignUpWithSSO from "../signup/components/SignUpWithSSO";
-import ContactSales from "../signup/components/ContactSales";
 
 import TeamsWebhooks from "../dashboard/pages/settings/integrations/teamsWebhooks/TeamsWebhooks";
 import TeamsWebhook from "../dashboard/pages/settings/integrations/teamsWebhooks/TeamsWebhook";
@@ -601,10 +600,6 @@ const router = createBrowserRouter([
     {
         path: "/sso-login",
         element: <SignUpWithSSO/>
-    },
-    {
-        path: "/contact-sales",
-        element: <ContactSales/>
     },
     // catches all undefined paths and redirects to homepage.
     {
