@@ -32,6 +32,7 @@ public class IconCache {
     // Static final concurrent cache data structures - thread safe
     private static final ConcurrentHashMap<String, String> hostnameToObjectIdCache = new ConcurrentHashMap<>();  // hostname -> ObjectId.toString()
     private static final ConcurrentHashMap<String, IconData> objectIdToIconDataCache = new ConcurrentHashMap<>(); // ObjectId.toString() -> IconData
+    private static final ConcurrentHashMap<String, String> domainToObjectIdCache = new ConcurrentHashMap<>(); // domain -> ObjectId.toString() for O(1) domain lookups
     
     private volatile long lastRefreshTime = 0;
     private final Object lock = new Object();
@@ -129,6 +130,7 @@ public class IconCache {
     /**
      * Find domain match by progressively stripping hostname to find matching domains
      * Examples: abc.tapestry.com -> check tapestry.com -> found -> add cache entry for abc.tapestry.com
+     * Optimized with O(1) domain lookups using domainToObjectIdCache index
      */
     private IconData findDomainMatchByStripping(String hostname) {
         String[] hostParts = hostname.split("\\.");
@@ -145,20 +147,16 @@ public class IconCache {
             }
             String candidateDomain = domainBuilder.toString();
 
-            // Check if this domain exists in cache by looking at domain part of composite keys
-            for (Map.Entry<String, String> entry : hostnameToObjectIdCache.entrySet()) {
-                String compositeKey = entry.getKey();
-                String[] parts = compositeKey.split(",", 2);
-                if (parts.length == 2 && candidateDomain.equals(parts[1])) {
-                    String objectIdStr = entry.getValue();
-                    IconData iconData = objectIdToIconDataCache.get(objectIdStr);
-                    if (iconData != null) {
-                        // Found domain match - add new cache entry for this hostname
-                        String newCompositeKey = hostname + "," + candidateDomain;
-                        hostnameToObjectIdCache.put(newCompositeKey, objectIdStr);
-                        logger.infoAndAddToDb("Added cache entry for hostname: " + hostname + " with domain: " + candidateDomain);
-                        return iconData;
-                    }
+            // O(1) lookup instead of O(n) iteration through all cache entries
+            String objectIdStr = domainToObjectIdCache.get(candidateDomain);
+            if (objectIdStr != null) {
+                IconData iconData = objectIdToIconDataCache.get(objectIdStr);
+                if (iconData != null) {
+                    // Found domain match - add new cache entry for this hostname
+                    String newCompositeKey = hostname + "," + candidateDomain;
+                    hostnameToObjectIdCache.put(newCompositeKey, objectIdStr);
+                    logger.infoAndAddToDb("Added cache entry for hostname: " + hostname + " with domain: " + candidateDomain);
+                    return iconData;
                 }
             }
         }
@@ -182,6 +180,8 @@ public class IconCache {
         if (objectIdToIconDataCache.containsKey(objectIdStr)) {
             String compositeKey = newHostname + "," + domainName;
             hostnameToObjectIdCache.put(compositeKey, objectIdStr);
+            // Also ensure domain index is updated (should already exist, but ensures consistency)
+            domainToObjectIdCache.put(domainName, objectIdStr);
             logger.infoAndAddToDb("Added hostname mapping to cache: " + compositeKey + " -> " + objectIdStr);
         }
     }
@@ -228,6 +228,7 @@ public class IconCache {
             synchronized (lock) {
                 hostnameToObjectIdCache.clear();
                 objectIdToIconDataCache.clear();
+                domainToObjectIdCache.clear();
             }
 
             int validIconsCount = 0;
@@ -258,6 +259,9 @@ public class IconCache {
                     // Add to static objectId cache
                     objectIdToIconDataCache.put(objectIdStr, iconDataObj);
                     validIconsCount++;
+
+                    // Add domain to domain index for O(1) domain lookups
+                    domainToObjectIdCache.put(icon.getDomainName(), objectIdStr);
 
                     // Add hostname mappings directly as string keys
                     if (icon.getMatchingHostnames() != null && !icon.getMatchingHostnames().isEmpty()) {
@@ -301,6 +305,7 @@ public class IconCache {
         synchronized (lock) {
             hostnameToObjectIdCache.clear();
             objectIdToIconDataCache.clear();
+            domainToObjectIdCache.clear();
             this.lastRefreshTime = 0;
             logger.infoAndAddToDb(CACHE_NAME + " cleared");
         }
