@@ -3,6 +3,7 @@ package com.akto.fast_discovery;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
@@ -16,6 +17,7 @@ import org.apache.kafka.common.header.Header;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * FastDiscoveryConsumer - Header-optimized API discovery.
@@ -35,7 +37,7 @@ public class FastDiscoveryConsumer {
 
     private final BloomFilterManager bloomFilter;
     private final DataActor dataActor;
-    private final Map<String, Integer> hostnameToCollectionId;
+    private final ConcurrentHashMap<String, Integer> hostnameToCollectionId;
 
     public FastDiscoveryConsumer(
             BloomFilterManager bloomFilter,
@@ -43,7 +45,7 @@ public class FastDiscoveryConsumer {
     ) {
         this.bloomFilter = bloomFilter;
         this.dataActor = DataActorFactory.fetchInstance();
-        this.hostnameToCollectionId = hostnameToCollectionId;
+        this.hostnameToCollectionId = new ConcurrentHashMap<>(hostnameToCollectionId);
     }
 
     /**
@@ -402,6 +404,38 @@ public class FastDiscoveryConsumer {
         }
 
         return successfulInserts;
+    }
+
+    /**
+     * Refresh hostname → collectionId cache from database.
+     * Called periodically to sync with collections created by mini-runtime.
+     */
+    public void refreshCollectionsCache() {
+        try {
+            loggerMaker.infoAndAddToDb("Fast-discovery: Refreshing collections cache...");
+
+            List<ApiCollection> collections = DataActorFactory.fetchInstance().fetchAllCollections();
+
+            int oldSize = hostnameToCollectionId.size();
+            hostnameToCollectionId.clear();
+
+            for (ApiCollection col : collections) {
+                if (col.getHostName() != null && !col.getHostName().isEmpty()) {
+                    String normalizedHostname = col.getHostName().toLowerCase().trim();
+                    hostnameToCollectionId.put(normalizedHostname, col.getId());
+                }
+            }
+
+            int newSize = hostnameToCollectionId.size();
+            loggerMaker.infoAndAddToDb(String.format(
+                "Fast-discovery: Collections cache refreshed (%d → %d entries)",
+                oldSize, newSize
+            ));
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Fast-discovery: Failed to refresh collections cache: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
 }
