@@ -862,6 +862,13 @@ const settingRequests = {
             method: 'post',
             data: {moduleIds, deleteTopicAndReboot}
         })
+    },
+    updateModuleEnvAndReboot(moduleId, moduleName, envData) {
+        return request({
+            url: '/api/updateModuleEnvAndReboot',
+            method: 'post',
+            data: {moduleId, moduleName, envData}
+        })
     }
 }
 
