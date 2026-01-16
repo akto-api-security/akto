@@ -86,6 +86,12 @@ public class ApiCollection {
     List<CollectionTags> tagsList;
     public static final String TAGS_STRING = "tagsList";
 
+    String serviceTag;
+    public static final String SERVICE_TAG = "serviceTag";
+
+    List<String> hostNames;
+    public static final String HOST_NAMES = "hostNames";
+
     private static final List<String> ENV_KEYWORDS_WITH_DOT = Arrays.asList(
             "staging", "preprod", "qa", "demo", "dev", "test", "svc",
             "localhost", "local", "intranet", "lan", "example", "invalid",
@@ -256,6 +262,16 @@ public class ApiCollection {
         return new ApiCollection(id, name, Context.now() , new HashSet<>(),  null, 0, false, true);
     }
 
+    // Generate deterministic collection ID from service tag value
+    // Each account has separate DB, so no need to include accountId
+    // Uses same approach as hostname-based collections (can be negative)
+    public static int generateServiceTagCollectionId(String serviceTagValue) {
+        if (serviceTagValue == null || serviceTagValue.isEmpty()) {
+            throw new IllegalArgumentException("Service tag value cannot be null or empty");
+        }
+        return serviceTagValue.hashCode();
+    }
+
     public boolean getRedact() {
         return redact;
     }
@@ -394,6 +410,22 @@ public class ApiCollection {
             return this.getTagsList().stream().anyMatch(t -> Constants.AKTO_GUARD_RAIL_TAG.equals(t.getKeyName()));
         }
         return false;
+    }
+
+    public String getServiceTag() {
+        return serviceTag;
+    }
+
+    public void setServiceTag(String serviceTag) {
+        this.serviceTag = serviceTag;
+    }
+
+    public List<String> getHostNames() {
+        return hostNames;
+    }
+
+    public void setHostNames(List<String> hostNames) {
+        this.hostNames = hostNames;
     }
 
 }
