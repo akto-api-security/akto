@@ -10,14 +10,12 @@ import AgenticSearchInput from './components/AgenticSearchInput';
 import AgenticHistoryModal from './components/AgenticHistoryModal';
 import './AgenticConversationPage.css';
 import { sendQuery, getConversationsList } from './services/agenticService';
-import func from '@/util/func';
 
 function AgenticConversationPage({ initialQuery, existingConversationId, onBack, existingMessages = [], onLoadConversation }) {
     // Conversation state
     const [conversationId, setConversationId] = useState(existingConversationId || null);
     const [messages, setMessages] = useState([]);
     const [completedStreamingMessages, setCompletedStreamingMessages] = useState(new Set());
-    const [isFromHistory, setIsFromHistory] = useState(!!existingConversationId);
 
     // UI state
     const [isLoading, setIsLoading] = useState(false);
@@ -44,18 +42,21 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                 if (existingConversationId) {
                     if (existingMessages.length > 0) {
                         let messages = [];
-                        existingMessages.forEach((item) => {
+                        const title = existingMessages[0].title;
+                        existingMessages[0].messages.forEach((item) => {
                             messages.push({
                                 _id: "user_" + item.prompt,
                                 message: item.prompt,
-                                role: "user"
+                                role: "user",
+                                title: title
                             })
                             messages.push({
                                 _id: "system_" + item.response,
                                 message: item.response,
                                 role: "system",
                                 isComplete: true,
-                                isFromHistory: true
+                                isFromHistory: true,
+                                title: title
                             })
                         })
                         setMessages(messages);
@@ -95,7 +96,6 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
             setIsHistoryLoading(true);
             try {
                 const response = await getConversationsList(50, historySearchQuery);
-                console.log('History API response:', response);
                 if (response && response.history) {
                     const formattedHistory = response.history.map(conv => {
                         // Get the conversation ID from the nested structure
@@ -227,7 +227,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                                 <Button plain onClick={onBack} icon={ArrowLeftMinor} />
                             )}
                             <Text variant="headingLg" as="h1">
-                                {messages[0]?.message || 'Agentic AI Conversation'}
+                                {messages[0]?.title || 'Agentic AI Conversation'}
                             </Text>
                         </HorizontalStack>
                         <Button
