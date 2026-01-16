@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import PersistStore from '../../../../main/PersistStore';
 import { formatDisplayName } from '../agentic/mcpClientHelper';
-import { INVENTORY_FILTER_KEY, ASSET_TAG_KEY_VALUES } from '../agentic/constants';
+import { INVENTORY_FILTER_KEY, ASSET_TAG_KEY_VALUES, extractServiceName } from '../agentic/constants';
 
 /**
- * Custom hook to detect envType filter from Endpoints page navigation
+ * Custom hook to detect envType or hostName filter from Endpoints page navigation
  * and compute filtered summary data for Agentic Collections
  * 
  * @param {Array} normalData - The normalized collection data
@@ -19,47 +19,54 @@ const useAgenticFilter = (normalData) => {
     useEffect(() => {
         const currentPageFilters = filtersMap[INVENTORY_FILTER_KEY];
         const envTypeFilter = currentPageFilters?.filters?.find(f => f.key === 'envType');
+        const hostNameFilter = currentPageFilters?.filters?.find(f => f.key === 'hostName');
         
-        if (!envTypeFilter || !envTypeFilter.value || normalData.length === 0) {
+        if (normalData.length === 0) {
             setFilteredSummaryData(null);
             setActiveFilterTitle(null);
             return;
         }
 
-        const filterValues = envTypeFilter.value.values || [];
-        const isNegated = envTypeFilter.value.negated;
-
-        // Determine the title based on filter
         let filterTitle = null;
-        if (!isNegated && filterValues.length === 1) {
-            // Specific group filter (e.g., mcp-client=SomeValue, ai-agent=SomeValue, browser-llm-agent=SomeValue)
-            const parts = filterValues[0].split('=');
-            if (parts.length === 2 && ASSET_TAG_KEY_VALUES.includes(parts[0])) {
-                // Use formatDisplayName to get proper display name (e.g., "claude-cli" -> "Claude CLI")
-                filterTitle = formatDisplayName(parts[1]);
+        let filteredCollections = [];
+
+        // Handle hostname filter (for service rows - may have multiple hostnames)
+        if (hostNameFilter?.value?.values?.length > 0) {
+            const hostNames = hostNameFilter.value.values;
+            // Extract service name from first hostname to show as title
+            const serviceName = extractServiceName(hostNames[0]);
+            filterTitle = serviceName || hostNames[0];
+            filteredCollections = normalData.filter(collection => hostNames.includes(collection.hostName));
+        }
+        // Handle envType filter (for agent rows)
+        else if (envTypeFilter?.value) {
+            const filterValues = envTypeFilter.value.values || [];
+            const isNegated = envTypeFilter.value.negated;
+
+            if (!isNegated && filterValues.length === 1) {
+                const parts = filterValues[0].split('=');
+                if (parts.length === 2 && ASSET_TAG_KEY_VALUES.includes(parts[0])) {
+                    filterTitle = formatDisplayName(parts[1]);
+                }
+            }
+
+            if (filterTitle) {
+                filteredCollections = normalData.filter(collection => {
+                    const envTypeArr = collection.envTypeOriginal || collection.envType || [];
+                    return envTypeArr.some(tag => {
+                        if (typeof tag === 'object' && tag.keyName && tag.value) {
+                            return `${tag.keyName}=${tag.value}` === filterValues[0];
+                        }
+                        return tag === filterValues[0];
+                    });
+                });
             }
         }
-        // Skip handling Unknown case as per requirement
 
-        if (filterTitle) {
+        if (filterTitle && filteredCollections.length > 0) {
             setActiveFilterTitle(filterTitle);
 
-            // Filter collections based on the envType filter
-            const filteredCollections = normalData.filter(collection => {
-                const envTypeArr = collection.envTypeOriginal || collection.envType || [];
-                const hasMatchingTag = envTypeArr.some(tag => {
-                    if (typeof tag === 'object' && tag.keyName && tag.value) {
-                        return `${tag.keyName}=${tag.value}` === filterValues[0];
-                    }
-                    return tag === filterValues[0];
-                });
-                return hasMatchingTag;
-            });
-
-            // Compute filtered summary
             const filteredEndpoints = filteredCollections.reduce((sum, c) => sum + (c.urlsCount || 0), 0);
-
-            // Count unique sensitive data types across filtered collections
             const allSensitiveTypes = new Set();
             filteredCollections.forEach(c => {
                 if (c.sensitiveInRespTypes && Array.isArray(c.sensitiveInRespTypes)) {
