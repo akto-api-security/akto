@@ -86,6 +86,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import org.json.JSONObject;
 
 public class ClientActor extends DataActor {
@@ -1109,10 +1112,10 @@ public class ClientActor extends DataActor {
                 }
 
                 // Parse response JSON object
-                com.google.gson.JsonObject responseObj = gson.fromJson(response.getBody(), com.google.gson.JsonObject.class);
+                JsonObject responseObj = gson.fromJson(response.getBody(), JsonObject.class);
 
                 // Extract apiIds array
-                com.google.gson.JsonArray apiIdsPage = responseObj.getAsJsonArray("apiIds");
+                JsonArray apiIdsPage = responseObj.getAsJsonArray("apiIds");
 
                 if (apiIdsPage == null || apiIdsPage.size() == 0) {
                     // Empty page means we're done
@@ -1121,9 +1124,9 @@ public class ClientActor extends DataActor {
                 }
 
                 // Convert to ApiInfo.ApiInfoKey objects
-                for (com.google.gson.JsonElement elem : apiIdsPage) {
+                for (JsonElement elem : apiIdsPage) {
                     try {
-                        com.google.gson.JsonObject apiIdObj = elem.getAsJsonObject();
+                        JsonObject apiIdObj = elem.getAsJsonObject();
                         int apiCollectionId = apiIdObj.get("apiCollectionId").getAsInt();
                         String urlStr = apiIdObj.get("url").getAsString();
                         String methodStr = apiIdObj.get("method").getAsString();

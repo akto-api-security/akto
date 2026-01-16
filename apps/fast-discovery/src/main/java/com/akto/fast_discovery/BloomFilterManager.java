@@ -22,7 +22,7 @@ public class BloomFilterManager {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(BloomFilterManager.class);
 
-    private BloomFilter<CharSequence> seenApis;
+    private volatile BloomFilter<CharSequence> seenApis;
     private final long expectedSize;
     private final double falsePositiveRate;
     private final DataActor dataActor;
@@ -152,5 +152,29 @@ public class BloomFilterManager {
      */
     public boolean isInitialized() {
         return seenApis != null;
+    }
+
+    /**
+     * Refresh Bloom filter by reloading all APIs from database.
+     * Called periodically to sync with APIs discovered by mini-runtime.
+     */
+    public void refresh() {
+        try {
+            loggerMaker.infoAndAddToDb("Fast-discovery: Refreshing Bloom filter...");
+            long startTime = System.currentTimeMillis();
+
+            // Reinitialize - reuses existing initialize() logic
+            initialize();
+
+            long durationMs = System.currentTimeMillis() - startTime;
+            loggerMaker.infoAndAddToDb(String.format(
+                "Fast-discovery: Bloom filter refreshed in %dms (%d MB memory)",
+                durationMs, getEstimatedMemoryUsageMB()
+            ));
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Fast-discovery: Failed to refresh Bloom filter: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 }
