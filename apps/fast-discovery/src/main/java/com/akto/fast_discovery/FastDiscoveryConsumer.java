@@ -96,7 +96,6 @@ public class FastDiscoveryConsumer {
             return;
         }
 
-        loggerMaker.infoAndAddToDb("Processing batch of " + records.count() + " messages");
         long startTime = System.currentTimeMillis();
 
         // Use Set<String> instead of Map - encode all data in the key
@@ -112,7 +111,6 @@ public class FastDiscoveryConsumer {
 
                 if (collectionHeader == null) {
                     headerMissingCount++;
-                    loggerMaker.errorAndAddToDb("Message missing 'collection_details' header - dropping message");
                     continue;
                 }
 
@@ -144,23 +142,11 @@ public class FastDiscoveryConsumer {
             }
         }
 
-        loggerMaker.infoAndAddToDb(String.format(
-            "Stage 1: Read %d headers (%d missing, %d parse errors), %d candidates after Bloom filter",
-            headerReadCount, headerMissingCount, headerParseErrors, candidates.size())
-        );
-
         if (candidates.isEmpty()) {
-            loggerMaker.infoAndAddToDb("No new APIs detected in this batch");
             return;
         }
 
         sendToDbAbstractor(candidates);
-
-        long durationMs = System.currentTimeMillis() - startTime;
-        loggerMaker.infoAndAddToDb(String.format(
-            "Batch completed in %dms, discovered %d new APIs (avg: %.2fms/message)",
-            durationMs, candidates.size(), (double) durationMs / records.count())
-        );
     }
 
     private void sendToDbAbstractor(Set<String> candidateKeys) {
@@ -193,7 +179,6 @@ public class FastDiscoveryConsumer {
         // Try to create new collections using createCollectionForHostAndVpc (same as mini-runtime)
         Set<Integer> successfulInserts = new HashSet<>();
         if (!newCollections.isEmpty()) {
-            loggerMaker.infoAndAddToDb("Fast-discovery: Attempting to create " + newCollections.size() + " new collections");
             successfulInserts = insertCollections(newCollections);
 
             // Update cache for successful inserts
@@ -202,8 +187,6 @@ public class FastDiscoveryConsumer {
                 String normalizedHostname = hostname.toLowerCase().trim();
                 hostnameToCollectionId.put(normalizedHostname, collectionId);
             }
-
-            loggerMaker.infoAndAddToDb("Fast-discovery: Successfully created " + successfulInserts.size() + " collections");
         }
 
         // Determine which collections are safe to write to
@@ -233,7 +216,6 @@ public class FastDiscoveryConsumer {
         }
 
         if (safeCandidateKeys.isEmpty()) {
-            loggerMaker.infoAndAddToDb("No safe APIs to write after collection filtering");
             return;
         }
 
@@ -242,11 +224,8 @@ public class FastDiscoveryConsumer {
             List<BulkUpdates> stiWrites = buildStiWrites(safeCandidateKeys);
             List<ApiInfo> apiInfoList = buildApiInfoList(safeCandidateKeys);
 
-            loggerMaker.infoAndAddToDb("Fast-discovery: Bulk writing " + stiWrites.size() + " entries to single_type_info");
             List<Object> writesForSti = new ArrayList<>(stiWrites);
             dataActor.fastDiscoveryBulkWriteSingleTypeInfo(writesForSti);
-
-            loggerMaker.infoAndAddToDb("Fast-discovery: Bulk writing " + apiInfoList.size() + " entries to api_info");
             dataActor.fastDiscoveryBulkWriteApiInfo(apiInfoList);
 
             // Update Bloom filter with Bloom filter keys (not candidate keys)
@@ -259,8 +238,6 @@ public class FastDiscoveryConsumer {
                 String bloomFilterKey = collectionId + " " + url + " " + method;
                 bloomFilter.add(bloomFilterKey);
             }
-
-            loggerMaker.infoAndAddToDb("Successfully sent " + safeCandidateKeys.size() + " new APIs to database-abstractor");
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Failed to send APIs to database-abstractor: " + e.getMessage());
             e.printStackTrace();
