@@ -77,6 +77,8 @@ public class AllMetrics {
         heapMemoryMaxMb = new GaugeMetric("HEAP_MEMORY_MAX_MB", 60, accountId, orgId);
         nonHeapMemoryUsedMb = new GaugeMetric("NON_HEAP_MEMORY_USED_MB", 60, accountId, orgId);
         threadCount = new GaugeMetric("THREAD_COUNT", 60, accountId, orgId);
+        availableProcessors = new GaugeMetric("AVAILABLE_PROCESSORS", 60, accountId, orgId);
+        totalPhysicalMemoryMb = new GaugeMetric("TOTAL_PHYSICAL_MEMORY_MB", 60, accountId, orgId);
 
         // Any new metric needs to be added here as well.
         metrics = Arrays.asList(runtimeKafkaRecordCount, runtimeKafkaRecordSize, runtimeProcessLatency,
@@ -86,7 +88,8 @@ public class AllMetrics {
                 pgDataSizeInMb, kafkaRecordsLagMax, kafkaRecordsConsumedRate, kafkaFetchAvgLatency,
                 kafkaBytesConsumedRate, cyborgNewApiCount, cyborgTotalApiCount, deltaCatalogNewCount, deltaCatalogTotalCount,
                 cyborgApiPayloadSize, multipleSampleDataFetchLatency, runtimeApiReceivedCount,
-                cpuUsagePercent, heapMemoryUsedMb, heapMemoryMaxMb, nonHeapMemoryUsedMb, threadCount);
+                cpuUsagePercent, heapMemoryUsedMb, heapMemoryMaxMb, nonHeapMemoryUsedMb, threadCount,
+                availableProcessors, totalPhysicalMemoryMb);
 
         AllMetrics _this = this;
         executorService.scheduleWithFixedDelay(() -> {
@@ -188,6 +191,8 @@ public class AllMetrics {
     private Metric heapMemoryMaxMb = null;
     private Metric nonHeapMemoryUsedMb = null;
     private Metric threadCount = null;
+    private Metric availableProcessors = null;
+    private Metric totalPhysicalMemoryMb = null;
 
     private List<Metric> metrics = null;
 
@@ -554,6 +559,15 @@ public class AllMetrics {
             // Thread metrics
             ThreadMXBean threadBean = ManagementFactory.getThreadMXBean();
             threadCount.record(threadBean.getThreadCount());
+
+            // Available processors (container-aware in Java 8u191+/10+)
+            availableProcessors.record(Runtime.getRuntime().availableProcessors());
+
+            // Total physical memory (container-aware)
+            long totalMemory = osBean.getTotalPhysicalMemorySize();
+            if (totalMemory > 0) {
+                totalPhysicalMemoryMb.record(totalMemory / (1024f * 1024f));
+            }
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error collecting infra metrics: " + e.getMessage(), LogDb.RUNTIME);

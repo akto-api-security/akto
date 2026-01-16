@@ -223,10 +223,17 @@ public class Main {
     public static String customMiniRuntimeServiceName;
     private static final String podName = System.getenv().getOrDefault("POD_NAME", "");
     private static final String nodeName = System.getenv().getOrDefault("NODE_NAME", "");
+    private static final String miniRuntimeName = System.getenv().getOrDefault("MINI_RUNTIME_NAME", "");
     static {
-        customMiniRuntimeServiceName = System.getenv("MINI_RUNTIME_NAME") == null? "Default_" + UUID.randomUUID().toString(): System.getenv("MINI_RUNTIME_NAME");
-        if (!nodeName.isEmpty() && !podName.isEmpty()){
+        if (!miniRuntimeName.isEmpty()) {
+            // Highest priority: explicit MINI_RUNTIME_NAME
+            customMiniRuntimeServiceName = miniRuntimeName;
+        } else if (!podName.isEmpty() && !nodeName.isEmpty()) {
+            // Second priority: pod and node name
             customMiniRuntimeServiceName = "akto-mr:" + podName + ":" + nodeName;
+        } else {
+            // Fallback: random UUID
+            customMiniRuntimeServiceName = "Default_" + UUID.randomUUID().toString();
         }
     }
 

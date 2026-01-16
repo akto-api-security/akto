@@ -67,7 +67,9 @@ public class MetricData {
         HEAP_MEMORY_USED_MB("Heap Memory Used", "JVM heap memory currently in use (MB)"),
         HEAP_MEMORY_MAX_MB("Heap Memory Max", "Maximum JVM heap memory available (MB)"),
         NON_HEAP_MEMORY_USED_MB("Non-Heap Memory Used", "JVM non-heap memory currently in use (MB)"),
-        THREAD_COUNT("Thread Count", "Number of live threads in the JVM");
+        THREAD_COUNT("Thread Count", "Number of live threads in the JVM"),
+        AVAILABLE_PROCESSORS("Available Processors", "Number of processors available to the JVM (container-aware)"),
+        TOTAL_PHYSICAL_MEMORY_MB("Total Physical Memory", "Total physical memory available (MB, container-aware)");
 
         private final String descriptionName;
         private final String description;
