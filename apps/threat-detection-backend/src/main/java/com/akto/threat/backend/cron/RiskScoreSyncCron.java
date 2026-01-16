@@ -74,10 +74,10 @@ public class RiskScoreSyncCron {
                         int accountId = t.getId();
                         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
                         FeatureAccess featureAccess = getFeatureAccessSaas(accountId, "THREAT_DETECTION");
-                        if(!featureAccess.getIsGranted()){
-                            loggerMaker.debugAndAddToDb("Feature access not granted for account " + accountId);
-                            return;
-                        }
+                        // if(!featureAccess.getIsGranted()){
+                        //     loggerMaker.debugAndAddToDb("Feature access not granted for account " + accountId);
+                        //     return;
+                        // }
                         int startTimestamp = Context.now();
                         loggerMaker.debugAndAddToDb("Risk score sync cron started for account " + accountId + " at " + startTimestamp);
                         LastCronRunInfo lastRunTimerInfo = accountSettings.getLastUpdatedCronInfo();
@@ -113,7 +113,9 @@ public class RiskScoreSyncCron {
                             apiInfoKeyToSeverities.put(key, severities);
                         }
 
-                        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(Filters.in(ApiInfo.ID_API_COLLECTION_ID, apiCollectionIdsFromEvents));
+                        loggerMaker.warnAndAddToDb("Malicious events count: " + apiInfoKeyToSeverities.size());
+
+                        List<ApiInfo> apiInfos = ApiInfoDao.instance.getMCollection().find(Filters.in(ApiInfo.ID_API_COLLECTION_ID, apiCollectionIdsFromEvents)).into(new ArrayList<>());
                         Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates = new HashMap<>();
                         Map<String, ApiInfoKey> apiInfoKeyToApiInfo = new HashMap<>();
 
