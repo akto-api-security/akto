@@ -50,6 +50,7 @@ function AgenticHistoryModal({ isOpen, onClose, onHistoryClick, historyItems = [
                             <Box
                                 key={item.id}
                                 padding="3"
+            
                                 borderRadius='2'
                                 onClick={() => handleItemClick(item.id, item.title)}
                                 onMouseEnter={() => setHoveredItemId(item.id)}
@@ -57,11 +58,13 @@ function AgenticHistoryModal({ isOpen, onClose, onHistoryClick, historyItems = [
                                 background={hoveredItemId === item.id ? "bg-hover" : ''}
                             >
                                 <HorizontalStack align='space-between' blockAlign="center">
+                                    <Box maxWidth="300px">
                                     <TooltipText
                                         textProps={{ fontWeight: "bold", variant: "bodyMd" }} 
                                         tooltip={item.title}
                                         text={item.title}
                                     />
+                                    </Box>
                                     {
                                         hoveredItemId === item.id ? (
                                             <Button monochrome icon={DeleteMinor} plain
