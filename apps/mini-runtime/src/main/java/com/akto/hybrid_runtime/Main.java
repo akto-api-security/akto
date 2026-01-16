@@ -252,7 +252,6 @@ public class Main {
 
         for (String path : possiblePaths) {
             if (path != null && new java.io.File(path).exists()) {
-                loggerMaker.infoAndAddToDb("Found fast-discovery JAR at: " + path);
                 return path;
             }
         }
@@ -349,16 +348,11 @@ public class Main {
                 // Mini-runtime uses: AKTO_KAFKA_GROUP_ID_CONFIG=asdf
                 // Fast-discovery must use: AKTO_KAFKA_GROUP_ID_CONFIG=fast-discovery
                 processBuilder.environment().put("AKTO_KAFKA_GROUP_ID_CONFIG", "fast-discovery");
-                loggerMaker.infoAndAddToDb("Fast-Discovery will use consumer group: fast-discovery (separate from mini-runtime)");
 
                 // Redirect output to separate log file
                 java.io.File logFile = new java.io.File("/tmp/fast-discovery.log");
                 processBuilder.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile));
                 processBuilder.redirectError(ProcessBuilder.Redirect.appendTo(logFile));
-
-                loggerMaker.infoAndAddToDb("Starting fast-discovery process...");
-                loggerMaker.infoAndAddToDb("  JAR: " + fastDiscoveryJar);
-                loggerMaker.infoAndAddToDb("  Log: " + logFile.getAbsolutePath());
 
                 // Start the process
                 fastDiscoveryProcess = processBuilder.start();
@@ -371,18 +365,12 @@ public class Main {
                         ". Check " + logFile.getAbsolutePath() + " for errors.");
                 }
 
-                loggerMaker.infoAndAddToDb("Fast-Discovery process started successfully as separate JVM");
-                loggerMaker.infoAndAddToDb("Fast-Discovery will initialize in background (Bloom filter load may take 10-30 seconds)");
-
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Failed to start Fast-Discovery process: " + e.getMessage());
-                loggerMaker.infoAndAddToDb("Continuing with mini-runtime only (Fast-Discovery disabled)");
                 e.printStackTrace();
                 // Continue without fast-discovery
                 fastDiscoveryProcess = null;
             }
-        } else {
-            loggerMaker.infoAndAddToDb("Fast-Discovery is DISABLED (ENABLE_FAST_DISCOVERY not set to 'true')");
         }
 
         String centralKafkaTopicName = AccountSettings.DEFAULT_CENTRAL_KAFKA_TOPIC_NAME;
@@ -427,7 +415,6 @@ public class Main {
             public void run() {
                 // Stop Fast-Discovery process first if running
                 if (finalFastDiscoveryProcess != null && finalFastDiscoveryProcess.isAlive()) {
-                    loggerMaker.infoAndAddToDb("Stopping Fast-Discovery process...");
                     try {
                         // Send SIGTERM (graceful shutdown)
                         finalFastDiscoveryProcess.destroy();
