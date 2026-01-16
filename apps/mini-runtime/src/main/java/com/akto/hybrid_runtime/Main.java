@@ -182,7 +182,7 @@ public class Main {
     private static void buildLocalKafkaProducer(String kafkaBrokerUrl) {
         loggerMaker.info("Building local kafka producer...................");
         int batchSize = AccountSettings.DEFAULT_CENTRAL_KAFKA_BATCH_SIZE;
-        int lingerMS = AccountSettings.DEFAULT_CENTRAL_KAFKA_LINGER_MS;
+        int lingerMS = AccountSettings.DEFAULT_LOCAL_KAFKA_LINGER_MS;
         try {
             localKafkaProducer = new Kafka(kafkaBrokerUrl, lingerMS, batchSize, kafkaUsername, kafkaPassword, isKafkaAuthenticationEnabled);
             loggerMaker.info("Connected to local kafka producer @ " + Context.now() + ", producerReady=" + localKafkaProducer.producerReady);
