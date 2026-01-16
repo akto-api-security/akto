@@ -29,7 +29,7 @@ function AgenticHistoryCards({ historyItems = [], onHistoryClick, onViewAllClick
                         <div key={item.id} onClick={() => onHistoryClick(item.id)} style={{ cursor: 'pointer' }}>
                             <Card  background="bg-magic-subdued-active" padding="3">
                                 <VerticalStack gap="8">
-                                        <Text variant="bodySm" fontWeight="medium" as="p" truncate>
+                                        <Text variant="bodySm" fontWeight="medium" as="p" breakWord>
                                             {item.title}
                                         </Text>
                                     <Text variant="bodyXs" tone="subdued" as="span">
