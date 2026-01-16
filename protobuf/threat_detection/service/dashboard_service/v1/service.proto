@@ -32,6 +32,7 @@ message ListMaliciousRequestsResponse {
       string label = 20;  // Common values: "threat", "guardrail"
       string host = 21;   // Host header from the request
       string jira_ticket_url = 22;  // URL of associated Jira ticket
+      string severity = 23;  // Severity level: "CRITICAL", "HIGH", "MEDIUM", "LOW"
     }
     repeated MaliciousEvent malicious_events = 1;
     uint64 total = 2;
@@ -58,6 +59,7 @@ message ListMaliciousRequestsRequest {
       optional string latest_api_orig_regex = 12 [json_name = "latestApiOrigRegex"];
       repeated int32 api_collection_id = 13;  // Filter by API collection IDs
       repeated string method = 14;  // Filter by HTTP methods (GET, POST, etc.)
+      optional bool sort_by_severity = 15;  // Sort results by severity (CRITICAL > HIGH > MEDIUM > LOW)
     }
 
     // The number of alerts to return
@@ -102,6 +104,7 @@ message ListThreatActorResponse {
     string severity = 4;
     string method = 5;
     string host = 6;
+    string metadata = 7;
   }
   message ThreatActor {
     string id = 1;
@@ -113,6 +116,7 @@ message ListThreatActorResponse {
     repeated ActivityData activity_data = 7;
     string latest_subcategory = 8;
     string latest_api_host = 9;
+    string latest_metadata = 10;
   }
   repeated ThreatActor actors = 1;
   uint64 total = 2;

@@ -1,7 +1,10 @@
 package com.akto.threat.backend.utils;
 
+import com.akto.ProtoMessageUtils;
+import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.google.protobuf.TextFormat;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.IndexOptions;
@@ -52,6 +55,31 @@ public class ThreatUtils {
         }
 
         return new Document("$and", Arrays.asList(nullOrNotExistsCondition, filterIdCondition));
+    }
+
+    public static boolean isAgenticOrEndpointContext(String contextSource) {
+        if (contextSource == null || contextSource.isEmpty()) {
+            return false;
+        }
+        String contextSourceUpper = contextSource.toUpperCase();
+        return CONTEXT_SOURCE.AGENTIC.name().equals(contextSourceUpper)
+                || CONTEXT_SOURCE.ENDPOINT.name().equals(contextSourceUpper);
+    }
+
+    public static String fetchMetadataString(String metadataStr) {
+        if (metadataStr == null || metadataStr.isEmpty()) {
+            return "";
+        }
+
+        Metadata.Builder metadataBuilder = Metadata.newBuilder();
+        try {
+            TextFormat.getParser().merge(metadataStr, metadataBuilder);
+        } catch (Exception e) {
+            return "";
+        }
+        Metadata metadataProto = metadataBuilder.build();
+        metadataStr = ProtoMessageUtils.toString(metadataProto).orElse("");
+        return metadataStr;
     }
 
     public static void createIndexIfAbsent(String accountId, MaliciousEventDao maliciousEventDao) {

@@ -16,6 +16,10 @@ import (
 	"go.uber.org/zap"
 )
 
+// const (
+// 	ContextSource = types.ContextSourceAgentic
+// )
+
 // policyCache holds cached policies and their metadata
 type policyCache struct {
 	policies      []types.Policy
@@ -68,14 +72,38 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 	}, nil
 }
 
-// getCachedPolicies returns cached policies if still valid, otherwise fetches fresh policies
-func (s *Service) getCachedPolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, error) {
+func (s *Service) filterPoliciesByContextSource(policies []types.Policy, contextSource string) []types.Policy {
+	if contextSource == "" {
+		return policies
+	}
+
+	if contextSource == string(types.ContextSourceAgentic) {
+		filtered := make([]types.Policy, 0)
+		for _, policy := range policies {
+			if policy.ContextSource == "" || policy.ContextSource == "AGENTIC" {
+				filtered = append(filtered, policy)
+			}
+		}
+		return filtered
+	}
+
+	filtered := make([]types.Policy, 0)
+	for _, policy := range policies {
+		if policy.ContextSource == contextSource {
+			filtered = append(filtered, policy)
+		}
+	}
+	return filtered
+}
+
+func (s *Service) getCachedPolicies(contextSource string) ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, error) {
 	refreshInterval := time.Duration(s.config.PolicyRefreshIntervalMin) * time.Minute
 
 	// Check if cache is valid
 	s.cache.mu.RLock()
 	if !s.cache.lastFetched.IsZero() && time.Since(s.cache.lastFetched) < refreshInterval {
-		policies := s.cache.policies
+		// Filter policies by contextSource from cached data
+		filteredPolicies := s.filterPoliciesByContextSource(s.cache.policies, contextSource)
 		auditPolicies := s.cache.auditPolicies
 		compiledRules := s.cache.compiledRules
 		hasAuditRules := s.cache.hasAuditRules
@@ -83,16 +111,26 @@ func (s *Service) getCachedPolicies() ([]types.Policy, map[string]*types.AuditPo
 		s.cache.mu.RUnlock()
 		s.logger.Debug("Using cached policies",
 			zap.Time("lastFetched", s.cache.lastFetched),
-			zap.Int("policiesCount", len(policies)))
-		return policies, auditPolicies, compiledRules, hasAuditRules, nil
+			zap.String("contextSource", contextSource),
+			zap.Int("totalPoliciesCount", len(s.cache.policies)),
+			zap.Int("filteredPoliciesCount", len(filteredPolicies)))
+		return filteredPolicies, auditPolicies, compiledRules, hasAuditRules, nil
 	}
 	s.cache.mu.RUnlock()
 
 	// Cache is stale or empty, fetch fresh policies
-	return s.refreshPolicies()
+	allPolicies, auditPolicies, compiledRules, hasAuditRules, err := s.refreshPolicies()
+	if err != nil {
+		return nil, nil, nil, false, err
+	}
+
+	// Filter by contextSource before returning
+	filteredPolicies := s.filterPoliciesByContextSource(allPolicies, contextSource)
+	return filteredPolicies, auditPolicies, compiledRules, hasAuditRules, nil
 }
 
 // refreshPolicies fetches fresh policies from database and updates the cache
+// Fetches ALL policies without filtering by contextSource
 func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, error) {
 	s.cache.mu.Lock()
 	defer s.cache.mu.Unlock()
@@ -104,21 +142,21 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 		return s.cache.policies, s.cache.auditPolicies, s.cache.compiledRules, s.cache.hasAuditRules, nil
 	}
 
-	s.logger.Info("Refreshing policies cache")
+	s.logger.Info("Refreshing policies cache - fetching ALL policies")
 
 	policies, auditPolicies, compiledRules, hasAuditRules, err := s.fetchAndParsePolicies()
 	if err != nil {
 		return nil, nil, nil, false, err
 	}
 
-	// Update cache
+	// Update cache with ALL policies
 	s.cache.policies = policies
 	s.cache.auditPolicies = auditPolicies
 	s.cache.compiledRules = compiledRules
 	s.cache.hasAuditRules = hasAuditRules
 	s.cache.lastFetched = time.Now()
 
-	s.logger.Info("Policy cache refreshed",
+	s.logger.Info("Policy cache refreshed with ALL policies",
 		zap.Int("policiesCount", len(policies)),
 		zap.Int("auditPoliciesCount", len(auditPolicies)),
 		zap.Time("lastFetched", s.cache.lastFetched))
@@ -126,9 +164,19 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 	return policies, auditPolicies, compiledRules, hasAuditRules, nil
 }
 
+// extractHostHeader extracts the host header value from request headers
+func extractHostHeader(headers map[string]string) string {
+	if host, ok := headers["Host"]; ok {
+		return host
+	}
+	if host, ok := headers["host"]; ok {
+		return host
+	}
+	return ""
+}
+
 // fetchAndParsePolicies fetches policies from database abstractor and parses them
 func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, error) {
-	// Fetch guardrail policies from database abstractor
 	rawGuardrailPolicies, err := s.dbClient.FetchGuardrailPolicies()
 	if err != nil {
 		return nil, nil, nil, false, fmt.Errorf("failed to fetch guardrail policies: %w", err)
@@ -235,18 +283,18 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 }
 
 // ValidateRequest validates a request payload against guardrail policies
-func (s *Service) ValidateRequest(ctx context.Context, payload string) (*mcp.ValidationResult, error) {
+func (s *Service) ValidateRequest(ctx context.Context, payload string, contextSource string) (*mcp.ValidationResult, error) {
 	s.logger.Info("Validating request payload")
 
 	// Get cached policies (refreshes if stale)
-	policies, auditPolicies, compiledRules, hasAuditRules, err := s.getCachedPolicies()
+	policies, auditPolicies, compiledRules, hasAuditRules, err := s.getCachedPolicies(contextSource)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
 
 	// Create validation context
 	valCtx := &mcp.ValidationContext{
-		// Add any context information needed
+		ContextSource: types.ContextSource(contextSource),
 	}
 
 	s.logger.Debug("Calling ProcessRequest",
@@ -275,8 +323,8 @@ func (s *Service) ValidateRequest(ctx context.Context, payload string) (*mcp.Val
 		Allowed:         !processResult.IsBlocked,
 		Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != payload,
 		ModifiedPayload: processResult.ModifiedPayload,
-		Reason:          "", // Extract from BlockedResponse if needed
-		Metadata:        processResult.ParsedData,
+		Reason:          "",                     // TODO: Extract from BlockedResponse when library is updated
+		Metadata:        types.ThreatMetadata{}, // Empty for now - library will populate later
 	}
 
 	s.logger.Info("Request validation completed",
@@ -288,18 +336,18 @@ func (s *Service) ValidateRequest(ctx context.Context, payload string) (*mcp.Val
 }
 
 // ValidateResponse validates a response payload against guardrail policies
-func (s *Service) ValidateResponse(ctx context.Context, payload string) (*mcp.ValidationResult, error) {
+func (s *Service) ValidateResponse(ctx context.Context, payload string, contextSource string) (*mcp.ValidationResult, error) {
 	s.logger.Info("Validating response payload")
 
 	// Get cached policies (refreshes if stale)
-	policies, _, _, _, err := s.getCachedPolicies()
+	policies, _, _, _, err := s.getCachedPolicies(contextSource)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
 
 	// Create validation context
 	valCtx := &mcp.ValidationContext{
-		// Add any context information needed
+		ContextSource: types.ContextSource(contextSource),
 	}
 
 	// Use processor's ProcessResponse method with external policies
@@ -313,8 +361,8 @@ func (s *Service) ValidateResponse(ctx context.Context, payload string) (*mcp.Va
 		Allowed:         !processResult.IsBlocked,
 		Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != payload,
 		ModifiedPayload: processResult.ModifiedPayload,
-		Reason:          "", // Extract from BlockedResponse if needed
-		Metadata:        processResult.ParsedData,
+		Reason:          "",                     // TODO: Extract from BlockedResponse when library is updated
+		Metadata:        types.ThreatMetadata{}, // Empty for now - library will populate later
 	}
 
 	s.logger.Info("Response validation completed",
@@ -326,11 +374,11 @@ func (s *Service) ValidateResponse(ctx context.Context, payload string) (*mcp.Va
 }
 
 // ValidateBatch validates a batch of request/response pairs
-func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDataBatch) ([]ValidationBatchResult, error) {
+func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDataBatch, contextSource string) ([]ValidationBatchResult, error) {
 	s.logger.Info("Validating batch data", zap.Int("count", len(batchData)))
 
 	// Get cached policies (refreshes if stale)
-	policies, auditPolicies, _, hasAuditRules, err := s.getCachedPolicies()
+	policies, auditPolicies, _, hasAuditRules, err := s.getCachedPolicies(string(contextSource))
 	if err != nil {
 		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
@@ -360,6 +408,9 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 			json.Unmarshal([]byte(data.ResponseHeaders), &respHeaders)
 		}
 
+		// Extract host header for McpServerName
+		mcpServerName := extractHostHeader(reqHeaders)
+
 		// Create validation context with actual data
 		valCtx := &mcp.ValidationContext{
 			IP:              data.IP,
@@ -370,6 +421,8 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 			StatusCode:      statusCode,
 			RequestPayload:  data.RequestPayload,
 			ResponsePayload: data.ResponsePayload,
+			ContextSource:   types.ContextSource(contextSource),
+			McpServerName:   mcpServerName,
 		}
 
 		var reqResult, respResult *mcp.ValidationResult
@@ -398,8 +451,8 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 					Allowed:         !processResult.IsBlocked,
 					Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != data.RequestPayload,
 					ModifiedPayload: processResult.ModifiedPayload,
-					Reason:          "",
-					Metadata:        processResult.ParsedData,
+					Reason:          "",                     // TODO: Extract from BlockedResponse when library is updated
+					Metadata:        types.ThreatMetadata{}, // Empty for now - library will populate later
 				}
 				result.RequestAllowed = reqResult.Allowed
 				result.RequestModified = reqResult.Modified
@@ -419,8 +472,8 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 					Allowed:         !processResult.IsBlocked,
 					Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != data.ResponsePayload,
 					ModifiedPayload: processResult.ModifiedPayload,
-					Reason:          "",
-					Metadata:        processResult.ParsedData,
+					Reason:          "",                     // TODO: Extract from BlockedResponse when library is updated
+					Metadata:        types.ThreatMetadata{}, // Empty for now - library will populate later
 				}
 				result.ResponseAllowed = respResult.Allowed
 				result.ResponseModified = respResult.Modified

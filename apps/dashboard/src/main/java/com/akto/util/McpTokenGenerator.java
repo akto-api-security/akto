@@ -9,7 +9,7 @@ import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 
 public class McpTokenGenerator {
 
-    public static String generateToken(){
+    public static String generateToken(String username){
         Map<String,Object> claims = new HashMap<>();
         int accountId;
         String contextSource = "api";
@@ -24,6 +24,7 @@ public class McpTokenGenerator {
         claims.put("contextSource", contextSource);
         claims.put("accountId", accountId);
         claims.put("auth_role", "mcp");
+        claims.put("username", username);
 
         try {
             String token = JwtAuthenticator.createJWT(

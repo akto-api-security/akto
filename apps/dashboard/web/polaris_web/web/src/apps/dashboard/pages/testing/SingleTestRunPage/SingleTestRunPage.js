@@ -56,6 +56,7 @@ import TestingRunEndpointsModal from './TestingRunEndpointsModal';
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 import MarkdownReportGenerator from "../../../components/shared/MarkdownReportGenerator";
 import { saveAs } from 'file-saver';
+import SeveritySelector from '../../issues/components/SeveritySelector';
 
 let sortOptions = [
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 3 },
@@ -178,6 +179,10 @@ function SingleTestRunPage() {
   const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
   const [copyUpdateTable, setCopyUpdateTable] = useState("");
   const [confirmationModal, setConfirmationModal] = useState(false);
+  const [severityModalActive, setSeverityModalActive] = useState(false);
+  const [selectedTestResultItems, setSelectedTestResultItems] = useState([]);
+  const [severityUpdateInProgress, setSeverityUpdateInProgress] = useState(false);
+  const [chartRefreshCounter, setChartRefreshCounter] = useState(0);
 
   const tableTabMap = {
     vulnerable: "VULNERABLE",
@@ -549,10 +554,56 @@ function SingleTestRunPage() {
     issuesFunctions.fetchIntegrationCustomFieldsMetadata();
   }, []);
 
+  const handleBulkSeverityUpdate = async (newSeverity) => {
+    // Prevent duplicate concurrent updates
+    if (severityUpdateInProgress) {
+      func.setToast(true, true, "Severity update already in progress");
+      return;
+    }
+
+    const hexIds = selectedTestResultItems.flat();
+    setSeverityUpdateInProgress(true);
+
+    try {
+      await api.bulkUpdateTestResultsSeverity(hexIds, newSeverity);
+
+      func.setToast(true, false, `Severity updated for ${hexIds.length} test result${hexIds.length === 1 ? "" : "s"} across all test runs`);
+      setSeverityModalActive(false);
+
+      // Trigger refresh:
+      // 1. fetchTestingRunResultSummaries updates testingRunResultSummariesObj
+      //    → triggers useEffect (line 315) → calls setUpdateTable automatically
+      // 2. chartRefreshCounter triggers TrendChart to refetch its data
+      setTimeout(async () => {
+        await fetchTestingRunResultSummaries();
+        setChartRefreshCounter(prev => prev + 1);
+      }, 500);
+
+    } catch (error) {
+      func.setToast(true, true, error.message || "Failed to update severity");
+      setSeverityModalActive(false);
+    } finally {
+      setSeverityUpdateInProgress(false);
+    }
+  };
+
+  const openSeverityUpdateModal = (items) => {
+    setSelectedTestResultItems(items);
+    setSeverityModalActive(true);
+  };
+
   const promotedBulkActions = () => {
     let totalSelectedItemsSet = new Set(TableStore.getState().selectedItems.flat())
 
     return [
+      {
+        content: 'Update severity',
+        onAction: () => {
+          if (totalSelectedItemsSet.size > 0) {
+            openSeverityUpdateModal([...totalSelectedItemsSet]);
+          }
+        },
+      },
       {
         content: `Rerun ${totalSelectedItemsSet.size} test${totalSelectedItemsSet.size === 1 ? '' : 's'}`,
         onAction: () => {
@@ -860,7 +911,7 @@ function SingleTestRunPage() {
 
 
   const components = [
-    runningTestsComp, <TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={true} totalVulnerabilities={tableCountObj.vulnerable} />,
+    runningTestsComp, <TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={true} totalVulnerabilities={tableCountObj.vulnerable} refreshTrigger={chartRefreshCounter} />,
     metadataComponent(), loading ? <SpinnerCentered key="loading" /> : (!workflowTest ? resultTable : workflowTestBuilder)];
 
   const openVulnerabilityReport = async (summaryMode = false) => {
@@ -1199,6 +1250,14 @@ function SingleTestRunPage() {
         components={useComponents}
       />
       <ReRunModal selectedTestRun={selectedTestRun} shouldRefresh={false} />
+      <SeveritySelector
+        open={severityModalActive}
+        onClose={() => setSeverityModalActive(false)}
+        onConfirm={handleBulkSeverityUpdate}
+        selectedCount={selectedTestResultItems.length}
+        pageType="test result"
+        disabled={severityUpdateInProgress}
+      />
       {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
     </>
   );

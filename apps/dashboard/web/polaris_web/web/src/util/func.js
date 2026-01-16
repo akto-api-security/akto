@@ -1074,6 +1074,9 @@ parameterizeUrl(x) {
 mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverityMap) {
   const allCollections = PersistStore.getState().allCollections
   const apiGroupsMap = func.mapCollectionIdToName(allCollections.filter(x => x.type === "API_GROUP"))
+  if(Object.keys(idToName).length === 0){
+    idToName = func.mapCollectionIdToName(allCollections)
+  }
 
   let ret = {}
   let apiInfoMap = {}
@@ -1119,6 +1122,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
           ret[key] = {
               id: x.method + "###" + x.url + "###" + x.apiCollectionId + "###" + Math.random(),
               shadow: x.shadow ? x.shadow : false,
+              hostName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
               sensitive: x.sensitive,
               tags: x.tags,
               endpoint: x.url,
@@ -2209,6 +2213,12 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   isDemoAccount(){
      return window.ACTIVE_ACCOUNT === 1669322524
   },
+
+  shouldShowIpReputation() {
+    return window.ACTIVE_ACCOUNT === 1669322524 || window.ACTIVE_ACCOUNT === 1767812031 || window.ACTIVE_ACCOUNT === 1767814409
+  },
+
+  
   isSameDateAsToday (givenDate) {
       const today = new Date();
       return (
@@ -2388,6 +2398,46 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       }
     }
     return placeholders;
+  },
+  /**
+   * Format timestamp for chat messages
+   * @param {number} timestamp - Unix timestamp in seconds
+   * @returns {string} Formatted timestamp string
+   */
+  formatChatTimestamp: (timestamp) => {
+    if (!timestamp) return '';
+    return new Date(timestamp * 1000).toLocaleString('en-US', {
+      month: 'numeric',
+      day: 'numeric',
+      year: '2-digit',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: true
+    });
+  },
+  extractEmailDetails(email) {
+    // Define the regex pattern
+    const pattern = /^(.*?)@([\w.-]+)\.[a-z]{2,}$/;
+  
+    // Match the regex pattern
+    const match = email.match(pattern);
+  
+    if (match) {
+      let rawUsername = match[1]; // Extract username
+      let mailserver = match[2]; // Extract mailserver (including subdomains)
+  
+      let username = rawUsername
+      .split(/[^a-zA-Z]+/) // Split by any non-alphabet character
+      .filter(Boolean) // Remove empty segments
+      .map(segment => segment.charAt(0).toUpperCase() + segment.slice(1)) // Capitalize each segment
+      .join(' '); // Join segments with a space
+          
+      mailserver = mailserver.charAt(0).toUpperCase() + mailserver.slice(1);
+  
+      return { username, mailserver };
+    } else {
+      return { error: "Invalid email format" };
+    }
   }
 }
 

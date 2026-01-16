@@ -21,7 +21,7 @@ function AddOnComponenet({featureLabel, featureComponent}) {
                 <Box paddingBlockStart={3}>
                     <Button primary onClick={
                         () => {
-                        window.open("https://calendly.com/ankita-akto/akto-demo", "_blank");
+                        window.open("https://www.akto.io/demo", "_blank");
                     }
                 }>
                     Contact Us

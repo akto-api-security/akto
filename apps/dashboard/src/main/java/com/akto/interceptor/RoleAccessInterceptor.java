@@ -79,7 +79,7 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             if(session == null){
                 throw new Exception("Found session null, returning from interceptor");
             }
-            loggerMaker.debugAndAddToDb("Found session in interceptor.", LogDb.DASHBOARD);
+            logger.debug("Found session in interceptor.");
             User user = (User) session.get(USER);
 
             if(user == null) {
@@ -103,7 +103,7 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             logger.debug("Time by feature label check in: " + (Context.now() - timeNow));
             timeNow = Context.now();
 
-            loggerMaker.debugAndAddToDb("Found user in interceptor: " + user.getLogin(), LogDb.DASHBOARD);
+            logger.debug("Found user in interceptor: " + user.getLogin());
             int userId = user.getId();
 
             Role userRoleRecord = RBACDao.getCurrentRoleForUser(userId, sessionAccId);
@@ -145,13 +145,13 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                     apiAuditLogs = new ApiAuditLogs(timestamp, apiEndpoint, actionDescription, userEmail, userAgentType.name(), userIpAddress, userProxyIpAddresses);
                 }
             } catch(Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error while inserting api audit logs: " + e.getMessage(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e, "Error while inserting api audit logs: " + e.getMessage());
             }
 
         } catch(Exception e) {
             String api = invocation.getProxy().getActionName();
             String error = "Error in RoleInterceptor for api: " + api + " ERROR: " + e.getMessage();
-            loggerMaker.errorAndAddToDb(e, error, LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e, error);
         }
 
         String result = invocation.invoke();

@@ -38,7 +38,8 @@ public class MaliciousEventDto {
   public enum Status {
     ACTIVE,
     UNDER_REVIEW,
-    IGNORED
+    IGNORED,
+    TRAINING
   }
 
   public enum Label {

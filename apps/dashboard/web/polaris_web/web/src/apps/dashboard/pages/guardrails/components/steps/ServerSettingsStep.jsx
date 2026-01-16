@@ -2,7 +2,7 @@ import { VerticalStack, Text, FormLayout, Box, Checkbox } from "@shopify/polaris
 import DropdownSearch from "../../../../components/shared/DropdownSearch";
 
 export const ServerSettingsConfig = {
-    number: 10,
+    number: 8,
     title: "Server and application settings",
 
     validate: () => {
