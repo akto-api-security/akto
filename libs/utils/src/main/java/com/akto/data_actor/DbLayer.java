@@ -188,19 +188,6 @@ public class DbLayer {
         return apiIds;
     }
 
-    public static void ensureCollections(List<Integer> collectionIds) {
-        if (collectionIds == null || collectionIds.isEmpty()) {
-            return;
-        }
-        for (Integer collectionId : collectionIds) {
-            ApiCollectionsDao.instance.getMCollection().updateOne(
-                Filters.eq("_id", collectionId),
-                Updates.setOnInsert("_id", collectionId),
-                new UpdateOptions().upsert(true)
-            );
-        }
-    }
-
     public static void bulkWriteSingleTypeInfo(List<WriteModel<SingleTypeInfo>> writesForSingleTypeInfo) {
         BulkWriteResult res = SingleTypeInfoDao.instance.getMCollection().bulkWrite(writesForSingleTypeInfo);
         loggerMaker.debug("bulk write result: del:" + res.getDeletedCount() + " ins:" + res.getInsertedCount() + " match:" + res.getMatchedCount() + " modify:" +res.getModifiedCount());
@@ -348,26 +335,6 @@ public class DbLayer {
 
     public static List<SingleTypeInfo> fetchAllSingleTypeInfo() {
         return SingleTypeInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(SingleTypeInfo._VALUES));
-    }
-
-    public static List<com.akto.dto.traffic.Key> fetchAllSampleDataKeys() {
-        List<com.akto.dto.traffic.Key> keys = new ArrayList<>();
-        try {
-            com.mongodb.client.FindIterable<SampleData> cursor = SampleDataDao.instance
-                .getMCollection()
-                .find()
-                .projection(Projections.include("_id"))
-                .batchSize(10000);
-
-            for (SampleData sampleData : cursor) {
-                if (sampleData != null && sampleData.getId() != null) {
-                    keys.add(sampleData.getId());
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return keys;
     }
 
     public static void updateRuntimeVersion(String fieldName, String version) {
@@ -537,6 +504,11 @@ public class DbLayer {
     public static List<ApiCollection> fetchAllApiCollections() {
         return ApiCollectionsDao.instance.findAll(new BasicDBObject(),
             Projections.exclude("urls"));
+    }
+
+    public static List<ApiCollection> fetchAllCollections() {
+        return ApiCollectionsDao.instance.findAll(new BasicDBObject(),
+            Projections.include("_id", "hostName"));
     }
 
     public static Organization fetchOrganization(int accountId) {

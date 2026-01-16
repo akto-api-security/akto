@@ -74,8 +74,6 @@ public abstract class DataActor {
 
     public abstract List<SingleTypeInfo> fetchAllStis();
 
-    public abstract List<com.akto.dto.traffic.Key> fetchAllSampleDataKeys();
-
     public abstract List<SensitiveParamInfo> getUnsavedSensitiveParamInfos();
 
     public abstract List<CustomDataType> fetchCustomDataTypes();
@@ -96,8 +94,6 @@ public abstract class DataActor {
 
     public abstract List<ApiInfo.ApiInfoKey> fetchApiIds();
 
-    public abstract void ensureCollections(List<Integer> collectionIds);
-
     public abstract List<RuntimeFilter> fetchRuntimeFilters();
 
     public abstract void updateRuntimeVersion(String fieldName, String version);
@@ -110,6 +106,7 @@ public abstract class DataActor {
 
     public abstract List<ApiCollection> fetchApiCollections();
     public abstract List<ApiCollection> fetchAllApiCollections();
+    public abstract List<ApiCollection> fetchAllCollections();
 
     public abstract void createCollectionSimple(int vxlanId);
 
