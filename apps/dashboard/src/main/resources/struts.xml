@@ -3846,6 +3846,9 @@
         <action name="api/fetchApiCallStats" class="com.akto.action.TrafficAction" method="fetchApiCallStats">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">THREAT_DETECTION</param>
+            </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SAMPLE_DATA</param>
                 <param name="accessType">READ</param>
@@ -3872,6 +3875,9 @@
         <action name="api/fetchIpLevelApiCallStats" class="com.akto.action.TrafficAction" method="fetchIpLevelApiCallStats">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">THREAT_DETECTION</param>
+            </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SAMPLE_DATA</param>
                 <param name="accessType">READ</param>
@@ -9177,6 +9183,9 @@
         <action name="api/getThreatReportFilters" class="com.akto.action.threat_detection.ThreatReportAction" method="getThreatReportFilters">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">THREAT_DETECTION</param>
+            </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">THREAT_PROTECTION</param>
                 <param name="accessType">READ</param>
