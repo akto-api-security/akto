@@ -834,14 +834,16 @@ public class HttpCallParser {
             // Add to cache FIRST to prevent redundant calls
             apiCollectionsMap.put(apiCollectionId, collection);
 
+            // Initialize hostname cache for this new collection
+            Set<String> cachedHostNames = new HashSet<>();
+            cachedHostNames.add(hostName);
+            serviceTagCollectionHostNamesCache.put(apiCollectionId, cachedHostNames);
+
             // Create collection in DB with initial fields (upsert pattern - safe if already exists)
             dataActor.createCollectionForServiceTag(apiCollectionId, serviceTagValue, hostNamesList, tagsList, hostName);
 
             loggerMaker.infoAndAddToDb("Created service-tag collection: " + serviceTagValue
                 + " (ID: " + apiCollectionId + ") for URL: " + httpResponseParam.getRequestParams().getURL());
-
-            // Update hostNames and tags using existing tag update flow (handles throttling, deduplication, etc.)
-            updateServiceTagCollectionHostNames(apiCollectionId, hostName, tagsJson, httpResponseParam);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error creating service-tag collection for: " + serviceTagValue);
             // Return vxlanId as fallback on error
@@ -857,17 +859,14 @@ public class HttpCallParser {
         }
 
         try {
-            // Check cache first to avoid redundant DB calls
+            // Check cache first to avoid redundant calls
             Set<String> cachedHostNames = serviceTagCollectionHostNamesCache.get(collectionId);
             if (cachedHostNames == null) {
                 cachedHostNames = new HashSet<>();
                 serviceTagCollectionHostNamesCache.put(collectionId, cachedHostNames);
             }
 
-            // Only make DB call if hostname is not already in cache
             if (!cachedHostNames.contains(hostName)) {
-                // Use atomic MongoDB $addToSet operation to handle concurrent updates from multiple mini-runtime instances
-                // This prevents race conditions when multiple machines process traffic simultaneously
                 dataActor.addHostNameToServiceTagCollection(collectionId, hostName);
                 cachedHostNames.add(hostName);
             }
