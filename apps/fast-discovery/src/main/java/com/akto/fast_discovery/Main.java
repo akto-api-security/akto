@@ -12,7 +12,9 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 
 import java.time.Duration;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -22,7 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Sets up Kafka consumer and initializes all components:
  * - DataActor (ClientActor for hybrid mode, DbActor for normal mode)
  * - BloomFilterManager (duplicate detection)
- * - ApiCollectionResolver (collection ID resolution)
+ * - Hostname cache (collection ID resolution)
  * - FastDiscoveryConsumer (processing pipeline)
  *
  * Consumes from akto.api.logs topic with separate consumer group "fast-discovery".
@@ -61,39 +63,44 @@ public class Main {
             loggerMaker.infoAndAddToDb("BloomFilterManager initialized with " +
                     bloomFilter.getEstimatedMemoryUsageMB() + " MB estimated memory");
 
-            // 3. Initialize API Collection Resolver
-            ApiCollectionResolver collectionResolver = new ApiCollectionResolver(dataActor);
-            loggerMaker.infoAndAddToDb("ApiCollectionResolver initialized");
-
-            // 4. Pre-populate collection cache from database
-            loggerMaker.infoAndAddToDb("Pre-populating collection cache...");
+            // 3. Build hostname → collectionId cache from database
+            loggerMaker.infoAndAddToDb("Building hostname to collectionId cache...");
+            Map<String, Integer> hostnameToCollectionId = new HashMap<>();
             try {
-                loggerMaker.infoAndAddToDb("Fetching all collections");
-                List<ApiCollection> existingCollections = dataActor.fetchAllApiCollections();
+                loggerMaker.infoAndAddToDb("Fetching all collections (id + hostname only)");
+                List<ApiCollection> existingCollections = dataActor.fetchAllCollections();
                 loggerMaker.infoAndAddToDb("Fetched " + existingCollections.size() + " collections");
-                collectionResolver.prePopulateCollections(existingCollections);
-                loggerMaker.infoAndAddToDb("Collection cache pre-populated with " +
-                    existingCollections.size() + " collections (~" +
-                    (collectionResolver.getCacheSize() * 40 / 1024) + " KB)");
+
+                for (ApiCollection col : existingCollections) {
+                    if (col.getHostName() != null && !col.getHostName().isEmpty()) {
+                        String normalizedHostname = col.getHostName().toLowerCase().trim();
+                        hostnameToCollectionId.put(normalizedHostname, col.getId());
+                    }
+                }
+
+                int sizeKB = hostnameToCollectionId.size() * 40 / 1024;
+                loggerMaker.infoAndAddToDb(String.format(
+                    "Built cache with %d hostname → collectionId mappings (~%d KB)",
+                    hostnameToCollectionId.size(), sizeKB));
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Failed to pre-populate collections: " + e.getMessage());
-                loggerMaker.infoAndAddToDb("Continuing anyway - collections will be created on-demand");
+                loggerMaker.errorAndAddToDb("Failed to build hostname cache: " + e.getMessage());
+                loggerMaker.infoAndAddToDb("Continuing with empty cache - collections will be created on-demand");
             }
 
-            // 5. Initialize Fast Discovery Consumer
+            // 4. Initialize Fast Discovery Consumer
             FastDiscoveryConsumer consumer = new FastDiscoveryConsumer(
                     bloomFilter,
-                    collectionResolver,
-                    dataActor
+                    dataActor,
+                    hostnameToCollectionId
             );
             loggerMaker.infoAndAddToDb("FastDiscoveryConsumer initialized");
 
-            // 7. Set up Kafka consumer
+            // 5. Set up Kafka consumer
             kafkaConsumer = createKafkaConsumer(config);
             kafkaConsumer.subscribe(Collections.singletonList(config.kafkaTopicName));
             loggerMaker.infoAndAddToDb("Kafka consumer subscribed to topic: " + config.kafkaTopicName);
 
-            // 8. Set up shutdown hook
+            // 6. Set up shutdown hook
             final KafkaConsumer<String, String> finalKafkaConsumer = kafkaConsumer;
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 loggerMaker.infoAndAddToDb("Shutdown signal received, cleaning up...");
@@ -104,7 +111,7 @@ public class Main {
                 loggerMaker.infoAndAddToDb("Fast-Discovery Consumer shut down gracefully");
             }));
 
-            // 9. Start consuming messages
+            // 7. Start consuming messages
             loggerMaker.infoAndAddToDb("Fast-Discovery Consumer started successfully! Beginning to process messages...");
             long totalProcessed = 0;
 

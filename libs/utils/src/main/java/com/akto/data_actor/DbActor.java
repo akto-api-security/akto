@@ -167,10 +167,6 @@ public class DbActor extends DataActor {
         return allParams;
     }
 
-    public List<com.akto.dto.traffic.Key> fetchAllSampleDataKeys() {
-        return DbLayer.fetchAllSampleDataKeys();
-    }
-
     public List<SensitiveParamInfo> getUnsavedSensitiveParamInfos() {
         return DbLayer.getUnsavedSensitiveParamInfos();
     }
@@ -213,10 +209,6 @@ public class DbActor extends DataActor {
         return DbLayer.fetchAllApiInfoKeys();
     }
 
-    public void ensureCollections(List<Integer> collectionIds) {
-        DbLayer.ensureCollections(collectionIds);
-    }
-
     public List<RuntimeFilter> fetchRuntimeFilters() {
         return DbLayer.fetchRuntimeFilters();
     }
@@ -243,6 +235,10 @@ public class DbActor extends DataActor {
 
     public List<ApiCollection> fetchAllApiCollections() {
         return DbLayer.fetchAllApiCollections();
+    }
+
+    public List<ApiCollection> fetchAllCollections() {
+        return DbLayer.fetchAllCollections();
     }
 
     public void createCollectionSimple(int vxlanId) {

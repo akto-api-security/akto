@@ -3,6 +3,7 @@ package com.akto.fast_discovery;
 import com.akto.data_actor.DataActor;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.log.LoggerMaker;
+import com.akto.runtime.RuntimeUtil;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.common.header.Header;
@@ -20,18 +21,63 @@ public class FastDiscoveryConsumer {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(FastDiscoveryConsumer.class);
 
+    // Header format: "host|method|url"
+    private static final int HEADER_INDEX_HOST = 0;
+    private static final int HEADER_INDEX_METHOD = 1;
+    private static final int HEADER_INDEX_URL = 2;
+    private static final int HEADER_EXPECTED_PARTS = 3;
+
     private final BloomFilterManager bloomFilter;
-    private final ApiCollectionResolver collectionResolver;
     private final DataActor dataActor;
+    private final Map<String, Integer> hostnameToCollectionId;
 
     public FastDiscoveryConsumer(
             BloomFilterManager bloomFilter,
-            ApiCollectionResolver collectionResolver,
-            DataActor dataActor
+            DataActor dataActor,
+            Map<String, Integer> hostnameToCollectionId
     ) {
         this.bloomFilter = bloomFilter;
-        this.collectionResolver = collectionResolver;
         this.dataActor = dataActor;
+        this.hostnameToCollectionId = hostnameToCollectionId;
+    }
+
+    /**
+     * Parse and validate collection_details header.
+     * Format: "host|method|url"
+     *
+     * @param headerValue Raw header value
+     * @return Array [host, method, url] if valid, null if invalid
+     */
+    private String[] parseAndValidateHeader(String headerValue) {
+        if (headerValue == null || headerValue.isEmpty()) {
+            loggerMaker.errorAndAddToDb("Header value is null or empty");
+            return null;
+        }
+
+        String[] parts = headerValue.split("\\|", HEADER_EXPECTED_PARTS);
+        if (parts.length != HEADER_EXPECTED_PARTS) {
+            loggerMaker.errorAndAddToDb(String.format(
+                "Invalid header format: expected 'host|method|url', got '%s' (%d parts)",
+                headerValue, parts.length));
+            return null;
+        }
+
+        // Trim and validate all parts
+        String host = parts[HEADER_INDEX_HOST].trim();
+        String method = parts[HEADER_INDEX_METHOD].trim();
+        String url = parts[HEADER_INDEX_URL].trim();
+
+        if (host.isEmpty() || method.isEmpty() || url.isEmpty()) {
+            loggerMaker.errorAndAddToDb("Empty field in header: " + headerValue);
+            return null;
+        }
+
+        // Return trimmed parts
+        parts[HEADER_INDEX_HOST] = host;
+        parts[HEADER_INDEX_METHOD] = method;
+        parts[HEADER_INDEX_URL] = url;
+
+        return parts;
     }
 
     /**
@@ -46,7 +92,9 @@ public class FastDiscoveryConsumer {
         loggerMaker.infoAndAddToDb("Processing batch of " + records.count() + " messages");
         long startTime = System.currentTimeMillis();
 
-        Map<String, ApiCandidate> candidates = new HashMap<>();
+        // Use Set<String> instead of Map - encode all data in the key
+        // Format: "hostname|url|method" (collectionId calculated from hostname when needed)
+        Set<String> candidates = new HashSet<>();
         int headerReadCount = 0;
         int headerMissingCount = 0;
         int headerParseErrors = 0;
@@ -62,25 +110,27 @@ public class FastDiscoveryConsumer {
                 }
 
                 String headerValue = new String(collectionHeader.value(), StandardCharsets.UTF_8);
-                CollectionDetails details = CollectionDetails.parse(headerValue);
+                String[] headerParts = parseAndValidateHeader(headerValue);
+                if (headerParts == null) {
+                    headerParseErrors++;
+                    continue;
+                }
                 headerReadCount++;
 
-                int apiCollectionId = collectionResolver.resolveApiCollectionIdFromHostname(details.getHost());
-                String normalizedUrl = normalizeUrl(details.getUrl());
-                String apiKey = apiCollectionId + " " + normalizedUrl + " " + details.getMethod();
+                String host = headerParts[HEADER_INDEX_HOST];
+                String method = headerParts[HEADER_INDEX_METHOD];
+                String url = headerParts[HEADER_INDEX_URL];
 
-                if (!bloomFilter.mightContain(apiKey)) {
-                    candidates.put(apiKey, new ApiCandidate(
-                        apiCollectionId,
-                        details.getHost(),
-                        normalizedUrl,
-                        details.getMethod()
-                    ));
+                int apiCollectionId = calculateCollectionId(host);
+                String normalizedUrl = normalizeUrl(url);
+                String bloomFilterKey = apiCollectionId + " " + normalizedUrl + " " + method;
+
+                if (!bloomFilter.mightContain(bloomFilterKey)) {
+                    // Encode all data in single string: "hostname|url|method"
+                    String candidateKey = host + "|" + normalizedUrl + "|" + method;
+                    candidates.add(candidateKey);
                 }
 
-            } catch (IllegalArgumentException e) {
-                headerParseErrors++;
-                loggerMaker.errorAndAddToDb("Failed to parse collection_details header: " + e.getMessage());
             } catch (Exception e) {
                 headerParseErrors++;
                 loggerMaker.errorAndAddToDb("Unexpected error processing header: " + e.getMessage());
@@ -106,23 +156,84 @@ public class FastDiscoveryConsumer {
         );
     }
 
-    private void sendToDbAbstractor(Map<String, ApiCandidate> newApis) {
-        List<BulkUpdates> stiWrites = buildStiWrites(newApis);
-        List<BulkUpdates> apiInfoWrites = buildApiInfoWrites(newApis);
+    private void sendToDbAbstractor(Set<String> candidateKeys) {
+        // Build hostname mapping for collection creation
+        // Parse candidate keys: "hostname|url|method"
+        Map<Integer, String> collectionIdToHostname = new HashMap<>();
 
-        List<Integer> collectionIds = new ArrayList<>();
-        for (ApiCandidate candidate : newApis.values()) {
-            int collectionId = candidate.apiCollectionId;
-            if (collectionId > 0 && !collectionIds.contains(collectionId)) {
-                collectionIds.add(collectionId);
+        for (String key : candidateKeys) {
+            String[] parts = parseCandidateKey(key);
+            String hostname = parts[INDEX_HOSTNAME];
+            int collectionId = calculateCollectionId(hostname);
+            collectionIdToHostname.put(collectionId, hostname);
+        }
+
+        // Separate new collections from existing (cached)
+        Map<Integer, String> newCollections = new HashMap<>();
+        Set<Integer> existingCollections = new HashSet<>();
+
+        for (Integer collectionId : collectionIdToHostname.keySet()) {
+            String hostname = collectionIdToHostname.get(collectionId);
+            String normalizedHostname = hostname.toLowerCase().trim();
+
+            if (hostnameToCollectionId.containsKey(normalizedHostname)) {
+                existingCollections.add(collectionId);
+            } else {
+                newCollections.put(collectionId, hostname);
             }
         }
 
-        try {
-            if (!collectionIds.isEmpty()) {
-                loggerMaker.infoAndAddToDb("Fast-discovery: Ensuring " + collectionIds.size() + " collections exist");
-                dataActor.ensureCollections(collectionIds);
+        // Try to create new collections using createCollectionForHostAndVpc (same as mini-runtime)
+        Set<Integer> successfulInserts = new HashSet<>();
+        if (!newCollections.isEmpty()) {
+            loggerMaker.infoAndAddToDb("Fast-discovery: Attempting to create " + newCollections.size() + " new collections");
+            successfulInserts = insertCollections(newCollections);
+
+            // Update cache for successful inserts
+            for (Integer collectionId : successfulInserts) {
+                String hostname = newCollections.get(collectionId);
+                String normalizedHostname = hostname.toLowerCase().trim();
+                hostnameToCollectionId.put(normalizedHostname, collectionId);
             }
+
+            loggerMaker.infoAndAddToDb("Fast-discovery: Successfully created " + successfulInserts.size() + " collections");
+        }
+
+        // Determine which collections are safe to write to
+        Set<Integer> safeCollections = new HashSet<>();
+        safeCollections.addAll(existingCollections);    // Already in cache
+        safeCollections.addAll(successfulInserts);       // Successfully inserted
+
+        // Filter candidate keys to only include those in safe collections
+        Set<String> safeCandidateKeys = new HashSet<>();
+        int droppedCount = 0;
+        for (String key : candidateKeys) {
+            String[] parts = parseCandidateKey(key);
+            String hostname = parts[INDEX_HOSTNAME];
+            int collectionId = calculateCollectionId(hostname);
+
+            if (safeCollections.contains(collectionId)) {
+                safeCandidateKeys.add(key);
+            } else {
+                droppedCount++;
+            }
+        }
+
+        if (droppedCount > 0) {
+            loggerMaker.errorAndAddToDb(String.format(
+                "Dropped %d APIs due to collection creation failures (likely collisions)",
+                droppedCount));
+        }
+
+        if (safeCandidateKeys.isEmpty()) {
+            loggerMaker.infoAndAddToDb("No safe APIs to write after collection filtering");
+            return;
+        }
+
+        // Write STI and API info only for safe collections
+        try {
+            List<BulkUpdates> stiWrites = buildStiWrites(safeCandidateKeys);
+            List<BulkUpdates> apiInfoWrites = buildApiInfoWrites(safeCandidateKeys);
 
             loggerMaker.infoAndAddToDb("Fast-discovery: Bulk writing " + stiWrites.size() + " entries to single_type_info");
             List<Object> writesForSti = new ArrayList<>(stiWrites);
@@ -142,24 +253,40 @@ public class FastDiscoveryConsumer {
             }
             dataActor.fastDiscoveryBulkWriteApiInfo(apiInfoList);
 
-            newApis.keySet().forEach(bloomFilter::add);
+            // Update Bloom filter with Bloom filter keys (not candidate keys)
+            for (String key : safeCandidateKeys) {
+                String[] parts = parseCandidateKey(key);
+                String hostname = parts[INDEX_HOSTNAME];
+                int collectionId = calculateCollectionId(hostname);
+                String url = parts[INDEX_URL];
+                String method = parts[INDEX_METHOD];
+                String bloomFilterKey = collectionId + " " + url + " " + method;
+                bloomFilter.add(bloomFilterKey);
+            }
 
-            loggerMaker.infoAndAddToDb("Successfully sent " + newApis.size() + " new APIs to database-abstractor");
+            loggerMaker.infoAndAddToDb("Successfully sent " + safeCandidateKeys.size() + " new APIs to database-abstractor");
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Failed to send APIs to database-abstractor: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
-    private List<BulkUpdates> buildStiWrites(Map<String, ApiCandidate> newApis) {
+    private List<BulkUpdates> buildStiWrites(Set<String> candidateKeys) {
         List<BulkUpdates> writes = new ArrayList<>();
         long timestamp = System.currentTimeMillis() / 1000;
 
-        for (ApiCandidate candidate : newApis.values()) {
+        for (String key : candidateKeys) {
+            // Parse: "hostname|url|method"
+            String[] parts = parseCandidateKey(key);
+            String hostname = parts[INDEX_HOSTNAME];
+            int apiCollectionId = calculateCollectionId(hostname);
+            String url = parts[INDEX_URL];
+            String method = parts[INDEX_METHOD];
+
             Map<String, Object> filters = new HashMap<>();
-            filters.put("apiCollectionId", candidate.apiCollectionId);
-            filters.put("url", candidate.url);
-            filters.put("method", candidate.method);
+            filters.put("apiCollectionId", apiCollectionId);
+            filters.put("url", url);
+            filters.put("method", method);
             filters.put("responseCode", -1);
             filters.put("isHeader", true);
             filters.put("param", "host");
@@ -168,7 +295,7 @@ public class FastDiscoveryConsumer {
 
             ArrayList<String> updates = new ArrayList<>();
             updates.add(String.format("{\"field\": \"timestamp\", \"val\": %d, \"op\": \"set\"}", timestamp));
-            updates.add(String.format("{\"field\": \"collectionIds\", \"val\": %d, \"op\": \"setOnInsert\"}", candidate.apiCollectionId));
+            updates.add(String.format("{\"field\": \"collectionIds\", \"val\": %d, \"op\": \"setOnInsert\"}", apiCollectionId));
             updates.add("{\"field\": \"count\", \"val\": 1, \"op\": \"set\"}");
 
             writes.add(new BulkUpdates(filters, updates));
@@ -177,21 +304,28 @@ public class FastDiscoveryConsumer {
         return writes;
     }
 
-    private List<BulkUpdates> buildApiInfoWrites(Map<String, ApiCandidate> newApis) {
+    private List<BulkUpdates> buildApiInfoWrites(Set<String> candidateKeys) {
         List<BulkUpdates> writes = new ArrayList<>();
         long timestamp = System.currentTimeMillis() / 1000;
 
-        for (ApiCandidate candidate : newApis.values()) {
+        for (String key : candidateKeys) {
+            // Parse: "hostname|url|method"
+            String[] parts = parseCandidateKey(key);
+            String hostname = parts[INDEX_HOSTNAME];
+            int apiCollectionId = calculateCollectionId(hostname);
+            String url = parts[INDEX_URL];
+            String method = parts[INDEX_METHOD];
+
             Map<String, Object> filters = new HashMap<>();
             Map<String, Object> id = new HashMap<>();
-            id.put("apiCollectionId", candidate.apiCollectionId);
-            id.put("url", candidate.url);
-            id.put("method", candidate.method);
+            id.put("apiCollectionId", apiCollectionId);
+            id.put("url", url);
+            id.put("method", method);
             filters.put("_id", id);
 
             ArrayList<String> updates = new ArrayList<>();
             updates.add(String.format("{\"field\": \"lastSeen\", \"val\": %d, \"op\": \"set\"}", timestamp));
-            updates.add(String.format("{\"field\": \"collectionIds\", \"val\": [%d], \"op\": \"setOnInsert\"}", candidate.apiCollectionId));
+            updates.add(String.format("{\"field\": \"collectionIds\", \"val\": [%d], \"op\": \"setOnInsert\"}", apiCollectionId));
 
             writes.add(new BulkUpdates(filters, updates));
         }
@@ -207,20 +341,78 @@ public class FastDiscoveryConsumer {
         return queryIndex != -1 ? url.substring(0, queryIndex) : url;
     }
 
-    /**
-     * Lightweight API representation for header-only processing.
-     */
-    private static class ApiCandidate {
-        final int apiCollectionId;
-        final String hostname;
-        final String url;
-        final String method;
+    // Candidate key format indices: "hostname|url|method"
+    private static final int INDEX_HOSTNAME = 0;
+    private static final int INDEX_URL = 1;
+    private static final int INDEX_METHOD = 2;
 
-        ApiCandidate(int apiCollectionId, String hostname, String url, String method) {
-            this.apiCollectionId = apiCollectionId;
-            this.hostname = hostname;
-            this.url = url;
-            this.method = method;
-        }
+    /**
+     * Parse candidate key string into components.
+     * Format: "hostname|url|method"
+     * Returns: [hostname, url, method]
+     */
+    private String[] parseCandidateKey(String candidateKey) {
+        return candidateKey.split("\\|", 3);
     }
+
+    /**
+     * Calculate collection ID from hostname.
+     * Checks cache first for existing hostname → collectionId mappings.
+     * Same logic as mini-runtime for consistency.
+     */
+    private int calculateCollectionId(String hostname) {
+        if (hostname == null || hostname.isEmpty()) {
+            return 0; // Default collection
+        }
+
+        // Check cache first - if hostname already has a collection, use it
+        String normalizedHostname = hostname.toLowerCase().trim();
+        Integer cachedId = hostnameToCollectionId.get(normalizedHostname);
+        if (cachedId != null) {
+            return cachedId;
+        }
+
+        // Not in cache - calculate new ID
+        if (RuntimeUtil.hasSpecialCharacters(hostname)) {
+            hostname = "Special_Char_Host";
+        }
+
+        hostname = hostname.toLowerCase().trim();
+        return hostname.hashCode();
+    }
+
+    /**
+     * Try to create collections using createCollectionForHostAndVpc.
+     * This uses the same method as mini-runtime, ensuring consistency.
+     * Creates collections with only 4 fields: _id, hostName, startTs, urls
+     *
+     * Note: We still track success/failure for collision detection.
+     */
+    private Set<Integer> insertCollections(Map<Integer, String> collectionIdToHostname) {
+        Set<Integer> successfulInserts = new HashSet<>();
+        String vpcId = System.getenv("VPC_ID");
+        List<com.akto.dto.traffic.CollectionTags> emptyTags = new ArrayList<>();
+
+        for (Map.Entry<Integer, String> entry : collectionIdToHostname.entrySet()) {
+            int collectionId = entry.getKey();
+            String hostname = entry.getValue();
+
+            try {
+                // Use same method as mini-runtime for consistency
+                // With vpcId=null and empty tags, creates only 4 fields
+                dataActor.createCollectionForHostAndVpc(hostname, collectionId, vpcId, emptyTags);
+                successfulInserts.add(collectionId);
+            } catch (Exception e) {
+                // Creation failed - either collection exists or collision
+                // Don't add to successfulInserts
+                loggerMaker.errorAndAddToDb(String.format(
+                    "Failed to create collection %d for hostname %s: %s",
+                    collectionId, hostname, e.getMessage()
+                ));
+            }
+        }
+
+        return successfulInserts;
+    }
+
 }

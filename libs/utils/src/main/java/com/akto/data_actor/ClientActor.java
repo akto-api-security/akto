@@ -581,61 +581,6 @@ public class ClientActor extends DataActor {
         return allStis;
     }
 
-    public List<com.akto.dto.traffic.Key> fetchAllSampleDataKeys() {
-        Map<String, List<String>> headers = buildHeaders();
-        List<com.akto.dto.traffic.Key> allKeys = new ArrayList<>();
-        String lastKeyId = null;
-
-        for (int i = 0; i < 80; i++) {
-            BasicDBObject obj = new BasicDBObject();
-            obj.put("lastKeyId", lastKeyId);
-            OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchSampleDataKeys", "", "POST", obj.toString(), headers, "");
-            try {
-                OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
-                String responsePayload = response.getBody();
-                if (response.getStatusCode() != 200 || responsePayload == null) {
-                    loggerMaker.errorAndAddToDb("invalid response in fetchAllSampleDataKeys", LoggerMaker.LogDb.RUNTIME);
-                    return allKeys;
-                }
-                BasicDBObject payloadObj;
-                try {
-                    payloadObj = BasicDBObject.parse(responsePayload);
-                    BasicDBList keyList = (BasicDBList) payloadObj.get("sampleDataKeys");
-                    if (keyList == null || keyList.isEmpty()) break;
-
-                    for (Object keyObj : keyList) {
-                        BasicDBObject obj2 = (BasicDBObject) keyObj;
-                        int apiCollectionId = obj2.getInt("apiCollectionId");
-                        String url_str = obj2.getString("url");
-                        String methodStr = obj2.getString("method");
-                        int responseCode = obj2.getInt("responseCode", -1);
-                        int isHeader = obj2.getInt("isHeader", 0);
-                        int ts = obj2.getInt("ts", 0);
-
-                        com.akto.dto.traffic.Key key = new com.akto.dto.traffic.Key(
-                            apiCollectionId,
-                            url_str,
-                            URLMethods.Method.valueOf(methodStr),
-                            responseCode,
-                            isHeader,
-                            ts
-                        );
-                        allKeys.add(key);
-
-                        // Use compound key for pagination cursor
-                        lastKeyId = apiCollectionId + "_" + url_str + "_" + methodStr;
-                    }
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("error extracting response in fetchAllSampleDataKeys" + e, LoggerMaker.LogDb.RUNTIME);
-                }
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("error in fetchAllSampleDataKeys" + e, LoggerMaker.LogDb.RUNTIME);
-            }
-        }
-
-        return allKeys;
-    }
-
     public List<SingleTypeInfo> fetchStiInBatches(int batchCount, int lastStiFetchTs) {
         Map<String, List<String>> headers = buildHeaders();
         List<SingleTypeInfo> allStis = new ArrayList<>();
@@ -1234,26 +1179,6 @@ public class ClientActor extends DataActor {
     }
 
 
-    public void ensureCollections(List<Integer> collectionIds) {
-        if (collectionIds == null || collectionIds.isEmpty()) {
-            return;
-        }
-        BasicDBObject obj = new BasicDBObject();
-        obj.put("collectionIdsToEnsure", collectionIds);
-        Map<String, List<String>> headers = buildHeaders();
-        String objString = gson.toJson(obj);
-
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/ensureApiCollections", "", "POST", objString, headers, "");
-        try {
-            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
-            if (response.getStatusCode() != 200) {
-                loggerMaker.errorAndAddToDb("non 2xx response in ensureCollections", LoggerMaker.LogDb.RUNTIME);
-            }
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in ensureCollections: " + e, LoggerMaker.LogDb.RUNTIME);
-        }
-    }
-
     public List<RuntimeFilter> fetchRuntimeFilters() {
         List<RuntimeFilter> runtimeFilters = new ArrayList<>();
 
@@ -1460,6 +1385,40 @@ public class ClientActor extends DataActor {
             loggerMaker.errorAndAddToDb("error in fetchAllApiCollections" + e, LoggerMaker.LogDb.RUNTIME);
         }
         loggerMaker.infoAndAddToDb("fetchAllApiCollections api called size " + apiCollections.size(), LoggerMaker.LogDb.RUNTIME);
+        return apiCollections;
+    }
+
+    public List<ApiCollection> fetchAllCollections() {
+        Map<String, List<String>> headers = buildHeaders();
+        List<ApiCollection> apiCollections = new ArrayList<>();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchAllCollections", "", "GET", null, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("invalid response in fetchAllCollections", LoggerMaker.LogDb.RUNTIME);
+                return apiCollections;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList collectionsList = (BasicDBList) payloadObj.get("collections");
+
+                for (Object obj : collectionsList) {
+                    BasicDBObject colObj = (BasicDBObject) obj;
+                    int id = colObj.getInt("id");
+                    String hostName = colObj.getString("hostName");
+
+                    ApiCollection col = new ApiCollection(id, null, 0, null, null, 0, false, true);
+                    col.setHostName(hostName);
+                    apiCollections.add(col);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchAllCollections" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchAllCollections" + e, LoggerMaker.LogDb.RUNTIME);
+        }
         return apiCollections;
     }
 
