@@ -14,11 +14,13 @@ public final class AIAgentConnectorConstants {
     public static final String CONNECTOR_TYPE_N8N = "N8N";
     public static final String CONNECTOR_TYPE_LANGCHAIN = "LANGCHAIN";
     public static final String CONNECTOR_TYPE_COPILOT_STUDIO = "COPILOT_STUDIO";
+    public static final String CONNECTOR_TYPE_LITELLM = "LITELLM";
 
     // Binary Names
     public static final String BINARY_NAME_N8N = "n8n-shield";
     public static final String BINARY_NAME_LANGCHAIN = "langchain-shield";
     public static final String BINARY_NAME_COPILOT_STUDIO = "copilot-shield";
+    public static final String BINARY_NAME_LITELLM = "litellm-shield";
 
     // Configuration Keys - N8N
     public static final String CONFIG_N8N_BASE_URL = "N8N_BASE_URL";
@@ -33,6 +35,10 @@ public final class AIAgentConnectorConstants {
     public static final String CONFIG_DATAVERSE_TENANT_ID = "DATAVERSE_TENANT_ID";
     public static final String CONFIG_DATAVERSE_CLIENT_ID = "DATAVERSE_CLIENT_ID";
     public static final String CONFIG_DATAVERSE_CLIENT_SECRET = "DATAVERSE_CLIENT_SECRET";
+
+    // Configuration Keys - LiteLLM
+    public static final String CONFIG_LITELLM_BASE_URL = "LITELLM_BASE_URL";
+    public static final String CONFIG_LITELLM_API_KEY = "LITELLM_API_KEY";
 
     // Common Configuration Keys
     public static final String CONFIG_DATA_INGESTION_SERVICE_URL = "DATA_INGESTION_SERVICE_URL";
