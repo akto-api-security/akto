@@ -1249,7 +1249,10 @@ public class DbLayer {
         UpdateOptions updateOptions = new UpdateOptions().upsert(true);
 
         for (ModuleInfo moduleInfo : moduleInfoList) {
-            Bson filter = Filters.eq("_id", moduleInfo.getId());
+            Bson filter = Filters.and(
+                Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
+                Filters.eq(ModuleInfo._REBOOT, false)
+            );
             Bson updates = Updates.combine(
                     Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
                     Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType().name()),
@@ -1257,14 +1260,41 @@ public class DbLayer {
                     Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
                     Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()),
                     Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
+                    Updates.set(ModuleInfo.MINI_RUNTIME_NAME, moduleInfo.getMiniRuntimeName()),
                     Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()),
-                    Updates.set(ModuleInfo._REBOOT, moduleInfo.isReboot()),
                     Updates.set(ModuleInfo.DELETE_TOPIC_AND_REBOOT, moduleInfo.isDeleteTopicAndReboot())
             );
             bulkUpdates.add(new UpdateOneModel<>(filter, updates, updateOptions));
         }
 
         ModuleInfoDao.instance.getMCollection().bulkWrite(bulkUpdates);
+    }
+
+    public static List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName) {
+        if (moduleType == null || miniRuntimeName == null || miniRuntimeName.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        Bson filter = Filters.and(
+            Filters.eq(ModuleInfo._REBOOT, true),
+            Filters.eq(ModuleInfo.MODULE_TYPE, moduleType.name()),
+            Filters.eq(ModuleInfo.MINI_RUNTIME_NAME, miniRuntimeName)
+        );
+
+        List<ModuleInfo> moduleInfoList = ModuleInfoDao.instance.findAll(filter);
+
+        if (moduleInfoList != null && !moduleInfoList.isEmpty()) {
+            List<String> ids = new ArrayList<>();
+            for (ModuleInfo moduleInfo : moduleInfoList) {
+                ids.add(moduleInfo.getId());
+            }
+
+            Bson updateFilter = Filters.in("_id", ids);
+            Bson updates = Updates.set(ModuleInfo._REBOOT, false);
+            ModuleInfoDao.instance.updateMany(updateFilter, updates);
+        }
+
+        return moduleInfoList != null ? moduleInfoList : new ArrayList<>();
     }
 
     public static List<McpReconRequest> fetchPendingMcpReconRequests() {

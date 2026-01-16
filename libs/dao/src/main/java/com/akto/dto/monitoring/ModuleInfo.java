@@ -21,6 +21,10 @@ public class ModuleInfo {
     private String name;
     public static final String ADDITIONAL_DATA = "additionalData";
     private Map<String, Object> additionalData;
+    public static final String MINI_RUNTIME_NAME = "miniRuntimeName";
+
+    @Getter @Setter
+    private String miniRuntimeName;
 
     @Getter @Setter
     private boolean reboot;
