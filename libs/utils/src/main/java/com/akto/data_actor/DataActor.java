@@ -322,4 +322,6 @@ public abstract class DataActor {
 
     public abstract void bulkWriteAgentTrafficLogs(List<Object> trafficLogs);
     public abstract YamlTemplate fetchCommonWordList();
+
+    public abstract List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName);
 }

@@ -33,14 +33,16 @@ public class AktoTrafficCollectorTelemetry {
     private final String heartbeatTopicName;
     private final DataActor dataActor;
     private final int batchSize;
+    private final String miniRuntimeName;
 
     public AktoTrafficCollectorTelemetry(
             String kafkaUrl,
             String groupIdConfig,
             int maxPollRecordsConfig,
             String heartbeatTopicName,
-            DataActor dataActor) {
-        this(kafkaUrl, groupIdConfig, maxPollRecordsConfig, heartbeatTopicName, dataActor, DEFAULT_BATCH_SIZE);
+            DataActor dataActor,
+            String miniRuntimeName) {
+        this(kafkaUrl, groupIdConfig, maxPollRecordsConfig, heartbeatTopicName, dataActor, DEFAULT_BATCH_SIZE, miniRuntimeName);
     }
 
     public AktoTrafficCollectorTelemetry(
@@ -49,13 +51,15 @@ public class AktoTrafficCollectorTelemetry {
             int maxPollRecordsConfig,
             String heartbeatTopicName,
             DataActor dataActor,
-            int batchSize) {
+            int batchSize,
+            String miniRuntimeName) {
         this.kafkaUrl = kafkaUrl;
         this.groupIdConfig = groupIdConfig;
         this.maxPollRecordsConfig = maxPollRecordsConfig;
         this.heartbeatTopicName = heartbeatTopicName;
         this.dataActor = dataActor;
         this.batchSize = batchSize;
+        this.miniRuntimeName = miniRuntimeName;
     }
 
     public void run() {
@@ -138,6 +142,8 @@ public class AktoTrafficCollectorTelemetry {
                 loggerMaker.errorAndAddToDb("Failed to parse module heartbeat: " + record.value());
                 return null;
             }
+
+            heartbeat.setMiniRuntimeName(this.miniRuntimeName);
 
             return heartbeat;
 
