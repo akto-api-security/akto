@@ -19,8 +19,8 @@ export const ASSET_TAG_KEY_VALUES = Object.values(ASSET_TAG_KEYS);
 export const getHeaders = () => {
     return [
         { title: "", text: "", value: "iconComp", isText: CellType.TEXT, boxWidth: '24px' },
-        { title: "Agentic asset", text: "Agentic asset", value: "groupName", filterKey: "groupName", textValue: "groupName", showFilter: true },
-        { title: "Type", text: "Type", value: "clientType", filterKey: "clientType", textValue: "clientType", showFilter: true, boxWidth: "120px" },
+        { title: "Agentic asset", text: "Agentic asset", value: "groupName", filterKey: "groupName", textValue: "groupName", showFilter: true, sortActive: true },
+        { title: "Type", text: "Type", value: "clientType", filterKey: "clientType", textValue: "clientType", showFilter: true, sortActive: true, boxWidth: "120px" },
         { 
             title: "Endpoints", 
             text: "Endpoints", 
@@ -71,14 +71,12 @@ export const sortOptions = [
     { label: "Name", value: "groupName desc", directionLabel: "Z-A", sortKey: "groupName", columnIndex: 2 },
     { label: "Type", value: "clientType asc", directionLabel: "A-Z", sortKey: "clientType", columnIndex: 3 },
     { label: "Type", value: "clientType desc", directionLabel: "Z-A", sortKey: "clientType", columnIndex: 3 },
-    { label: "Total agentic components", value: "totalAgenticComponents asc", directionLabel: "Lowest", sortKey: "totalAgenticComponents", columnIndex: 4 },
-    { label: "Total agentic components", value: "totalAgenticComponents desc", directionLabel: "Highest", sortKey: "totalAgenticComponents", columnIndex: 4 },
-    { label: "Endpoints", value: "endpointsCount asc", directionLabel: "Lowest", sortKey: "endpointsCount", columnIndex: 5 },
-    { label: "Endpoints", value: "endpointsCount desc", directionLabel: "Highest", sortKey: "endpointsCount", columnIndex: 5 },
-    { label: "Risk score", value: "riskScore asc", directionLabel: "Lowest", sortKey: "riskScore", columnIndex: 6 },
-    { label: "Risk score", value: "riskScore desc", directionLabel: "Highest", sortKey: "riskScore", columnIndex: 6 },
-    { label: "Last traffic seen", value: "detectedTimestamp asc", directionLabel: "Oldest", sortKey: "detectedTimestamp", columnIndex: 8 },
-    { label: "Last traffic seen", value: "detectedTimestamp desc", directionLabel: "Newest", sortKey: "detectedTimestamp", columnIndex: 8 },
+    { label: "Endpoints", value: "endpointsCount asc", directionLabel: "Lowest", sortKey: "endpointsCount", columnIndex: 4 },
+    { label: "Endpoints", value: "endpointsCount desc", directionLabel: "Highest", sortKey: "endpointsCount", columnIndex: 4 },
+    { label: "Risk score", value: "riskScore asc", directionLabel: "Lowest", sortKey: "riskScore", columnIndex: 5 },
+    { label: "Risk score", value: "riskScore desc", directionLabel: "Highest", sortKey: "riskScore", columnIndex: 5 },
+    { label: "Last traffic seen", value: "detectedTimestamp asc", directionLabel: "Oldest", sortKey: "detectedTimestamp", columnIndex: 7 },
+    { label: "Last traffic seen", value: "detectedTimestamp desc", directionLabel: "Newest", sortKey: "detectedTimestamp", columnIndex: 7 },
 ];
 
 export const resourceName = { singular: "Agentic asset", plural: "Agentic assets" };
