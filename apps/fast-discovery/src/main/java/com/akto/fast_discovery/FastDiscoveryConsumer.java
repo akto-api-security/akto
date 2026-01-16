@@ -389,11 +389,8 @@ public class FastDiscoveryConsumer {
      */
     public void refreshCollectionsCache() {
         try {
-            loggerMaker.infoAndAddToDb("Fast-discovery: Refreshing collections cache...");
-
             List<ApiCollection> collections = DataActorFactory.fetchInstance().fetchAllCollections();
 
-            int oldSize = hostnameToCollectionId.size();
             hostnameToCollectionId.clear();
 
             for (ApiCollection col : collections) {
@@ -402,12 +399,6 @@ public class FastDiscoveryConsumer {
                     hostnameToCollectionId.put(normalizedHostname, col.getId());
                 }
             }
-
-            int newSize = hostnameToCollectionId.size();
-            loggerMaker.infoAndAddToDb(String.format(
-                "Fast-discovery: Collections cache refreshed (%d → %d entries)",
-                oldSize, newSize
-            ));
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Fast-discovery: Failed to refresh collections cache: " + e.getMessage());
