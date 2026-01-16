@@ -98,7 +98,7 @@ export default function Header() {
             disabled.push("DAST")
         }
         if (endpointSecurityGranted === false) {
-            // disabled.push("Endpoint Security")
+            disabled.push("Endpoint Security")
         }
         return disabled;
     }, [mcpSecurityGranted, agenticSecurityGranted, dastGranted, endpointSecurityGranted]);
