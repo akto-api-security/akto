@@ -9,6 +9,7 @@ import com.akto.log.LoggerMaker;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.StringDeserializer;
 
 import java.time.Duration;
@@ -38,6 +39,7 @@ public class Main {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
     private static final AtomicBoolean running = new AtomicBoolean(true);
     private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     public static void main(String[] args) {
         loggerMaker.infoAndAddToDb("Starting Fast-Discovery Consumer...");
@@ -50,9 +52,8 @@ public class Main {
         KafkaConsumer<String, String> kafkaConsumer = null;
 
         try {
-            DataActor dataActor = initializeDataActor();
             BloomFilterManager bloomFilter = initializeBloomFilter(config);
-            Map<String, Integer> hostnameCache = buildHostnameCache(dataActor);
+            Map<String, Integer> hostnameCache = buildHostnameCache();
             FastDiscoveryConsumer consumer = initializeFastDiscoveryConsumer(bloomFilter, hostnameCache);
 
             schedulePeriodicRefresh(consumer, bloomFilter);
@@ -68,18 +69,6 @@ public class Main {
         } finally {
             cleanup(kafkaConsumer);
         }
-    }
-
-    /**
-     * Initialize DataActor for database operations.
-     * Uses DataActorFactory to choose between ClientActor (hybrid) or DbActor (normal).
-     */
-    private static DataActor initializeDataActor() {
-        DataActor dataActor = DataActorFactory.fetchInstance();
-        boolean isHybrid = RuntimeMode.isHybridDeployment();
-        loggerMaker.infoAndAddToDb("DataActor initialized: " +
-            (isHybrid ? "ClientActor (hybrid mode - HTTP calls)" : "DbActor (normal mode - direct MongoDB)"));
-        return dataActor;
     }
 
     /**
@@ -102,14 +91,11 @@ public class Main {
      * Build hostname → collectionId cache from database.
      * Returns empty map if fetch fails (collections will be created on-demand).
      */
-    private static Map<String, Integer> buildHostnameCache(DataActor dataActor) {
-        loggerMaker.infoAndAddToDb("Building hostname to collectionId cache...");
+    private static Map<String, Integer> buildHostnameCache() {
         Map<String, Integer> hostnameToCollectionId = new HashMap<>();
 
         try {
-            loggerMaker.infoAndAddToDb("Fetching all collections (id + hostname only)");
             List<ApiCollection> existingCollections = dataActor.fetchAllCollections();
-            loggerMaker.infoAndAddToDb("Fetched " + existingCollections.size() + " collections");
 
             for (ApiCollection col : existingCollections) {
                 if (col.getHostName() != null && !col.getHostName().isEmpty()) {
@@ -136,9 +122,7 @@ public class Main {
     private static FastDiscoveryConsumer initializeFastDiscoveryConsumer(
             BloomFilterManager bloomFilter,
             Map<String, Integer> hostnameCache) {
-        FastDiscoveryConsumer consumer = new FastDiscoveryConsumer(bloomFilter, hostnameCache);
-        loggerMaker.infoAndAddToDb("FastDiscoveryConsumer initialized");
-        return consumer;
+        return new FastDiscoveryConsumer(bloomFilter, hostnameCache);
     }
 
     /**
@@ -162,8 +146,6 @@ public class Main {
             }
         }, 15, 15, TimeUnit.MINUTES);
 
-        loggerMaker.infoAndAddToDb("Scheduled collections cache refresh: every 15 minutes");
-
         // Bloom filter refresh: Every 15 minutes
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
@@ -176,8 +158,6 @@ public class Main {
                 }
             }
         }, 15, 15, TimeUnit.MINUTES);
-
-        loggerMaker.infoAndAddToDb("Scheduled Bloom filter refresh: every 15 minutes");
     }
 
     /**
@@ -232,16 +212,18 @@ public class Main {
         while (running.get()) {
             try {
                 ConsumerRecords<String, String> records = kafkaConsumer.poll(Duration.ofMillis(1000));
-                if (!records.isEmpty()) {
-                    consumer.processBatch(records);
-                    totalProcessed += records.count();
-
-                    // Log progress every 10K messages
-                    if (totalProcessed % 10_000 == 0) {
-                        loggerMaker.infoAndAddToDb("Total messages processed: " + totalProcessed);
-                    }
+                if (records.isEmpty()) {
+                    continue;
                 }
-            } catch (org.apache.kafka.common.errors.WakeupException e) {
+
+                consumer.processBatch(records);
+                totalProcessed += records.count();
+
+                // Log progress every 100K messages
+                if (totalProcessed % 100_000 == 0) {
+                    loggerMaker.infoAndAddToDb("Total messages processed: " + totalProcessed);
+                }
+            } catch (WakeupException e) {
                 // Expected on shutdown
                 break;
             } catch (Exception e) {
@@ -292,26 +274,18 @@ public class Main {
         Config config = new Config();
 
         // Kafka configuration
-        config.kafkaBrokerUrl = getEnv("AKTO_KAFKA_BROKER_URL", "localhost:9092");
-        config.kafkaTopicName = getEnv("AKTO_KAFKA_TOPIC_NAME", "akto.api.logs");
-        config.kafkaGroupId = getEnv("AKTO_KAFKA_GROUP_ID_CONFIG", "fast-discovery");
-        config.kafkaMaxPollRecords = Integer.parseInt(getEnv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG", "1000"));
+        config.kafkaBrokerUrl = System.getenv().getOrDefault("AKTO_KAFKA_BROKER_URL", "localhost:9092");
+        config.kafkaTopicName = System.getenv().getOrDefault("AKTO_KAFKA_TOPIC_NAME", "akto.api.logs");
+        config.kafkaGroupId = System.getenv().getOrDefault("AKTO_KAFKA_GROUP_ID_CONFIG", "fast-discovery");
+        config.kafkaMaxPollRecords = Integer.parseInt(System.getenv().getOrDefault("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG", "1000"));
 
         // Note: Database-Abstractor configuration (URL and JWT token) is read by ClientActor from environment variables
 
         // Bloom Filter configuration
-        config.bloomFilterExpectedSize = Long.parseLong(getEnv("BLOOM_FILTER_EXPECTED_SIZE", "10000000"));
-        config.bloomFilterFpp = Double.parseDouble(getEnv("BLOOM_FILTER_FPP", "0.01"));
+        config.bloomFilterExpectedSize = Long.parseLong(System.getenv().getOrDefault("BLOOM_FILTER_EXPECTED_SIZE", "10000000"));
+        config.bloomFilterFpp = Double.parseDouble(System.getenv().getOrDefault("BLOOM_FILTER_FPP", "0.01"));
 
         return config;
-    }
-
-    /**
-     * Get environment variable with default value.
-     */
-    private static String getEnv(String name, String defaultValue) {
-        String value = System.getenv(name);
-        return (value != null && !value.isEmpty()) ? value : defaultValue;
     }
 
     /**
