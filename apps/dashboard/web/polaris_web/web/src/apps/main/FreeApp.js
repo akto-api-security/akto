@@ -11,7 +11,7 @@ function FreeApp() {
 
     const description = (
         <Text>
-            Free access is not available. Reach out to our sales team to discuss your organization's requirements and next steps.
+            Reach out to our sales team to discuss your organization's requirements and next steps.
         </Text>
     );
 
