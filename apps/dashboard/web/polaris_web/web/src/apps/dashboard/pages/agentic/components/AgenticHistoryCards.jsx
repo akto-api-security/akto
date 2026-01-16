@@ -9,7 +9,7 @@ function AgenticHistoryCards({ historyItems = [], onHistoryClick, onViewAllClick
     }
 
     return (
-        <Box width="100%">
+        <Box width="550px" maxWidth="100%">
             <VerticalStack gap="4">
                 <Box width="100%">
                     <HorizontalStack align="space-between" blockAlign="center">
@@ -29,9 +29,9 @@ function AgenticHistoryCards({ historyItems = [], onHistoryClick, onViewAllClick
                         <div key={item.id} onClick={() => onHistoryClick(item.id)} style={{ cursor: 'pointer' }}>
                             <Card  background="bg-magic-subdued-active" padding="3">
                                 <VerticalStack gap="8">
-                                    <Text variant="bodySm" fontWeight="medium" as="p">
-                                        {item.title}
-                                    </Text>
+                                        <Text variant="bodySm" fontWeight="medium" as="p" truncate>
+                                            {item.title}
+                                        </Text>
                                     <Text variant="bodyXs" tone="subdued" as="span">
                                         {func.prettifyEpoch(item.lastUpdatedAt)}
                                     </Text>
