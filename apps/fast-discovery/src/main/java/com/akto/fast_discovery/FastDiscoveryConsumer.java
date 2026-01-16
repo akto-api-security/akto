@@ -1,7 +1,13 @@
 package com.akto.fast_discovery;
 
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.bulk_updates.BulkUpdates;
+import com.akto.dto.bulk_updates.UpdatePayload;
+import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.runtime.RuntimeUtil;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -33,11 +39,10 @@ public class FastDiscoveryConsumer {
 
     public FastDiscoveryConsumer(
             BloomFilterManager bloomFilter,
-            DataActor dataActor,
             Map<String, Integer> hostnameToCollectionId
     ) {
         this.bloomFilter = bloomFilter;
-        this.dataActor = dataActor;
+        this.dataActor = DataActorFactory.fetchInstance();
         this.hostnameToCollectionId = hostnameToCollectionId;
     }
 
@@ -233,24 +238,13 @@ public class FastDiscoveryConsumer {
         // Write STI and API info only for safe collections
         try {
             List<BulkUpdates> stiWrites = buildStiWrites(safeCandidateKeys);
-            List<BulkUpdates> apiInfoWrites = buildApiInfoWrites(safeCandidateKeys);
+            List<ApiInfo> apiInfoList = buildApiInfoList(safeCandidateKeys);
 
             loggerMaker.infoAndAddToDb("Fast-discovery: Bulk writing " + stiWrites.size() + " entries to single_type_info");
             List<Object> writesForSti = new ArrayList<>(stiWrites);
             dataActor.fastDiscoveryBulkWriteSingleTypeInfo(writesForSti);
 
-            loggerMaker.infoAndAddToDb("Fast-discovery: Bulk writing " + apiInfoWrites.size() + " entries to api_info");
-            List<com.akto.dto.ApiInfo> apiInfoList = new ArrayList<>();
-            for (BulkUpdates write : apiInfoWrites) {
-                try {
-                    com.akto.dto.ApiInfo apiInfo = BulkUpdatesToApiInfo.convert(write);
-                    if (apiInfo != null) {
-                        apiInfoList.add(apiInfo);
-                    }
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("Failed to convert BulkUpdates to ApiInfo: " + e.getMessage());
-                }
-            }
+            loggerMaker.infoAndAddToDb("Fast-discovery: Bulk writing " + apiInfoList.size() + " entries to api_info");
             dataActor.fastDiscoveryBulkWriteApiInfo(apiInfoList);
 
             // Update Bloom filter with Bloom filter keys (not candidate keys)
@@ -283,20 +277,25 @@ public class FastDiscoveryConsumer {
             String url = parts[INDEX_URL];
             String method = parts[INDEX_METHOD];
 
-            Map<String, Object> filters = new HashMap<>();
-            filters.put("apiCollectionId", apiCollectionId);
-            filters.put("url", url);
-            filters.put("method", method);
-            filters.put("responseCode", -1);
-            filters.put("isHeader", true);
-            filters.put("param", "host");
-            filters.put("subType", "GENERIC");
-            filters.put("isUrlParam", false);
+            // Create SingleTypeInfo object to represent the STI entry
+            SingleTypeInfo info = new SingleTypeInfo();
+            info.setApiCollectionId(apiCollectionId);
+            info.setUrl(url);
+            info.setMethod(method);
+            info.setResponseCode(-1);
+            info.setIsHeader(true);
+            info.setParam("host");
+            info.setSubType(SingleTypeInfo.GENERIC);
+            info.setIsUrlParam(false);
 
+            // Use DAO helper to create filters (same as mini-runtime)
+            Map<String, Object> filters = SingleTypeInfoDao.createFiltersMap(info);
+
+            // Build updates using UpdatePayload (same as mini-runtime)
             ArrayList<String> updates = new ArrayList<>();
-            updates.add(String.format("{\"field\": \"timestamp\", \"val\": %d, \"op\": \"set\"}", timestamp));
-            updates.add(String.format("{\"field\": \"collectionIds\", \"val\": %d, \"op\": \"setOnInsert\"}", apiCollectionId));
-            updates.add("{\"field\": \"count\", \"val\": 1, \"op\": \"set\"}");
+            updates.add(new UpdatePayload(SingleTypeInfo._TIMESTAMP, timestamp, "set").toString());
+            updates.add(new UpdatePayload(SingleTypeInfo._COLLECTION_IDS, apiCollectionId, "setOnInsert").toString());
+            updates.add(new UpdatePayload(SingleTypeInfo._COUNT, 1, "set").toString());
 
             writes.add(new BulkUpdates(filters, updates));
         }
@@ -304,9 +303,8 @@ public class FastDiscoveryConsumer {
         return writes;
     }
 
-    private List<BulkUpdates> buildApiInfoWrites(Set<String> candidateKeys) {
-        List<BulkUpdates> writes = new ArrayList<>();
-        long timestamp = System.currentTimeMillis() / 1000;
+    private List<ApiInfo> buildApiInfoList(Set<String> candidateKeys) {
+        List<ApiInfo> apiInfoList = new ArrayList<>();
 
         for (String key : candidateKeys) {
             // Parse: "hostname|url|method"
@@ -316,21 +314,12 @@ public class FastDiscoveryConsumer {
             String url = parts[INDEX_URL];
             String method = parts[INDEX_METHOD];
 
-            Map<String, Object> filters = new HashMap<>();
-            Map<String, Object> id = new HashMap<>();
-            id.put("apiCollectionId", apiCollectionId);
-            id.put("url", url);
-            id.put("method", method);
-            filters.put("_id", id);
-
-            ArrayList<String> updates = new ArrayList<>();
-            updates.add(String.format("{\"field\": \"lastSeen\", \"val\": %d, \"op\": \"set\"}", timestamp));
-            updates.add(String.format("{\"field\": \"collectionIds\", \"val\": [%d], \"op\": \"setOnInsert\"}", apiCollectionId));
-
-            writes.add(new BulkUpdates(filters, updates));
+            // Use proper constructor - initializes all collections and sets lastSeen automatically
+            ApiInfo apiInfo = new ApiInfo(apiCollectionId, url, URLMethods.Method.fromString(method));
+            apiInfoList.add(apiInfo);
         }
 
-        return writes;
+        return apiInfoList;
     }
 
     private String normalizeUrl(String url) {

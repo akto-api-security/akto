@@ -1,6 +1,7 @@
 package com.akto.fast_discovery;
 
 import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiInfo;
 import com.akto.log.LoggerMaker;
 import com.google.common.base.Charsets;
@@ -29,12 +30,11 @@ public class BloomFilterManager {
     /**
      * Constructor with custom configuration.
      *
-     * @param dataActor          Data access layer (ClientActor or DbActor)
      * @param expectedSize       Expected number of APIs (default: 10,000,000)
      * @param falsePositiveRate  False positive probability (default: 0.01 = 1%)
      */
-    public BloomFilterManager(DataActor dataActor, long expectedSize, double falsePositiveRate) {
-        this.dataActor = dataActor;
+    public BloomFilterManager(long expectedSize, double falsePositiveRate) {
+        this.dataActor = DataActorFactory.fetchInstance();
         this.expectedSize = expectedSize;
         this.falsePositiveRate = falsePositiveRate;
     }
@@ -42,8 +42,8 @@ public class BloomFilterManager {
     /**
      * Constructor with default configuration.
      */
-    public BloomFilterManager(DataActor dataActor) {
-        this(dataActor, 10_000_000L, 0.01);
+    public BloomFilterManager() {
+        this(10_000_000L, 0.01);
     }
 
     /**

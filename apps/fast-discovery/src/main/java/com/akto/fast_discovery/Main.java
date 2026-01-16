@@ -54,7 +54,6 @@ public class Main {
 
             // 2. Initialize Bloom Filter Manager
             BloomFilterManager bloomFilter = new BloomFilterManager(
-                    dataActor,
                     config.bloomFilterExpectedSize,
                     config.bloomFilterFpp
             );
@@ -90,7 +89,6 @@ public class Main {
             // 4. Initialize Fast Discovery Consumer
             FastDiscoveryConsumer consumer = new FastDiscoveryConsumer(
                     bloomFilter,
-                    dataActor,
                     hostnameToCollectionId
             );
             loggerMaker.infoAndAddToDb("FastDiscoveryConsumer initialized");
