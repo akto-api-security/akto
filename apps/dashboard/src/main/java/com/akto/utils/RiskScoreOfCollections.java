@@ -152,7 +152,7 @@ public class RiskScoreOfCollections {
         if(severityScoreMap != null){
             severityScoreMap.forEach((apiInfoKey, severityScore)->{
                 Bson filter = ApiInfoDao.getFilter(apiInfoKey);
-                ApiInfo apiInfo = ApiInfoDao.instance.findOne(filter);
+                ApiInfo apiInfo = ApiInfoDao.instance.getMCollection().find(filter).first();
                 boolean isSensitive = apiInfo != null ? apiInfo.getIsSensitive() : false;
                 float riskScore = ApiInfoDao.getRiskScore(apiInfo, isSensitive, getRiskScoreValueFromSeverityScore(severityScore));
 
@@ -278,7 +278,7 @@ public class RiskScoreOfCollections {
         // create a set for severityScore
         Map<ApiInfoKey, Float> initialSeverityScoreMap = getUpdatedApiInfosMap(0);
         while(count < 100){
-            List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(filter,0, limit, Sorts.descending(ApiInfo.LAST_CALCULATED_TIME), projection);
+            List<ApiInfo> apiInfos = ApiInfoDao.instance.getMCollection().find(filter).sort(Sorts.descending(ApiInfo.LAST_CALCULATED_TIME)).limit(limit).projection(projection).into(new ArrayList<>());
             for(ApiInfo apiInfo: apiInfos){
                 float riskScore = ApiInfoDao.getRiskScore(apiInfo, apiInfo.getIsSensitive(), getRiskScoreValueFromSeverityScore(initialSeverityScoreMap.getOrDefault(apiInfo.getId(), (float) 0)));
                 Bson update = Updates.combine(
