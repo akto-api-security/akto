@@ -31,7 +31,9 @@ import com.akto.util.Constants;
 import com.client9.libinjection.SQLParse;
 import com.akto.util.Pair;
 
+import static com.akto.threat_utils.Utils.cleanThreatUrl;
 import static com.akto.threat_utils.Utils.generateTrie;
+import static com.akto.threat_utils.Utils.isMatchingUrl;
 
 public class ThreatDetector {
 
@@ -84,72 +86,87 @@ public class ThreatDetector {
 
     }
 
-    List<Pair<String, String>> extractParamNameAndValue(HttpResponseParams httpResponseParams) {
-        List<Pair<String, String>> paramNameAndValue = new ArrayList<>();
 
+    public List<Pair<String, String>> getUrlParamNamesAndValues(String url, URLTemplate urlTemplate) {
+        List<Pair<String, String>> paramNameAndValue = new ArrayList<>();
+        String[] urlTokens = url.split("/");
+
+        String[] templateTokens = urlTemplate.getTokens();
+
+        // Extract params where template token is null (parameterized position)
+        for (int i = 0; i < templateTokens.length && i < urlTokens.length; i++) {
+            if (templateTokens[i] == null) {
+                // Param name is the previous static segment, or fallback to type name
+                String paramName;
+                if (i > 0 && templateTokens[i - 1] != null) {
+                    paramName = templateTokens[i - 1];
+                } else {
+                    // Fallback: use the type name if available
+                    paramName = urlTemplate.getTypes()[i] != null
+                            ? urlTemplate.getTypes()[i].name()
+                            : "param" + i;
+                }
+                String paramValue = urlTokens[i];
+                paramNameAndValue.add(new Pair<>(paramName, paramValue));
+            }
+        }
+        return paramNameAndValue;
+    }
+
+    
+    public List<Pair<String, String>> extractParamNameAndValue(HttpResponseParams httpResponseParams){
         AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
         Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates = config.getApiCollectionUrlTemplates();
 
         int apiCollectionId = httpResponseParams.requestParams.getApiCollectionId();
         String url = httpResponseParams.getRequestParams().getURL();
+        String method = httpResponseParams.getRequestParams().getMethod();
 
-        // Normalize URL: remove query params, fragments, and leading/trailing slashes
-        if (url.contains("?")) {
-            url = url.substring(0, url.indexOf("?"));
-        }
-        if (url.contains("#")) {
-            url = url.substring(0, url.indexOf("#"));
-        }
-        if (url.startsWith("/")) {
-            url = url.substring(1);
-        }
-        if (url.endsWith("/")) {
-            url = url.substring(0, url.length() - 1);
-        }
+        // Get matching api template for this static url. 
+        // Example:
+        // threat traffic url: /v1/users/123/?/etc/passwd -> clean this url ->
+        // /v1/users/123
+        // api info templates: /v1/users/INTEGER -> match with cleaned url
+        // TODO: Cache already matched templates
+        URLTemplate urlTemplate = isMatchingUrl(apiCollectionId, url, method, apiCollectionUrlTemplates, lfiTrie,
+                osCommandInjectionTrie, ssrfTrie);
 
-        // Get templates for this collection
-        List<URLTemplate> urlTemplates = apiCollectionUrlTemplates.get(apiCollectionId);
-        if (urlTemplates == null || urlTemplates.isEmpty()) {
-            return paramNameAndValue;
+        // no matching template was found.
+        if (urlTemplate == null) {
+            return new ArrayList<>();
         }
 
-        // Find matching template and extract params
-        String[] urlTokens = url.split("/");
-        for (URLTemplate template : urlTemplates) {
-            if (template.matchTokens(urlTokens)) {
-                String[] templateTokens = template.getTokens();
+        url = cleanThreatUrl(url, lfiTrie, osCommandInjectionTrie, ssrfTrie);
 
-                // Extract params where template token is null (parameterized position)
-                for (int i = 0; i < templateTokens.length && i < urlTokens.length; i++) {
-                    if (templateTokens[i] == null) {
-                        // Param name is the previous static segment, or fallback to type name
-                        String paramName;
-                        if (i > 0 && templateTokens[i - 1] != null) {
-                            paramName = templateTokens[i - 1];
-                        } else {
-                            // Fallback: use the type name if available
-                            paramName = template.getTypes()[i] != null
-                                ? template.getTypes()[i].name()
-                                : "param" + i;
-                        }
-                        String paramValue = urlTokens[i];
-                        paramNameAndValue.add(new Pair<>(paramName, paramValue));
-                    }
-                }
-                break; // Found a match, stop searching
+        return getUrlParamNamesAndValues(url, urlTemplate);
+
+    }
+    public boolean isParamEnumerationThreat(HttpResponseParams httpResponseParams) {
+        List<Pair<String, String>> paramNamesAndValues = extractParamNameAndValue(httpResponseParams);
+        
+        String url = httpResponseParams.getRequestParams().getURL();
+        String method = httpResponseParams.getRequestParams().getMethod();
+
+        url = cleanThreatUrl(url, lfiTrie, osCommandInjectionTrie, ssrfTrie);
+
+        for(Pair<String, String> paramNameAndValue : paramNamesAndValues){
+            String paramName = paramNameAndValue.getFirst();
+            String paramValue = paramNameAndValue.getSecond();
+            boolean isUserEnumAttack = ParamEnumerationDetector.getInstance().recordAndCheck(
+                httpResponseParams.getSourceIP(),
+                httpResponseParams.requestParams.getApiCollectionId(), 
+                method,
+                url, 
+                paramName,
+                paramValue
+            );
+
+            if(isUserEnumAttack){
+                return true;
             }
         }
 
-        return paramNameAndValue;
-    }
-
-    public boolean isParamEnumerationThreat(HttpResponseParams httpResponseParams) {
-        String path = httpResponseParams.getRequestParams().getURL();
-        String method = httpResponseParams.getRequestParams().getMethod();
-        return ParamEnumerationDetector.getInstance().recordAndCheck(httpResponseParams.getSourceIP(),
-                httpResponseParams.requestParams.getApiCollectionId(), method,
-                path, "test",
-                "test");
+        return false;
     }
 
     public boolean isSuccessfulExploit(List<FilterConfig> successfulExploitFilters,

@@ -268,6 +268,40 @@ class ExtractParamNameAndValueTest {
         assertThat(result.get(0).getSecond()).isEqualTo("999");
     }
 
+    @Test
+    void testConsecutiveParams_secondParamUsesTypeName() {
+        // Template: /api/INTEGER/INTEGER (consecutive params)
+        // When previous token is also null, should fallback to type name
+        URLTemplate template = RuntimeUtil.createUrlTemplate("/api/INTEGER/INTEGER", URLMethods.Method.GET);
+        setupTestConfig(createTemplateMap(123, template));
+
+        HttpResponseParams responseParam = createResponseParam("/api/123/456", 123);
+
+        List<Pair<String, String>> result = threatDetector.extractParamNameAndValue(responseParam);
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).getFirst()).isEqualTo("api");       // Previous static segment
+        assertThat(result.get(0).getSecond()).isEqualTo("123");
+        assertThat(result.get(1).getFirst()).isEqualTo("INTEGER");   // Fallback to type name
+        assertThat(result.get(1).getSecond()).isEqualTo("456");
+    }
+
+    @Test
+    void testThreeConsecutiveParams() {
+        // Template: /INTEGER/STRING/INTEGER (all params)
+        URLTemplate template = RuntimeUtil.createUrlTemplate("/INTEGER/STRING/INTEGER", URLMethods.Method.GET);
+        setupTestConfig(createTemplateMap(123, template));
+
+        HttpResponseParams responseParam = createResponseParam("/111/abc/333", 123);
+
+        List<Pair<String, String>> result = threatDetector.extractParamNameAndValue(responseParam);
+
+        assertThat(result).hasSize(3);
+        assertThat(result.get(0).getFirst()).isEqualTo("INTEGER");  // No previous, fallback to type
+        assertThat(result.get(1).getFirst()).isEqualTo("STRING");   // Previous is null, fallback to type
+        assertThat(result.get(2).getFirst()).isEqualTo("INTEGER");  // Previous is null, fallback to type
+    }
+
     // ==================== Multiple Templates ====================
 
     @Test
