@@ -990,18 +990,20 @@ const AgenticDashboard = () => {
                                 tooltipContent="Monitor and manage your agentic processes from this centralized dashboard. View real-time status, logs, and performance metrics to ensure optimal operation."
                                 docsUrl="https://docs.akto.io/agentic-ai/agentic-dashboard"
                             />
-                            <Dropdown
-                                menuItems={[
-                                    {label: 'CISO', value: 'ciso'}
-                                ]}
-                                selected={setViewMode}
-                                initial={viewMode}
-                            />
+                            <Box style={{ display: 'none' }}>
+                                <Dropdown
+                                    menuItems={[
+                                        {label: 'CISO', value: 'ciso'}
+                                    ]}
+                                    selected={setViewMode}
+                                    initial={viewMode}
+                                />
+                            </Box>
                         </HorizontalStack>
                     }
                     primaryAction={<HorizontalStack gap={2}>
                         {componentsMenu}
-                        <Button icon={SettingsFilledMinor} onClick={() => {}}>Owner setting</Button>
+                        <Button icon={SettingsFilledMinor} onClick={() => {}} style={{ display: 'none' }}>Owner setting</Button>
                     </HorizontalStack>}
                     secondaryActions={[<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />]}
                     components={[
