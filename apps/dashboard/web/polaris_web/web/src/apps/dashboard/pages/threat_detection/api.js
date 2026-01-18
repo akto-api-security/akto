@@ -262,6 +262,13 @@ const threatDetectionRequests = {
             method: 'post',
             data: {}
         })
+    },
+    getIpReputationScore(ipAddress) {
+        return request({
+            url: '/api/getIpReputationScore',
+            method: 'post',
+            data: { ipAddress }
+        })
     }
 }
 export default threatDetectionRequests

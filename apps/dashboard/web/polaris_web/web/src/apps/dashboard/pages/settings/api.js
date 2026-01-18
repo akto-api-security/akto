@@ -300,6 +300,30 @@ const settingRequests = {
         })
     },
 
+    fetchJiraPriorities() {
+        return request({
+            url: '/api/jira/fetchPriorities',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    saveSeverityMapping(severityToPriorityMap) {
+        return request({
+            url: '/api/jira/saveSeverityMapping',
+            method: 'post',
+            data: {severityToPriorityMap}
+        })
+    },
+
+    fetchSeverityMapping() {
+        return request({
+            url: '/api/jira/fetchSeverityMapping',
+            method: 'post',
+            data: {}
+        })
+    },
+
     addOktaSso(clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri) {
         return request({
             url: '/api/addOktaSso',
@@ -837,6 +861,13 @@ const settingRequests = {
             url: '/api/rebootModules',
             method: 'post',
             data: {moduleIds, deleteTopicAndReboot}
+        })
+    },
+    updateModuleEnvAndReboot(moduleId, moduleName, envData) {
+        return request({
+            url: '/api/updateModuleEnvAndReboot',
+            method: 'post',
+            data: {moduleId, moduleName, envData}
         })
     }
 }

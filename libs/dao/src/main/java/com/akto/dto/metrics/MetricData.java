@@ -62,7 +62,14 @@ public class MetricData {
         CYBORG_CALL_COUNT("Cyborg Call Count", "Number of calls made to Cyborg"),
         CYBORG_DATA_SIZE("Cyborg Data Size", "Total size of data processed by Cyborg"),
 
-        DATA_INGESTION_API_COUNT("APIs Ingested", "Number of APIs ingested by data ingestion service");
+        DATA_INGESTION_API_COUNT("APIs Ingested", "Number of APIs ingested by data ingestion service"),
+
+        // Infrastructure metrics (CPU, Memory, Threads)
+        CPU_USAGE_PERCENT("CPU Usage", "Process CPU usage percentage"),
+        HEAP_MEMORY_USED_MB("Heap Memory Used", "JVM heap memory currently in use (MB)"),
+        HEAP_MEMORY_MAX_MB("Heap Memory Max", "Maximum JVM heap memory available (MB)"),
+        NON_HEAP_MEMORY_USED_MB("Non-Heap Memory Used", "JVM non-heap memory currently in use (MB)"),
+        THREAD_COUNT("Thread Count", "Number of live threads in the JVM");
 
         private final String descriptionName;
         private final String description;

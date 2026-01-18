@@ -155,10 +155,9 @@ public class UsersCollectionsList {
                     Filters.or(
                         Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
                         Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG))
-                    ));
-                if (isDemoAccount()) {
-                    finalFilter = Filters.and(finalFilter, Filters.nor(getEndpointSourceFilter()));
-                }
+                    ),
+                    Filters.nor(getEndpointSourceFilter())
+                );
                 break;
             case DAST:
                 finalFilter = Filters.and(
@@ -193,6 +192,6 @@ public class UsersCollectionsList {
 
     public static boolean isDemoAccount() {
         Integer accountId = Context.accountId.get();
-        return accountId == 1669322524;
+        return accountId == 1669322524 || accountId == 1767814409 || accountId == 1767812031;
     }
 }

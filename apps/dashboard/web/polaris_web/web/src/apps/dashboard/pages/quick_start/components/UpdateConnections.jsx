@@ -8,6 +8,8 @@ import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo';
 import FlyLayout from '../../../components/layouts/FlyLayout';
 import { useSearchParams } from 'react-router-dom';
 import func from "@/util/func"
+import EndpointShieldCard from './EndpointShieldCard';
+import { isEndpointSecurityCategory } from '@/apps/main/labelHelper';
 
 function UpdateConnections(props) {
 
@@ -55,6 +57,16 @@ function UpdateConnections(props) {
         currentCardObj ? currentCardObj.component : null
     ]
 
+    const handleInstallEndpointShield = () => {
+        func.updateQueryParams(searchParams, setSearchParams, "connector", encodeURIComponent("mcp_endpoint_shield"))
+    };
+
+    const handleSeeDocsEndpointShield = () => {
+        window.open('https://docs.akto.io/mcp-endpoint-shield', '_blank');
+    };
+
+    const showRecommendedSetup = !func.checkLocal() && isEndpointSecurityCategory();
+
     return (
         <Page 
             fullWidth
@@ -66,7 +78,17 @@ function UpdateConnections(props) {
         >
             <div>
                 <VerticalStack gap="8">
-                    {Object.keys(obj).map((key, index) => {
+                    {showRecommendedSetup && (
+                        <VerticalStack gap="4">
+                            <Text variant="headingMd" as="h6">Recommended setup</Text>
+                            <Divider />
+                            <EndpointShieldCard
+                                onInstall={handleInstallEndpointShield}
+                                onSeeDocs={handleSeeDocsEndpointShield}
+                            />
+                        </VerticalStack>
+                    )}
+                    {Object.keys(obj).filter(key => key !== "").map((key, index) => {
                         return (
                             <VerticalStack gap="4" key={key}>
                             <HorizontalStack gap={"3"}>
@@ -74,9 +96,9 @@ function UpdateConnections(props) {
                                 <Tag>{obj[key].length.toString()}</Tag>
                             </HorizontalStack>
                             <Divider/>
-                            <GridRows CardComponent={RowCard} columns="3" 
-                            items={obj[key]} buttonText="Connect" onButtonClick={onButtonClick}     
-                            changedColumns={newCol} 
+                            <GridRows CardComponent={RowCard} columns="3"
+                            items={obj[key]} buttonText="Connect" onButtonClick={onButtonClick}
+                            changedColumns={newCol}
                             />
                             </VerticalStack>
                         )

@@ -50,8 +50,9 @@ export default function Header() {
         if (window.beamer_config) {
             const isOnPrem = window.DASHBOARD_MODE === 'ON_PREM';
             const isAgentic = dashboardCategory === 'Agentic Security';
+            const isEndpoint = dashboardCategory === 'Endpoint Security';
 
-            const productId = isAgentic
+            const productId = (isAgentic || isEndpoint)
                 ? (isOnPrem ? 'shUignSe80215' : 'ijUqfdSQ80078')
                 : (isOnPrem ? 'rggteHBr72897' : 'cJtNevEq80216');
 
@@ -60,6 +61,7 @@ export default function Header() {
             if (window.beamer_config.product_id !== productId || window.beamer_config.filter !== filterTag) {
                 window.beamer_config.product_id = productId;
                 window.beamer_config.filter = filterTag;
+                window.beamer_config.selector = '#beamer-btn';
                 if (window.Beamer) {
                     window.Beamer.destroy();
                     window.Beamer.init();
@@ -67,6 +69,12 @@ export default function Header() {
             }
         }
     }, [dashboardCategory]);
+
+    const handleBeamerClick = useCallback(() => {
+        if (window.Beamer) {
+            window.Beamer.show();
+        }
+    }, []);
 
 
     const logoSrc = dashboardCategory === "Agentic Security" ? "/public/white_logo.svg" : "/public/akto_name_with_logo.svg";
@@ -187,8 +195,12 @@ export default function Header() {
         LocalStore.getState().setCategoryMap({});
         LocalStore.getState().setSubCategoryMap({});
         SessionStore.getState().setThreatFiltersMap({});
+        PersistStore.getState().setFiltersMap({});
         setDashboardCategory(value);
-        navigate("/dashboard/observe/inventory");
+        const targetPath = value === "Endpoint Security"
+            ? "/dashboard/observe/agentic-assets"
+            : "/dashboard/observe/inventory";
+        navigate(targetPath);
         navigate(0);
     }
 
@@ -283,14 +295,11 @@ export default function Header() {
                 </div>
             </div> */}
 
-            <TopBar.Menu
-                activatorContent={
-                    <span id="beamer-btn" className={getColorForIcon()}>
-                        <Icon source={NotificationMajor} />
-                    </span>
-                }
-                actions={[]}
-            />
+            <Button id="beamer-btn" plain monochrome onClick={handleBeamerClick}>
+                <span className={getColorForIcon()}>
+                    <Icon source={NotificationMajor} />
+                </span>
+            </Button>
             <TopBar.Menu
                 activatorContent={
                     <span style={{ cursor: 'pointer' }} onClick={() => navigate("/dashboard/settings/about")}>
@@ -320,16 +329,16 @@ export default function Header() {
                                         { value: "API Security", label: "API Security", id: "api-security" },
                                         {
                                             value: "Agentic Security",
-                                            label: func.isDemoAccount() ? "Akto ARGUS" : "Agentic Security",
+                                            label: "Akto ARGUS",
                                             id: "agentic-security",
-                                            helpText: func.isDemoAccount() ? "Agentic AI Security for Homegrown AI" : undefined
+                                            helpText: "Agentic AI Security for Homegrown AI"
                                         },
-                                        ...(func.isDemoAccount() ? [{
+                                        {
                                             value: "Endpoint Security",
                                             label: "Akto ATLAS",
                                             id: "endpoint-security",
                                             helpText: "Agentic AI Security for Employee Endpoints"
-                                        }] : []),
+                                        },
                                         { value: "DAST", label: "DAST", id: "dast" },
                                     ]}
                                     initial={dropdownInitial}

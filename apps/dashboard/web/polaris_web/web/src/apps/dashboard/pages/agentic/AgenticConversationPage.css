@@ -1,0 +1,140 @@
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -1000px 0;
+    }
+    100% {
+        background-position: 1000px 0;
+    }
+}
+
+@keyframes pulseFade {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Scoped styles for agentic pages only - using ask-ai-route class from Dashboard */
+.ask-ai-route .Polaris-Page {
+    min-height: 100vh;
+    background: radial-gradient(68.5% 70.87% at 49.29% 41.78%, #FAFAFA 27.4%, #FAFAFA 54.33%, #F9F6FF 69.17%, #FFF 86.54%, #F0FAFF 98.08%);
+}
+
+.ask-ai-route .Polaris-Page__Content{
+    height: 100%;
+}
+
+
+/* AgenticSearchInput styles */
+.agentic-search-input .Polaris-TextField {
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.agentic-search-input .Polaris-TextField__Input {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 8px !important;
+    background: transparent !important;
+}
+
+.agentic-search-input .Polaris-TextField__Input:focus {
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+.agentic-search-input .Polaris-TextField__Backdrop {
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+}
+
+.agentic-search-input .Polaris-TextField__Backdrop::before,
+.agentic-search-input .Polaris-TextField__Backdrop::after {
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.agentic-history-modal-search .Polaris-TextField {
+    background: #E4E5E7;
+}
+
+.agentic-history-modal-search .Polaris-TextField__Backdrop::before,
+.agentic-history-modal-search .Polaris-TextField__Backdrop::after {
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.agentic-history-modal-search .Polaris-TextField__Backdrop {
+    background-color: #E4E5E7 !important;
+}
+.shimmer-container {
+    position: relative;
+    overflow: hidden;
+}
+
+.shimmer-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 12px;
+    padding: 1px;
+    background: linear-gradient(
+        90deg,
+        rgba(98, 0, 234, 0.67) 0%,
+        rgba(98, 0, 234, 0.67) 40%,
+        rgba(200, 150, 255, 1) 50%,
+        rgba(98, 0, 234, 0.67) 60%,
+        rgba(98, 0, 234, 0.67) 100%
+    );
+    background-size: 200% 100%;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: shimmer 3s linear infinite;
+    pointer-events: none;
+}
+
+/* AgenticThinkingBox styles */
+.thinking-text {
+    color: rgba(190, 190, 191, 1);
+    font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "San Francisco", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    font-size: 12px;
+    font-style: normal;
+    font-weight: 400;
+    animation: pulseFade 2s ease-in-out infinite;
+}
+
+.thinking-item {
+    color: #8C9196;
+    font-feature-settings: 'liga' off, 'clig' off;
+    font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "San Francisco", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    font-size: 10px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: 14px;
+}
+
+.thinking-bullet {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #8C9196;
+    margin-top: 5px;
+    flex-shrink: 0;
+}
