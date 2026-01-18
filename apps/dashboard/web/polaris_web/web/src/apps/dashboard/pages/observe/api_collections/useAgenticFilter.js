@@ -109,24 +109,28 @@ const useAgenticFilter = (normalData) => {
 
             const filteredEndpoints = filteredCollections.reduce((sum, c) => sum + (c.urlsCount || 0), 0);
             
-            // Count unique endpoints (<3> - serviceName) and unique sources (<2> - sourceId)
-            const uniqueServiceNames = new Set();
-            const uniqueSourceIds = new Set();
+            // Count unique values from collection name: <1>.<2>.<3> = <endpoint-id>.<source-id>.<service-name>
+            const uniqueEndpointIds = new Set();   // <1> - endpoint-id
+            const uniqueSourceIds = new Set();     // <2> - source-id  
+            const uniqueServiceNames = new Set();  // <3> - service-name
             filteredCollections.forEach(c => {
-                if (c.serviceName) {
-                    uniqueServiceNames.add(c.serviceName);
+                if (c.endpointId) {
+                    uniqueEndpointIds.add(c.endpointId);
                 }
                 if (c.sourceId) {
                     uniqueSourceIds.add(c.sourceId);
+                }
+                if (c.serviceName) {
+                    uniqueServiceNames.add(c.serviceName);
                 }
             });
 
             setFilteredSummaryData({
                 totalEndpoints: filteredEndpoints,
                 totalCollections: filteredCollections.length,
-                uniqueEndpoints: uniqueServiceNames.size,  // count of unique <3>
-                uniqueSources: uniqueSourceIds.size,       // count of unique <2>
-                uniqueResources: uniqueServiceNames.size   // count of unique <3> for AI Agent
+                uniqueEndpoints: uniqueEndpointIds.size,   // count of unique <1> (endpoint-id)
+                uniqueSources: uniqueSourceIds.size,       // count of unique <2> (source-id)
+                uniqueResources: uniqueServiceNames.size   // count of unique <3> (service-name) for AI Agent
             });
         } else {
             setFilteredSummaryData(null);
