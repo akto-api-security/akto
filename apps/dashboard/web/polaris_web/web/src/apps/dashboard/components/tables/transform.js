@@ -63,8 +63,8 @@ const tableFunc = {
 
         let localFilters = func.prepareFilters(tempData,props.filters);
 
-        // Create cache key based on data length and headers
-        const cacheKey = `${props.data.length}_${props.headers.map(h => h.value).join('_')}`;
+        // Create cache key based on data length, headers, and filter properties
+        const cacheKey = `${props.data.length}_${props.headers.map(h => `${h.value}:${h.filterKey || ''}:${h.filterLabel || ''}`).join('_')}`;
 
         let filtersFromHeaders;
         if (filterChoicesCache.has(cacheKey)) {

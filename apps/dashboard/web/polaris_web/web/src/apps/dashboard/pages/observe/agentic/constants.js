@@ -154,7 +154,6 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
     return Object.values(agents).map(g => ({
         ...g,
         id: `agent-${g.groupKey}`,
-        totalAgenticComponents: g.collections.length,
         endpointsCount: g.endpointIds.size,
         sensitiveInRespTypes: Array.from(g.sensitiveTypes),
         sensitiveSubTypesVal: Array.from(g.sensitiveTypes).join(' ') || '-',
@@ -233,7 +232,6 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
     return Object.values(services).map(g => ({
         ...g,
         id: `service-${g.groupKey}`,
-        totalAgenticComponents: g.collections.length,
         endpointsCount: g.endpointIds.size,
         sensitiveInRespTypes: Array.from(g.sensitiveTypes),
         sensitiveSubTypesVal: Array.from(g.sensitiveTypes).join(' ') || '-',
