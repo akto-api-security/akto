@@ -1521,6 +1521,22 @@ function ApiCollections(props) {
             ? headers.map(h => h.titleWithTooltip ? {...h, title: h.titleWithTooltip} : h) 
             : [...headers];
         
+        // Helper function to move source column after endpoint ID for LLM/MCP
+        const moveSourceColumnAfterEndpointId = (headers) => {
+            const displayNameIdx = headers.findIndex(h => h.value === 'displayNameComp');
+            const endpointIdIdx = headers.findIndex(h => h.value === 'endpointId');
+            
+            if (displayNameIdx !== -1 && endpointIdIdx !== -1 && displayNameIdx < endpointIdIdx) {
+                // Remove displayNameComp from its current position
+                const [displayNameHeader] = headers.splice(displayNameIdx, 1);
+                // Find new endpointId index (it shifted after removal)
+                const newEndpointIdIdx = headers.findIndex(h => h.value === 'endpointId');
+                // Insert after endpointId
+                headers.splice(newEndpointIdIdx + 1, 0, displayNameHeader);
+            }
+            return headers;
+        };
+        
         // Apply filter-type based modifications
         if (activeFilterType === FILTER_TYPES.BROWSER_LLM) {
             // Hide "Total endpoints" column for browser-llm
@@ -1532,6 +1548,8 @@ function ApiCollections(props) {
                 }
                 return h;
             });
+            // Move source column after Endpoint ID
+            modifiedHeaders = moveSourceColumnAfterEndpointId(modifiedHeaders);
         } else if (activeFilterType === FILTER_TYPES.AI_AGENT) {
             // Rename column to "Agentic resource name" with proper filter
             modifiedHeaders = modifiedHeaders.map(h => {
@@ -1551,6 +1569,8 @@ function ApiCollections(props) {
                 }
                 return h;
             });
+            // Move source column after Endpoint ID
+            modifiedHeaders = moveSourceColumnAfterEndpointId(modifiedHeaders);
         }
         return modifiedHeaders;
     };
