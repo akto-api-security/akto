@@ -13,6 +13,7 @@ import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.test_editor.info.InfoParser;
+import com.akto.dao.testing.AgentConversationResultDao;
 import com.akto.dao.testing.DefaultTestSuitesDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.Account;
@@ -28,6 +29,7 @@ import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.AgentConversationResult;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
@@ -42,6 +44,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.RequiredConfigs;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
+import com.akto.test_editor.TestingUtilsSingleton;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.testing.TestExecutor;
 import com.akto.testing.Utils;
@@ -57,6 +60,10 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 
+import lombok.Getter;
+import lombok.Setter;
+
+import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -92,6 +99,8 @@ public class SaveTestEditorAction extends UserAction {
     private HashMap<String, Integer> testCountMap;
     private String testingRunPlaygroundHexId;
     private State testingRunPlaygroundStatus;
+    @Getter @Setter
+    private String testRoleId;
 
     public String fetchTestingRunResultFromTestingRun() {
         if (testingRunHexId == null) {
@@ -134,6 +143,7 @@ public class SaveTestEditorAction extends UserAction {
             ObjectMapper mapper = new ObjectMapper(YAMLFactory.builder()
             .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
             .disable(YAMLGenerator.Feature.SPLIT_LINES)
+            .enable(YAMLGenerator.Feature.ALWAYS_QUOTE_NUMBERS_AS_STRINGS)
             .build());
             mapper.findAndRegisterModules();
             Map<String, Object> config = mapper.readValue(content, Map.class);
@@ -259,6 +269,9 @@ public class SaveTestEditorAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    @Getter
+    List<AgentConversationResult> agentConversationResults;
+
     public String runTestForGivenTemplate() {
         TestExecutor executor = new TestExecutor();
         TestConfig testConfig;
@@ -291,6 +304,8 @@ public class SaveTestEditorAction extends UserAction {
             addActionError("sampleDataList is empty");
             return ERROR.toUpperCase();
         }
+
+        TestingUtilsSingleton.init();
 
         Account account = AccountsDao.instance.findOne(Filters.eq(Constants.ID, Context.accountId.get()));
         ApiInfo.ApiInfoKey infoKey = new ApiInfo.ApiInfoKey(apiInfoKey.getInt(ApiInfo.ApiInfoKey.API_COLLECTION_ID),
@@ -360,11 +375,22 @@ public class SaveTestEditorAction extends UserAction {
         int lastSampleIndex = sampleDataList.get(0).getSamples().size() - 1;
         
         TestingRunConfig testingRunConfig = new TestingRunConfig();
+        testingRunConfig.setTestRoleId(testRoleId);
         List<String> samples = testingUtil.getSampleMessages().get(infoKey);
         TestingRunResult testingRunResult = Utils.generateFailedRunResultForMessage(null, infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory(), null,samples , null);
         if(testingRunResult == null){
             String sample = samples.get(samples.size() - 1);
             testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, testingRunConfig, true, testLogs, sample);
+            String conversationId = null;
+            if(testingRunResult != null){
+                if(testingRunResult.getTestResults().get(0) instanceof TestResult){
+                    TestResult testResult = (TestResult) testingRunResult.getTestResults().get(0);
+                    conversationId = testResult.getConversationId();
+                }
+                if(!StringUtils.isEmpty(conversationId)){
+                    agentConversationResults = AgentConversationResultDao.instance.findAll(Filters.eq("conversationId", conversationId));
+                }
+            }
         }
         if (testingRunResult == null) {
             testingRunResult = new TestingRunResult(
@@ -665,6 +691,7 @@ public class SaveTestEditorAction extends UserAction {
             CommonTemplateDao.instance.updateOne(
                     Filters.eq(Constants.ID, COMMON_TEST_TEMPLATE),
                     Updates.combine(updates));
+            YamlTemplateDao.instance.clearCommonWordListMapForAccount();
 
         } catch (Exception e) {
             e.printStackTrace();

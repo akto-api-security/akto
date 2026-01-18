@@ -1,7 +1,12 @@
 import { Card, VerticalStack, Button, Box, Avatar, Text } from '@shopify/polaris'
-import React from 'react'
+import func from '../../../../../../util/func';
 
-function AddOnComponenet() {
+function AddOnComponenet({featureLabel, featureComponent}) {
+
+    if(featureLabel && featureComponent && func.checkForFeatureSaas(featureLabel)){
+        return featureComponent;
+    }
+
   return (
       <div className='card-items'>
            <Card background="bg-subdued">
@@ -16,7 +21,7 @@ function AddOnComponenet() {
                 <Box paddingBlockStart={3}>
                     <Button primary onClick={
                         () => {
-                        window.open("https://calendly.com/ankita-akto/akto-demo", "_blank");
+                        window.open("https://www.akto.io/demo", "_blank");
                     }
                 }>
                     Contact Us

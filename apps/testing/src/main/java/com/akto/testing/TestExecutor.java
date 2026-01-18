@@ -17,6 +17,7 @@ import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dao.testing.config.TestSuiteDao;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomAuthType;
@@ -60,6 +61,8 @@ import com.akto.dto.testing.WorkflowTestingEndpoints;
 import com.akto.dto.testing.WorkflowUpdatedSampleData;
 import com.akto.dto.testing.YamlTestResult;
 import com.akto.dto.testing.info.SingleTestPayload;
+import com.akto.dto.test_run_findings.TestingIssuesId;
+import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -69,6 +72,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
+import com.akto.test_editor.TestingUtilsSingleton;
 import com.akto.test_editor.execution.Build;
 import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.execution.VariableResolver;
@@ -81,6 +85,7 @@ import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.akto.util.enums.GlobalEnums.Severity;
+import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.util.enums.LoginFlowEnums;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
@@ -90,6 +95,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.WriteConcern;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
 import java.net.URI;
@@ -319,7 +325,8 @@ public class TestExecutor {
         ConcurrentHashMap<String, String> subCategoryEndpointMap = new ConcurrentHashMap<>();
         Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();
 
-        TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests());
+        TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests(), testingRun.getDoNotMarkIssuesAsFixed());
+        TestingUtilsSingleton.init();
 
         if(!shouldInitOnly){
             int maxThreads = Math.min(testingRunSubCategories.size(), 500);
@@ -427,6 +434,7 @@ public class TestExecutor {
                                     break;
                                 }
                                 if(Context.now() - prevCalcTime > relaxingTime){
+                                    Main.sendSlackAlertForFailedTest(accountId, "Relaxing time reached in case of old testing => " + relaxingTime + " minutes, stopping tests with count left: " + totalTestsToBeExecuted.get());
                                     loggerMaker.infoAndAddToDb("Relaxing time reached => " + relaxingTime + " minutes, stopping tests with count left: " + totalTestsToBeExecuted.get());
                                     break;
                                 }                               
@@ -1092,6 +1100,60 @@ public class TestExecutor {
             }
         }
 
+        // Check if user has manually updated severity for this issue in a previous test run
+        // TestingRunIssues collection is the single source of truth - it has one entry per unique issue
+        if (vulnerable) {
+            try {
+                TestingIssuesId issuesId = new TestingIssuesId(
+                    apiInfoKey,
+                    TestErrorSource.AUTOMATED_TESTING,
+                    testSubType
+                );
+
+                // Fetch the existing issue from DB (latest state)
+                TestingRunIssues existingIssue = TestingRunIssuesDao.instance.findOne(
+                    Filters.eq(Constants.ID, issuesId),
+                    Projections.include(
+                        TestingRunIssues.KEY_SEVERITY,
+                        TestingRunIssues.LAST_UPDATED_BY
+                    )
+                );
+
+                // If issue exists and was manually updated by a user, use their preferred severity
+                if (existingIssue != null && existingIssue.getLastUpdatedBy() != null &&
+                    !existingIssue.getLastUpdatedBy().isEmpty() &&
+                    testResults.getTestResults() != null && !testResults.getTestResults().isEmpty()) {
+
+                    // Get the current severity from test result (before applying user preference)
+                    Confidence templateDetectedSeverity = testResults.getTestResults().get(0).getConfidence();
+
+                    Severity userPreferredSeverity = existingIssue.getSeverity();
+                    Confidence userPreferredConfidence = Confidence.valueOf(userPreferredSeverity.toString());
+
+                    // Log the override with details
+                    if (!templateDetectedSeverity.toString().equals(userPreferredSeverity.toString())) {
+                        loggerMaker.infoAndAddToDb(String.format(
+                            "Severity override detected for %s : %s | Template detected: %s, User preference: %s (set by: %s) | Applying user preference: %s",
+                            apiInfoKey, testSubType, templateDetectedSeverity, userPreferredSeverity,
+                            existingIssue.getLastUpdatedBy(), userPreferredSeverity
+                        ), LogDb.TESTING);
+                    } else {
+                        loggerMaker.debugAndAddToDb("User's preferred severity " + userPreferredSeverity +
+                            " matches template severity for " + apiInfoKey + " : " + testSubType, LogDb.TESTING);
+                    }
+
+                    // Apply user's preferred severity to all test results
+                    for (GenericTestResult testResult: testResults.getTestResults()) {
+                        if (testResult != null) {
+                            testResult.setConfidence(userPreferredConfidence);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error checking for manual severity preference: " + e.getMessage(), LogDb.TESTING);
+            }
+        }
+
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
 
         int confidencePercentage = 100;
@@ -1143,6 +1205,12 @@ public class TestExecutor {
         String url = apiInfoKey.getUrl();
         if (!url.toLowerCase().contains("graphql") || (!url.toLowerCase().contains("query") && !url.toLowerCase().contains("mutation"))) {
             return false;
+        }
+
+        // Remove extensions from payload for specific account
+        Integer currentAccountId = Context.accountId.get();
+        if (currentAccountId != null && currentAccountId == 1758787662) {
+            removeExtensionsFromGraphQL(rawApi);
         }
 
         String queryName;
@@ -1206,6 +1274,47 @@ public class TestExecutor {
             return true;
         } catch (Exception e) {
             throw new Exception("Error while modifying graphQL payload");
+        }
+    }
+
+    private void removeExtensionsFromGraphQL(RawApi rawApi) {
+        try {
+            // Remove extensions from request body
+            String body = rawApi.getRequest().getBody();
+            if (body != null && !body.trim().isEmpty()) {
+                try {
+                    Object bodyObj = JSON.parse(body);
+                    if (bodyObj instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> bodyMap = (Map<String, Object>) bodyObj;
+                        if (bodyMap.containsKey("extensions")) {
+                            bodyMap.remove("extensions");
+                            rawApi.getRequest().setBody(gson.toJson(bodyMap));
+                        }
+                    } else if (bodyObj instanceof Object[]) {
+                        // Handle array of GraphQL requests
+                        Object[] bodyArray = (Object[]) bodyObj;
+                        boolean modified = false;
+                        for (Object item : bodyArray) {
+                            if (item instanceof Map) {
+                                @SuppressWarnings("unchecked")
+                                Map<String, Object> itemMap = (Map<String, Object>) item;
+                                if (itemMap.containsKey("extensions")) {
+                                    itemMap.remove("extensions");
+                                    modified = true;
+                                }
+                            }
+                        }
+                        if (modified) {
+                            rawApi.getRequest().setBody(gson.toJson(bodyArray));
+                        }
+                    }
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error removing extensions from GraphQL body: " + e.getMessage(), LogDb.TESTING);
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in removeExtensionsFromGraphQL: " + e.getMessage(), LogDb.TESTING);
         }
     }
 

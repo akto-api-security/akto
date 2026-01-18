@@ -40,14 +40,21 @@ export default {
         });
         return resp;
     },
-    async updateAuditData(hexId, remarks) {
-            const resp = await request({
-                url: '/api/updateAuditData',
-                method: 'post',
-                data: { hexId, remarks }
-            });
-            return resp;
-        },
+    async updateAuditData(hexId, remarks, approvalData = null) {
+        const data = { hexId };
+        if (approvalData) {
+            data.approvalData = approvalData;
+        } else {
+            data.remarks = remarks;
+        }
+        
+        const resp = await request({
+            url: '/api/updateAuditData',
+            method: 'post',
+            data: data
+        });
+        return resp;
+    },
 
     async fetchDataTypeNames() {
         const resp = await request({
@@ -581,20 +588,20 @@ export default {
             data: {}
         })
     },
-    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceName, selectedSlackWebhook, autoTicketingDetails) {
+    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceName, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceName, selectedSlackWebhook, autoTicketingDetails}
+            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceName, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed}
         }).then((resp) => {
             return resp
         })
     },
-    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceName, selectedSlackWebhook, autoTicketingDetails) {
+    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceName, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceName, selectedSlackWebhook, autoTicketingDetails}
+            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceName, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed}
         }).then((resp) => {
             return resp
         })        
@@ -713,12 +720,13 @@ export default {
             }
         })
     },
-    async getEndpointsListFromConditions(conditions) {
+    async getEndpointsListFromConditions(conditions, skipTagsMismatch = false) {
         return await request({
             url: '/api/getEndpointsListFromConditions',
             method: 'post',
             data: {
-                conditions
+                conditions,
+                skipTagsMismatch
             }
         }).then((resp) => {
             return resp
@@ -740,14 +748,6 @@ export default {
             data: {
                 apiCollectionId, url, method
             }
-        })
-    },
-
-    async getSensitiveInfoForCollections(){
-        return await request({
-            url: '/api/getSensitiveInfoForCollections',
-            method: 'post',
-            data:{},
         })
     },
 
@@ -805,6 +805,13 @@ export default {
             url: '/api/deMergeApi',
             method: 'post',
             data: {apiCollectionId, url, method}
+        })
+    },
+    async bulkDeMergeApis(apiInfoKeyList){
+        return await request({
+            url: '/api/bulkDeMergeApis',
+            method: 'post',
+            data: {apiInfoKeyList}
         })
     },
     async getUserEndpoints(){
@@ -960,6 +967,24 @@ export default {
             }
         })
         return resp
+    },
+
+    async fetchMcpToolsApiCalls(apiCollectionId) {
+        const resp = await request({
+            url: '/api/fetchMcpToolsApiCalls',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId
+            }
+        })
+        return resp
+    },
+
+    getAllIconsCache(){
+        return request({
+            url: '/api/getAllIconsCache',
+            method: 'get'
+        })
     }
 
 }

@@ -1,10 +1,9 @@
 package com.akto.threat.backend.service;
 
-import com.akto.dao.MCollection;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.log.LoggerMaker;
-import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsResponse;
@@ -22,17 +21,16 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorResponse.ActivityData;
-import com.akto.ProtoMessageUtils;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataResponse;
 import com.akto.threat.backend.constants.MongoDBCollection;
+import com.akto.threat.backend.dao.MaliciousEventDao;
+import com.akto.threat.backend.utils.ThreatUtils;
 import com.akto.threat.backend.db.ActorInfoModel;
 import com.akto.threat.backend.dto.RateLimitConfigDTO;
+import com.akto.util.ThreatDetectionConstants;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
-import com.akto.threat.backend.db.MaliciousEventModel.EventType;
-import com.akto.threat.backend.utils.ThreatUtils;
-import com.google.protobuf.TextFormat;
 import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.Sorts;
 
@@ -48,17 +46,20 @@ import org.bson.conversions.Bson;
 public class ThreatActorService {
 
   private final MongoClient mongoClient;
+  private final MaliciousEventDao maliciousEventDao;
+  private final com.akto.threat.backend.dao.ThreatConfigurationDao threatConfigurationDao = com.akto.threat.backend.dao.ThreatConfigurationDao.instance;
+  private final com.akto.threat.backend.dao.SplunkIntegrationDao splunkIntegrationDao = com.akto.threat.backend.dao.SplunkIntegrationDao.instance;
+  private final com.akto.threat.backend.dao.ActorInfoDao actorInfoDao = com.akto.threat.backend.dao.ActorInfoDao.instance;
   private static final LoggerMaker loggerMaker = new LoggerMaker(ThreatActorService.class, LoggerMaker.LogDb.THREAT_DETECTION);
 
-  public ThreatActorService(MongoClient mongoClient) {
+  public ThreatActorService(MongoClient mongoClient, MaliciousEventDao maliciousEventDao) {
     this.mongoClient = mongoClient;
+    this.maliciousEventDao = maliciousEventDao;
   }
 
   public ThreatConfiguration fetchThreatConfiguration(String accountId) {
     ThreatConfiguration.Builder builder = ThreatConfiguration.newBuilder();
-    MongoCollection<Document> coll = this.mongoClient
-        .getDatabase(accountId)
-        .getCollection(MongoDBCollection.ThreatDetection.THREAT_CONFIGURATION, Document.class);
+    MongoCollection<Document> coll = this.threatConfigurationDao.getCollection(accountId);
     Document doc = coll.find().first();
     if (doc != null) {
         // Handle actor configuration
@@ -85,19 +86,30 @@ public class ThreatActorService {
         if (rateLimitConfig != null) {
             builder.setRatelimitConfig(rateLimitConfig);
         }
+        
+        // Handle archivalDays
+        Object archivalDaysObj = doc.get("archivalDays");
+        if (archivalDaysObj instanceof Number) {
+            int archivalDays = ((Number) archivalDaysObj).intValue();
+            builder.setArchivalDays(archivalDays);
+        }
+
+        // Handle archivalEnabled
+        Object archivalEnabledObj = doc.get("archivalEnabled");
+        if (archivalEnabledObj instanceof Boolean) {
+            boolean archivalEnabled = (Boolean) archivalEnabledObj;
+            builder.setArchivalEnabled(archivalEnabled);
+        }
     }
     return builder.build();
 }
 
   public ThreatConfiguration modifyThreatConfiguration(String accountId, ThreatConfiguration updatedConfig) {
     ThreatConfiguration.Builder builder = ThreatConfiguration.newBuilder();
-    MongoCollection<Document> coll =
-        this.mongoClient
-            .getDatabase(accountId)
-            .getCollection(MongoDBCollection.ThreatDetection.THREAT_CONFIGURATION, Document.class);
+    MongoCollection<Document> coll = this.threatConfigurationDao.getCollection(accountId);
 
     Document newDoc = new Document();
-    
+
     // Prepare a list of actorId documents
     if (updatedConfig.hasActor()) {
         List<Document> actorIdDocs = new ArrayList<>();
@@ -112,7 +124,7 @@ public class ThreatActorService {
         }
         newDoc.append("actor", actorIdDocs);
     }
-    
+
     // Prepare rate limit config documents using DTO
     if (updatedConfig.hasRatelimitConfig()) {
         Document ratelimitConfigDoc = RateLimitConfigDTO.toDocument(updatedConfig.getRatelimitConfig());
@@ -120,7 +132,15 @@ public class ThreatActorService {
             newDoc.append("ratelimitConfig", ratelimitConfigDoc.get("ratelimitConfig"));
         }
     }
-    
+
+    // Handle archivalDays - only update if explicitly set (> 0)
+    if (updatedConfig.getArchivalDays() > 0) {
+        newDoc.append("archivalDays", updatedConfig.getArchivalDays());
+    }
+
+    // Note: archivalEnabled is now handled by separate endpoint /toggle_archival_enabled
+    // This prevents other config updates from accidentally resetting it
+
     Document existingDoc = coll.find().first();
 
     if (existingDoc != null) {
@@ -130,43 +150,71 @@ public class ThreatActorService {
         coll.insertOne(newDoc);
     }
 
-    // Set the actor and ratelimitConfig in the returned proto
+    // Set the actor, ratelimitConfig, and archivalDays in the returned proto
     if (updatedConfig.hasActor()) {
         builder.setActor(updatedConfig.getActor());
     }
     if (updatedConfig.hasRatelimitConfig()) {
         builder.setRatelimitConfig(updatedConfig.getRatelimitConfig());
     }
+    // Read archivalDays from the saved document to return the current value
+    Document savedDoc = coll.find().first();
+    if (savedDoc != null) {
+        Object archivalDaysObj = savedDoc.get("archivalDays");
+        if (archivalDaysObj instanceof Number) {
+            int archivalDays = ((Number) archivalDaysObj).intValue();
+            builder.setArchivalDays(archivalDays);
+        }
+        // archivalEnabled is handled by separate endpoint, but include in response for frontend
+        Object archivalEnabledObj = savedDoc.get("archivalEnabled");
+        if (archivalEnabledObj instanceof Boolean) {
+            boolean archivalEnabled = (Boolean) archivalEnabledObj;
+            builder.setArchivalEnabled(archivalEnabled);
+        }
+    }
     return builder.build();
 }
 
+  public com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ToggleArchivalEnabledResponse toggleArchivalEnabled(
+      String accountId,
+      com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ToggleArchivalEnabledRequest request) {
+
+    MongoCollection<Document> coll = this.threatConfigurationDao.getCollection(accountId);
+    boolean enabled = request.getEnabled();
+
+    Document existingDoc = coll.find().first();
+    Document updateDoc = new Document("$set", new Document("archivalEnabled", enabled));
+
+    if (existingDoc != null) {
+        coll.updateOne(new Document("_id", existingDoc.getObjectId("_id")), updateDoc);
+    } else {
+        // Create new document with just archivalEnabled
+        Document newDoc = new Document("archivalEnabled", enabled);
+        coll.insertOne(newDoc);
+    }
+
+    return com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ToggleArchivalEnabledResponse.newBuilder()
+        .setEnabled(enabled)
+        .build();
+  }
+
     public void deleteAllMaliciousEvents(String accountId) {
         loggerMaker.infoAndAddToDb("Deleting all malicious events for accountId: " + accountId);
-        MongoCollection<Document> coll = this.mongoClient
-                .getDatabase(accountId)
-                .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
-
-        coll.drop();
-        ThreatUtils.createIndexIfAbsent(accountId, mongoClient);
+        maliciousEventDao.getCollection(accountId).drop();
+        ThreatUtils.createIndexIfAbsent(accountId, maliciousEventDao);
         loggerMaker.infoAndAddToDb("Deleted all malicious events for accountId: " + accountId);
     }
 
 
-    public ListThreatActorResponse listThreatActors(String accountId, ListThreatActorsRequest request) {
+    public ListThreatActorResponse listThreatActors(String accountId, ListThreatActorsRequest request, String contextSource) {
         int skip = request.hasSkip() ? request.getSkip() : 0;
         int limit = request.getLimit();
         Map<String, Integer> sort = request.getSortMap();
 
-        MongoCollection<Document> coll = this.mongoClient
-            .getDatabase(accountId)
-            .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
+        boolean isAgenticOrEndpoint = ThreatUtils.isAgenticOrEndpointContext(contextSource);
 
         ListThreatActorsRequest.Filter filter = request.getFilter();
         Document match = new Document();
-
-        if(filter.getLatestAttackList() == null || filter.getLatestAttackList().isEmpty()) {
-            return ListThreatActorResponse.newBuilder().build();
-        }
 
         // Apply filters
         if (!filter.getActorsList().isEmpty()) match.append("actor", new Document("$in", filter.getActorsList()));
@@ -180,20 +228,37 @@ public class ThreatActorService {
             match.append("detectedAt", new Document("$gte", request.getStartTs()).append("$lte", request.getEndTs()));
         }
 
+        // Apply simple context filter (only for ENDPOINT and AGENTIC)
+        Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+        if (!contextFilter.isEmpty()) {
+            match.putAll(contextFilter);
+        }
+
         List<Document> pipeline = new ArrayList<>();
         if (!match.isEmpty()) pipeline.add(new Document("$match", match));
 
         // Sort first for $first to work
         pipeline.add(new Document("$sort", new Document("detectedAt", -1)));
 
-        pipeline.add(new Document("$group", new Document("_id", "$actor")
+        Document groupDoc = new Document("_id", "$actor")
             .append("latestApiEndpoint", new Document("$first", "$latestApiEndpoint"))
             .append("latestApiMethod", new Document("$first", "$latestApiMethod"))
             .append("latestApiIp", new Document("$first", "$latestApiIp"))
+            .append("latestApiHost", new Document("$first", "$host"))
             .append("country", new Document("$first", "$country"))
             .append("discoveredAt", new Document("$first", "$detectedAt"))
-            .append("latestSubCategory", new Document("$first", "$filterId"))
-        ));
+            .append("latestSubCategory", new Document("$first", "$filterId"));
+
+        // Only add metadata field for AGENTIC or ENDPOINT contexts
+        if (isAgenticOrEndpoint) {
+            groupDoc.append("latestMetadata", new Document("$first", "$metadata"));
+        }
+
+        pipeline.add(new Document("$group", groupDoc));
+
+        if (!filter.getHostsList().isEmpty()) {
+            pipeline.add(new Document("$match", new Document("latestApiHost", new Document("$in", filter.getHostsList()))));
+        }
 
         // Facet: count and paginated result
         List<Document> facetStages = Arrays.asList(
@@ -207,7 +272,7 @@ public class ThreatActorService {
             .append("count", Arrays.asList(new Document("$count", "total")))
         ));
 
-        Document result = coll.aggregate(pipeline).first();
+        Document result = maliciousEventDao.aggregateRaw(accountId, pipeline).first();
         List<Document> paginated = result.getList("paginated", Document.class, Collections.emptyList());
         List<Document> countList = result.getList("count", Document.class, Collections.emptyList());
         long total = countList.isEmpty() ? 0 : countList.get(0).getInteger("total");
@@ -218,61 +283,82 @@ public class ThreatActorService {
             String actorId = doc.getString("_id");
             List<ActivityData> activityDataList = new ArrayList<>();
 
-            try (MongoCursor<Document> cursor2 = coll.find(Filters.eq("actor", actorId))
+            // Build activity query with filtering
+            Document activityQuery = new Document("actor", actorId);
+
+            if (!contextFilter.isEmpty()) {
+                activityQuery.putAll(contextFilter);
+            }
+
+            try (MongoCursor<MaliciousEventDto> cursor2 = maliciousEventDao.getCollection(accountId)
+                    .find(activityQuery)
                     .sort(Sorts.descending("detectedAt"))
                     .limit(40)
                     .cursor()) {
                 while (cursor2.hasNext()) {
-                    Document doc2 = cursor2.next();
-                    activityDataList.add(ActivityData.newBuilder()
-                        .setUrl(doc2.getString("latestApiEndpoint"))
-                        .setDetectedAt(doc2.getLong("detectedAt"))
-                        .setSubCategory(doc2.getString("filterId"))
-                        .setSeverity(doc2.getString("severity"))
-                        .setMethod(doc2.getString("latestApiMethod"))
-                        .build());
+                    MaliciousEventDto event = cursor2.next();
+                    ActivityData.Builder activityBuilder = ActivityData.newBuilder()
+                        .setUrl(event.getLatestApiEndpoint())
+                        .setDetectedAt(event.getDetectedAt())
+                        .setSubCategory(event.getFilterId())
+                        .setSeverity(event.getSeverity())
+                        .setMethod(event.getLatestApiMethod().name())
+                        .setHost(event.getHost() != null ? event.getHost() : "");
+
+                    // Only add metadata field for AGENTIC or ENDPOINT contexts
+                    if (isAgenticOrEndpoint) {
+                        activityBuilder.setMetadata(ThreatUtils.fetchMetadataString(event.getMetadata()));
+                    }
+
+                    activityDataList.add(activityBuilder.build());
                 }
             }
 
-            actors.add(ListThreatActorResponse.ThreatActor.newBuilder()
+            ListThreatActorResponse.ThreatActor.Builder actorBuilder = ListThreatActorResponse.ThreatActor.newBuilder()
                 .setId(actorId)
                 .setLatestApiEndpoint(doc.getString("latestApiEndpoint"))
                 .setLatestApiMethod(doc.getString("latestApiMethod"))
                 .setLatestApiIp(doc.getString("latestApiIp"))
+                .setLatestApiHost(doc.getString("latestApiHost") != null ? doc.getString("latestApiHost") : "")
                 .setDiscoveredAt(doc.getLong("discoveredAt"))
                 .setCountry(doc.getString("country"))
                 .setLatestSubcategory(doc.getString("latestSubCategory"))
-                .addAllActivityData(activityDataList)
-                .build());
+                .addAllActivityData(activityDataList);
+
+            // Only add metadata field for AGENTIC or ENDPOINT contexts
+            if (isAgenticOrEndpoint) {
+                actorBuilder.setLatestMetadata(ThreatUtils.fetchMetadataString(doc.getString("latestMetadata")));
+            }
+
+            actors.add(actorBuilder.build());
         }
 
         return ListThreatActorResponse.newBuilder().addAllActors(actors).setTotal(total).build();
     }
 
-  public DailyActorsCountResponse getDailyActorCounts(String accountId, long startTs, long endTs, List<String> latestAttackList) {
-
-      if(latestAttackList == null || latestAttackList.isEmpty()) {
-          return DailyActorsCountResponse.newBuilder().build();
-      }
+  public DailyActorsCountResponse getDailyActorCounts(String accountId, long startTs, long endTs, List<String> latestAttackList, String contextSource) {
 
     List<DailyActorsCountResponse.ActorsCount> actors = new ArrayList<>();
-    MongoCollection<Document> coll = this.mongoClient
-        .getDatabase(accountId)
-        .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
-
         List<Document> pipeline = new ArrayList<>();
 
 
       Document matchConditions = new Document();
 
-      if(latestAttackList != null && !latestAttackList.isEmpty()) {
-          matchConditions.append("filterId", new Document("$in", latestAttackList));
-      }
+    if(latestAttackList != null && !latestAttackList.isEmpty()) {
+        matchConditions.append("filterId", new Document("$in", latestAttackList));
+    }
 
       matchConditions.append("detectedAt", new Document("$lte", endTs));
         if (startTs > 0) {
             matchConditions.get("detectedAt", Document.class).append("$gte", startTs);
         }
+
+    // Apply simple context filter (only for ENDPOINT and AGENTIC)
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    if (!contextFilter.isEmpty()) {
+        matchConditions.putAll(contextFilter);
+    }
+
         pipeline.add(new Document("$match", matchConditions));
     
         pipeline.add(new Document("$project", 
@@ -315,11 +401,11 @@ public class ThreatActorService {
                     new Document("$sum", 
                         new Document("$cond", 
                             Arrays.asList(
-                                new Document("$eq", Arrays.asList("$severity", "HIGH")),
+                                new Document("$eq", Arrays.asList("$severity", "CRITICAL")),
                                 1,
                                 0))))));
-    
-        try (MongoCursor<Document> cursor = coll.aggregate(pipeline).cursor()) {
+
+        try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {
             while (cursor.hasNext()) {
                 Document doc = cursor.next();
                 // Convert dayStart from Date (ms) back to seconds
@@ -337,32 +423,77 @@ public class ThreatActorService {
             }
         }
 
-        return DailyActorsCountResponse.newBuilder().addAllActorsCounts(actors).build();
+        // Calculate summary counts using MaliciousEventDao
+        // Total analysed - count all documents matching the filter
+        long totalAnalysed = maliciousEventDao.getCollection(accountId).countDocuments(matchConditions);
+
+        // Total attacks - count documents with successfulExploit = true
+        long totalAttacks = maliciousEventDao.getCollection(accountId).countDocuments(new Document(matchConditions).append("successfulExploit", true));
+
+        int criticalActorsCount = 0;
+        for (DailyActorsCountResponse.ActorsCount ac : actors) {
+            criticalActorsCount += ac.getCriticalActors();
+        }
+        // Status aggregation for totalActive, totalIgnored, totalUnderReview
+        List<Document> statusPipeline = new ArrayList<>();
+        if (!matchConditions.isEmpty()) {
+            statusPipeline.add(new Document("$match", matchConditions));
+        }
+        // Group by status and actor to get distinct actors per status
+        statusPipeline.add(new Document("$group",
+            new Document("_id", "$status").append("count", new Document("$sum", 1))));
+
+        int totalActive = 0;
+        int totalIgnored = 0;
+        int totalUnderReview = 0;
+        try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, statusPipeline).cursor()) {
+            while (cursor.hasNext()) {
+                Document d = cursor.next();
+                String status = d.getString("_id");
+                int c = d.getInteger("count", 0);
+                if ("ACTIVE".equalsIgnoreCase(status)) {
+                    totalActive = c;
+                } else if (ThreatDetectionConstants.IGNORED.equalsIgnoreCase(status)) {
+                    totalIgnored = c;
+                } else if ("UNDER_REVIEW".equalsIgnoreCase(status)) {
+                    totalUnderReview = c;
+                }
+            }
+        }
+
+        return DailyActorsCountResponse.newBuilder()
+            .addAllActorsCounts(actors)
+            .setTotalAnalysed((int) totalAnalysed)
+            .setTotalAttacks((int) totalAttacks)
+            .setCriticalActorsCount(criticalActorsCount)
+            .setTotalActive(totalActive)
+            .setTotalIgnored(totalIgnored)
+            .setTotalUnderReview(totalUnderReview)
+            .build();
   }
 
-  public ThreatActivityTimelineResponse getThreatActivityTimeline(String accountId, long startTs, long endTs, List<String> latestAttackList) {
-
-      if(latestAttackList == null || latestAttackList.isEmpty()) {
-          return ThreatActivityTimelineResponse.newBuilder().build();
-      }
+  public ThreatActivityTimelineResponse getThreatActivityTimeline(String accountId, long startTs, long endTs, List<String> latestAttackList, String contextSource) {
 
         List<ThreatActivityTimelineResponse.ActivityTimeline> timeline = new ArrayList<>();
         // long sevenDaysInSeconds = TimeUnit.DAYS.toSeconds(7);
         // if (startTs < endTs - sevenDaysInSeconds) {
         //     startTs = endTs - sevenDaysInSeconds;
         // }
-        MongoCollection<Document> coll = this.mongoClient
-            .getDatabase(accountId)
-            .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
 
       Document match = new Document();
 
-      if(latestAttackList != null && !latestAttackList.isEmpty()) {
-          match.append("filterId", new Document("$in", latestAttackList));
-      }
+    if(latestAttackList != null && !latestAttackList.isEmpty()) {
+        match.append("filterId", new Document("$in", latestAttackList));
+    }
 
       // Stage 1: Match documents within the startTs and endTs range
       match.append("detectedAt", new Document("$gte", startTs).append("$lte", endTs));
+
+    // Apply simple context filter (only for ENDPOINT and AGENTIC)
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    if (!contextFilter.isEmpty()) {
+        match.putAll(contextFilter);
+    }
 
       List<Document> pipeline = Arrays.asList(
         new Document("$match", match),
@@ -385,7 +516,7 @@ public class ThreatActorService {
                 new Document("$push", new Document("subCategory", "$_id.subCategory").append("count", "$count"))))
         );
 
-        try (MongoCursor<Document> cursor = coll.aggregate(pipeline).cursor()) {
+        try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {
             while (cursor.hasNext()) {
                 Document doc = cursor.next();
                 System.out.print(doc);
@@ -424,30 +555,17 @@ public class ThreatActorService {
         return ThreatActivityTimelineResponse.newBuilder().addAllThreatActivityTimeline(timeline).build();
   }
 
-  private String fetchMetadataString(Document doc){
-    String metadataStr = doc.getString("metadata");
-    Metadata.Builder metadataBuilder = Metadata.newBuilder();
-    try {
-      TextFormat.getParser().merge(metadataStr, metadataBuilder);
-    } catch (Exception e) {
-      return "";
-    }
-    Metadata metadataProto = metadataBuilder.build();
-    metadataStr = ProtoMessageUtils.toString(metadataProto).orElse("");
-    return metadataStr;
-  }
-
-  private List<FetchMaliciousEventsResponse.MaliciousPayloadsResponse> fetchMaliciousPayloadsResponse(FindIterable<Document> respList){
+  private List<FetchMaliciousEventsResponse.MaliciousPayloadsResponse> fetchMaliciousPayloadsResponse(FindIterable<MaliciousEventDto> respList){
     if (respList == null) {
       return Collections.emptyList();
     }
     List<FetchMaliciousEventsResponse.MaliciousPayloadsResponse> maliciousPayloadsResponse = new ArrayList<>();
-    for (Document doc: respList) {
+    for (MaliciousEventDto event: respList) {
         maliciousPayloadsResponse.add(
             FetchMaliciousEventsResponse.MaliciousPayloadsResponse.newBuilder().
-            setOrig(HttpResponseParams.getSampleStringFromProtoString(doc.getString("latestApiOrig"))).
-            setMetadata(fetchMetadataString(doc)).
-            setTs(doc.getLong("detectedAt")).build());
+            setOrig(HttpResponseParams.getSampleStringFromProtoString(event.getLatestApiOrig())).
+            setMetadata(ThreatUtils.fetchMetadataString(event.getMetadata() != null ? event.getMetadata() : "")).
+            setTs(event.getDetectedAt()).build());
     }
     return maliciousPayloadsResponse;
   } 
@@ -457,11 +575,10 @@ public class ThreatActorService {
 
     List<FetchMaliciousEventsResponse.MaliciousPayloadsResponse> maliciousPayloadsResponse = new ArrayList<>();
     String refId = request.getRefId();
-    MongoCollection<Document> coll = this.mongoClient.getDatabase(accountId).getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
     Bson filters = Filters.eq("refId", refId);
-    FindIterable<Document> respList;
+    FindIterable<MaliciousEventDto> respList;
 
-    if (request.getEventType().equalsIgnoreCase(EventType.AGGREGATED.name())) {
+    if (request.getEventType().equalsIgnoreCase(MaliciousEventDto.EventType.AGGREGATED.name())) {
         Bson matchConditions = Filters.and(
             Filters.eq("actor", request.getActor()),
             Filters.gte("filterId", request.getFilterId())
@@ -470,34 +587,25 @@ public class ThreatActorService {
             matchConditions,
             filters
         );
-        respList = (FindIterable<Document>) coll.find(matchConditions).sort(Sorts.descending("detectedAt")).limit(10);
+        respList = maliciousEventDao.getCollection(accountId).find(matchConditions).sort(Sorts.descending("detectedAt")).limit(10);
         maliciousPayloadsResponse.addAll(this.fetchMaliciousPayloadsResponse(respList));
         // TODO: Handle case where aggregate was satisfied only once.
     } else {
-        respList = (FindIterable<Document>) coll.find(filters);
-        maliciousPayloadsResponse = this.fetchMaliciousPayloadsResponse(respList); 
+        respList = maliciousEventDao.getCollection(accountId).find(filters);
+        maliciousPayloadsResponse = this.fetchMaliciousPayloadsResponse(respList);
 
     }
     return FetchMaliciousEventsResponse.newBuilder().addAllMaliciousPayloadsResponse(maliciousPayloadsResponse).build();
   }
 
   public ThreatActorByCountryResponse getThreatActorByCountry(
-      String accountId, ThreatActorByCountryRequest request) {
+      String accountId, ThreatActorByCountryRequest request, String contextSource) {
 
-      if(request.getLatestAttackList() == null || request.getLatestAttackList().isEmpty()) {
-          return ThreatActorByCountryResponse.newBuilder().build();
-      }
+      List<Document> pipeline = new ArrayList<>();
 
-    MongoCollection<Document> coll =
-        this.mongoClient
-            .getDatabase(accountId)
-            .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
+      Document match = new Document();
 
-    List<Document> pipeline = new ArrayList<>();
-
-    Document match = new Document();
-
-      if(request.getLatestAttackList() != null && !request.getLatestAttackList().isEmpty()) {
+      if (!request.getLatestAttackList().isEmpty()) {
           match.append("filterId", new Document("$in", request.getLatestAttackList()));
       }
 
@@ -507,6 +615,12 @@ public class ThreatActorService {
           match.append("detectedAt",
               new Document("$gte", request.getStartTs())
                   .append("$lte", request.getEndTs()));
+    }
+
+    // Apply simple context filter (only for ENDPOINT and AGENTIC)
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    if (!contextFilter.isEmpty()) {
+        match.putAll(contextFilter);
     }
 
   pipeline.add(new Document("$match", match));
@@ -525,7 +639,7 @@ public class ThreatActorService {
 
     List<ThreatActorByCountryResponse.CountryCount> actorsByCountryCount = new ArrayList<>();
 
-    try (MongoCursor<Document> cursor = coll.aggregate(pipeline).batchSize(1000).cursor()) {
+    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).batchSize(1000).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();
         actorsByCountryCount.add(
@@ -543,10 +657,7 @@ public class ThreatActorService {
       String accountId, SplunkIntegrationRequest req) {
 
         int accId = Integer.parseInt(accountId);
-        MongoCollection<SplunkIntegrationModel> coll =
-            this.mongoClient
-                .getDatabase(accountId)
-                .getCollection(MongoDBCollection.ThreatDetection.SPLUNK_INTEGRATION_CONFIG, SplunkIntegrationModel.class);
+        MongoCollection<SplunkIntegrationModel> coll = this.splunkIntegrationDao.getCollection(accountId);
 
         Bson filters = Filters.eq("accountId", accId);
         long cnt = coll.countDocuments(filters);
@@ -561,10 +672,7 @@ public class ThreatActorService {
             .updateOne(filters, updates);
         } else {
             SplunkIntegrationModel splunkIntegrationModel = SplunkIntegrationModel.newBuilder().setAccountId(accId).setSplunkToken(req.getSplunkToken()).setSplunkUrl(req.getSplunkUrl()).build();
-            this.mongoClient
-            .getDatabase(accountId + "")
-            .getCollection(MongoDBCollection.ThreatDetection.SPLUNK_INTEGRATION_CONFIG, SplunkIntegrationModel.class)
-            .insertOne(splunkIntegrationModel);
+            this.splunkIntegrationDao.getCollection(accountId).insertOne(splunkIntegrationModel);
         }
         
         return SplunkIntegrationRespone.newBuilder().build();
@@ -575,10 +683,7 @@ public class ThreatActorService {
     public ModifyThreatActorStatusResponse modifyThreatActorStatus(
       String accountId, ModifyThreatActorStatusRequest request) {
 
-        MongoCollection<ActorInfoModel> coll =
-            this.mongoClient
-                .getDatabase(accountId)
-                .getCollection(MongoDBCollection.ThreatDetection.ACTOR_INFO, ActorInfoModel.class);
+        MongoCollection<ActorInfoModel> coll = this.actorInfoDao.getCollection(accountId);
         String actorIp = request.getIp();
 
         Bson filters = Filters.eq("ip", actorIp);
@@ -595,13 +700,124 @@ public class ThreatActorService {
         } else {
             ActorInfoModel actorInfoModel = ActorInfoModel.newBuilder().setIp(actorIp).
               setStatus(request.getStatus()).setUpdatedTs(request.getUpdatedTs()).build();
-            this.mongoClient
-              .getDatabase(accountId + "")
-              .getCollection(MongoDBCollection.ThreatDetection.ACTOR_INFO, ActorInfoModel.class)
-              .insertOne(actorInfoModel);
+            this.actorInfoDao.getCollection(accountId).insertOne(actorInfoModel);
         }
 
 
         return ModifyThreatActorStatusResponse.newBuilder().build();
       }
+
+  public FetchTopNDataResponse fetchTopNData(
+      String accountId, long startTs, long endTs, List<String> latestAttackList, int limit, String contextSource) {
+
+    List<Document> pipeline = new ArrayList<>();
+
+        // Match stage (only apply time range filter; ignore latestAttackList)
+        Document match = new Document();
+        
+        if (latestAttackList != null && !latestAttackList.isEmpty()) {
+            match.append("filterId", new Document("$in", latestAttackList));
+        }
+
+        if (startTs > 0 || endTs > 0) {
+            Document tsRange = new Document();
+            if (startTs > 0) tsRange.append("$gte", startTs);
+            if (endTs > 0) tsRange.append("$lte", endTs);
+            match.append("detectedAt", tsRange);
+        }
+
+        // Apply simple context filter (only for ENDPOINT and AGENTIC)
+        Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+        if (!contextFilter.isEmpty()) {
+            match.putAll(contextFilter);
+        }
+
+        if (!match.isEmpty()) {
+            pipeline.add(new Document("$match", match));
+        }
+
+    // Group by endpoint, method, and severity to get separate rows per severity level
+    // First, add a stage to normalize severity (handle null, case-insensitive)
+    pipeline.add(new Document("$addFields",
+        new Document("normalizedSeverity",
+            new Document("$ifNull", Arrays.asList(
+                new Document("$toUpper", "$severity"),
+                "UNKNOWN"
+            ))
+        )
+    ));
+    
+    // Group by endpoint, method, and severity to get count per severity
+    pipeline.add(new Document("$group",
+        new Document("_id", new Document("endpoint", "$latestApiEndpoint")
+            .append("method", "$latestApiMethod")
+            .append("severity", "$normalizedSeverity"))
+            .append("attacks", new Document("$sum", 1))));
+
+    // Project to flatten the structure
+    pipeline.add(new Document("$project",
+        new Document("endpoint", "$_id.endpoint")
+            .append("method", "$_id.method")
+            .append("attacks", 1)
+            .append("severity", "$_id.severity")));
+
+    // Sort by attacks descending
+    pipeline.add(new Document("$sort", new Document("attacks", -1)));
+
+    // Limit results
+    pipeline.add(new Document("$limit", limit > 0 ? limit : 5));
+
+    List<FetchTopNDataResponse.TopApiData> topApis = new ArrayList<>();
+
+    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {
+      while (cursor.hasNext()) {
+        Document doc = cursor.next();
+        topApis.add(
+            FetchTopNDataResponse.TopApiData.newBuilder()
+                .setEndpoint(doc.getString("endpoint"))
+                .setMethod(doc.getString("method"))
+                .setAttacks(doc.getInteger("attacks"))
+                .setSeverity(doc.getString("severity"))
+                .build());
+      }
+    }
+
+    // Build pipeline for top hosts based on 'host' field
+    List<Document> hostPipeline = new ArrayList<>();
+    if (!match.isEmpty()) {
+      hostPipeline.add(new Document("$match", match));
+    }
+    // Only consider documents where host exists and is not empty
+    hostPipeline.add(new Document("$match", new Document("host", new Document("$ne", null))));
+    hostPipeline.add(new Document("$match", new Document("host", new Document("$ne", ""))));
+
+    hostPipeline.add(new Document("$group",
+        new Document("_id", "$host")
+            .append("attacks", new Document("$sum", 1))));
+
+    hostPipeline.add(new Document("$project",
+        new Document("host", "$_id")
+            .append("attacks", 1)));
+
+    hostPipeline.add(new Document("$sort", new Document("attacks", -1)));
+    hostPipeline.add(new Document("$limit", limit > 0 ? limit : 5));
+
+    List<FetchTopNDataResponse.TopHostData> topHosts = new ArrayList<>();
+    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, hostPipeline).cursor()) {
+      while (cursor.hasNext()) {
+        Document doc = cursor.next();
+        topHosts.add(
+            FetchTopNDataResponse.TopHostData.newBuilder()
+                .setHost(doc.getString("host"))
+                .setAttacks(doc.getInteger("attacks", 0))
+                .build());
+      }
+    }
+
+    return FetchTopNDataResponse.newBuilder()
+        .addAllTopApis(topApis)
+        .addAllTopHosts(topHosts)
+        .build();
+  }
 }
+

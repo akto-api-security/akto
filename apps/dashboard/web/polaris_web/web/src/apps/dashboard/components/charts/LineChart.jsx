@@ -6,7 +6,7 @@ import SpinnerCentered from "../progress/SpinnerCentered";
 
 function LineChart(props) {
 
-    const { type, height, backgroundColor, data, graphPointClick, tooltipFormatter, yAxisTitle, title, text, defaultChartOptions, areaFillHex, color, width, noGap, showGridLines } = props;
+    const { type, height, backgroundColor, data, graphPointClick, tooltipFormatter, yAxisTitle, title, text, defaultChartOptions, areaFillHex, color, width, noGap, showGridLines, exportingDisabled } = props;
     const chartComponentRef = useRef(null)
 
     const fillColor = {
@@ -34,6 +34,9 @@ function LineChart(props) {
         },
         tooltip:{
             shared: false,
+        },
+        exporting: {
+            enabled: !exportingDisabled
         },
         plotOptions: {
             column: {
@@ -82,6 +85,9 @@ function LineChart(props) {
     }
 
     function processChartData(data) {
+        // Check if using single yAxis mode
+        const singleYAxis = defaultChartOptions?.yAxis && !Array.isArray(defaultChartOptions.yAxis);
+
         return  data.map((x, i) => {
             return {
                 data: x.data,
@@ -91,8 +97,8 @@ function LineChart(props) {
                 marker: {
                     enabled: false
                 },
-                yAxis: i==1 ? 1 : 0,
-                lineWidth: i==1 ? 1: 3
+                yAxis: singleYAxis ? 0 : (i===1 ? 1 : 0),
+                lineWidth: singleYAxis ? 2 : (i===1 ? 1: 3)
 
             }
         })
@@ -107,18 +113,25 @@ function LineChart(props) {
                 return prev;
             }
             prev.series = tmp;
-            prev.yAxis = tmp.map((x, i) => {
-                return {
-                    title: {
-                        text: x.name,
-                        color: x.color
-                    },
-                    visible: x.name,
-                    gridLineWidth: 1,
-                    min: 1,
-                    opposite: i==1,
-                }
-            })
+
+            // If defaultChartOptions has a single yAxis config, use it; otherwise create multiple
+            if (defaultChartOptions?.yAxis && !Array.isArray(defaultChartOptions.yAxis)) {
+                prev.yAxis = [defaultChartOptions.yAxis];
+            } else {
+                prev.yAxis = tmp.map((x, i) => {
+                    return {
+                        title: {
+                            text: x.name,
+                            color: x.color
+                        },
+                        visible: x.name,
+                        gridLineWidth: 1,
+                        min: 1,
+                        opposite: i===1,
+                    }
+                })
+            }
+
             prev.plotOptions.series.point.events.click = graphPointClick
             prev.tooltip.formatter = tooltipFormatter
             return {...prev};

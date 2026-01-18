@@ -1,19 +1,20 @@
 import { Badge, Box, HorizontalStack, Text, Tooltip } from '@shopify/polaris'
-import React, { useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import func from '@/util/func'
 import transform from '../onboarding/transform'
 import observeFunc from "./transform"
-import { getDashboardCategory } from '../../../main/labelHelper'
+import { isAgenticSecurityCategory, isMCPSecurityCategory, isEndpointSecurityCategory } from '../../../main/labelHelper'
 
 export const getMethod = (url, method) => {
-    const category = getDashboardCategory();
-    if(category.includes("MCP")){
+    if(isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory()){
         if(url.includes("tool")){
             return "TOOL";
         }else if(url.includes("resource")){
             return "RESOURCE";
         }else if(url.includes("prompt")){
             return "PROMPT";
+        }else if(url.includes("server")){
+            return "SERVER";
         }
     }
     return method;

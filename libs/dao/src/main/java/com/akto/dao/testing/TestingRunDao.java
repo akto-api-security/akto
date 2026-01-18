@@ -119,6 +119,20 @@ public class TestingRunDao extends AccountsContextDao<TestingRun> {
         return "testing_run";
     }
 
+    /**
+     * Creates a filter for finding scheduled testing runs that should have started.
+     * This matches the filter used in Main.findPendingTestingRun for scheduled tests.
+     * 
+     * @param maxScheduleTimestamp Maximum schedule timestamp (typically current time or current time - buffer)
+     * @return Bson filter for scheduled testing runs
+     */
+    public Bson createScheduledTestingRunFilter(int maxScheduleTimestamp) {
+        return Filters.and(
+            Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
+            Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, maxScheduleTimestamp)
+        );
+    }
+
     @Override
     public Class<TestingRun> getClassT() {
         return TestingRun.class;

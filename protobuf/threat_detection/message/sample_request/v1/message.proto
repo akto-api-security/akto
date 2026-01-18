@@ -8,13 +8,28 @@ option java_package = "threat_detection.message.sample_request.v1";
 message Metadata {
   string country_code = 1;
   repeated SchemaConformanceError schema_errors = 2;
+  string policy_name = 3;
+  string rule_violated = 4;
+  string risk_score = 5;
+  string reason = 6;
 }
 
 message SchemaConformanceError {
+  enum Location {
+    LOCATION_UNSPECIFIED = 0;
+    LOCATION_URL = 1;
+    LOCATION_HEADER = 2;
+    LOCATION_BODY = 3;
+  }
+  
   string schema_path = 1;
   string instance_path = 2;
   string attribute = 3;
   string message = 4;
+  Location location = 5;
+  int32 start = 6;       // Start position of threat in the text
+  int32 end = 7;         // End position of threat in the text
+  string phrase = 8;     // The actual threat phrase/keyword detected
 }
 
 message SampleMaliciousRequest {
@@ -26,6 +41,8 @@ message SampleMaliciousRequest {
   string payload = 6;
   string filter_id = 7;
   Metadata metadata = 8; 
+  bool successful_exploit = 9;
+  string status = 10;
 }
 
 message SampleRequestKafkaEnvelope {

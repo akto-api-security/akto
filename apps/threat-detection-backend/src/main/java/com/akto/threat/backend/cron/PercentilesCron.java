@@ -176,6 +176,7 @@ public class PercentilesCron {
 
     /**
      * Updates ApiInfo collection with the given percentiles.
+     * Sets rateLimitConfidence to 0.8 for each entry.
      */
     public void updateApiInfo(PercentilesResult r, int apiCollectionId, String url, String method, int windowSize) {
         try {
@@ -185,7 +186,8 @@ public class PercentilesCron {
                             Updates.set("rateLimits." + windowSize + ".p50", r.p50),
                             Updates.set("rateLimits." + windowSize + ".p75", r.p75),
                             Updates.set("rateLimits." + windowSize + ".p90", r.p90),
-                            Updates.set("rateLimits." + windowSize + ".max_requests", r.maxRequests)
+                            Updates.set("rateLimits." + windowSize + ".max_requests", r.maxRequests),
+                            Updates.set("rateLimitConfidence", 0.8)
                     ),
                     new UpdateOptions().upsert(false)
             );
@@ -281,7 +283,7 @@ public class PercentilesCron {
                 Filters.gte("windowStart", (int) getWindowStartForBaselinePeriod(baseLinePeriod))
         );
 
-        return ApiDistributionDataService.fetchBucketStats(accountId, filter, mongoClient);
+        return ApiDistributionDataService.fetchBucketStats(accountId, filter, com.akto.threat.backend.dao.ApiDistributionDataDao.instance);
     }
 
 

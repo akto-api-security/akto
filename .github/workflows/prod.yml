@@ -43,6 +43,14 @@ on:
         type: boolean
         default: false
         description: Threat Detection Backend
+      agent_traffic_analyzer:
+        type: boolean
+        default: false
+        description: Agent Traffic Analyzer
+      guardrails_service:
+        type: boolean
+        default: false
+        description: Guardrails Service
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -68,6 +76,7 @@ jobs:
         uses: arduino/setup-protoc@v3
         with:
           version: "29.2"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: bufbuild/buf-action@v1
         with:
           setup_only: true
@@ -140,12 +149,6 @@ jobs:
             echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"
           fi
 
-          if [[ "${{ github.event.inputs.testing }}" == "true" ]]; then
-            cd ../testing-cli
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG_2 . --push
-            echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG"
-          fi
-
           if [[ "${{ github.event.inputs.billing }}" == "true" ]]; then
             cd ../billing
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-billing:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-billing:$IMAGE_TAG_2 . --push
@@ -211,6 +214,139 @@ jobs:
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
 
+  build-agent-traffic-analyzer:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-22.04
+    if: ${{ github.event.inputs.agent_traffic_analyzer == 'true' }}
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+      
+      - name: DockerHub login
+        env:
+          DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
+          DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
+        run: |
+          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+
+      - name: Build, tag, and push the image to DockerHub
+        id: build-image-dockerhub
+        env:
+          ECR_REGISTRY: aktosecurity
+          IMAGE_VERSION: ${{ github.event.inputs.release_version }}
+        run: |
+          docker buildx create --use
+          cd apps/agent-traffic-analyzer
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/agent-traffic-analyzer:local -t $ECR_REGISTRY/agent-traffic-analyzer:$IMAGE_VERSION . --push
+          echo "::set-output name=image::$ECR_REGISTRY/agent-traffic-analyzer:$IMAGE_VERSION"
+          echo "::notice title=Azure Deployment::Image built with version $IMAGE_VERSION. To deploy to Azure, manually run 'Agent Traffic Analyzer - Azure Deployment' workflow with version: $IMAGE_VERSION"
+
+      - name: Configure AWS Credentials for ECR
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
+          aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
+          aws-region: us-east-1
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          mask-password: "true"
+          registry-type: public
+
+      - name: Push git tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          custom_tag: agent-traffic-analyzer-${{ github.event.inputs.release_version }}
+      - name: Create a GitHub release
+        uses: ncipollo/release-action@v1.12.0
+        with:
+          tag: ${{ steps.tag_version.outputs.new_tag }}
+          name: Release ${{ steps.tag_version.outputs.new_tag }}
+          omitBody: true
+      - name: Send Github release notification to Slack
+        id: slack
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "Agent Traffic Analyzer v${{ github.event.inputs.release_version }} released!"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+  build-guardrails-service:
+    runs-on: ubuntu-22.04
+    if: ${{ github.event.inputs.guardrails_service == 'true' }}
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: DockerHub login
+        env:
+          DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
+          DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
+        run: |
+          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+
+      - name: Build, tag, and push the image to DockerHub
+        id: build-image-dockerhub
+        env:
+          ECR_REGISTRY: aktosecurity
+          IMAGE_VERSION: ${{ github.event.inputs.release_version }}
+        run: |
+          docker buildx create --use
+          cd apps/guardrails-service/container
+          chmod +x setup-netrc.sh
+          # token expires in 1 year [2026-12-17]
+          GITHUB_TOKEN=${{ secrets.AKTO_GITHUB_TOKEN }} ./setup-netrc.sh
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/guardrails-service:local -t $ECR_REGISTRY/guardrails-service:$IMAGE_VERSION . --push
+          echo "::set-output name=image::$ECR_REGISTRY/guardrails-service:$IMAGE_VERSION"
+
+      - name: Configure AWS Credentials for ECR
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
+          aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
+          aws-region: us-east-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          mask-password: "true"
+          registry-type: public
+
+      - name: Push git tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          custom_tag: guardrails-service-${{ github.event.inputs.release_version }}
+
+      - name: Create a GitHub release
+        uses: ncipollo/release-action@v1.12.0
+        with:
+          tag: ${{ steps.tag_version.outputs.new_tag }}
+          name: Release ${{ steps.tag_version.outputs.new_tag }}
+          omitBody: true
+
+      - name: Send Github release notification to Slack
+        id: slack
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "Guardrails Service v${{ github.event.inputs.release_version }} released!"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
   build-threat:
     # The type of runner that the job will run on
@@ -230,6 +366,7 @@ jobs:
         uses: arduino/setup-protoc@v3
         with:
           version: "29.2"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: bufbuild/buf-action@v1
         with:
           setup_only: true

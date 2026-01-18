@@ -4,6 +4,7 @@ import Dropdown from "../../../components/layouts/Dropdown";
 import SingleDate from "../../../components/layouts/SingleDate";
 import func from "@/util/func"
 import DropdownSearch from '../../../components/shared/DropdownSearch';
+import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 
 const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, miniTestingServiceNames, slackChannels, jiraProjectMap, generateLabelForJiraIntegration}) => {
     const reducer = (state, action) => {
@@ -154,7 +155,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
             </HorizontalGrid>
             <HorizontalGrid gap={"4"} columns={"3"}>
                 <Dropdown
-                    label="Test run time"
+                    label={mapLabel("Test", getDashboardCategory()) + " run time"}
                     menuItems={testRunTimeOptions}
                     initial={testRun.testRunTimeLabel}
                     selected={(timeInSeconds) => {
@@ -172,7 +173,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                     }} />
                     <Dropdown
                         menuItems={testRolesArr}
-                        label="Select Test Role"
+                        label={"Select " + mapLabel("Test", getDashboardCategory()) + " Role"}
                         initial={testRun.testRoleLabel}
                         selected={(requests) => {
                             let testRole;
@@ -290,7 +291,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
             </HorizontalStack>
             <HorizontalGrid columns={2}>
                 <Checkbox
-                    label="Use different target for testing"
+                    label={"Use different target for " + mapLabel("testing", getDashboardCategory())}
                     checked={testRun.hasOverriddenTestAppUrl}
                     onChange={() => {
                         setTestRun(prev => ({ ...prev, hasOverriddenTestAppUrl: !prev.hasOverriddenTestAppUrl, overriddenTestAppUrl: "" }))
@@ -306,6 +307,11 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                     </div>
                 }
             </HorizontalGrid>
+            <Checkbox
+                label="Mark issues as fixed if they don't show up again"
+                checked={!testRun.doNotMarkIssuesAsFixed}
+                onChange={() => setTestRun(prev => ({ ...prev, doNotMarkIssuesAsFixed: !prev.doNotMarkIssuesAsFixed }))}
+            />
         </VerticalStack>
     );
 };

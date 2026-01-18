@@ -13,7 +13,7 @@ import AuthParams from './AuthParams';
 function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
 
     const initialStepState = {
-        id: "step1",
+        id: "x1",
         content: "Step 1",
         body: '{"email": "abc@mail.com"}',
         headers: '{"content-type": "application/json"}',
@@ -29,7 +29,7 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
 
     const [steps, setSteps] = useState([{
         ...initialStepState,
-        id: "step1",
+        id: "x1",
         content: "Step 1",
     }
     ])
@@ -48,13 +48,13 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
     const [isLoading, setIsLoading] = useState(false)
 
     useEffect(() => {
-        
+
         if(extractInformation){
             setIsLoading(true)
             if (authMechanism && authMechanism.type === "LOGIN_REQUEST" && authMechanism.requestData[0].type !== "RECORDED_FLOW") {
                 setSteps(authMechanism.requestData.map((step, index) => ({
                     ...step,
-                    id: `step${index + 1}`,
+                    id: `x${2 * index + 1}`,
                     content: `Step ${index + 1}`,
                     testResponse: ''
                 })))
@@ -122,7 +122,7 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
             setSelectedStep(prev.length)
             return [...prev, {
                 ...initialStepState,
-                id: `step${prev.length + 1}`,
+                id: `x${2 * prev.length + 1}`,
                 content: `Step ${prev.length + 1}`,
                 type: "LOGIN_FORM",
             }]
@@ -137,7 +137,7 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
                 const prevFiltered = prev.filter((step, index) => index !== selectedStep)
                 const prevIndexFixed = [...prevFiltered]
                 for(let i = 0; i < prevIndexFixed.length; i++) {
-                    prevIndexFixed[i].id = `step${i + 1}`
+                    prevIndexFixed[i].id = `x${2 * i + 1}`
                     prevIndexFixed[i].content = `Step ${i + 1}`
                 }
                 return prevIndexFixed

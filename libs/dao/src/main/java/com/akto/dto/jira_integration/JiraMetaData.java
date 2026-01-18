@@ -24,4 +24,5 @@ public class JiraMetaData {
     private TestingIssuesId testingIssueId;
     private ObjectId testSummaryId;
     private Map<String, Object> additionalIssueFields;
+    private String labels;
 }

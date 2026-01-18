@@ -142,7 +142,7 @@ public class DashboardAction extends UserAction {
         try {
             List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
             if(collectionIds != null) {
-                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+                pipeline.add(Aggregates.match(Filters.in(TestingRunIssuesDao.instance.getFilterKeyString(), collectionIds)));
             }
         } catch(Exception e){
         }
@@ -232,7 +232,7 @@ public class DashboardAction extends UserAction {
                     Context.userId.get(), Context.accountId.get()
                 );
                 if (collectionIds != null) {
-                    basePipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+                    basePipeline.add(Aggregates.match(Filters.in(TestingRunIssuesDao.instance.getFilterKeyString(), collectionIds)));
                 }
             } catch (Exception e) {
             }

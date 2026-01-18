@@ -94,6 +94,17 @@
             </modules>
         </profile>
         <profile>
+            <id>account-job-executor</id>
+            <activation>
+                <file>
+                    <exists>account-job-executor/pom.xml</exists>
+                </file>
+            </activation>
+            <modules>
+                <module>account-job-executor</module>
+            </modules>
+        </profile>
+        <profile>
             <id>billing</id>
             <activation>
                 <file>

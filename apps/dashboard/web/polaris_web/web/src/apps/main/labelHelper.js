@@ -8,26 +8,50 @@ import PersistStore from "./PersistStore";
  * @returns {string} - Transformed label for that category
  */
 export function mapLabel(value, category) {
-  return labelMap?.[category]?.[value] || value
+  // Apply standard label mappings for all accounts and categories
+  return labelMap?.[category]?.[value] || value;
 }
+
+export const CATEGORY_MCP_SECURITY = 'MCP Security';
+export const CATEGORY_GEN_AI = 'Gen AI';
+export const CATEGORY_API_SECURITY = 'API Security';
+export const CATEGORY_AGENTIC_SECURITY = 'Agentic Security';
+export const CATEGORY_DAST = 'DAST';
+export const CATEGORY_ENDPOINT_SECURITY = 'Endpoint Security';
 
 export function getDashboardCategory() {
   try {
     const category = PersistStore.getState().dashboardCategory
     return category
   } catch(e){
-    return "API Security"
+    return CATEGORY_API_SECURITY
   }
 }
 
+export function isCategory(category) {
+  return getDashboardCategory() === category;
+}
+
 export function isMCPSecurityCategory() {
-  return getDashboardCategory() === 'MCP Security';
+  return isCategory(CATEGORY_MCP_SECURITY);
 }
 
 export function isGenAISecurityCategory() {
-  return getDashboardCategory() === 'Gen AI';
+  return isCategory(CATEGORY_GEN_AI);
 }
 
 export function isApiSecurityCategory() {
-  return getDashboardCategory() === 'API Security';
+  return isCategory(CATEGORY_API_SECURITY);
+}
+
+export function isAgenticSecurityCategory() {
+  return isCategory(CATEGORY_AGENTIC_SECURITY);
+}
+
+export function isDastCategory() {
+  return isCategory(CATEGORY_DAST);
+}
+
+export function isEndpointSecurityCategory() {
+  return isCategory(CATEGORY_ENDPOINT_SECURITY);
 }

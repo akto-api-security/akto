@@ -32,6 +32,7 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
 import com.akto.dto.rbac.UsersCollectionsList;
+import com.mongodb.MongoCommandException;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
@@ -56,13 +57,17 @@ import com.opensymphony.xwork2.Action;
 
 import lombok.Setter;
 import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
-import static com.akto.util.Constants.AKTO_MCP_SERVER_TAG;
+
 import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.dto.type.URLMethods;
+import com.akto.cache.IconCache;
 
 public class ApiCollectionsAction extends UserAction {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiCollectionsAction.class, LogDb.DASHBOARD);
+    
+    // Error codes
+    private static final int MONGO_INVALID_REGEX_ERROR_CODE = 51091;
 
     List<ApiCollection> apiCollections = new ArrayList<>();
     Map<Integer,Integer> testedEndpointsMaps = new HashMap<>();
@@ -73,6 +78,8 @@ public class ApiCollectionsAction extends UserAction {
     Map<Integer, List<String>> sensitiveSubtypesInCollection = new HashMap<>();
     List<BasicDBObject> sensitiveSubtypesInUrl = new ArrayList<>();
     LastCronRunInfo timerInfo;
+    @Setter
+    boolean skipTagsMismatch = false;
 
     Map<Integer,Map<String,Integer>> severityInfo = new HashMap<>();
     int apiCollectionId;
@@ -240,6 +247,14 @@ public class ApiCollectionsAction extends UserAction {
         UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
         this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty(), Projections.exclude("urls"));
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
+        
+        // Start background icon processing for Argus and Atlas collections asynchronously
+        // This runs in a separate thread to not block the main response
+
+        if(!Context.contextSource.get().equals(CONTEXT_SOURCE.DAST) && !Context.contextSource.get().equals(CONTEXT_SOURCE.API)) {
+            com.akto.util.IconUtils.processIconsForCollections(this.apiCollections);
+        }
+        
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -497,17 +512,23 @@ public class ApiCollectionsAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        List<TestingEndpoints> conditions = generateConditions(this.conditions);
+        try {
+            List<TestingEndpoints> conditions = generateConditions(this.conditions);
 
-        ApiCollection apiCollection = new ApiCollection(Context.now(), collectionName, conditions);
-        ApiCollectionsDao.instance.insertOne(apiCollection);
+            ApiCollection apiCollection = new ApiCollection(Context.now(), collectionName, conditions);
+            ApiCollectionsDao.instance.insertOne(apiCollection);
 
-        ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
+            ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
 
-        this.apiCollections = new ArrayList<>();
-        this.apiCollections.add(apiCollection);
+            this.apiCollections = new ArrayList<>();
+            this.apiCollections.add(apiCollection);
 
-        return SUCCESS.toUpperCase();
+            return SUCCESS.toUpperCase();
+        } catch (MongoCommandException e) {
+            return handleMongoException(e);
+        } catch (Exception e) {
+            return handleGeneralException(e, "Error creating collection");
+        }
     }
 
     public String updateCustomCollection(){
@@ -517,29 +538,131 @@ public class ApiCollectionsAction extends UserAction {
             addActionError("No collection with id exists.");
             return ERROR.toUpperCase();
         }
-        List<TestingEndpoints> conditions = generateConditions(this.conditions);
-        ApiCollectionsDao.instance.updateOneNoUpsert(filter, Updates.set(ApiCollection.CONDITIONS_STRING, conditions));
-        ApiCollectionUsers.computeCollectionsForCollectionId(conditions, collection.getId());
-        return SUCCESS.toUpperCase();
+        try {
+            List<TestingEndpoints> conditions = generateConditions(this.conditions);
+            ApiCollectionsDao.instance.updateOneNoUpsert(filter, Updates.set(ApiCollection.CONDITIONS_STRING, conditions));
+            ApiCollectionUsers.computeCollectionsForCollectionId(conditions, collection.getId());
+            return SUCCESS.toUpperCase();
+        } catch (MongoCommandException e) {
+            return handleMongoException(e);
+        } catch (Exception e) {
+            return handleGeneralException(e, "Error updating collection");
+        }
     }
 
     int apiCount;
 
-    public String getEndpointsListFromConditions() {
-        List<TestingEndpoints> conditions = generateConditions(this.conditions);
-        List<BasicDBObject> list = ApiCollectionUsers.getSingleTypeInfoListFromConditions(conditions, 0, 200, Utils.DELTA_PERIOD_VALUE,  new ArrayList<>(deactivatedCollections));
-        InventoryAction inventoryAction = new InventoryAction();
-        inventoryAction.attachAPIInfoListInResponse(list,-1);
-        this.setResponse(inventoryAction.getResponse());
-        response.put("apiCount", ApiCollectionUsers.getApisCountFromConditionsWithStis(conditions, new ArrayList<>(deactivatedCollections)));
-        return SUCCESS.toUpperCase();
+    private static final String TAG_KEY_MISMATCH = "tags-mismatch";
+    private static final String TAG_VALUE_TRUE = "true";
+
+    private List<BasicDBObject> removeMismatchedCollections(List<BasicDBObject> list) {
+        if (!skipTagsMismatch || list.isEmpty()) {
+            return list;
+        }
+
+        // Extract unique collection IDs
+        Set<Integer> apiCollectionIds = list.stream()
+                .map(this::extractApiCollectionId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        if (apiCollectionIds.isEmpty()) {
+            return list;
+        }
+
+        // Query for mismatched collections
+        Bson filter = Filters.and(
+                Filters.in(Constants.ID, apiCollectionIds),
+                Filters.elemMatch(ApiCollection.TAGS_STRING,
+                        Filters.and(
+                                Filters.eq("keyName", TAG_KEY_MISMATCH),
+                                Filters.eq("value", TAG_VALUE_TRUE))));
+
+        Set<Integer> mismatchedCollectionIds = ApiCollectionsDao.instance
+                .findAll(filter, Projections.include(Constants.ID))
+                .stream()
+                .map(ApiCollection::getId)
+                .collect(Collectors.toSet());
+
+        if (mismatchedCollectionIds.isEmpty()) {
+            return list;
+        }
+
+        // Filter out mismatched collections
+        return list.stream()
+                .filter(obj -> {
+                    Integer colId = extractApiCollectionId(obj);
+                    return colId == null || !mismatchedCollectionIds.contains(colId);
+                })
+                .collect(Collectors.toList());
     }
+
+    private Integer extractApiCollectionId(BasicDBObject obj) {
+        Object id = obj.get("_id");
+        if (id instanceof BasicDBObject) {
+            return ((BasicDBObject) id).getInt("apiCollectionId");
+        }
+        return null;
+    }
+
+    public String getEndpointsListFromConditions() {
+        try {
+            List<TestingEndpoints> conditions = generateConditions(this.conditions);
+            List<BasicDBObject> list = ApiCollectionUsers.getSingleTypeInfoListFromConditions(conditions, 0, 200, Utils.DELTA_PERIOD_VALUE,  new ArrayList<>(deactivatedCollections));
+            
+            int initialCount = list.size();
+            
+            // Get accurate count with the same filter
+            int totalCount = ApiCollectionUsers.getApisCountFromConditionsWithStis(
+                conditions, new ArrayList<>(deactivatedCollections));
+
+            list = removeMismatchedCollections(list);
+            // removes from paginated results only
+            int removedCount = initialCount - list.size();
+
+            totalCount = totalCount - removedCount;
+            
+            InventoryAction inventoryAction = new InventoryAction();
+            inventoryAction.attachAPIInfoListInResponse(list,-1);
+            this.setResponse(inventoryAction.getResponse());
+            response.put("apiCount", totalCount);
+            
+            return SUCCESS.toUpperCase();
+        } catch (MongoCommandException e) {
+            return handleMongoException(e);
+        } catch (Exception e) {
+            return handleGeneralException(e, "Error processing conditions");
+        }
+    }
+
     public String getEndpointsFromConditions(){
-        List<TestingEndpoints> conditions = generateConditions(this.conditions);
+        try {
+            List<TestingEndpoints> conditions = generateConditions(this.conditions);
 
-        apiCount = ApiCollectionUsers.getApisCountFromConditions(conditions, new ArrayList<>(deactivatedCollections));
+            apiCount = ApiCollectionUsers.getApisCountFromConditions(conditions, new ArrayList<>(deactivatedCollections));
 
-        return SUCCESS.toUpperCase();
+            return SUCCESS.toUpperCase();
+        } catch (MongoCommandException e) {
+            return handleMongoException(e);
+        } catch (Exception e) {
+            return handleGeneralException(e, "Error processing conditions");
+        }
+    }
+    
+    private String handleMongoException(MongoCommandException e) {
+        loggerMaker.errorAndAddToDb(e, "MongoCommandException while processing request");
+        if (e.getCode() == MONGO_INVALID_REGEX_ERROR_CODE) {
+            addActionError("Invalid regex pattern. Please check your filter conditions.");
+        } else {
+            addActionError("Internal error while processing request.");
+        }
+        return ERROR.toUpperCase();
+    }
+    
+    private String handleGeneralException(Exception e, String context) {
+        loggerMaker.errorAndAddToDb(e, context);
+        addActionError(context);
+        return ERROR.toUpperCase();
     }
 
     public String computeCustomCollections(){
@@ -600,9 +723,13 @@ public class ApiCollectionsAction extends UserAction {
 
         List<String> sensitiveSubtypesInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
         this.sensitiveUrlsInResponse = SingleTypeInfoDao.instance.getSensitiveApisCount(sensitiveSubtypes, true, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
-
         sensitiveSubtypes.addAll(sensitiveSubtypesInRequest);
-        this.sensitiveSubtypesInCollection = SingleTypeInfoDao.instance.getSensitiveSubtypesDetectedForCollection(sensitiveSubtypes);
+        if(type!= null && type.equals("topSensitive")){
+            this.sensitiveSubtypesInUrl = SingleTypeInfoDao.instance.getSensitiveSubtypesDetectedForUrl(sensitiveSubtypes);
+        }else {
+            this.sensitiveSubtypesInCollection = SingleTypeInfoDao.instance.getSensitiveSubtypesDetectedForCollection(sensitiveSubtypes);
+        }
+
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -1348,6 +1475,70 @@ public class ApiCollectionsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchMcpToolsApiCalls() {
+        CONTEXT_SOURCE currentContextSource = Context.contextSource.get();
+
+        if(currentContextSource.equals(CONTEXT_SOURCE.API)) {
+            addActionError("Invalid dashboard category: " + currentContextSource.name());
+            return ERROR.toUpperCase();
+        }
+
+        List<ApiInfo> mcpToolsList = ApiInfoDao.instance.findAll(
+            Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId),
+            Projections.include(Constants.ID)
+        );
+
+        Map<ApiInfoKey, List<ApiInfoKey>> toolApiCallsMap = new HashMap<>();
+
+        // Collect all tool names in a single list
+        List<String> allMcpToolNames = new ArrayList<>();
+        Map<String, ApiInfoKey> toolNameToKeyMap = new HashMap<>();
+
+        for(ApiInfo mcpToolInfo : mcpToolsList) {
+            String toolUrl = mcpToolInfo.getId().getUrl();
+            String[] urlSegments = toolUrl.split("/");
+            String mcpToolName = urlSegments[urlSegments.length - 1];
+
+            allMcpToolNames.add(mcpToolName);
+            toolNameToKeyMap.put(mcpToolName, mcpToolInfo.getId());
+
+            // Initialize empty list for each tool
+            toolApiCallsMap.put(mcpToolInfo.getId(), new ArrayList<>());
+        }
+
+        // Single DB call to get all API calls for all tools at once
+        if (!allMcpToolNames.isEmpty()) {
+            Context.contextSource.set(CONTEXT_SOURCE.API);
+
+            List<ApiInfo> allApiCalls = ApiInfoDao.instance.findAll(
+                Filters.in(ApiInfo.PARENT_MCP_TOOL_NAMES, allMcpToolNames),
+                Projections.include(Constants.ID, ApiInfo.PARENT_MCP_TOOL_NAMES)
+            );
+
+            // Group API calls by their parent tool names
+            for(ApiInfo apiCall : allApiCalls) {
+                List<String> parentToolNames = apiCall.getParentMcpToolNames();
+                if (parentToolNames != null) {
+                    for (String toolName : parentToolNames) {
+                        ApiInfoKey toolKey = toolNameToKeyMap.get(toolName);
+                        if (toolKey != null) {
+                            toolApiCallsMap.get(toolKey).add(apiCall.getId());
+                        }
+                    }
+                }
+            }
+        }
+
+        Context.contextSource.set(currentContextSource);
+
+        if(this.response == null) {
+            this.response = new BasicDBObject();
+        }
+        this.response.put("toolApiCallsMap", toolApiCallsMap);
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
 
 
     public void setFilterType(String filterType) {
@@ -1493,6 +1684,35 @@ public class ApiCollectionsAction extends UserAction {
 
     public void setResetEnvTypes(boolean resetEnvTypes) {
         this.resetEnvTypes = resetEnvTypes;
+    }
+
+
+    public String fetchAllIconsCache() {
+        try {
+            loggerMaker.infoAndAddToDb("DEBUG: fetchAllIconsCache called", LogDb.DASHBOARD);
+            
+            // Get both caches from IconCache
+            IconCache iconCache = IconCache.getInstance();
+            
+            // Force refresh the cache to get latest data from database
+            loggerMaker.infoAndAddToDb("DEBUG: Force refreshing icon cache", LogDb.DASHBOARD);
+            
+            Map<String, String> hostnameToObjectIdCache = iconCache.getHostnameToObjectIdCache();
+            Map<String, IconCache.IconData> objectIdToIconDataCache = iconCache.getObjectIdToIconDataCache();
+            
+            if(this.response == null) {
+                this.response = new BasicDBObject();
+            }
+            this.response.put("hostnameToObjectIdCache", hostnameToObjectIdCache);
+            this.response.put("objectIdToIconDataCache", objectIdToIconDataCache);
+            
+            loggerMaker.infoAndAddToDb("DEBUG: fetchAllIconsCache returning " + hostnameToObjectIdCache.size() + " hostname mappings and " + objectIdToIconDataCache.size() + " icon data entries", LogDb.DASHBOARD);
+            return Action.SUCCESS.toUpperCase();
+            
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error fetching all icons cache", LogDb.DASHBOARD);
+            return Action.ERROR.toUpperCase();
+        }
     }
 
 }

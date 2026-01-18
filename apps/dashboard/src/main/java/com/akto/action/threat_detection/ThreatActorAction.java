@@ -44,13 +44,12 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.bson.conversions.Bson;
 
-import static com.akto.action.threat_detection.utils.ThreatsUtils.getTemplates;
-
 public class ThreatActorAction extends AbstractThreatDetectionAction {
 
   List<DashboardThreatActor> actors;
   List<MaliciousPayloadsResponse> maliciousPayloadsResponses;
   List<ThreatActorPerCountry> actorsCountPerCountry;
+  List<BasicDBObject> threatComplianceInfos;
   int skip;
   static final int LIMIT = 50;
   long total;
@@ -60,6 +59,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   List<String> latestAttack;
   List<String> country;
   List<String> actorId;
+  List<String> host;
   int startTs;
   int endTs;
   String splunkUrl;
@@ -89,19 +89,18 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_actors_count_per_country", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
+    post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
 
     if(endTs <= 0){
         endTs = Context.now();
     }
     startTs = Math.max(startTs, 0);
 
-    List<String> templatesContext = getTemplates(this.latestAttack);
-
     Map<String, Object> body = new HashMap<String, Object>() {
       {
         put("start_ts", startTs);
         put("end_ts", endTs);
-        put("latestAttack", templatesContext);
+        put("latestAttack", latestAttack);
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -150,6 +149,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
                         .filter(allowedTemplates::contains)
                         .collect(Collectors.toList());
                 this.actorId = msg.getActorIdList();
+                this.host = msg.getHostList();
               });
     } catch (Exception e) {
       e.printStackTrace();
@@ -163,16 +163,19 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         new HttpPost(String.format("%s/api/dashboard/list_threat_actors", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
+    post.addHeader("x-context-source", Context.contextSource.get().toString());
     Map<String, Object> filter = new HashMap<>();
 
-    List<String> templates = getTemplates(latestAttack);
-    filter.put("latestAttack", templates);
+    filter.put("latestAttack", latestAttack);
 
     if(this.country != null && !this.country.isEmpty()){
       filter.put("country", this.country);
     }
     if(this.actorId != null && !this.actorId.isEmpty()){
       filter.put("actors", this.actorId);
+    }
+    if(this.host != null && !this.host.isEmpty()){
+      filter.put("hosts", this.host);
     }
     Map<String, Object> body =
         new HashMap<String, Object>() {
@@ -210,8 +213,10 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
                                     smr.getCountry(),
                                     smr.getLatestSubcategory(),
                                     smr.getActivityDataList().stream()
-                                    .map(subData -> new ActivityData(subData.getUrl(), subData.getSeverity(), subData.getSubCategory(), subData.getDetectedAt(), subData.getMethod()))
-                                    .collect(Collectors.toList())))
+                                    .map(subData -> new ActivityData(subData.getUrl(), subData.getSeverity(), subData.getSubCategory(), subData.getDetectedAt(), subData.getMethod(), subData.getHost(), subData.getMetadata()))
+                                    .collect(Collectors.toList()),
+                                    smr.getLatestApiHost(),
+                                    smr.getLatestMetadata()))
                         .collect(Collectors.toList());
 
                 this.total = m.getTotal();
@@ -267,6 +272,30 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     }
 
     return SUCCESS.toUpperCase();
+  }
+
+  public String fetchThreatComplianceInfos() {
+    try {
+      Bson emptyFilter = Filters.empty();
+      List<com.akto.dto.threat_detection.ThreatComplianceInfo> threatComplianceList =
+          com.akto.dao.threat_detection.ThreatComplianceInfosDao.instance.findAll(emptyFilter);
+
+      this.threatComplianceInfos = new ArrayList<>();
+      for (com.akto.dto.threat_detection.ThreatComplianceInfo threatCompliance : threatComplianceList) {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put(Constants.ID, threatCompliance.getId());
+        obj.put("mapComplianceToListClauses", threatCompliance.getMapComplianceToListClauses());
+        obj.put("author", threatCompliance.getAuthor());
+        obj.put("hash", threatCompliance.getHash());
+        this.threatComplianceInfos.add(obj);
+      }
+
+      loggerMaker.infoAndAddToDb("Fetched " + this.threatComplianceInfos.size() + " threat compliance infos", LogDb.DASHBOARD);
+      return SUCCESS.toUpperCase();
+    } catch (Exception e) {
+      loggerMaker.errorAndAddToDb(e, "Error while fetching threat compliance infos: " + e.getMessage(), LogDb.DASHBOARD);
+      return ERROR.toUpperCase();
+    }
   }
 
     public static Wafv2Client getAwsWafClient(String accessKey, String secretKey, String region) {
@@ -724,6 +753,14 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     this.actorId = actorId;
   }
 
+  public List<String> getHost() {
+    return host;
+  }
+
+  public void setHost(List<String> host) {
+    this.host = host;
+  }
+
   public String getEventType() {
     return eventType;
   }
@@ -754,5 +791,13 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
 
   public void setSort(Map<String, Integer> sort) {
     this.sort = sort;
+  }
+
+  public List<BasicDBObject> getThreatComplianceInfos() {
+    return threatComplianceInfos;
+  }
+
+  public void setThreatComplianceInfos(List<BasicDBObject> threatComplianceInfos) {
+    this.threatComplianceInfos = threatComplianceInfos;
   }
 }

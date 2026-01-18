@@ -1,9 +1,12 @@
 package com.akto.runtime;
 
+import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.settings.DefaultPayload;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.dto.type.APICatalog;
+import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLTemplate;
 import com.akto.log.LoggerMaker;
 import com.fasterxml.jackson.core.JsonFactory;
@@ -12,6 +15,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 
+import java.net.URI;
 import java.net.URL;
 import java.util.*;
 
@@ -146,5 +150,43 @@ public class RuntimeUtil {
             }
         }
 
+    }
+
+    public static void fillURLTemplatesMap(List<ApiInfo> apiInfos, Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods, Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates, Map<String, ApiInfo.ApiInfoKey> apiInfoKeyToApiInfo){
+        if (apiInfos != null && !apiInfos.isEmpty()) {
+            for (ApiInfo apiInfo : apiInfos) {
+                String url = apiInfo.getId().getUrl();
+                int apiCollectionId = apiInfo.getId().getApiCollectionId();
+                com.akto.dto.type.URLMethods.Method method = apiInfo.getId().getMethod();
+
+                // Build URL to methods map with key format: "apiCollectionId:url"
+                String urlKey = apiCollectionId + ":" + url;
+                if(apiInfoUrlToMethods != null){
+                    apiInfoUrlToMethods.computeIfAbsent(urlKey, k -> new HashSet<>()).add(method);
+                }
+
+                // Build URL templates for parameterized URLs
+                if (APICatalog.isTemplateUrl(url)) {
+                    URLTemplate urlTemplate = createUrlTemplate(url, method);
+
+                    if (!apiCollectionUrlTemplates.containsKey(apiCollectionId)) {
+                        apiCollectionUrlTemplates.put(apiCollectionId, new ArrayList<>());
+                    }
+
+                    apiCollectionUrlTemplates.get(apiCollectionId).add(urlTemplate);
+                }else if(apiInfoKeyToApiInfo != null){
+                    // remove host from url
+                    String urlWithoutHost = url;
+                    if(urlWithoutHost.contains("://")){
+                        try {
+                            URI uri = new URI(urlWithoutHost);
+                            urlWithoutHost = uri.getPath();
+                        } catch (Exception e) {
+                        }
+                    }
+                    apiInfoKeyToApiInfo.put(apiCollectionId + " " + urlWithoutHost + " " + method.name(), apiInfo.getId());
+                }
+            }
+        }
     }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 
 import { Box, Button, Frame, HorizontalGrid, HorizontalStack, TopBar } from "@shopify/polaris"
@@ -20,6 +20,7 @@ import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import LocalStore from "../../../main/LocalStorageStore"
 import func from "../../../../util/func"
 import transform from "../testing/transform"
+import { getDashboardCategory, mapLabel } from "../../../main/labelHelper"
 
 const TestEditor = () => {
     const navigate = useNavigate()
@@ -32,7 +33,7 @@ const TestEditor = () => {
     const setSubCategoryMap = LocalStore(state => state.setSubCategoryMap)
 
     const [loading, setLoading] = useState(true)
-
+    const [testsLoaded, setTestsLoaded] = useState(0)
 
     const handleExit = () => {
         navigate("/dashboard/test-library/tests")
@@ -59,7 +60,7 @@ const TestEditor = () => {
     }
 
     const fetchSubcategories = async () => {
-        const metaDataObj = await transform.getAllSubcategoriesData(false, "testEditor")
+        const metaDataObj = await transform.getAllSubcategoriesData(false, "testEditor", setTestsLoaded)
         return metaDataObj.subCategories
     }
 
@@ -114,18 +115,54 @@ const TestEditor = () => {
         console.log("add test")
     }
 
-    const learnMoreObjEditor = learnMoreObject['dashboard_test_editor']
+    // Get category-specific learn more data
+    // Note: This logic mirrors PageWithMultipleCards.jsx for consistent category handling
+    const learnMoreObjEditor = useMemo(() => {
+        const category = getDashboardCategory()
+        const categoryKey = category?.toLowerCase().replace(/ /g, '_')
+        const pageData = learnMoreObject['dashboard_test_editor']
+
+        if (!pageData) return null
+
+        // Check if category-specific data exists
+        if (pageData[categoryKey] && typeof pageData[categoryKey] === 'object') {
+            const categoryData = pageData[categoryKey]
+            return {
+                title: categoryData.title,
+                description: categoryData.description,
+                docsLink: Array.isArray(categoryData.docsLink) ? categoryData.docsLink : [],
+                videoLink: Array.isArray(categoryData.videoLink) ? categoryData.videoLink : []
+            }
+        }
+
+        // Fallback to root-level data
+        const hasRootDocs = Array.isArray(pageData.docsLink)
+        const hasRootVideos = Array.isArray(pageData.videoLink)
+
+        if (hasRootDocs || hasRootVideos) {
+            return {
+                title: pageData.title,
+                description: pageData.description,
+                docsLink: hasRootDocs ? pageData.docsLink : [],
+                videoLink: hasRootVideos ? pageData.videoLink : []
+            }
+        }
+
+        return null
+    }, []) // Empty dependency array as category and learnMoreObject are stable
 
     const headerComp = (
         <div className="header-css">
             <HorizontalStack gap="5">
                 <Button onClick={handleExit} icon={ExitMajor} plain/>
                 <HorizontalStack gap={"2"}>
-                    <TitleWithInfo docsUrl={"https://docs.akto.io/test-editor/concepts"} tooltipContent={"Test editor playground"} titleText={"Test Editor"} />
+                    <TitleWithInfo docsUrl={"https://docs.akto.io/test-editor/concepts"} tooltipContent={"Test editor playground"} titleText={mapLabel("Test Editor", getDashboardCategory())} />
                 </HorizontalStack>
             </HorizontalStack>
 
-            <LearnPopoverComponent learnMoreObj={learnMoreObjEditor} />
+            {learnMoreObjEditor && (learnMoreObjEditor.docsLink?.length > 0 || learnMoreObjEditor.videoLink?.length > 0) && (
+                <LearnPopoverComponent learnMoreObj={learnMoreObjEditor} />
+            )}
         </div>
     )
     
@@ -150,7 +187,7 @@ const TestEditor = () => {
 
     return (
         loading ?
-            <SpinnerCentered />
+            <SpinnerCentered height="100vh" text={`Loading tests... ${testsLoaded} tests loaded`}/>
         : 
         <Frame topBar={
             headerEditor

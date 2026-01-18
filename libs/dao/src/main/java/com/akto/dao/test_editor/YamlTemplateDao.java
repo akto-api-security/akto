@@ -45,6 +45,10 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
         return commonWordListMap;
     }
 
+    public void clearCommonWordListMapForAccount() {
+        commonTemplateCache.remove(Context.accountId.get());
+    }
+
     public Map<String, TestConfig> fetchTestConfigMap(boolean includeYamlContent, boolean fetchOnlyActive, int skip, int limit, Bson customFilter) {
         Map<String, TestConfig> testConfigMap = new HashMap<>();
         List<Bson> filters = new ArrayList<>();

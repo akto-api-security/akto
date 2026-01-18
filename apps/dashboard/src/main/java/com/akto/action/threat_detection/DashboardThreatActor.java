@@ -3,6 +3,8 @@ package com.akto.action.threat_detection;
 import java.util.List;
 
 import com.akto.dto.type.URLMethods.Method;
+import lombok.Getter;
+import lombok.Setter;
 
 public class DashboardThreatActor {
 
@@ -14,6 +16,11 @@ public class DashboardThreatActor {
   private String country;
   private String latestAttack;
   private List<ActivityData> activity;
+  private String latestApiHost;
+
+  @Getter
+  @Setter
+  private String latestMetadata;
 
   public DashboardThreatActor(
       String id,
@@ -23,7 +30,9 @@ public class DashboardThreatActor {
       long discoveredAt,
       String country,
       String latestAttack,
-      List<ActivityData> activity) {
+      List<ActivityData> activity,
+      String latestApiHost,
+      String latestMetadata) {
 
     this.id = id;
     this.latestApiEndpoint = latestApiEndpoint;
@@ -33,6 +42,8 @@ public class DashboardThreatActor {
     this.country = country;
     this.latestAttack = latestAttack;
     this.activity = activity;
+    this.latestApiHost = latestApiHost;
+    this.latestMetadata = latestMetadata;
   }
 
   public String getId() {
@@ -99,4 +110,11 @@ public class DashboardThreatActor {
     this.latestAttack = latestAttack;
   }
 
+  public String getLatestApiHost() {
+    return latestApiHost;
+  }
+
+  public void setLatestApiHost(String latestApiHost) {
+    this.latestApiHost = latestApiHost;
+  }
 }

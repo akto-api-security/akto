@@ -13,7 +13,6 @@ import java.util.stream.Collectors;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ApiDistributionDataRequestPayload;
 import com.akto.threat.backend.cron.PercentilesCron;
 import com.akto.utils.ThreatApiDistributionUtils;
-import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.ReplaceOptions;
 import com.mongodb.client.model.Filters;
@@ -78,13 +77,11 @@ public class ApiRateLimitBucketStatisticsModel {
 
     public static void calculateStatistics(
             String accountId,
-            MongoClient mongoClient,
+            com.akto.threat.backend.dao.ApiRateLimitBucketStatisticsDao dao,
             Map<String, List<ApiDistributionDataRequestPayload.DistributionData>> frequencyBuckets) {
         if (frequencyBuckets == null || frequencyBuckets.isEmpty()) return;
 
-        MongoCollection<ApiRateLimitBucketStatisticsModel> coll = mongoClient
-            .getDatabase(accountId)
-            .getCollection("api_rate_limit_bucket_statistics", ApiRateLimitBucketStatisticsModel.class);
+        MongoCollection<ApiRateLimitBucketStatisticsModel> coll = dao.getCollection(accountId);
 
         for (Map.Entry<String, List<ApiDistributionDataRequestPayload.DistributionData>> entry : frequencyBuckets.entrySet()) {
             String docId = entry.getKey();

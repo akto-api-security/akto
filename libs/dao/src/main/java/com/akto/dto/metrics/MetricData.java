@@ -1,8 +1,6 @@
 package com.akto.dto.metrics;
 
 import com.akto.dao.context.Context;
-import com.akto.dto.data_types.Conditions;
-import com.akto.dto.usage.MetricTypes;
 import org.bson.types.ObjectId;
 
 public class MetricData {
@@ -22,7 +20,7 @@ public class MetricData {
     }
 
     public enum MetricType {
-        LATENCY, SUM
+        LATENCY, SUM, MAX, GAUGE
     }
 
     private MetricType metricType;
@@ -31,8 +29,9 @@ public class MetricData {
         RT_KAFKA_RECORD_COUNT("Kafka Records Count", "Number of records processed by runtime module"),
         RT_KAFKA_RECORD_SIZE("Kafka Records Size", "Total size of records processed by runtime module"),
         RT_KAFKA_LATENCY("Runtime Processing Latency", "Time taken to process records in runtime module"),
-        KAFKA_RECORDS_LAG_MAX("Kafka Records Lag", "Maximum lag in processing Kafka records"),
-        KAFKA_RECORDS_CONSUMED_RATE("Kafka Consumption Rate", "Rate at which Kafka records are being consumed"),
+        RT_API_RECEIVED_COUNT("APIs Received", "Number of APIs received by mini-runtime module"),
+        KAFKA_RECORDS_LAG_MAX("Kafka Records Lag", "Maximum lag in processing Kafka records in this time period"),
+        KAFKA_RECORDS_CONSUMED_RATE("Kafka Consumption Rate", "Rate at which Kafka records are being consumed per second"),
         KAFKA_FETCH_AVG_LATENCY("Kafka Fetch Latency", "Average time taken to fetch records from Kafka"),
         KAFKA_BYTES_CONSUMED_RATE("Kafka Bytes Consumption Rate", "Rate at which bytes are being consumed from Kafka"),
         CYBORG_NEW_API_COUNT("New APIs Detected", "Count of newly discovered APIs by Cyborg"),
@@ -61,7 +60,16 @@ public class MetricData {
         // Cyborg metrics
         CYBORG_CALL_LATENCY("Cyborg Call Latency", "Time taken for Cyborg API calls"),
         CYBORG_CALL_COUNT("Cyborg Call Count", "Number of calls made to Cyborg"),
-        CYBORG_DATA_SIZE("Cyborg Data Size", "Total size of data processed by Cyborg");
+        CYBORG_DATA_SIZE("Cyborg Data Size", "Total size of data processed by Cyborg"),
+
+        DATA_INGESTION_API_COUNT("APIs Ingested", "Number of APIs ingested by data ingestion service"),
+
+        // Infrastructure metrics (CPU, Memory, Threads)
+        CPU_USAGE_PERCENT("CPU Usage", "Process CPU usage percentage"),
+        HEAP_MEMORY_USED_MB("Heap Memory Used", "JVM heap memory currently in use (MB)"),
+        HEAP_MEMORY_MAX_MB("Heap Memory Max", "Maximum JVM heap memory available (MB)"),
+        NON_HEAP_MEMORY_USED_MB("Non-Heap Memory Used", "JVM non-heap memory currently in use (MB)"),
+        THREAD_COUNT("Thread Count", "Number of live threads in the JVM");
 
         private final String descriptionName;
         private final String description;

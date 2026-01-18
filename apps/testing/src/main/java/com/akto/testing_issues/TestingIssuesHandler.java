@@ -13,10 +13,10 @@ import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.TestExecutor;
+import com.akto.testing.kafka_utils.TestingConfigurations;
 import com.akto.testing_utils.TestingUtils;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
-import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.InsertOneModel;
@@ -43,7 +43,8 @@ public class TestingIssuesHandler {
 
     private void writeUpdateQueryIntoWriteModel(List<WriteModel<TestingRunIssues>> writeModelList,
                                                 Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap,
-                                                List<TestingRunIssues> testingRunIssuesList) {
+                                                List<TestingRunIssues> testingRunIssuesList,
+                                                boolean doNotMarkIssuesAsFixed) {
         int lastSeen = Context.now();
 
         testingRunIssuesList.forEach(testingRunIssues -> {
@@ -61,14 +62,28 @@ public class TestingIssuesHandler {
                 updateStatusFields = new BsonDocument();
             } else if (runResult.isVulnerable()) {
                 updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN);
+            } else if (doNotMarkIssuesAsFixed) {
+                // Don't mark as FIXED if the test run has the "do not mark issues as fixed" flag set
+                updateStatusFields = new BsonDocument();
             } else {
                 updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED);
             }
 
+            // Check if severity was manually updated by a user
+            // If lastUpdatedBy is set and not null, it means a user manually changed the severity
+            // In that case, preserve the user's preference and don't overwrite it
+            boolean wasManuallySeverityUpdated = testingRunIssues.getLastUpdatedBy() != null &&
+                                                  !testingRunIssues.getLastUpdatedBy().isEmpty();
+
             // name = cateogry
             String subCategory = runResult.getTestSubType();
 
-            if (subCategory.startsWith("http")) {//TestSourceConfig case
+            if (wasManuallySeverityUpdated) {
+                // Preserve user's manual severity change
+                updateSeverityField = new BsonDocument();
+                loggerMaker.debugAndAddToDb(String.format("Preserving manual severity update for issue %s (last updated by: %s)",
+                    issuesId, testingRunIssues.getLastUpdatedBy()), LogDb.TESTING);
+            } else if (subCategory.startsWith("http")) {//TestSourceConfig case
                 TestSourceConfig config = TestSourceConfigsDao.instance.getTestSourceConfig(runResult.getTestSubType());
                 updateSeverityField = Updates.set(TestingRunIssues.KEY_SEVERITY, config.getSeverity());
             } else {//TestSubCategory case
@@ -185,7 +200,7 @@ public class TestingIssuesHandler {
 
         List<WriteModel<TestingRunIssues>> writeModelList = new ArrayList<>();
         // this will create only the updates {status and summaryId change} for existing issues only
-        writeUpdateQueryIntoWriteModel(writeModelList, testingIssuesIdsMap, testingRunIssuesList);
+        writeUpdateQueryIntoWriteModel(writeModelList, testingIssuesIdsMap, testingRunIssuesList, TestingConfigurations.getInstance().getDoNotMarkIssuesAsFixed());
 
 
         insertVulnerableTestsIntoIssuesCollection(writeModelList, testingIssuesIdsMap, testingRunIssuesList);

@@ -47,6 +47,8 @@ import com.opensymphony.xwork2.Action;
 
 import java.net.URI;
 import java.util.function.Function;
+
+import lombok.Getter;
 import lombok.Setter;
 
 import java.io.File;
@@ -64,6 +66,7 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
+import com.akto.action.threat_detection.SuspectSampleDataAction;
 import com.akto.dao.AccountSettingsDao;
 
 import static com.akto.utils.jira.Utils.buildAdditionalIssueFieldsForJira;
@@ -98,6 +101,13 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     @Setter
     private String actionItemType;
 
+    @Getter
+    @Setter
+    private String threatEventId;
+
+    @Getter @Setter
+    private String jiraTicketUrl;
+
     private Map<String,List<BasicDBObject>> projectAndIssueMap;
     private Map<String, ProjectMapping> projectMappings;
 
@@ -106,6 +116,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private static final String CREATE_ISSUE_ENDPOINT_BULK = "/rest/api/3/issue/bulk";
     private static final String ATTACH_FILE_ENDPOINT = "/attachments";
     private static final String ISSUE_STATUS_ENDPOINT = "/rest/api/3/project/%s/statuses";
+    private static final String PRIORITY_ENDPOINT = "/rest/api/3/priority";
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.DASHBOARD);
 
@@ -122,6 +133,9 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private String title;
     @Setter
     private String description;
+    @Setter
+    private String labels;
+
 
     public String testIntegration() {
 
@@ -266,6 +280,159 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         return statusesMap.stream()
             .flatMap(statusResp -> statusResp.getStatuses().stream())
             .collect(Collectors.toSet());
+    }
+
+    private List<BasicDBObject> jiraPriorities;
+
+    public String fetchJiraPriorities() {
+        // Always fetch credentials from database
+        jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+        if (jiraIntegration == null) {
+            loggerMaker.errorAndAddToDb("Jira integration not found");
+            addActionError("Jira is not integrated. Please integrate Jira first.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        baseUrl = jiraIntegration.getBaseUrl();
+        userEmail = jiraIntegration.getUserEmail();
+        apiToken = jiraIntegration.getApiToken();
+
+        loggerMaker.infoAndAddToDb("Fetching Jira priorities from " + baseUrl);
+        setApiToken(buildApiToken(apiToken));
+        try {
+            String priorityUrl = baseUrl + PRIORITY_ENDPOINT;
+            Request.Builder builder = buildBasicRequest(priorityUrl, userEmail, apiToken, false);
+            Request okHttpRequest = builder.build();
+
+            Response response = null;
+            String responsePayload;
+
+            try {
+                response = client.newCall(okHttpRequest).execute();
+                loggerMaker.infoAndAddToDb("Jira priorities API response code: " + response.code());
+
+                if (!response.isSuccessful()) {
+                    loggerMaker.errorAndAddToDb("Failed to fetch Jira priorities - response not successful");
+                    addActionError("Failed to fetch Jira priorities");
+                    return Action.ERROR.toUpperCase();
+                }
+
+                if (response.body() == null) {
+                    loggerMaker.errorAndAddToDb("Failed to fetch Jira priorities - response body is null");
+                    addActionError("Failed to fetch Jira priorities");
+                    return Action.ERROR.toUpperCase();
+                }
+
+                responsePayload = response.body().string();
+
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error while making request to fetch Jira priorities");
+                addActionError("Error while fetching Jira priorities");
+                return Action.ERROR.toUpperCase();
+            } finally {
+                if (response != null) {
+                    response.close();
+                }
+            }
+
+            try {
+                // Parse JSON array response
+                List<Map<String, Object>> prioritiesArray = JsonUtils.fromJson(responsePayload,
+                    new TypeReference<List<Map<String, Object>>>() {});
+
+                this.jiraPriorities = new ArrayList<>();
+
+                if (prioritiesArray != null) {
+                    for (Map<String, Object> priority : prioritiesArray) {
+                        BasicDBObject priorityItem = new BasicDBObject();
+                        priorityItem.put("id", priority.get("id") != null ? priority.get("id").toString() : "");
+                        priorityItem.put("name", priority.get("name") != null ? priority.get("name").toString() : "");
+                        this.jiraPriorities.add(priorityItem);
+                    }
+                }
+                loggerMaker.infoAndAddToDb("Successfully loaded " + this.jiraPriorities.size() + " Jira priorities");
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error parsing Jira priorities response");
+                addActionError("Error parsing Jira priorities");
+                return Action.ERROR.toUpperCase();
+            }
+
+            return Action.SUCCESS.toUpperCase();
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchJiraPriorities");
+            addActionError("Error while fetching jira priorities");
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    public List<BasicDBObject> getJiraPriorities() {
+        return jiraPriorities;
+    }
+
+    public void setJiraPriorities(List<BasicDBObject> jiraPriorities) {
+        this.jiraPriorities = jiraPriorities;
+    }
+
+    private Map<String, String> severityToPriorityMap;
+
+    public String saveSeverityMapping() {
+        try {
+            loggerMaker.infoAndAddToDb("Saving Jira severity to priority mapping for account: " + Context.accountId.get());
+
+            if (severityToPriorityMap == null) {
+                loggerMaker.errorAndAddToDb("Severity mapping is null");
+                addActionError("Severity mapping cannot be null");
+                return Action.ERROR.toUpperCase();
+            }
+
+            JiraIntegrationDao.instance.updateOne(
+                new BasicDBObject(),
+                Updates.set(JiraIntegration.ISSUE_SEVERITY_TO_PRIORITY_MAP, severityToPriorityMap)
+            );
+
+            loggerMaker.infoAndAddToDb("Successfully updated severity to priority mapping in JiraIntegration");
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error saving severity mapping");
+            addActionError("Error while saving severity mapping: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    public String fetchSeverityMapping() {
+        try {
+            loggerMaker.infoAndAddToDb("Fetching Jira severity to priority mapping for account: " + Context.accountId.get());
+
+            JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+
+            if (jiraIntegration != null) {
+                this.severityToPriorityMap = jiraIntegration.getIssueSeverityToPriorityMap();
+
+                if (this.severityToPriorityMap == null) {
+                    this.severityToPriorityMap = new HashMap<>();
+                    loggerMaker.infoAndAddToDb("No existing severity mapping found, initialized empty map");
+                }
+            } else {
+                loggerMaker.infoAndAddToDb("JiraIntegration not found, initialized empty severity map");
+                this.severityToPriorityMap = new HashMap<>();
+            }
+
+            loggerMaker.infoAndAddToDb("Successfully fetched severity mapping with " + this.severityToPriorityMap.size() + " entries");
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error fetching severity mapping");
+            addActionError("Error while fetching severity mapping: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    public Map<String, String> getSeverityToPriorityMap() {
+        return severityToPriorityMap;
+    }
+
+    public void setSeverityToPriorityMap(Map<String, String> severityToPriorityMap) {
+        this.severityToPriorityMap = severityToPriorityMap;
     }
 
     private List<BasicDBObject> getIssueTypesWithIds(BasicDBList issueTypes) {
@@ -461,7 +628,9 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         if(apiToken == null){
             throw new IllegalStateException("No jira integration found. Please integrate Jira first.");
         }
-        String url = baseUrl + META_ENDPOINT;
+        // Use new endpoint: /rest/api/3/issue/createmeta/{projectKey}/issuetypes
+        // Old deprecated endpoint: /rest/api/3/issue/createmeta returns empty projects array
+        String url = baseUrl + "/rest/api/3/issue/createmeta/" + projectId + "/issuetypes";
         Request.Builder builder = buildBasicRequest(url, userEmail, apiToken, true);
         Request okHttpRequest = builder.build();
 
@@ -470,11 +639,22 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
         try {
             response = client.newCall(okHttpRequest).execute();
+
+            if (response.body() == null) {
+                throw new IllegalStateException("Received null response body from Jira API");
+            }
+
             responsePayload = response.body().string();
 
             if (!Utils.isJsonPayload(responsePayload)) {
+                response.close(); // Close before retry to prevent resource leak
                 okHttpRequest = retryWithoutGzipRequest(builder, url);
                 response = client.newCall(okHttpRequest).execute();
+
+                if (response.body() == null) {
+                    throw new IllegalStateException("Received null response body from Jira API after retry");
+                }
+
                 responsePayload = response.body().string();
             }
         } finally {
@@ -483,20 +663,15 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             }
         }
 
+        // New API response structure: {"issueTypes": [{"id": "10001", "name": "Bug"}]}
         BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
-        BasicDBList projects = (BasicDBList) payloadObj.get("projects");
+        BasicDBList issueTypes = (BasicDBList) payloadObj.get("issueTypes");
 
-        for (Object projObj : projects) {
-            BasicDBObject obj = (BasicDBObject) projObj;
-            String key = obj.getString("key");
-
-            if (projectId.equals(key)) {
-                BasicDBList issueTypes = (BasicDBList) obj.get("issuetypes");
-                return getIssueTypesWithIds(issueTypes);
-            }
+        if (issueTypes == null || issueTypes.isEmpty()) {
+            throw new IllegalArgumentException("No issue types found for project '" + projectId + "'. Check if the API token has access to this project.");
         }
 
-        throw new IllegalArgumentException("Project with ID '" + projectId + "' not found");
+        return getIssueTypesWithIds(issueTypes);
     }
 
     public String fetchIntegration() {
@@ -542,7 +717,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             Filters.eq(Constants.ID,
                 getRemediationId(jiraMetaData.getTestingIssueId().getTestSubCategory())));
         BasicDBObject fields = jiraTicketPayloadCreator(jiraMetaData, testingRunIssues, yamlTemplate.getInfo(),
-            remediation);
+            remediation, jiraIntegration);
 
         reqPayload.put("fields", fields);
 
@@ -774,8 +949,14 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                 String endpoint = url.getPath();
 
                 Map<String, Object> additionalFields = null;
-                if (this.jiraMetaData != null && this.jiraMetaData.getAdditionalIssueFields() != null) {
-                    additionalFields = this.jiraMetaData.getAdditionalIssueFields();
+                String labels = null;
+                if (this.jiraMetaData != null) {
+                    if (this.jiraMetaData.getAdditionalIssueFields() != null) {
+                        additionalFields = this.jiraMetaData.getAdditionalIssueFields();
+                    }
+                    if (this.jiraMetaData.getLabels() != null) {
+                        labels = this.jiraMetaData.getLabels();
+                    }
                 }
 
                 jiraMetaData = new JiraMetaData(
@@ -786,7 +967,8 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                         info.getDescription(),
                         testingIssuesId,
                         null,
-                        additionalFields
+                        additionalFields,
+                        labels
                 );
 
             } catch (Exception e) {
@@ -817,7 +999,8 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             BasicDBObject fields = jiraTicketPayloadCreator(jiraMetaData,
                 issuesEligibleForJiraMap.get(issuesId),
                 testSubTypeToInfoMap.get(issuesId.getTestSubCategory()),
-                remediationMap.get(getRemediationId(issuesId.getTestSubCategory())));
+                remediationMap.get(getRemediationId(issuesId.getTestSubCategory())),
+                jiraIntegration);
 
             // Prepare the issue object
             BasicDBObject issueObject = new BasicDBObject();
@@ -936,7 +1119,8 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     }
 
     private BasicDBObject jiraTicketPayloadCreator(JiraMetaData jiraMetaData, TestingRunIssues issue,
-        Info info, Remediation remediation) {
+        Info info, Remediation remediation, JiraIntegration jiraIntegration) {
+
         String endpoint = jiraMetaData.getEndPointStr().replace("Endpoint - ", "");
         String truncatedEndpoint = endpoint;
         if(endpoint.length() > 30) {
@@ -959,8 +1143,28 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             contentList.addAll(additionalFields);
         }
 
-        BasicDBObject fields = buildPayloadForJiraTicket(summary, this.projId, this.issueType, contentList,jiraMetaData.getAdditionalIssueFields());
-        fields.put("labels", new String[] {JobConstants.TICKET_LABEL_AKTO_SYNC});
+        BasicDBObject fields = buildPayloadForJiraTicket(summary, this.projId, this.issueType, contentList,jiraMetaData.getAdditionalIssueFields(), issue.getSeverity(), jiraIntegration);
+        
+        // Combine user labels with AKTO_SYNC label
+        List<String> labelsList = new ArrayList<>();
+        labelsList.add(JobConstants.TICKET_LABEL_AKTO_SYNC);
+
+        // Parse and add user-provided labels
+        if (jiraMetaData.getLabels() != null && !jiraMetaData.getLabels().trim().isEmpty()) {
+            String[] userLabels = jiraMetaData.getLabels().split(",");
+            for (String label : userLabels) {
+                String trimmedLabel = label.trim();
+                if (!trimmedLabel.isEmpty()) {
+                    // Jira labels cannot contain spaces - replace with underscores
+                    String sanitizedLabel = trimmedLabel.replaceAll("\\s+", "_");
+                    if (!labelsList.contains(sanitizedLabel)) {
+                        labelsList.add(sanitizedLabel);
+                    }
+                }
+            }
+        }
+
+        fields.put("labels", labelsList.toArray(new String[0]));
         return fields;
     }
 
@@ -1255,7 +1459,28 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         try {
             BasicDBList contentList = new BasicDBList();
             contentList.add(buildContentDetails(this.description, null));
-            BasicDBObject fields = buildPayloadForJiraTicket(this.title, this.projId, this.issueType, contentList, null);
+            BasicDBObject fields = buildPayloadForJiraTicket(this.title, this.projId, this.issueType, contentList, null, null, jiraIntegration);
+            
+            // Combine user labels with AKTO_SYNC label
+            List<String> labelsList = new ArrayList<>();
+            labelsList.add(JobConstants.TICKET_LABEL_AKTO_SYNC);
+
+            // Parse and add user-provided labels
+            if (this.labels != null && !this.labels.trim().isEmpty()) {
+                String[] userLabels = this.labels.split(",");
+                for (String label : userLabels) {
+                    String trimmedLabel = label.trim();
+                    if (!trimmedLabel.isEmpty()) {
+                        // Jira labels cannot contain spaces - replace with underscores
+                        String sanitizedLabel = trimmedLabel.replaceAll("\\s+", "_");
+                        if (!labelsList.contains(sanitizedLabel)) {
+                            labelsList.add(sanitizedLabel);
+                        }
+                    }
+                }
+            }
+
+            fields.put("labels", labelsList.toArray(new String[0]));
 
             BasicDBObject reqPayload = new BasicDBObject();
             reqPayload.put("fields", fields);
@@ -1287,13 +1512,25 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
                 Pair<String, String> pair = getJiraTicketUrlPair(responsePayload, jiraIntegration.getBaseUrl());
                 this.jiraTicketKey = pair.getSecond();
-                String jiraTicketUrl = pair.getFirst();
+                this.jiraTicketUrl = pair.getFirst();
                 if (!StringUtils.isEmpty(this.actionItemType)) {
                     storeTicketUrlInAccountSettings(jiraTicketUrl);
                 }
 
             } catch (Exception e) {
                 // TODO: handle exception
+                loggerMaker.errorAndAddToDb("Error creating general Jira ticket: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+                return Action.ERROR.toUpperCase();
+            }
+
+            if(!StringUtils.isEmpty(this.threatEventId)) {
+               // utilise the updateMaliciousEventStatus to update the jiraTicket url in the malicious event
+               SuspectSampleDataAction suspectSampleDataAction = new SuspectSampleDataAction();
+               suspectSampleDataAction.setEventId(this.threatEventId);
+               String result = suspectSampleDataAction.updateMaliciousEventJiraUrl(this.threatEventId, jiraTicketUrl);
+               if(!result.equals(Action.SUCCESS.toUpperCase())) {
+                addActionError("Error updating malicious event Jira URL: " + result);
+               }
             }
             return Action.SUCCESS.toUpperCase();
 

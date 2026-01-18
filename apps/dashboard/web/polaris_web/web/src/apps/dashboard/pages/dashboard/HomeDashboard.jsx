@@ -1,6 +1,7 @@
 import React, { useEffect, useReducer, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from './api';
+import threatApi from "../threat_detection/api"
 import func from '@/util/func';
 import observeFunc from "../observe/transform"
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
@@ -67,6 +68,8 @@ function HomeDashboard() {
         },
     ];
 
+    const ALL_COLLECTION_INVENTORY_ID = 111111121
+
 
     const allCollections = PersistStore(state => state.allCollections)
     const hostNameMap = PersistStore(state => state.hostNameMap)
@@ -92,6 +95,9 @@ function HomeDashboard() {
     const [mcpApiCallStats, setMcpApiCallStats] = useState([])
     const [policyGuardrailStats, setPolicyGuardrailStats] = useState([])
     const [mcpTopApplications, setMcpTopApplications] = useState([])
+    const [threatActorsTimeline, setThreatActorsTimeline] = useState([])
+    const [threatSeverityData, setThreatSeverityData] = useState({})
+    const [threatCategoryData, setThreatCategoryData] = useState([{ data: [], color: observeFunc.getColorForSensitiveData('CRITICAL') }])
 
     // MCP API Requests time selector state
     const statsOptions = [
@@ -131,21 +137,25 @@ function HomeDashboard() {
             "text": 0,
             "color": "#147CF6",
             "filterKey": "Partner",
+            "filterValue": "Partner"
         },
         "Internal": {
             "text": 0,
             "color": "#FDB33D",
-            "filterKey": "Internal"
+            "filterKey": "Internal",
+            "filterValue": "Private"
         },
         "External": {
             "text": 0,
             "color": "#658EE2",
-            "filterKey": "External"
+            "filterKey": "External",
+            "filterValue": "Public"
         },
         "Third Party": {
             "text": 0,
             "color": "#68B3D0",
-            "filterKey": "Third Party"
+            "filterKey": "Third Party",
+            "filterValue": "Third Party"
         },
         "Need more data": {
             "text": 0,
@@ -166,6 +176,70 @@ function HomeDashboard() {
 
     const convertSeverityArrToMap = (arr) => {
         return Object.fromEntries(arr.map(item => [item.split(' ')[1].toLowerCase(), +item.split(' ')[0]]));
+    }
+
+    function transformThreatActorsTimeline(actorsCounts) {
+        if (!actorsCounts || !Array.isArray(actorsCounts)) {
+            return [];
+        }
+        return actorsCounts
+            .sort((a, b) => a.ts - b.ts)
+            .map(item => [
+                item.ts * 1000,
+                item.totalActors || 0
+            ]);
+    }
+
+    function transformSeverityData(categoryCounts) {
+        const severityLevels = func.getAktoSeverities();
+        const severityMap = {};
+
+        severityLevels.forEach(severity => {
+            severityMap[severity] = {
+                text: 0,
+                color: func.getHexColorForSeverity(severity),
+                filterKey: severity
+            };
+        });
+
+        if (categoryCounts && Array.isArray(categoryCounts)) {
+            categoryCounts.forEach(item => {
+                const severity = String(item.subCategory || item.severity || '').toUpperCase();
+                if (severityMap[severity]) {
+                    severityMap[severity].text = item.count || 0;
+                }
+            });
+        }
+
+        return severityMap;
+    }
+
+    function transformThreatCategoryData(threatCategoryCount) {
+        if (!threatCategoryCount || !Array.isArray(threatCategoryCount)) {
+            return [{ data: [], color: observeFunc.getColorForSensitiveData('CRITICAL') }];
+        }
+
+        const categoryMap = {};
+        threatCategoryCount.forEach(item => {
+            const category = item.category || item.subCategory || "Unknown";
+            const displayName = category
+                .replace(/_/g, ' ')
+                .toLowerCase()
+                .replace(/\b\w/g, l => l.toUpperCase());
+
+            if (!categoryMap[displayName]) {
+                categoryMap[displayName] = 0;
+            }
+            categoryMap[displayName] += item.count || 0;
+        });
+
+        const sortedCategories = Object.entries(categoryMap)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 10);
+
+        const data = sortedCategories.map(([name, count]) => [name, count]);
+
+        return [{ data, color: observeFunc.getColorForSensitiveData('CRITICAL'), name: "Threats" }];
     }
 
     const testSummaryData = async () => {
@@ -196,6 +270,11 @@ function HomeDashboard() {
     }
 
     const fetchPolicyGuardrailStats = async (startTs, endTs) => {
+        if (!func.checkForFeatureSaas('THREAT_DETECTION')) {
+            const emptyData = generateTimeSeriesWithGaps(startTs, endTs, {});
+            setPolicyGuardrailStats(emptyData);
+            return;
+        }
         try {
             // Get collections with guard-rail tag
             const guardRailCollections = allCollections.filter(collection => {
@@ -261,6 +340,11 @@ function HomeDashboard() {
     };
 
     const fetchMcpApiCallStats = async (startTs, endTs) => {
+        if (!func.checkForFeatureSaas('THREAT_DETECTION')) {
+            const emptyData = generateTimeSeriesWithGaps(startTs, endTs, {});
+            setMcpApiCallStats(emptyData);
+            return;
+        }
         try {
             // Get MCP collections by checking for MCP tag
             const mcpCollections = allCollections.filter(collection => {
@@ -446,8 +530,51 @@ function HomeDashboard() {
         setLoading(false)
     }
 
+    const fetchThreatData = async () => {
+        try {
+            const threatPromises = [
+                threatApi.getDailyThreatActorsCount(startTimestamp, endTimestamp, []),
+                threatApi.fetchCountBySeverity(startTimestamp, endTimestamp),
+                threatApi.fetchThreatCategoryCount(startTimestamp, endTimestamp)
+            ];
+
+            const results = await Promise.allSettled(threatPromises);
+
+            // Process timeline data
+            if (results[0].status === 'fulfilled' && results[0].value?.actorsCounts) {
+                const timelineData = transformThreatActorsTimeline(results[0].value.actorsCounts);
+                setThreatActorsTimeline(timelineData);
+            } else {
+                setThreatActorsTimeline([]);
+            }
+
+            // Process severity data
+            if (results[1].status === 'fulfilled' && results[1].value?.categoryCounts) {
+                const severityData = transformSeverityData(results[1].value.categoryCounts);
+                setThreatSeverityData(severityData);
+            } else {
+                setThreatSeverityData({});
+            }
+
+            // Process category data
+            if (results[2].status === 'fulfilled' && results[2].value?.categoryCounts) {
+                const categoryData = transformThreatCategoryData(results[2].value.categoryCounts);
+                setThreatCategoryData(categoryData);
+            } else {
+                setThreatCategoryData([{ data: [], color: observeFunc.getColorForSensitiveData('CRITICAL') }]);
+            }
+        } catch (error) {
+            setThreatActorsTimeline([]);
+            setThreatSeverityData({});
+            setThreatCategoryData([{ data: [], color: observeFunc.getColorForSensitiveData('CRITICAL') }]);
+        }
+    };
+
     useEffect(() => {
         fetchData()
+        if (func.checkForFeatureSaas('THREAT_DETECTION')) {
+            fetchThreatData()
+        }
     }, [startTimestamp, endTimestamp])
     
     // Fetch MCP API call stats when time range changes
@@ -577,7 +704,7 @@ function HomeDashboard() {
         )
     }
 
-    const runTestEmptyCardComponent = <Text alignment='center' color='subdued'>There's no data to show. <Link url="/dashboard/testing" target='_blank'>Run test</Link> to get data populated. </Text>
+    const runTestEmptyCardComponent = <Text alignment='center' color='subdued'>There's no data to show. <Link url="/dashboard/testing" target='_blank'>{mapLabel('Run test', getDashboardCategory())}</Link> to get data populated. </Text>
 
     function mapAccessTypes(apiStats, missingCount, redundantCount, apiTypeMissing) {
         if (!apiStats) return
@@ -624,6 +751,11 @@ function HomeDashboard() {
         // Initialize colors list
         const colors = ["#7F56D9", "#8C66E1", "#9E77ED", "#AB88F1", "#B692F6", "#D6BBFB", "#E9D7FE", "#F4EBFF"];
 
+        const formatFilterValue = (key) => {
+            if (key === undefined || key === null) return undefined
+            return String(key).toLowerCase()
+        }
+
         // Convert and sort the authTypeMap entries by value (count) in descending order
         const sortedAuthTypes = Object.entries(apiStatsEnd.authTypeMap)
             .map(([key, value]) => ({ key: key, text: value }))
@@ -636,10 +768,12 @@ function HomeDashboard() {
 
         // Fill in the authMap with sorted entries and corresponding colors
         sortedAuthTypes.forEach((item, index) => {
-            authMap[convertKey(item.key)] = {
+            const displayKey = convertKey(item.key)
+            authMap[displayKey] = {
                 "text": item.text,
                 "color": colors[index] || "#F4EBFF", // Assign color; default to last color if out of range
-                "filterKey": convertKey(item.key),
+                "filterKey": displayKey,
+                "filterValue": formatFilterValue(item.key),
                 "dataTableComponent": apiStatsStart && apiStatsStart.authTypeMap && apiStatsStart.authTypeMap[item.key] ? generateChangeComponent((item.text - apiStatsStart.authTypeMap[item.key]), item.key === "UNAUTHENTICATED") : null
             };
         });
@@ -651,6 +785,7 @@ function HomeDashboard() {
                 "text": countMissing,
                 "color": "#EFE3FF",
                 "filterKey": "Need more data",
+                "filterValue": undefined,
                 "dataTableComponent": generateChangeComponent(0, false) // No change component for missing auth types
             };
         }
@@ -659,6 +794,18 @@ function HomeDashboard() {
         setAuthMap(authMap)
     }
 
+
+    const buildAuthFiltersUrl = useCallback((baseUrl, filterValue, baseFilter) => {
+        if(!func.checkForFeatureSaas("AKTO_API_GROUP_CRONS")){
+            return undefined;
+        }
+        if (!baseUrl) return undefined
+        if (!filterValue) {
+            return baseUrl
+        }
+        const separator = baseUrl.includes('?') ? '&' : '?'
+        return `${baseUrl}${separator}filters=${baseFilter}__${encodeURIComponent(filterValue)}`
+    }, [])
 
     function buildAPITypesData(apiStats, missingCount, redundantCount, apiTypeMissing) {
         // Initialize the data with default values for all API types
@@ -813,9 +960,9 @@ function HomeDashboard() {
     const testSummaryCardsList = showTestingComponents ? (
         <InfoCard
             component={<TestSummaryCardsList summaryItems={testSummaryInfo} />}
-            title="Recent Tests"
-            titleToolTip="View details of recent API security tests, APIs tested and number of issues found of last 7 days."
-            linkText="Increase test coverage"
+            title={"Recent " + mapLabel("Tests", getDashboardCategory())}
+            titleToolTip={"View details of recent" + mapLabel("API security tests", getDashboardCategory()) + ", APIs tested and number of issues found of last 7 days."}
+            linkText={"Increase " + mapLabel("test coverage", getDashboardCategory())}
             linkUrl="/dashboard/testing"
         />
     ) : null
@@ -836,22 +983,22 @@ function HomeDashboard() {
             "Critical": {
                 "text": countMap.CRITICAL || 0,
                 "color": func.getHexColorForSeverity("CRITICAL"),
-                "filterKey": "Critical"
+                "filterKey": "CRITICAL"
             },
             "High": {
                 "text": countMap.HIGH || 0,
                 "color": func.getHexColorForSeverity("HIGH"),
-                "filterKey": "High"
+                "filterKey": "HIGH"
             },
             "Medium": {
                 "text": countMap.MEDIUM || 0,
                 "color": func.getHexColorForSeverity("MEDIUM"),
-                "filterKey": "Medium"
+                "filterKey": "MEDIUM"
             },
             "Low": {
                 "text": countMap.LOW || 0,
                 "color": func.getHexColorForSeverity("LOW"),
-                "filterKey": "Low"
+                "filterKey": "LOW"
             }
         };
 
@@ -890,7 +1037,7 @@ function HomeDashboard() {
             <div style={{ marginTop: "20px" }}>
                 <ChartypeComponent
                     data={severityMap}
-                    navUrl={"/dashboard/issues/"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0}
+                    navUrl={"/dashboard/issues"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0}
                     pieInnerSize="50%"
                 />
             </div>
@@ -917,27 +1064,31 @@ function HomeDashboard() {
         linkUrl="/dashboard/observe/inventory"
     />
 
+    const inventoryAllCollectionBaseUrl = `/dashboard/observe/inventory/${ALL_COLLECTION_INVENTORY_ID}`
+
     const apisByAccessTypeComponent = <InfoCard
         component={
-            <ChartypeComponent data={accessTypeMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0} pieInnerSize="50%" />
+            <ChartypeComponent data={accessTypeMap} navUrl={inventoryAllCollectionBaseUrl}  navUrlBuilder={(baseUrl, filterValue) => buildAuthFiltersUrl(baseUrl, filterValue, "access_type")} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0} pieInnerSize="50%" />
         }
         title={`${mapLabel("APIs", getDashboardCategory())} by Access type`}
         titleToolTip={`Categorization of ${mapLabel("APIs", getDashboardCategory())} based on their access permissions and intended usage (Partner, Internal, External, etc.).`}
         linkText="Check out"
-        linkUrl="/dashboard/observe/inventory"
+        linkUrl={inventoryAllCollectionBaseUrl}
     />
+
+    
 
     const apisByAuthTypeComponent =
         <InfoCard
             component={
                 <div style={{ marginTop: showTestingComponents ? '0px' : '20px' }}>
-                    <ChartypeComponent data={authMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0} pieInnerSize="50%"/>
+                    <ChartypeComponent data={authMap} navUrl={inventoryAllCollectionBaseUrl} navUrlBuilder={(baseUrl, filterValue) => buildAuthFiltersUrl(baseUrl, filterValue, "auth_type")} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0} pieInnerSize="50%"/>
                 </div>
             }
             title={`${mapLabel("APIs", getDashboardCategory())} by Authentication`}
             titleToolTip={`Breakdown of ${mapLabel("APIs", getDashboardCategory())} by the authentication methods they use, including unauthenticated APIs which may pose security risks.`}
             linkText="Check out"
-            linkUrl="/dashboard/observe/inventory"
+            linkUrl={inventoryAllCollectionBaseUrl}
         />
 
     const apisByTypeComponent = (!isMCPSecurityCategory()) ? <InfoCard
@@ -1277,11 +1428,119 @@ function HomeDashboard() {
         minHeight="344px"
     />
 
+    const hasTimelineData = Array.isArray(threatActorsTimeline) && threatActorsTimeline.length > 0;
+
+    const threatActorsTimelineComponent = (
+        <InfoCard
+            component={
+                <Box>
+                    {hasTimelineData ? (
+                        <GraphMetric
+                            data={[{
+                                data: threatActorsTimeline,
+                                color: observeFunc.getColorForSensitiveData('CRITICAL'),
+                                name: 'Active Threat Actors'
+                            }]}
+                            type='spline'
+                            color={observeFunc.getColorForSensitiveData('CRITICAL')}
+                            areaFillHex='true'
+                            height='250'
+                            title=''
+                            subtitle=''
+                            defaultChartOptions={defaultChartOptions}
+                            backgroundColor='#ffffff'
+                            text='true'
+                            inputMetrics={[]}
+                        />
+                    ) : (
+                        <Box minHeight="250px" paddingBlockStart="8">
+                            <Text alignment='center' color='subdued'>No threat actor data in the selected period</Text>
+                        </Box>
+                    )}
+                </Box>
+            }
+            title="Threat Actor Activity"
+            titleToolTip="Timeline showing the number of active threat actors detected over time"
+            linkText="View threat details"
+            linkUrl="/dashboard/protection/threat-dashboard"
+        />
+    );
+
+    const hasSeverityData = threatSeverityData && typeof threatSeverityData === 'object' && Object.keys(threatSeverityData).length > 0 && Object.values(threatSeverityData).some(item => item?.text > 0);
+
+    const threatSeverityComponent = (
+        <InfoCard
+            component={
+                <div style={{ marginTop: "20px" }}>
+                    {hasSeverityData ? (
+                        <ChartypeComponent
+                            data={threatSeverityData}
+                            navUrl="/dashboard/protection/threat-dashboard"
+                            isNormal={true}
+                            boxHeight={'250px'}
+                            chartOnLeft={true}
+                            dataTableWidth="250px"
+                            pieInnerSize="50%"
+                        />
+                    ) : (
+                        <Box minHeight="250px">
+                            <Text alignment='center' color='subdued'>No threat severity data available</Text>
+                        </Box>
+                    )}
+                </div>
+            }
+            title="Threats by Severity"
+            titleToolTip="Distribution of detected threats categorized by severity level"
+            linkText="View all threats"
+            linkUrl="/dashboard/protection/threat-dashboard"
+        />
+    );
+
+    const hasCategoryData = threatCategoryData[0] && Array.isArray(threatCategoryData[0].data) && threatCategoryData[0].data.length > 0;
+
+    const threatCategoryComponent = (
+        <InfoCard
+            component={
+                <Box>
+                    {hasCategoryData ? (
+                        <StackedChart
+                            type='column'
+                            color={observeFunc.getColorForSensitiveData('CRITICAL')}
+                            height="280"
+                            data={threatCategoryData}
+                            yAxisTitle="Number of Threats"
+                            width={40}
+                            showGridLines={true}
+                            customXaxis={{
+                                categories: threatCategoryData[0].data.map(item => item[0])
+                            }}
+                        />
+                    ) : (
+                        <Box minHeight="280px" paddingBlockStart="8">
+                            <Text alignment='center' color='subdued'>No threat category data available</Text>
+                        </Box>
+                    )}
+                </Box>
+            }
+            title="Top Threat Categories"
+            titleToolTip="Most common types of security threats detected across your APIs"
+            linkText="View all categories"
+            linkUrl="/dashboard/protection/threat-dashboard"
+        />
+    );
+
+    const threatComponents = func.checkForFeatureSaas('THREAT_DETECTION') ? [
+        {id: 'threat-timeline', component: threatActorsTimelineComponent},
+        {id: 'threat-severity', component: threatSeverityComponent},
+        {id: 'threat-categories', component: threatCategoryComponent},
+    ] : [];
+
     let gridComponents = showTestingComponents ?
         [
             {id: 'critical-apis', component: criticalUnsecuredAPIsOverTime},
             {id: 'vulnerable-apis', component: vulnerableApisBySeverityComponent},
             {id: 'critical-findings', component: criticalFindings},
+            ...threatComponents,
             {id: 'risk-score', component: apisByRiskscoreComponent},
             {id: 'access-type', component: apisByAccessTypeComponent},
             {id: 'auth-type', component: apisByAuthTypeComponent},
@@ -1296,6 +1555,7 @@ function HomeDashboard() {
             {id: 'critical-apis', component: criticalUnsecuredAPIsOverTime},
             {id: 'vulnerable-apis', component: vulnerableApisBySeverityComponent},
             {id: 'critical-findings', component: criticalFindings},
+            ...threatComponents,
             {id: 'api-type', component: apisByTypeComponent},
         ]
 
@@ -1313,7 +1573,7 @@ function HomeDashboard() {
     }
 
     const gridComponent = (
-        isMCPSecurityCategory() ? (
+        (isMCPSecurityCategory()) ? (
             <VerticalStack gap={5}>
                 {/* First row with MCP Components Requests and Policy Guardrails side by side */}
                 <HorizontalGrid gap={5} columns={2}>
