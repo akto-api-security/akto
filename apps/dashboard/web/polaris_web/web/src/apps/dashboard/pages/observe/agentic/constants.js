@@ -1,113 +1,243 @@
-import { Text } from "@shopify/polaris";
-import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip";
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
-import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
-import { ASSET_TAG_KEYS, formatDisplayName, getTypeFromTags, findAssetTag } from "./mcpClientHelper";
+import { 
+    ASSET_TAG_KEYS, 
+    ROW_TYPES,
+    formatDisplayName, 
+    getTypeFromTags, 
+    findAssetTag,
+    findTypeTag,
+    getAgentTypeFromValue 
+} from "./mcpClientHelper";
 import func from "@/util/func";
 
 // Route constants
-export const UNKNOWN_GROUP = "Unknown";
 export const INVENTORY_PATH = '/dashboard/observe/inventory';
 export const INVENTORY_FILTER_KEY = '/dashboard/observe/inventory/';
 export const ASSET_TAG_KEY_VALUES = Object.values(ASSET_TAG_KEYS);
 
-// Table headers
+// Table headers with all columns
 export const getHeaders = () => {
-    const cat = getDashboardCategory();
     return [
         { title: "", text: "", value: "iconComp", isText: CellType.TEXT, boxWidth: '24px' },
-        { title: "Agentic asset", text: "Agentic asset", value: "groupName", filterKey: "groupName", textValue: "groupName", showFilter: true },
-        { title: "Type", text: "Type", value: "clientType", filterKey: "clientType", textValue: "clientType", showFilter: true, boxWidth: "120px" },
-        {
-            title: "Endpoints", text: "Endpoints", value: "collectionsCount", isText: CellType.TEXT, sortActive: true, boxWidth: "80px",
+        { title: "Agentic asset", text: "Agentic asset", value: "groupName", filterKey: "groupName", textValue: "groupName", showFilter: true, sortActive: true },
+        { title: "Type", text: "Type", value: "clientType", filterKey: "clientType", textValue: "clientType", showFilter: true, sortActive: true, boxWidth: "120px" },
+        { 
+            title: "Endpoints", 
+            text: "Endpoints", 
+            value: "endpointsCount", 
+            isText: CellType.TEXT, 
+            sortActive: true, 
+            boxWidth: "80px",
             mergeType: (a, b) => (a || 0) + (b || 0),
-            shouldMerge: true,
+            shouldMerge: true
         },
-        {
-            title: mapLabel("Total endpoints", cat), text: mapLabel("Total endpoints", cat), value: "urlsCount", isText: CellType.TEXT, sortActive: true, boxWidth: "80px", filterKey: "urlsCount", showFilter: true,
-            mergeType: (a, b) => (a || 0) + (b || 0),
-            shouldMerge: true,
-        },
-        {
-            title: <HeadingWithTooltip content={<Text variant="bodySm">Maximum risk score</Text>} title="Risk score" />, value: "riskScoreComp", textValue: "riskScore", numericValue: "riskScore", text: "Risk Score", sortActive: true, boxWidth: "80px",
+        { 
+            title: "Risk score", 
+            text: "Risk score", 
+            value: "riskScoreComp", 
+            numericValue: "riskScore", 
+            textValue: "riskScore", 
+            sortActive: true, 
+            boxWidth: "80px",
             mergeType: (a, b) => Math.max(a || 0, b || 0),
-            shouldMerge: true,
+            shouldMerge: true
         },
-        {
-            title: "Sensitive data", text: "Sensitive data", value: "sensitiveSubTypes", numericValue: "sensitiveInRespTypes", textValue: "sensitiveSubTypesVal", tooltipContent: <Text variant="bodySm">Types of sensitive data in responses</Text>, boxWidth: "160px",
+        { 
+            title: "Sensitive data", 
+            text: "Sensitive data", 
+            value: "sensitiveSubTypes", 
+            numericValue: "sensitiveInRespTypes",
+            textValue: "sensitiveSubTypesVal", 
+            boxWidth: "160px",
             mergeType: (a, b) => [...new Set([...(a || []), ...(b || [])])],
-            shouldMerge: true,
+            shouldMerge: true
         },
-        {
-            title: <HeadingWithTooltip content={<Text variant="bodySm">Last traffic seen</Text>} title="Last traffic seen" />, text: "Last traffic seen", value: "lastTraffic", numericValue: "detectedTimestamp", isText: CellType.TEXT, sortActive: true, boxWidth: "80px",
+        { 
+            title: "Last traffic seen", 
+            text: "Last traffic seen", 
+            value: "lastTraffic", 
+            numericValue: "detectedTimestamp", 
+            isText: CellType.TEXT, 
+            sortActive: true, 
+            boxWidth: "120px",
             mergeType: (a, b) => Math.max(a || 0, b || 0),
-            shouldMerge: true,
+            shouldMerge: true
         },
     ];
 };
 
 export const sortOptions = [
-    { label: "Endpoints", value: "urlsCount asc", directionLabel: "More", sortKey: "urlsCount", columnIndex: 1 },
-    { label: "Endpoints", value: "urlsCount desc", directionLabel: "Less", sortKey: "urlsCount", columnIndex: 1 },
-    { label: "Risk Score", value: "score asc", directionLabel: "High risk", sortKey: "riskScore", columnIndex: 2 },
-    { label: "Risk Score", value: "score desc", directionLabel: "Low risk", sortKey: "riskScore", columnIndex: 2 },
-    { label: "Last traffic seen", value: "detected asc", directionLabel: "Recent first", sortKey: "detectedTimestamp", columnIndex: 5 },
-    { label: "Last traffic seen", value: "detected desc", directionLabel: "Oldest first", sortKey: "detectedTimestamp", columnIndex: 5 },
+    { label: "Name", value: "groupName asc", directionLabel: "A-Z", sortKey: "groupName", columnIndex: 2 },
+    { label: "Name", value: "groupName desc", directionLabel: "Z-A", sortKey: "groupName", columnIndex: 2 },
+    { label: "Type", value: "clientType asc", directionLabel: "A-Z", sortKey: "clientType", columnIndex: 3 },
+    { label: "Type", value: "clientType desc", directionLabel: "Z-A", sortKey: "clientType", columnIndex: 3 },
+    { label: "Endpoints", value: "endpointsCount asc", directionLabel: "Lowest", sortKey: "endpointsCount", columnIndex: 4 },
+    { label: "Endpoints", value: "endpointsCount desc", directionLabel: "Highest", sortKey: "endpointsCount", columnIndex: 4 },
+    { label: "Risk score", value: "riskScore asc", directionLabel: "Lowest", sortKey: "riskScore", columnIndex: 5 },
+    { label: "Risk score", value: "riskScore desc", directionLabel: "Highest", sortKey: "riskScore", columnIndex: 5 },
+    { label: "Last traffic seen", value: "detectedTimestamp asc", directionLabel: "Oldest", sortKey: "detectedTimestamp", columnIndex: 7 },
+    { label: "Last traffic seen", value: "detectedTimestamp desc", directionLabel: "Newest", sortKey: "detectedTimestamp", columnIndex: 7 },
 ];
 
 export const resourceName = { singular: "Agentic asset", plural: "Agentic assets" };
 
-// Helper to get the merge key from header (similar to transform.js getFinalKey)
-const getMergeKey = (h) => h?.numericValue || h?.filterKey || h?.value;
+// Extract endpoint ID from hostname format: <endpoint-id>.<source-id>.<service-name>
+export const extractEndpointId = (hostName) => {
+    if (!hostName) return null;
+    const parts = hostName.split('.');
+    return parts[0];
+};
 
-// Grouping utilities (merged from utils.js)
-export const groupCollectionsByTag = (collections, sensitiveInfoMap, riskScoreMap, trafficInfoMap) => {
-    const headers = getHeaders();
-    const mergeableHeaders = headers.filter(h => h.shouldMerge);
-    const groups = {};
+// Extract service name from hostname format: <endpoint-id>.<source-id>.<service-name>
+// Service name can contain dots (e.g., mcp.razorpay.com)
+// Skip first 2 parts (endpoint-id, source-id) and join the rest
+export const extractServiceName = (hostName) => {
+    if (!hostName) return null;
+    const parts = hostName.split('.');
+    // Need at least 3 parts: endpoint-id, source-id, and at least one part of service-name
+    if (parts.length < 3) return hostName;
+    // Skip first 2 parts and join the rest as service name
+    return parts.slice(2).join('.');
+};
+
+// Group collections by agent identification (mcp-client, ai-agent values)
+// These are the sources that discovered the services (cursor, litellm, etc.)
+// Note: browser-llm-agent is excluded from this grouping
+export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveMap = {}) => {
+    const agents = {};
     
     collections.forEach((c) => {
         if (c.deactivated) return;
         const assetTag = findAssetTag(c.envType);
-        const key = assetTag?.value || UNKNOWN_GROUP;
+        if (!assetTag?.value) return; // Skip collections without agent tag
+        if (assetTag.keyName === ASSET_TAG_KEYS.BROWSER_LLM_AGENT) return; // Skip browser-llm-agent rows
         
-        // Prepare collection's mergeable values
-        const collectionData = {
-            urlsCount: c.urlsCount || 0,
-            collectionsCount: 1,
-            riskScore: riskScoreMap[c.id] || 0,
-            detectedTimestamp: trafficInfoMap[c.id] || 0,
-            sensitiveInRespTypes: sensitiveInfoMap[c.id] || [],
-        };
+        const key = assetTag.value;
+        const hostName = c.hostName || c.displayName || c.name;
+        const endpointId = extractEndpointId(hostName);
         
-        if (!groups[key]) {
-            groups[key] = {
-                groupName: assetTag?.value ? formatDisplayName(assetTag.value) : UNKNOWN_GROUP,
-                groupKey: key, tagKey: assetTag?.keyName, tagValue: assetTag?.value,
-                clientType: getTypeFromTags(c.envType), collections: [], firstCollection: null,
+        if (!agents[key]) {
+            agents[key] = {
+                rowType: ROW_TYPES.AGENT,
+                groupName: formatDisplayName(assetTag.value),
+                groupKey: key,
+                tagKey: assetTag.keyName,
+                tagValue: assetTag.value,
+                clientType: getAgentTypeFromValue(assetTag.value),
+                collections: [],
+                firstCollection: null,
+                endpointIds: new Set(),
+                sensitiveTypes: new Set(),
+                maxTrafficTimestamp: 0,
             };
-            // Initialize mergeable fields from first collection
-            mergeableHeaders.forEach(h => {
-                const mergeKey = getMergeKey(h);
-                groups[key][mergeKey] = collectionData[mergeKey];
-            });
-        } else {
-            // Use mergeType functions from headers to combine data
-            mergeableHeaders.forEach(h => {
-                const mergeKey = getMergeKey(h);
-                groups[key][mergeKey] = h.mergeType(groups[key][mergeKey], collectionData[mergeKey]);
-            });
         }
         
-        const g = groups[key];
-        g.collections.push(c);
-        if (!g.firstCollection) g.firstCollection = c;
+        agents[key].collections.push(c);
+        if (!agents[key].firstCollection) agents[key].firstCollection = c;
+        
+        // Track unique endpoint IDs
+        if (endpointId) {
+            agents[key].endpointIds.add(endpointId);
+        }
+        
+        // Aggregate sensitive types
+        const sensitive = sensitiveMap[c.id] || [];
+        sensitive.forEach(s => agents[key].sensitiveTypes.add(s));
+        
+        // Track max traffic timestamp
+        const traffic = trafficMap[c.id] || 0;
+        if (traffic > agents[key].maxTrafficTimestamp) {
+            agents[key].maxTrafficTimestamp = traffic;
+        }
     });
     
-    return Object.values(groups).map(g => ({
-        ...g, id: g.groupKey || g.groupName,
-        sensitiveSubTypesVal: (g.sensitiveInRespTypes || []).join(" ") || "-",
-        lastTraffic: func.prettifyEpoch(g.detectedTimestamp),
+    return Object.values(agents).map(g => ({
+        ...g,
+        id: `agent-${g.groupKey}`,
+        endpointsCount: g.endpointIds.size,
+        sensitiveInRespTypes: Array.from(g.sensitiveTypes),
+        sensitiveSubTypesVal: Array.from(g.sensitiveTypes).join(' ') || '-',
+        detectedTimestamp: g.maxTrafficTimestamp,
+        lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
+        riskScore: null, // Agents don't have risk score
+    }));
+};
+
+// Group collections by service name (extracted from hostname)
+// Hostname format: <endpoint-id>.<source-id>.<service-name>
+// Service name can contain dots (e.g., "mcp.razorpay.com" from "123.456.mcp.razorpay.com")
+export const groupCollectionsByService = (collections, trafficMap = {}, sensitiveMap = {}, riskScoreMap = {}) => {
+    const services = {};
+    
+    collections.forEach((c) => {
+        if (c.deactivated) return;
+        const typeTag = findTypeTag(c.envType);
+        if (!typeTag) return; // Skip collections without type tag
+        
+        const hostName = c.hostName || c.displayName || c.name;
+        if (!hostName) return;
+        
+        const serviceName = extractServiceName(hostName);
+        if (!serviceName) return;
+        
+        const endpointId = extractEndpointId(hostName);
+        const key = serviceName;
+        
+        if (!services[key]) {
+            services[key] = {
+                rowType: ROW_TYPES.SERVICE,
+                groupName: serviceName,
+                groupKey: key,
+                serviceName: serviceName,
+                hostNames: [],
+                clientType: getTypeFromTags(c.envType),
+                collections: [],
+                firstCollection: null,
+                endpointIds: new Set(),
+                sensitiveTypes: new Set(),
+                maxTrafficTimestamp: 0,
+                maxRiskScore: 0,
+            };
+        }
+        
+        services[key].collections.push(c);
+        // Track all hostnames for this service for filtering
+        if (!services[key].hostNames.includes(hostName)) {
+            services[key].hostNames.push(hostName);
+        }
+        if (!services[key].firstCollection) services[key].firstCollection = c;
+        
+        // Track unique endpoint IDs
+        if (endpointId) {
+            services[key].endpointIds.add(endpointId);
+        }
+        
+        // Aggregate sensitive types
+        const sensitive = sensitiveMap[c.id] || [];
+        sensitive.forEach(s => services[key].sensitiveTypes.add(s));
+        
+        // Track max traffic timestamp
+        const traffic = trafficMap[c.id] || 0;
+        if (traffic > services[key].maxTrafficTimestamp) {
+            services[key].maxTrafficTimestamp = traffic;
+        }
+        
+        // Track max risk score
+        const riskScore = riskScoreMap[c.id] || 0;
+        if (riskScore > services[key].maxRiskScore) {
+            services[key].maxRiskScore = riskScore;
+        }
+    });
+    
+    return Object.values(services).map(g => ({
+        ...g,
+        id: `service-${g.groupKey}`,
+        endpointsCount: g.endpointIds.size,
+        sensitiveInRespTypes: Array.from(g.sensitiveTypes),
+        sensitiveSubTypesVal: Array.from(g.sensitiveTypes).join(' ') || '-',
+        detectedTimestamp: g.maxTrafficTimestamp,
+        lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
+        riskScore: g.maxRiskScore,
     }));
 };
 
@@ -115,3 +245,10 @@ export const createEnvTypeFilter = (values, negated = false) => ({
     filters: [{ key: 'envType', label: func.convertToDisambiguateLabelObj(values, null, 2), value: { values, negated }, onRemove: () => {} }],
     sort: []
 });
+
+export const createHostnameFilter = (hostnames) => ({
+    filters: [{ key: 'hostName', label: func.convertToDisambiguateLabelObj(hostnames, null, 2), value: { values: hostnames, negated: false }, onRemove: () => {} }],
+    sort: []
+});
+
+export { ROW_TYPES } from "./mcpClientHelper";

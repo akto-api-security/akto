@@ -25,7 +25,6 @@ import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip"
 import SearchableResourceList from "../../../components/shared/SearchableResourceList"
 import ResourceListModal from "../../../components/shared/ResourceListModal"
 import { saveAs } from 'file-saver'
-// import dummyJson from "../../../components/shared/treeView/dummyJson"
 import TreeViewTable from "../../../components/shared/treeView/TreeViewTable"
 import TableStore from "../../../components/tables/TableStore";
 import { useNavigate } from "react-router-dom";
@@ -36,7 +35,7 @@ import ReactFlow, {
   } from 'react-flow-renderer';
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
 import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isGenAISecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
-import useAgenticFilter from "./useAgenticFilter";
+import useAgenticFilter, { FILTER_TYPES } from "./useAgenticFilter";
   
 const CenterViewType = {
     Table: 0,
@@ -57,8 +56,8 @@ const headers = [
     }] : []),
     ...(isEndpointSecurityCategory() ? [
         {
-            title: "API Collection name",
-            text: "API Collection name",
+            title: mapLabel("API collection name", getDashboardCategory()),
+            text: mapLabel("API collection name", getDashboardCategory()),
             value: "displayNameComp",
             filterKey: "splitApiCollectionName",
             textValue: 'splitApiCollectionName',
@@ -251,10 +250,14 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
         // Split collection name for Endpoint Security category
         let displayText = c.displayName;
         let endpointId = '';
+        let sourceId = '';
+        let serviceName = '';
         if (isEndpointSecurityCategory()) {
             const splitResult = transform.splitCollectionNameForEndpointSecurity(c.displayName);
             displayText = splitResult.apiCollectionName;
             endpointId = splitResult.endpointId;
+            sourceId = splitResult.sourceId;
+            serviceName = splitResult.serviceName;
         }
 
         // Build result object directly without spread operator for better memory efficiency
@@ -263,6 +266,8 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             displayName: c.displayName,
             splitApiCollectionName: displayText,
             endpointId: endpointId,
+            sourceId: sourceId,
+            serviceName: serviceName,
             hostName: c.hostName,
             type: c.type,
             deactivated: c.deactivated,
@@ -349,10 +354,14 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
     // Split collection name for Endpoint Security category
     let splitApiCollectionName = rawCollection.displayName;
     let endpointId = '';
+    let sourceId = '';
+    let serviceName = '';
     if (isEndpointSecurityCategory()) {
         const splitResult = transform.splitCollectionNameForEndpointSecurity(rawCollection.displayName);
         splitApiCollectionName = splitResult.apiCollectionName;
         endpointId = splitResult.endpointId;
+        sourceId = splitResult.sourceId;
+        serviceName = splitResult.serviceName;
     }
 
     // Return minimal object - only fields needed for filtering, sorting, and categorization
@@ -362,6 +371,8 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         displayName: rawCollection.displayName,
         splitApiCollectionName: splitApiCollectionName,
         endpointId: endpointId,
+        sourceId: sourceId,
+        serviceName: serviceName,
         hostName: rawCollection.hostName,
         type: rawCollection.type,
         deactivated: rawCollection.deactivated,
@@ -981,7 +992,7 @@ function ApiCollections(props) {
                     setSummaryData(updatedSummary);
                 }
             }
-        }).catch(error => {
+        }).catch(() => {
         });
 
         if (res.hostname.length === 0 && (tableSelectedTab === undefined || tableSelectedTab.length === 0)) {
@@ -1014,7 +1025,7 @@ function ApiCollections(props) {
     }
 
     // Use custom hook for Agentic filter detection and summary calculation
-    const { filteredSummaryData, activeFilterTitle } = useAgenticFilter(normalData);
+    const { filteredSummaryData, activeFilterTitle, activeFilterType } = useAgenticFilter(normalData);
 
     useEffect(() => {
         const isMountedRef = { current: true };
@@ -1329,8 +1340,7 @@ function ApiCollections(props) {
         })
 
 
-
-        await api.updateEnvTypeOfCollection(tagObj === null ? tagObj : [tagObj], apiCollectionIds, tagObj === null).then((resp) => {
+        await api.updateEnvTypeOfCollection(tagObj === null ? tagObj : [tagObj], apiCollectionIds, tagObj === null).then(() => {
             func.setToast(true, false, "Tags updated successfully")
             setEnvTypeMap(copyObj)
             updateData(copyObj)
@@ -1358,16 +1368,41 @@ function ApiCollections(props) {
     }
 
     // Use filtered summary data when a filter is active (from Endpoints page navigation)
-    const displaySummary = filteredSummaryData || summaryData;
     const displayTotalAPIs = filteredSummaryData ? filteredSummaryData.totalEndpoints : totalAPIs;
 
+    // Get the appropriate title for unique sources based on filter type
+    const getUniqueSourcesTitle = () => {
+        switch (activeFilterType) {
+            case FILTER_TYPES.BROWSER_LLM:
+                return "Unique LLM sources";
+            case FILTER_TYPES.AI_AGENT:
+                return "Unique Agentic resource";
+            case FILTER_TYPES.MCP_SERVER:
+                return "Unique MCP sources";
+            default:
+                return "Unique sources";
+        }
+    };
+
+    // Get the appropriate count for unique sources based on filter type
+    const getUniqueSourcesCount = () => {
+        // For AI Agent: count unique <3> (serviceName/resources)
+        // For LLM and MCP Server: count unique <2> (sourceId)
+        if (activeFilterType === FILTER_TYPES.AI_AGENT) {
+            return filteredSummaryData?.uniqueResources || 0;
+        }
+        return filteredSummaryData?.uniqueSources || 0;
+    };
+
     const summaryItems = [
-        {
-            title: activeFilterTitle 
-                ? mapLabel("Total Agentic Components", getDashboardCategory())
-                : mapLabel("Total APIs", getDashboardCategory()),
-            data: transform.formatNumberWithCommas(displayTotalAPIs),
-        },
+        ...(!activeFilterTitle
+            ? [
+                  {
+                      title: mapLabel("Total APIs", getDashboardCategory()),
+                      data: transform.formatNumberWithCommas(displayTotalAPIs),
+                  },
+              ]
+            : []),
     
         ...(!isEndpointSecurityCategory() && !activeFilterTitle
             ? [
@@ -1384,27 +1419,31 @@ function ApiCollections(props) {
               ]
             : []),
     
+        // For agentic filter: show Unique Endpoints and Unique Sources
         ...(activeFilterTitle
             ? [
                   {
-                      title: "Agentic Collections",
+                      title: "Unique Endpoints",
                       data: transform.formatNumberWithCommas(
-                          filteredSummaryData?.totalCollections || 0
+                          filteredSummaryData?.uniqueEndpoints || 0
                       ),
+                  },
+                  {
+                      title: getUniqueSourcesTitle(),
+                      data: transform.formatNumberWithCommas(getUniqueSourcesCount()),
                   },
               ]
             : []),
     
-        {
-            title: activeFilterTitle
-                ? "Sensitive in Response"
-                : mapLabel("Sensitive in response APIs", getDashboardCategory()),
-            data: transform.formatNumberWithCommas(
-                activeFilterTitle 
-                    ? (filteredSummaryData?.totalSensitiveInResponse || 0)
-                    : (summaryData.totalSensitiveEndpoints || 0)
-            ),
-        },
+        // Only show sensitive data when NOT filtering by agentic collections
+        ...(!activeFilterTitle
+            ? [
+                  {
+                      title: mapLabel("Sensitive in response APIs", getDashboardCategory()),
+                      data: transform.formatNumberWithCommas(summaryData.totalSensitiveEndpoints || 0),
+                  },
+              ]
+            : []),
     ];
 
     function switchToGraphView() {
@@ -1473,7 +1512,69 @@ function ApiCollections(props) {
     }
 
     // Use titleWithTooltip for Groups tab (selected === 2)
-    const dynamicHeaders = selected === 2 ? headers.map(h => h.titleWithTooltip ? {...h, title: h.titleWithTooltip} : h) : headers;
+    // Also conditionally modify headers based on activeFilterType:
+    // - For browser-llm: hide "Total endpoints" column, rename "API collection name" to "LLM source"
+    // - For ai-agent: rename "API collection name" to "Agentic resource name"
+    // - For mcp-server: rename "Total endpoints" to "Total tools", rename "API collection name" to "MCP Server source"
+    const getModifiedHeaders = () => {
+        let modifiedHeaders = selected === 2 
+            ? headers.map(h => h.titleWithTooltip ? {...h, title: h.titleWithTooltip} : h) 
+            : [...headers];
+        
+        // Helper function to move source column after endpoint ID for LLM/MCP
+        const moveSourceColumnAfterEndpointId = (headers) => {
+            const displayNameIdx = headers.findIndex(h => h.value === 'displayNameComp');
+            const endpointIdIdx = headers.findIndex(h => h.value === 'endpointId');
+            
+            if (displayNameIdx !== -1 && endpointIdIdx !== -1 && displayNameIdx < endpointIdIdx) {
+                // Remove displayNameComp from its current position
+                const [displayNameHeader] = headers.splice(displayNameIdx, 1);
+                // Find new endpointId index (it shifted after removal)
+                const newEndpointIdIdx = headers.findIndex(h => h.value === 'endpointId');
+                // Insert after endpointId
+                headers.splice(newEndpointIdIdx + 1, 0, displayNameHeader);
+            }
+            return headers;
+        };
+        
+        // Apply filter-type based modifications
+        if (activeFilterType === FILTER_TYPES.BROWSER_LLM) {
+            // Hide "Total endpoints" column for browser-llm
+            modifiedHeaders = modifiedHeaders.filter(h => h.value !== 'urlsCount');
+            // Rename column to "LLM source" with proper filter
+            modifiedHeaders = modifiedHeaders.map(h => {
+                if (h.value === 'displayNameComp') {
+                    return { ...h, title: 'LLM source', text: 'LLM source', filterLabel: 'LLM source', textValue: 'sourceId', filterKey: 'sourceId', showFilter: true };
+                }
+                return h;
+            });
+            // Move source column after Endpoint ID
+            modifiedHeaders = moveSourceColumnAfterEndpointId(modifiedHeaders);
+        } else if (activeFilterType === FILTER_TYPES.AI_AGENT) {
+            // Rename column to "Agentic resource name" with proper filter
+            modifiedHeaders = modifiedHeaders.map(h => {
+                if (h.value === 'displayNameComp') {
+                    return { ...h, title: 'Agentic resource name', text: 'Agentic resource name', filterLabel: 'Agentic resource name', textValue: 'serviceName', filterKey: 'serviceName', showFilter: true };
+                }
+                return h;
+            });
+        } else if (activeFilterType === FILTER_TYPES.MCP_SERVER) {
+            // Rename columns with proper filters
+            modifiedHeaders = modifiedHeaders.map(h => {
+                if (h.value === 'urlsCount') {
+                    return { ...h, title: 'Total tools', text: 'Total tools', filterLabel: 'Total tools' };
+                }
+                if (h.value === 'displayNameComp') {
+                    return { ...h, title: 'MCP Server source', text: 'MCP Server source', filterLabel: 'MCP Server source', textValue: 'sourceId', filterKey: 'sourceId', showFilter: true };
+                }
+                return h;
+            });
+            // Move source column after Endpoint ID
+            modifiedHeaders = moveSourceColumnAfterEndpointId(modifiedHeaders);
+        }
+        return modifiedHeaders;
+    };
+    const dynamicHeaders = getModifiedHeaders();
 
     // Ensure all headers have unique IDs for IndexTable headings to avoid duplicate key warnings
     const headingsWithIds = dynamicHeaders.map((header, index) => ({
@@ -1513,7 +1614,7 @@ function ApiCollections(props) {
             onSelect={handleSelectedTab}
             selected={selected}
             csvFileName={"Inventory"}
-            prettifyPageData={(pageData) => selectedTab === 'untracked' ? transform.prettifyUntrackedCollectionsData(pageData) : transform.prettifyCollectionsData(pageData, false, selectedTab)}
+            prettifyPageData={(pageData) => selectedTab === 'untracked' ? transform.prettifyUntrackedCollectionsData(pageData) : transform.prettifyCollectionsData(pageData, false, selectedTab, activeFilterType)}
             transformRawData={transformRawCollectionData}
         />:    <div style={{height: "800px"}}>
 
@@ -1539,10 +1640,22 @@ function ApiCollections(props) {
         )
     }
 
-    // Dynamic title based on active filter
-    const pageTitle = activeFilterTitle 
-        ? `Agentic Collections - ${activeFilterTitle}`
-        : mapLabel("API Collections", getDashboardCategory());
+    // Dynamic title based on active filter and filter type
+    const getFilteredPageTitle = () => {
+        if (!activeFilterTitle) return mapLabel("API Collections", getDashboardCategory());
+        
+        switch (activeFilterType) {
+            case FILTER_TYPES.BROWSER_LLM:
+                return `LLM - ${activeFilterTitle}`;
+            case FILTER_TYPES.AI_AGENT:
+                return `AI Agent - ${activeFilterTitle}`;
+            case FILTER_TYPES.MCP_SERVER:
+                return `MCP Server - ${activeFilterTitle}`;
+            default:
+                return `${activeFilterTitle}`;
+        }
+    };
+    const pageTitle = getFilteredPageTitle();
 
     return(
         <PageWithMultipleCards

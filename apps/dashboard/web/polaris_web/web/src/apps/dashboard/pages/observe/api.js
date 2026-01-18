@@ -751,14 +751,6 @@ export default {
         })
     },
 
-    async getSensitiveInfoForCollections(){
-        return await request({
-            url: '/api/getSensitiveInfoForCollections',
-            method: 'post',
-            data:{},
-        })
-    },
-
     async getCoverageInfoForCollections(){
         return await request({
             url: '/api/getCoverageInfoForCollections',

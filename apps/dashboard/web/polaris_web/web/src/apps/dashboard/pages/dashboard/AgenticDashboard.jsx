@@ -90,6 +90,7 @@ const AgenticDashboard = () => {
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[3])
     const containerRef = useRef(null);
     const [popoverActive, setPopoverActive] = useState(false);
+    const [gridWidth, setGridWidth] = useState(1200);
     const setToastConfig = Store(state => state.setToastConfig);
 
     // State for all dashboard data - initialized with empty/default values
@@ -193,6 +194,38 @@ const AgenticDashboard = () => {
         }
         loadSavedLayout()
     }, [])
+
+    useEffect(() => {
+        let rafId = null;
+        let resizeObserver = null;
+
+        const updateWidth = () => {
+            if (rafId) cancelAnimationFrame(rafId);
+            rafId = requestAnimationFrame(() => {
+                if (containerRef.current) {
+                    setGridWidth(containerRef.current.clientWidth);
+                }
+            });
+        };
+
+        // Initial measurement
+        updateWidth();
+
+        // Set up observers if container is available
+        if (containerRef.current) {
+            resizeObserver = new ResizeObserver(updateWidth);
+            resizeObserver.observe(containerRef.current);
+        }
+
+        // Window resize listener - always active
+        window.addEventListener('resize', updateWidth);
+
+        return () => {
+            if (rafId) cancelAnimationFrame(rafId);
+            if (resizeObserver) resizeObserver.disconnect();
+            window.removeEventListener('resize', updateWidth);
+        };
+    }, [loading, layoutLoading]);
 
     useEffect(() => {
         if (savedLayout === null || savedVisibleComponents === null) return
@@ -1012,8 +1045,7 @@ const AgenticDashboard = () => {
                                 <SpinnerCentered />
                             ) : (
                                 <GridLayout
-                                    // TODO: make width responsive
-                                    width={1200}
+                                    width={gridWidth}
                                     layout={layout.filter(item => visibleComponents.includes(item.i))}
                                     gridConfig={{
                                         cols: 12,

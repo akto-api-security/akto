@@ -101,7 +101,10 @@ function AgenticMainPage() {
             <AgenticConversationPage
                 initialQuery={currentQuery}
                 existingConversationId={loadConversationId}
-                existingMessages={historyItems.find(item => item.id === loadConversationId)?.messages || []}
+                existingMessages={historyItems.filter(item => item.id === loadConversationId).map(item => ({
+                    messages: item.messages,
+                    title: item.title
+                }))}
                 onBack={() => {
                     setShowConversation(false);
                     setSearchValue(''); // Clear search input when going back
@@ -129,7 +132,7 @@ function AgenticMainPage() {
                         />
                     </VerticalStack>    
                     <AgenticHistoryCards
-                        historyItems={historyItems.slice(0, 3)}
+                        historyItems={historyItems.sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt).slice(0, 3)}
                         onHistoryClick={handleHistoryClick}
                         onViewAllClick={handleViewAllClick}
                     />
@@ -143,12 +146,12 @@ function AgenticMainPage() {
                     setHistorySearchQuery(''); // Reset search query when closing
                 }}
                 onHistoryClick={handleHistoryClick}
-                historyItems={historyItems}
+                historyItems={historyItems.sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt)}
                 searchQuery={historySearchQuery}
                 onSearchQueryChange={setHistorySearchQuery}
                 isLoading={isLoadingHistory}
                 onDelete={(conversationId) => {
-                    setHistoryItems(historyItems.filter(item => item.id !== conversationId));
+                    setHistoryItems(historyItems.filter(item => item.id !== conversationId).sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt));
                 }}
             />
             </div>

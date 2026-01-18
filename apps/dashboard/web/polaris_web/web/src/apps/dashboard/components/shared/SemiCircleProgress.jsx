@@ -38,8 +38,13 @@ function SemiCircleProgress({progress, size, height, width, title, color, center
                 fontWeight: 'normal'
             }
         } : {
-            text: '',
-            style: { display: 'none' }
+            text: progress + '%',
+            y: 0.4*size,
+            style:{
+                fontWeight: 'medium',
+                color: "#344054",
+                fontSize: '14px'
+            }
         },
         subtitle: centerText ? {
             text: centerText,
