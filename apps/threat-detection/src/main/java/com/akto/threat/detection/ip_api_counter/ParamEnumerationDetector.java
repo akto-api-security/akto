@@ -101,8 +101,8 @@ public class ParamEnumerationDetector {
      * @param ip              Source IP address (e.g., "1.2.3.4")
      * @param apiCollectionId API collection ID
      * @param method          HTTP method (e.g., "GET", "POST")
-     * @param apiTemplate     API template (e.g., "/users/{userId}")
-     * @param paramName       Parameter being tracked (e.g., "userId")
+     * @param apiTemplate     API template (e.g., "/v1/users/STRING")
+     * @param paramName       Parameter being tracked (e.g., "users")
      * @param paramValue      Actual parameter value (e.g., "42")
      * @return true if unique values exceed threshold in the sliding window
      */

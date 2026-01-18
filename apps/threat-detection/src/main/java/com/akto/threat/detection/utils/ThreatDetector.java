@@ -9,7 +9,6 @@ import java.util.Map;
 import org.ahocorasick.trie.Trie;
 import org.json.JSONObject;
 
-import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.HttpResponseParams;
@@ -49,7 +48,6 @@ public class ThreatDetector {
     private Trie ssrfTrie;
     private static final LoggerMaker logger = new LoggerMaker(ThreatDetector.class, LogDb.THREAT_DETECTION);
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
-    private static AccountConfig accountConfig = AccountConfigurationCache.getInstance().getConfig(dataActor);
 
     public ThreatDetector() throws Exception {
         lfiTrie = generateTrie(Constants.LFI_OS_FILES_DATA);
@@ -88,6 +86,7 @@ public class ThreatDetector {
 
 
     public List<Pair<String, String>> getUrlParamNamesAndValues(String url, URLTemplate urlTemplate) {
+        url = cleanThreatUrl(url, lfiTrie, osCommandInjectionTrie, ssrfTrie);
         List<Pair<String, String>> paramNameAndValue = new ArrayList<>();
         String[] urlTokens = url.split("/");
 
@@ -113,8 +112,7 @@ public class ThreatDetector {
         return paramNameAndValue;
     }
 
-    
-    public List<Pair<String, String>> extractParamNameAndValue(HttpResponseParams httpResponseParams){
+    private URLTemplate findMatchingUrlTemplate(HttpResponseParams httpResponseParams){
         AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
         Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates = config.getApiCollectionUrlTemplates();
 
@@ -130,24 +128,21 @@ public class ThreatDetector {
         // TODO: Cache already matched templates
         URLTemplate urlTemplate = isMatchingUrl(apiCollectionId, url, method, apiCollectionUrlTemplates, lfiTrie,
                 osCommandInjectionTrie, ssrfTrie);
-
-        // no matching template was found.
-        if (urlTemplate == null) {
-            return new ArrayList<>();
-        }
-
-        url = cleanThreatUrl(url, lfiTrie, osCommandInjectionTrie, ssrfTrie);
-
-        return getUrlParamNamesAndValues(url, urlTemplate);
+        return urlTemplate;
 
     }
-    public boolean isParamEnumerationThreat(HttpResponseParams httpResponseParams) {
-        List<Pair<String, String>> paramNamesAndValues = extractParamNameAndValue(httpResponseParams);
-        
-        String url = httpResponseParams.getRequestParams().getURL();
-        String method = httpResponseParams.getRequestParams().getMethod();
 
-        url = cleanThreatUrl(url, lfiTrie, osCommandInjectionTrie, ssrfTrie);
+    public boolean isParamEnumerationThreat(HttpResponseParams httpResponseParams) {
+        
+        URLTemplate urlTemplate = findMatchingUrlTemplate(httpResponseParams);
+        if(urlTemplate == null){
+            return false;
+        }
+
+        String url = httpResponseParams.getRequestParams().getURL();
+
+        List<Pair<String, String>> paramNamesAndValues = getUrlParamNamesAndValues(url, urlTemplate);
+        
 
         for(Pair<String, String> paramNameAndValue : paramNamesAndValues){
             String paramName = paramNameAndValue.getFirst();
@@ -155,8 +150,8 @@ public class ThreatDetector {
             boolean isUserEnumAttack = ParamEnumerationDetector.getInstance().recordAndCheck(
                 httpResponseParams.getSourceIP(),
                 httpResponseParams.requestParams.getApiCollectionId(), 
-                method,
-                url, 
+                httpResponseParams.getRequestParams().getMethod(),
+                urlTemplate.getTemplateString(), 
                 paramName,
                 paramValue
             );

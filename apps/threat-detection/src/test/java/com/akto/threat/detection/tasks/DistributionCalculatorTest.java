@@ -19,7 +19,8 @@ public class DistributionCalculatorTest {
     @Before
     public void setup() {
         calculator = new DistributionCalculator();
-        CmsCounterLayer.reset();
+        CmsCounterLayer.initialize(null);
+        CmsCounterLayer.getInstance().reset();
         apiKey = "11111|GET|/users";
         cmsKey = "11111|1.1.1.1|GET|/users";
     }
