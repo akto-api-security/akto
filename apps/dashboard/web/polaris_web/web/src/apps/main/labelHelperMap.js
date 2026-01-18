@@ -66,7 +66,8 @@ export const labelMap = {
     "tests selected": "tests selected",
     "testing": "testing",
     "Test library":"Test library",
-    "Endpoint Shield": "API Endpoint Shield"
+    "Endpoint Shield": "API Endpoint Shield",
+    "Endpoints": "Endpoints"
   },
   "DAST": {
     "API Security Posture": "Security Posture",
@@ -135,7 +136,8 @@ export const labelMap = {
     "tests selected": "tests selected",
     "testing": "testing",
     "Test library":"Test library",
-    "Endpoint Shield": "Endpoint Shield"
+    "Endpoint Shield": "Endpoint Shield",
+    "Endpoints": "Endpoints",
   },
   "MCP Security": {
     "API Security Posture": "MCP Security Posture",
@@ -208,7 +210,8 @@ export const labelMap = {
     "testing": "scanning",
     "Test library":"Probe library",
     "Endpoint Shield": "MCP Endpoint Shield",
-    "Threat": "Guardrail"
+    "Threat": "Guardrail",
+    "Endpoints": "Tools",
   },
   "Gen AI": {
     "API Security Posture": "AI Agent Security Posture",
@@ -277,7 +280,8 @@ export const labelMap = {
     "tests selected": "probes selected",
     "testing": "scanning",
     "Test library":"Probe library",
-    "Endpoint Shield": "AI Agent Endpoint Shield"
+    "Endpoint Shield": "AI Agent Endpoint Shield",
+    "Endpoints": "Components",
   },
   "Agentic Security": {
     "Quick Start": "Connectors",
@@ -321,6 +325,7 @@ export const labelMap = {
     "API parameters": "Agentic Parameters",
     "endpoint": "Agentic component",
     "endpoints": "Agentic components",
+    "Endpoints": "Components",
     "URLs": "Agentic components",
     "security testing": "red teaming",
     "test results": "scan results",
@@ -369,6 +374,7 @@ export const labelMap = {
     "Sensitive in response APIs": "Sensitive in Response",
     "Untracked APIs": "Untracked Agentic Components",
     "Total endpoints": "Total Components",
+    "Endpoints": "Components",
     "Test your APIs": "Test your Agentic Systems",
     "API Security": "Agentic Security",
     "API endpoint": "Agentic Component",

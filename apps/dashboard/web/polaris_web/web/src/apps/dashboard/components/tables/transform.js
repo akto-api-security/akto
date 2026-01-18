@@ -324,11 +324,17 @@ const tableFunc = {
       return {columnIndex: -1, sortDirection: 'descending'}
     }
 
-    const sortColumn = sortOptions.filter((x) => x.value === sortSelected[0])[0]
+    const sortColumn = sortOptions.find((x) => x.value === sortSelected[0])
+    
+    // Handle case where selected sort doesn't exist in current options
+    if (!sortColumn) {
+      return {columnIndex: -1, sortDirection: 'descending'}
+    }
+    
     const sortDirection = sortSelected[0].split(" ")[1] === "asc" ? "ascending" : "descending"
 
     return {
-      columnIndex: sortColumn.columnIndex - 1,
+      columnIndex: (sortColumn.columnIndex || 0) - 1,
       sortDirection: sortDirection
     }
   },
@@ -338,6 +344,16 @@ const tableFunc = {
     }
     if(!filtersMap || filtersMap?.sort === undefined || filtersMap.sort.length === 0){
       return [sortOptions[0].value]
+    }
+    // Validate that stored sort exists in current options
+    const storedSort = filtersMap.sort;
+    if (Array.isArray(storedSort) && storedSort.length > 0) {
+      const sortValue = storedSort[0];
+      const isValidSort = sortOptions.some(opt => opt.value === sortValue);
+      if (!isValidSort) {
+        // Stored sort is not valid for current options, use first available
+        return [sortOptions[0].value]
+      }
     }
     return filtersMap.sort
   },
