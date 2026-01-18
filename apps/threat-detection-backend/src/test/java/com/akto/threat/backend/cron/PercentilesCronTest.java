@@ -1,12 +1,19 @@
 package com.akto.threat.backend.cron;
 
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.BucketStats;
+import com.akto.threat.backend.db.ApiRateLimitBucketStatisticsModel;
+import com.mongodb.client.FindIterable;
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
+import org.bson.conversions.Bson;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.*;
 
 public class PercentilesCronTest {
 
@@ -186,5 +193,192 @@ public class PercentilesCronTest {
         assertEquals(50, vals[0]);   // p50 in b2
         assertEquals(250, vals[1]);  // p75 in b4
         assertEquals(250, vals[2]);  // p90 in b4
+    }
+
+    @Test
+    public void testFetchBucketStatsFromStatistics_returnsCorrectData() throws Exception {
+        // Test the optimized method that reads from api_rate_limit_bucket_statistics
+        System.out.println("\n=== Testing Optimized fetchBucketStatsFromStatistics ===");
+
+        MongoClient mockClient = mock(MongoClient.class);
+        MongoDatabase mockDatabase = mock(MongoDatabase.class);
+        @SuppressWarnings("unchecked")
+        MongoCollection<ApiRateLimitBucketStatisticsModel> mockCollection = mock(MongoCollection.class);
+        @SuppressWarnings("unchecked")
+        FindIterable<ApiRateLimitBucketStatisticsModel> mockFindIterable = mock(FindIterable.class);
+
+        when(mockClient.getDatabase(anyString())).thenReturn(mockDatabase);
+        when(mockDatabase.getCollection(eq("api_rate_limit_bucket_statistics"), any(Class.class)))
+            .thenReturn(mockCollection);
+        when(mockCollection.find(any(Bson.class))).thenReturn(mockFindIterable);
+
+        // Create mock statistics document with 3 buckets
+        ApiRateLimitBucketStatisticsModel mockDoc = new ApiRateLimitBucketStatisticsModel();
+        List<ApiRateLimitBucketStatisticsModel.Bucket> buckets = new ArrayList<>();
+
+        // Bucket b1
+        List<ApiRateLimitBucketStatisticsModel.UserCountData> b1Counts = new ArrayList<>();
+        b1Counts.add(new ApiRateLimitBucketStatisticsModel.UserCountData(500, 1000));
+        b1Counts.add(new ApiRateLimitBucketStatisticsModel.UserCountData(480, 1005));
+        b1Counts.add(new ApiRateLimitBucketStatisticsModel.UserCountData(510, 1010));
+        ApiRateLimitBucketStatisticsModel.Stats b1Stats =
+            new ApiRateLimitBucketStatisticsModel.Stats(480, 510, 485, 495, 505);
+        buckets.add(new ApiRateLimitBucketStatisticsModel.Bucket("b1", b1Counts, b1Stats));
+
+        // Bucket b2
+        List<ApiRateLimitBucketStatisticsModel.UserCountData> b2Counts = new ArrayList<>();
+        b2Counts.add(new ApiRateLimitBucketStatisticsModel.UserCountData(300, 1000));
+        b2Counts.add(new ApiRateLimitBucketStatisticsModel.UserCountData(320, 1005));
+        b2Counts.add(new ApiRateLimitBucketStatisticsModel.UserCountData(290, 1010));
+        ApiRateLimitBucketStatisticsModel.Stats b2Stats =
+            new ApiRateLimitBucketStatisticsModel.Stats(290, 320, 295, 300, 310);
+        buckets.add(new ApiRateLimitBucketStatisticsModel.Bucket("b2", b2Counts, b2Stats));
+
+        // Bucket b3
+        List<ApiRateLimitBucketStatisticsModel.UserCountData> b3Counts = new ArrayList<>();
+        b3Counts.add(new ApiRateLimitBucketStatisticsModel.UserCountData(200, 1000));
+        b3Counts.add(new ApiRateLimitBucketStatisticsModel.UserCountData(190, 1005));
+        b3Counts.add(new ApiRateLimitBucketStatisticsModel.UserCountData(210, 1010));
+        ApiRateLimitBucketStatisticsModel.Stats b3Stats =
+            new ApiRateLimitBucketStatisticsModel.Stats(190, 210, 195, 200, 205);
+        buckets.add(new ApiRateLimitBucketStatisticsModel.Bucket("b3", b3Counts, b3Stats));
+
+        mockDoc.setBuckets(buckets);
+        when(mockFindIterable.first()).thenReturn(mockDoc);
+
+        // Create cron instance and call optimized method
+        PercentilesCron cron = new PercentilesCron(mockClient);
+        List<BucketStats> result = cron.fetchBucketStatsFromStatistics(
+            "1000000", 123, "/checkout", "GET", 5
+        );
+
+        // Verify results
+        System.out.println("Retrieved " + result.size() + " bucket stats");
+        assertEquals(3, result.size(), "Should return 3 buckets");
+
+        // Verify b1
+        BucketStats b1 = result.get(0);
+        assertEquals("b1", b1.getBucketLabel());
+        assertEquals(480, b1.getMin());
+        assertEquals(510, b1.getMax());
+        assertEquals(505, b1.getP75());  // This is what calculatePercentiles uses!
+
+        // Verify b2
+        BucketStats b2 = result.get(1);
+        assertEquals("b2", b2.getBucketLabel());
+        assertEquals(310, b2.getP75());
+
+        // Verify b3
+        BucketStats b3 = result.get(2);
+        assertEquals("b3", b3.getBucketLabel());
+        assertEquals(205, b3.getP75());
+
+        System.out.println("✓ Optimized method successfully reads pre-calculated stats!");
+        System.out.println("✓ Returns same data structure as old method");
+        System.out.println("✓ But queries 1 document instead of ~576 documents!");
+
+        // Verify collection was called correctly
+        verify(mockCollection, times(1)).find(any(Bson.class));
+    }
+
+    @Test
+    public void testFetchBucketStatsFromStatistics_handlesEmptyData() {
+        // Test when no statistics document exists
+        MongoClient mockClient = mock(MongoClient.class);
+        MongoDatabase mockDatabase = mock(MongoDatabase.class);
+        @SuppressWarnings("unchecked")
+        MongoCollection<ApiRateLimitBucketStatisticsModel> mockCollection = mock(MongoCollection.class);
+        @SuppressWarnings("unchecked")
+        FindIterable<ApiRateLimitBucketStatisticsModel> mockFindIterable = mock(FindIterable.class);
+
+        when(mockClient.getDatabase(anyString())).thenReturn(mockDatabase);
+        when(mockDatabase.getCollection(eq("api_rate_limit_bucket_statistics"), any(Class.class)))
+            .thenReturn(mockCollection);
+        when(mockCollection.find(any(Bson.class))).thenReturn(mockFindIterable);
+        when(mockFindIterable.first()).thenReturn(null);  // No document found
+
+        PercentilesCron cron = new PercentilesCron(mockClient);
+        List<BucketStats> result = cron.fetchBucketStatsFromStatistics(
+            "1000000", 123, "/unknown", "GET", 5
+        );
+
+        assertEquals(0, result.size(), "Should return empty list when no data exists");
+    }
+
+    @Test
+    public void testExtractApiKeyFromDocId_validFormats() throws Exception {
+        PercentilesCron cron = new PercentilesCron(null);
+
+        // Use reflection to access private method
+        java.lang.reflect.Method method = PercentilesCron.class.getDeclaredMethod("extractApiKeyFromDocId", String.class);
+        method.setAccessible(true);
+
+        // Test case 1: Simple URL
+        String result1 = (String) method.invoke(cron, "123_GET_/checkout_5");
+        assertEquals("123|/checkout|GET", result1);
+
+        // Test case 2: Nested URL
+        String result2 = (String) method.invoke(cron, "456_POST_/api/users_15");
+        assertEquals("456|/api/users|POST", result2);
+
+        // Test case 3: URL with underscores
+        String result3 = (String) method.invoke(cron, "789_PUT_/api/user_profile_30");
+        assertEquals("789|/api/user_profile|PUT", result3);
+
+        // Test case 4: Different window size
+        String result4 = (String) method.invoke(cron, "100_DELETE_/resource_30");
+        assertEquals("100|/resource|DELETE", result4);
+    }
+
+    @Test
+    public void testExtractApiKeyFromDocId_invalidFormats() throws Exception {
+        PercentilesCron cron = new PercentilesCron(null);
+
+        // Use reflection to access private method
+        java.lang.reflect.Method method = PercentilesCron.class.getDeclaredMethod("extractApiKeyFromDocId", String.class);
+        method.setAccessible(true);
+
+        // Test null
+        String result1 = (String) method.invoke(cron, (String) null);
+        assertEquals(null, result1);
+
+        // Test empty string
+        String result2 = (String) method.invoke(cron, "");
+        assertEquals(null, result2);
+
+        // Test malformed (no underscores)
+        String result3 = (String) method.invoke(cron, "malformed");
+        assertEquals(null, result3);
+
+        // Test malformed (only one underscore)
+        String result4 = (String) method.invoke(cron, "123_GET");
+        assertEquals(null, result4);
+    }
+
+    @Test
+    public void testExtractApiKeyFromDocId_deduplication() throws Exception {
+        PercentilesCron cron = new PercentilesCron(null);
+
+        // Use reflection to access private method
+        java.lang.reflect.Method method = PercentilesCron.class.getDeclaredMethod("extractApiKeyFromDocId", String.class);
+        method.setAccessible(true);
+
+        // Same API with different window sizes should produce same key
+        String result1 = (String) method.invoke(cron, "123_GET_/checkout_5");
+        String result2 = (String) method.invoke(cron, "123_GET_/checkout_15");
+        String result3 = (String) method.invoke(cron, "123_GET_/checkout_30");
+
+        assertEquals("123|/checkout|GET", result1);
+        assertEquals("123|/checkout|GET", result2);
+        assertEquals("123|/checkout|GET", result3);
+        assertEquals(result1, result2);
+        assertEquals(result2, result3);
+
+        // When added to a Set, should deduplicate
+        Set<String> keys = new HashSet<>();
+        keys.add(result1);
+        keys.add(result2);
+        keys.add(result3);
+        assertEquals(1, keys.size(), "All three should deduplicate to single key");
     }
 }

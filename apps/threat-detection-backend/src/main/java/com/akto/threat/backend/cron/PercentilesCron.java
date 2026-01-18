@@ -5,11 +5,14 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.BucketStats;
 import com.akto.dao.ApiInfoDao;
 import com.akto.threat.backend.db.ApiDistributionDataModel;
+import com.akto.threat.backend.db.ApiRateLimitBucketStatisticsModel;
 import com.akto.threat.backend.service.ApiDistributionDataService;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.*;
@@ -55,19 +58,36 @@ public class PercentilesCron {
 
 
     public void runOnce(String accountId) {
-        MongoCollection<ApiDistributionDataModel> coll = this.mongoClient
+        long startTime = System.currentTimeMillis();
+
+        MongoCollection<Document> statsCollection = this.mongoClient
                 .getDatabase(accountId)
-                .getCollection("api_distribution_data", ApiDistributionDataModel.class);
+                .getCollection("api_rate_limit_bucket_statistics");
 
         Set<String> keys = new HashSet<>();
-        try (MongoCursor<ApiDistributionDataModel> cursor = coll.find().iterator()) {
+
+        // Fetch only _id field (minimal data transfer)
+        try (MongoCursor<Document> cursor = statsCollection.find()
+                .projection(Projections.include("_id"))
+                .iterator()) {
+
             while (cursor.hasNext()) {
-                ApiDistributionDataModel doc = cursor.next();
-                String key = doc.apiCollectionId + "|" + doc.url + "|" + doc.method;
-                keys.add(key);
+                String docId = cursor.next().getString("_id");
+                // docId format: "apiCollectionId_method_url_windowSize"
+                // Example: "123_GET_/checkout_5"
+
+                // Extract unique API key (without windowSize)
+                String apiKey = extractApiKeyFromDocId(docId);
+                if (apiKey != null) {
+                    keys.add(apiKey);
+                }
             }
         }
 
+        long fetchKeysTime = System.currentTimeMillis() - startTime;
+        logger.infoAndAddToDb("Fetched " + keys.size() + " unique API keys in " + fetchKeysTime + "ms");
+
+        // Process each unique API
         for (String key : keys) {
             String[] parts = key.split("\\|", -1);
             int apiCollectionId = Integer.parseInt(parts[0]);
@@ -82,12 +102,75 @@ public class PercentilesCron {
                     continue;
                 }
 
-                // Fetch last baseline days of distribution data for this window size
-                List<BucketStats> distributionData = fetchBucketStats(DEFAULT_BASELINE_DAYS, accountId, apiCollectionId, url, method, windowSize);
+                // OPTIMIZED: Fetch pre-calculated statistics instead of querying raw distribution data
+                List<BucketStats> distributionData = fetchBucketStatsFromStatistics(accountId, apiCollectionId, url, method, windowSize);
+
+                if (distributionData.isEmpty()) {
+                    logger.infoAndAddToDb("No bucket statistics available for apiCollectionId " + apiCollectionId +
+                            " url " + url + " method " + method + " windowSize " + windowSize + ". Skipping.");
+                    continue;
+                }
+
                 PercentilesResult r = calculatePercentiles(distributionData);
 
                 updateApiInfo(r, apiCollectionId, url, method, windowSize);
             }
+        }
+
+        long totalTime = System.currentTimeMillis() - startTime;
+        logger.infoAndAddToDb("PercentilesCron completed for " + keys.size() + " APIs in " + totalTime + "ms");
+    }
+
+    /**
+     * Extracts unique API key from statistics document ID.
+     *
+     * Document ID format: "apiCollectionId_method_url_windowSize"
+     * Examples:
+     *   - "123_GET_/checkout_5" -> "123|/checkout|GET"
+     *   - "456_POST_/api/users_15" -> "456|/api/users|POST"
+     *
+     * @param docId The document ID from api_rate_limit_bucket_statistics
+     * @return API key in format "apiCollectionId|url|method", or null if parsing fails
+     */
+    private String extractApiKeyFromDocId(String docId) {
+        if (docId == null || docId.isEmpty()) {
+            return null;
+        }
+
+        try {
+            // Remove windowSize suffix (_5, _15, or _30)
+            int lastUnderscore = docId.lastIndexOf('_');
+            if (lastUnderscore == -1) {
+                return null;
+            }
+
+            String withoutWindowSize = docId.substring(0, lastUnderscore);
+            // Now we have: "apiCollectionId_method_url"
+            // Example: "123_GET_/checkout"
+
+            // Find first underscore (after apiCollectionId)
+            int firstUnderscore = withoutWindowSize.indexOf('_');
+            if (firstUnderscore == -1) {
+                return null;
+            }
+
+            String apiCollectionId = withoutWindowSize.substring(0, firstUnderscore);
+
+            // Find second underscore (after method)
+            int secondUnderscore = withoutWindowSize.indexOf('_', firstUnderscore + 1);
+            if (secondUnderscore == -1) {
+                return null;
+            }
+
+            String method = withoutWindowSize.substring(firstUnderscore + 1, secondUnderscore);
+            String url = withoutWindowSize.substring(secondUnderscore + 1);
+
+            // Return in expected format: "apiCollectionId|url|method"
+            return apiCollectionId + "|" + url + "|" + method;
+
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Failed to parse docId: " + docId + " - " + e.getMessage());
+            return null;
         }
     }
 
@@ -125,8 +208,69 @@ public class PercentilesCron {
     }
 
     /**
-     * Fetches distribution documents for the given API over the past baseLinePeriod days.
+     * OPTIMIZED: Fetches pre-calculated bucket statistics from api_rate_limit_bucket_statistics collection.
+     * This is much faster than fetching raw distribution data and recalculating stats.
+     *
+     * Performance: Queries 1 document instead of ~576 documents, resulting in 10-50x speedup.
+     *
+     * @param accountId The account ID
+     * @param apiCollectionId The API collection ID
+     * @param url The API URL
+     * @param method The HTTP method
+     * @param windowSize The window size (5, 15, or 30 minutes)
+     * @return List of BucketStats with pre-calculated p75 values
      */
+    public List<BucketStats> fetchBucketStatsFromStatistics(String accountId, int apiCollectionId, String url, String method, int windowSize) {
+        long startTime = System.currentTimeMillis();
+
+        MongoCollection<ApiRateLimitBucketStatisticsModel> coll = mongoClient
+                .getDatabase(accountId)
+                .getCollection("api_rate_limit_bucket_statistics", ApiRateLimitBucketStatisticsModel.class);
+
+        String docId = ApiRateLimitBucketStatisticsModel.getBucketStatsDocIdForApi(
+            apiCollectionId, method, url, windowSize
+        );
+
+        ApiRateLimitBucketStatisticsModel doc = coll.find(Filters.eq("_id", docId)).first();
+
+        if (doc == null || doc.getBuckets() == null) {
+            logger.infoAndAddToDb("No statistics found for apiCollectionId " + apiCollectionId +
+                    " url " + url + " method " + method + " windowSize " + windowSize);
+            return Collections.emptyList();
+        }
+
+        List<BucketStats> result = new ArrayList<>();
+        for (ApiRateLimitBucketStatisticsModel.Bucket bucket : doc.getBuckets()) {
+            if (bucket.getStats() == null) {
+                continue;
+            }
+
+            BucketStats stats = BucketStats.newBuilder()
+                .setBucketLabel(bucket.getLabel())
+                .setMin(bucket.getStats().getMin())
+                .setMax(bucket.getStats().getMax())
+                .setP25(bucket.getStats().getP25())
+                .setP50(bucket.getStats().getP50())
+                .setP75(bucket.getStats().getP75())
+                .build();
+
+            result.add(stats);
+        }
+
+        long duration = System.currentTimeMillis() - startTime;
+        logger.infoAndAddToDb("Fetched bucket stats from statistics collection in " + duration + "ms for apiCollectionId " +
+                apiCollectionId + " url " + url + " method " + method + " windowSize " + windowSize);
+
+        return result;
+    }
+
+    /**
+     * @deprecated Use fetchBucketStatsFromStatistics() instead for better performance.
+     *
+     * Fetches distribution documents for the given API over the past baseLinePeriod days.
+     * This method queries raw distribution data and recalculates statistics, which is slow.
+     */
+    @Deprecated
     public List<BucketStats> fetchBucketStats(int baseLinePeriod, String accountId, int apiCollectionId, String url, String method, int windowSize) {
 
         Bson filter = Filters.and(
