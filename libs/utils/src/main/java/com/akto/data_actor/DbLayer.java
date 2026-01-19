@@ -455,14 +455,14 @@ public class DbLayer {
 
         Bson existsFilter = Filters.empty();
         Bson filters = Filters.empty();
-        if(Context.accountId.get() == 1758179941){
-            loggerMaker.info("Fetch all api infos for Dil");
-        }else {
-            existsFilter = Filters.and(
-                Filters.ne("rateLimits", null),
-                Filters.ne("rateLimitConfidence", null)
-            );
-        }
+        // if(Context.accountId.get() == 1758179941){
+        //     loggerMaker.info("Fetch all api infos for Dil");
+        // }else {
+        //     existsFilter = Filters.and(
+        //         Filters.ne("rateLimits", null),
+        //         Filters.ne("rateLimitConfidence", null)
+        //     );
+        // }
         // Filter for documents that have both rateLimits and rateLimitConfidence fields
 
         // Add pagination filter using common helper
