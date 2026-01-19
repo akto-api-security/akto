@@ -81,9 +81,9 @@ public class VCDemoData {
 
         ApiInfo apiInfo = new ApiInfo(acid, url, URLMethods.Method.GET);
         apiInfo.setApiAccessTypes(new HashSet<>(Collections.singleton(ApiInfo.ApiAccessType.PUBLIC)));
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.API_TOKEN);
-        Set<Set<ApiInfo.AuthType>> g = new HashSet<>();
+        Set<Set<String>> g = new HashSet<>();
         g.add(s);
         apiInfo.setAllAuthTypesFound(g);
         apiInfos.add(apiInfo);
