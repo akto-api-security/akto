@@ -1,5 +1,6 @@
-import { EmptyState, LegacyCard, Page } from '@shopify/polaris'
+import { EmptyState, LegacyCard, Page, Button } from '@shopify/polaris'
 import React, { useEffect, useReducer, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import DateRangeFilter from '../../../components/layouts/DateRangeFilter'
 import Dropdown from '../../../components/layouts/Dropdown'
 import {produce} from "immer"
@@ -73,7 +74,8 @@ function MetricsSection({ sectionTitle, metricsToDisplay, orderedResult, nameMap
 }
 
 function Metrics() {
-    
+
+    const navigate = useNavigate()
     const [hosts, setHosts] = useState([])
     const apiCollections = PersistStore(state => state.allCollections)
     const [metricsList, setMetricList] = useState([])
@@ -159,10 +161,6 @@ function Metrics() {
         'CYBORG_CALL_COUNT',
         'CYBORG_DATA_SIZE',
         'DATA_INGESTION_API_COUNT',
-
-        // Traffic Collectors metrics
-        'TC_CPU_USAGE',
-        'TC_MEMORY_USAGE',
     ];
 
     const names = [...oldMetrics, ...newMetrics];
@@ -196,34 +194,11 @@ function Metrics() {
             const metricData = data.filter(item => item.metricId === metricId);
 
             if (metricData && metricData.length > 0) {
-                const isTCMetric = metricId === 'TC_CPU_USAGE' || metricId === 'TC_MEMORY_USAGE';
-
-                if (isTCMetric) {
-                    const groupedByInstance = {};
-                    metricData.forEach(item => {
-                        const instanceId = item.instanceId || 'unknown';
-                        if (!groupedByInstance[instanceId]) {
-                            groupedByInstance[instanceId] = [];
-                        }
-                        groupedByInstance[instanceId].push([item.timestamp * 1000, item.value]);
-                    });
-
-                    Object.entries(groupedByInstance).forEach(([instanceId, dataPoints]) => {
-                        result.push({
-                            "data": dataPoints,
-                            "color": null,
-                            "name": instanceId
-                        });
-                    });
-
-                    metricsData[metricId] = result;
-                } else {
-                    const trend = metricData.map(item => ([item.timestamp * 1000,item.value]));
-                    result.push(
-                        { "data": trend, "color": null, "name": currentNameMap.get(metricId)?.descriptionName },
-                    );
-                    metricsData[metricId] = result;
-                }
+                const trend = metricData.map(item => ([item.timestamp * 1000,item.value]));
+                result.push(
+                    { "data": trend, "color": null, "name": currentNameMap.get(metricId)?.descriptionName },
+                );
+                metricsData[metricId] = result;
             }
         }
         return metricsData;
@@ -307,7 +282,6 @@ function Metrics() {
     const testingMetricsKeys = newMetrics.slice(22, 26);
     const cyborgMetricsKeys = newMetrics.slice(26, 29);
     const dataIngestionMetricsKeys = newMetrics.slice(29, 30);
-    const trafficCollectorsMetricsKeys = newMetrics.slice(30, 32);
 
     const graphContainer = (
         <>
@@ -353,14 +327,6 @@ function Metrics() {
                 nameMap={nameMap}
                 defaultChartOptionsFn={defaultChartOptions}
             />
-            <MetricsSection
-                sectionTitle="Traffic Collectors Metrics"
-                metricsToDisplay={trafficCollectorsMetricsKeys}
-                orderedResult={orderedResult}
-                nameMap={nameMap}
-                defaultChartOptionsFn={defaultChartOptions}
-                showLegendForSection={true}
-            />
         </>
     )
 
@@ -371,8 +337,13 @@ function Metrics() {
                     <LegacyCard.Header title="Metrics">
                         <DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>
                         <Dropdown menuItems={menuItems} initial= {groupBy} selected={handleChange}
-                                    subItems={hosts.length > 0} subContent="Group by Id" subClick={changeItems}
+                                    subItems={hosts.length > 0}
+                                    subContent="Group by Id"
+                                    subClick={changeItems}
                         />
+                        <Button onClick={() => navigate("/dashboard/settings/traffic-collectors-metrics")}>
+                            Traffic Collectors
+                        </Button>
                     </LegacyCard.Header>
                 </LegacyCard.Section>
                 {graphContainer}
