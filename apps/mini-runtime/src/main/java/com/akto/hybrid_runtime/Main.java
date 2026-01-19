@@ -258,6 +258,8 @@ public class Main {
     private static String findFastDiscoveryJar() {
         // Try multiple possible locations
         String[] possiblePaths = {
+            // Docker deployment location
+            "/app/fast-discovery-1.0-SNAPSHOT-jar-with-dependencies.jar",
             // Maven build location (development)
             "apps/fast-discovery/target/fast-discovery-1.0-SNAPSHOT-jar-with-dependencies.jar",
             // Environment variable override
@@ -363,10 +365,8 @@ public class Main {
                 // Fast-discovery must use: AKTO_KAFKA_GROUP_ID_CONFIG=fast-discovery
                 processBuilder.environment().put("AKTO_KAFKA_GROUP_ID_CONFIG", "fast-discovery");
 
-                // Redirect output to separate log file
-                java.io.File logFile = new java.io.File("/tmp/fast-discovery.log");
-                processBuilder.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile));
-                processBuilder.redirectError(ProcessBuilder.Redirect.appendTo(logFile));
+                // Output goes to stdout/stderr (captured by Docker logs)
+                processBuilder.inheritIO();
 
                 // Start the process
                 fastDiscoveryProcess = processBuilder.start();
@@ -375,8 +375,7 @@ public class Main {
                 Thread.sleep(2000); // Wait 2 seconds
                 if (!fastDiscoveryProcess.isAlive()) {
                     int exitCode = fastDiscoveryProcess.exitValue();
-                    throw new Exception("Fast-discovery process exited immediately with code " + exitCode +
-                        ". Check " + logFile.getAbsolutePath() + " for errors.");
+                    throw new Exception("Fast-discovery process exited immediately with code " + exitCode);
                 }
 
             } catch (Exception e) {
