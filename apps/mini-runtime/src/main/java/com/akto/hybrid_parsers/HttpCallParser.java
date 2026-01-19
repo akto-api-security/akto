@@ -77,6 +77,10 @@ public class HttpCallParser {
     private DataActor dataActor = DataActorFactory.fetchInstance();
     private Map<Integer, ApiCollection> apiCollectionsMap = new HashMap<>();
 
+    // Track which hostnames have been added to each service-tag collection to avoid redundant DB calls
+    // Key: collectionId, Value: Set of hostnames already added
+    private Map<Integer, Set<String>> serviceTagCollectionHostNamesCache = new HashMap<>();
+
     // Pre-compiled patterns for better performance
     private static final Pattern IP_ADDRESS_PATTERN = Pattern.compile("\\b\\d{1,3}(?:\\.\\d{1,3}){3}.*");
     private static final String EMPTY_JSON = "{}";
@@ -96,9 +100,18 @@ public class HttpCallParser {
         apiCatalogSync.buildFromDB(false, fetchAllSTI);
         apiCollectionsMap = new HashMap<>();
         apiCollectionIdTagsSyncTimestampMap = new HashMap<>();
+        serviceTagCollectionHostNamesCache = new HashMap<>();
         List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta();
         for (ApiCollection apiCollection: apiCollections) {
             apiCollectionsMap.put(apiCollection.getId(), apiCollection);
+
+            // Initialize cache for service-tag collections with existing hostNames
+            if (apiCollection.getServiceTag() != null) {
+                serviceTagCollectionHostNamesCache.put(
+                    apiCollection.getId(),
+                    new HashSet<>(apiCollection.getHostNames())
+                );
+            }
         }
         if (Context.getActualAccountId() == 1745303931 || Context.getActualAccountId() == 1741069294 || Context.getActualAccountId() == 1749515934 || Context.getActualAccountId() == 1753864648) {
             this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, Main.isOnprem, RuntimeMode.isHybridDeployment(), apiCollectionsMap);
@@ -305,11 +318,11 @@ public class HttpCallParser {
 
         // Modify host header to Kubernetes Service filter
         // TODO: Make this generic or customer specific
-        String serviceName = getHeaderValue(responseParam.getRequestParams().getHeaders(), "x-akto-k8s-privatecloud.agoda.com/service");
-        if (serviceName != null && serviceName.length() > 0){
-            responseParam.getRequestParams().getHeaders().put("host", Arrays.asList(hostName + "-" + serviceName));
-            filterType = FILTER_TYPE.MODIFIED;
-        }
+        // String serviceName = getHeaderValue(responseParam.getRequestParams().getHeaders(), "x-akto-k8s-privatecloud.agoda.com/service");
+        // if (serviceName != null && serviceName.length() > 0){
+        //     responseParam.getRequestParams().getHeaders().put("host", Arrays.asList(hostName + "-" + serviceName));
+        //     filterType = FILTER_TYPE.MODIFIED;
+        // }
 
         // Merge am-pc collections
         if(hostName.contains("am-pc")) {
@@ -576,6 +589,11 @@ public class HttpCallParser {
      */
     public void updateApiCollectionTags(String hostNameMapKey, HttpResponseParams httpResponseParams) {
         int apiCollectionId = hostNameToIdMap.get(hostNameMapKey);
+        updateApiCollectionTags(apiCollectionId, httpResponseParams, hostNameMapKey, false);
+    }
+
+    // Overloaded version for service-tag collections where we already have the apiCollectionId
+    public void updateApiCollectionTags(int apiCollectionId, HttpResponseParams httpResponseParams, String hostNameMapKey, boolean isServiceTagCollection) {
         ApiCollection apiCollection = apiCollectionsMap.get(apiCollectionId);
 
         if( apiCollection == null) {
@@ -590,6 +608,7 @@ public class HttpCallParser {
         }
 
         List<CollectionTags> tagsList = CollectionTags.convertTagsFormat(httpResponseParams.getTags());
+        tagsList = filterTagsForAccount(tagsList);
         tagsList = CollectionTags.getUniqueTags(apiCollection, tagsList);
         apiCollection.setTagsList(tagsList);
         apiCollectionsMap.put(apiCollectionId, apiCollection);
@@ -633,9 +652,15 @@ public class HttpCallParser {
         if (tagsList == null || tagsList.isEmpty()) {
             return;
         }
-        
-        // Detects if collections were created based on hostName
-        if (hostNameMapKey.contains(NON_HOSTNAME_KEY)) {
+
+        // Sync tags to DB based on collection type
+        if (isServiceTagCollection) {
+            // Service-tag collection - call createCollectionForServiceTag to update tags
+            String serviceTag = apiCollection.getServiceTag();
+            List<String> hostNames = apiCollection.getHostNames();
+            String hostName = apiCollection.getHostName();
+            dataActor.createCollectionForServiceTag(apiCollectionId, serviceTag, hostNames, tagsList, hostName);
+        } else if (hostNameMapKey.contains(NON_HOSTNAME_KEY)) {
             String vpcId = System.getenv("VPC_ID");
             createCollectionSimpleForVpc(
                     httpResponseParams.requestParams.getApiCollectionId(), vpcId, tagsList);
@@ -656,8 +681,35 @@ public class HttpCallParser {
         }
     }
 
+    // Agoda-specific tag keys
+    private static final String SERVICE_TAG_KEY = "privatecloud.agoda.com/service";
+    private static final String ENVIRONMENT_TAG_KEY = "privatecloud.agoda.com/environment";
+    private static final String COMPONENT_TAG_KEY = "catalog.agoda.com/component";
+
+    private String extractServiceTag(String tagsJson) {
+        if (tagsJson == null || tagsJson.isEmpty()) {
+            return null;
+        }
+
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            return tagsMap.get(SERVICE_TAG_KEY);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error parsing tags JSON for service tag extraction");
+            return null;
+        }
+    }
+
     public int createApiCollectionId(HttpResponseParams httpResponseParam){
         int apiCollectionId;
+
+        // Check if service tag is present in tags - if yes, use service-tag based collection
+        String serviceTagValue = extractServiceTag(httpResponseParam.getTags());
+        if (serviceTagValue != null && !serviceTagValue.isEmpty()) {
+            return createApiCollectionIdByServiceTag(httpResponseParam, serviceTagValue);
+        }
+
         // Use getHostnameForCollection to get reconstructed hostname for AI agents
         String hostName = getHostnameForCollection(httpResponseParam);
 
@@ -668,6 +720,7 @@ public class HttpCallParser {
         int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
         String vpcId = System.getenv("VPC_ID");
         List<CollectionTags> tagList = CollectionTags.convertTagsFormat(httpResponseParam.getTags());
+        tagList = filterTagsForAccount(tagList);
 
         if (useHostCondition(hostName, httpResponseParam.getSource())) {
             hostName = hostName.toLowerCase();
@@ -737,7 +790,122 @@ public class HttpCallParser {
         return apiCollectionId;
     }
 
+    public int createApiCollectionIdByServiceTag(HttpResponseParams httpResponseParam, String serviceTagValue) {
+        int apiCollectionId;
+        String hostName = getHostnameForCollection(httpResponseParam);
+        String tagsJson = httpResponseParam.getTags();
 
+        // Generate collection ID from service tag value
+        // No need for accountId since each account has its own separate database
+        apiCollectionId = ApiCollection.generateServiceTagCollectionId(serviceTagValue);
+
+        // Check if collection already exists in cache
+        if (apiCollectionsMap.containsKey(apiCollectionId)) {
+            // Update hostNames list if hostname is new
+            updateServiceTagCollectionHostNames(apiCollectionId, hostName, tagsJson, httpResponseParam);
+            return apiCollectionId;
+        }
+
+        // Collection not in cache - create a dummy collection object and add to cache immediately
+        // This prevents making DB calls for every message before the collection is created
+        // The actual DB upsert will happen only once (first time we see this service tag)
+        try {
+            List<String> hostNamesList = new ArrayList<>();
+            if (hostName != null && !hostName.isEmpty()) {
+                hostNamesList.add(hostName);
+            }
+            List<CollectionTags> tagsList = CollectionTags.convertTagsFormat(tagsJson);
+            tagsList = filterTagsForAccount(tagsList);
+
+            ApiCollection collection = new ApiCollection(
+                apiCollectionId,
+                serviceTagValue,  // name = service tag value
+                Context.now(),    // startTs
+                new HashSet<>(),  // urls (empty initially)
+                hostName,             // hostName = null for service-tag collections
+                0,                // vxlanId
+                false,            // redact
+                true              // sampleCollectionsDropped
+            );
+            collection.setServiceTag(serviceTagValue);
+            collection.setHostNames(hostNamesList);
+            collection.setTagsList(tagsList);
+
+            // Add to cache FIRST to prevent redundant calls
+            apiCollectionsMap.put(apiCollectionId, collection);
+
+            // Initialize hostname cache for this new collection
+            Set<String> cachedHostNames = new HashSet<>();
+            cachedHostNames.add(hostName);
+            serviceTagCollectionHostNamesCache.put(apiCollectionId, cachedHostNames);
+
+            // Create collection in DB with initial fields (upsert pattern - safe if already exists)
+            dataActor.createCollectionForServiceTag(apiCollectionId, serviceTagValue, hostNamesList, tagsList, hostName);
+
+            loggerMaker.infoAndAddToDb("Created service-tag collection: " + serviceTagValue
+                + " (ID: " + apiCollectionId + ") for URL: " + httpResponseParam.getRequestParams().getURL());
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error creating service-tag collection for: " + serviceTagValue);
+            // Return vxlanId as fallback on error
+            return httpResponseParam.requestParams.getApiCollectionId();
+        }
+
+        return apiCollectionId;
+    }
+
+    private void updateServiceTagCollectionHostNames(int collectionId, String hostName, String tagsJson, HttpResponseParams httpResponseParam) {
+        if (hostName == null || hostName.isEmpty()) {
+            return;
+        }
+
+        try {
+            // Check cache first to avoid redundant calls
+            Set<String> cachedHostNames = serviceTagCollectionHostNamesCache.get(collectionId);
+            if (cachedHostNames == null) {
+                cachedHostNames = new HashSet<>();
+                serviceTagCollectionHostNamesCache.put(collectionId, cachedHostNames);
+            }
+
+            if (!cachedHostNames.contains(hostName)) {
+                dataActor.addHostNameToServiceTagCollection(collectionId, hostName);
+                cachedHostNames.add(hostName);
+            }
+
+            // Reuse existing tag update logic - pass service tag value as hostNameMapKey
+            ApiCollection apiCollection = apiCollectionsMap.get(collectionId);
+            if (apiCollection != null && apiCollection.getServiceTag() != null) {
+                updateApiCollectionTags(collectionId, httpResponseParam, apiCollection.getServiceTag(), true);
+            }
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error updating hostNames for collection: " + collectionId);
+        }
+    }
+
+    private List<CollectionTags> filterTagsForAccount(List<CollectionTags> tagsList) {
+        if (tagsList == null || tagsList.isEmpty()) {
+            return tagsList;
+        }
+
+        if (!INPROCESS_ADVANCED_FILTERS_ACCOUNTS.contains(Context.getActualAccountId())) {
+            return tagsList;
+        }
+
+        // Keep only these specific tag keys
+        Set<String> allowedKeys = new HashSet<>();
+        allowedKeys.add(SERVICE_TAG_KEY);
+        allowedKeys.add(ENVIRONMENT_TAG_KEY);
+        allowedKeys.add(COMPONENT_TAG_KEY);
+
+        List<CollectionTags> filteredTags = new ArrayList<>();
+        for (CollectionTags tag : tagsList) {
+            if (tag != null && allowedKeys.contains(tag.getKeyName())) {
+                filteredTags.add(tag);
+            }
+        }
+
+        return filteredTags;
+    }
 
     private boolean isBlankResponseBodyForGET(String method, String contentType, String matchContentType,
             String responseBody) {
