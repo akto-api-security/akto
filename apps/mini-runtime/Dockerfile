@@ -1,6 +1,7 @@
 FROM amazoncorretto:8
 WORKDIR /app
 COPY ./target/mini-runtime-1.0-SNAPSHOT-jar-with-dependencies.jar /app/mini-runtime-1.0-SNAPSHOT-jar-with-dependencies.jar
+COPY ../fast-discovery/target/fast-discovery-1.0-SNAPSHOT-jar-with-dependencies.jar /app/fast-discovery-1.0-SNAPSHOT-jar-with-dependencies.jar
 
 RUN yum update -y && yum install -y procps
 RUN yum install -y bind-utils
