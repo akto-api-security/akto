@@ -37,6 +37,7 @@ import SequencesFlow from "./SequencesFlow"
 import { CATEGORY_API_SECURITY, getDashboardCategory, isCategory, mapLabel, isEndpointSecurityCategory } from "../../../../main/labelHelper"
 import AgentDiscoverGraph from "./AgentDiscoverGraph"
 import McpToolsGraph from "./McpToolsGraph"
+import { findTypeTag, TYPE_TAG_KEYS } from "../agentic/mcpClientHelper"
 
 const headings = [
     {
@@ -1088,6 +1089,30 @@ function ApiEndpoints(props) {
         return getTagsCompactComponent(envTypeList)
     }
 
+    function getEmptyScreenText(collectionsObj) {
+        const typeTag = findTypeTag(collectionsObj?.envType);
+        if (typeTag?.keyName === TYPE_TAG_KEYS.MCP_SERVER) {
+            return {
+                headingText: "Discover MCP tools to get started",
+                description: "Your MCP server collection is currently empty."
+            };
+        } else if (typeTag?.keyName === TYPE_TAG_KEYS.GEN_AI) {
+            return {
+                headingText: "Discover AI endpoints to get started",
+                description: "Your AI agent collection is currently empty."
+            };
+        } else if (typeTag?.keyName === TYPE_TAG_KEYS.BROWSER_LLM) {
+            return {
+                headingText: "Discover LLM endpoints to get started",
+                description: "Your LLM collection is currently empty."
+            };
+        }
+        return {
+            headingText: "Discover APIs to get started",
+            description: "Your API collection is currently empty. Import APIs from other collections now."
+        };
+    }
+
     const collectionsObj = (allCollections && allCollections.length > 0) ? allCollections.filter(x => Number(x.id) === Number(apiCollectionId))[0] : {}
     const isApiGroup = collectionsObj?.type === 'API_GROUP'
     const isHostnameCollection = hostNameMap[collectionsObj?.id] !== null && hostNameMap[collectionsObj?.id] !== undefined 
@@ -1511,8 +1536,8 @@ function ApiEndpoints(props) {
             ] : showEmptyScreen ? [
                 <EmptyScreensLayout key={"emptyScreen"}
                     iconSrc={"/public/file_plus.svg"}
-                    headingText={"Discover APIs to get started"}
-                    description={"Your API collection is currently empty. Import APIs from other collections now."}
+                    headingText={getEmptyScreenText(collectionsObj).headingText}
+                    description={getEmptyScreenText(collectionsObj).description}
                     buttonText={"Import from other collections"}
                     redirectUrl={"/dashboard/observe/inventory"}
                     learnText={"inventory"}
