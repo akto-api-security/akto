@@ -18,7 +18,7 @@ import com.akto.listener.RuntimeListener;
 import com.akto.parsers.HttpCallParser;
 import com.akto.types.CappedSet;
 import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
-import com.google.api.client.util.Charsets;
+import com.google.common.base.Charsets;
 import com.google.common.hash.BloomFilter;
 import com.google.common.hash.Funnels;
 import com.mongodb.BasicDBObject;

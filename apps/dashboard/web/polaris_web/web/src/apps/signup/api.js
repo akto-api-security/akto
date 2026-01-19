@@ -29,6 +29,13 @@ export default {
         })
         return res
     },
+    fetchWrappedData: function () {
+        return request({
+            url: 'api/wrapped',
+            method: 'post',
+            data: {}
+        })
+    },
     updateAktoUIMode(aktoUIMode) {
         return request({
             url: 'api/updateAktoUIMode',

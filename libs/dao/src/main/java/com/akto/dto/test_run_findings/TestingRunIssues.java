@@ -46,6 +46,10 @@ public class TestingRunIssues {
     private List<Integer> collectionIds;
     public static final String DESCRIPTION = "description";
     private String description;
+    public static final String SERVICENOW_ISSUE_URL = "servicenowIssueUrl";
+    private String servicenowIssueUrl;
+    public static final String DEVREV_WORK_URL = "devrevWorkUrl";
+    private String devrevWorkUrl;
 
     public static final String ID_API_COLLECTION_ID = Constants.ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.API_COLLECTION_ID;
     public static final String ID_URL = Constants.ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.URL;
@@ -237,5 +241,21 @@ public class TestingRunIssues {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getServicenowIssueUrl() {
+        return servicenowIssueUrl;
+    }
+
+    public void setServicenowIssueUrl(String servicenowIssueUrl) {
+        this.servicenowIssueUrl = servicenowIssueUrl;
+    }
+
+    public String getDevrevWorkUrl() {
+        return devrevWorkUrl;
+    }
+
+    public void setDevrevWorkUrl(String devrevWorkUrl) {
+        this.devrevWorkUrl = devrevWorkUrl;
     }
 }

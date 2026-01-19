@@ -1,7 +1,6 @@
 package com.akto.action.testing;
 
 import com.akto.action.UserAction;
-import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -16,9 +15,6 @@ import lombok.Getter;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import com.mongodb.ConnectionString;
-import com.akto.DaoInit;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -50,66 +46,24 @@ public class TestResultsStatsAction extends UserAction {
      */
     public static final String REGEX_5XX = "\"statusCode\"\\s*:\\s*5[0-9][0-9]";
 
-    /**
-     * Cloudflare Security and CDN Error Pattern
-     * Detects various Cloudflare blocking scenarios and error conditions:
-     * 
-     * Error Codes:
-     * - 1xxx series (1000-1999): DNS resolution, firewall, security blocking
-     * - 10xxx series (10000+): API limits, configuration issues
-     * - Specific codes: 1012 (access denied), 1015 (rate limited), 1020 (access
-     * denied)
-     * 
-     * Security Blocking:
-     * - WAF (Web Application Firewall) triggered blocks
-     * - Cloudflare security service protection messages
-     * - Access denied and rate limiting scenarios
-     * - Attention Required pages shown to users
-     * 
-     * Note: Excludes cf-ray headers which are present on all Cloudflare responses
-     * including successful 2xx codes.
-     * 
-     * References:
-     * -
-     * -
-     * https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/
-     * - https://developers.cloudflare.com/waf/
-     * - https://developers.cloudflare.com/fundamentals/reference/cloudflare-ray-id/
-     * - Error page types:
-     * https://developers.cloudflare.com/rules/custom-errors/reference/error-page-types/
-     * - Block pages:
-     * https://developers.cloudflare.com/cloudflare-one/policies/gateway/block-page/
-     * - Custom errors: https://developers.cloudflare.com/rules/custom-errors/
-     */
-    public static final String REGEX_CLOUDFLARE = "(error\\s*1[0-9]{3}|error\\s*10[0-9]{3}|" + // CF-specific error
-                                                                                               // codes
-            "attention\\s*required.*cloudflare|" + // Challenge page identifier
-            "managed\\s*challenge.*cloudflare|cloudflare.*managed\\s*challenge|" + // Managed challenge variations
-            "interactive\\s*challenge.*cloudflare|cloudflare.*interactive\\s*challenge|" + // Interactive challenges
-            "under\\s*attack.*cloudflare|cloudflare.*under\\s*attack|" + // Under attack mode
-            "ddos\\s*protection.*cloudflare|cloudflare.*ddos|" + // DDoS protection
-            "anti[-\\s]*ddos.*cloudflare|cloudflare.*anti[-\\s]*ddos|" + // Anti-DDoS phrasing
-            "ddos\\s*attack\\s*mitigation|attack\\s*mitigation.*cloudflare|" + // DDoS attack mitigation
-            "ddos\\s*protection.*under\\s*attack.*enabled|under\\s*attack.*mode.*enabled|" + // Under attack mode
-                                                                                             // enabled
-            "(blocked|denied|limited|restricted).*cloudflare|" + // Generic blocking with CF context
-            "cloudflare.*(blocked|denied|limited|restricted|security)|" + // CF context with blocking
-            "waf.*cloudflare|cloudflare.*waf|" + // WAF by Cloudflare
-            "\\bweb\\s*application\\s*firewall\\b|\\bWAF\\b|waf\\s*rule\\s*triggered|waf\\s*(block|security|alert|protection)|"
-            + // WAF mentions without CF
-            "rate.*limit.*cloudflare|cloudflare.*rate.*limit|" + // Rate limiting by CF
-            "checking.*browser.*cloudflare|browser\\s*integrity\\s*check|verifying.*browser.*supports|" + // Browser
-                                                                                                          // check
-                                                                                                          // challenge
-            "security.*check.*cloudflare|security.*verification.*cloudflare|" + // Security checks/verification
-            "verification.*cloudflare|additional.*security.*cloudflare|" + // Additional security verification
-            "security\\s*challenge.*cloudflare|cloudflare.*security\\s*challenge|" + // Security challenge variations
-            "interactive\\s*challenge.*required|challenge.*required.*cloudflare|" + // Interactive challenge
-                                                                                    // requirements
-            "captcha\\s*verification|complete.*security\\s*check.*prove.*not.*robot|" + // CAPTCHA verification patterns
-            "this\\s*website\\s*is\\s*using\\s*a\\s*security\\s*service\\s*to\\s*protect\\s*itself\\s*from\\s*online\\s*attacks|"
-            + // Common CF block text
-            "ray\\s*id.*blocked|blocked.*ray\\s*id)"; // Ray ID blocked variants
+    public static final String REGEX_CLOUDFLARE =
+    "(?is).*\"response\".*\"body\".*(" +
+    
+    // ==== REAL CLOUDFLARE BRANDED BLOCKING PAGES ====
+    // Reference: https://developers.cloudflare.com/fundamentals/reference/under-attack-mode/
+    "attention\\s+required.*cloudflare|" +
+    
+    // ==== HTML TITLE CONTAINS CLOUDFLARE ====
+    // Reference: https://developers.cloudflare.com/rules/custom-errors/edit-error-pages/
+    "<title>[^<]*cloudflare[^<]*</title>|" +
+    
+    // ==== CLOUDFLARE STRUCTURAL ELEMENTS ====  
+    // Reference: https://developers.cloudflare.com/rules/custom-errors/
+    "cf-error-details|" +
+
+    "access\\s+denied.*cloudflare" +         
+    
+    ")";
 
     public String fetchTestResultsStatsCount() {
         try {
@@ -142,7 +96,8 @@ public class TestResultsStatsAction extends UserAction {
 
             String description = describePattern(resolvedRegex);
 
-            this.count = getCountByPattern(testingRunResultSummaryId, resolvedRegex);
+            this.count = getCountByPattern(testingRunResultSummaryId, resolvedRegex)
+                    + getCountByPatternMultiExecResults(testingRunResultSummaryId, resolvedRegex);
 
             loggerMaker.debugAndAddToDb(
                     "Found " + count + " requests matching " + description + " for test summary: "
@@ -243,6 +198,26 @@ public class TestResultsStatsAction extends UserAction {
         return resultCount;
     }
 
+    private int getCountByPatternMultiExecResults(ObjectId testingRunResultSummaryId, String regex) {
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(Filters.and(
+                        Filters.eq("testRunResultSummaryId", testingRunResultSummaryId),
+                        Filters.eq("vulnerable", false),
+                        Filters.exists("testResults.nodeResultMap.x1.message", true))));
+        pipeline.add(Aggregates.sort(Sorts.descending("endTimestamp")));
+        pipeline.add(Aggregates.limit(10000));
+        pipeline.add(Aggregates.match(Filters.regex("testResults.nodeResultMap.x1.message", regex, "i")));
+        pipeline.add(Aggregates.count("count"));
+        MongoCursor<BasicDBObject> cursor = TestingRunResultDao.instance.getMCollection()
+                .aggregate(pipeline, BasicDBObject.class).cursor();
+        int resultCount = 0;
+        if (cursor.hasNext()) {
+            BasicDBObject result = cursor.next();
+            resultCount = result.getInt("count", 0);
+        }
+        cursor.close();
+        return resultCount;
+    }
 
     private void explainAggregationPipeline(List<Bson> pipeline) {
         try {

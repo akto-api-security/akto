@@ -137,7 +137,7 @@ public class PercentilesCron {
                 Filters.gte("windowStart", (int) getWindowStartForBaselinePeriod(baseLinePeriod))
         );
 
-        return ApiDistributionDataService.fetchBucketStats(accountId, filter, mongoClient);
+        return ApiDistributionDataService.fetchBucketStats(accountId, filter, com.akto.threat.backend.dao.ApiDistributionDataDao.instance);
     }
 
 

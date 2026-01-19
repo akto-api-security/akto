@@ -26,6 +26,11 @@ let testEditorStore = (set)=>({
     setCurrentContent:(currentContent)=>{
         set({currentContent: currentContent})
     },
+
+    selectedRole: null,
+    setSelectedRole:(selectedRole)=>{
+        set({selectedRole: selectedRole})
+    },
 })
 
 testEditorStore = devtools(testEditorStore)

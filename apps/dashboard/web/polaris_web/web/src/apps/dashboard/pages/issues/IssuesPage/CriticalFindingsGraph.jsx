@@ -6,6 +6,7 @@ import testingApi from "../../testing/api.js"
 import testingFunc from "../../testing/transform.js"
 import BarGraph from '../../../components/charts/BarGraph.jsx';
 import LocalStore from "../../../../main/LocalStorageStore";
+import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 
 const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl, complianceMode }) => {
     const subCategoryMap = LocalStore(state => state.subCategoryMap);
@@ -38,7 +39,8 @@ const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl
                 });
             })
         } else {
-            tempResultSubCategoryMap = testingFunc.convertSubIntoSubcategory(subcategoryDataResp).subCategoryMap
+            const result = await testingFunc.convertSubIntoSubcategory(subcategoryDataResp);
+            tempResultSubCategoryMap = result.subCategoryMap;
         }
         convertSubCategoryInfo(tempResultSubCategoryMap)
         setShowTestingComponents(true)
@@ -54,7 +56,7 @@ const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl
         },
     }
 
-    const runTestEmptyCardComponent = <Text alignment='center' color='subdued'>There’s no data to show. <Link url="/dashboard/testing" target='_blank'>Run test</Link> to get data populated. </Text>
+    const runTestEmptyCardComponent = <Text alignment='center' color='subdued'>There's no data to show. <Link url="/dashboard/testing" target='_blank'>{mapLabel('Run test', getDashboardCategory())}</Link> to get data populated. </Text>
 
     const criticalFindings = (criticalFindingsData && criticalFindingsData.length > 0) ?
     <InfoCard
@@ -72,7 +74,7 @@ const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl
             />
         }
         title={complianceMode ? (complianceMode + " clauses") : "Vulnerabilities findings"}
-        titleToolTip="Overview of the most critical security issues detected, including the number of issues and APIs affected for each type of vulnerability."
+        titleToolTip={"Overview of the most critical security issues detected, including the number of issues and " + mapLabel("APIs", getDashboardCategory()) + " affected for each type of vulnerability."}
         linkText={linkText}
         linkUrl={linkUrl}
     /> : <EmptyCard title={complianceMode ? (complianceMode + " clauses") : "Vulnerabilities findings"} subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No Vulnerabilities found</Text>: runTestEmptyCardComponent} />

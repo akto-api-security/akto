@@ -37,7 +37,8 @@ public abstract class Config {
     public String id;
 
     public enum ConfigType {
-        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, GOOGLE_SAML, AWS_WAF, SPLUNK_SIEM, AKTO_DASHBOARD_HOST_URL, CLOUDFLARE_WAF;
+        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, GOOGLE_SAML, AWS_WAF, SPLUNK_SIEM, AKTO_DASHBOARD_HOST_URL, CLOUDFLARE_WAF, RSA_KP, MCP_REGISTRY,
+        SLACK_ALERT_INTERNAL, ABUSEIPDB;
     }
 
     public ConfigType configType;
@@ -675,6 +676,36 @@ public abstract class Config {
             this.slackWebhookUrl = slackWebhookUrl;
         }
     }
+
+    @BsonDiscriminator
+    public static class SlackAlertInternalConfig extends Config {
+        private String slackWebhookUrl;
+        private String dastSlackWebhookUrl;
+
+        public static final String CONFIG_ID = ConfigType.SLACK_ALERT_INTERNAL.name() + CONFIG_SALT;
+
+        public SlackAlertInternalConfig() {
+            this.configType = ConfigType.SLACK_ALERT_INTERNAL;
+            this.id = CONFIG_ID;
+        }
+
+        public String getSlackWebhookUrl() {
+            return slackWebhookUrl;
+        }
+
+        public void setSlackWebhookUrl(String slackWebhookUrl) {
+            this.slackWebhookUrl = slackWebhookUrl;
+        }
+
+        public String getDastSlackWebhookUrl() {
+            return dastSlackWebhookUrl;
+        }
+
+        public void setDastSlackWebhookUrl(String dastSlackWebhookUrl) {
+            this.dastSlackWebhookUrl = dastSlackWebhookUrl;
+        }
+    }
+
     @BsonDiscriminator
     public static class HybridSaasConfig extends Config {
         String privateKey;
@@ -938,6 +969,40 @@ public abstract class Config {
         }
     }
 
+    @Getter
+    @Setter
+    @BsonDiscriminator
+    public static class RSAKeyPairConfig extends Config {
+
+        public static final String PRIVATE_KEY = "privateKey";
+        public static final String PUBLIC_KEY = "publicKey";
+        public static final String CREATED_AT = "createdAt";
+
+        private String privateKey;
+        private String publicKey;
+        private int createdAt;
+
+        public RSAKeyPairConfig() {
+            this.configType = ConfigType.RSA_KP;
+            this.id = ConfigType.RSA_KP.name() + CONFIG_SALT;
+        }
+
+        public RSAKeyPairConfig(String privateKey, String publicKey) {
+            this.configType = ConfigType.RSA_KP;
+            this.id = ConfigType.RSA_KP.name() + CONFIG_SALT;
+            this.privateKey = privateKey;
+            this.publicKey = publicKey;
+        }
+
+        public RSAKeyPairConfig(String privateKey, String publicKey, int createdAt) {
+            this.configType = ConfigType.RSA_KP;
+            this.id = ConfigType.RSA_KP.name() + CONFIG_SALT;
+            this.privateKey = privateKey;
+            this.publicKey = publicKey;
+            this.createdAt = createdAt;
+        }
+    }
+
     public static boolean isConfigSSOType(ConfigType configType){
         if(configType == null){
             return false;
@@ -970,5 +1035,72 @@ public abstract class Config {
                 Filters.eq(OktaConfig.ORGANIZATION_DOMAIN, domain)
         );
         return config;
+    }
+
+    @Getter
+    @Setter
+    @BsonDiscriminator
+    public static class McpRegistryConfig extends Config {
+
+        public static final String REGISTRIES = "registries";
+        public static final String CONFIG_ID = ConfigType.MCP_REGISTRY.name();
+
+        private List<McpRegistry> registries;
+
+        public McpRegistryConfig() {
+            this.configType = ConfigType.MCP_REGISTRY;
+            this.id = CONFIG_ID;
+        }
+
+        public McpRegistryConfig(List<McpRegistry> registries, int accountId) {
+            this.registries = registries;
+            this.id = accountId + "_" + CONFIG_ID;
+            this.configType = ConfigType.MCP_REGISTRY;
+        }
+
+        @Getter
+        @Setter
+        public static class McpRegistry {
+            public static final String ID = "id";
+            public static final String NAME = "name";
+            public static final String URL = "url";
+            public static final String IS_DEFAULT = "isDefault";
+
+            private String id;
+            private String name;
+            private String url;
+            private boolean isDefault;
+
+            public McpRegistry() {}
+
+            public McpRegistry(String id, String name, String url, boolean isDefault) {
+                this.id = id;
+                this.name = name;
+                this.url = url;
+                this.isDefault = isDefault;
+            }
+        }
+    }
+
+    @Getter
+    @Setter
+    @BsonDiscriminator
+    public static class AbuseIPDBConfig extends Config {
+
+        public static final String API_KEY = "apiKey";
+        public static final String CONFIG_ID = ConfigType.ABUSEIPDB.name() + CONFIG_SALT;
+
+        private String apiKey;
+
+        public AbuseIPDBConfig() {
+            this.configType = ConfigType.ABUSEIPDB;
+            this.id = CONFIG_ID;
+        }
+
+        public AbuseIPDBConfig(String apiKey) {
+            this.configType = ConfigType.ABUSEIPDB;
+            this.id = CONFIG_ID;
+            this.apiKey = apiKey;
+        }
     }
 }

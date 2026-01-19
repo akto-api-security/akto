@@ -188,7 +188,7 @@ public class InventoryAction extends UserAction {
                     return;
                 }
                 ApiInfoKey apiInfoKey = new ApiInfoKey(
-                        apiCollectionId,
+                        item.getInt(ApiInfoKey.API_COLLECTION_ID),
                         item.getString(ApiInfoKey.URL),
                         Method.fromString(item.getString(ApiInfoKey.METHOD)));
                 listOfEndpointsInCollection.add(apiInfoKey);
@@ -1168,6 +1168,69 @@ public class InventoryAction extends UserAction {
             MergedUrlsDao.instance.getMCollection().deleteOne(filters);
         }
         return SUCCESS.toUpperCase();
+    }
+
+    private List<ApiInfo.ApiInfoKey> apiInfoKeyList;
+
+    public String bulkDeMergeApis() {
+        if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) {
+            addActionError("API list cannot be null or empty");
+            return ERROR.toUpperCase();
+        }
+
+        int successCount = 0;
+        int failureCount = 0;
+        List<String> errors = new ArrayList<>();
+
+        for (ApiInfo.ApiInfoKey apiInfoKey : apiInfoKeyList) {
+            try {
+                String apiUrl = apiInfoKey.getUrl();
+                String apiMethod = apiInfoKey.getMethod().name();
+                int collectionId = apiInfoKey.getApiCollectionId();
+
+                // Validate that this is a merged URL
+                if (!APICatalog.isTemplateUrl(apiUrl)) {
+                    errors.add("URL " + apiUrl + " is not a merged URL");
+                    failureCount++;
+                    continue;
+                }
+
+                // Set temporary values for single API de-merge
+                this.url = apiUrl;
+                this.method = apiMethod;
+                this.apiCollectionId = collectionId;
+
+                // Call the existing deMergeApi logic
+                String result = deMergeApi();
+
+                if (SUCCESS.toUpperCase().equals(result)) {
+                    successCount++;
+                } else {
+                    errors.add("Failed to de-merge: " + apiMethod + " " + apiUrl);
+                    failureCount++;
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error de-merging API: " + e.getMessage(), LogDb.DASHBOARD);
+                errors.add("Error de-merging API: " + e.getMessage());
+                failureCount++;
+            }
+        }
+
+        loggerMaker.infoAndAddToDb("Bulk de-merge completed. Success: " + successCount + ", Failed: " + failureCount, LogDb.DASHBOARD);
+
+        if (failureCount > 0) {
+            addActionError("Some APIs failed to de-merge. Success: " + successCount + ", Failed: " + failureCount);
+        }
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public void setApiInfoKeyList(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
+        this.apiInfoKeyList = apiInfoKeyList;
+    }
+
+    public List<ApiInfo.ApiInfoKey> getApiInfoKeyList() {
+        return apiInfoKeyList;
     }
 
     public String fetchNotTestedAPICount() {

@@ -1,10 +1,11 @@
-import { Button, ButtonGroup, LegacyCard, Text, DataTable, VerticalStack } from "@shopify/polaris"
+import { Button, ButtonGroup, LegacyCard, Text, VerticalStack, DataTable, Checkbox, HorizontalStack, RadioButton, Modal, Link } from "@shopify/polaris"
 import { useEffect, useState } from "react";
 import settingRequests from "../api";
 import func from "@/util/func";
 import LogsContainer from "./LogsContainer";
 import Dropdown from "../../../components/layouts/Dropdown"
 import { saveAs } from 'file-saver'
+import ModuleEnvConfigComponent from "./ModuleEnvConfig"
 
 const Logs = () => {
     const fiveMins = 1000 * 60 * 5
@@ -17,6 +18,10 @@ const Logs = () => {
     })
     const [ loading, setLoading ] = useState(false)
     const [ moduleInfos, setModuleInfos ] = useState([])
+    const [ allowedEnvFields, setAllowedEnvFields ] = useState([])
+    const [ selectedModules, setSelectedModules ] = useState([])
+    const [ modalActive, setModalActive ] = useState(false)
+    const [ selectedModule, setSelectedModule ] = useState(null)
     const logGroupSelected = logs.logGroup !== ''
     const hasAccess = func.checkUserValidForIntegrations()
 
@@ -57,6 +62,7 @@ const Logs = () => {
     const fetchModuleInfo = async () => {
         const response = await settingRequests.fetchModuleInfo();
         setModuleInfos(response.moduleInfos || []);
+        setAllowedEnvFields(response.allowedEnvFields || []);
     }
 
     useEffect(() => {
@@ -97,14 +103,86 @@ const Logs = () => {
         }
     }
 
+    const handleRebootModules = async (deleteTopicAndReboot) => {
+        if (selectedModules.length === 0) {
+            func.setToast(true, true, "Please select at least one module to reboot");
+            return;
+        }
+        try {
+            await settingRequests.rebootModules(selectedModules, deleteTopicAndReboot);
+            const rebootType = deleteTopicAndReboot ? "Container reboot" : "Restart process";
+            func.setToast(true, false, `${rebootType} flag set for eligible modules`);
+            setSelectedModules([]);
+            await fetchModuleInfo(); // Refresh the module list
+        } catch (error) {
+            func.setToast(true, true, "Failed to set reboot flag for modules");
+        }
+    }
+
+    const toggleModuleSelection = (moduleId) => {
+        setSelectedModules(prev => {
+            if (prev.includes(moduleId)) {
+                return prev.filter(id => id !== moduleId);
+            } else {
+                return [...prev, moduleId];
+            }
+        });
+    }
+
+    const canRebootModule = (module) => {
+        const twoMinutesAgo = Math.floor(Date.now() / 1000) - 120;
+        return module.lastHeartbeatReceived >= twoMinutesAgo &&
+               module.name &&
+               (module.name.startsWith('Default_') || module.moduleType === 'TRAFFIC_COLLECTOR');
+    }
+
+    const handleModuleTypeClick = (module) => {
+        setSelectedModule(module);
+        setModalActive(true);
+    }
+
+    const handleModalClose = () => {
+        setModalActive(false);
+        setSelectedModule(null);
+    }
+
+    const handleSaveEnv = async (moduleId, moduleName, envData) => {
+        try {
+            await settingRequests.updateModuleEnvAndReboot(moduleId, moduleName, envData);
+            func.setToast(true, false, "Environment config saved successfully. Module will reboot.");
+            handleModalClose();
+            await fetchModuleInfo();
+        } catch (error) {
+            func.setToast(true, true, "Failed to update environment config");
+        }
+    }
+
     // Sort moduleInfos by lastHeartbeatReceived in descending order
     const sortedModuleInfos = [...moduleInfos].sort((a, b) => (b.lastHeartbeatReceived || 0) - (a.lastHeartbeatReceived || 0));
-    const moduleInfoRows = sortedModuleInfos.map(module => [
-        module.moduleType || '-',
-        module.currentVersion || '-',
-        func.epochToDateTime(module.startedTs),
-        func.epochToDateTime(module.lastHeartbeatReceived)
-    ]);
+
+    const moduleInfoRows = sortedModuleInfos.map(module => {
+        const isEligible = canRebootModule(module);
+        const isSelected = selectedModules.includes(module.id);
+        const isTrafficCollector = module.moduleType === 'TRAFFIC_COLLECTOR';
+
+        return [
+            isTrafficCollector ? (
+                <Link onClick={() => handleModuleTypeClick(module)} removeUnderline>{module.moduleType || '-'}</Link>
+            ) : (
+                module.moduleType || '-'
+            ),
+            module.name || '-',
+            module.currentVersion || '-',
+            func.epochToDateTime(module.startedTs),
+            func.epochToDateTime(module.lastHeartbeatReceived),
+            isEligible ? 'Yes' : 'No',
+            <Checkbox
+                checked={isSelected}
+                onChange={() => toggleModuleSelection(module.id)}
+                disabled={!isEligible}
+            />,
+        ];
+    });
 
     return (
         <VerticalStack>
@@ -143,12 +221,28 @@ const Logs = () => {
                 }
             </LegacyCard>
 
-            
-                {moduleInfos && moduleInfos.length > 0 ? (
-                    <LegacyCard sectioned title="Module Information">
-
+            {moduleInfos && moduleInfos.length > 0 ? (
+                <LegacyCard
+                    sectioned
+                    title="Module Information"
+                    actions={[
+                        {
+                            content: 'Restart process',
+                            onAction: () => handleRebootModules(false),
+                            disabled: selectedModules.length === 0
+                        },
+                        {
+                            content: 'Delete topic and restart process',
+                            onAction: () => handleRebootModules(true),
+                            disabled: selectedModules.length === 0
+                        }
+                    ]}
+                >
                     <DataTable
                         columnContentTypes={[
+                            'text',
+                            'text',
+                            'text',
                             'text',
                             'text',
                             'text',
@@ -156,15 +250,34 @@ const Logs = () => {
                         ]}
                         headings={[
                             'Type',
+                            'Name',
                             'Version',
                             'Started At',
-                            'Last Heartbeat'
+                            'Last Heartbeat',
+                            'Reboot Eligible',
+                            'Select'
                         ]}
                         rows={moduleInfoRows}
                     />
-                                </LegacyCard>
+                </LegacyCard>
+            ) : <></>}
 
-                ) : <></>}
+            <Modal
+                open={modalActive}
+                onClose={handleModalClose}
+                title={`Configure ${selectedModule?.moduleType || 'Module'}`}
+                large
+            >
+                <Modal.Section>
+                    <ModuleEnvConfigComponent
+                        title="Environment Variables"
+                        description={`Configure environment variables for ${selectedModule?.name || 'module'}`}
+                        module={selectedModule}
+                        allowedEnvFields={allowedEnvFields}
+                        onSaveEnv={handleSaveEnv}
+                    />
+                </Modal.Section>
+            </Modal>
         </VerticalStack>
     )
 }

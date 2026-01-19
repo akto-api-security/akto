@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import transform from '../transform'
 import func from '@/util/func'
 import api from '../api'
@@ -11,13 +11,14 @@ function SummaryTable({testingRunResultSummaries, setSummary}) {
 
     const [data, setData] = useState([])
 
-    const headers = [
+    // Memoize headers to prevent recreation on every render
+    const headers = useMemo(() => [
         {
-            title: 'Test started',
+            title: mapLabel("Test", getDashboardCategory()) + " started",
             value: 'startTime',
         },
         {
-            title: 'Results count',
+            title: mapLabel("Results", getDashboardCategory()) + " count",
             value: 'testResultsCount'
         },
         {
@@ -29,7 +30,14 @@ function SummaryTable({testingRunResultSummaries, setSummary}) {
             title: `Total ${mapLabel('APIs Tested', getDashboardCategory())}`,
             value: 'totalApis',
         },
-    ]
+    ], []);
+
+    // Ensure all headings have unique id properties to avoid duplicate key warnings
+    const processedHeadings = useMemo(() => {
+        return headers.map((heading, index) => ({
+            ...heading,
+            id: heading.id || heading.value || heading.title || `heading-${index}`        }));
+    }, [headers]);
 
     const pageLimit = 10
     const [page, setPage] = useState(0)
@@ -71,14 +79,14 @@ function SummaryTable({testingRunResultSummaries, setSummary}) {
             index,
         ) => (
             <GithubRow
-                key={data.id}
+                key={data.id || `row-${index}`}
                 id={data.id}
                 dataObj={data}
                 index={index}
                 headers={headers}
                 page={page}
                 newRow={true}
-                headings={headers}
+                headings={processedHeadings}
                 selectedResources={selectedResources}
                 onRowClick={handleRowClick}
             />
@@ -98,9 +106,12 @@ function SummaryTable({testingRunResultSummaries, setSummary}) {
     return (
         <div className={tableClass}>
             <LegacyCard>
-                <LegacyCard.Section flush>
+                <LegacyCard.Section flush
+                    key="summary-table-section"
+                >
                     <IndexTable
-                        headings={headers}
+                        key="summary-table"
+                        headings={processedHeadings}
                         resourceName={{ singular: 'summary', plural: 'summaries' }}
                         hasZebraStriping={true}
                         itemCount={total}
@@ -113,10 +124,14 @@ function SummaryTable({testingRunResultSummaries, setSummary}) {
                         {rowMarkup}
                     </IndexTable>
                 </LegacyCard.Section>
-                <LegacyCard.Section>
+                <LegacyCard.Section
+                    key="pagination-section"
+                >
                     <HorizontalStack
+                        key="pagination-stack"
                         align="center">
                         <Pagination
+                            key="pagination"
                             label={
                                 total === 0 ? 'No data found' :
                                     <div data-testid="pagination-label">
@@ -129,7 +144,7 @@ function SummaryTable({testingRunResultSummaries, setSummary}) {
                             onNext={onPageNext}
                         />
                     </HorizontalStack>
-                    </LegacyCard.Section>
+                </LegacyCard.Section>
             </LegacyCard>
         </div>
     )

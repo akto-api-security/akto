@@ -1,6 +1,7 @@
 import React from "react";
 import { DataTable } from "@shopify/polaris";
 import InfoCard from "../../dashboard/new_components/InfoCard";
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 
 const ThreatApiSubcategoryCount = ({ data }) => {
   const Data = () => (
@@ -15,8 +16,8 @@ const ThreatApiSubcategoryCount = ({ data }) => {
 
   return (
     <InfoCard
-      title={"Top Categories"}
-      titleToolTip={"Top Threat Categories"}
+      title={`Top ${mapLabel("Threat", getDashboardCategory())} Categories`}
+      titleToolTip={`Top ${mapLabel("Threat", getDashboardCategory())} Categories`}
       component={<Data />}
     />
   );

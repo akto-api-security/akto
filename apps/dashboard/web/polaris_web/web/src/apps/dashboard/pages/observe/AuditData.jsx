@@ -1,5 +1,5 @@
 
-import { Text, HorizontalStack } from "@shopify/polaris"
+import { Text, HorizontalStack, VerticalStack, Box } from "@shopify/polaris"
 import { useEffect, useReducer, useState } from "react"
 import values from "@/util/values";
 import {produce} from "immer"
@@ -10,9 +10,12 @@ import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCard
 import GithubServerTable from "../../components/tables/GithubServerTable";
 import { MethodBox } from "./GetPrettifyEndpoint";
 import { CellType } from "../../components/tables/rows/GithubRow";
-import { CircleTickMajor, CircleCancelMajor } from "@shopify/polaris-icons";
+import { CircleTickMajor, CircleCancelMajor, SettingsMajor } from "@shopify/polaris-icons";
+import { Icon } from "@shopify/polaris";
 import settingRequests from "../settings/api";
 import PersistStore from "../../../main/PersistStore";
+import ConditionalApprovalModal from "../../components/modals/ConditionalApprovalModal";
+import RegistryBadge from "../../components/shared/RegistryBadge";
 
 const headings = [
     {
@@ -21,10 +24,9 @@ const headings = [
         text: 'Type',
     },
     {
-        text: "MCP component name",
+        text: "Agentic Component name",
         value: "resourceName",
-        title: "MCP component name",
-        type: CellType.TEXT
+        title: "Agentic Component name"
     },
     {
         text: "Collection name",
@@ -120,24 +122,108 @@ const resourceName = {
     plural: 'audit records',
 };
 
-const convertDataIntoTableFormat = (auditRecord, collectionName) => {
+const stripDeviceIdFromName = (name, allCollections, collectionId) => {
+    if (!name || !allCollections || !collectionId) {
+        return name;
+    }
+    
+    // Find the collection by ID
+    const collection = allCollections.find(col => col.id === collectionId);
+    if (!collection || !collection.envType || !Array.isArray(collection.envType)) {
+        return name;
+    }
+    
+    // Check if any envType has source "ENDPOINT" (case insensitive)
+    const hasEndpointSource = collection.envType.some(env => 
+        env.value && env.value.toLowerCase() === 'endpoint'
+    );
+    
+    if (!hasEndpointSource) {
+        return name;
+    }
+
+    const dotIndex = name.indexOf('.');
+    if (dotIndex > 0 && dotIndex < name.length - 1) {
+        // Return everything after the first dot
+        return name.substring(dotIndex + 1);
+    }
+    
+    return name;
+};
+
+const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegistry) => {
+    const allCollections = PersistStore.getState().allCollections;
     let temp = {...auditRecord}
     temp['typeComp'] = (
         <MethodBox method={""} url={auditRecord?.type.toLowerCase() || "TOOL"}/>
     )
     
     temp['apiAccessTypesComp'] = temp?.apiAccessTypes && temp?.apiAccessTypes.length > 0 && temp?.apiAccessTypes.join(', ') ;
+    temp['resourceName'] = stripDeviceIdFromName(temp?.resourceName, allCollections, temp?.hostCollectionId);
     temp['lastDetectedComp'] = func.prettifyEpoch(temp?.lastDetected)
     temp['updatedTimestampComp'] = func.prettifyEpoch(temp?.updatedTimestamp)
+    temp['approvedAtComp'] = func.prettifyEpoch(temp?.approvedAt)
+    temp['expiresAtComp'] = temp?.approvalConditions?.expiresAt ? (() => {
+        const expirationDate = new Date(temp.approvalConditions.expiresAt * 1000);
+        return expirationDate.toLocaleString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+            timeZone: window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE
+        });
+    })() : null
     temp['remarksComp'] = (
-        temp?.remarks === null? <Text variant="headingSm" color="critical">Pending...</Text> : <Text variant="bodyMd">{temp?.remarks}</Text>
+        (temp?.remarks === null || temp?.remarks === "" || !temp?.remarks) ? 
+            <Text variant="headingSm" color="critical" fontWeight="bold">Pending...</Text> : 
+            <VerticalStack gap="1">
+                <Text variant="bodyMd">{temp?.remarks}</Text>
+                {temp?.approvalConditions && (
+                    <Box paddingBlockStart="1">
+                        <VerticalStack gap="0">
+                            {(() => {
+                                const approvalDetails = [
+                                    { condition: temp?.approvalConditions?.justification, label: 'Justification', value: temp.approvalConditions.justification },
+                                    { condition: temp?.approvedAt, label: 'Approved at', value: temp.approvedAtComp },
+                                    { condition: temp?.expiresAtComp, label: 'Expires At', value: temp.expiresAtComp },
+                                    { condition: temp?.approvalConditions?.allowedIps, label: 'Allowed IPs', value: temp.approvalConditions.allowedIps?.join(', ') },
+                                    { condition: temp?.approvalConditions?.allowedIpRange, label: 'Allowed IP Ranges', value: temp.approvalConditions.allowedIpRange },
+                                    { condition: temp?.approvalConditions?.allowedEndpoints, label: 'Allowed Endpoints', value: temp.approvalConditions.allowedEndpoints?.map(ep => ep.name).join(', ') }
+                                ];
+                                
+                                const elements = [];
+                                for (let i = 0; i < approvalDetails.length; i++) {
+                                    const detail = approvalDetails[i];
+                                    if (detail.condition) {
+                                        elements.push(
+                                            <Text key={i} variant="bodySm" color="subdued">
+                                                <Text as="span" fontWeight="medium">{detail.label}:</Text> {detail.value}
+                                            </Text>
+                                        );
+                                    }
+                                }
+                                return elements;
+                            })()}
+                        </VerticalStack>
+                    </Box>
+                )}
+            </VerticalStack>
     )
-    temp['collectionName'] = collectionName;
+    temp['collectionName'] = (
+        <HorizontalStack gap="2" align="center">
+            <Text>{stripDeviceIdFromName(collectionName, allCollections, temp?.hostCollectionId)}</Text>
+            {collectionRegistry === "available" && <RegistryBadge />}
+        </HorizontalStack>
+    );
     return temp;
 }
 
 function AuditData() {
     const [loading, setLoading] = useState(true);
+    const [modalOpen, setModalOpen] = useState(false);
+    const [selectedAuditItem, setSelectedAuditItem] = useState(null);
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5]);
     const getTimeEpoch = (key) => {
@@ -147,6 +233,7 @@ function AuditData() {
     const startTimestamp = getTimeEpoch("since")
     const endTimestamp = getTimeEpoch("until")
     const collectionsMap = PersistStore(state => state.collectionsMap)
+    const collectionsRegistryStatusMap = PersistStore(state => state.collectionsRegistryStatusMap)
 
     function disambiguateLabel(key, value) {
         switch (key) {
@@ -166,17 +253,36 @@ function AuditData() {
         window.location.reload();
     }
 
+    const updateAuditDataWithConditions = async (hexId, approvalData) => {
+        await api.updateAuditData(hexId, null, approvalData)
+        window.location.reload();
+    }
+
+    // Custom colored icons
+    const GreenTickIcon = () => <Icon source={CircleTickMajor} tone="success" />;
+    const GreenSettingsIcon = () => <Icon source={SettingsMajor} tone="success" />;
+    const RedCancelIcon = () => <Icon source={CircleCancelMajor} tone="critical" />;
+
     const getActionsList = (item) => {
         return [{title: 'Actions', items: [
             {
-                content: 'Mark as resolved',
-                icon: CircleTickMajor,
+                content: <span style={{ color: '#008060' }}>Conditional Approval</span>,
+                icon: GreenSettingsIcon,
+                onAction: () => {
+                    setSelectedAuditItem(item);
+                    setModalOpen(true);
+                },
+            },
+            {
+                content: <span style={{ color: '#008060' }}>Mark as resolved</span>,
+                icon: GreenTickIcon,
                 onAction: () => {updateAuditData(item.hexId, "Approved")},
             },
             {
-                content: 'Disapprove',
-                icon: CircleCancelMajor,
+                content: <span style={{ color: '#D72C0D' }}>Disapprove</span>,
+                icon: RedCancelIcon,
                 onAction: () => {updateAuditData(item.hexId, "Rejected")},
+                destructive: true
             }
         ]}]
     }
@@ -194,14 +300,19 @@ function AuditData() {
             const res = await api.fetchAuditData(sortKey, sortOrder, skip, limit, finalFilters, filterOperators)
             if (res && res.auditData) {
                 res.auditData.forEach((auditRecord) => {
+                    // Get collection name and registry status from separate maps
                     const collectionName = collectionsMap[auditRecord?.hostCollectionId] || "Unknown Collection";
-                    const dataObj = convertDataIntoTableFormat(auditRecord, collectionName)
+                    const collectionRegistryStatus = collectionsRegistryStatusMap[auditRecord?.hostCollectionId];
+                    const dataObj = convertDataIntoTableFormat(
+                        auditRecord, 
+                        collectionName, 
+                        collectionRegistryStatus
+                    )
                     ret.push(dataObj);
                 })
                 total = res.total || 0;
             }
         } catch (error) {
-            console.error("Error fetching audit data:", error)
         }
         
         setLoading(false);
@@ -235,36 +346,48 @@ function AuditData() {
     )
 
     return (
-        <PageWithMultipleCards
-        title={
-            <Text as="div" variant="headingLg">
-            Audit Data
-          </Text>
-        }
-        backUrl="/dashboard/observe"
-        primaryAction={primaryActions}
-        components = {[
-            <GithubServerTable
-                key={startTimestamp + endTimestamp + filters[1].choices.length}
-                headers={headings}
-                resourceName={resourceName} 
-                appliedFilters={[]}
-                sortOptions={sortOptions}
-                disambiguateLabel={disambiguateLabel}
-                loading={loading}
-                fetchData={fetchData}
-                filters={filters}
-                hideQueryField={false}
-                getStatus={func.getTestResultStatus}
-                useNewRow={true}
-                condensedHeight={true}
-                pageLimit={20}
-                headings={headings}
-                getActions = {(item) => getActionsList(item)}
-                hasRowActions={true}
+        <>
+            <PageWithMultipleCards
+            title={
+                <Text as="div" variant="headingLg">
+                Audit Data
+              </Text>
+            }
+            isFirstPage={true}
+            primaryAction={primaryActions}
+            components = {[
+                <GithubServerTable
+                    key={startTimestamp + endTimestamp + filters[1].choices.length}
+                    headers={headings}
+                    resourceName={resourceName} 
+                    appliedFilters={[]}
+                    sortOptions={sortOptions}
+                    disambiguateLabel={disambiguateLabel}
+                    loading={loading}
+                    fetchData={fetchData}
+                    filters={filters}
+                    hideQueryField={false}
+                    getStatus={func.getTestResultStatus}
+                    useNewRow={true}
+                    condensedHeight={true}
+                    pageLimit={20}
+                    headings={headings}
+                    getActions = {(item) => getActionsList(item)}
+                    hasRowActions={true}
+                />
+            ]}
             />
-        ]}
-        />
+            
+            <ConditionalApprovalModal
+                isOpen={modalOpen}
+                onClose={() => {
+                    setModalOpen(false);
+                    setSelectedAuditItem(null);
+                }}
+                onApprove={updateAuditDataWithConditions}
+                auditItem={selectedAuditItem}
+            />
+        </>
     )
 }
 

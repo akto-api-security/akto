@@ -30,6 +30,7 @@ public class DistributionCalculator {
 
   
     /**
+     * TODO: Move all windows and counting logic to CmsCounterLayer.
      * Get the end of the window for a given current epoch minute and window size.
      * Example:
      * currentEpochMin = 12:01,12:02,12:03,12:04,12:05, windowSize = 5, return 12:05
@@ -40,6 +41,7 @@ public class DistributionCalculator {
     }
 
     /**
+     * TODO: Move all windows and counting logic to CmsCounterLayer.
      * Get the start of the window for a given window end and window size.
      * Example:
      * windowEnd = 12:05, windowSize = 5, return 12:01
@@ -87,6 +89,7 @@ public class DistributionCalculator {
     }
 
     /**
+     * TODO: Move all windows and counting logic to CmsCounterLayer.
      *   TUMBLING (Fixed blocks):
      *   [12:01-12:05] [12:06-12:10] [12:11-12:15]
      *   ↑             ↑             ↑
@@ -103,6 +106,7 @@ public class DistributionCalculator {
     }
 
     /**
+     * TODO: Move all windows and counting logic to CmsCounterLayer.
      *  SLIDING (Moving window):
          [11:59-12:03] at 12:03
           [12:00-12:04] at 12:04

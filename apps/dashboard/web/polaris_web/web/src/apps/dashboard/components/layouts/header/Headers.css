@@ -17,3 +17,45 @@
 .local_icon .Polaris-Icon__Svg {
     fill: #2C6ECB !important;
 }
+
+/* Agentic Security top bar */
+body:has(.agentic-security-nav) .Polaris-TopBar {
+    background: linear-gradient(90deg, #5C11E2 40%, #804ADC 60%) !important;
+}
+
+body:has(.agentic-security-nav) .Polaris-TopBar__SecondaryMenu .Polaris-Icon svg {
+    fill: #ffffff !important;
+}
+
+body:has(.agentic-security-nav) .Polaris-TopBar button:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+}
+
+body:has(.agentic-security-nav) .logo img {
+    max-width: 78px !important;
+}
+
+/* Fix text colors for Agentic Security test run status */
+body:has(.agentic-security-nav) .Polaris-TopBar__SecondaryMenu .Polaris-Text--root {
+    color: #ffffff !important;
+}
+
+body:has(.agentic-security-nav) .Polaris-TopBar__SecondaryMenu .Polaris-Text--subdued {
+    color: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Fix semi-circle progress percentage text color */
+body:has(.agentic-security-nav) .Polaris-TopBar__SecondaryMenu text {
+    fill: #ffffff !important;
+}
+
+/* Reduce spacing between header icons */
+.Polaris-TopBar__SecondaryMenu {
+    gap: 8px !important;
+}
+
+/* Remove extra padding from bell button */
+#beamer-btn.Polaris-Button {
+    padding: 0 !important;
+    margin: 0 4px 0 0 !important;
+}

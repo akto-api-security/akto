@@ -15,7 +15,6 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 
 /*
@@ -61,7 +60,7 @@ public class SendMaliciousEventsToBackend extends AbstractKafkaConsumerTask<byte
                         OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
                         String responsePayload = response.getBody();
                         if (response.getStatusCode() != 200 || responsePayload == null) {
-                          logger.errorAndAddToDb("non 2xx response in record_malicious_event");
+                          logger.errorAndAddToDb("statusCode: " +  response.getStatusCode() + " in record_malicious_event API");
                         }
                       } catch (Exception e) {
                         logger.errorAndAddToDb("error sending malicious event " + e.getMessage());

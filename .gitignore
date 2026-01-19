@@ -8,6 +8,7 @@
 **/yarn-error.log
 **/yarn.lock
 **/.vscode/
+**/.cursor/
 **/.project
 **/.classpath
 **/.settings
@@ -24,3 +25,8 @@ https:
 **/bin
 .factorypath
 model.onnx
+test_scripts/*
+run-master.sh
+run-threat-consumer.sh
+run-account-jobs.sh
+CLAUDE.md

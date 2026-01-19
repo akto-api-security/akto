@@ -1,6 +1,10 @@
 package com.akto.dao.monitoring;
 
+import com.akto.dao.GuardrailPoliciesDao;
+import com.akto.dto.GuardrailPolicies;
+import java.nio.file.LinkOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +24,12 @@ public class FilterYamlTemplateDao extends AccountsContextDao<YamlTemplate> {
 
     public static final FilterYamlTemplateDao instance = new FilterYamlTemplateDao();
     private static final ConcurrentHashMap<Pair<Integer, CONTEXT_SOURCE>, Pair<Set<String>, Integer>> contextFiltersMap = new ConcurrentHashMap<>();
+
+    private static final List<String> OLD_MCP_TEMPLATE_IDS = Arrays.asList(
+        "MCPGuardrails",
+        "AuditPolicy",
+        "MCPMaliciousComponent"
+    );
 
     public Map<String, FilterConfig> fetchFilterConfig(
             boolean includeYamlContent, boolean shouldParseExecutor) {
@@ -57,6 +67,13 @@ public class FilterYamlTemplateDao extends AccountsContextDao<YamlTemplate> {
         if(source == null) {
             source = CONTEXT_SOURCE.API;
         }
+
+        if (source == CONTEXT_SOURCE.AGENTIC || source == CONTEXT_SOURCE.ENDPOINT) {
+            Set<String> policyNames = fetchGuardrailPolicies();
+            policyNames.addAll(OLD_MCP_TEMPLATE_IDS);
+            return policyNames;
+        }
+
         Pair<Integer, CONTEXT_SOURCE> key = new Pair<>(accountId, source);
         Pair<Set<String>, Integer> collectionIdEntry = contextFiltersMap.get(key);
 
@@ -85,9 +102,23 @@ public class FilterYamlTemplateDao extends AccountsContextDao<YamlTemplate> {
                 }
             }
 
-            List<String> finalIds = templatesByCategory.getOrDefault(source.name(), new ArrayList<>());
+            List<String> finalIds;
 
-            return finalIds.stream().collect(Collectors.toSet());
+            // Handle AGENTIC and ENDPOINT contexts - combine both MCP and GenAI templates
+            if (source == CONTEXT_SOURCE.AGENTIC || source == CONTEXT_SOURCE.ENDPOINT) {
+                finalIds = new ArrayList<>();
+                finalIds.addAll(templatesByCategory.getOrDefault(CONTEXT_SOURCE.MCP.name(), new ArrayList<>()));
+                finalIds.addAll(templatesByCategory.getOrDefault(CONTEXT_SOURCE.GEN_AI.name(), new ArrayList<>()));
+            } else {
+                finalIds = templatesByCategory.getOrDefault(source.name(), new ArrayList<>());
+            }
+
+            Set<String> resultSet = finalIds.stream().collect(Collectors.toSet());
+            
+            // Cache the result for future use
+            contextFiltersMap.put(key, new Pair<>(resultSet, Context.now()));
+            
+            return resultSet;
         } else {
             return collectionIdEntry.getFirst();
         }
@@ -102,6 +133,11 @@ public class FilterYamlTemplateDao extends AccountsContextDao<YamlTemplate> {
         }
         Pair<Integer, CONTEXT_SOURCE> key = new Pair<>(accountId, source);
         contextFiltersMap.remove(key);
+    }
+
+    private static Set<String> fetchGuardrailPolicies() {
+        List<GuardrailPolicies> policies = GuardrailPoliciesDao.instance.fetchAllGuardrailPoliciesName();
+        return policies.stream().map(GuardrailPolicies::getName).collect(Collectors.toSet());
     }
 
     @Override

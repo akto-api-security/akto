@@ -5,56 +5,152 @@ import api from "../api"
 import func from '@/util/func';
 import DropdownSearch from "../../../components/shared/DropdownSearch";
 import { useSearchParams } from "react-router-dom";
-import { getDashboardCategory } from "../../../../main/labelHelper";
+import { updateThreatFiltersStore } from "../utils/threatFilters";
+import SessionStore from "../../../../main/SessionStore";
 
-function FilterComponent() {
+function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals, titleText, readOnly = false, validateOnSave, showDelete = false }) {
     const[searchParams] = useSearchParams()
     const filteredPolicy = searchParams.get("policy")
     const [ogData, setOgData] = useState({ message: "" })
     const [data, setData] = useState({ message: "" })
     const [allData, setAllData] = useState([])
     const [id, setId] = useState("")
-    const shortHand = getDashboardCategory().split(" ")[0].toLowerCase();
-    const fetchData = async () => {
-        await api.fetchFilterYamlTemplate().then((resp) => {
-            let temp = resp?.templates ? resp?.templates : []
-            if(!shortHand.includes("api")){  
-                temp = temp.filter(x => x?.info?.category?.name !== undefined && x?.info?.category?.name?.toLowerCase().includes(shortHand))
-            }else{
-                temp = temp.filter(x => x?.info?.category?.name !== undefined && !x?.info?.category?.name?.toLowerCase().includes("mcp"))
-            }
-            setAllData(temp)
-            if (temp.length > 0) {
-                const temp2 = temp[0]
-                if(filteredPolicy && filteredPolicy.length > 0){
-                    setId(filteredPolicy)
-                    try{
-                        let content = temp.filter((x) => x.id === filteredPolicy)[0]?.content
-                        setData({message: content})
-                        setOgData({message: content})
-                    }catch(err){
-                        setId(temp2.id)
-                        const temp3 = { message: temp2.content }
-                        setData(temp3)
-                        setOgData(temp3)
+    // helpers: normalize and category accessor
+    const normalize = (s) => (s || '').toLowerCase()
+    const getCategory = (t) => normalize(t?.info?.category?.name)
+
+    const fetchTemplates = async () => {
+        const resp = await api.fetchFilterYamlTemplate()
+        const templates = Array.isArray(resp?.templates) ? resp.templates : []
+        let categoryFilteredTemplates = templates;
+        try {
+            categoryFilteredTemplates = updateThreatFiltersStore(templates)
+        } catch (e) {
+            console.error(`Failed to update SessionStore threat filters: ${e?.message}`);
+        }
+
+        try {
+            const complianceResp = await api.fetchThreatComplianceInfos();
+            if (complianceResp?.threatComplianceInfos && Array.isArray(complianceResp.threatComplianceInfos)) {
+                const threatComplianceMap = {};
+                complianceResp.threatComplianceInfos.forEach((compliance) => {
+                    threatComplianceMap[compliance._id] = compliance;
+                });
+
+                const currentThreatFiltersMap = SessionStore.getState().threatFiltersMap || {};
+                const updatedThreatFiltersMap = { ...currentThreatFiltersMap };
+
+                Object.keys(updatedThreatFiltersMap).forEach((filterId) => {
+                    const complianceKey = `threat_compliance/${filterId}.conf`;
+                    const compliance = threatComplianceMap[complianceKey];
+
+                    if (compliance) {
+                        updatedThreatFiltersMap[filterId] = {
+                            ...updatedThreatFiltersMap[filterId],
+                            compliance: {
+                                mapComplianceToListClauses: compliance.mapComplianceToListClauses
+                            }
+                        };
                     }
-                    
-                }else{
-                    setId(temp2.id)
-                    const temp3 = { message: temp2.content }
-                    setData(temp3)
-                    setOgData(temp3)
-                }
+                });
+
+                SessionStore.getState().setThreatFiltersMap(updatedThreatFiltersMap);
             }
-        });
+        } catch (e) {
+            console.error(`Failed to fetch and merge threat compliance: ${e?.message}`);
+        }
+
+        return categoryFilteredTemplates
+    }
+
+    const filterTemplates = (templates) => {
+        let out = templates
+
+        // include/exclude by category name
+        if (includeCategoryNameEquals && includeCategoryNameEquals.length > 0) {
+            const inc = normalize(includeCategoryNameEquals)
+            out = out.filter((t) => getCategory(t) === inc)
+        } else if (excludeCategoryNameEquals && excludeCategoryNameEquals.length > 0) {
+            const excList = excludeCategoryNameEquals.map(normalize)
+            out = out.filter((t) => !excList.includes(getCategory(t)))
+        }
+        return out
+    }
+
+    const pickTemplate = (templates) => {
+        if (!templates || templates.length === 0) return { id: undefined, content: '' }
+        if (filteredPolicy && filteredPolicy.length > 0) {
+            const chosen = templates.find((t) => t.id === filteredPolicy) || templates[0]
+            return { id: chosen?.id, content: chosen?.content || '' }
+        }
+        const first = templates[0]
+        return { id: first?.id, content: first?.content || '' }
+    }
+
+    const applySelection = ({ id, content }) => {
+        if (id === undefined) return
+        setId(id)
+        const payload = { message: content }
+        setData(payload)
+        setOgData(payload)
+    }
+
+    const fetchData = async () => {
+        try {
+            const templates = await fetchTemplates()
+            const filtered = filterTemplates(templates)
+            setAllData(filtered)
+            if (filtered.length === 0) return
+            const selection = pickTemplate(filtered)
+            applySelection(selection)
+        } catch (e) {
+            console.error(`Failed to fetch threat policies error: ${e?.message}`);
+        }
     }
     useEffect(() => {
         fetchData();
     }, [])
 
     async function onSave() {
+        // Run validation if provided
+        if (validateOnSave) {
+            const validationResult = validateOnSave(data);
+            if (!validationResult.isValid) {
+                func.setToast(true, true, validationResult.errorMessage);
+                return;
+            }
+        }
+
         await api.saveFilterYamlTemplate(data)
         func.setToast(true, false, 'Saved filter template')
+    }
+
+    async function onDelete() {
+        try {
+            if (!id) {
+                func.setToast(true, true, 'No policy selected to delete')
+                return
+            }
+            await api.deleteFilterYamlTemplate(id)
+            func.setToast(true, false, 'Deleted filter template')
+            await fetchData()
+        } catch (e) {
+            func.setToast(true, true, 'Failed to delete filter template')
+        }
+    }
+
+    async function onDeleteClick() {
+        if (!id) {
+            func.setToast(true, true, 'No policy selected to delete')
+            return
+        }
+        func.showConfirmationModal(
+            'Are you sure you want to delete this filter template? This action cannot be undone.',
+            'Delete',
+            async () => {
+                await onDelete()
+            }
+        )
     }
 
     return (
@@ -62,10 +158,19 @@ function FilterComponent() {
             <LegacyCard.Section flush>
                 <Box padding={"2"}>
                     <HorizontalStack padding="2" align='space-between'>
-                        Threat detection filter
-                        <Button plain monochrome removeUnderline onClick={onSave}>
-                            Save
-                        </Button>
+                        {titleText ? titleText : 'Threat detection filter'}
+                        {!readOnly && (
+                            <HorizontalStack gap="2">
+                                {showDelete && (
+                                    <Button outline size="slim" onClick={onDeleteClick}>
+                                        Delete
+                                    </Button>
+                                )}
+                                <Button outline size="slim" onClick={onSave}>
+                                    Save
+                                </Button>
+                            </HorizontalStack>
+                        )}
                     </HorizontalStack>
                 </Box>
             </LegacyCard.Section>
@@ -94,7 +199,7 @@ function FilterComponent() {
                 />
             </LegacyCard.Section>
             <LegacyCard.Section flush>
-                <SampleData data={ogData} editorLanguage="custom_yaml" minHeight="65vh" readOnly={false} getEditorData={setData} />
+                <SampleData data={ogData} editorLanguage="custom_yaml" minHeight="65vh" readOnly={readOnly} getEditorData={setData} />
             </LegacyCard.Section>
         </LegacyCard>
     )

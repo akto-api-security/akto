@@ -6,10 +6,11 @@ import Store from "../../../store";
 import func from "@/util/func";
 import { MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
-import { ActionList, Button, HorizontalGrid, HorizontalStack, IndexFiltersMode, Popover, Modal, TextField, Text, VerticalStack } from "@shopify/polaris";
+import { ActionList, Badge, Box, Button, HorizontalGrid, HorizontalStack, IndexFiltersMode, Popover, TextField, Text } from "@shopify/polaris";
+import CompulsoryDescriptionModal from "../components/CompulsoryDescriptionModal.jsx";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
-import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
+import { SelectCollectionComponent } from "../../testing/TestRunsPage/TestrunsBannerComponent"
 import { useEffect } from "react";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import { useSearchParams } from "react-router-dom";
@@ -36,6 +37,9 @@ import testingApi from "../../testing/api.js"
 import { saveAs } from 'file-saver'
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import IssuesGraphsGroup from "./IssuesGraphsGroup.jsx";
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper.js";
+import MarkdownReportGenerator from "../../../components/shared/MarkdownReportGenerator";
+import SeveritySelector from "../components/SeveritySelector";
 
 
 const sortOptions = [
@@ -59,17 +63,17 @@ let filtersOptions = [
         label: 'Severity',
         title: 'Severity',
         choices: [
-            {label: 'Critical', value: 'CRITICAL'},
-            { label: "High", value: "HIGH" }, 
+            { label: 'Critical', value: 'CRITICAL' },
+            { label: "High", value: "HIGH" },
             { label: "Medium", value: "MEDIUM" },
             { label: "Low", value: "LOW" }
         ],
     },
     {
-        key:"issueCategory",
+        key: "issueCategory",
         label: "Issue category",
-        title:"Issue category",
-        choices:[]
+        title: "Issue category",
+        choices: []
     },
     {
         key: `issueName`,
@@ -79,8 +83,8 @@ let filtersOptions = [
     },
     {
         key: 'collectionIds',
-        label: 'API groups',
-        title: 'API groups',
+        label: mapLabel('Api', getDashboardCategory()) + ' groups',
+        title: mapLabel('Api', getDashboardCategory()) + ' groups',
         choices: [],
     },
     {
@@ -89,14 +93,14 @@ let filtersOptions = [
         title: 'Active collections',
         choices: [
             {
-                label:"Active collections",
-                value:true
+                label: "Active collections",
+                value: true
             },
             {
-                label:"All collections",
-                value:false
+                label: "All collections",
+                value: false
             }],
-        singleSelect:true
+        singleSelect: true
     },
     {
         key: 'tagsId',
@@ -114,8 +118,8 @@ const resourceName = {
 function IssuesPage() {
     const [headers, setHeaders] = useState([
         {
-          title: '',
-          type: CellType.COLLAPSIBLE
+            title: '',
+            type: CellType.COLLAPSIBLE
         },
         {
             title: "Severity",
@@ -144,7 +148,7 @@ function IssuesPage() {
             title: "Domains",
             text: "Domains",
             value: "domains",
-            textValue:"domainVal"
+            textValue: "domainVal"
         },
         {
             title: "Compliance",
@@ -176,7 +180,7 @@ function IssuesPage() {
     const [issuesDataCount, setIssuesDataCount] = useState([])
     const [jiraModalActive, setJiraModalActive] = useState(false)
     const [selectedIssuesItems, setSelectedIssuesItems] = useState([])
-    const [jiraProjectMaps,setJiraProjectMap] = useState({})
+    const [jiraProjectMaps, setJiraProjectMap] = useState({})
     const [issueType, setIssueType] = useState('');
     const [projId, setProjId] = useState('')
 
@@ -185,7 +189,17 @@ function IssuesPage() {
     const [projectId, setProjectId] = useState('')
     const [workItemType, setWorkItemType] = useState('')
     const [issuesByApis, setIssuesByApis] = useState({});
-    
+
+    const [serviceNowModalActive, setServiceNowModalActive] = useState(false)
+    const [serviceNowTables, setServiceNowTables] = useState([])
+    const [serviceNowTable, setServiceNowTable] = useState('')
+    const [labelsText, setLabelsText] = useState('')
+
+    const [devrevModalActive, setDevRevModalActive] = useState(false)
+    const [devrevParts, setDevRevParts] = useState([])
+    const [devrevPartId, setDevRevPartId] = useState('')
+    const [devrevWorkItemType, setDevRevWorkItemType] = useState('issue')
+
     // Compulsory description modal states
     const [compulsoryDescriptionModal, setCompulsoryDescriptionModal] = useState(false)
     const [pendingIgnoreAction, setPendingIgnoreAction] = useState(null)
@@ -196,6 +210,10 @@ function IssuesPage() {
         noTimeToFix: false,
         acceptableFix: false
     })
+
+    // Severity update modal states
+    const [severityModalActive, setSeverityModalActive] = useState(false)
+    const [severityUpdateInProgress, setSeverityUpdateInProgress] = useState(false)
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
 
@@ -213,16 +231,16 @@ function IssuesPage() {
     const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
         setToastConfig({
-          isActive: isActive,
-          isError: isError,
-          message: message
+            isActive: isActive,
+            isError: isError,
+            message: message
         })
     }
 
     const handleSelectedTab = (selectedIndex) => {
         setTableLoading(true)
         setSelected(selectedIndex)
-        setTimeout(()=> {
+        setTimeout(() => {
             setTableLoading(false)
         }, 200)
     }
@@ -239,14 +257,14 @@ function IssuesPage() {
         setKey(!key)
         setSelectedIssuesItems([])
     }
-    
+
     useEffect(() => {
         const statusHeader = {
             title: "Status",
             text: "Status",
             value: "issueStatus"
         }
-    
+
         if (selectedTab.toUpperCase() === 'OPEN') {
             if (!headers.some(header => header.value === "issueStatus")) {
                 setHeaders(prevHeaders => {
@@ -274,8 +292,8 @@ function IssuesPage() {
     useEffect(() => {
         const fetchCompulsorySettings = async () => {
             try {
-                const {resp} = await settingFunctions.fetchAdminInfo();
-                
+                const { resp } = await settingFunctions.fetchAdminInfo();
+
                 if (resp?.compulsoryDescription) {
                     setCompulsorySettings(resp.compulsoryDescription);
                 }
@@ -291,9 +309,9 @@ function IssuesPage() {
 
     const filterParams = searchParams.get('filters')
     let initialValForResponseFilter = true
-    if(filterParams && filterParams !== undefined &&filterParams.split('activeCollections').length > 1){
-        let isRequestVal =  filterParams.split("activeCollections__")[1].split('&')[0]
-        if(isRequestVal.length > 0){
+    if (filterParams && filterParams !== undefined && filterParams.split('activeCollections').length > 1) {
+        let isRequestVal = filterParams.split("activeCollections__")[1].split('&')[0]
+        if (isRequestVal.length > 0) {
             initialValForResponseFilter = (isRequestVal === 'true' || isRequestVal.includes('true'))
         }
     }
@@ -302,26 +320,31 @@ function IssuesPage() {
         {
             key: 'activeCollections',
             value: [initialValForResponseFilter],
-            onRemove: () => {}
+            onRemove: () => { }
         }
     ]
 
     filtersOptions = func.getCollectionFilters(filtersOptions)
 
     const tagsFilter = filtersOptions.find(filter => filter.key === 'tagsId');
-        if (tagsFilter) {
-            tagsFilter.choices = Object.keys(tagsCollectionsMap).map((key) => {
-                return {
-                    label: key,
-                    value: key
-                }
-            });
-        }
+    if (tagsFilter) {
+        tagsFilter.choices = Object.keys(tagsCollectionsMap).map((key) => {
+            return {
+                label: key,
+                value: key
+            }
+        });
+    }
 
-    const handleSaveJiraAction = () => {
+    const handleSaveJiraAction = (issueId, labels) => {
         let jiraMetaData;
         try {
             jiraMetaData = issuesFunctions.prepareAdditionalIssueFieldsJiraMetaData(projId, issueType);
+            // Use labels parameter if provided, otherwise fall back to state
+            const labelsToUse = labels !== undefined ? labels : labelsText;
+            if (labelsToUse && labelsToUse.trim()) {
+                jiraMetaData.labels = labelsToUse.trim();
+            }
         } catch (error) {
             setToast(true, true, "Please fill all required fields before creating a Jira ticket.");
             resetResourcesSelected()
@@ -331,7 +354,7 @@ function IssuesPage() {
         setToast(true, false, "Please wait while we create your Jira ticket.")
         setJiraModalActive(false)
         api.bulkCreateJiraTickets(selectedIssuesItems, window.location.origin, projId, issueType, jiraMetaData).then((res) => {
-            if(res?.errorMessage) {
+            if (res?.errorMessage) {
                 setToast(true, false, res?.errorMessage)
             } else {
                 setToast(true, false, `${selectedIssuesItems.length} jira ticket${selectedIssuesItems.length === 1 ? "" : "s"} created.`)
@@ -341,15 +364,51 @@ function IssuesPage() {
     }
 
     const handleSaveBulkAzureWorkItemsAction = () => {
+        let customABWorkItemFieldsPayload = [];
+        try {
+            customABWorkItemFieldsPayload = issuesFunctions.prepareCustomABWorkItemFieldsPayload(projectId, workItemType);
+        } catch (error) {
+            setToast(true, true, "Please fill all required fields before creating a Azure boards work item.");
+            return;
+        }
+
         setToast(true, false, "Please wait while we create your Azure Boards Work Item.")
         setBoardsModalActive(false)
-        api.bulkCreateAzureWorkItems(selectedIssuesItems, projectId, workItemType, window.location.origin).then((res) => {
-            if(res?.errorMessage) {
+        api.bulkCreateAzureWorkItems(selectedIssuesItems, projectId, workItemType, window.location.origin, customABWorkItemFieldsPayload).then((res) => {
+            if (res?.errorMessage) {
                 setToast(true, false, res?.errorMessage)
             } else {
                 setToast(true, false, `${selectedIssuesItems.length} Azure Boards Work Item${selectedIssuesItems.length === 1 ? "" : "s"} created.`)
             }
             resetResourcesSelected()
+        })
+    }
+
+    const handleSaveBulkServiceNowTicketsAction = () => {
+        setToast(true, false, "Please wait while we create your ServiceNow tickets.")
+        setServiceNowModalActive(false)
+        api.bulkCreateServiceNowTickets(selectedIssuesItems, serviceNowTable).then((res) => {
+            if (res?.errorMessage) {
+                setToast(true, false, res?.errorMessage)
+            } else {
+                setToast(true, false, `${selectedIssuesItems.length} ServiceNow ticket${selectedIssuesItems.length === 1 ? "" : "s"} created.`)
+            }
+            resetResourcesSelected()
+        })
+    }
+
+    const handleSaveBulkDevRevTicketsAction = () => {
+        setToast(true, false, "Please wait while we create your DevRev tickets.")
+        setDevRevModalActive(false)
+        api.createDevRevTickets(selectedIssuesItems, devrevPartId, devrevWorkItemType, window.location.origin).then((res) => {
+            if (res?.errorMessage) {
+                setToast(true, false, res?.errorMessage)
+            } else {
+                setToast(true, false, `${selectedIssuesItems.length} DevRev ticket${selectedIssuesItems.length === 1 ? "" : "s"} created.`)
+            }
+            resetResourcesSelected()
+        }).catch((err) => {
+            setToast(true, true, err?.response?.data?.errorMessage || err?.response?.data?.actionErrors?.[0] || "Error creating DevRev tickets")
         })
     }
 
@@ -362,7 +421,7 @@ function IssuesPage() {
     const handleIgnoreWithDescription = () => {
         if (pendingIgnoreAction && mandatoryDescription.trim()) {
             // Use the same endpoint as TestRunResultFlyout.jsx for description update
-            const updatePromises = pendingIgnoreAction.items.map(item => 
+            const updatePromises = pendingIgnoreAction.items.map(item =>
                 testingApi.updateIssueDescription(item, mandatoryDescription)
             );
             Promise.allSettled(updatePromises).then(() => {
@@ -381,6 +440,38 @@ function IssuesPage() {
         }
     }, [compulsoryDescriptionModal, pendingIgnoreAction]);
 
+    const handleBulkSeverityUpdate = (newSeverity) => {
+        // Prevent duplicate concurrent updates
+        if (severityUpdateInProgress) {
+            setToast(true, true, "Severity update already in progress")
+            return
+        }
+
+        const items = selectedIssuesItems
+        setSeverityUpdateInProgress(true)
+
+        api.bulkUpdateIssueSeverity(items, newSeverity).then((res) => {
+            setToast(true, false, `Severity updated for ${items.length} issue${items.length === 1 ? "" : "s"} across all test runs`)
+            setSeverityModalActive(false)
+
+            // Reset selections
+            resetResourcesSelected()
+
+            // Refresh table data
+            setKey(!key)
+        }).catch((error) => {
+            setToast(true, true, "Failed to update severity")
+            setSeverityModalActive(false)
+        }).finally(() => {
+            setSeverityUpdateInProgress(false)
+        })
+    }
+
+    const openSeverityUpdateModal = (items) => {
+        setSelectedIssuesItems(items)
+        setSeverityModalActive(true)
+    }
+
     const performBulkIgnoreAction = (items, ignoreReason, description = "") => {
         api.bulkUpdateIssueStatus(items, "IGNORED", ignoreReason, { description }).then((res) => {
             setToast(true, false, `Issue${items.length === 1 ? "" : "s"} ignored${description ? " with description" : ""}`);
@@ -393,14 +484,14 @@ function IssuesPage() {
 
     let promotedBulkActions = (selectedResources) => {
         let items
-        if(selectedResources.length > 0 && typeof selectedResources[0][0] === 'string') {
+        if (selectedResources.length > 0 && typeof selectedResources[0][0] === 'string') {
             const flatSelectedResources = selectedResources.flat()
             items = flatSelectedResources.map((item) => JSON.parse(item))
         } else {
             items = selectedResources.map((item) => JSON.parse(item))
         }
-        
-        function ignoreAction(reasonKey){
+
+        function ignoreAction(reasonKey) {
             if (requiresDescription(reasonKey)) {
                 setPendingIgnoreAction({ items, reason: reasonKey });
                 setCompulsoryDescriptionModal(true);
@@ -408,23 +499,23 @@ function IssuesPage() {
             }
             performBulkIgnoreAction(items, reasonKey);
         }
-        
-        function reopenAction(){
-            api.bulkUpdateIssueStatus(items, "OPEN", "" ).then((res) => {
-                setToast(true, false, `Issue${items.length==1 ? "" : "s"} re-opened`)
+
+        function reopenAction() {
+            api.bulkUpdateIssueStatus(items, "OPEN", "").then((res) => {
+                setToast(true, false, `Issue${items.length == 1 ? "" : "s"} re-opened`)
                 resetResourcesSelected()
             })
         }
 
-        function createJiraTicketBulk () {
+        function createJiraTicketBulk() {
             setSelectedIssuesItems(items)
             settingFunctions.fetchJiraIntegration().then((jirIntegration) => {
-                if(jirIntegration.projectIdsMap !== null && Object.keys(jirIntegration.projectIdsMap).length > 0){
+                if (jirIntegration.projectIdsMap !== null && Object.keys(jirIntegration.projectIdsMap).length > 0) {
                     setJiraProjectMap(jirIntegration.projectIdsMap)
-                    if(Object.keys(jirIntegration.projectIdsMap).length > 0){
+                    if (Object.keys(jirIntegration.projectIdsMap).length > 0) {
                         setProjId(Object.keys(jirIntegration.projectIdsMap)[0])
                     }
-                }else{
+                } else {
                     setProjId(jirIntegration.projId)
                     setIssueType(jirIntegration.issueType)
                 }
@@ -435,28 +526,56 @@ function IssuesPage() {
         function createAzureBoardWorkItemBulk() {
             setSelectedIssuesItems(items)
             settingFunctions.fetchAzureBoardsIntegration().then((azureBoardsIntegration) => {
-                if(azureBoardsIntegration.projectToWorkItemsMap != null && Object.keys(azureBoardsIntegration.projectToWorkItemsMap).length > 0){
+                if (azureBoardsIntegration.projectToWorkItemsMap != null && Object.keys(azureBoardsIntegration.projectToWorkItemsMap).length > 0) {
                     setProjectToWorkItemsMap(azureBoardsIntegration.projectToWorkItemsMap)
-                    if(Object.keys(azureBoardsIntegration.projectToWorkItemsMap).length > 0){
+                    if (Object.keys(azureBoardsIntegration.projectToWorkItemsMap).length > 0) {
                         setProjectId(Object.keys(azureBoardsIntegration.projectToWorkItemsMap)[0])
                         setWorkItemType(Object.values(azureBoardsIntegration.projectToWorkItemsMap)[0]?.[0])
                     }
-                }else{
+                } else {
                     setProjectId(azureBoardsIntegration?.projectId)
                     setWorkItemType(azureBoardsIntegration?.workItemType)
                 }
                 setBoardsModalActive(true)
             })
         }
-        
+
+        function createServiceNowTicketBulk() {
+            setSelectedIssuesItems(items)
+            settingFunctions.fetchServiceNowIntegration().then((serviceNowIntegration) => {
+                if (serviceNowIntegration.tableNames && serviceNowIntegration.tableNames.length > 0) {
+                    setServiceNowTables(serviceNowIntegration.tableNames)
+                    setServiceNowTable(serviceNowIntegration.tableNames[0])
+                }
+                setServiceNowModalActive(true)
+            })
+        }
+
+        function createDevRevTicketBulk() {
+            setSelectedIssuesItems(items)
+            settingFunctions.fetchDevRevIntegration().then((devrevIntegration) => {
+                const partsMap = devrevIntegration.partsMap || {}
+                const partsArray = Object.entries(partsMap).map(([id, name]) => ({ id, name }))
+                if (partsArray.length > 0) {
+                    setDevRevParts(partsArray)
+                    setDevRevPartId(partsArray[0].id)
+                }
+                setDevRevModalActive(true)
+            })
+        }
+
         let issues = [
+            {
+                content: 'Update severity',
+                onAction: () => { openSeverityUpdateModal(items) }
+            },
             {
                 content: 'False positive',
                 key: 'falsePositive',
                 onAction: () => { ignoreAction('falsePositive') }
             },
             {
-                content: 'Acceptable fix',
+                content: 'Acceptable risk',
                 key: 'acceptableFix',
                 onAction: () => { ignoreAction('acceptableFix') }
             },
@@ -474,6 +593,14 @@ function IssuesPage() {
                 onAction: () => { openVulnerabilityReport(items, true) }
             },
             {
+                content: 'Export selected Issues as Markdown',
+                onAction: () => {
+                    const markdown = MarkdownReportGenerator.generateMarkdown(items, 'Issues');
+                    const blob = new Blob(["\uFEFF" + markdown], { type: "text/markdown;charset=utf-8" });
+                    saveAs(blob, "issues_report.md");
+                }
+            },
+            {
                 content: 'Create jira ticket',
                 onAction: () => { createJiraTicketBulk() },
                 disabled: (window.JIRA_INTEGRATED === 'false')
@@ -482,20 +609,30 @@ function IssuesPage() {
                 content: 'Create azure work item',
                 onAction: () => { createAzureBoardWorkItemBulk() },
                 disabled: (window.AZURE_BOARDS_INTEGRATED === 'false')
+            },
+            {
+                content: 'Create ServiceNow ticket',
+                onAction: () => { createServiceNowTicketBulk() },
+                disabled: (window.SERVICENOW_INTEGRATED === 'false')
+            },
+            {
+                content: 'Create DevRev ticket',
+                onAction: () => { createDevRevTicketBulk() },
+                disabled: (window.DEVREV_INTEGRATED === 'false')
             }
         ];
-        
-        let reopen =  [{
+
+        let reopen = [{
             content: 'Reopen',
             onAction: () => { reopenAction() }
         }]
-        
+
         let ret = [];
         let status = selectedTab.toUpperCase()
-        
+
         switch (status) {
             case "OPEN": ret = [].concat(issues); break;
-            case "IGNORED": 
+            case "IGNORED":
                 ret = ret.concat(reopen);
                 break;
             case "FIXED":
@@ -505,7 +642,7 @@ function IssuesPage() {
 
         return ret;
     }
-    
+
     let store = {}
     let result = []
     let issueName = []
@@ -516,7 +653,7 @@ function IssuesPage() {
             store[superCategory.name] = []
         }
         store[superCategory.name].push(x._name);
-        issueName.push({"label": x.testName, "value": x._name})
+        issueName.push({ "label": x.testName, "value": x._name })
     })
     filtersOptions[2].choices = [].concat(result)
     filtersOptions[3].choices = [].concat(issueName)
@@ -540,14 +677,14 @@ function IssuesPage() {
             case "tagsId":
                 return func.convertToDisambiguateLabelObj(value, null, 2)
             case "activeCollections":
-                if(value[0]){
+                if (value[0]) {
                     return "Active collections only"
-                }else{
+                } else {
                     return "All collections"
                 }
             default:
-              return value;
-          }          
+                return value;
+        }
     }
 
     const openVulnerabilityReport = async (items = [], summaryMode = false) => {
@@ -589,20 +726,17 @@ function IssuesPage() {
         }
     ]
 
-  useEffect(() => {
-    if (subCategoryMap && Object.keys(subCategoryMap).length > 0 && apiCollectionMap && Object.keys(apiCollectionMap).length > 0) {
-        setShowEmptyScreen(false)
-        setLoading(false)
-    }
-  }, [subCategoryMap, apiCollectionMap])
+    useEffect(() => {
+        if (subCategoryMap && Object.keys(subCategoryMap).length > 0 && apiCollectionMap && Object.keys(apiCollectionMap).length > 0) {
+            setShowEmptyScreen(false)
+            setLoading(false)
+        }
+    }, [subCategoryMap, apiCollectionMap])
 
 
     useEffect(() => {
-        // Fetch jira integration field metadata
         fetchIssuesByApisData()
-        if (window.JIRA_INTEGRATED === 'true') {
-            issuesFunctions.fetchCreateIssueFieldMetaData()
-        }
+        issuesFunctions.fetchIntegrationCustomFieldsMetadata();
     }, [])
 
 
@@ -623,7 +757,7 @@ function IssuesPage() {
         const selectedTagsCollectionId = filters.tagsId || []
         const tagCollectionIds = selectedTagsCollectionId.map((tag) => tagsCollectionsMap[tag]).flat()
         filterCollectionsId = filterCollectionsId.concat(tagCollectionIds)
-        const collectionIdsArray = filterCollectionsId.map((x) => {return x.toString()})
+        const collectionIdsArray = filterCollectionsId.map((x) => { return x.toString() })
 
         let obj = {
             'filterStatus': filterStatus,
@@ -669,6 +803,7 @@ function IssuesPage() {
                             id: item?.id ? JSON.stringify(item.id) : '',
                             issueDescription: item?.description,
                             jiraIssueUrl: item?.jiraIssueUrl || "",
+                            devrevWorkUrl: item?.devrevWorkUrl || "",
                         }],
                         numberOfEndpoints: 1
                     })
@@ -685,7 +820,8 @@ function IssuesPage() {
                         url: item?.id?.apiInfoKey?.url,
                         id: item?.id ? JSON.stringify(item.id) : '',
                         issueDescription: item?.description,
-                        jiraIssueUrl: item?.jiraIssueUrl || ""
+                        jiraIssueUrl: item?.jiraIssueUrl || "",
+                        devrevWorkUrl: item?.devrevWorkUrl || ""
                     })
                     existingIssue.numberOfEndpoints = (existingIssue.numberOfEndpoints || 1) + 1
                 }
@@ -707,11 +843,12 @@ function IssuesPage() {
         setTableLoading(false)
         setLoading(false)
 
-        return {value: ret, total: total}
+        return { value: ret, total: total }
     }
 
-    async function modifyDataForCSV(){
-        const filters= {}
+    async function exportMarkdown() {
+        setToast(true, false, "Generating Markdown report...")
+        const filters = {}
         const filtersFromPersistStore = PersistStore.getState().filtersMap;
         const currentPageKey = "/dashboard/reports/issues/#" + selectedTab
         let selectedFilters = filtersFromPersistStore[currentPageKey]?.filters || [];
@@ -729,7 +866,7 @@ function IssuesPage() {
         filters?.issueCategory?.forEach((issue) => {
             filterSubCategory = filterSubCategory.concat(categoryToSubCategories[issue])
         })
-        if(filters?.issueName !== undefined && filters?.issueName.length > 0){
+        if (filters?.issueName !== undefined && filters?.issueName.length > 0) {
             filterSubCategory = filterSubCategory.concat(filters?.issueName)
         }
         let issueItems = []
@@ -746,8 +883,66 @@ function IssuesPage() {
                     numberOfEndpoints: 1,
                     creationTime: func.prettifyEpoch(item.creationTime),
                     issueStatus: item.unread && item.unread.toString() === 'false' ? "read" : "unread",
-                    domainVal:[(item.id.apiInfoKey && hostNameMap[item.id.apiInfoKey.apiCollectionId] !== null ? hostNameMap[item.id.apiInfoKey.apiCollectionId] : apiCollectionMap[item.id.apiInfoKey.apiCollectionId])],
-                    url:`${item.id.apiInfoKey?.method || ""} ${item.id.apiInfoKey?.url || ""}`
+                    domainVal: [(item.id.apiInfoKey && hostNameMap[item.id.apiInfoKey.apiCollectionId] !== null ? hostNameMap[item.id.apiInfoKey.apiCollectionId] : apiCollectionMap[item.id.apiInfoKey.apiCollectionId])],
+                    url: `${item.id.apiInfoKey?.method || ""} ${item.id.apiInfoKey?.url || ""}`,
+                    description: item.description || subCategoryMap[item.id.testSubCategory]?.issueDetails,
+                    impact: subCategoryMap[item.id.testSubCategory]?.issueImpact,
+                    remediation: subCategoryMap[item.id.testSubCategory]?.remediation,
+                    cwe: subCategoryMap[item.id.testSubCategory]?.cwe || [],
+                    cve: subCategoryMap[item.id.testSubCategory]?.cve || [],
+                    tags: subCategoryMap[item.id.testSubCategory]?.issueTags || []
+                }
+                issueItems.push(issue)
+            })
+
+            const markdown = MarkdownReportGenerator.generateMarkdown(issueItems, 'Issues');
+            const blob = new Blob(["\uFEFF" + markdown], { type: "text/markdown;charset=utf-8" });
+            saveAs(blob, "issues_report.md");
+            setToast(true, false, "Markdown report downloaded successfully")
+
+        }).catch((e) => {
+            func.setToast(true, true, e.message)
+        })
+    }
+
+    async function modifyDataForCSV() {
+        const filters = {}
+        const filtersFromPersistStore = PersistStore.getState().filtersMap;
+        const currentPageKey = "/dashboard/reports/issues/#" + selectedTab
+        let selectedFilters = filtersFromPersistStore[currentPageKey]?.filters || [];
+        selectedFilters.forEach((filter) => {
+            filters[filter.key] = filter.value
+        })
+
+        let filterStatus = [selectedTab.toUpperCase()]
+        let filterSeverity = filters?.severity || []
+        let filterCompliance = filters?.compliance || []
+        const activeCollections = (filters?.activeCollections !== undefined && filters?.activeCollections.length > 0) ? filters?.activeCollections[0] : initialValForResponseFilter;
+        const apiCollectionId = filters?.apiCollectionId || []
+        let filterCollectionsId = (apiCollectionId || []).concat(filters?.collectionIds || [])
+        let filterSubCategory = []
+        filters?.issueCategory?.forEach((issue) => {
+            filterSubCategory = filterSubCategory.concat(categoryToSubCategories[issue])
+        })
+        if (filters?.issueName !== undefined && filters?.issueName.length > 0) {
+            filterSubCategory = filterSubCategory.concat(filters?.issueName)
+        }
+        let issueItems = []
+
+        await api.fetchIssues(0, 20000, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, "severity", -1, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
+            issuesDataRes.issues.forEach((item) => {
+                if (!item || !item.id || !item.id.testSubCategory || !subCategoryMap[item.id.testSubCategory]) return;
+                const issue = {
+                    id: item.id,
+                    severityVal: func.toSentenceCase(item.severity),
+                    complianceVal: Object.keys(subCategoryMap[item.id.testSubCategory]?.compliance?.mapComplianceToListClauses || {}),
+                    issueName: item.id.testSubCategory,
+                    category: subCategoryMap[item.id.testSubCategory]?.superCategory?.shortName,
+                    numberOfEndpoints: 1,
+                    creationTime: func.prettifyEpoch(item.creationTime),
+                    issueStatus: item.unread && item.unread.toString() === 'false' ? "read" : "unread",
+                    domainVal: [(item.id.apiInfoKey && hostNameMap[item.id.apiInfoKey.apiCollectionId] !== null ? hostNameMap[item.id.apiInfoKey.apiCollectionId] : apiCollectionMap[item.id.apiInfoKey.apiCollectionId])],
+                    url: `${item.id.apiInfoKey?.method || ""} ${item.id.apiInfoKey?.url || ""}`
                 }
                 issueItems.push(issue)
             })
@@ -757,7 +952,7 @@ function IssuesPage() {
         return issueItems;
 
     }
-    
+
 
 
     async function exportCsv() {
@@ -795,17 +990,17 @@ function IssuesPage() {
             />
 
             <IssuesGraphsGroup heading="Issues summary">
-              {[
-                <HorizontalGrid gap={5} columns={2} key="critical-issues-graph-detail">
-                  <CriticalUnresolvedApisByAge />
-                  <CriticalFindingsGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
-                </HorizontalGrid>,
-                <HorizontalGrid columns={2} gap={4} key="open-issues-graphs">
-                  <ApisWithMostOpenIsuuesGraph issuesData={issuesByApis} />
-                  <IssuesByCollection collectionsData={issuesByApis} />
-                </HorizontalGrid>,
-                <AllUnsecuredAPIsOverTimeGraph key="unsecured-over-time" startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
-              ]}
+                {[
+                    <HorizontalGrid gap={5} columns={2} key="critical-issues-graph-detail">
+                        <CriticalUnresolvedApisByAge />
+                        <CriticalFindingsGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
+                    </HorizontalGrid>,
+                    <HorizontalGrid columns={2} gap={4} key="open-issues-graphs">
+                        <ApisWithMostOpenIsuuesGraph issuesData={issuesByApis} />
+                        <IssuesByCollection collectionsData={issuesByApis} />
+                    </HorizontalGrid>,
+                    <AllUnsecuredAPIsOverTimeGraph key="unsecured-over-time" startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
+                ]}
             </IssuesGraphsGroup>
 
             <GithubServerTable
@@ -820,9 +1015,9 @@ function IssuesPage() {
                 headers={headers}
                 getStatus={() => { return "warning" }}
                 selected={selected}
-                onRowClick={() => {}}
+                onRowClick={() => { }}
                 onSelect={handleSelectedTab}
-                getFilteredItems={()=>{}}
+                getFilteredItems={() => { }}
                 mode={IndexFiltersMode.Default}
                 headings={headers}
                 useNewRow={true}
@@ -838,62 +1033,66 @@ function IssuesPage() {
     )
 
     const [popOverActive, setPopOverActive] = useState(false)
-    
+
     return (
         <>
-        <PageWithMultipleCards
-            title={
-                <HorizontalStack gap={4}>
-                    <TitleWithInfo
-                        titleText={"Issues"}
-                        tooltipContent={"Issues are created when a test from test library has passed validation and thus a potential vulnerability is found."}
-                    />
-                </HorizontalStack>
-            }
-            isFirstPage={true}
-            components = {loading ? [<SpinnerCentered />] : [
-                showEmptyScreen ? 
-                <EmptyScreensLayout key={"emptyScreen"}
-                    iconSrc={"/public/alert_hexagon.svg"}
-                    headingText={"No issues yet!"}
-                    description={"There are currently no issues with your APIs. Haven't run your tests yet? Start testing now to prevent any potential issues."}
-                    buttonText={"Run test"}
-                    infoItems={infoItems}
-                    infoTitle={"Once you have issues:"}
-                    learnText={"issues"}
-                    docsUrl={ISSUES_PAGE_DOCS_URL}
-                    bodyComponent={<SelectCollectionComponent />}
-                />
+            <PageWithMultipleCards
+                title={
+                    <HorizontalStack gap={4}>
+                        <TitleWithInfo
+                            titleText={"Issues"}
+                            tooltipContent={"Issues are created when a test from test library has passed validation and thus a potential vulnerability is found."}
+                        />
+                    </HorizontalStack>
+                }
+                isFirstPage={true}
+                components={loading ? [<SpinnerCentered />] : [
+                    showEmptyScreen ?
+                        <EmptyScreensLayout key={"emptyScreen"}
+                            iconSrc={"/public/alert_hexagon.svg"}
+                            headingText={"No issues yet!"}
+                            description={"There are currently no issues with your APIs. Haven't run your tests yet? Start testing now to prevent any potential issues."}
+                            buttonText={mapLabel("Run test", getDashboardCategory())}
+                            infoItems={infoItems}
+                            infoTitle={"Once you have issues:"}
+                            learnText={"issues"}
+                            docsUrl={ISSUES_PAGE_DOCS_URL}
+                            bodyComponent={<SelectCollectionComponent />}
+                        />
 
-            
-            : components
-            ]}
-            primaryAction={<Button primary onClick={() => openVulnerabilityReport([], false)} disabled={showEmptyScreen}>Export results</Button>}
-            secondaryActions={
-            <HorizontalStack  gap={2}>
-                <DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />
-                <Popover
-                active={popOverActive}
-                activator={<Button onClick={() => setPopOverActive((prev)=>!prev)} disabled={showEmptyScreen} disclosure>More Actions</Button>}
-                autofocusTarget="first-node"
-                onClose={() => setPopOverActive(false)}
-                >
-                <ActionList
-                  actionRole="menuitem"
-                  items={[
-                    {
-                      content: 'Export results as CSV',
-                      onAction: exportCsv,
-                    },
-                    {
-                      content: 'Export summary report',
-                      onAction: () => openVulnerabilityReport([], true),
-                    },
-                  ]}
-                />
-              </Popover>
-            </HorizontalStack>}
-        />
+
+                        : components
+                ]}
+                primaryAction={<Button primary onClick={() => openVulnerabilityReport([], false)} disabled={showEmptyScreen}>Export results</Button>}
+                secondaryActions={
+                    <HorizontalStack gap={2}>
+                        <DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />
+                        <Popover
+                            active={popOverActive}
+                            activator={<Button onClick={() => setPopOverActive((prev) => !prev)} disabled={showEmptyScreen} disclosure>More Actions</Button>}
+                            autofocusTarget="first-node"
+                            onClose={() => setPopOverActive(false)}
+                        >
+                            <ActionList
+                                actionRole="menuitem"
+                                items={[
+                                    {
+                                        content: 'Export results as CSV',
+                                        onAction: exportCsv,
+                                    },
+                                    {
+                                        content: 'Export results as Markdown',
+                                        onAction: exportMarkdown,
+                                    },
+                                    {
+                                        content: 'Export summary report',
+                                        onAction: () => openVulnerabilityReport([], true),
+                                    },
+                                ]}
+                            />
+                        </Popover>
+                    </HorizontalStack>}
+            />
             {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
             <JiraTicketCreationModal
                 modalActive={jiraModalActive}
@@ -904,6 +1103,8 @@ function IssuesPage() {
                 setIssueType={setIssueType}
                 projId={projId}
                 issueType={issueType}
+                labelsText={labelsText}
+                setLabelsText={setLabelsText}
             />
 
             <JiraTicketCreationModal
@@ -917,40 +1118,49 @@ function IssuesPage() {
                 issueType={workItemType}
                 isAzureModal={true}
             />
-            
-            <Modal
+
+            <JiraTicketCreationModal
+                modalActive={serviceNowModalActive}
+                setModalActive={setServiceNowModalActive}
+                handleSaveAction={handleSaveBulkServiceNowTicketsAction}
+                jiraProjectMaps={serviceNowTables}
+                setProjId={setServiceNowTable}
+                setIssueType={() => { }}
+                projId={serviceNowTable}
+                issueType=""
+                isServiceNowModal={true}
+            />
+
+            <JiraTicketCreationModal
+                modalActive={devrevModalActive}
+                setModalActive={setDevRevModalActive}
+                handleSaveAction={handleSaveBulkDevRevTicketsAction}
+                jiraProjectMaps={devrevParts}
+                setProjId={setDevRevPartId}
+                setIssueType={setDevRevWorkItemType}
+                projId={devrevPartId}
+                issueType={devrevWorkItemType}
+                isDevRevModal={true}
+            />
+
+            <CompulsoryDescriptionModal
                 open={compulsoryDescriptionModal}
                 onClose={() => setCompulsoryDescriptionModal(false)}
-                title="Description Required"
-                primaryAction={{
-                    content: modalLoading ? 'Loading...' : 'Confirm',
-                    onAction: handleIgnoreWithDescription,
-                    disabled: mandatoryDescription.trim().length === 0 || modalLoading
-                }}
-                secondaryActions={[
-                    {
-                        content: 'Cancel',
-                        onAction: () => setCompulsoryDescriptionModal(false)
-                    }
-                ]}
-            >
-                <Modal.Section>
-                    <VerticalStack gap="4">
-                        <Text variant="bodyMd">
-                            A description is required for this action based on your account settings. Please provide a reason for marking these issues as "{pendingIgnoreAction?.reason}".
-                        </Text>
-                        <TextField
-                            label="Description"
-                            value={mandatoryDescription}
-                            onChange={setMandatoryDescription}
-                            multiline={4}
-                            autoComplete="off"
-                            placeholder="Please provide a description for this action..."
-                            disabled={modalLoading}
-                        />
-                    </VerticalStack>
-                </Modal.Section>
-            </Modal>
+                onConfirm={handleIgnoreWithDescription}
+                reasonLabel={pendingIgnoreAction?.reason}
+                description={mandatoryDescription}
+                onChangeDescription={setMandatoryDescription}
+                loading={modalLoading}
+            />
+
+            <SeveritySelector
+                open={severityModalActive}
+                onClose={() => setSeverityModalActive(false)}
+                onConfirm={handleBulkSeverityUpdate}
+                selectedCount={selectedIssuesItems.length}
+                pageType="issue"
+                disabled={severityUpdateInProgress}
+            />
         </>
     )
 }

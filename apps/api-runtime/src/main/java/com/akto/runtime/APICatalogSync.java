@@ -39,7 +39,7 @@ import com.akto.util.JSONUtils;
 import com.akto.utils.RedactSampleData;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.google.api.client.util.Charsets;
+import com.google.common.base.Charsets;
 import com.google.common.hash.BloomFilter;
 import com.google.common.hash.Funnels;
 import com.mongodb.BasicDBObject;
@@ -67,7 +67,7 @@ public class APICatalogSync {
     public int thresh;
     public String userIdentifier;
     private static final Logger logger = LoggerFactory.getLogger(APICatalogSync.class);
-    private static final LoggerMaker loggerMaker = new LoggerMaker(APICatalogSync.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(APICatalogSync.class, LogDb.RUNTIME);
     public Map<Integer, APICatalog> dbState;
     public Map<Integer, APICatalog> delta;
     public AktoPolicyNew aktoPolicyNew;
@@ -2038,14 +2038,25 @@ public class APICatalogSync {
             return new Pair<>(apiSyncLimit, MetricTypes.ACTIVE_ENDPOINTS);
         }
 
+        // For agentic billing: Use combined limit that respects both MCP and GenAI limits
         if (apiCollection.isMcpCollection()) {
+            // Get combined limit that ensures both MCP and GenAI limits are respected
+            SyncLimit combinedLimit = com.akto.billing.UsageMetricUtils.getCombinedAgenticSyncLimit(Context.accountId.get());
+            if (combinedLimit.checkLimit) {
+                return new Pair<>(combinedLimit, MetricTypes.MCP_ASSET_COUNT);
+            }
             return new Pair<>(mcpAssetsSyncLimit, MetricTypes.MCP_ASSET_COUNT);
         }
 
         if (apiCollection.isGenAICollection()) {
+            // Get combined limit that ensures both MCP and GenAI limits are respected
+            SyncLimit combinedLimit = com.akto.billing.UsageMetricUtils.getCombinedAgenticSyncLimit(Context.accountId.get());
+            if (combinedLimit.checkLimit) {
+                return new Pair<>(combinedLimit, MetricTypes.AI_ASSET_COUNT);
+            }
             return new Pair<>(aiAssetsSyncLimit, MetricTypes.AI_ASSET_COUNT);
         }
-        // add ai sync limit in future
+
         return new Pair<>(apiSyncLimit, MetricTypes.ACTIVE_ENDPOINTS);
     }
 

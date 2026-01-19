@@ -1,5 +1,8 @@
 package com.akto.action.threat_detection;
 
+import lombok.Getter;
+import lombok.Setter;
+
 public class ActivityData {
     
     private String url;
@@ -7,13 +10,20 @@ public class ActivityData {
     private String subCategory;
     private long detectedAt;
     private String method;
+    private String host;
 
-    public ActivityData(String url, String severity, String subCategory, long detectedAt, String method) {
+    @Getter
+    @Setter
+    private String metadata;
+
+    public ActivityData(String url, String severity, String subCategory, long detectedAt, String method, String host, String metadata) {
         this.url = url;
         this.severity = severity;
         this.subCategory = subCategory;
         this.detectedAt = detectedAt;
         this.method = method;
+        this.host = host;
+        this.metadata = metadata;
     }
 
     public String getUrl() {
@@ -49,4 +59,11 @@ public class ActivityData {
         this.method = method;
     }
 
+    public String getHost() {
+        return host;
+    }
+
+    public void setHost(String host) {
+        this.host = host;
+    }
 }

@@ -9,6 +9,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.util.Constants;
 import com.akto.util.Pair;
+import com.akto.util.Util;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
@@ -129,7 +130,9 @@ public class UsersCollectionsList {
             Filters.exists(ApiCollection.TAGS_STRING, false),
             Filters.nor(
                 Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
-                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG))
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG)),
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_DAST_TAG)),
+                getEndpointSourceFilter()
             )
         );
         switch (source) {
@@ -145,6 +148,29 @@ public class UsersCollectionsList {
                     Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG))
                 );
                 break;
+            case AGENTIC:
+                // For agentic context, include both MCP and GenAI collections, EXCLUDE endpoint collections
+                finalFilter = Filters.and(
+                    Filters.exists(ApiCollection.TAGS_STRING),
+                    Filters.or(
+                        Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
+                        Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG))
+                    ),
+                    Filters.nor(getEndpointSourceFilter())
+                );
+                break;
+            case DAST:
+                finalFilter = Filters.and(
+                    Filters.exists(ApiCollection.TAGS_STRING),
+                    Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_DAST_TAG))
+                );
+                break;
+            case ENDPOINT:
+                finalFilter = Filters.and(
+                    Filters.exists(ApiCollection.TAGS_STRING),
+                    getEndpointSourceFilter()
+                );
+                break;
             default:
                 break;
         }
@@ -153,5 +179,19 @@ public class UsersCollectionsList {
             collectionIds.add(cursor.next().getId());
         }
         return collectionIds;
+    }
+
+    private static Bson getEndpointSourceFilter() {
+        return Filters.elemMatch(ApiCollection.TAGS_STRING,
+            Filters.and(
+                Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_ENDPOINT_SOURCE_TAG),
+                Filters.eq(CollectionTags.VALUE, Constants.AKTO_ENDPOINT_SOURCE_VALUE)
+            )
+        );
+    }
+
+    public static boolean isDemoAccount() {
+        Integer accountId = Context.accountId.get();
+        return accountId == 1669322524 || accountId == 1767814409 || accountId == 1767812031;
     }
 }

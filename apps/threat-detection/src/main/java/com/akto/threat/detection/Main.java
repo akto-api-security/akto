@@ -1,11 +1,22 @@
 package com.akto.threat.detection;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
 import com.akto.DaoInit;
 import com.akto.RuntimeMode;
 import com.akto.dao.context.Context;
+import com.akto.data_actor.ClientActor;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
+import com.akto.dto.*;
+import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.billing.Organization;
 import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.kafka.KafkaConfig;
 import com.akto.kafka.KafkaConsumerConfig;
 import com.akto.kafka.KafkaProducerConfig;
@@ -18,6 +29,7 @@ import com.akto.threat.detection.crons.ApiCountInfoRelayCron;
 import com.akto.threat.detection.ip_api_counter.CmsCounterLayer;
 import com.akto.threat.detection.ip_api_counter.DistributionCalculator;
 import com.akto.threat.detection.ip_api_counter.DistributionDataForwardLayer;
+import com.akto.threat.detection.ip_api_counter.ParamEnumerationDetector;
 import com.akto.threat.detection.tasks.MaliciousTrafficDetectorTask;
 import com.akto.threat.detection.tasks.SendMaliciousEventsToBackend;
 import com.akto.threat.detection.utils.Utils;
@@ -33,14 +45,43 @@ public class Main {
 
   private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
-  public static void main(String[] args) throws Exception {
-    
+  public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+
+
+    public static void main(String[] args) throws Exception {
+
+    boolean isHybridDeployment = RuntimeMode.isHybridDeployment();
+
+     if (isHybridDeployment) {
+       while (true) {
+
+         int accountId = ClientActor.getAccountId();
+
+         Organization organization = dataActor.fetchOrganization(accountId);
+         if (organization == null) {
+           logger.errorAndAddToDb("Organization not found for account id: " + accountId);
+           Thread.sleep(30000);
+           continue;
+         }
+         HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
+         if(featureWiseAllowed == null || featureWiseAllowed.isEmpty()) {
+            // case for on-prem customers without internet access
+            break;
+         }
+
+         FeatureAccess allowed = featureWiseAllowed.getOrDefault("THREAT_DETECTION", FeatureAccess.noAccess);
+         if (allowed.getIsGranted()) {
+           break;
+         }
+
+         Thread.sleep(30000);
+       }
+     }
+
     RedisClient localRedis = null;
 
     logger.warnAndAddToDb("aggregation rules enabled " + aggregationRulesEnabled);
     ModuleInfoWorker.init(ModuleInfo.ModuleType.THREAT_DETECTION, dataActor);
-
-    boolean isHybridDeployment = RuntimeMode.isHybridDeployment();
     if (!isHybridDeployment) {
         DaoInit.init(new ConnectionString(System.getenv("AKTO_MONGO_CONN")));
     }
@@ -82,8 +123,9 @@ public class Main {
             .setValueSerializer(Serializer.BYTE_ARRAY)
             .build();
 
-
+    initCustomDataTypeScheduler();
     CmsCounterLayer.initialize(localRedis);
+    ParamEnumerationDetector.initialize(localRedis, 50, 5);
     DistributionCalculator distributionCalculator = new DistributionCalculator();
     DistributionDataForwardLayer distributionDataForwardLayer = new DistributionDataForwardLayer(localRedis, distributionCalculator);
 
@@ -137,4 +179,16 @@ public class Main {
     return redisClient;
   }
 
+    public static void initCustomDataTypeScheduler(){
+        Account account = dataActor.fetchActiveAccount();
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                List<CustomDataType> customDataTypes = dataActor.fetchCustomDataTypes();
+                logger.info("customData type " + customDataTypes.size());
+                List<AktoDataType> aktoDataTypes = dataActor.fetchAktoDataTypes();
+                SingleTypeInfo.fetchCustomDataTypes(account.getId(),customDataTypes,aktoDataTypes);
+
+            }
+        }, 0, 5, TimeUnit.MINUTES);
+    }
 }

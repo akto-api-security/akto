@@ -83,6 +83,8 @@ function TestRunResultFull(props) {
           </LegacyCard.Section>
         </LegacyCard>
       )
+
+    const errorsPresent = selectedTestRunResult?.testResults?.some((result) => result.errors && result.errors.length > 0)
     
     const components = loading ? [<SpinnerCentered key="loading" />] : [
           issueDetails.id &&
@@ -99,9 +101,18 @@ function TestRunResultFull(props) {
         <SampleDataList
           key={"sampleData"}
           sampleData={selectedTestRunResult?.testResults.map((result) => {
-            return {originalMessage: result.originalMessage, message:result.message, highlightPaths:[]}
+            if (result.errors && result.errors.length > 0) {
+              let errorList = result.errors.join(", ");
+              return { errorList: errorList }
+            }
+
+            if (result.originalMessage || result.message) {
+              return { originalMessage: result.originalMessage, message: result.message, highlightPaths: [] }
+            }
+            return { errorList: "No data found" }
           })}
           isNewDiff={true}
+          vertical={errorsPresent}
           vulnerable={selectedTestRunResult?.vulnerable}
           heading={"Attempt"}
           isVulnerable={selectedTestRunResult.vulnerable}
@@ -129,7 +140,6 @@ function TestRunResultFull(props) {
             divider= {true}
             backUrl = {source === "editor" ? undefined : (hexId ==="issues" ? "/dashboard/issues" : `/dashboard/testing/${hexId}`)}
             isFirstPage = {source === "editor"}
-            // primaryAction = {<Button primary onClick={()=>createJiraTicket(issueDetails)} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"} >Create Jira Ticket</Button>} 
             components = {components}
         />
     )

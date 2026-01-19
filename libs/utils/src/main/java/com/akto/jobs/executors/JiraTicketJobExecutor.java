@@ -27,6 +27,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
+import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.akto.util.enums.GlobalEnums.TicketSource;
 import com.akto.util.http_util.CoreHTTPClient;
@@ -99,6 +100,7 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         Map<String, Info> infoMap = fetchYamlInfoMap(issues);
 
         List<JiraMetaData> batchMetaList = new ArrayList<>();
+        Map<TestingIssuesId, TestingRunIssues> issuesMap = new HashMap<>();
 
         for (TestingRunIssues issue : issues) {
 
@@ -136,7 +138,8 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
                     info.getDescription(),
                     id,
                     summaryId,
-                    null
+                    null,
+                    ""
                 );
             } catch (Exception e) {
                 logger.error("Error parsing URL for issue {}: {}", id, e.getMessage(), e);
@@ -144,16 +147,18 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
             }
 
             batchMetaList.add(meta);
+            issuesMap.put(id, issue);
 
             if (batchMetaList.size() == BATCH_SIZE) {
-                processJiraBatch(batchMetaList, issueType, projId, jira);
+                processJiraBatch(batchMetaList, issuesMap, issueType, projId, jira);
                 batchMetaList.clear();
+                issuesMap.clear();
                 updateJobHeartbeat(job);
             }
         }
 
         if (!batchMetaList.isEmpty()) {
-            processJiraBatch(batchMetaList, issueType, projId, jira);
+            processJiraBatch(batchMetaList, issuesMap, issueType, projId, jira);
             updateJobHeartbeat(job);
         }
     }
@@ -199,8 +204,9 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         return YamlTemplateDao.instance.fetchTestInfoMap(Filters.in(YamlTemplateDao.ID, subCategories));
     }
 
-    private void processJiraBatch(List<JiraMetaData> batch, String issueType, String projId, JiraIntegration jira) throws Exception {
-        BasicDBObject payload = buildJiraPayload(batch, issueType, projId);
+    private void processJiraBatch(List<JiraMetaData> batch, Map<TestingIssuesId, TestingRunIssues> issuesMap,
+                                  String issueType, String projId, JiraIntegration jira) throws Exception {
+        BasicDBObject payload = buildJiraPayload(batch, issuesMap, issueType, projId);
         List<String> createdKeys = sendJiraBulkCreate(jira, payload, batch, projId);
         logger.info("Created {} Jira issues out of {} Akto issues", createdKeys.size(), batch.size());
         List<TestingRunResult> results = fetchRunResults(batch);
@@ -223,10 +229,13 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         return results;
     }
 
-    private BasicDBObject buildJiraPayload(List<JiraMetaData> metaList, String issueType, String projId) {
+    private BasicDBObject buildJiraPayload(List<JiraMetaData> metaList, Map<TestingIssuesId, TestingRunIssues> issuesMap,
+                                            String issueType, String projId) {
         BasicDBList issueUpdates = new BasicDBList();
         for (JiraMetaData meta : metaList) {
-            BasicDBObject fields = jiraTicketPayloadCreator(meta, issueType, projId);
+            TestingRunIssues issue = issuesMap.get(meta.getTestingIssueId());
+            Severity severity = issue != null ? issue.getSeverity() : null;
+            BasicDBObject fields = jiraTicketPayloadCreator(meta, severity, issueType, projId);
             BasicDBObject issueObject = new BasicDBObject("fields", fields);
             issueUpdates.add(issueObject);
         }
@@ -347,7 +356,7 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         }
     }
 
-    private BasicDBObject jiraTicketPayloadCreator(JiraMetaData meta, String issueType, String projId) {
+    private BasicDBObject jiraTicketPayloadCreator(JiraMetaData meta, Severity severity, String issueType, String projId) {
         BasicDBObject fields = new BasicDBObject();
         String method = meta.getTestingIssueId().getApiInfoKey().getMethod().name();
         String endpoint = meta.getEndPointStr().replace("Endpoint - ", "");
@@ -358,6 +367,31 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         fields.put("issuetype", new BasicDBObject("id", issueType));
         fields.put("project", new BasicDBObject("key", projId));
         fields.put("labels", new String[] {JobConstants.TICKET_LABEL_AKTO_SYNC});
+
+        // Apply severity to priority mapping
+        if (severity != null) {
+            try {
+                JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+                if (jiraIntegration != null) {
+                    Map<String, String> severityToPriorityMap = jiraIntegration.getIssueSeverityToPriorityMap();
+                    if (severityToPriorityMap != null && !severityToPriorityMap.isEmpty()) {
+                        String priorityId = severityToPriorityMap.get(severity.name());
+                        if (priorityId != null && !priorityId.isEmpty()) {
+                            fields.put("priority", new BasicDBObject("id", priorityId));
+                            logger.info("Set Jira priority {} for severity {}", priorityId, severity.name());
+                        } else {
+                            logger.info("No priority mapping found for severity: {}", severity.name());
+                        }
+                    } else {
+                        logger.info("Priority map is null or empty");
+                    }
+                }
+            } catch (Exception e) {
+                logger.error("Error setting Jira priority from severity mapping", e);
+            }
+        } else {
+            logger.info("Severity is null, skipping priority mapping");
+        }
 
         BasicDBList contentList = new BasicDBList();
         contentList.add(buildContentDetails(meta.getHostStr(), null));

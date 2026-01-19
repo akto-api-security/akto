@@ -5,6 +5,7 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 
+import com.akto.util.enums.LoginFlowEnums;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
@@ -89,6 +90,14 @@ public class AuthMechanism {
             result = result || authParamPair.authTokenPresent(request);
         }
         return result;
+    }
+
+    public List<AuthParam> getAuthParamsFromAuthMechanism() {
+        boolean eligibleForCachedToken = LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(getType()) || LoginFlowEnums.AuthMechanismTypes.SAMPLE_DATA.toString().equalsIgnoreCase(getType());
+        boolean shouldUseCachedAuth = eligibleForCachedToken && !isCacheExpired();
+        List<AuthParam> authParamsToUse = shouldUseCachedAuth ? authParamsCached : authParams;
+
+        return authParamsToUse;
     }
 
     public ObjectId getId() {

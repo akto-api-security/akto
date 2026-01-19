@@ -6,6 +6,7 @@ import ReactFlow, {
 import { faEye, faEyeSlash, faSave, faPlayCircle, faCalendarPlus, faArrowAltCircleDown } from '@fortawesome/free-regular-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import IconButton from "@mui/material/IconButton"
+import { mapLabel, getDashboardCategory } from '../../../../main/labelHelper'
 
 import useStore from './store'
 import StartNode from './StartNode.jsx';
@@ -284,12 +285,12 @@ const Workflow = ({apiCollectionId, defaultOpenResult}) => {
       icon: faSave
     },
     {
-      title: "Run test",
+      title: mapLabel("Run test", getDashboardCategory()),
       onClick: runTest,
       icon: faPlayCircle
     },
     {
-      title: "Show test results",
+      title: `Show ${mapLabel('test results', getDashboardCategory())}`,
       onClick: showResult,
       icon: open ? faEyeSlash : faEye
     },

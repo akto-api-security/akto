@@ -92,6 +92,9 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
             new String[] {ApiInfo.DISCOVERED_TIMESTAMP }, false);
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            new String[] {ApiInfo.PARENT_MCP_TOOL_NAMES }, false);
     }
     
 
@@ -174,11 +177,15 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
         }
         return result;
     }
-
+    
     public static Float getRiskScore(ApiInfo apiInfo, boolean isSensitive, float riskScoreFromSeverityScore){
+        return getRiskScore(apiInfo, isSensitive, riskScoreFromSeverityScore, apiInfo.getThreatScore() > 0);
+    }
+
+    public static Float getRiskScore(ApiInfo apiInfo, boolean isSensitive, float riskScoreFromSeverityScore, boolean isThreatDetected){
         float riskScore = 0;
         if(apiInfo != null){
-            if(Context.now() - apiInfo.getLastSeen() <= Constants.ONE_MONTH_TIMESTAMP){
+            if((Context.now() - apiInfo.getDiscoveredTimestamp()) <= Constants.ONE_MONTH_TIMESTAMP && !isThreatDetected) {
                 riskScore += 1;
             }
             if(apiInfo.getApiAccessTypes().contains(ApiAccessType.PUBLIC)){
@@ -186,6 +193,9 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
             }
         }
         if(isSensitive){
+            riskScore += 1;
+        }
+        if(isThreatDetected){
             riskScore += 1;
         }
         riskScore += riskScoreFromSeverityScore;

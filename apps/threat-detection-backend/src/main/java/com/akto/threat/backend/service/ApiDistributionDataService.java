@@ -17,7 +17,8 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Fe
 import com.akto.threat.backend.db.ApiDistributionDataModel;
 import com.akto.threat.backend.db.ApiRateLimitBucketStatisticsModel;
 import com.akto.utils.ThreatApiDistributionUtils;
-import com.mongodb.client.MongoClient;
+import com.akto.threat.backend.dao.ApiDistributionDataDao;
+import com.akto.threat.backend.dao.ApiRateLimitBucketStatisticsDao;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.BulkWriteOptions;
@@ -30,10 +31,10 @@ import com.mongodb.client.model.WriteModel;
 public class ApiDistributionDataService {
     
     private static final LoggerMaker logger = new LoggerMaker(ApiDistributionDataService.class);
-    private final MongoClient mongoClient;
+    private final ApiDistributionDataDao apiDistributionDataDao;
 
-    public ApiDistributionDataService(MongoClient mongoClient) {
-        this.mongoClient = mongoClient;
+    public ApiDistributionDataService(ApiDistributionDataDao apiDistributionDataDao) {
+        this.apiDistributionDataDao = apiDistributionDataDao;
     }
 
     public ApiDistributionDataResponsePayload saveApiDistributionData(String accountId, ApiDistributionDataRequestPayload payload) {
@@ -71,19 +72,15 @@ public class ApiDistributionDataService {
             bulkUpdates.add(new UpdateOneModel<>(filter, update, options));
         }
 
-        this.mongoClient
-            .getDatabase(accountId + "")
-            .getCollection("api_distribution_data", ApiDistributionDataModel.class)
+        apiDistributionDataDao.getCollection(accountId)
             .bulkWrite(bulkUpdates, new BulkWriteOptions().ordered(false));
 
-        ApiRateLimitBucketStatisticsModel.calculateStatistics(accountId, this.mongoClient, frequencyBuckets);
+        ApiRateLimitBucketStatisticsModel.calculateStatistics(accountId, ApiRateLimitBucketStatisticsDao.instance, frequencyBuckets);
         return ApiDistributionDataResponsePayload.newBuilder().build();
     }
 
-    public static List<BucketStats> fetchBucketStats(String accountId, Bson filters, MongoClient mongoClient) {
-        MongoCollection<ApiDistributionDataModel> coll = mongoClient
-                .getDatabase(accountId)
-                .getCollection("api_distribution_data", ApiDistributionDataModel.class);
+    public static List<BucketStats> fetchBucketStats(String accountId, Bson filters, ApiDistributionDataDao dao) {
+        MongoCollection<ApiDistributionDataModel> coll = dao.getCollection(accountId);
 
         Map<String, List<Integer>> bucketToValues = new HashMap<>();
         try (MongoCursor<ApiDistributionDataModel> cursor = coll.find(filters).iterator()) {
@@ -140,7 +137,7 @@ public class ApiDistributionDataService {
         );
         
         FetchApiDistributionDataResponse.Builder responseBuilder = FetchApiDistributionDataResponse.newBuilder();
-        responseBuilder.addAllBucketStats(fetchBucketStats(accountId, filter, this.mongoClient));
+        responseBuilder.addAllBucketStats(fetchBucketStats(accountId, filter, apiDistributionDataDao));
 
         return responseBuilder.build();
     }

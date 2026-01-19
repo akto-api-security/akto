@@ -1,18 +1,20 @@
 import CollectionComponent from "../../../components/CollectionComponent"
 import OperatorDropdown from "../../../components/layouts/OperatorDropdown";
-import { VerticalStack, Card, Button, HorizontalStack, Collapsible, Text, Box, Icon } from "@shopify/polaris";
+import { VerticalStack, Card, Button, HorizontalStack, Collapsible, Text, Box, Icon, Popover, ActionList, Checkbox } from "@shopify/polaris";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import React, { useState, useReducer, useCallback, useMemo, useEffect } from 'react'
 import { produce } from "immer"
 import ApiEndpoints from "./ApiEndpoints";
 import api from "../api"
-import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons"
+import { ChevronDownMinor, ChevronUpMinor, FileMinor } from "@shopify/polaris-icons"
 import func from "@/util/func";
 import SaveAsCollectionModal from "./api_query_component/SaveAsCollectionModal";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import PersistStore from "../../../../main/PersistStore";
 import collectionsApi from "./api"
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
+import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 
 function APIQuery() {
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), []);
@@ -24,8 +26,15 @@ function APIQuery() {
     const [active, setActive] = useState(false);
     const collectionsMap = PersistStore.getState().collectionsMap
     const [isUpdate, setIsUpdate] = useState(false)
+    const [moreActions, setMoreActions] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+
+    // Only show checkbox for specific accounts
+    const showSkipTagsMismatch = func.isApiCollectionsCachingEnabled();
+    const [skipTagsMismatch, setSkipTagsMismatch] = useState(showSkipTagsMismatch);
 
     const [searchParams, setSearchParams] = useSearchParams();
+    const navigate = useNavigate();
     const collectionId = (searchParams && searchParams.get("collectionId") !== null) ? searchParams.get("collectionId") : -1
 
     const getEmptyCondition = (type) => {
@@ -122,36 +131,50 @@ function APIQuery() {
         }
         let dt = prepareData();
         if (dt && dt.length > 0) {
-            await api.createCustomCollection(newCollectionName, dt);
-            setActive(false);
-            func.setToast(true, false, <div data-testid="collection_creation_message">{"API collection created successfully"}</div>);
+            try {
+                await api.createCustomCollection(newCollectionName, dt);
+                setActive(false);
+                func.setToast(true, false, <div data-testid="collection_creation_message">{"API collection created successfully"}</div>);
+            } catch (error) {
+                func.setToast(true, true, "Failed to create collection. Please try again.");
+            }
         } else {
             func.setToast(true, true, <div data-testid="collection_creation_message">{"No endpoints selected"}</div>);
         }
     }
 
     const handleClearFunction = useCallback(() => {
+        setIsLoading(true);
         dispatchConditions({ type: "clear" });
         setEndpointListFromConditions({});
         setSensitiveParams({});
+        setIsLoading(false);
     }, []);
 
 
     const exploreEndpoints = useCallback(async () => {
-        let dt = prepareData();
-        if (dt.length > 0) {
-            let endpointListFromConditions = await api.getEndpointsListFromConditions(dt);
-            let sensitiveParams = await api.loadSensitiveParameters(-1);
-            if (endpointListFromConditions || sensitiveParams) {
-                setEndpointListFromConditions(endpointListFromConditions);
-                setSensitiveParams(sensitiveParams);
-                setApiCount(endpointListFromConditions.apiCount);
+        setIsLoading(true);
+        try {
+            let dt = prepareData();
+            if (dt.length > 0) {
+                let endpointListFromConditions = await api.getEndpointsListFromConditions(dt, skipTagsMismatch);
+                let sensitiveParams = await api.loadSensitiveParameters(-1);
+                if (endpointListFromConditions || sensitiveParams) {
+                    setEndpointListFromConditions(endpointListFromConditions);
+                    setSensitiveParams(sensitiveParams);
+                    setApiCount(endpointListFromConditions.apiCount);
+                }
+            } else {
+                setEndpointListFromConditions({});
+                setSensitiveParams({});
             }
-        } else {
+        } catch (error) {
             setEndpointListFromConditions({});
             setSensitiveParams({});
+        } finally {
+            setIsLoading(false);
         }
-    }, [prepareData]);
+    }, [prepareData, skipTagsMismatch]);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const modalComponent =
@@ -168,7 +191,7 @@ function APIQuery() {
             <Box background={"bg-subdued"} width="100%" padding={"2"} onClick={handleToggle} key="collapsible-component-header">
                 <HorizontalStack align="space-between">
                     <Text variant="headingSm">
-                        {endpointListFromConditions.data ? apiCount > 200 ? `Listing 200 sample endpoints out of total ` + apiCount + ` endpoints` : `Listing total ` + apiCount + ` endpoints` : "Select filters to see endpoints"}
+                        {endpointListFromConditions.data ? apiCount > 200 ? `Listing 200 sample ${mapLabel("endpoints", getDashboardCategory())} out of total ` + apiCount + ` ${mapLabel("endpoints", getDashboardCategory())}` : `Listing total ` + apiCount + ` ${mapLabel("endpoints", getDashboardCategory())}` : `Select filters to see ${mapLabel("endpoints", getDashboardCategory())}`}
                     </Text>
                     <Box>
                         <Icon source={open ? ChevronDownMinor : ChevronUpMinor} />
@@ -213,8 +236,16 @@ function APIQuery() {
                                     conditions.length > 0 ? <Button plain destructive onClick={handleClearFunction}>Clear all</Button> : null
                                 }
                             </HorizontalStack>
-                            <HorizontalStack gap={4} align="end">
-                                <Button onClick={exploreEndpoints}>Explore endpoints</Button>
+                            <HorizontalStack gap={4} align="space-between">
+                                {showSkipTagsMismatch && (
+                                    <Checkbox
+                                        label="Hide mismatched collections"
+                                        checked={skipTagsMismatch}
+                                        onChange={setSkipTagsMismatch}
+                                        helpText="Filter out endpoints from collections with tags-mismatch=true"
+                                    />
+                                )}
+                                <Button onClick={exploreEndpoints}>Explore {mapLabel("endpoints", getDashboardCategory())}</Button>
                             </HorizontalStack>
                         </VerticalStack>
                     </Card>
@@ -225,23 +256,21 @@ function APIQuery() {
     const components = useMemo(() => [
         modalComponent,
         collapsibleComponent,
-        <ApiEndpoints
+        isLoading ? <SpinnerCentered/> : <ApiEndpoints
             key="endpoint-table"
             endpointListFromConditions={endpointListFromConditions}
             sensitiveParamsForQuery={sensitiveParams}
             isQueryPage={true}
         />
-    ], [modalComponent, collapsibleComponent, endpointListFromConditions, sensitiveParams]);
+    ], [modalComponent, collapsibleComponent, endpointListFromConditions, sensitiveParams, isLoading]);
 
     const handleClick = () => {
         if(isUpdate){
             let dt = prepareData()
             api.updateCustomCollection(collectionId, dt).then((res) => {
-                try {
-                    func.setToast(true, false, "Conditions updated successfully")
-                } catch (error) {
-                    func.setToast(true,true, "Error in updating conditions")
-                }
+                func.setToast(true, false, "Conditions updated successfully")
+            }).catch((error) => {
+                func.setToast(true, true, "Error in updating conditions");
             })
         }else{
             openModal()
@@ -249,6 +278,49 @@ function APIQuery() {
     }
 
     const primaryActionLabel = isUpdate ? 'Update conditions' : 'Save as API Group'
+
+    const findMissingUrls = useCallback(() => {
+        navigate(`/dashboard/observe/debug-endpoints`);
+        setMoreActions(false);
+    }, [navigate]);
+
+    const isAktoUser = window.USER_NAME && window.USER_NAME.includes('akto.io');
+
+    const secondaryActionsComp = isAktoUser ? (
+        <HorizontalStack gap={2}>
+            <Popover
+                active={moreActions}
+                activator={(
+                    <Button onClick={() => setMoreActions(!moreActions)} disclosure removeUnderline>
+                        More Actions
+                    </Button>
+                )}
+                autofocusTarget="first-node"
+                onClose={() => { setMoreActions(false) }}
+            >
+                <Popover.Pane fixed>
+                    <ActionList
+                        actionRole="menuitem"
+                        sections={
+                            [
+                                {
+                                    title: 'Debug Mode',
+                                    items: [
+                                        {
+                                            content: 'Find Missing Urls',
+                                            onAction: findMissingUrls,
+                                            prefix: <Box><Icon source={FileMinor} /></Box>,
+                                            disabled: false
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    />
+                </Popover.Pane>
+            </Popover>
+        </HorizontalStack>
+    ) : null;
 
     return (
         <PageWithMultipleCards
@@ -259,8 +331,9 @@ function APIQuery() {
                 />
             }
             primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={handleClick}>{primaryActionLabel}</Button>}
+            secondaryActions={secondaryActionsComp}
             components={components}
-            backUrl="/dashboard/observe/inventory"
+            backUrl="dashboard/observe/query_mode"
         />
     )
 }

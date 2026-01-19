@@ -5,8 +5,9 @@ import "./run_test_suites.css"
 import RunTestSuiteRow from "./RunTestSuiteRow";
 import testingApi from "../../testing/api";
 import func from "@/util/func";
+import { getDashboardCategory, mapLabel, isAgenticSecurityCategory } from "../../../../main/labelHelper";
 
-function RunTestSuites({ testRun, setTestRun, apiCollectionName, activeFromTesting, setTestSuiteIds, testSuiteIds,setTestNameSuiteModal,testNameSuiteModal }) {
+function RunTestSuites({ apiCollectionName, activeFromTesting, setTestSuiteIds, testSuiteIds,setTestNameSuiteModal,testNameSuiteModal }) {
 
     const [data, setData] = useState({ owaspTop10List: {}, testingMethods:{}, custom : {}, severity: {} });
     const [testSuiteIdsNameMap, setTestSuiteIdsNameMap] = useState({});
@@ -115,7 +116,7 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, activeFromTesti
 
     function checkifSelected(data) {
         if(checkedSelected(data) === true) {
-            return `${countTestSuitesTests(data)} tests selected`
+            return `${countTestSuitesTests(data)} ${mapLabel("tests selected", getDashboardCategory())}`
         }
         return `${countTestSuitesTests(data)} tests`;
     }
@@ -148,16 +149,18 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, activeFromTesti
                                 disabled={testSuiteIds?.length===0}><div data-testid="remove_all_tests">Clear selection</div></Button></div>
                     </div>
                     {
-                        Object.values(data).map((key) => {
-                            return (
-                                <RunTestSuiteRow 
-                                    data={key} 
-                                    checkifSelected={checkifSelected} 
-                                    checkedSelected={checkedSelected} 
-                                    handleTestSuiteSelection={handleTestSuiteSelection}
-                                />
-                            );
-                        })   
+                        Object.entries(data)
+                            .filter(([key]) => !(isAgenticSecurityCategory() && key === 'owaspTop10List'))
+                            .map(([, value]) => {
+                                return (
+                                    <RunTestSuiteRow 
+                                        data={value} 
+                                        checkifSelected={checkifSelected} 
+                                        checkedSelected={checkedSelected} 
+                                        handleTestSuiteSelection={handleTestSuiteSelection}
+                                    />
+                                );
+                            })   
                     }
 
                 </VerticalStack>

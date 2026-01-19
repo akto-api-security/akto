@@ -6,6 +6,7 @@ import { useEffect, useState, useRef} from "react";
 import { Frame, Toast, VerticalStack, Banner, Button, Text } from "@shopify/polaris";
 import "./dashboard.css"
 import func from "@/util/func"
+import values from "@/util/values";
 import transform from "./testing/transform";
 import PersistStore from "../../main/PersistStore";
 import LocalStore, { localStorePersistSync } from "../../main/LocalStorageStore";
@@ -17,6 +18,7 @@ import WelcomeBackDetailsModal from "../components/WelcomeBackDetailsModal";
 import useTable from "../components/tables/TableContext";
 import threatDetectionRequests from "./threat_detection/api";
 import SessionStore from "../../main/SessionStore";
+import { updateThreatFiltersStore } from "./threat_detection/utils/threatFilters";
 
 function Dashboard() {
 
@@ -28,7 +30,6 @@ function Dashboard() {
     const setTagCollectionsMap = PersistStore(state => state.setTagCollectionsMap)
     const setHostNameMap = PersistStore(state => state.setHostNameMap)
     const threatFiltersMap = SessionStore(state => state.threatFiltersMap);
-    const setThreatFiltersMap = SessionStore(state => state.setThreatFiltersMap);
 
     const { selectItems } = useTable()
 
@@ -77,25 +78,8 @@ function Dashboard() {
     }
 
     const fetchFilterYamlTemplates = () => {
-        const category = PersistStore.getState().dashboardCategory;
-        const shortHand = category.split(" ")[0].toLowerCase();
         threatDetectionRequests.fetchFilterYamlTemplate().then((res) => {
-            const maps = { mcp: {}, gen: {}, api: {} };
-            res.templates.forEach((x) => {
-                let trimmed = {...x, content: '', ...x.info}
-                const name = trimmed?.category?.name?.toLowerCase();
-                delete trimmed['info']
-
-                if(name?.includes("mcp")) {
-                    maps.mcp[x.id] = trimmed;
-                } else if (name?.includes("gen")){
-                    maps.gen[x.id] = trimmed;
-                }else {
-                    maps.api[x.id] = trimmed;
-                }
-            })
-            setThreatFiltersMap(maps[shortHand])
-            
+            updateThreatFiltersStore(res?.templates || [])
         })
     }
 
@@ -195,6 +179,9 @@ function Dashboard() {
     }
 
     const refreshFunc = () => {
+        if (values.DISABLED_AUTO_ACCOUNT_REFRESH.includes(window.ACTIVE_ACCOUNT)){
+            return;
+        }
         if(document.visibilityState === 'hidden'){
             PersistStore.getState().resetAll();
             LocalStore.getState().resetStore();
@@ -230,8 +217,10 @@ function Dashboard() {
 
     const shouldShowWelcomeBackModal = window.IS_SAAS === "true" && window?.USER_NAME?.length > 0 && (window?.USER_FULL_NAME?.length === 0 || (window?.USER_ROLE === 'ADMIN' && window?.ORGANIZATION_NAME?.length === 0))
 
+    const isAskAiRoute = location.pathname.includes('/ask-ai')
+
     return (
-        <div className="dashboard">
+        <div className={`dashboard ${isAskAiRoute ? 'ask-ai-route' : ''}`}>
         <Frame>
             <Outlet />
             {shouldShowWelcomeBackModal && <WelcomeBackDetailsModal isAdmin={window.USER_ROLE === 'ADMIN'} />}
@@ -252,7 +241,7 @@ function Dashboard() {
                         })}
                     </VerticalStack>
             </div> : null}
-            {func.checkLocal() && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || location.pathname.includes("onboarding") || location.pathname.includes("summary")) ?<div className="call-banner" style={{marginBottom: "1rem"}}>
+            {func.checkLocal() && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || location.pathname.includes("onboarding") || location.pathname.includes("summary") || location.pathname.includes("report")) ?<div className="call-banner" style={{marginBottom: "1rem"}}>
                 <Banner hideIcon={true}>
                     <Text variant="headingMd">Need a 1:1 experience?</Text>
                     <Button plain monochrome onClick={() => {

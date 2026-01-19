@@ -19,6 +19,9 @@ public class TestReports {
     public static final String ISSUE_IDS_FOR_REPORT = "issuesIdsForReport";
     private List<TestingIssuesId> issuesIdsForReport;
 
+    public static final String THREAT_IDS_FOR_REPORT = "threatIdsForReport";
+    private List<String> threatIdsForReport;
+
     public TestReports () {}
 
     public TestReports (Map<String, List<String>> filtersForReport, int timestamp, String pdfReportString, List<TestingIssuesId> issuesIdsForReport){
@@ -26,6 +29,14 @@ public class TestReports {
         this.timestamp = timestamp;
         this.pdfReportString = pdfReportString;
         this.issuesIdsForReport = issuesIdsForReport;
+    }
+
+    public TestReports (Map<String, List<String>> filtersForReport, int timestamp, String pdfReportString, List<TestingIssuesId> issuesIdsForReport, List<String> threatIdsForReport){
+        this.filtersForReport = filtersForReport;
+        this.timestamp = timestamp;
+        this.pdfReportString = pdfReportString;
+        this.issuesIdsForReport = issuesIdsForReport;
+        this.threatIdsForReport = threatIdsForReport;
     }
 
 
@@ -59,5 +70,13 @@ public class TestReports {
 
     public void setIssuesIdsForReport(List<TestingIssuesId> issuesIdsForReport) {
         this.issuesIdsForReport = issuesIdsForReport;
+    }
+
+    public List<String> getThreatIdsForReport() {
+        return threatIdsForReport;
+    }
+
+    public void setThreatIdsForReport(List<String> threatIdsForReport) {
+        this.threatIdsForReport = threatIdsForReport;
     }
 }
