@@ -247,6 +247,14 @@ const api = {
         })
     },
 
+    saveDataDogConnector(datadogApiKey, datadogAppKey, datadogSite, serviceNames) {
+        return request({
+            url: '/api/saveDataDogConfigs',
+            method: 'post',
+            data: {datadogApiKey, datadogAppKey, datadogSite, serviceNames}
+        })
+    },
+
 }
 
 export default api

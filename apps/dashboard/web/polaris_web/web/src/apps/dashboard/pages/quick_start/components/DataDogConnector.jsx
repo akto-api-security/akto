@@ -8,9 +8,15 @@ function DataDogConnector() {
     const [datadogApiKey, setDatadogApiKey] = useState('')
     const [datadogAppKey, setDatadogAppKey] = useState('')
     const [site, setSite] = useState('')
+    const [serviceNames, setServiceNames] = useState('')
 
     const primaryAction = async() => {
-        await api.saveDataDogConnector(datadogApiKey, datadogAppKey, site).then((res) => {
+        let serviceNamesArray = serviceNames.trim().split(',')
+        await api.saveDataDogConnector(datadogApiKey, datadogAppKey, site, serviceNamesArray).then((res) => {
+            setDatadogApiKey('')
+            setDatadogAppKey('')
+            setSite('')
+            setServiceNames('')
             func.setToast(true, false, "DataDog connector saved successfully")
         }).catch((err) => {
             func.setToast(true, true, "Failed to save DataDog connector")
@@ -26,9 +32,10 @@ function DataDogConnector() {
                 Enter your Datadog API key and app key to connect your Datadog account to Akto.
             </Text>
             <VerticalStack gap="2">
-                <PasswordTextField label="Datadog API Key" onFunc={true} setField={setDatadogApiKey} field={datadogApiKey} />
-                <PasswordTextField label="Datadog App Key" setField={setDatadogAppKey} onFunc={true} field={datadogAppKey} />
-                <TextField label="Datadog Site" value={site} onChange={(value) => setSite(value)} />
+                <PasswordTextField label="Datadog API Key" onFunc={true} setField={setDatadogApiKey} field={datadogApiKey} requiredIndicator/>
+                <PasswordTextField label="Datadog App Key" setField={setDatadogAppKey} onFunc={true} field={datadogAppKey} requiredIndicator/>
+                <TextField label="Datadog Site" value={site} onChange={(value) => setSite(value)} requiredIndicator/>
+                <TextField label="Service Names" placeholder="Enter service names (comma separated), default all services" value={serviceNames} onChange={(value) => setServiceNames(value)} />
             </VerticalStack>
             <HorizontalStack align='end'>
                 <Button disabled={datadogApiKey?.length === 0 || datadogAppKey?.length === 0 || site?.length === 0} onClick={primaryAction} primary>Save</Button>
