@@ -13,7 +13,6 @@ import java.util.stream.Collectors;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ApiDistributionDataRequestPayload;
 import com.akto.threat.backend.cron.PercentilesCron;
 import com.akto.utils.ThreatApiDistributionUtils;
-import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.ReplaceOptions;
 import com.mongodb.client.model.Filters;

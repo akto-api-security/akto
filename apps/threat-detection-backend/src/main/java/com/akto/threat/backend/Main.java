@@ -90,6 +90,8 @@ public class Main {
     ApiDistributionDataService apiDistributionDataService = new ApiDistributionDataService(ApiDistributionDataDao.instance);
     com.akto.log.LoggerMaker logger = new com.akto.log.LoggerMaker(Main.class);
 
+     // Start PercentilesCron for all accounts
+
     try {
       PercentilesCron percentilesCron = new PercentilesCron(threatProtectionMongo);
       logger.infoAndAddToDb("Starting PercentilesCron for all accounts", com.akto.log.LoggerMaker.LogDb.RUNTIME);
