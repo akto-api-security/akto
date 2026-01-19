@@ -127,7 +127,6 @@ public class FastDiscoveryConsumer {
                 String method = headerParts[HEADER_INDEX_METHOD];
                 String url = headerParts[HEADER_INDEX_URL];
 
-                // Skip IP addresses early (same logic as mini-runtime)
                 if (!RuntimeUtil.isValidHostname(host)) {
                     continue;
                 }
