@@ -455,6 +455,34 @@ public class DbLayer {
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
     }
 
+    // Similar to createCollectionForHostAndVpc but for service-tag based collections
+    public static void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName) {
+        FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
+        updateOptions.upsert(true);
+
+        Bson updates = Updates.combine(
+            Updates.setOnInsert(Constants.ID, id),
+            Updates.setOnInsert(ApiCollection.NAME, serviceTagValue),
+            Updates.setOnInsert(ApiCollection.START_TS, Context.now()),
+            Updates.setOnInsert(ApiCollection.URLS_STRING, new HashSet<>()),
+            Updates.setOnInsert(ApiCollection.SERVICE_TAG, serviceTagValue),
+            Updates.setOnInsert(ApiCollection.HOST_NAMES, hostNames),
+            Updates.setOnInsert(ApiCollection.HOST_NAME, hostName),
+            Updates.setOnInsert(ApiCollection.REDACT, false),
+            Updates.setOnInsert(ApiCollection.SAMPLE_COLLECTIONS_DROPPED, true)
+        );
+
+        if(tags != null && !tags.isEmpty()) {
+            updates = Updates.combine(updates, Updates.set(ApiCollection.TAGS_STRING, tags));
+        }
+
+        ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(
+            Filters.eq(Constants.ID, id),
+            updates,
+            updateOptions
+        );
+    }
+
     public static void insertRuntimeLog(Log log) {
         RuntimeLogsDao.instance.insertOne(log);
     }
@@ -887,6 +915,18 @@ public class DbLayer {
     public static void insertApiCollection(int apiCollectionId, String apiCollectionName) {
         ApiCollection apiCollection = new ApiCollection(apiCollectionId, apiCollectionName, Context.now(),new HashSet<>(), null, apiCollectionId, false, true);
         ApiCollectionsDao.instance.insertOne(apiCollection);
+    }
+
+    // Atomic operation to add hostname to service tag collection
+    // Uses $addToSet to prevent duplicates and handle concurrent updates from multiple mini-runtime instances
+    public static void addHostNameToServiceTagCollection(int collectionId, String hostName) {
+        if (hostName == null || hostName.isEmpty()) {
+            return;
+        }
+        ApiCollectionsDao.instance.updateOne(
+            Filters.eq(Constants.ID, collectionId),
+            Updates.addToSet(ApiCollection.HOST_NAMES, hostName)
+        );
     }
 
     public static List<TestingRunIssues> fetchIssuesByIds(Set<TestingIssuesId> issuesIds) {
