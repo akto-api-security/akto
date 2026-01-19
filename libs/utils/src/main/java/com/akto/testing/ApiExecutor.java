@@ -36,7 +36,7 @@ public class ApiExecutor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.TESTING);
 
     // Load only first 1 MiB of response body into memory.
-    private static final int MAX_RESPONSE_SIZE = 1024*1024;
+    private static final int MAX_RESPONSE_SIZE = 1024*1024*5;
     private static final ObjectMapper objectMapper = new ObjectMapper();
     
     private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String requestProtocol) throws Exception {

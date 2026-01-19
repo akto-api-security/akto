@@ -9,12 +9,18 @@ import java.util.Map;
 import org.ahocorasick.trie.Trie;
 import org.json.JSONObject;
 
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.RawApi;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.type.KeyTypes;
+import com.akto.dto.type.URLTemplate;
+import com.akto.threat.detection.cache.AccountConfig;
+import com.akto.threat.detection.cache.AccountConfigurationCache;
+import com.akto.threat.detection.ip_api_counter.ParamEnumerationDetector;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
@@ -22,8 +28,11 @@ import com.akto.test_editor.Utils;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.util.Constants;
 import com.client9.libinjection.SQLParse;
+import com.akto.util.Pair;
 
+import static com.akto.threat_utils.Utils.cleanThreatUrl;
 import static com.akto.threat_utils.Utils.generateTrie;
+import static com.akto.threat_utils.Utils.isMatchingUrl;
 
 public class ThreatDetector {
 
@@ -32,11 +41,13 @@ public class ThreatDetector {
     public static final String SQL_INJECTION_FILTER_ID = "SQLInjection";
     public static final String OS_COMMAND_INJECTION_FILTER_ID = "OSCommandInjection";
     public static final String SSRF_FILTER_ID = "SSRF";
+    public static final String PARAM_ENUMERATION_FILTER_ID = "ParamEnumeration";
     private static Map<String, Object> varMap = new HashMap<>();
     private Trie lfiTrie;
     private Trie osCommandInjectionTrie;
     private Trie ssrfTrie;
     private static final LoggerMaker logger = new LoggerMaker(ThreatDetector.class, LogDb.THREAT_DETECTION);
+    private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     public ThreatDetector() throws Exception {
         lfiTrie = generateTrie(Constants.LFI_OS_FILES_DATA);
@@ -62,12 +73,95 @@ public class ThreatDetector {
             if (threatFilter.getId().equals(SSRF_FILTER_ID)) {
                 return isSSRFThreat(httpResponseParams); 
             }
+            if (threatFilter.getId().equals(PARAM_ENUMERATION_FILTER_ID)) {
+                return isParamEnumerationThreat(httpResponseParams);
+            }
             return validateFilterForRequest(threatFilter, rawApi, apiInfoKey);
         } catch (Exception e) {
             logger.errorAndAddToDb(e, "Error in applyFilter " + e.getMessage());
             return false;
         }
 
+    }
+
+
+    public List<Pair<String, String>> getUrlParamNamesAndValues(String url, URLTemplate urlTemplate) {
+        url = cleanThreatUrl(url, lfiTrie, osCommandInjectionTrie, ssrfTrie);
+        List<Pair<String, String>> paramNameAndValue = new ArrayList<>();
+        String[] urlTokens = url.split("/");
+
+        String[] templateTokens = urlTemplate.getTokens();
+
+        // Extract params where template token is null (parameterized position)
+        for (int i = 0; i < templateTokens.length && i < urlTokens.length; i++) {
+            if (templateTokens[i] == null) {
+                // Param name is the previous static segment, or fallback to type name
+                String paramName;
+                if (i > 0 && templateTokens[i - 1] != null) {
+                    paramName = templateTokens[i - 1];
+                } else {
+                    // Fallback: use the type name if available
+                    paramName = urlTemplate.getTypes()[i] != null
+                            ? urlTemplate.getTypes()[i].name()
+                            : "param" + i;
+                }
+                String paramValue = urlTokens[i];
+                paramNameAndValue.add(new Pair<>(paramName, paramValue));
+            }
+        }
+        return paramNameAndValue;
+    }
+
+    private URLTemplate findMatchingUrlTemplate(HttpResponseParams httpResponseParams){
+        AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
+        Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates = config.getApiCollectionUrlTemplates();
+
+        int apiCollectionId = httpResponseParams.requestParams.getApiCollectionId();
+        String url = httpResponseParams.getRequestParams().getURL();
+        String method = httpResponseParams.getRequestParams().getMethod();
+
+        // Get matching api template for this static url. 
+        // Example:
+        // threat traffic url: /v1/users/123/?/etc/passwd -> clean this url ->
+        // /v1/users/123
+        // api info templates: /v1/users/INTEGER -> match with cleaned url
+        // TODO: Cache already matched templates
+        URLTemplate urlTemplate = isMatchingUrl(apiCollectionId, url, method, apiCollectionUrlTemplates, lfiTrie,
+                osCommandInjectionTrie, ssrfTrie);
+        return urlTemplate;
+
+    }
+
+    public boolean isParamEnumerationThreat(HttpResponseParams httpResponseParams) {
+        
+        URLTemplate urlTemplate = findMatchingUrlTemplate(httpResponseParams);
+        if(urlTemplate == null){
+            return false;
+        }
+
+        String url = httpResponseParams.getRequestParams().getURL();
+
+        List<Pair<String, String>> paramNamesAndValues = getUrlParamNamesAndValues(url, urlTemplate);
+        
+
+        for(Pair<String, String> paramNameAndValue : paramNamesAndValues){
+            String paramName = paramNameAndValue.getFirst();
+            String paramValue = paramNameAndValue.getSecond();
+            boolean isUserEnumAttack = ParamEnumerationDetector.getInstance().recordAndCheck(
+                httpResponseParams.getSourceIP(),
+                httpResponseParams.requestParams.getApiCollectionId(), 
+                httpResponseParams.getRequestParams().getMethod(),
+                urlTemplate.getTemplateString(), 
+                paramName,
+                paramValue
+            );
+
+            if(isUserEnumAttack){
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public boolean isSuccessfulExploit(List<FilterConfig> successfulExploitFilters,
