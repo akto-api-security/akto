@@ -116,7 +116,7 @@ public class AccountConfigurationCache {
             List<ApiInfo> apiInfos = new ArrayList<>();
 
             if (accountSettings.getId() == 1763355072) {
-                apiInfos = dataActor.fetchApiInfos();
+                apiInfos = dataActor.fetchApiRateLimits(null);
             }
 
             // Build API info metadata structures - always non-null
