@@ -100,7 +100,8 @@ export default function LeftNav() {
         "shivam@akto.io",
         "umesh@akto.io",
         "shivansh@akto.io",
-        "aryan@akto.io"
+        "aryan@akto.io",
+        "fenil@akto.io"
     ];
     const isAllowedDashboardUser = window.USER_NAME && allowedDashboardUsers.includes(window.USER_NAME.toLowerCase());
 
