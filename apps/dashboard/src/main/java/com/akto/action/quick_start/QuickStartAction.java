@@ -5,6 +5,7 @@ import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ApiTokensDao;
 import com.akto.dao.AwsResourcesDao;
 import com.akto.dao.BackwardCompatibilityDao;
+import com.akto.dao.ConfigsDao;
 import com.akto.dao.context.Context;
 import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.dto.ApiToken;
@@ -12,15 +13,13 @@ import com.akto.dto.AwsResource;
 import com.akto.dto.AwsResources;
 import com.akto.dto.BackwardCompatibility;
 import com.akto.dto.User;
+import com.akto.dto.Config.DataDogConfig;
+import com.akto.dto.jobs.DatadogTrafficCollectorJobParams;
+import com.akto.dto.jobs.JobExecutorType;
 import com.akto.dto.third_party_access.PostmanCredential;
-import com.akto.dto.HttpResponseParams;
+import com.akto.jobs.JobScheduler;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.otel.OtelTraceImporter;
-import com.akto.otel.OtelTraceImporter.ImportRequest;
-import com.akto.otel.OtelTraceImporter.ImportResult;
-import com.akto.runtime.Main;
-import com.akto.dto.APIConfig;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.utils.cloud.CloudType;
@@ -515,89 +514,49 @@ public class QuickStartAction extends UserAction {
     @Setter
     private String datadogSite;
     @Setter
-    private long startTime;
-    @Setter
-    private long endTime;
-    @Setter
-    private String serviceName;
-    @Setter
-    private int limit = 100;
+    private List<String> serviceNames;
 
-    private List<HttpResponseParams> convertedTraces;
-    private int tracesProcessed;
-    private int tracesConverted;
+    public String saveDataDogConfigs() {
+        try {
+            if(StringUtils.isEmpty(datadogApiKey) || StringUtils.isEmpty(datadogAppKey) || StringUtils.isEmpty(datadogSite)) {
+                addActionError("Datadog API key, App key and Site are required");
+                return Action.ERROR.toUpperCase();
+            }
+            DataDogConfig dataDogConfig = new DataDogConfig();
+            dataDogConfig.setApiKey(datadogApiKey);
+            dataDogConfig.setAppKey(datadogAppKey);
+            dataDogConfig.setSite(datadogSite);
+            dataDogConfig.setAccountId(Context.accountId.get());
+            ConfigsDao.instance.insertOne(dataDogConfig);
 
-    public String fetchAndConvertOtelTraces() {
-        if (StringUtils.isEmpty(datadogApiKey) || StringUtils.isEmpty(datadogAppKey)) {
-            addActionError("Datadog API key and App key are required");
+            // Create a recurring job to collect traffic from Datadog every 1 hour
+            createDatadogTrafficCollectorJob(this.datadogApiKey, this.datadogAppKey, this.datadogSite, this.serviceNames);
+
+            logger.infoAndAddToDb("DataDog configs saved and traffic collector job created successfully");
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Failed to save DataDog configs: " + e.getMessage());
+            addActionError("Failed to save DataDog configs: " + e.getMessage());
             return Action.ERROR.toUpperCase();
         }
+        return Action.SUCCESS.toUpperCase();
+    }
 
-        try {
-            OtelTraceImporter importer = new OtelTraceImporter(
+    private void createDatadogTrafficCollectorJob(String datadogApiKey, String datadogAppKey, String datadogSite, List<String> serviceNames) {
+        DatadogTrafficCollectorJobParams jobParams = new DatadogTrafficCollectorJobParams(
+                0,
                 datadogApiKey,
                 datadogAppKey,
-                datadogSite
+                datadogSite,
+                serviceNames,
+                1000
             );
+        JobScheduler.scheduleRecurringJob(
+            Context.accountId.get(),
+            jobParams,
+            JobExecutorType.DASHBOARD,
+            60*60
+        );
 
-            ImportRequest request =
-                new ImportRequest(startTime, endTime, serviceName, limit);
-
-            ImportResult result =
-                importer.importTraces(request, Context.accountId.get());
-
-            this.convertedTraces = result.getTraces();
-            this.tracesProcessed = result.getTracesProcessed();
-            this.tracesConverted = result.getTracesConverted();
-
-            // Process the converted traces through the API pipeline
-            if (this.convertedTraces != null && !this.convertedTraces.isEmpty()) {
-                processConvertedTraces(this.convertedTraces);
-            }
-
-            return Action.SUCCESS.toUpperCase();
-
-        } catch (Exception e) {
-            logger.errorAndAddToDb(e, "Failed to import OpenTelemetry traces: " + e.getMessage());
-            addActionError("Failed to import traces: " + e.getMessage());
-            return Action.ERROR.toUpperCase();
-        }
+        logger.infoAndAddToDb("Datadog traffic collector job scheduled to run every hour");
     }
-
-    private void processConvertedTraces(List<HttpResponseParams> traces) {
-        try {
-            Map<String, List<HttpResponseParams>> responseParamsToAccountIdMap = new HashMap<>();
-            responseParamsToAccountIdMap.put(Context.accountId.get().toString(), traces);
-
-            APIConfig apiConfig = new APIConfig();
-            // Configure APIConfig as needed for your use case
-
-            Main.handleResponseParams(
-                responseParamsToAccountIdMap,
-                new HashMap<>(),
-                false,
-                new HashMap<>(),
-                apiConfig,
-                false,
-                true
-            );
-
-            logger.infoAndAddToDb("Successfully processed " + traces.size() + " converted traces through API pipeline", LogDb.DASHBOARD);
-        } catch (Exception e) {
-            logger.errorAndAddToDb(e, "Failed to process converted traces: " + e.getMessage(), LogDb.DASHBOARD);
-        }
-    }
-
-    public List<HttpResponseParams> getConvertedTraces() {
-        return convertedTraces;
-    }
-
-    public int getTracesProcessed() {
-        return tracesProcessed;
-    }
-
-    public int getTracesConverted() {
-        return tracesConverted;
-    }
-
 }

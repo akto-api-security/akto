@@ -31,16 +31,11 @@ public class OtelTraceImporter {
      * @throws Exception if import fails
      */
     public ImportResult importTraces(ImportRequest request, int accountId) throws Exception {
-        logger.infoAndAddToDb(String.format(
-            "Importing traces from Datadog: startTime=%d, endTime=%d, service=%s, limit=%d",
-            request.getStartTimeSeconds(), request.getEndTimeSeconds(),
-            request.getServiceName(), request.getLimit()
-        ));
 
         String rawSpansJson = datadogClient.fetchSpans(
             request.getStartTimeSeconds(),
             request.getEndTimeSeconds(),
-            request.getServiceName(),
+            request.getServiceNames(),
             request.getLimit()
         );
 
@@ -66,13 +61,13 @@ public class OtelTraceImporter {
     public static class ImportRequest {
         private final long startTimeSeconds;
         private final long endTimeSeconds;
-        private final String serviceName;
+        private final List<String> serviceNames;
         private final int limit;
 
-        public ImportRequest(long startTimeSeconds, long endTimeSeconds, String serviceName, int limit) {
+        public ImportRequest(long startTimeSeconds, long endTimeSeconds, List<String> serviceNames, int limit) {
             this.startTimeSeconds = startTimeSeconds;
             this.endTimeSeconds = endTimeSeconds;
-            this.serviceName = serviceName;
+            this.serviceNames = serviceNames;
             this.limit = limit > 0 ? limit : 100;
         }
 
@@ -84,8 +79,8 @@ public class OtelTraceImporter {
             return endTimeSeconds;
         }
 
-        public String getServiceName() {
-            return serviceName;
+        public List<String> getServiceNames() {
+            return serviceNames;
         }
 
         public int getLimit() {

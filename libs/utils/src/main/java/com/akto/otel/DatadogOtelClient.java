@@ -9,9 +9,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.*;
 
-/**
- * Client for fetching OpenTelemetry spans from Datadog API
- */
 public class DatadogOtelClient {
 
     private static final LoggerMaker logger = new LoggerMaker(DatadogOtelClient.class, LogDb.DASHBOARD);
@@ -29,19 +26,9 @@ public class DatadogOtelClient {
         this.site = site != null ? site : "datadoghq.com";
     }
 
-    /**
-     * Fetches spans from Datadog within the specified time range
-     *
-     * @param startTimeSeconds Unix timestamp in seconds
-     * @param endTimeSeconds Unix timestamp in seconds
-     * @param serviceName Optional service name filter
-     * @param limit Maximum number of spans to fetch
-     * @return Raw JSON response from Datadog API
-     * @throws Exception if the API call fails
-     */
-    public String fetchSpans(long startTimeSeconds, long endTimeSeconds, String serviceName, int limit) throws Exception {
+    public String fetchSpans(long startTimeSeconds, long endTimeSeconds, List<String> serviceNames, int limit) throws Exception {
         String apiUrl = buildApiUrl();
-        String requestBody = buildRequestBody(startTimeSeconds, endTimeSeconds, serviceName, limit);
+        String requestBody = buildRequestBody(startTimeSeconds, endTimeSeconds, serviceNames, limit);
 
         OriginalHttpRequest request = createRequest(apiUrl, requestBody);
         OriginalHttpResponse response = ApiExecutor.sendRequest(request, false, null, false, new ArrayList<>());
@@ -60,20 +47,28 @@ public class DatadogOtelClient {
         return String.format("https://api.%s%s", site, SPANS_SEARCH_PATH);
     }
 
-    private String buildRequestBody(long startTimeSeconds, long endTimeSeconds, String serviceName, int limit) throws Exception {
-        Map<String, Object> requestBody = new HashMap<>();
-
+    private String buildRequestBody(long startTimeSeconds, long endTimeSeconds, List<String> serviceNames, int limit) throws Exception {
         Map<String, Object> filter = new HashMap<>();
         filter.put("from", startTimeSeconds * MILLISECONDS_PER_SECOND);
         filter.put("to", endTimeSeconds * MILLISECONDS_PER_SECOND);
 
-        if (serviceName != null && !serviceName.trim().isEmpty()) {
-            filter.put("query", "service:" + serviceName);
+        if (serviceNames != null && !serviceNames.isEmpty()) {
+            filter.put("query", String.join(" OR service:", serviceNames));
+        } else {
+            filter.put("query", "*");
         }
 
-        requestBody.put("filter", filter);
-        requestBody.put("page", Collections.singletonMap("limit", limit));
-        requestBody.put("sort", "timestamp");
+        Map<String, Object> attributes = new HashMap<>();
+        attributes.put("filter", filter);
+        attributes.put("page", Collections.singletonMap("limit", limit));
+        attributes.put("sort", "timestamp");
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("attributes", attributes);
+        data.put("type", "search_request");
+
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("data", data);
 
         return objectMapper.writeValueAsString(requestBody);
     }
