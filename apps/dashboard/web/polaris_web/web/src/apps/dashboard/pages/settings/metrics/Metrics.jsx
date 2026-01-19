@@ -158,7 +158,11 @@ function Metrics() {
         'CYBORG_CALL_LATENCY',
         'CYBORG_CALL_COUNT',
         'CYBORG_DATA_SIZE',
-        'DATA_INGESTION_API_COUNT'
+        'DATA_INGESTION_API_COUNT',
+
+        // Traffic Collectors metrics
+        'TC_CPU_USAGE',
+        'TC_MEMORY_USAGE',
     ];
 
     const names = [...oldMetrics, ...newMetrics];
@@ -192,12 +196,34 @@ function Metrics() {
             const metricData = data.filter(item => item.metricId === metricId);
 
             if (metricData && metricData.length > 0) {
-                const trend = metricData.map(item => ([item.timestamp * 1000,item.value]));
-                result.push(
-                    { "data": trend, "color": null, "name": currentNameMap.get(metricId)?.descriptionName },
-                )
+                const isTCMetric = metricId === 'TC_CPU_USAGE' || metricId === 'TC_MEMORY_USAGE';
 
-                metricsData[metricId] = result;
+                if (isTCMetric) {
+                    const groupedByInstance = {};
+                    metricData.forEach(item => {
+                        const instanceId = item.instanceId || 'unknown';
+                        if (!groupedByInstance[instanceId]) {
+                            groupedByInstance[instanceId] = [];
+                        }
+                        groupedByInstance[instanceId].push([item.timestamp * 1000, item.value]);
+                    });
+
+                    Object.entries(groupedByInstance).forEach(([instanceId, dataPoints]) => {
+                        result.push({
+                            "data": dataPoints,
+                            "color": null,
+                            "name": instanceId
+                        });
+                    });
+
+                    metricsData[metricId] = result;
+                } else {
+                    const trend = metricData.map(item => ([item.timestamp * 1000,item.value]));
+                    result.push(
+                        { "data": trend, "color": null, "name": currentNameMap.get(metricId)?.descriptionName },
+                    );
+                    metricsData[metricId] = result;
+                }
             }
         }
         return metricsData;
@@ -280,7 +306,8 @@ function Metrics() {
     const postgresqlMetricsKeys = newMetrics.slice(13, 22);
     const testingMetricsKeys = newMetrics.slice(22, 26);
     const cyborgMetricsKeys = newMetrics.slice(26, 29);
-    const dataIngestionMetricsKeys = newMetrics.slice(29);
+    const dataIngestionMetricsKeys = newMetrics.slice(29, 30);
+    const trafficCollectorsMetricsKeys = newMetrics.slice(30, 32);
 
     const graphContainer = (
         <>
@@ -325,6 +352,14 @@ function Metrics() {
                 orderedResult={orderedResult}
                 nameMap={nameMap}
                 defaultChartOptionsFn={defaultChartOptions}
+            />
+            <MetricsSection
+                sectionTitle="Traffic Collectors Metrics"
+                metricsToDisplay={trafficCollectorsMetricsKeys}
+                orderedResult={orderedResult}
+                nameMap={nameMap}
+                defaultChartOptionsFn={defaultChartOptions}
+                showLegendForSection={true}
             />
         </>
     )
