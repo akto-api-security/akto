@@ -11,6 +11,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Li
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ModifyThreatActorStatusRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ModifyThreatActorStatusResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ParamEnumerationConfig;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.RatelimitConfig;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatConfiguration;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Actor;
@@ -26,6 +27,7 @@ import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.utils.ThreatUtils;
 import com.akto.threat.backend.db.ActorInfoModel;
+import com.akto.threat.backend.dto.ParamEnumerationConfigDTO;
 import com.akto.threat.backend.dto.RateLimitConfigDTO;
 import com.akto.util.ThreatDetectionConstants;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
@@ -100,6 +102,12 @@ public class ThreatActorService {
             boolean archivalEnabled = (Boolean) archivalEnabledObj;
             builder.setArchivalEnabled(archivalEnabled);
         }
+
+        // Handle paramEnumerationConfig using DTO
+        ParamEnumerationConfig paramEnumConfig = ParamEnumerationConfigDTO.parseFromDocument(doc);
+        if (paramEnumConfig != null) {
+            builder.setParamEnumerationConfig(paramEnumConfig);
+        }
     }
     return builder.build();
 }
@@ -138,6 +146,14 @@ public class ThreatActorService {
         newDoc.append("archivalDays", updatedConfig.getArchivalDays());
     }
 
+    // Handle paramEnumerationConfig using DTO
+    if (updatedConfig.hasParamEnumerationConfig()) {
+        Document paramEnumConfigDoc = ParamEnumerationConfigDTO.toDocument(updatedConfig.getParamEnumerationConfig());
+        if (paramEnumConfigDoc != null) {
+            newDoc.append("paramEnumerationConfig", paramEnumConfigDoc.get("paramEnumerationConfig"));
+        }
+    }
+
     // Note: archivalEnabled is now handled by separate endpoint /toggle_archival_enabled
     // This prevents other config updates from accidentally resetting it
 
@@ -150,12 +166,15 @@ public class ThreatActorService {
         coll.insertOne(newDoc);
     }
 
-    // Set the actor, ratelimitConfig, and archivalDays in the returned proto
+    // Set the actor, ratelimitConfig, paramEnumerationConfig in the returned proto
     if (updatedConfig.hasActor()) {
         builder.setActor(updatedConfig.getActor());
     }
     if (updatedConfig.hasRatelimitConfig()) {
         builder.setRatelimitConfig(updatedConfig.getRatelimitConfig());
+    }
+    if (updatedConfig.hasParamEnumerationConfig()) {
+        builder.setParamEnumerationConfig(updatedConfig.getParamEnumerationConfig());
     }
     // Read archivalDays from the saved document to return the current value
     Document savedDoc = coll.find().first();
