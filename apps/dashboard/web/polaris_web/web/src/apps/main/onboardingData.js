@@ -36,7 +36,7 @@ const learnMoreObject = {
             docsLink: [
                 {
                     content: "What is Akto Argus",
-                    value: "https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/endpoints-discovery-agents"
+                    value: "https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/overview"
                 },
                 {
                     content: "Agentic Discovery",
@@ -180,35 +180,10 @@ const learnMoreObject = {
                     content: "Agentic Discovery",
                     value: "https://ai-security-docs.akto.io/agentic-discovery/get-started"
                 },
-                {
-                    content: "What are AI Agents",
-                    value: "https://ai-security-docs.akto.io/agentic-discovery/concepts/agents"
-                },
-                {
-                    content: "What are MCP Servers",
-                    value: "https://ai-security-docs.akto.io/agentic-discovery/concepts/mcp-servers"
-                },
+                
                 {
                     content: "Connect AI Agents",
                     value: "https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors"
-                }
-            ]
-        },
-        endpoint_security: {
-            title: "Akto Atlas Inventory",
-            description: "Discover AI tools across employee endpoints",
-            docsLink: [
-                {
-                    content: "Endpoint Discovery",
-                    value: "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents"
-                },
-                {
-                    content: "View Audit Data",
-                    value: "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/audit-data"
-                },
-                {
-                    content: "Endpoint Shield Details",
-                    value: "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/view-endpoint-shield-details"
                 }
             ]
         }
@@ -317,6 +292,66 @@ const learnMoreObject = {
                     value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
                 }
             ]
+        },
+        agentic_security: {
+            title: "Sensitive data",
+            description: "Identify and manage sensitive data in AI agents and MCP servers",
+            docsLink: [
+                {
+                    content:"What is Sensitive Data",
+                    value:"https://ai-security-docs.akto.io/agentic-ai-discovery/concepts/sensitive-data"
+                },
+                {
+                    content:"What is Data Type",
+                    value:"https://ai-security-docs.akto.io/agentic-ai-discovery/concepts/data-types"
+                },
+                {
+                    content:"How to create a Custom Data Type",
+                    value:"https://ai-security-docs.akto.io/agentic-ai-discovery/how-to/create-a-custom-data-type"
+                },
+                {
+                    content:"How to set sensitivity of a Data Type",
+                    value:"https://ai-security-docs.akto.io/agentic-ai-discovery/how-to/set-sensitivity-of-a-data-type"
+                },
+                {
+                    content:"How to De-activate a data type",
+                    value:"https://ai-security-docs.akto.io/agentic-ai-discovery/how-to/de-activate-a-data-type"
+                },
+                {
+                    content:"How to Redact sensitive data",
+                    value:"https://ai-security-docs.akto.io/agentic-ai-discovery/how-to/redact-sensitive-data"
+                }
+            ]
+        },
+        endpoint_security: {
+            title: "Sensitive data",
+            description: "Monitor and protect sensitive data on employee endpoints",
+            docsLink: [
+                {
+                    content:"What is Sensitive Data",
+                    value:"https://ai-security-docs.akto.io/agentic-ai-discovery/concepts/sensitive-data"
+                },
+                {
+                    content:"What is Data Type",
+                    value:"https://ai-security-docs.akto.io/agentic-ai-discovery/concepts/data-types"
+                },
+                {
+                    content:"How to create a Custom Data Type",
+                    value:"https://ai-security-docs.akto.io/agentic-ai-discovery/how-to/create-a-custom-data-type"
+                },
+                {
+                    content:"How to set sensitivity of a Data Type",
+                    value:"https://ai-security-docs.akto.io/agentic-ai-discovery/how-to/set-sensitivity-of-a-data-type"
+                },
+                {
+                    content:"How to De-activate a data type",
+                    value:"https://ai-security-docs.akto.io/agentic-ai-discovery/how-to/de-activate-a-data-type"
+                },
+                {
+                    content:"How to Redact sensitive data",
+                    value:"https://ai-security-docs.akto.io/agentic-ai-discovery/how-to/redact-sensitive-data"
+                }
+            ]
         }
     },
     dashboard_testing: {
@@ -358,7 +393,7 @@ const learnMoreObject = {
                 },
                 {
                     content: "Understanding Scan Results",
-                    value: "https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/agentic-red-teaming/concepts/scan-results"
+                    value: "https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/agentic-red-teaming/concepts/test-result"
                 },
                 {
                     content: "Result Types",
@@ -478,7 +513,7 @@ const learnMoreObject = {
                 },
                 {
                     content:"Test YAML Syntax",
-                    value:"https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/probe-library/concepts/test-yaml-syntax"
+                    value:"https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/probe-library/concepts/test-yaml-syntax-detailed"
                 },
                 {
                     content:"Create Custom Test",
@@ -556,19 +591,23 @@ const learnMoreObject = {
         }
     },
     dashboard_settings_users:{
+        api_security: {
+            docsLink: [
+                {
+                    content:"How to invite user",
+                    value:"https://docs.akto.io/account/invite-user"
+                },
+                {
+                    content:"How to change role of a User",
+                    value:"https://docs.akto.io/account/invite-user/change-role-of-a-user"
+                },
+                {
+                    content:"Understanding Role Permissions",
+                    value:"https://docs.akto.io/account/understanding-role-permissions"
+                }
+            ]
+        },
         docsLink: [
-            {
-                content:"How to invite user",
-                value:"https://docs.akto.io/account/invite-user"
-            },
-            {
-                content:"How to change role of a User",
-                value:"https://docs.akto.io/account/invite-user/change-role-of-a-user"
-            },
-            {
-                content:"Understanding Role Permissions",
-                value:"https://docs.akto.io/account/understanding-role-permissions"
-            },
             {
                 content:"Invite User",
                 value:"https://ai-security-docs.akto.io/account-management/invite-user"
@@ -602,11 +641,21 @@ const learnMoreObject = {
         }
     },
     dashboard_settings_integrations_ci_cd:{
+        api_security: {
+            docsLink: [
+                {
+                    content:"Run tests in CI/CD",
+                    value:"https://docs.akto.io/testing/run-tests-in-cicd"
+                }
+            ],
+            videoLink: [
+                {
+                    content: "Watch Akto demo" ,
+                    value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+                }
+            ]
+        },
         docsLink: [
-            {
-                content:"Run tests in CI/CD",
-                value:"https://docs.akto.io/testing/run-tests-in-cicd"
-            },
             {
                 content:"CI/CD Integrations Overview",
                 value:"https://ai-security-docs.akto.io/integrations/ci-cd-integrations"
@@ -622,12 +671,6 @@ const learnMoreObject = {
             {
                 content:"GitLab",
                 value:"https://ai-security-docs.akto.io/integrations/ci-cd-integrations/gitlab"
-            }
-        ],
-        videoLink: [
-            {
-                content: "Watch Akto demo" ,
-                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
             }
         ]
     },
@@ -688,7 +731,7 @@ const learnMoreObject = {
             docsLink: [
                 {
                     content:"How to create tag",
-                    value:"https://docs.akto.io/api-inventory/concepts/tags"
+                    value:"https://docs.akto.io/api-inventory/how-to/set-tags"
                 },
                 {
                     content:"How to Create new Tag",
@@ -790,11 +833,21 @@ const learnMoreObject = {
         }
     },
     dashboard_settings_integrations_slack:{
+        api_security: {
+            docsLink: [
+                {
+                    content:"What is Webhook Alert?",
+                    value:"https://docs.akto.io/api-inventory/concepts/alerts#what-is-webhook-alert"
+                }
+            ],
+            videoLink: [
+                {
+                    content: "Watch Akto demo" ,
+                    value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+                }
+            ]
+        },
         docsLink: [
-            {
-                content:"What is Webhook Alert?",
-                value:"https://docs.akto.io/api-inventory/concepts/alerts#what-is-webhook-alert"
-            },
             {
                 content:"Setup Slack Webhook",
                 value:"https://ai-security-docs.akto.io/alerts/slack-webhook"
@@ -803,24 +856,28 @@ const learnMoreObject = {
                 content:"Configure Test Alerts",
                 value:"https://ai-security-docs.akto.io/alerts/alerts-testing-results"
             }
-        ],
-        videoLink: [
-            {
-                content: "Watch Akto demo" ,
-                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
-            }
         ]
     },
     dashboard_settings_integrations_webhooks:{
+        api_security: {
+            docsLink: [
+                {
+                    content:"What is Webhook Alert?",
+                    value:"https://docs.akto.io/api-inventory/concepts/alerts#what-is-webhook-alert"
+                },
+                {
+                    content:"How to configure alerts on API changes",
+                    value:"https://docs.akto.io/api-inventory/how-to/configure-alerts-on-api-changes"
+                }
+            ],
+            videoLink: [
+                {
+                    content: "Watch Akto demo" ,
+                    value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+                }
+            ]
+        },
         docsLink: [
-            {
-                content:"What is Webhook Alert?",
-                value:"https://docs.akto.io/api-inventory/concepts/alerts#what-is-webhook-alert"
-            },
-            {
-                content:"How to configure alerts on API changes",
-                value:"https://docs.akto.io/api-inventory/how-to/configure-alerts-on-api-changes"
-            },
             {
                 content:"Gmail Webhook",
                 value:"https://ai-security-docs.akto.io/alerts/gmail-webhook"
@@ -833,83 +890,93 @@ const learnMoreObject = {
                 content:"Setup Test Alerts",
                 value:"https://ai-security-docs.akto.io/alerts/alerts-testing-results"
             }
-        ],
-        videoLink: [
-            {
-                content: "Watch Akto demo" ,
-                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
-            }
         ]
     },
     dashboard_settings_integrations_github_sso:{
+        api_security: {
+            docsLink: [
+                {
+                    content:"How to setup GitHub SSO",
+                    value:"https://docs.akto.io/sso/github-oidc"
+                }
+            ],
+            videoLink: [
+                {
+                    content: "Watch Akto demo" ,
+                    value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+                }
+            ]
+        },
         docsLink: [
-            {
-                content:"How to setup GitHub SSO",
-                value:"https://docs.akto.io/sso/github-oidc"
-            },
             {
                 content:"SSO Overview",
                 value:"https://ai-security-docs.akto.io/account-management/sso"
-            }
-        ],
-        videoLink: [
-            {
-                content: "Watch Akto demo" ,
-                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
             }
         ]
     },
     dashboard_settings_integrations_azure_sso:{
+        api_security: {
+            docsLink: [
+                {
+                    content:"How to setup Azure SSO",
+                    value:"https://docs.akto.io/sso/azuread-saml"
+                }
+            ],
+            videoLink: [
+                {
+                    content: "Watch Akto demo" ,
+                    value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+                }
+            ]
+        },
         docsLink: [
-            {
-                content:"How to setup Azure SSO",
-                value:"https://docs.akto.io/sso/azuread-saml"
-            },
             {
                 content:"SSO Overview",
                 value:"https://ai-security-docs.akto.io/account-management/sso"
-            }
-        ],
-        videoLink: [
-            {
-                content: "Watch Akto demo" ,
-                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
             }
         ]
     },
     dashboard_settings_integrations_okta_sso:{
+        api_security: {
+            docsLink: [
+                {
+                    content:"How to setup Okta SSO",
+                    value:"https://docs.akto.io/sso/okta-oidc"
+                }
+            ],
+            videoLink: [
+                {
+                    content: "Watch Akto demo" ,
+                    value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+                }
+            ]
+        },
         docsLink: [
-            {
-                content:"How to setup Okta SSO",
-                value:"https://docs.akto.io/sso/okta-oidc"
-            },
             {
                 content:"SSO Overview",
                 value:"https://ai-security-docs.akto.io/account-management/sso"
             }
-        ],
-        videoLink: [
-            {
-                content: "Watch Akto demo" ,
-                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
-            }
         ]
     },
     dashboard_settings_integrations_jira:{
+        api_security: {
+            docsLink: [
+                {
+                    content:"Jira Integration guide",
+                    value:"https://docs.akto.io/issues/how-to/jira-integration"
+                }
+            ],
+            videoLink: [
+                {
+                    content: "Watch Akto demo" ,
+                    value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+                }
+            ]
+        },
         docsLink: [
-            {
-                content:"Jira Integration guide",
-                value:"https://docs.akto.io/issues/how-to/jira-integration"
-            },
             {
                 content:"Jira Integration",
                 value:"https://ai-security-docs.akto.io/integrations/jira-integration"
-            }
-        ],
-        videoLink: [
-            {
-                content: "Watch Akto demo" ,
-                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
             }
         ]
     },
@@ -946,23 +1013,33 @@ const learnMoreObject = {
         }
     },
     dashboard_settings_test_library:{
+        api_security: {
+            docsLink: [
+                {
+                    content:"How to contribute to test library",
+                    value:"https://docs.akto.io/test-editor/test-library#how-to-contribute-to-test-library"
+                },
+                {
+                    content:"How to add a new test library",
+                    value:"https://docs.akto.io/test-editor/how-to/add-a-new-test-library"
+                },
+                {
+                    content:"How to edit built in test",
+                    value:"https://docs.akto.io/test-editor/writing-custom-tests"
+                },
+                {
+                    content:"Test YAML Syntax",
+                    value:"https://docs.akto.io/test-editor/test-yaml-syntax-one-pager"
+                }
+            ],
+            videoLink: [
+                {
+                    content: "Watch Akto demo" ,
+                    value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+                }
+            ]
+        },
         docsLink: [
-            {
-                content:"How to contribute to test library",
-                value:"https://docs.akto.io/test-editor/test-library#how-to-contribute-to-test-library"
-            },
-            {
-                content:"How to add a new test library",
-                value:"https://docs.akto.io/test-editor/how-to/add-a-new-test-library"
-            },
-            {
-                content:"How to edit built in test",
-                value:"https://docs.akto.io/test-editor/writing-custom-tests"
-            },
-            {
-                content:"Test YAML Syntax",
-                value:"https://docs.akto.io/test-editor/test-yaml-syntax-one-pager"
-            },
             {
                 content:"Probe Library Overview",
                 value:"https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/probe-library/concepts/overview"
@@ -977,13 +1054,7 @@ const learnMoreObject = {
             },
             {
                 content:"Test YAML Syntax",
-                value:"https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/probe-library/concepts/test-yaml-syntax"
-            }
-        ],
-        videoLink: [
-            {
-                content: "Watch Akto demo" ,
-                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+                value:"https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/probe-library/concepts/test-yaml-syntax-detailed"
             }
         ]
     },
@@ -1056,7 +1127,7 @@ const learnMoreObject = {
                 },
                 {
                     content:"Test YAML Syntax",
-                    value:"https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/probe-library/concepts/test-yaml-syntax"
+                    value:"https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/probe-library/concepts/test-yaml-syntax-detailed"
                 },
                 {
                     content:"Edit Test",
@@ -1139,6 +1210,106 @@ const learnMoreObject = {
             ]
         }
     },
+    dashboard_protection_threat_dashboard: {
+        api_security: {
+            docsLink: [
+                {
+                    content: "API Protection Overview",
+                    value: "https://docs.akto.io/api-protection/overview"
+                }
+            ]
+        },
+        docsLink: [
+            {
+                content: "Agentic Guardrails Overview",
+                value: "https://ai-security-docs.akto.io/agentic-guardrails/overview"
+            }
+        ]
+    },
+    dashboard_protection_threat_activity: {
+        api_security: {
+            docsLink: [
+                {
+                    content: "View Threat Activity Breakdown",
+                    value: "https://docs.akto.io/api-protection/how-to/view-threat-activity-breakdown"
+                },
+                {
+                    content: "Take Actions on Threats",
+                    value: "https://docs.akto.io/api-protection/how-to/take-actions-on-threats"
+                }
+            ]
+        },
+        docsLink: [
+            {
+                content: "Guardrail Activity Monitoring",
+                value: "https://ai-security-docs.akto.io/agentic-guardrails/concepts/guardrail-activity"
+            },
+            {
+                content: "Detailed Activity View",
+                value: "https://ai-security-docs.akto.io/agentic-guardrails/how-to/guardrail-activity-detailed-view"
+            }
+        ]
+    },
+    dashboard_protection_threat_api: {
+        api_security: {
+            docsLink: [
+                {
+                    content: "API Protection Overview",
+                    value: "https://docs.akto.io/api-protection/overview"
+                }
+            ]
+        },
+        docsLink: [
+            {
+                content: "Agentic Guardrails Overview",
+                value: "https://ai-security-docs.akto.io/agentic-guardrails/overview"
+            }
+        ]
+    },
+    dashboard_protection_threat_actor: {
+        api_security: {
+            docsLink: [
+                {
+                    content: "Understanding Threat Actors",
+                    value: "https://docs.akto.io/api-protection/concepts/threat-actors"
+                }
+            ]
+        },
+        docsLink: [
+            {
+                content: "Guardrail Actors",
+                value: "https://ai-security-docs.akto.io/agentic-guardrails/concepts/threat-actors"
+            },
+            {
+                content: "Access Specific Guardrail Actor",
+                value: "https://ai-security-docs.akto.io/agentic-guardrails/how-to/access-a-specific-guardrail-actor"
+            }
+        ]
+    },
+    dashboard_protection_threat_policy: {
+        api_security: {
+            docsLink: [
+                {
+                    content: "Threat Policy Concepts",
+                    value: "https://docs.akto.io/api-protection/concepts/threat-policy"
+                },
+                {
+                    content: "Manage Threat Policies",
+                    value: "https://docs.akto.io/api-protection/how-to/manage-threat-policies"
+                }
+            ]
+        },
+        docsLink: [
+            {
+                content: "Create Guardrail Policies",
+                value: "https://ai-security-docs.akto.io/agentic-guardrails/how-to/create-guardrail-policies"
+            },
+            {
+                content: "Manage Guardrail Policies",
+                value: "https://ai-security-docs.akto.io/agentic-guardrails/how-to/manage-guardrail-policies"
+            }
+        ]
+    },
     dashboard_protection_configure_exploits: {
         api_security: {
             docsLink: [
@@ -1179,6 +1350,189 @@ const learnMoreObject = {
                 {
                     content: "Agentic Guardrails Overview",
                     value: "https://ai-security-docs.akto.io/agentic-guardrails/overview"
+                }
+            ]
+        }
+    },
+    dashboard_reports_issues: {
+        api_security: {
+            docsLink: [
+                {
+                    content: "Export Vulnerability Report",
+                    value: "https://docs.akto.io/api-security-testing/how-to/export-test-results"
+                }
+            ]
+        },
+        agentic_security: {
+            docsLink: [
+                {
+                    content: "Agentic Security Issues Overview",
+                    value: "https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/issues"
+                },
+                {
+                    content: "Vulnerability Report Guide",
+                    value: "https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/issues/vulnerability-report"
+                },
+                {
+                    content: "Export Issues to Reports",
+                    value: "https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/issues/export-selected-issues-to-reports"
+                },
+                {
+                    content: "Triage and Manage Issues",
+                    value: "https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/issues/triage-issues"
+                }
+            ]
+        }
+    },
+    dashboard_reports_compliance: {
+        api_security: {
+            docsLink: [
+                {
+                    content: "Export Summary Report",
+                    value: "https://docs.akto.io/api-security-testing/concepts/export-summary-report"
+                }
+            ]
+        },
+        agentic_security: {
+            docsLink: [
+                {
+                    content: "Compliance Dashboard Overview",
+                    value: "https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/compliance"
+                }
+            ]
+        }
+    },
+    dashboard_reports_threat: {
+        api_security: {
+            docsLink: []
+        },
+        agentic_security: {
+            docsLink: []
+        }
+    },
+    dashboard_guardrails_activity: {
+        api_security: {
+            docsLink: []
+        },
+        docsLink: [
+            {
+                content: "Guardrail Activity Monitoring",
+                value: "https://ai-security-docs.akto.io/agentic-guardrails/concepts/guardrail-activity"
+            },
+            {
+                content: "Detailed Activity View",
+                value: "https://ai-security-docs.akto.io/agentic-guardrails/how-to/guardrail-activity-detailed-view"
+            }
+        ]
+    },
+    dashboard_guardrails_policies: {
+        docsLink: [
+            {
+                content: "Create Guardrail Policies",
+                value: "https://ai-security-docs.akto.io/agentic-guardrails/how-to/create-guardrail-policies"
+            },
+            {
+                content: "Manage Guardrail Policies",
+                value: "https://ai-security-docs.akto.io/agentic-guardrails/how-to/manage-guardrail-policies"
+            }
+        ]
+    },
+    dashboard_observe_endpoints: {
+        endpoint_security: {
+            title: "Akto Atlas Inventory",
+            description: "Discover AI tools across employee endpoints",
+            docsLink: [
+                {
+                    content: "Endpoint Discovery",
+                    value: "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents"
+                },
+                {
+                    content: "View Audit Data",
+                    value: "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/audit-data"
+                },
+                {
+                    content: "Endpoint Shield Details",
+                    value: "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/view-endpoint-shield-details"
+                }
+            ]
+        }
+    },
+    dashboard_testing_test_suite: {
+        api_security: {
+            docsLink: [
+                {
+                    content: "Create Custom Test Suites",
+                    value: "https://docs.akto.io/api-security-testing/how-to/create-custom-test-suites"
+                }
+            ]
+        },
+        docsLink: [
+            {
+                content: "Agentic Red Teaming",
+                value: "https://ai-security-docs.akto.io/agentic-red-teaming/get-started"
+            }
+        ]
+    },
+    dashboard_testing_dependency: {
+        api_security: {
+            docsLink: []
+        },
+        docsLink: []
+    },
+    dashboard_observe_audit: {
+        endpoint_security: {
+            title: "Audit Data",
+            description: "View and manage audit records for agentic components",
+            docsLink: [
+                {
+                    content: "View Audit Data",
+                    value: "https://ai-security-docs.akto.io/agentic-ai-discovery/concepts/audit-data"
+                }
+            ]
+        },
+        agentic_security: {
+            title: "Audit Data",
+            description: "View and manage audit records for agentic components",
+            docsLink: [
+                {
+                    content: "View Audit Data",
+                    value: "https://ai-security-docs.akto.io/agentic-ai-discovery/concepts/audit-data"
+                }
+            ]
+        }
+    },
+    dashboard_observe_endpoint_shield: {
+        endpoint_security: {
+            title: "Endpoint Shield",
+            description: "Monitor and manage MCP Endpoint Shield agents",
+            docsLink: [
+                {
+                    content: "MCP Endpoint Shield",
+                    value: "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/mcp-endpoint-shield"
+                },
+                {
+                    content: "View Endpoint Shield Details",
+                    value: "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/view-endpoint-shield-details"
+                }
+            ]
+        }
+    },
+    dashboard_observe_agentic_assets: {
+        endpoint_security: {
+            title: "Agentic Assets (Atlas)",
+            description: "View and manage agentic assets discovered on employee endpoints through Akto Atlas",
+            docsLink: [
+                {
+                    content: "What is Akto Atlas",
+                    value: "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/overview"
+                },
+                {
+                    content: "Endpoint Discovery",
+                    value: "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents"
+                },
+                {
+                    content: "View Audit Data",
+                    value: "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/audit-data"
                 }
             ]
         }

@@ -171,7 +171,10 @@ public class MaliciousEventService {
     Set<T> result = new HashSet<>();
     MongoCursor<T> cursor = r.cursor();
     while (cursor.hasNext()) {
-      result.add(cursor.next());
+      T value = cursor.next();
+      if (value != null) {
+        result.add(value);
+      }
     }
     return result;
   }

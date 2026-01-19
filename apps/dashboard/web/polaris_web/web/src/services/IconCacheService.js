@@ -86,6 +86,56 @@ class IconCacheService {
         }
         return null;
     }
+
+    /**
+     * Search for icon by keyword in cached hostnames
+     * Useful for finding icons by client name (e.g., "claude", "copilot")
+     * @param {string} keyword - The keyword to search for in hostnames
+     * @returns {string|null} Base64 icon data or null if not found
+     */
+    async getIconByKeyword(keyword) {
+        if (!keyword || keyword.trim() === '') {
+            return null;
+        }
+
+        // Ensure caches are loaded
+        await this.loadAllIcons();
+        
+        const lowerKeyword = keyword.toLowerCase().trim();
+        
+        // Search for keyword in cached hostnames
+        let objectId = null;
+        for (const [key, value] of Object.entries(this.hostnameToObjectIdCache)) {
+            // key is a string like "mcp.twilio.com,twilio.com"
+            const lowerKey = key.toLowerCase();
+            
+            // Check if keyword is found in any part of the hostname key
+            if (lowerKey.includes(lowerKeyword)) {
+                objectId = value;
+                break;
+            }
+        }
+        
+        if (objectId && this.objectIdToIconDataCache[objectId]) {
+            const iconDataObj = this.objectIdToIconDataCache[objectId];
+            if (iconDataObj.imageData && iconDataObj.imageData.trim() !== '') {
+                return iconDataObj.imageData;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Get favicon URL for a domain using external service
+     * Returns a URL that can be used directly in img src
+     * @param {string} domain - The domain to get favicon for
+     * @returns {string} Favicon URL
+     */
+    getFaviconUrl(domain) {
+        if (!domain) return null;
+        // Use Google's favicon service - reliable and fast
+        return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+    }
 }
 
 // Export the class, not an instance

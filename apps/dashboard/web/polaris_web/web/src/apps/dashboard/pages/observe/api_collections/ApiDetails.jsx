@@ -169,6 +169,13 @@ function ApiDetails(props) {
     };
 
     const fetchDistributionData = async () => {
+        if (!func.checkForFeatureSaas('THREAT_DETECTION')) {
+            apiDistributionAvailableRef.current = false;
+            setApiCallDistribution([]);
+            setHasApiDistribution(false);
+            updateApiCallStatsTabVisibility();
+            return;
+        }
         try {
             const { apiCollectionId, endpoint, method } = apiDetail;
             const res = await api.fetchIpLevelApiCallStats(apiCollectionId, endpoint, method, Math.floor(startTime / 60),  Math.floor(endTs / 60));
@@ -221,6 +228,13 @@ function ApiDetails(props) {
     
 
     const fetchStats = async (apiCollectionId, endpoint, method) => {
+        if (!func.checkForFeatureSaas('THREAT_DETECTION')) {
+            apiStatsAvailableRef.current = false;
+            setApiCallStats([]);
+            setHasApiStats(false);
+            updateApiCallStatsTabVisibility();
+            return;
+        }
         try {
             setApiCallStats([]); // Clear state before fetching new data
             const res = await api.fetchApiCallStats(apiCollectionId, endpoint, method, startTime, endTs);
@@ -246,6 +260,14 @@ function ApiDetails(props) {
             updateApiCallStatsTabVisibility(false, hasApiDistribution);
         }
     };
+
+    const isRBACError = (error) => {
+        const message = error?.response?.data?.actionErrors[0] || error?.message;
+        if(message?.includes("This role doesn't have access to the feature:") || message?.includes("This feature is not available in your plan.")) {
+            return true;
+        }
+        return false;
+    }
 
     const fetchData = async () => {
         if (showDetails) {
@@ -281,11 +303,6 @@ function ApiDetails(props) {
                     }
                 })
             } catch (error) {
-                if (error?.response?.status === 403 || error?.status === 403) {
-                    setShowForbidden(true);
-                    setLoading(false);
-                    return;
-                }
             }
 
             setTimeout(() => {
@@ -315,7 +332,7 @@ function ApiDetails(props) {
                             const res3 = await api.loadSensitiveParameters(apiCollectionId, endpoint, method)
                             sensitiveData = res3.data.endpoints;
                         } catch (error) {
-                            if (error?.response?.status === 403 || error?.status === 403) {
+                            if (isRBACError(error)) {
                                 setShowForbidden(true);
                                 setLoading(false);
                                 return;
@@ -329,14 +346,14 @@ function ApiDetails(props) {
                     }
                     setSampleData(commonMessages)
                 } catch (error) {
-                    if (error?.response?.status === 403 || error?.status === 403) {
+                    if (isRBACError(error)) {
                         setShowForbidden(true);
                         setLoading(false);
                         return;
                     }
                 }
             } catch (error) {
-                if (error?.response?.status === 403 || error?.status === 403) {
+                if (isRBACError(error)) {
                     setShowForbidden(true);
                     setLoading(false);
                     return;
@@ -474,58 +491,6 @@ function ApiDetails(props) {
           options['legend'] = { layout: 'vertical', align: 'right', verticalAlign: 'middle' };
         }
         return options;
-    };
-
-    const distributionChartOptions = {
-        chart: {
-            type: 'column',
-            marginTop: 10,
-            marginBottom: 70,
-            marginRight: 10,
-        },
-        xAxis: {
-            title: {
-                text: mapLabel('Api', getDashboardCategory()) + ' Call Frequency',
-                style: {
-                    fontSize: '12px',
-                },
-            },
-            gridLineWidth: 0,
-            labels: {
-                style: {
-                    fontSize: '12px',
-                },
-                enabled: true,
-            },
-            tickmarkPlacement: 'on',
-            tickWidth: 1,
-            tickLength: 5,
-        },
-        yAxis: {
-            title: {
-                text: 'Number of Users',
-                style: {
-                    fontSize: '12px',
-                },
-            },
-            gridLineWidth: 0,
-        },
-        plotOptions: {
-            column: {
-                pointPadding: 0.05,
-                groupPadding: 0.1,
-                borderWidth: 0,
-            },
-        },
-        tooltip: {
-            formatter: function () {
-                const binRange = this.point?.binRange || [Math.floor(this.x) - 15, Math.floor(this.x) + 15];
-                return `<b>${this.y}</b> users made calls in range <b>${binRange[0]} to ${binRange[1] - 1}</b>`;
-            },
-        },
-        title: { text: null },
-        subtitle: { text: null },
-        legend: { enabled: false },
     };
 
     const distributionBoxplotOptions = {

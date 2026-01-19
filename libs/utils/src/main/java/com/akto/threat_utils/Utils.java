@@ -2,6 +2,7 @@ package com.akto.threat_utils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -9,6 +10,7 @@ import java.io.InputStreamReader;
 import org.ahocorasick.trie.Trie;
 
 import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLTemplate;
 
@@ -77,16 +79,24 @@ public class Utils {
         return result.toString();
     }
 
-    public static URLTemplate isMatchingUrl(int apiCollectionId, String urlFromEvent, String methodFromEvent, Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates, Trie lfiTrie, Trie osCommandInjectionTrie, Trie ssrfTrie){
+    public static String cleanThreatUrl(String urlFromEvent, Trie lfiTrie, Trie osCommandInjectionTrie,
+            Trie ssrfTrie) {
         urlFromEvent = ApiInfo.getNormalizedUrl(urlFromEvent);
         urlFromEvent = removeThreatPatternsFromUrl(urlFromEvent, lfiTrie, osCommandInjectionTrie, ssrfTrie);
+        return urlFromEvent;
+    }
+
+    public static URLTemplate isMatchingUrl(int apiCollectionId, String urlFromEvent, String methodFromEvent,
+            Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates, Trie lfiTrie, Trie osCommandInjectionTrie,
+            Trie ssrfTrie) {
+        urlFromEvent = cleanThreatUrl(urlFromEvent, lfiTrie, osCommandInjectionTrie, ssrfTrie);
         List<URLTemplate> urlTemplates = apiCollectionUrlTemplates.get(apiCollectionId);
-        if(urlTemplates == null || urlTemplates.isEmpty()){
+        if (urlTemplates == null || urlTemplates.isEmpty()) {
             return null;
         }
         URLMethods.Method method = URLMethods.Method.fromString(methodFromEvent);
-        for(URLTemplate urlTemplate : urlTemplates){
-            if(!urlTemplate.matchTemplate(urlFromEvent, method).equals(URLTemplate.MatchResult.NO_MATCH)){
+        for (URLTemplate urlTemplate : urlTemplates) {
+            if (!urlTemplate.matchTemplate(urlFromEvent, method).equals(URLTemplate.MatchResult.NO_MATCH)) {
                 return urlTemplate;
             }
         }

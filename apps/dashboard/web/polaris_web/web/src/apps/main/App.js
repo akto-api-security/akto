@@ -47,10 +47,8 @@ import UserConfig from "../dashboard/pages/testing/user_config/UserConfig";
 import AuthTypes from "../dashboard/pages/settings/auth_types/AuthTypes";
 import DefaultPayloads from "../dashboard/pages/settings/default_payloads/DefaultPayloads";
 import AuthTypeDetails from "../dashboard/pages/settings/auth_types/AuthTypeDetails";
-import Tags from "../dashboard/pages/settings/tags/Tags";
 import Billing from "../dashboard/pages/settings/billing/Billing";
 import SelfHosted from "../dashboard/pages/settings/billing/SelfHosted";
-import TagDetails from "../dashboard/pages/settings/tags/TagDetails";
 import Onboarding from "../dashboard/pages/onboarding/Onboarding";
 import Dashboard from "../dashboard/pages/Dashboard";
 import Slack from "../dashboard/pages/settings/integrations/Slack";
@@ -118,6 +116,10 @@ import ThreatDashboardPage from "../dashboard/pages/threat_detection/ThreatDashb
 import OpenApiAgentTester from "../dashboard/pages/observe/OpenApiAgentTester";
 import DastProgress from "../dashboard/pages/observe/api_collections/DastProgress.jsx";
 import DastProgressSingle from "../dashboard/pages/observe/api_collections/DastProgressSingle.jsx";
+import AgenticMainPage from "../dashboard/pages/agentic/AgenticMainPage.jsx";
+import Endpoints from "../dashboard/pages/observe/agentic/Endpoints.jsx";
+import AgenticDashboard from "../dashboard/pages/dashboard/AgenticDashboard.jsx";
+import EndpointDashboard from "../dashboard/pages/dashboard/EndpointDashboard.jsx";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -133,6 +135,18 @@ const router = createBrowserRouter([
                     {
                         path: "home",
                         element: <HomeDashboard/>,
+                    },
+                    {
+                        path: "agentic-dashboard",
+                        element: <AgenticDashboard/>,
+                    },
+                    {
+                        path: "endpoint-dashboard",
+                        element: <EndpointDashboard/>,
+                    },
+                    {
+                        path: "view",
+                        element: <AgenticDashboard/>,
                     },
                     {
                         path: "testing",
@@ -185,6 +199,10 @@ const router = createBrowserRouter([
                             {
                                 path: "inventory",
                                 element: <ApiCollections/>
+                            },
+                            {
+                                path: "agentic-assets",
+                                element: <Endpoints/>
                             },
                             {
                                 path: "query_mode",
@@ -295,6 +313,10 @@ const router = createBrowserRouter([
                                 element: <ConfigureIgnoredEventsPage/>
                             }
                         ]
+                    },
+                    {
+                        path: "ask-ai",
+                        element: <AgenticMainPage/>,
                     },
                     {
                         path: "quick-start",
