@@ -272,6 +272,9 @@ const AgenticDashboard = () => {
                 // Fetch all consolidated APIs in parallel
                 // Note: Endpoints over time is fetched via existing InventoryAction APIs
                 // Threats over time is fetched via getDailyThreatActorsCount API
+                // Check if threat detection feature is available before calling the API
+                const threatDetectionAvailable = func.checkForFeatureSaas && func.checkForFeatureSaas('THREAT_DETECTION');
+                
                 const [
                     endpointDiscoveryResponse,
                     issuesResponse,
@@ -287,7 +290,20 @@ const AgenticDashboard = () => {
                     api.fetchThreatData(startTs, endTs),
                     observeApi.fetchNewEndpointsTrendForHostCollections(startTs, endTs),
                     observeApi.fetchNewEndpointsTrendForNonHostCollections(startTs, endTs),
-                    threatApi.getDailyThreatActorsCount(startTs, endTs, [])
+                    // Only call threat API if feature is available, otherwise resolve with null
+                    threatDetectionAvailable 
+                        ? threatApi.getDailyThreatActorsCount(startTs, endTs, []).catch(err => {
+                            // Handle 403 and other errors gracefully - return null instead of throwing
+                            // This prevents infinite loops and allows the dashboard to continue loading
+                            if (err?.response?.status === 403 || err?.status === 403) {
+                                console.warn('Threat detection API returned 403 - feature not available or permission denied');
+                                return null;
+                            }
+                            // For other errors, also return null to prevent breaking the dashboard
+                            console.warn('Threat detection API error:', err);
+                            return null;
+                        })
+                        : Promise.resolve(null)
                 ]);
 
                 // Process Endpoint Discovery Data
@@ -538,7 +554,10 @@ const AgenticDashboard = () => {
                 }
 
                 // Process Threats Over Time from getDailyThreatActorsCount API
-                if (threatActorsCountResponse.status === 'fulfilled' && threatActorsCountResponse.value) {
+                // Handle both fulfilled with null (feature not available) and rejected cases
+                if (threatActorsCountResponse.status === 'fulfilled' && 
+                    threatActorsCountResponse.value && 
+                    threatActorsCountResponse.value.actorsCounts) {
                     const actorsCounts = threatActorsCountResponse.value.actorsCounts || [];
                     // Transform actorsCounts to [timestamp, count] format (same as HomeDashboard.jsx)
                     // actorsCounts has {ts (seconds), totalActors, criticalActors}
@@ -560,6 +579,7 @@ const AgenticDashboard = () => {
                         ] : []
                     );
                 } else {
+                    // Set empty data if API failed, returned null, or feature not available
                     setThreatRequestsChartData([]);
                 }
                 
@@ -602,7 +622,10 @@ const AgenticDashboard = () => {
                 }
                 
                 let threatRequestsFlaggedData = [];
-                if (threatActorsCountResponse.status === 'fulfilled' && threatActorsCountResponse.value) {
+                // Only process if response is fulfilled and has valid data (not null from 403/error)
+                if (threatActorsCountResponse.status === 'fulfilled' && 
+                    threatActorsCountResponse.value && 
+                    threatActorsCountResponse.value.actorsCounts) {
                     const actorsCounts = threatActorsCountResponse.value.actorsCounts || [];
                     // Transform actorsCounts to [timestamp, count] format (same as HomeDashboard.jsx)
                     const threatRequestsFlaggedDataRaw = actorsCounts
@@ -614,6 +637,7 @@ const AgenticDashboard = () => {
                     // Fill missing time periods with 0 for continuous line
                     threatRequestsFlaggedData = fillMissingTimePeriods(threatRequestsFlaggedDataRaw, startTs, endTs);
                 }
+                // If API failed or feature not available, threatRequestsFlaggedData remains empty array
                 
                 const overallStatsData = [
                     {
