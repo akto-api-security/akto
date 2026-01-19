@@ -23,7 +23,9 @@ const ComponentHeader = ({ title, itemId, onRemove }) => {
                         </Box>
                         <Text variant='headingMd'>{title}</Text>
                     </HorizontalStack>
-                    <Button monochrome plain icon={DeleteMinor} onClick={() => onRemove(itemId)} />
+                    <Box opacity={isHovered ? "1" : "0"}>
+                        <Button monochrome plain icon={DeleteMinor} onClick={() => onRemove(itemId)} />
+                    </Box>
                 </HorizontalStack>
             </Box>
         </Box>
