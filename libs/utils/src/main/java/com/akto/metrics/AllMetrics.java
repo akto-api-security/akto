@@ -15,6 +15,7 @@ import java.lang.management.MemoryUsage;
 import java.lang.management.ThreadMXBean;
 import com.sun.management.OperatingSystemMXBean;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -26,9 +27,11 @@ public class AllMetrics {
     public void init(LogDb module, boolean pgMetrics, DataActor dataActor, int accountId, String instanceId) {
         this.dataActor = dataActor;
         this.instance_id = instanceId;
+        this.accountId = accountId;
 
         Organization organization = OrgUtils.getOrganizationCached(accountId);
         String orgId = organization.getId();
+        this.orgId = orgId;
 
         if(LogDb.RUNTIME.equals(module)){
             runtimeKafkaRecordCount = new SumMetric("RT_KAFKA_RECORD_COUNT", 60, accountId, orgId);
@@ -138,13 +141,45 @@ public class AllMetrics {
                     );
                     metricDataList.add(metricData);
                 }
-                if(!list.isEmpty()) {
+
+                processAndCleanupTcMetrics(tcCpuUsageMetrics, "TC_CPU_USAGE", _this.orgId, metricDataList);
+                processAndCleanupTcMetrics(tcMemoryUsageMetrics, "TC_MEMORY_USAGE", _this.orgId, metricDataList);
+
+                if(!list.isEmpty() || !metricDataList.isEmpty()) {
                     _this.sendDataToAkto(list, metricDataList);
                 }
             } catch (Exception e){
                 loggerMaker.errorAndAddToDb("Error while sending metrics to akto: " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
             }
         }, 0, 120, TimeUnit.SECONDS);
+    }
+
+    private void processAndCleanupTcMetrics(Map<String, Metric> metricsMap, String metricId, String orgId, List<MetricData> metricDataList) {
+        List<String> deadInstances = new ArrayList<>();
+
+        for (Map.Entry<String, Metric> entry : metricsMap.entrySet()) {
+            String tcInstanceId = entry.getKey();
+            Metric metric = entry.getValue();
+            float value = metric.getMetricAndReset();
+
+            MetricData metricData = new MetricData(
+                metricId,
+                value,
+                orgId,
+                tcInstanceId,
+                MetricData.MetricType.GAUGE
+            );
+            metricDataList.add(metricData);
+
+            if (value == 0.0f) {
+                deadInstances.add(tcInstanceId);
+            }
+        }
+
+        // Remove dead pod entries after iteration
+        for (String deadInstanceId : deadInstances) {
+            metricsMap.remove(deadInstanceId);
+        }
     }
 
     private AllMetrics(){}
@@ -193,6 +228,12 @@ public class AllMetrics {
     private Metric threadCount = null;
     private Metric availableProcessors = null;
     private Metric totalPhysicalMemoryMb = null;
+
+    // Traffic Collector profiling metrics - per instance tracking
+    private final Map<String, Metric> tcCpuUsageMetrics = new ConcurrentHashMap<>();
+    private final Map<String, Metric> tcMemoryUsageMetrics = new ConcurrentHashMap<>();
+    private int accountId;
+    private String orgId;
 
     private List<Metric> metrics = null;
 
@@ -349,6 +390,19 @@ public class AllMetrics {
     public void setMultipleSampleDataFetchLatency(float val){
         if(multipleSampleDataFetchLatency != null)
             multipleSampleDataFetchLatency.record(val);
+    }
+
+    // Traffic Collector profiling metrics - per instance
+    public void setTcCpuUsage(String instanceId, float val) {
+        tcCpuUsageMetrics.computeIfAbsent(instanceId,
+            k -> new GaugeMetric("TC_CPU_USAGE", 60, accountId, orgId))
+            .record(val);
+    }
+
+    public void setTcMemoryUsage(String instanceId, float val) {
+        tcMemoryUsageMetrics.computeIfAbsent(instanceId,
+            k -> new GaugeMetric("TC_MEMORY_USAGE", 60, accountId, orgId))
+            .record(val);
     }
 
 

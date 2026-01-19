@@ -3,12 +3,10 @@ package com.akto.hybrid_runtime;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.dto.monitoring.ModuleInfo;
-import com.akto.dto.metrics.MetricData;
-import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.AllMetrics;
 import com.akto.runtime.parser.SampleParser;
-import com.akto.usage.OrgUtils;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -176,41 +174,21 @@ public class AktoTrafficCollectorTelemetry {
                 return;
             }
 
-            Organization organization = OrgUtils.getOrganizationCached(Context.getActualAccountId());
-            String orgId = organization != null ? organization.getId() : "";
             String instanceId = heartbeat.getName(); // Use pod/daemon name as instance ID
 
-            List<MetricData> metricsToIngest = new ArrayList<>();
-
+            // Record CPU metric
             if (profiling.containsKey("cpu_percent")) {
                 float cpuUsage = extractFloat(profiling.get("cpu_percent"));
-                MetricData cpuMetric = new MetricData(
-                    "TC_CPU_USAGE",
-                    cpuUsage,
-                    orgId,
-                    instanceId,
-                    MetricData.MetricType.GAUGE
-                );
-                metricsToIngest.add(cpuMetric);
-                loggerMaker.infoAndAddToDb("Extracted CPU metric for " + instanceId + ": " + cpuUsage + "%");
+                AllMetrics.instance.setTcCpuUsage(instanceId, cpuUsage);
+                loggerMaker.infoAndAddToDb("Recorded CPU metric for " + instanceId + ": " + cpuUsage + "%");
             }
 
+            // Record Memory metric
             if (profiling.containsKey("memory_used_mb")) {
                 float memoryUsedMB = extractFloat(profiling.get("memory_used_mb"));
-                MetricData memoryMetric = new MetricData(
-                    "TC_MEMORY_USAGE",
-                    memoryUsedMB,
-                    orgId,
-                    instanceId,
-                    MetricData.MetricType.GAUGE
-                );
-                metricsToIngest.add(memoryMetric);
-                loggerMaker.infoAndAddToDb("Extracted Memory metric for " + instanceId + ": " +
+                AllMetrics.instance.setTcMemoryUsage(instanceId, memoryUsedMB);
+                loggerMaker.infoAndAddToDb("Recorded Memory metric for " + instanceId + ": " +
                     (int)memoryUsedMB + " MB");
-            }
-
-            if (!metricsToIngest.isEmpty()) {
-                dataActor.ingestMetricData(metricsToIngest);
             }
 
         } catch (Exception e) {
