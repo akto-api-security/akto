@@ -234,9 +234,21 @@ public class Main {
     private static final String LOG_GROUP_ID = "-log";
 
 
-    public static final String customMiniRuntimeServiceName;
+    public static String customMiniRuntimeServiceName;
+    private static final String podName = System.getenv().getOrDefault("POD_NAME", "");
+    private static final String nodeName = System.getenv().getOrDefault("NODE_NAME", "");
+    private static final String miniRuntimeName = System.getenv().getOrDefault("MINI_RUNTIME_NAME", "");
     static {
-        customMiniRuntimeServiceName = System.getenv("MINI_RUNTIME_NAME") == null? "Default_" + UUID.randomUUID().toString().substring(0, 4) : System.getenv("MINI_RUNTIME_NAME");
+        if (!miniRuntimeName.isEmpty()) {
+            // Highest priority: explicit MINI_RUNTIME_NAME
+            customMiniRuntimeServiceName = miniRuntimeName;
+        } else if (!podName.isEmpty() && !nodeName.isEmpty()) {
+            // Second priority: pod and node name
+            customMiniRuntimeServiceName = "akto-mr:" + podName + ":" + nodeName;
+        } else {
+            // Fallback: random UUID
+            customMiniRuntimeServiceName = "Default_" + UUID.randomUUID().toString();
+        }
     }
 
     static private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
@@ -324,7 +336,7 @@ public class Main {
 
         final boolean checkPg = aSettings != null && aSettings.isRedactPayload();
 
-        AllMetrics.instance.init(LogDb.RUNTIME, checkPg, dataActor, Context.getActualAccountId());
+        AllMetrics.instance.init(LogDb.RUNTIME, checkPg, dataActor, Context.getActualAccountId(), customMiniRuntimeServiceName);
         loggerMaker.infoAndAddToDb("All metrics initialized");
 
         dataActor.modifyHybridSaasSetting(RuntimeMode.isHybridDeployment());
