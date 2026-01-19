@@ -129,6 +129,16 @@ function GithubServerTable(props) {
     setSortSelected(tableFunc.getInitialSortSelected(props.sortOptions, pageFiltersMap))
   },[currentPageKey])
 
+  // Update sortSelected when sortOptions changes and current sort is invalid
+  useEffect(() => {
+    if (props.sortOptions && props.sortOptions.length > 0 && sortSelected && sortSelected.length > 0) {
+      const isCurrentSortValid = props.sortOptions.some(opt => opt.value === sortSelected[0]);
+      if (!isCurrentSortValid) {
+        setSortSelected([props.sortOptions[0].value]);
+      }
+    }
+  }, [props.sortOptions])
+
   useEffect(() => {
     const tempFilters = appliedFilters.filter((filter) => !filter?.key?.includes("dateRange"))
     updateQueryParams("filters",tableFunc.getPrettifiedFilter(tempFilters))
