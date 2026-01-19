@@ -62,7 +62,16 @@ public class MetricData {
         CYBORG_CALL_COUNT("Cyborg Call Count", "Number of calls made to Cyborg"),
         CYBORG_DATA_SIZE("Cyborg Data Size", "Total size of data processed by Cyborg"),
 
-        // Profiling metrics
+        // Infrastructure metrics (CPU, Memory, Threads)
+        CPU_USAGE_PERCENT("CPU Usage", "Process CPU usage percentage"),
+        HEAP_MEMORY_USED_MB("Heap Memory Used", "JVM heap memory currently in use (MB)"),
+        HEAP_MEMORY_MAX_MB("Heap Memory Max", "Maximum JVM heap memory available (MB)"),
+        NON_HEAP_MEMORY_USED_MB("Non-Heap Memory Used", "JVM non-heap memory currently in use (MB)"),
+        THREAD_COUNT("Thread Count", "Number of live threads in the JVM"),
+        AVAILABLE_PROCESSORS("Available Processors", "Number of processors available to the JVM"),
+        TOTAL_PHYSICAL_MEMORY_MB("Total Physical Memory", "Total physical memory available (MB)"),
+
+                // Profiling metrics
         TC_CPU_USAGE("Traffic Collector CPU Usage", "CPU usage percentage of traffic collector modules"),
         TC_MEMORY_USAGE("Traffic Collector Memory Used", "Memory used in MB by traffic collector modules");
 
