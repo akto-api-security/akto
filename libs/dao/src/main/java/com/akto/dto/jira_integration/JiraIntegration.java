@@ -7,6 +7,20 @@ import com.mongodb.BasicDBObject;
 
 public class JiraIntegration {
 
+    /**
+     * Enum representing Jira deployment type
+     * CLOUD: Jira Cloud (REST API v3, Basic authentication with email:token)
+     * DATA_CENTER: Jira Data Center/Server (REST API v2, Bearer token authentication)
+     * 
+     * Reference: 
+     * - Cloud: https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/
+     * - Data Center: https://developer.atlassian.com/server/jira/platform/rest-apis/
+     */
+    public enum JiraType {
+        CLOUD,
+        DATA_CENTER
+    }
+
     private String baseUrl;
     private String projId;
     private String userEmail;
@@ -14,12 +28,14 @@ public class JiraIntegration {
     private String issueType;
     private int createdTs;
     private int updatedTs;
+    private JiraType jiraType; // Cloud vs Data Center
     private Map<String,List<BasicDBObject>> projectIdsMap;
     private Map<String, ProjectMapping> projectMappings;
     private Map<String, String> issueSeverityToPriorityMap;
 
     public static final String API_TOKEN = "apiToken";
     public static final String ISSUE_SEVERITY_TO_PRIORITY_MAP = "issueSeverityToPriorityMap";
+    public static final String JIRA_TYPE = "jiraType";
 
     public String getBaseUrl() {
         return baseUrl;
@@ -99,6 +115,14 @@ public class JiraIntegration {
 
     public void setIssueSeverityToPriorityMap(Map<String, String> issueSeverityToPriorityMap) {
         this.issueSeverityToPriorityMap = issueSeverityToPriorityMap;
+    }
+
+    public JiraType getJiraType() {
+        return jiraType;
+    }
+
+    public void setJiraType(JiraType jiraType) {
+        this.jiraType = jiraType;
     }
 
 }

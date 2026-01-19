@@ -40,6 +40,7 @@ import com.akto.util.enums.GlobalEnums.TicketSource;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.utils.JsonUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
@@ -72,6 +73,7 @@ import com.akto.dao.AccountSettingsDao;
 import static com.akto.utils.jira.Utils.buildAdditionalIssueFieldsForJira;
 import static com.akto.utils.jira.Utils.buildApiToken;
 import static com.akto.utils.jira.Utils.buildBasicRequest;
+import static com.akto.utils.jira.Utils.buildBearerRequest;
 import static com.akto.utils.jira.Utils.buildPayloadForJiraTicket;
 import static com.akto.utils.jira.Utils.getAccountJiraFields;
 import static com.akto.utils.jira.Utils.isLabelsFieldError;
@@ -87,6 +89,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private String userEmail;
     private String apiToken;
     private String issueType;
+    private String jiraType; // "CLOUD" or "DATA_CENTER"
     private JiraIntegration jiraIntegration;
     private JiraMetaData jiraMetaData;
 
@@ -111,12 +114,48 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private Map<String,List<BasicDBObject>> projectAndIssueMap;
     private Map<String, ProjectMapping> projectMappings;
 
+    /*
+     * Jira REST API Version Compatibility Documentation:
+     * 
+     * JIRA CLOUD:
+     * - Uses REST API v3: /rest/api/3/
+     * - Documentation: https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/
+     * - Authentication: API Token (email + token)
+     * - Base URL format: https://your-domain.atlassian.net
+     * 
+     * JIRA DATA CENTER/SERVER:
+     * - Uses REST API v2: /rest/api/2/
+     * - Documentation: https://developer.atlassian.com/server/jira/platform/rest-apis/
+     * - Latest version (v11.3.1) still uses v2: https://developer.atlassian.com/server/jira/platform/rest/v11002/intro/
+     * - Authentication: Personal Access Token (PAT) or Basic Auth
+     * - Base URL format: http://your-server.com:port
+     * 
+     * KEY DIFFERENCES:
+     * - API version in URI: v3 (Cloud) vs v2 (Data Center)
+     * - Cloud has additional features like Atlassian Document Format support
+     * - Data Center documentation explicitly states: "api - for everything else. Current version is 2"
+     * - Both use same endpoint patterns, just different version numbers
+     * 
+     * IMPLEMENTATION STRATEGY:
+     * - Try v3 first (Cloud)
+     * - Fallback to v2 if v3 fails (Data Center)
+     * - Maintain compatibility with both deployment types
+     */
+    
+    // Cloud (v3) endpoints - Primary
     private static final String META_ENDPOINT = "/rest/api/3/issue/createmeta";
     private static final String CREATE_ISSUE_ENDPOINT = "/rest/api/3/issue";
     private static final String CREATE_ISSUE_ENDPOINT_BULK = "/rest/api/3/issue/bulk";
     private static final String ATTACH_FILE_ENDPOINT = "/attachments";
     private static final String ISSUE_STATUS_ENDPOINT = "/rest/api/3/project/%s/statuses";
     private static final String PRIORITY_ENDPOINT = "/rest/api/3/priority";
+    
+    // Data Center (v2) endpoints - Fallback
+    private static final String META_ENDPOINT_V2 = "/rest/api/2/issue/createmeta";
+    private static final String CREATE_ISSUE_ENDPOINT_V2 = "/rest/api/2/issue";
+    private static final String CREATE_ISSUE_ENDPOINT_BULK_V2 = "/rest/api/2/issue/bulk";
+    private static final String ISSUE_STATUS_ENDPOINT_V2 = "/rest/api/2/project/%s/statuses";
+    private static final String PRIORITY_ENDPOINT_V2 = "/rest/api/2/priority";
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.DASHBOARD);
 
@@ -129,6 +168,34 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
     private static final String REMEDIATION_INFO_URL = "tests-library-master/remediation/%s.md";
 
+    // Helper methods to determine API version
+    private boolean isDataCenter() {
+        if (jiraType == null || jiraType.trim().isEmpty()) {
+            return false; // Default to Cloud if not specified
+        }
+        return "DATA_CENTER".equalsIgnoreCase(jiraType.trim());
+    }
+
+    private String getMetaEndpoint() {
+        return isDataCenter() ? META_ENDPOINT_V2 : META_ENDPOINT;
+    }
+
+    private String getCreateIssueEndpoint() {
+        return isDataCenter() ? CREATE_ISSUE_ENDPOINT_V2 : CREATE_ISSUE_ENDPOINT;
+    }
+
+    private String getCreateIssueEndpointBulk() {
+        return isDataCenter() ? CREATE_ISSUE_ENDPOINT_BULK_V2 : CREATE_ISSUE_ENDPOINT_BULK;
+    }
+
+    private String getIssueStatusEndpoint() {
+        return isDataCenter() ? ISSUE_STATUS_ENDPOINT_V2 : ISSUE_STATUS_ENDPOINT;
+    }
+
+    private String getPriorityEndpoint() {
+        return isDataCenter() ? PRIORITY_ENDPOINT_V2 : PRIORITY_ENDPOINT;
+    }
+
     @Setter
     private String title;
     @Setter
@@ -139,10 +206,15 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
     public String testIntegration() {
 
-        String url = baseUrl + META_ENDPOINT;
+        String url = baseUrl + getMetaEndpoint();
         setApiToken(buildApiToken(apiToken));
         try {
-            Request.Builder builder = buildBasicRequest(url, userEmail, apiToken, true);
+            Request.Builder builder;
+            if (isDataCenter()) {
+                builder = buildBearerRequest(url, apiToken, true);
+            } else {
+                builder = buildBasicRequest(url, userEmail, apiToken, true);
+            }
             Request okHttpRequest = builder.build();
             Call call = client.newCall(okHttpRequest);
             Response response = null;
@@ -216,9 +288,18 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         try {
             setProjId(projId.replaceAll("\\s+", ""));
 
-            // Step 2: Call the API to get issue types for the project
-            String statusUrl = baseUrl + String.format(ISSUE_STATUS_ENDPOINT, projId) + "?maxResults=100";
-            Request.Builder builder = buildBasicRequest(statusUrl, userEmail, apiToken, false);
+            // Try v3 API first (Cloud), fallback to v2 (Data Center)
+            // Reference: https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-projects/#api-rest-api-3-project-projectidorkey-statuses-get
+            // Reference: https://developer.atlassian.com/server/jira/platform/rest/v11002/api-group-project/#api-rest-api-2-project-projectidorkey-statuses-get
+            String statusUrl = baseUrl + String.format(getIssueStatusEndpoint(), projId) + "?maxResults=100";
+            
+            Request.Builder builder;
+            if (isDataCenter()) {
+                builder = buildBearerRequest(statusUrl, apiToken, false);
+            } else {
+                builder = buildBasicRequest(statusUrl, userEmail, apiToken, false);
+            }
+            
             Request okHttpRequest = builder.build();
 
             Response response = null;
@@ -229,8 +310,8 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
                 if (!response.isSuccessful()) {
                     loggerMaker.error(
-                        "Error while fetching Jira Project statuses. Response code: {}, accountId: {}, projectId: {}",
-                        response.code(), Context.accountId.get(), projId);
+                        "Error while fetching Jira Project statuses. Response code: {}, accountId: {}, projectId: {}, API version: {}",
+                        response.code(), Context.accountId.get(), projId, (isDataCenter() ? "v2 Data Center" : "v3 Cloud"));
                     return Action.ERROR.toUpperCase();
                 }
 
@@ -296,12 +377,22 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         baseUrl = jiraIntegration.getBaseUrl();
         userEmail = jiraIntegration.getUserEmail();
         apiToken = jiraIntegration.getApiToken();
+        jiraType = jiraIntegration.getJiraType() != null ? jiraIntegration.getJiraType().name() : "CLOUD";
 
         loggerMaker.infoAndAddToDb("Fetching Jira priorities from " + baseUrl);
         setApiToken(buildApiToken(apiToken));
         try {
-            String priorityUrl = baseUrl + PRIORITY_ENDPOINT;
-            Request.Builder builder = buildBasicRequest(priorityUrl, userEmail, apiToken, false);
+            String priorityUrl = baseUrl + getPriorityEndpoint();
+            
+            Request.Builder builder;
+            if (isDataCenter()) {
+                // Data Center uses Bearer token authentication
+                builder = buildBearerRequest(priorityUrl, apiToken, false);
+            } else {
+                // Cloud uses Basic authentication (email:token)
+                builder = buildBasicRequest(priorityUrl, userEmail, apiToken, false);
+            }
+            
             Request okHttpRequest = builder.build();
 
             Response response = null;
@@ -309,7 +400,9 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
             try {
                 response = client.newCall(okHttpRequest).execute();
-                loggerMaker.infoAndAddToDb("Jira priorities API response code: " + response.code());
+                
+                loggerMaker.infoAndAddToDb("Jira priorities API response code: " + response.code() + 
+                    " (using " + (isDataCenter() ? "v2 Data Center" : "v3 Cloud") + ")");
 
                 if (!response.isSuccessful()) {
                     loggerMaker.errorAndAddToDb("Failed to fetch Jira priorities - response not successful");
@@ -462,6 +555,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             Updates.set("projId", projId),
             Updates.set("userEmail", userEmail),
             Updates.set("issueType", issueType),
+            Updates.set("jiraType", jiraType != null && !jiraType.isEmpty() ? jiraType : "CLOUD"),
             Updates.setOnInsert("createdTs", Context.now()),
             Updates.set("updatedTs", Context.now()),
             Updates.set("projectIdsMap", projectAndIssueMap),
@@ -622,56 +716,177 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         return Action.SUCCESS.toUpperCase();
     }
 
+    /**
+     * Fetches project metadata (issue types) from Jira API
+     * Uses appropriate API version based on deployment type
+     * 
+     * @param projectId The Jira project key/ID
+     * @return List of issue types with their IDs
+     * @throws Exception if API call fails or parsing fails
+     */
     private List<BasicDBObject> getProjectMetadata(String projectId) throws Exception {
-
         setApiToken(buildApiToken(apiToken));
-        if(apiToken == null){
+        if (apiToken == null) {
             throw new IllegalStateException("No jira integration found. Please integrate Jira first.");
         }
-        // Use new endpoint: /rest/api/3/issue/createmeta/{projectKey}/issuetypes
-        // Old deprecated endpoint: /rest/api/3/issue/createmeta returns empty projects array
-        String url = baseUrl + "/rest/api/3/issue/createmeta/" + projectId + "/issuetypes";
-        Request.Builder builder = buildBasicRequest(url, userEmail, apiToken, true);
+        
+        String responsePayload = fetchProjectMetadataFromJira(projectId);
+        BasicDBList issueTypes = parseProjectMetadataResponse(responsePayload);
+        
+        if (issueTypes == null || issueTypes.isEmpty()) {
+            throw new IllegalArgumentException("No issue types found for project '" + projectId + "'. Check if the API token has access to this project.");
+        }
+        
+        loggerMaker.infoAndAddToDb("Successfully fetched " + issueTypes.size() + " issue types for project " + projectId + 
+            " using " + (isDataCenter() ? "v2 (Data Center)" : "v3 (Cloud)") + " API");
+        return getIssueTypesWithIds(issueTypes);
+    }
+
+    /**
+     * Makes HTTP request to Jira API to fetch project metadata
+     * 
+     * Jira Cloud (v3): GET /rest/api/3/issue/createmeta/{projectKey}/issuetypes
+     * Reference: https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-createmeta-projectidorkey-issuetypes-get
+     * Response: {"issueTypes": [{"id": "10001", "name": "Bug"}]}
+     * 
+     * Jira Data Center (v2): GET /rest/api/2/project/{projectKey}/statuses
+     * Reference: https://developer.atlassian.com/server/jira/platform/rest/v11002/api-group-project/#api-rest-api-2-project-projectidorkey-statuses-get
+     * Response: [{"id":"10002","name":"Task","statuses":[...]}]
+     * 
+     * @param projectId The Jira project key/ID
+     * @return Raw JSON response as string
+     * @throws Exception if HTTP request fails
+     */
+    private String fetchProjectMetadataFromJira(String projectId) throws Exception {
+        String url;
+        
+        if (isDataCenter()) {
+            // Data Center v2: use project statuses endpoint which returns issue types
+            url = baseUrl + "/rest/api/2/project/" + projectId + "/statuses";
+            loggerMaker.infoAndAddToDb("Fetching Data Center v2 metadata from: " + url);
+        } else {
+            // Cloud v3: use createmeta endpoint
+            url = baseUrl + "/rest/api/3/issue/createmeta/" + projectId + "/issuetypes";
+            loggerMaker.infoAndAddToDb("Fetching Cloud v3 metadata from: " + url);
+        }
+        
+        Request.Builder builder;
+        if (isDataCenter()) {
+            // Data Center uses Bearer token authentication
+            builder = buildBearerRequest(url, apiToken, true);
+        } else {
+            // Cloud uses Basic authentication (email:token)
+            builder = buildBasicRequest(url, userEmail, apiToken, true);
+        }
+        
         Request okHttpRequest = builder.build();
-
+        
         Response response = null;
-        String responsePayload;
-
         try {
             response = client.newCall(okHttpRequest).execute();
-
+            
+            if (response.code() != 200) {
+                String errorBody = response.body() != null ? response.body().string() : "No error body";
+                throw new IllegalStateException("Jira API returned status " + response.code() + ": " + errorBody);
+            }
+            
             if (response.body() == null) {
                 throw new IllegalStateException("Received null response body from Jira API");
             }
-
-            responsePayload = response.body().string();
-
+            
+            String responsePayload = response.body().string();
+            
             if (!Utils.isJsonPayload(responsePayload)) {
-                response.close(); // Close before retry to prevent resource leak
+                response.close();
                 okHttpRequest = retryWithoutGzipRequest(builder, url);
                 response = client.newCall(okHttpRequest).execute();
-
+                
                 if (response.body() == null) {
                     throw new IllegalStateException("Received null response body from Jira API after retry");
                 }
-
+                
                 responsePayload = response.body().string();
             }
+            
+            return responsePayload;
         } finally {
             if (response != null) {
                 response.close();
             }
         }
+    }
 
-        // New API response structure: {"issueTypes": [{"id": "10001", "name": "Bug"}]}
-        BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
-        BasicDBList issueTypes = (BasicDBList) payloadObj.get("issueTypes");
-
-        if (issueTypes == null || issueTypes.isEmpty()) {
-            throw new IllegalArgumentException("No issue types found for project '" + projectId + "'. Check if the API token has access to this project.");
+    /**
+     * Parses Jira API response based on deployment type
+     * 
+     * @param responsePayload Raw JSON response from Jira API
+     * @return Parsed list of issue types
+     * @throws Exception if parsing fails
+     */
+    private BasicDBList parseProjectMetadataResponse(String responsePayload) throws Exception {
+        BasicDBList issueTypes = null;
+        
+        if (isDataCenter()) {
+            // Data Center v2 API returns: [{"id":"10002","name":"Task","subtask":false,"statuses":[...]}]
+            issueTypes = parseDataCenterResponse(responsePayload);
+        } else {
+            // Cloud v3 API returns: {"issueTypes": [{"id": "10001", "name": "Bug"}]}
+            issueTypes = parseCloudResponse(responsePayload);
         }
+        
+        return issueTypes;
+    }
 
-        return getIssueTypesWithIds(issueTypes);
+    /**
+     * Parses Data Center v2 API response
+     * Response format: [{"id":"10002","name":"Task","statuses":[...]}]
+     * 
+     * @param responsePayload Raw JSON response
+     * @return List of issue types
+     * @throws Exception if parsing fails
+     */
+    private BasicDBList parseDataCenterResponse(String responsePayload) throws Exception {
+        BasicDBList issueTypes = new BasicDBList();
+        
+        try {
+            // Use ObjectMapper for complex nested JSON parsing
+            ObjectMapper mapper = new ObjectMapper();
+            List<Map<String, Object>> projectStatuses = mapper.readValue(responsePayload, new TypeReference<List<Map<String, Object>>>() {});
+            
+            for (Map<String, Object> typeObj : projectStatuses) {
+                BasicDBObject issueTypeItem = new BasicDBObject();
+                issueTypeItem.put("id", typeObj.get("id") != null ? typeObj.get("id").toString() : "");
+                issueTypeItem.put("name", typeObj.get("name") != null ? typeObj.get("name").toString() : "");
+                issueTypes.add(issueTypeItem);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error parsing Data Center v2 API response: " + responsePayload);
+            throw new IllegalStateException("Failed to parse Data Center API response", e);
+        }
+        
+        return issueTypes;
+    }
+
+    /**
+     * Parses Cloud v3 API response
+     * Response format: {"issueTypes": [{"id": "10001", "name": "Bug"}]}
+     * 
+     * @param responsePayload Raw JSON response
+     * @return List of issue types
+     * @throws Exception if parsing fails
+     */
+    private BasicDBList parseCloudResponse(String responsePayload) throws Exception {
+        try {
+            BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+            BasicDBList issueTypes = (BasicDBList) payloadObj.get("issueTypes");
+            if (issueTypes == null) {
+                throw new IllegalStateException("Cloud API response missing 'issueTypes' field");
+            }
+            return issueTypes;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error parsing Cloud v3 API response: " + responsePayload);
+            throw new IllegalStateException("Failed to parse Cloud API response", e);
+        }
     }
 
     public String fetchIntegration() {
@@ -681,6 +896,10 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
         if(jiraIntegration != null){
             jiraIntegration.setApiToken("****************************");
+            // Also set jiraType for frontend
+            if (jiraIntegration.getJiraType() == null) {
+                jiraIntegration.setJiraType(JiraIntegration.JiraType.CLOUD); // Default
+            }
         }
         return Action.SUCCESS.toUpperCase();
     }
@@ -707,6 +926,9 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             addActionError("Jira is not integrated.");
             return ERROR.toUpperCase();
         }
+        
+        // Set jiraType from integration to use correct endpoint
+        jiraType = jiraIntegration.getJiraType() != null ? jiraIntegration.getJiraType().name() : "CLOUD";
 
         TestingRunIssues testingRunIssues = TestingRunIssuesDao.instance.findOne(
             Filters.eq(Constants.ID, jiraMetaData.getTestingIssueId()));
@@ -721,17 +943,39 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
         reqPayload.put("fields", fields);
 
-        String url = jiraIntegration.getBaseUrl() + CREATE_ISSUE_ENDPOINT;
-        String authHeader = Base64.getEncoder().encodeToString((jiraIntegration.getUserEmail() + ":" + jiraIntegration.getApiToken()).getBytes());
+        String url = jiraIntegration.getBaseUrl() + getCreateIssueEndpoint();
+        
+        Map<String, List<String>> headers = new HashMap<>();
+        if (isDataCenter()) {
+            // Data Center uses Bearer token authentication
+            headers.put("Authorization", Collections.singletonList("Bearer " + jiraIntegration.getApiToken()));
+        } else {
+            // Cloud uses Basic authentication (email:token)
+            String authHeader = Base64.getEncoder().encodeToString((jiraIntegration.getUserEmail() + ":" + jiraIntegration.getApiToken()).getBytes());
+            headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
+        }
 
         String jiraTicketUrl = "";
-        Map<String, List<String>> headers = new HashMap<>();
-        headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
         OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", reqPayload.toString(), headers, "");
         try {
+            loggerMaker.infoAndAddToDb("Creating Jira issue - Request URL: " + url);
+            loggerMaker.infoAndAddToDb("Creating Jira issue - Request Body: " + request.getBody());
+            System.out.println("=== JIRA REQUEST ===");
+            System.out.println("URL: " + url);
+            System.out.println("Body: " + request.getBody());
+            
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
             String responsePayload = response.getBody();
+            
+            System.out.println("=== JIRA RESPONSE ===");
+            System.out.println("Status: " + response.getStatusCode());
+            System.out.println("Body: " + responsePayload);
+            loggerMaker.infoAndAddToDb("Jira API Response - Status: " + response.getStatusCode() + ", Body: " + responsePayload);
+            
             if (response.getStatusCode() > 201 || responsePayload == null) {
+                System.out.println("=== ERROR RESPONSE ===");
+                System.out.println("Response Body: " + responsePayload);
+                System.out.println("Parsed Error: " + handleError(responsePayload));
                 loggerMaker.errorAndAddToDb("error while creating jira issue, url not accessible, requestbody " + request.getBody() + " ,responsebody " + response.getBody() + " ,responsestatus " + response.getStatusCode(), LoggerMaker.LogDb.DASHBOARD);
                 
                 // Check if it's a labels field error and retry without labels
@@ -796,7 +1040,15 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
         try {
             jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
-            String url = jiraIntegration.getBaseUrl() + CREATE_ISSUE_ENDPOINT + "/" + issueId + ATTACH_FILE_ENDPOINT;
+            if (jiraIntegration == null) {
+                loggerMaker.errorAndAddToDb("Jira integration not found");
+                return Action.ERROR.toUpperCase();
+            }
+            
+            // Set jiraType from integration
+            jiraType = jiraIntegration.getJiraType() != null ? jiraIntegration.getJiraType().name() : "CLOUD";
+            
+            String url = jiraIntegration.getBaseUrl() + getCreateIssueEndpoint() + "/" + issueId + ATTACH_FILE_ENDPOINT;
             File tmpOutputFile = createRequestFile(origReq, testReq);
             if(tmpOutputFile == null) {
                 return Action.SUCCESS.toUpperCase();
@@ -807,7 +1059,13 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                     .addFormDataPart("file", tmpOutputFile.getName(),
                             RequestBody.create(tmpOutputFile, mType))
                     .build();
-            Request.Builder builder = buildBasicRequest(url, jiraIntegration.getUserEmail(), jiraIntegration.getApiToken(), false);
+            
+            Request.Builder builder;
+            if (isDataCenter()) {
+                builder = buildBearerRequest(url, jiraIntegration.getApiToken(), false);
+            } else {
+                builder = buildBasicRequest(url, jiraIntegration.getUserEmail(), jiraIntegration.getApiToken(), false);
+            }
 
             builder.removeHeader("Accept");
             builder.addHeader("X-Atlassian-Token", "no-check");
@@ -880,6 +1138,9 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             addActionError("Jira is not integrated.");
             return ERROR.toUpperCase();
         }
+        
+        // Set jiraType from integration to use correct endpoint
+        jiraType = jiraIntegration.getJiraType() != null ? jiraIntegration.getJiraType().name() : "CLOUD";
 
         List<JiraMetaData> jiraMetaDataList = new ArrayList<>();
         Bson projection = Projections.include(YamlTemplate.INFO);
@@ -1012,11 +1273,17 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         reqPayload.put("issueUpdates", issueUpdates);
 
         // URL for bulk create issues
-        String url = jiraIntegration.getBaseUrl() + CREATE_ISSUE_ENDPOINT_BULK;
-        String authHeader = Base64.getEncoder().encodeToString((jiraIntegration.getUserEmail() + ":" + jiraIntegration.getApiToken()).getBytes());
-
+        String url = jiraIntegration.getBaseUrl() + getCreateIssueEndpointBulk();
+        
         Map<String, List<String>> headers = new HashMap<>();
-        headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
+        if (isDataCenter()) {
+            // Data Center uses Bearer token authentication
+            headers.put("Authorization", Collections.singletonList("Bearer " + jiraIntegration.getApiToken()));
+        } else {
+            // Cloud uses Basic authentication (email:token)
+            String authHeader = Base64.getEncoder().encodeToString((jiraIntegration.getUserEmail() + ":" + jiraIntegration.getApiToken()).getBytes());
+            headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
+        }
 
         OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", reqPayload.toString(), headers, "");
 
@@ -1453,8 +1720,11 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
         if (jiraIntegration == null) {
             addActionError("Jira is not integrated.");
-            return ERROR.toUpperCase();
+            return Action.ERROR.toUpperCase();
         }
+        
+        // Set jiraType from integration to use correct endpoint
+        jiraType = jiraIntegration.getJiraType() != null ? jiraIntegration.getJiraType().name() : "CLOUD";
 
         try {
             BasicDBList contentList = new BasicDBList();
@@ -1484,12 +1754,22 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
             BasicDBObject reqPayload = new BasicDBObject();
             reqPayload.put("fields", fields);
-            Request.Builder requestBuilder = buildBasicRequest(
-                jiraIntegration.getBaseUrl() + CREATE_ISSUE_ENDPOINT,
-                jiraIntegration.getUserEmail(),
-                jiraIntegration.getApiToken(),
-                false
-            );
+            
+            Request.Builder requestBuilder;
+            if (isDataCenter()) {
+                requestBuilder = buildBearerRequest(
+                    jiraIntegration.getBaseUrl() + getCreateIssueEndpoint(),
+                    jiraIntegration.getApiToken(),
+                    false
+                );
+            } else {
+                requestBuilder = buildBasicRequest(
+                    jiraIntegration.getBaseUrl() + getCreateIssueEndpoint(),
+                    jiraIntegration.getUserEmail(),
+                    jiraIntegration.getApiToken(),
+                    false
+                );
+            }
             RequestBody body = RequestBody.create(
                 reqPayload.toJson(),
                 MediaType.parse("application/json")
@@ -1551,5 +1831,13 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error storing Jira URL: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
         }
+    }
+
+    public String getJiraType() {
+        return jiraType;
+    }
+
+    public void setJiraType(String jiraType) {
+        this.jiraType = jiraType;
     }
 }

@@ -47,8 +47,25 @@ public class Utils {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class, LogDb.DASHBOARD);
 
+    /*
+     * Jira REST API Endpoint Documentation:
+     * 
+     * CLOUD (v3): https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/
+     * - Create Issue Metadata: /rest/api/3/issue/createmeta/{projectKey}/issuetypes/{issueTypeId}
+     * - Field Search: /rest/api/3/field/search
+     * 
+     * DATA CENTER (v2): https://developer.atlassian.com/server/jira/platform/rest/v11002/intro/
+     * - Create Issue Metadata: /rest/api/2/issue/createmeta (returns all projects)
+     * - Field Search: /rest/api/2/field (returns all fields)
+     * 
+     * Note: Field search pagination and filtering differs between versions
+     */
     private static final String CREATE_ISSUE_FIELD_METADATA_ENDPOINT = "/rest/api/3/issue/createmeta/%s/issuetypes/%s"; 
     private static final String FIELD_SEARCH_ENDPOINT = "/rest/api/3/field/search";
+    
+    // Data Center v2 fallback endpoints
+    private static final String CREATE_ISSUE_FIELD_METADATA_ENDPOINT_V2 = "/rest/api/2/issue/createmeta";
+    private static final String FIELD_SEARCH_ENDPOINT_V2 = "/rest/api/2/field";
 
     //Caching for Account Wise Jira Integration Issue Creation Fields
     private static final ConcurrentHashMap<Integer, Pair<Map<String, Map<String, BasicDBList>>, Integer>> accountWiseJiraFieldsMap = new ConcurrentHashMap<>();
@@ -357,6 +374,27 @@ public class Utils {
         return builder;
     }
 
+    /**
+     * Builds HTTP request with Bearer token authentication for Jira Data Center
+     * Data Center uses Personal Access Tokens (PAT) with Bearer authentication
+     * 
+     * @param url The API endpoint URL
+     * @param apiToken The Personal Access Token (already in correct format)
+     * @param isGzipEnabled Whether to enable gzip compression
+     * @return Configured Request.Builder
+     */
+    public static Request.Builder buildBearerRequest(String url, String apiToken, boolean isGzipEnabled) {
+        Request.Builder builder = new Request.Builder();
+        builder.addHeader("Authorization", "Bearer " + apiToken);
+        if (isGzipEnabled) {
+            builder.addHeader("Accept-Encoding", "gzip");
+        } else {
+            builder.addHeader("Accept", "application/json");
+        }
+        builder = builder.url(url);
+        return builder;
+    }
+
     public static Request retryWithoutGzipRequest(Request.Builder builder, String url) {
         builder.removeHeader("Accept-Encoding");
         builder = builder.url(url);
@@ -412,12 +450,116 @@ public class Utils {
         return new Pair<>(jiraBaseUrl + "/browse/" + jiraTicketKey, jiraTicketKey);
     }
 
+    /**
+     * Extracts plain text from Atlassian Document Format (ADF) content
+     * Jira Cloud uses ADF (Atlassian Document Format) for descriptions
+     * Jira Data Center v2 API uses plain text
+     * Reference: https://developer.atlassian.com/cloud/jira/platform/apis/document/structure/
+     * 
+     * @param content ADF content block
+     * @return Plain text extracted from ADF
+     */
+    private static String extractTextFromADF(BasicDBObject content) {
+        StringBuilder text = new StringBuilder();
+        String type = content.getString("type");
+        
+        if ("text".equals(type)) {
+            // Base case: text node
+            String textValue = content.getString("text");
+            if (textValue != null) {
+                text.append(textValue);
+            }
+        } else if ("paragraph".equals(type)) {
+            // Paragraph contains text or other inline nodes
+            Object contentObj = content.get("content");
+            if (contentObj instanceof BasicDBList) {
+                BasicDBList contentList = (BasicDBList) contentObj;
+                for (Object item : contentList) {
+                    if (item instanceof BasicDBObject) {
+                        text.append(extractTextFromADF((BasicDBObject) item));
+                    }
+                }
+            }
+        } else if ("heading".equals(type)) {
+            // Heading with level attribute
+            Object attrsObj = content.get("attrs");
+            int level = 1;
+            if (attrsObj instanceof BasicDBObject) {
+                BasicDBObject attrs = (BasicDBObject) attrsObj;
+                Object levelObj = attrs.get("level");
+                if (levelObj instanceof Integer) {
+                    level = (Integer) levelObj;
+                }
+            }
+            
+            Object contentObj = content.get("content");
+            if (contentObj instanceof BasicDBList) {
+                BasicDBList contentList = (BasicDBList) contentObj;
+                for (Object item : contentList) {
+                    if (item instanceof BasicDBObject) {
+                        text.append(extractTextFromADF((BasicDBObject) item));
+                    }
+                }
+            }
+        } else if ("bulletList".equals(type)) {
+            // Bullet list contains list items
+            Object contentObj = content.get("content");
+            if (contentObj instanceof BasicDBList) {
+                BasicDBList contentList = (BasicDBList) contentObj;
+                for (Object item : contentList) {
+                    if (item instanceof BasicDBObject) {
+                        String itemText = extractTextFromADF((BasicDBObject) item);
+                        if (itemText != null && !itemText.trim().isEmpty()) {
+                            text.append("- ").append(itemText).append("\n");
+                        }
+                    }
+                }
+            }
+        } else if ("listItem".equals(type)) {
+            // List item contains a paragraph
+            Object contentObj = content.get("content");
+            if (contentObj instanceof BasicDBList) {
+                BasicDBList contentList = (BasicDBList) contentObj;
+                for (Object item : contentList) {
+                    if (item instanceof BasicDBObject) {
+                        text.append(extractTextFromADF((BasicDBObject) item));
+                    }
+                }
+            }
+        }
+        
+        return text.toString();
+    }
+
     public static BasicDBObject buildPayloadForJiraTicket(String summary, String projectKey, String issueType, BasicDBList contentList, Map<String, Object> additionalIssueFields, Severity severity, JiraIntegration jiraIntegration) {
         BasicDBObject fields = new BasicDBObject();
         fields.put("summary", summary);
         fields.put("project", new BasicDBObject("key", projectKey));
         fields.put("issuetype", new BasicDBObject("id", issueType));
-        fields.put("description", new BasicDBObject("type", "doc").append("version", 1).append("content", contentList));
+        
+        // Description format differs between Cloud and Data Center
+        // Cloud (v3): Uses Atlassian Document Format (ADF) - complex JSON structure
+        // Data Center (v2): Uses plain text or Wiki markup
+        boolean isDataCenter = jiraIntegration != null && 
+            jiraIntegration.getJiraType() == JiraIntegration.JiraType.DATA_CENTER;
+        
+        if (isDataCenter) {
+            // Data Center: Convert ADF content to plain text
+            StringBuilder plainTextDescription = new StringBuilder();
+            for (Object contentObj : contentList) {
+                if (contentObj instanceof BasicDBObject) {
+                    BasicDBObject content = (BasicDBObject) contentObj;
+                    String text = extractTextFromADF(content);
+                    if (text != null && !text.isEmpty()) {
+                        plainTextDescription.append(text).append("\n");
+                    }
+                }
+            }
+            fields.put("description", plainTextDescription.toString().trim());
+        } else {
+            // Cloud: Use Atlassian Document Format (ADF)
+            fields.put("description", new BasicDBObject("type", "doc").append("version", 1).append("content", contentList));
+        }
 
         // Apply severity to priority mapping
         if (severity != null && jiraIntegration != null) {
