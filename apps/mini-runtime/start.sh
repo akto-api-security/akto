@@ -1,9 +1,12 @@
 #!/bin/bash
 
-LOG_FILE="/tmp/dump.log"
-MAX_LOG_SIZE=${MAX_LOG_SIZE:-10485760}  # Default to 10 MB if not set (10 MB = 10 * 1024 * 1024 bytes)
+LOG_FILE="/var/log/app/runtime.log"
+MAX_LOG_SIZE=${MAX_LOG_SIZE:-104857600}  # Default to 10 MB if not set (10 MB = 10 * 1024 * 1024 bytes)
 CHECK_INTERVAL=60                        # Check interval in seconds
 MEMORY_RESTART_THRESHOLD=${MEMORY_RESTART_THRESHOLD:-95}  # Restart if memory usage exceeds 95%
+
+# Ensure log directory exists before first use
+mkdir -p /var/log/app
 
 # 1. Detect and read cgroup memory limits
 if [ -f /sys/fs/cgroup/memory.max ]; then
@@ -75,21 +78,15 @@ monitor_memory() {
 }
 
 
-if [[ "${ENABLE_LOGS}" == "false" ]]; then
-    # Start monitoring in the background
-    while true; do
-        rotate_log   # Check and rotate logs if necessary
-        sleep "$CHECK_INTERVAL"  # Wait for the specified interval before checking again
-    done &
-fi
+# Start monitoring in the background
+while true; do
+    rotate_log   # Check and rotate logs if necessary
+    sleep "$CHECK_INTERVAL"  # Wait for the specified interval before checking again
+done &
 
 # Start Java and monitor it
 start_java() {
-    if [[ "${ENABLE_LOGS}" == "false" ]]; then
-        java -XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m -jar /app/mini-runtime-1.0-SNAPSHOT-jar-with-dependencies.jar >> "$LOG_FILE" 2>&1 &
-    else
-        java -XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m -jar /app/mini-runtime-1.0-SNAPSHOT-jar-with-dependencies.jar &
-    fi
+    java -XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m -jar /app/mini-runtime-1.0-SNAPSHOT-jar-with-dependencies.jar 2>&1 | tee -a "$LOG_FILE" &
 
     JAVA_PID=$!
     echo "Started Java with PID: $JAVA_PID" | tee -a "$LOG_FILE"
