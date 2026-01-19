@@ -216,8 +216,8 @@ const tempSortOptions = [
 ]
 
 const sortOptions = [
-    { label: 'Endpoints', value: 'urlsCount asc', directionLabel: 'More', sortKey: 'urlsCount', columnIndex: endpointColIndex },
-    { label: 'Endpoints', value: 'urlsCount desc', directionLabel: 'Less', sortKey: 'urlsCount', columnIndex: endpointColIndex },
+    { label: mapLabel("Endpoints", getDashboardCategory()), value: 'urlsCount asc', directionLabel: 'More', sortKey: 'urlsCount', columnIndex: endpointColIndex },
+    { label: mapLabel("Endpoints", getDashboardCategory()), value: 'urlsCount desc', directionLabel: 'Less', sortKey: 'urlsCount', columnIndex: endpointColIndex },
     { label: 'Activity', value: 'deactivatedScore asc', directionLabel: 'Active', sortKey: 'deactivatedRiskScore' },
     { label: 'Activity', value: 'deactivatedScore desc', directionLabel: 'Inactive', sortKey: 'activatedRiskScore' },
     { label: 'Risk Score', value: 'score asc', directionLabel: 'High risk', sortKey: 'riskScore', columnIndex: riskColIndex },
@@ -1521,6 +1521,22 @@ function ApiCollections(props) {
             ? headers.map(h => h.titleWithTooltip ? {...h, title: h.titleWithTooltip} : h) 
             : [...headers];
         
+        // Helper function to move source column after endpoint ID for LLM/MCP
+        const moveSourceColumnAfterEndpointId = (headers) => {
+            const displayNameIdx = headers.findIndex(h => h.value === 'displayNameComp');
+            const endpointIdIdx = headers.findIndex(h => h.value === 'endpointId');
+            
+            if (displayNameIdx !== -1 && endpointIdIdx !== -1 && displayNameIdx < endpointIdIdx) {
+                // Remove displayNameComp from its current position
+                const [displayNameHeader] = headers.splice(displayNameIdx, 1);
+                // Find new endpointId index (it shifted after removal)
+                const newEndpointIdIdx = headers.findIndex(h => h.value === 'endpointId');
+                // Insert after endpointId
+                headers.splice(newEndpointIdIdx + 1, 0, displayNameHeader);
+            }
+            return headers;
+        };
+        
         // Apply filter-type based modifications
         if (activeFilterType === FILTER_TYPES.BROWSER_LLM) {
             // Hide "Total endpoints" column for browser-llm
@@ -1532,6 +1548,8 @@ function ApiCollections(props) {
                 }
                 return h;
             });
+            // Move source column after Endpoint ID
+            modifiedHeaders = moveSourceColumnAfterEndpointId(modifiedHeaders);
         } else if (activeFilterType === FILTER_TYPES.AI_AGENT) {
             // Rename column to "Agentic resource name" with proper filter
             modifiedHeaders = modifiedHeaders.map(h => {
@@ -1551,10 +1569,41 @@ function ApiCollections(props) {
                 }
                 return h;
             });
+            // Move source column after Endpoint ID
+            modifiedHeaders = moveSourceColumnAfterEndpointId(modifiedHeaders);
         }
         return modifiedHeaders;
     };
     const dynamicHeaders = getModifiedHeaders();
+
+    // Get modified sort options based on filter type
+    const getModifiedSortOptions = () => {
+        let modifiedSortOptions = [...sortOptions];
+        
+        if (activeFilterType === FILTER_TYPES.BROWSER_LLM) {
+            // Remove endpoints sorting for LLM
+            modifiedSortOptions = modifiedSortOptions.filter(opt => opt.sortKey !== 'urlsCount');
+        } else if (activeFilterType === FILTER_TYPES.AI_AGENT) {
+            // Change "Endpoints" to "Components" for AI Agents
+            modifiedSortOptions = modifiedSortOptions.map(opt => {
+                if (opt.sortKey === 'urlsCount') {
+                    return { ...opt, label: 'Components' };
+                }
+                return opt;
+            });
+        } else if (activeFilterType === FILTER_TYPES.MCP_SERVER) {
+            // Change "Endpoints" to "Tools" for MCP Servers
+            modifiedSortOptions = modifiedSortOptions.map(opt => {
+                if (opt.sortKey === 'urlsCount') {
+                    return { ...opt, label: 'Tools' };
+                }
+                return opt;
+            });
+        }
+        
+        return modifiedSortOptions;
+    };
+    const dynamicSortOptions = getModifiedSortOptions();
 
     // Ensure all headers have unique IDs for IndexTable headings to avoid duplicate key warnings
     const headingsWithIds = dynamicHeaders.map((header, index) => ({
@@ -1568,7 +1617,7 @@ function ApiCollections(props) {
         centerView === CenterViewType.Tree ?
         <TreeViewTable
             collectionsArr={filterTreeViewData(normalData)}
-            sortOptions={sortOptions}
+            sortOptions={dynamicSortOptions}
             resourceName={resourceName}
             tableHeaders={headingsWithIds.filter((x) => x.shouldMerge !== undefined)}
             promotedBulkActions={promotedBulkActions}
@@ -1579,7 +1628,7 @@ function ApiCollections(props) {
             filterStateUrl={"/dashboard/observe/inventory/"}
             pageLimit={100}
             data={data[selectedTab]}
-            sortOptions={ selectedTab === 'groups' ? [...tempSortOptions, ...sortOptions] : sortOptions}
+            sortOptions={ selectedTab === 'groups' ? [...tempSortOptions, ...dynamicSortOptions] : dynamicSortOptions}
             resourceName={resourceName}
             filters={[]}
             disambiguateLabel={disambiguateLabel}
