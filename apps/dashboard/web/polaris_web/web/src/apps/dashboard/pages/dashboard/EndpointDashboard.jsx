@@ -700,9 +700,9 @@ const EndpointDashboard = () => {
                 primaryAction={
                     <HorizontalStack gap={2}>
                         {componentsMenu}
-                        <Button icon={SettingsFilledMinor} onClick={() => { }} style={{ display: 'none' }}>
+                        {/* <Button icon={SettingsFilledMinor} onClick={() => { }} style={{ display: 'none' }}>
                             Owner setting
-                        </Button>
+                        </Button> */}
                     </HorizontalStack>
                 }
                 secondaryActions={[

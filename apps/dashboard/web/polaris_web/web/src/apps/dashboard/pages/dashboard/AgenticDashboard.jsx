@@ -25,27 +25,19 @@ import ComplianceAtRisksCard from './new_components/ComplianceAtRisksCard'
 import CustomPieChart from './new_components/CustomPieChart'
 import CustomLineChart from './new_components/CustomLineChart'
 import CustomDataTable from './new_components/CustomDataTable'
+import EmptyCard from './new_components/EmptyCard'
 
-// Helper function to get compliance color based on compliance name
-const getComplianceColor = (complianceName) => {
-    const colorMap = {
-        'SOC 2': '#3B82F6',
-        'GDPR': '#7C3AED',
-        'ISO 27001': '#F97316',
-        'HIPAA': '#06B6D4',
-        'PCI DSS': '#10B981',
-        'PCI-DSS': '#10B981',
-        'NIST 800-53': '#EF4444',
-        'NIST 800-171': '#EF4444',
-        'NIST': '#EF4444',
-        'OWASP': '#F59E0B',
-        'FEDRAMP': '#3B82F6',
-        'CIS CONTROLS': '#3B82F6',
-        'CMMC': '#3B82F6',
-        'FISMA': '#3B82F6',
-        'CSA CCM': '#3B82F6'
-    };
-    return colorMap[complianceName] || '#3B82F6'; // Default color
+// Helper function to get compliance color based on risk level (percentage)
+// Higher percentage = more issues = higher risk = red color
+// Lower percentage = fewer issues = lower risk = green/blue color
+const getComplianceColor = (percentage) => {
+    if (percentage >= 70) {
+        return '#EF4444'; // Red for high risk (70%+)
+    } else if (percentage >= 30) {
+        return '#F59E0B'; // Orange/Yellow for medium risk (30-70%)
+    } else {
+        return '#10B981'; // Green for low risk (<30%)
+    }
 };
 
 // Helper function to normalize compliance name for icon lookup
@@ -374,8 +366,8 @@ const AgenticDashboard = () => {
 
                     // Open & Resolved Issues
                     const openResolved = data.openResolvedIssues || {};
-                    const openData = transformTimeSeriesData(openResolved.open || []);
-                    const resolvedData = transformTimeSeriesData(openResolved.resolved || []);
+                    const openData = transformTimeSeriesData(openResolved.open || [], startTs, endTs);
+                    const resolvedData = transformTimeSeriesData(openResolved.resolved || [], startTs, endTs);
 
                     setOpenResolvedChartData([
                         {
@@ -415,16 +407,29 @@ const AgenticDashboard = () => {
                     setComplianceData(
                         complianceAtRisks.slice(0, 4).map((item) => {
                             const complianceName = item.name || 'Unknown';
+                            const percentage = item.percentage || 0;
+                            // Normalize the compliance name for icon lookup (handles special cases like CMMC)
                             const normalizedName = normalizeComplianceNameForIcon(complianceName);
-                            // func.getComplianceIcon converts to uppercase, so we need to pass the normalized name
-                            // and then construct the path manually to preserve exact case
-                            const iconPath = normalizedName ? `/public/${normalizedName}.svg` : '';
+                            // Use func.getComplianceIcon which converts to uppercase and constructs the path
+                            // URL encode the path to handle spaces and special characters in filenames
+                            let iconPath = normalizedName ? func.getComplianceIcon(normalizedName) : '';
+                            if (iconPath) {
+                                // Split path and encode only the filename part to preserve path structure
+                                const pathParts = iconPath.split('/');
+                                const filename = pathParts.pop();
+                                // encodeURIComponent handles spaces, but we need to ensure parentheses are encoded
+                                // for CSS url() to work correctly
+                                let encodedFilename = encodeURIComponent(filename);
+                                // Manually encode parentheses if they weren't encoded (some contexts don't encode them)
+                                encodedFilename = encodedFilename.replace(/\(/g, '%28').replace(/\)/g, '%29');
+                                iconPath = pathParts.join('/') + '/' + encodedFilename;
+                            }
                             return {
                                 name: complianceName,
-                                percentage: item.percentage || 0,
+                                percentage: percentage,
                                 count: item.count || 0,
                                 icon: iconPath,
-                                color: getComplianceColor(complianceName) || '#3B82F6'
+                                color: getComplianceColor(percentage)
                             };
                         })
                     );
@@ -443,8 +448,8 @@ const AgenticDashboard = () => {
                     const data = testingResponse.value;
                     const testedVsNonTested = data.testedVsNonTested || {};
 
-                    const testedData = transformTimeSeriesData(testedVsNonTested.tested || []);
-                    const nonTestedData = transformTimeSeriesData(testedVsNonTested.nonTested || []);
+                    const testedData = transformTimeSeriesData(testedVsNonTested.tested || [], startTs, endTs);
+                    const nonTestedData = transformTimeSeriesData(testedVsNonTested.nonTested || [], startTs, endTs);
 
                     setTestedVsNonTestedChartData([
                         {
@@ -507,8 +512,8 @@ const AgenticDashboard = () => {
 
                     // Open & Resolved Threats
                     const openResolvedThreats = data.openResolvedThreats || {};
-                    const openThreatsData = transformTimeSeriesData(openResolvedThreats.open || []);
-                    const resolvedThreatsData = transformTimeSeriesData(openResolvedThreats.resolved || []);
+                    const openThreatsData = transformTimeSeriesData(openResolvedThreats.open || [], startTs, endTs);
+                    const resolvedThreatsData = transformTimeSeriesData(openResolvedThreats.resolved || [], startTs, endTs);
 
                     setOpenResolvedThreatsData([
                         {
@@ -537,12 +542,14 @@ const AgenticDashboard = () => {
                     const actorsCounts = threatActorsCountResponse.value.actorsCounts || [];
                     // Transform actorsCounts to [timestamp, count] format (same as HomeDashboard.jsx)
                     // actorsCounts has {ts (seconds), totalActors, criticalActors}
-                    const threatRequestsData = actorsCounts
+                    const threatRequestsDataRaw = actorsCounts
                         .sort((a, b) => a.ts - b.ts)
                         .map(item => [
                             item.ts * 1000, // Convert seconds to milliseconds
                             item.totalActors || 0
                         ]);
+                    // Fill missing time periods with 0 for continuous line
+                    const threatRequestsData = fillMissingTimePeriods(threatRequestsDataRaw, startTs, endTs);
                     setThreatRequestsChartData(
                         threatRequestsData.length > 0 ? [
                             {
@@ -582,7 +589,7 @@ const AgenticDashboard = () => {
                     const issuesOverTimeRaw = issuesResponse.value.issuesOverTime;
                     if (issuesOverTimeRaw && Array.isArray(issuesOverTimeRaw)) {
                         if (issuesOverTimeRaw.length > 0) {
-                            issuesDataForChart = transformTimeSeriesData(issuesOverTimeRaw);
+                            issuesDataForChart = transformTimeSeriesData(issuesOverTimeRaw, startTs, endTs);
                         }
                         // If empty array, keep as empty array (chart will handle empty state)
                     } else {
@@ -598,12 +605,14 @@ const AgenticDashboard = () => {
                 if (threatActorsCountResponse.status === 'fulfilled' && threatActorsCountResponse.value) {
                     const actorsCounts = threatActorsCountResponse.value.actorsCounts || [];
                     // Transform actorsCounts to [timestamp, count] format (same as HomeDashboard.jsx)
-                    threatRequestsFlaggedData = actorsCounts
+                    const threatRequestsFlaggedDataRaw = actorsCounts
                         .sort((a, b) => a.ts - b.ts)
                         .map(item => [
                             item.ts * 1000, // Convert seconds to milliseconds
                             item.totalActors || 0
                         ]);
+                    // Fill missing time periods with 0 for continuous line
+                    threatRequestsFlaggedData = fillMissingTimePeriods(threatRequestsFlaggedDataRaw, startTs, endTs);
                 }
                 
                 const overallStatsData = [
@@ -634,12 +643,72 @@ const AgenticDashboard = () => {
         fetchAllDashboardData();
     }, [dashboardCategory, currDateRange])
 
-    const transformTimeSeriesData = (backendData) => {
+    // Helper function to fill missing time periods with 0 values for continuous line charts
+    const fillMissingTimePeriods = (data, startTs, endTs) => {
+        if (!data || data.length === 0) {
+            // If no data, return empty array (will be handled by empty state)
+            return [];
+        }
+
+        const startMs = startTs * 1000;
+        const endMs = endTs * 1000;
+        const timeDiff = endMs - startMs;
+
+        // Determine interval based on time range
+        let intervalMs;
+        let isDayBased = false;
+        
+        if (timeDiff <= 7 * 24 * 60 * 60 * 1000) {
+            // <= 7 days: daily intervals
+            intervalMs = 24 * 60 * 60 * 1000;
+            isDayBased = true;
+        } else if (timeDiff <= 90 * 24 * 60 * 60 * 1000) {
+            // <= 90 days: daily intervals
+            intervalMs = 24 * 60 * 60 * 1000;
+            isDayBased = true;
+        } else if (timeDiff <= 365 * 24 * 60 * 60 * 1000) {
+            // <= 1 year: weekly intervals
+            intervalMs = 7 * 24 * 60 * 60 * 1000;
+        } else {
+            // > 1 year: monthly intervals
+            intervalMs = 30 * 24 * 60 * 60 * 1000; // Approximate month
+        }
+
+        // Create a map of existing data points
+        const dataMap = new Map();
+        data.forEach(([timestamp, value]) => {
+            // Round timestamp to nearest interval for matching
+            const roundedTs = Math.floor(timestamp / intervalMs) * intervalMs;
+            if (!dataMap.has(roundedTs) || dataMap.get(roundedTs) < value) {
+                dataMap.set(roundedTs, value);
+            }
+        });
+
+        // Generate complete time series with gaps filled as zeros
+        const completeData = [];
+        let currentTs = Math.floor(startMs / intervalMs) * intervalMs;
+        
+        while (currentTs <= endMs) {
+            const value = dataMap.get(currentTs) || 0;
+            completeData.push([currentTs, value]);
+            
+            if (isDayBased) {
+                // For day-based intervals, increment by exactly 1 day
+                currentTs += 24 * 60 * 60 * 1000;
+            } else {
+                currentTs += intervalMs;
+            }
+        }
+
+        return completeData;
+    };
+
+    const transformTimeSeriesData = (backendData, startTs = null, endTs = null) => {
         if (!backendData || !Array.isArray(backendData)) {
             return [];
         }
 
-        return backendData.map(item => {
+        const transformedData = backendData.map(item => {
             const id = item._id;
             let timestamp;
 
@@ -762,6 +831,13 @@ const AgenticDashboard = () => {
             const count = item.count || 0;
             return [timestamp, count];
         }).sort((a, b) => a[0] - b[0]); // Sort by timestamp
+
+        // Fill missing time periods with 0 if startTs and endTs are provided
+        if (startTs && endTs && transformedData.length > 0) {
+            return fillMissingTimePeriods(transformedData, startTs, endTs);
+        }
+
+        return transformedData;
     }
 
     const onLayoutChange = (newLayout) => {
@@ -802,6 +878,26 @@ const AgenticDashboard = () => {
         });
     };
 
+    // Helper functions to check if data is empty
+    const isPieChartDataEmpty = (graphData) => {
+        if (!graphData || Object.keys(graphData).length === 0) return true;
+        const total = Object.values(graphData).reduce((sum, item) => sum + (item?.text || 0), 0);
+        return total === 0;
+    };
+
+    const isLineChartDataEmpty = (chartData) => {
+        if (!chartData || !Array.isArray(chartData) || chartData.length === 0) return true;
+        const hasData = chartData.some(series => 
+            series.data && Array.isArray(series.data) && series.data.length > 0 && 
+            series.data.some(point => point && Array.isArray(point) && point.length >= 2 && point[1] > 0)
+        );
+        return !hasData;
+    };
+
+    const isArrayDataEmpty = (data) => {
+        return !data || !Array.isArray(data) || data.length === 0;
+    };
+
     const componentNames = {
         'security-posture-chart': `${mapLabel('API Security Posture', dashboardCategory)} over time`,
         'api-discovery-pie': dashboardCategory === 'AGENTIC' ? 'Agentic AI Discovery' : mapLabel('API Discovery', dashboardCategory),
@@ -821,69 +917,130 @@ const AgenticDashboard = () => {
     };
 
     const allComponentsMap = {
-        'security-posture-chart': <CustomLineChart
-            title={`${func.toSentenceCase(window.ACCOUNT_NAME)} ${mapLabel('API Security Posture', dashboardCategory)} over time`}
-            chartData={overallStats}
-            labels={[
-                { label: mapLabel('API Endpoints Discovered', dashboardCategory), color: '#B692F6' },
-                { label: `${mapLabel('API', dashboardCategory)} Issues`, color: '#D72C0D' },
-                { label: `${mapLabel('Threat', dashboardCategory)} Requests flagged`, color: '#F3B283' }
-            ]}
-            itemId='security-posture-chart'
-            onRemoveComponent={removeComponent}
-        />,
-        'api-discovery-pie': <CustomPieChart
-            title={dashboardCategory === 'AGENTIC' ? 'Agentic AI Discovery' : mapLabel('API Discovery', dashboardCategory)}
-            subtitle={dashboardCategory === 'AGENTIC' ? 'Total Agentic Components' : `Total ${mapLabel('APIs', dashboardCategory)}`}
-            graphData={apiDiscoveryData}
-            itemId='api-discovery-pie'
-            onRemoveComponent={removeComponent}
-        />,
-        'issues-pie': <CustomPieChart
-            title="Issues"
-            subtitle="Total Issues"
-            graphData={issuesData}
-            itemId='issues-pie'
-            onRemoveComponent={removeComponent}
-        />,
-        'threat-detection-pie': <CustomPieChart
-            title={mapLabel('Threat Detection', dashboardCategory)}
-            subtitle="Requests Flagged"
-            graphData={threatData}
-            itemId='threat-detection-pie'
-            onRemoveComponent={removeComponent}
-        />,
-        'average-issue-age': <AverageIssueAgeCard
-            issueAgeData={averageIssueAgeData}
-            itemId='average-issue-age'
-            onRemoveComponent={removeComponent}
-        />,
-        'compliance-at-risks': <ComplianceAtRisksCard
-            complianceData={complianceData}
-            itemId='compliance-at-risks'
-            onRemoveComponent={removeComponent}
-        />,
-        'tested-vs-non-tested': <CustomLineChart
-            title={`Tested vs Non-Tested ${mapLabel('APIs', dashboardCategory)}`}
-            chartData={testedVsNonTestedChartData}
-            labels={[
-                { label: 'Non-Tested', color: '#D72C0D' },
-                { label: 'Tested', color: '#9E77ED' }
-            ]}
-            itemId='tested-vs-non-tested'
-            onRemoveComponent={removeComponent}
-        />,
-        'open-resolved-issues': <CustomLineChart
-            title="Open & Resolved Issues"
-            chartData={openResolvedChartData}
-            labels={[
-                { label: 'Open Issues', color: '#D72C0D' },
-                { label: 'Resolved Issues', color: '#9E77ED' }
-            ]}
-            itemId='open-resolved-issues'
-            onRemoveComponent={removeComponent}
-        />,
-        'threat-requests-chart': (threatRequestsChartData && Array.isArray(threatRequestsChartData) && threatRequestsChartData.length > 0) ? (
+        'security-posture-chart': isLineChartDataEmpty(overallStats) ? (
+            <EmptyCard 
+                title={componentNames['security-posture-chart']}
+                subTitleComponent={<Text alignment='center' color='subdued'>No security posture data available for the selected time period</Text>}
+            />
+        ) : (
+            <CustomLineChart
+                title={`${func.toSentenceCase(window.ACCOUNT_NAME)} ${mapLabel('API Security Posture', dashboardCategory)} over time`}
+                chartData={overallStats}
+                labels={[
+                    { label: mapLabel('API Endpoints Discovered', dashboardCategory), color: '#B692F6' },
+                    { label: `${mapLabel('API', dashboardCategory)} Issues`, color: '#D72C0D' },
+                    { label: `${mapLabel('Threat', dashboardCategory)} Requests flagged`, color: '#F3B283' }
+                ]}
+                itemId='security-posture-chart'
+                onRemoveComponent={removeComponent}
+            />
+        ),
+        'api-discovery-pie': isPieChartDataEmpty(apiDiscoveryData) ? (
+            <EmptyCard 
+                title={componentNames['api-discovery-pie']}
+                subTitleComponent={<Text alignment='center' color='subdued'>No API discovery data available for the selected time period</Text>}
+            />
+        ) : (
+            <CustomPieChart
+                title={dashboardCategory === 'AGENTIC' ? 'Agentic AI Discovery' : mapLabel('API Discovery', dashboardCategory)}
+                subtitle={dashboardCategory === 'AGENTIC' ? 'Total Agentic Components' : `Total ${mapLabel('APIs', dashboardCategory)}`}
+                graphData={apiDiscoveryData}
+                itemId='api-discovery-pie'
+                onRemoveComponent={removeComponent}
+            />
+        ),
+        'issues-pie': isPieChartDataEmpty(issuesData) ? (
+            <EmptyCard 
+                title={componentNames['issues-pie']}
+                subTitleComponent={<Text alignment='center' color='subdued'>No issues found for the selected time period</Text>}
+            />
+        ) : (
+            <CustomPieChart
+                title="Issues"
+                subtitle="Total Issues"
+                graphData={issuesData}
+                itemId='issues-pie'
+                onRemoveComponent={removeComponent}
+            />
+        ),
+        'threat-detection-pie': isPieChartDataEmpty(threatData) ? (
+            <EmptyCard 
+                title={componentNames['threat-detection-pie']}
+                subTitleComponent={<Text alignment='center' color='subdued'>No threat detection data available for the selected time period</Text>}
+            />
+        ) : (
+            <CustomPieChart
+                title={mapLabel('Threat Detection', dashboardCategory)}
+                subtitle="Requests Flagged"
+                graphData={threatData}
+                itemId='threat-detection-pie'
+                onRemoveComponent={removeComponent}
+            />
+        ),
+        'average-issue-age': isArrayDataEmpty(averageIssueAgeData) ? (
+            <EmptyCard 
+                title={componentNames['average-issue-age']}
+                subTitleComponent={<Text alignment='center' color='subdued'>No issue age data available for the selected time period</Text>}
+            />
+        ) : (
+            <AverageIssueAgeCard
+                issueAgeData={averageIssueAgeData}
+                itemId='average-issue-age'
+                onRemoveComponent={removeComponent}
+            />
+        ),
+        'compliance-at-risks': isArrayDataEmpty(complianceData) ? (
+            <EmptyCard 
+                title={componentNames['compliance-at-risks']}
+                subTitleComponent={<Text alignment='center' color='subdued'>No compliance data available for the selected time period</Text>}
+            />
+        ) : (
+            <ComplianceAtRisksCard
+                complianceData={complianceData}
+                itemId='compliance-at-risks'
+                onRemoveComponent={removeComponent}
+            />
+        ),
+        'tested-vs-non-tested': isLineChartDataEmpty(testedVsNonTestedChartData) ? (
+            <EmptyCard 
+                title={componentNames['tested-vs-non-tested']}
+                subTitleComponent={<Text alignment='center' color='subdued'>No testing data available for the selected time period</Text>}
+            />
+        ) : (
+            <CustomLineChart
+                title={`Tested vs Non-Tested ${mapLabel('APIs', dashboardCategory)}`}
+                chartData={testedVsNonTestedChartData}
+                labels={[
+                    { label: 'Non-Tested', color: '#D72C0D' },
+                    { label: 'Tested', color: '#9E77ED' }
+                ]}
+                itemId='tested-vs-non-tested'
+                onRemoveComponent={removeComponent}
+            />
+        ),
+        'open-resolved-issues': isLineChartDataEmpty(openResolvedChartData) ? (
+            <EmptyCard 
+                title={componentNames['open-resolved-issues']}
+                subTitleComponent={<Text alignment='center' color='subdued'>No issues data available for the selected time period</Text>}
+            />
+        ) : (
+            <CustomLineChart
+                title="Open & Resolved Issues"
+                chartData={openResolvedChartData}
+                labels={[
+                    { label: 'Open Issues', color: '#D72C0D' },
+                    { label: 'Resolved Issues', color: '#9E77ED' }
+                ]}
+                itemId='open-resolved-issues'
+                onRemoveComponent={removeComponent}
+            />
+        ),
+        'threat-requests-chart': isLineChartDataEmpty(threatRequestsChartData) ? (
+            <EmptyCard 
+                title={componentNames['threat-requests-chart']}
+                subTitleComponent={<Text alignment='center' color='subdued'>No threat requests data available for the selected time period</Text>}
+            />
+        ) : (
             <CustomLineChart
                 title={`${mapLabel('Threat', dashboardCategory)} Requests over time`}
                 chartData={threatRequestsChartData}
@@ -894,21 +1051,13 @@ const AgenticDashboard = () => {
                 itemId='threat-requests-chart'
                 onRemoveComponent={removeComponent}
             />
-        ) : (
-            <Card>
-                <VerticalStack gap="4">
-                    <ComponentHeader 
-                        title={`${mapLabel('Threat', dashboardCategory)} Requests over time`} 
-                        itemId='threat-requests-chart' 
-                        onRemove={removeComponent} 
-                    />
-                    <Box width='100%' minHeight='290px' display='flex' alignItems='center' justifyContent='center'>
-                        <Text alignment='center' color='subdued'>No threat data available</Text>
-                    </Box>
-                </VerticalStack>
-            </Card>
         ),
-        'open-resolved-threats': (openResolvedThreatsData && Array.isArray(openResolvedThreatsData) && openResolvedThreatsData.length > 0) ? (
+        'open-resolved-threats': isLineChartDataEmpty(openResolvedThreatsData) ? (
+            <EmptyCard 
+                title={componentNames['open-resolved-threats']}
+                subTitleComponent={<Text alignment='center' color='subdued'>No threat data available for the selected time period</Text>}
+            />
+        ) : (
             <CustomLineChart
                 title={`Open & Resolved ${mapLabel('Threat', dashboardCategory)}s`}
                 chartData={openResolvedThreatsData}
@@ -919,55 +1068,77 @@ const AgenticDashboard = () => {
                 itemId='open-resolved-threats'
                 onRemoveComponent={removeComponent}
             />
-        ) : (
-            <Card>
-                <VerticalStack gap="4">
-                    <ComponentHeader 
-                        title={`Open & Resolved ${mapLabel('Threat', dashboardCategory)}s`} 
-                        itemId='open-resolved-threats' 
-                        onRemove={removeComponent} 
-                    />
-                    <Box width='100%' minHeight='290px' display='flex' alignItems='center' justifyContent='center'>
-                        <Text alignment='center' color='subdued'>No threat data available</Text>
-                    </Box>
-                </VerticalStack>
-            </Card>
         ),
-        'weakest-areas': <CustomDataTable
-            title="Top Issues by Category"
-            data={topIssuesByCategory}
-            showSignalIcon={true}
-            itemId='weakest-areas'
-            onRemoveComponent={removeComponent}
-        />,
-        'top-apis-issues': <CustomDataTable
-            title={`Top ${mapLabel('APIs', dashboardCategory)} with Critical & High Issues`}
-            data={topHostnamesByIssues}
-            showSignalIcon={true}
-            itemId='top-apis-issues'
-            onRemoveComponent={removeComponent}
-        />,
-        'top-requests-by-type': <CustomDataTable
-            title="Top Threats by Category"
-            data={topThreatsByCategory}
-            showSignalIcon={true}
-            itemId='top-requests-by-type'
-            onRemoveComponent={removeComponent}
-        />,
-        'top-attacked-apis': <CustomDataTable
-            title={`Top Attacked ${mapLabel('APIs', dashboardCategory)}`}
-            data={topAttackHosts}
-            showSignalIcon={false}
-            itemId='top-attacked-apis'
-            onRemoveComponent={removeComponent}
-        />,
-        'top-bad-actors': <CustomDataTable
-            title="Top Bad Actors"
-            data={topBadActors}
-            showSignalIcon={false}
-            itemId='top-bad-actors'
-            onRemoveComponent={removeComponent}
-        />
+        'weakest-areas': isArrayDataEmpty(topIssuesByCategory) ? (
+            <EmptyCard 
+                title={componentNames['weakest-areas']}
+                subTitleComponent={<Text alignment='center' color='subdued'>No issues by category data available for the selected time period</Text>}
+            />
+        ) : (
+            <CustomDataTable
+                title="Top Issues by Category"
+                data={topIssuesByCategory}
+                showSignalIcon={true}
+                itemId='weakest-areas'
+                onRemoveComponent={removeComponent}
+            />
+        ),
+        'top-apis-issues': isArrayDataEmpty(topHostnamesByIssues) ? (
+            <EmptyCard 
+                title={componentNames['top-apis-issues']}
+                subTitleComponent={<Text alignment='center' color='subdued'>No APIs with issues data available for the selected time period</Text>}
+            />
+        ) : (
+            <CustomDataTable
+                title={`Top ${mapLabel('APIs', dashboardCategory)} with Critical & High Issues`}
+                data={topHostnamesByIssues}
+                showSignalIcon={true}
+                itemId='top-apis-issues'
+                onRemoveComponent={removeComponent}
+            />
+        ),
+        'top-requests-by-type': isArrayDataEmpty(topThreatsByCategory) ? (
+            <EmptyCard 
+                title={componentNames['top-requests-by-type']}
+                subTitleComponent={<Text alignment='center' color='subdued'>No threats by category data available for the selected time period</Text>}
+            />
+        ) : (
+            <CustomDataTable
+                title="Top Threats by Category"
+                data={topThreatsByCategory}
+                showSignalIcon={true}
+                itemId='top-requests-by-type'
+                onRemoveComponent={removeComponent}
+            />
+        ),
+        'top-attacked-apis': isArrayDataEmpty(topAttackHosts) ? (
+            <EmptyCard 
+                title={componentNames['top-attacked-apis']}
+                subTitleComponent={<Text alignment='center' color='subdued'>No attacked APIs data available for the selected time period</Text>}
+            />
+        ) : (
+            <CustomDataTable
+                title={`Top Attacked ${mapLabel('APIs', dashboardCategory)}`}
+                data={topAttackHosts}
+                showSignalIcon={false}
+                itemId='top-attacked-apis'
+                onRemoveComponent={removeComponent}
+            />
+        ),
+        'top-bad-actors': isArrayDataEmpty(topBadActors) ? (
+            <EmptyCard 
+                title={componentNames['top-bad-actors']}
+                subTitleComponent={<Text alignment='center' color='subdued'>No bad actors data available for the selected time period</Text>}
+            />
+        ) : (
+            <CustomDataTable
+                title="Top Bad Actors"
+                data={topBadActors}
+                showSignalIcon={false}
+                itemId='top-bad-actors'
+                onRemoveComponent={removeComponent}
+            />
+        )
     }
 
     const componentsMenuActivator = (
@@ -1036,7 +1207,7 @@ const AgenticDashboard = () => {
                     }
                     primaryAction={<HorizontalStack gap={2}>
                         {componentsMenu}
-                        <Button icon={SettingsFilledMinor} onClick={() => {}} style={{ display: 'none' }}>Owner setting</Button>
+                        {/* <Button icon={SettingsFilledMinor} onClick={() => {}} style={{ display: 'none' }}>Owner setting</Button> */}
                     </HorizontalStack>}
                     secondaryActions={[<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />]}
                     components={[

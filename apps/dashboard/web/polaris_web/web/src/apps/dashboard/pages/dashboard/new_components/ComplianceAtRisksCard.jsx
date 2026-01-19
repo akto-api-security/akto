@@ -13,13 +13,13 @@ const ComplianceAtRisksCard = ({ complianceData = [], itemId = "", onRemoveCompo
                             <VerticalStack key={idx} gap={2} align='center' inlineAlign='center'>
                                 <Box width='100%' minHeight='80px' display='flex' alignItems='center' justifyContent='center'>
                                     <div style={{
-                                        width: '100%',
-                                        maxWidth: '100px',
+                                        width: '100px',
                                         height: '80px',
-                                        backgroundImage: `url(${compliance.icon})`,
+                                        backgroundImage: `url("${compliance.icon}")`,
                                         backgroundRepeat: 'no-repeat',
-                                        backgroundPosition: 'center',
-                                        backgroundSize: 'contain'
+                                        backgroundPosition: 'center center',
+                                        backgroundSize: 'contain',
+                                        margin: '0 auto'
                                     }} />
                                 </Box>
 
