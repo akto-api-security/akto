@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react'
+import React, {useEffect} from 'react'
 import {
   Badge,
   Box,
@@ -842,14 +842,14 @@ function Jira() {
                         <Text variant="bodyMd" fontWeight="semibold">Deployment Type</Text>
                         <HorizontalStack gap={4}>
                             <RadioButton
-                                label="Jira Cloud (API v3)"
+                                label="Jira Cloud"
                                 checked={jiraType === 'CLOUD' || !jiraType}
                                 id="jira-cloud"
                                 name="jiraType"
                                 onChange={() => actions.setJiraType('CLOUD')}
                             />
                             <RadioButton
-                                label="Jira Data Center (API v2)"
+                                label="Jira Data Center"
                                 checked={jiraType === 'DATA_CENTER'}
                                 id="jira-datacenter"
                                 name="jiraType"
@@ -880,8 +880,8 @@ function Jira() {
                         onChange={(value) => actions.setCredentials('userEmail', value)} 
                     />
                     <PasswordTextField 
-                        label="Api Token" 
-                        helpText="Specify the api token created for your user email" 
+                        label={jiraType === 'DATA_CENTER' ? 'Personal Access Token(PAT)' : 'API Token'}
+                        helpText= {jiraType === 'DATA_CENTER' ? 'Specify your PAT (Personal Access Token) for Jira Data Center' : 'Specify your API token generated from Jira Cloud'}
                         field={apiToken} 
                         onFunc={true} 
                         setField={(value) => actions.setCredentials('apiToken', value)} 
