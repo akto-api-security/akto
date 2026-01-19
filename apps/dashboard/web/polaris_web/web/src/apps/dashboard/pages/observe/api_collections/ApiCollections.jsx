@@ -532,7 +532,6 @@ function ApiCollections(props) {
     }
 
     const allCollections = PersistStore(state => state.allCollections)
-    // const allCollections = dummyData.allCollections;
     const setAllCollections = PersistStore(state => state.setAllCollections)
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const setCollectionsRegistryStatusMap = PersistStore(state => state.setCollectionsRegistryStatusMap)
@@ -1489,7 +1488,7 @@ function ApiCollections(props) {
                                         }
                                     ]
                                 },
-                                {
+                                !activeFilterType && {
                                     title: 'Switch view',
                                     items: [
                                         {
@@ -1504,12 +1503,12 @@ function ApiCollections(props) {
                                         }
                                     ]
                                 }
-                            ]
+                            ].filter(Boolean)
                         }
                     />
                 </Popover.Pane>
             </Popover>
-            <Button id={"create-new-collection-popup"} secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>
+            {!activeFilterType && <Button id={"create-new-collection-popup"} secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>}
         </HorizontalStack>
     )
 
@@ -1621,10 +1620,11 @@ function ApiCollections(props) {
         title: (typeof header.title === 'string' && header.title.trim() === '') ? ' ' : header.title
     }));
 
-    // Check if we should use tree view (for agentic filter types)
-    const useTreeView = activeFilterType === FILTER_TYPES.AI_AGENT || 
+    // Check if we should use tree view (for agentic filter types) - only for Atlas (Endpoint Security)
+    const useTreeView = isEndpointSecurityCategory() && (
+                        activeFilterType === FILTER_TYPES.AI_AGENT || 
                         activeFilterType === FILTER_TYPES.MCP_SERVER || 
-                        activeFilterType === FILTER_TYPES.BROWSER_LLM;
+                        activeFilterType === FILTER_TYPES.BROWSER_LLM);
     
     // For agentic filters, use the tree view component grouped by endpoint ID
     const getTableComponent = () => {
