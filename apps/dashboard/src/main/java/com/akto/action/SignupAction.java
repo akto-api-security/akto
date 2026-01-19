@@ -1342,6 +1342,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                             accountId = Integer.parseInt(firstAdminAccountId);
                             logger.infoAndAddToDb("[createUserAndRedirect] Multiple account organization - linking user to admin's first accountId: " + accountId);
                         }
+                        invitationToAccount = accountId;
+                        if (UsageMetricCalculator.isRbacFeatureAvailable(invitationToAccount)) {
+                            invitedRole = fetchDefaultInviteRole(invitationToAccount, RBAC.Role.GUEST.name());
+                        }
                     } else {
                         logger.info("[createUserAndRedirect] No matching organization found by domain, creating new account and organization");
 
@@ -1417,7 +1421,12 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
 
             logger.infoAndAddToDb("[createUserAndRedirect] Initializing account for new user");
-            user = AccountAction.initializeAccount(userEmail, accountId, "My account",invitationToAccount == 0, invitedRole == null ? RBAC.Role.ADMIN.name() : invitedRole);
+            if(invitationToAccount>0){
+                Account oldAccount = AccountsDao.instance.findOne("_id", invitationToAccount);
+                user = AccountAction.initializeAccount(userEmail, invitationToAccount, oldAccount.getName(),false, invitedRole == null ? RBAC.Role.GUEST.name() : invitedRole);
+            }else {
+                user = AccountAction.initializeAccount(userEmail, accountId, "My account", invitationToAccount == 0, invitedRole == null ? RBAC.Role.ADMIN.name() : invitedRole);
+            }
             logger.infoAndAddToDb("[createUserAndRedirect] Account initialized successfully for accountId: " + accountId);
 
             servletRequest.getSession().setAttribute("user", user);
