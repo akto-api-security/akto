@@ -686,21 +686,23 @@ const EndpointDashboard = () => {
                             tooltipContent="Monitor and manage your endpoint security from this centralized dashboard."
                             docsUrl="https://docs.akto.io/endpoint-security"
                         />
-                        <Dropdown
-                            menuItems={[
-                                { label: 'CISO', value: 'ciso' }
-                            ]}
-                            selected={setViewMode}
-                            initial={viewMode}
-                        />
+                        <Box style={{ display: 'none' }}>
+                            <Dropdown
+                                menuItems={[
+                                    { label: 'CISO', value: 'ciso' }
+                                ]}
+                                selected={setViewMode}
+                                initial={viewMode}
+                            />
+                        </Box>
                     </HorizontalStack>
                 }
                 primaryAction={
                     <HorizontalStack gap={2}>
                         {componentsMenu}
-                        <Button icon={SettingsFilledMinor} onClick={() => { }}>
+                        {/* <Button icon={SettingsFilledMinor} onClick={() => { }} style={{ display: 'none' }}>
                             Owner setting
-                        </Button>
+                        </Button> */}
                     </HorizontalStack>
                 }
                 secondaryActions={[
