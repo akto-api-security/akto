@@ -451,9 +451,8 @@ public class Utils {
     }
 
     /**
-     * Extracts plain text from Atlassian Document Format (ADF) content
-     * Jira Cloud uses ADF (Atlassian Document Format) for descriptions
-     * Jira Data Center v2 API uses plain text
+     * Extracts plain text from Atlassian Document Format (ADF) content.
+     * Jira Cloud uses ADF for descriptions, while Data Center v2 API uses plain text.
      * Reference: https://developer.atlassian.com/cloud/jira/platform/apis/document/structure/
      * 
      * @param content ADF content block
@@ -539,7 +538,7 @@ public class Utils {
         
         // Description format differs between Cloud and Data Center
         // Cloud (v3): Uses Atlassian Document Format (ADF) - complex JSON structure
-        // Data Center (v2): Uses plain text or Wiki markup
+        // Data Center (v2): Uses plain text string
         boolean isDataCenter = jiraIntegration != null && 
             jiraIntegration.getJiraType() == JiraIntegration.JiraType.DATA_CENTER;
         
@@ -557,7 +556,7 @@ public class Utils {
             }
             fields.put("description", plainTextDescription.toString().trim());
         } else {
-            // Cloud: Use Atlassian Document Format (ADF)
+            // Cloud: Use ADF format directly
             fields.put("description", new BasicDBObject("type", "doc").append("version", 1).append("content", contentList));
         }
 

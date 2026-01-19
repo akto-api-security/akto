@@ -958,24 +958,10 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         String jiraTicketUrl = "";
         OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", reqPayload.toString(), headers, "");
         try {
-            loggerMaker.infoAndAddToDb("Creating Jira issue - Request URL: " + url);
-            loggerMaker.infoAndAddToDb("Creating Jira issue - Request Body: " + request.getBody());
-            System.out.println("=== JIRA REQUEST ===");
-            System.out.println("URL: " + url);
-            System.out.println("Body: " + request.getBody());
-            
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
             String responsePayload = response.getBody();
             
-            System.out.println("=== JIRA RESPONSE ===");
-            System.out.println("Status: " + response.getStatusCode());
-            System.out.println("Body: " + responsePayload);
-            loggerMaker.infoAndAddToDb("Jira API Response - Status: " + response.getStatusCode() + ", Body: " + responsePayload);
-            
             if (response.getStatusCode() > 201 || responsePayload == null) {
-                System.out.println("=== ERROR RESPONSE ===");
-                System.out.println("Response Body: " + responsePayload);
-                System.out.println("Parsed Error: " + handleError(responsePayload));
                 loggerMaker.errorAndAddToDb("error while creating jira issue, url not accessible, requestbody " + request.getBody() + " ,responsebody " + response.getBody() + " ,responsestatus " + response.getStatusCode(), LoggerMaker.LogDb.DASHBOARD);
                 
                 // Check if it's a labels field error and retry without labels
