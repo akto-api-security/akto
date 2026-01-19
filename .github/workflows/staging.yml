@@ -44,8 +44,9 @@ jobs:
           echo $IMAGE_TAG >> $GITHUB_STEP_SUMMARY
           docker buildx create --use
           # Build a docker container and push it to DockerHub
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -f apps/mini-runtime/Dockerfile -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG . --push
-          cd apps/mini-testing
+          cd apps/mini-runtime
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG . --push
+          cd ../mini-testing
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-testing:$IMAGE_TAG . --push
           cd ../mini-runtime-service
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-runtime-service:$IMAGE_TAG . --push

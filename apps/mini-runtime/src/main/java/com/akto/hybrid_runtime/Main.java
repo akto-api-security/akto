@@ -250,20 +250,20 @@ public class Main {
     }
 
     /**
-     * Find the fast-discovery JAR file.
-     * Looks in common locations relative to mini-runtime JAR.
+     * Find the mini-runtime JAR (which contains embedded fast-discovery classes).
+     * Fast-discovery runs as a separate process using the same JAR with -cp.
      *
-     * @return Path to fast-discovery JAR, or null if not found
+     * @return Path to mini-runtime JAR, or null if not found
      */
-    private static String findFastDiscoveryJar() {
+    private static String findMiniRuntimeJar() {
         // Try multiple possible locations
         String[] possiblePaths = {
             // Docker deployment location
-            "/app/fast-discovery-1.0-SNAPSHOT-jar-with-dependencies.jar",
+            "/app/mini-runtime-1.0-SNAPSHOT-jar-with-dependencies.jar",
             // Maven build location (development)
-            "apps/fast-discovery/target/fast-discovery-1.0-SNAPSHOT-jar-with-dependencies.jar",
+            "apps/mini-runtime/target/mini-runtime-1.0-SNAPSHOT-jar-with-dependencies.jar",
             // Environment variable override
-            System.getenv("FAST_DISCOVERY_JAR_PATH")
+            System.getenv("MINI_RUNTIME_JAR_PATH")
         };
 
         for (String path : possiblePaths) {
@@ -272,7 +272,7 @@ public class Main {
             }
         }
 
-        loggerMaker.errorAndAddToDb("Fast-discovery JAR not found. Tried locations: " +
+        loggerMaker.errorAndAddToDb("Mini-runtime JAR not found. Tried locations: " +
             String.join(", ", possiblePaths));
         return null;
     }
@@ -338,23 +338,24 @@ public class Main {
 
         initializeRuntime();
 
-        // Fast-Discovery Integration (optional) - Run as separate process
+        // Fast-Discovery Integration (optional) - Run as separate process from embedded classes
         if (isFastDiscoveryEnabled()) {
             try {
                 loggerMaker.infoAndAddToDb("Fast-Discovery is ENABLED - starting as separate process...");
 
-                // Find fast-discovery JAR
-                String fastDiscoveryJar = findFastDiscoveryJar();
-                if (fastDiscoveryJar == null) {
-                    throw new Exception("Fast-discovery JAR not found. Cannot start fast-discovery.");
+                // Find mini-runtime JAR (which contains embedded fast-discovery classes)
+                String miniRuntimeJar = findMiniRuntimeJar();
+                if (miniRuntimeJar == null) {
+                    throw new Exception("Mini-runtime JAR not found. Cannot start fast-discovery.");
                 }
 
-                // Build process with environment variables inherited from parent
+                // Build process: use -cp to run fast-discovery main class from embedded classes
                 ProcessBuilder processBuilder = new ProcessBuilder(
                     "java",
                     "-Xmx512m",  // Limit memory for fast-discovery (lightweight)
-                    "-jar",
-                    fastDiscoveryJar
+                    "-cp",
+                    miniRuntimeJar,
+                    "com.akto.fast_discovery.Main"  // Fast-discovery main class
                 );
 
                 // Inherit all environment variables from mini-runtime
