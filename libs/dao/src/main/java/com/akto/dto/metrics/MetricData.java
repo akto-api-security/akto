@@ -60,7 +60,11 @@ public class MetricData {
         // Cyborg metrics
         CYBORG_CALL_LATENCY("Cyborg Call Latency", "Time taken for Cyborg API calls"),
         CYBORG_CALL_COUNT("Cyborg Call Count", "Number of calls made to Cyborg"),
-        CYBORG_DATA_SIZE("Cyborg Data Size", "Total size of data processed by Cyborg");
+        CYBORG_DATA_SIZE("Cyborg Data Size", "Total size of data processed by Cyborg"),
+
+        // Profiling metrics
+        TC_CPU_USAGE("Traffic Collector CPU Usage", "CPU usage percentage of traffic collector modules"),
+        TC_MEMORY_USAGE("Traffic Collector Memory Used", "Memory used in MB by traffic collector modules");
 
         private final String descriptionName;
         private final String description;
