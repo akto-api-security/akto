@@ -116,7 +116,7 @@ const AgenticDashboard = () => {
         { i: 'issues-pie', x: 4, y: 4, w: 4, h: 3, minW: 4, maxW: 4, minH: 3, maxH: 3 },
         { i: 'threat-detection-pie', x: 8, y: 4, w: 4, h: 3, minW: 4, maxW: 4, minH: 3, maxH: 3 },
         { i: 'average-issue-age', x: 0, y: 7, w: 4, h: 3, minW: 4, maxW: 4, minH: 3, maxH: 3 },
-        { i: 'compliance-at-risks', x: 4, y: 7, w: 8, h: 3, minW: 6, minH: 2, maxH: 3 },
+        { i: 'compliance-at-risks', x: 4, y: 7, w: 8, h: 2, minW: 6, minH: 2, maxH: 3 },
         { i: 'tested-vs-non-tested', x: 0, y: 10, w: 6, h: 4, minW: 4, minH: 4, maxH: 4 },
         { i: 'open-resolved-issues', x: 6, y: 10, w: 6, h: 4, minW: 4, minH: 4, maxH: 4 },
         { i: 'threat-requests-chart', x: 0, y: 14, w: 6, h: 4, minW: 4, minH: 4, maxH: 4 },
@@ -921,6 +921,8 @@ const AgenticDashboard = () => {
             <EmptyCard 
                 title={componentNames['security-posture-chart']}
                 subTitleComponent={<Text alignment='center' color='subdued'>No security posture data available for the selected time period</Text>}
+                itemId='security-posture-chart'
+                onRemoveComponent={removeComponent}
             />
         ) : (
             <CustomLineChart
@@ -939,6 +941,8 @@ const AgenticDashboard = () => {
             <EmptyCard 
                 title={componentNames['api-discovery-pie']}
                 subTitleComponent={<Text alignment='center' color='subdued'>No API discovery data available for the selected time period</Text>}
+                itemId='api-discovery-pie'
+                onRemoveComponent={removeComponent}
             />
         ) : (
             <CustomPieChart
@@ -953,6 +957,8 @@ const AgenticDashboard = () => {
             <EmptyCard 
                 title={componentNames['issues-pie']}
                 subTitleComponent={<Text alignment='center' color='subdued'>No issues found for the selected time period</Text>}
+                itemId='issues-pie'
+                onRemoveComponent={removeComponent}
             />
         ) : (
             <CustomPieChart
@@ -967,6 +973,8 @@ const AgenticDashboard = () => {
             <EmptyCard 
                 title={componentNames['threat-detection-pie']}
                 subTitleComponent={<Text alignment='center' color='subdued'>No threat detection data available for the selected time period</Text>}
+                itemId='threat-detection-pie'
+                onRemoveComponent={removeComponent}
             />
         ) : (
             <CustomPieChart
@@ -981,6 +989,8 @@ const AgenticDashboard = () => {
             <EmptyCard 
                 title={componentNames['average-issue-age']}
                 subTitleComponent={<Text alignment='center' color='subdued'>No issue age data available for the selected time period</Text>}
+                itemId='average-issue-age'
+                onRemoveComponent={removeComponent}
             />
         ) : (
             <AverageIssueAgeCard
@@ -993,6 +1003,8 @@ const AgenticDashboard = () => {
             <EmptyCard 
                 title={componentNames['compliance-at-risks']}
                 subTitleComponent={<Text alignment='center' color='subdued'>No compliance data available for the selected time period</Text>}
+                itemId='compliance-at-risks'
+                onRemoveComponent={removeComponent}
             />
         ) : (
             <ComplianceAtRisksCard
@@ -1005,6 +1017,8 @@ const AgenticDashboard = () => {
             <EmptyCard 
                 title={componentNames['tested-vs-non-tested']}
                 subTitleComponent={<Text alignment='center' color='subdued'>No testing data available for the selected time period</Text>}
+                itemId='tested-vs-non-tested'
+                onRemoveComponent={removeComponent}
             />
         ) : (
             <CustomLineChart
@@ -1022,6 +1036,8 @@ const AgenticDashboard = () => {
             <EmptyCard 
                 title={componentNames['open-resolved-issues']}
                 subTitleComponent={<Text alignment='center' color='subdued'>No issues data available for the selected time period</Text>}
+                itemId='open-resolved-issues'
+                onRemoveComponent={removeComponent}
             />
         ) : (
             <CustomLineChart
@@ -1039,6 +1055,8 @@ const AgenticDashboard = () => {
             <EmptyCard 
                 title={componentNames['threat-requests-chart']}
                 subTitleComponent={<Text alignment='center' color='subdued'>No threat requests data available for the selected time period</Text>}
+                itemId='threat-requests-chart'
+                onRemoveComponent={removeComponent}
             />
         ) : (
             <CustomLineChart
@@ -1056,6 +1074,8 @@ const AgenticDashboard = () => {
             <EmptyCard 
                 title={componentNames['open-resolved-threats']}
                 subTitleComponent={<Text alignment='center' color='subdued'>No threat data available for the selected time period</Text>}
+                itemId='open-resolved-threats'
+                onRemoveComponent={removeComponent}
             />
         ) : (
             <CustomLineChart
@@ -1073,6 +1093,8 @@ const AgenticDashboard = () => {
             <EmptyCard 
                 title={componentNames['weakest-areas']}
                 subTitleComponent={<Text alignment='center' color='subdued'>No issues by category data available for the selected time period</Text>}
+                itemId='weakest-areas'
+                onRemoveComponent={removeComponent}
             />
         ) : (
             <CustomDataTable
@@ -1087,6 +1109,8 @@ const AgenticDashboard = () => {
             <EmptyCard 
                 title={componentNames['top-apis-issues']}
                 subTitleComponent={<Text alignment='center' color='subdued'>No APIs with issues data available for the selected time period</Text>}
+                itemId='top-apis-issues'
+                onRemoveComponent={removeComponent}
             />
         ) : (
             <CustomDataTable
@@ -1101,6 +1125,8 @@ const AgenticDashboard = () => {
             <EmptyCard 
                 title={componentNames['top-requests-by-type']}
                 subTitleComponent={<Text alignment='center' color='subdued'>No threats by category data available for the selected time period</Text>}
+                itemId='top-requests-by-type'
+                onRemoveComponent={removeComponent}
             />
         ) : (
             <CustomDataTable
@@ -1115,6 +1141,8 @@ const AgenticDashboard = () => {
             <EmptyCard 
                 title={componentNames['top-attacked-apis']}
                 subTitleComponent={<Text alignment='center' color='subdued'>No attacked APIs data available for the selected time period</Text>}
+                itemId='top-attacked-apis'
+                onRemoveComponent={removeComponent}
             />
         ) : (
             <CustomDataTable
@@ -1129,6 +1157,8 @@ const AgenticDashboard = () => {
             <EmptyCard 
                 title={componentNames['top-bad-actors']}
                 subTitleComponent={<Text alignment='center' color='subdued'>No bad actors data available for the selected time period</Text>}
+                itemId='top-bad-actors'
+                onRemoveComponent={removeComponent}
             />
         ) : (
             <CustomDataTable
