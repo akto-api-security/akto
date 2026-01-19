@@ -127,6 +127,7 @@ jobs:
           echo $IMAGE_TAG >> $GITHUB_STEP_SUMMARY
           docker buildx create --use
           # Build a docker container and push it to DockerHub
+          cd apps/mini-runtime
           if [[ "${{ github.event.inputs.mini-runtime }}" == "true" ]]; then
             cd ../mini-runtime
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG1 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG2 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG3 . --push
