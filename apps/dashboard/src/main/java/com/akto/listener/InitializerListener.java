@@ -2480,14 +2480,6 @@ public class InitializerListener implements ServletContextListener {
                     }
                 } while (!connectedToMongo);
 
-                if (DashboardMode.isOnPremDeployment()) {
-                    Context.accountId.set(1_000_000);
-                    logger.debugAndAddToDb("Dashboard started at " + Context.now());
-                }
-
-                setDashboardMode();
-                updateGlobalAktoVersion();
-
                 com.akto.otel.TraceProcessingService.Holder.setInstance(new com.akto.otel.TraceProcessingServiceImpl());
                 logger.infoAndAddToDb("TraceProcessingService initialized");
 
@@ -2505,31 +2497,7 @@ public class InitializerListener implements ServletContextListener {
                 int now = Context.now();
                 if (runJobFunctions || runJobFunctionsAnyway) {
 
-                    logger.debug("Starting init functions and scheduling jobs at " + now);
-
-                    AccountTask.instance.executeTask(new Consumer<Account>() {
-                        @Override
-                        public void accept(Account account) {
-                            runInitializerFunctions();
-                        }
-                    }, "context-initializer-secondary");
-                    logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
-                    setUpWebhookScheduler();
-                    logger.warn("Started traffic alert schedulers", LogDb.DASHBOARD);
-                    setUpTrafficAlertScheduler();
-                    logger.warn("Started daily schedulers", LogDb.DASHBOARD);
-                    setUpDailyScheduler();
-                    if (DashboardMode.isMetered()) {
-                        setupUsageScheduler();
-                    }
-                    updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
-                    syncCronInfo.setUpUpdateCronScheduler();
-                    syncCronInfo.setUpMcpMaliciousnessCronScheduler();
-                    agentBasePromptDetectionCron.setUpAgentBasePromptDetectionScheduler();
-                    setUpTestEditorTemplatesScheduler();
                     JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
-                    updateApiGroupsForAccounts();
-                    setupAutomatedApiGroupsScheduler();
                     if(runJobFunctionsAnyway) {
                         crons.trafficAlertsScheduler();
                         crons.insertHistoricalDataJob();
