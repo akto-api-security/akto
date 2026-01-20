@@ -4,6 +4,7 @@ import static com.akto.dao.MCollection.SET;
 import static com.mongodb.client.model.Filters.eq;
 
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 
 import com.akto.dao.AccountsDao;
@@ -43,7 +44,9 @@ import com.akto.utils.GithubLogin;
 import com.akto.utils.JWT;
 import com.akto.utils.OktaLogin;
 import com.akto.utils.billing.OrganizationUtils;
+import com.akto.utils.crons.OrganizationCache;
 import com.akto.utils.sso.CustomSamlSettings;
+import com.akto.util.Pair;
 import com.akto.utils.sso.SsoUtils;
 import com.auth0.Tokens;
 import com.auth0.jwk.Jwk;
@@ -67,15 +70,10 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import lombok.Setter;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.security.interfaces.RSAPublicKey;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
@@ -531,7 +529,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
             // All headers
             logger.infoAndAddToDb("[registerViaOkta] === ALL REQUEST HEADERS ===");
-            java.util.Enumeration<String> headerNames = servletRequest.getHeaderNames();
+            Enumeration<String> headerNames = servletRequest.getHeaderNames();
             if(headerNames != null) {
                 while(headerNames.hasMoreElements()) {
                     String headerName = headerNames.nextElement();
@@ -1295,35 +1293,24 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                         userDomain = userEmail.split("@")[1].toLowerCase();
                         logger.info("[createUserAndRedirect] User domain extracted: " + userDomain);
                     }
+                    Pair<String, String> matchedOrgInfo = null;
 
-                    Organization matchingOrganization = null;
                     if (userDomain != null) {
-                        logger.info("[createUserAndRedirect] Searching for existing organizations with matching domain");
+                        logger.info("[createUserAndRedirect] Searching for existing organizations with matching domain using cache");
 
-                        // Get all organizations and check for domain matches
-                        List<Organization> allOrganizations = OrganizationsDao.instance.findAll(new BasicDBObject());
-                        logger.info("[createUserAndRedirect] Found " + allOrganizations.size() + " organizations to check");
-                        if (!allOrganizations.isEmpty()) {
-                            for (Organization org : allOrganizations) {
-                                if (org.getAdminEmail() != null && org.getAdminEmail().contains("@")) {
-                                    String orgAdminDomain = org.getAdminEmail().split("@")[1].toLowerCase();
-                                    logger.debug("[createUserAndRedirect] Checking organization admin domain: " + orgAdminDomain + " against user domain: " + userDomain);
-
-                                    // Use the existing domain matching logic from InviteUserAction
-                                    if (InviteUserAction.isSameDomain(userDomain, orgAdminDomain)) {
-                                        matchingOrganization = org;
-                                        logger.infoAndAddToDb("[createUserAndRedirect] Found matching organization: " + org.getId() + " with admin email domain: " + orgAdminDomain);
-                                        break;
-                                    }
-                                }
-                            }
-                        }
+                            logger.info("[createUserAndRedirect] Cache populated with " + OrganizationCache.getCacheSize() + " organizations");
+                            matchedOrgInfo = OrganizationCache.getOrganizationInfoByDomain(userDomain);
                     }
 
-                    if (matchingOrganization != null) {
-                        logger.infoAndAddToDb("[createUserAndRedirect] Adding user to existing organization: " + matchingOrganization.getId());
+                    if (matchedOrgInfo != null) {
+                        logger.infoAndAddToDb("[createUserAndRedirect] Adding user to existing organization: " + matchedOrgInfo.getFirst());
 
-                        Set<Integer> orgAccounts = matchingOrganization.getAccounts();
+                        // Fetch organization with projection to get only ACCOUNTS field for performance
+                        Organization matchedOrganization = OrganizationsDao.instance.findOne(
+                            Filters.eq(Organization.ID, matchedOrgInfo.getFirst()),
+                            Projections.include(Organization.ID, Organization.ACCOUNTS)
+                        );
+                        Set<Integer> orgAccounts = matchedOrganization.getAccounts();
                         logger.info("[createUserAndRedirect] Organization has " + orgAccounts.size() + " account(s)");
 
                         if (orgAccounts.size() == 1) {
@@ -1334,10 +1321,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                             // Multiple accounts organization - link user to admin's first account
                             logger.info("[createUserAndRedirect] Multiple account organization found, finding admin user");
                             
-                            String orgAdminEmail = matchingOrganization.getAdminEmail();
+                            String orgAdminEmail = matchedOrgInfo.getSecond(); // Get admin email from cache
                             
                             // Find the admin user in users collection
-                            User adminUser = UsersDao.instance.findOne(Filters.eq(User.LOGIN, orgAdminEmail));
+                            User adminUser = UsersDao.instance.findOne(eq(User.LOGIN, orgAdminEmail));
                             // Get the first account from admin's account array
                             String firstAdminAccountId = adminUser.getAccounts().keySet().iterator().next();
                             accountId = Integer.parseInt(firstAdminAccountId);
