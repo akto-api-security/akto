@@ -1,18 +1,19 @@
 package com.akto.otel;
 
-import com.akto.dao.context.Context;
-import com.akto.dto.APIConfig;
-import com.akto.dto.HttpResponseParams;
-import com.akto.log.LoggerMaker;
-import com.akto.runtime.Main;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Implementation of TraceProcessingService that uses the runtime Main handler
- */
+import com.akto.dao.AccountSettingsDao;
+import com.akto.dao.context.Context;
+import com.akto.dto.AccountSettings;
+import com.akto.dto.HttpResponseParams;
+import com.akto.dto.type.SingleTypeInfo;
+import com.akto.listener.RuntimeListener;
+import com.akto.log.LoggerMaker;
+import com.akto.parsers.HttpCallParser;
+import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
+
 public class TraceProcessingServiceImpl implements TraceProcessingService {
 
     private static final LoggerMaker logger = new LoggerMaker(TraceProcessingServiceImpl.class, LoggerMaker.LogDb.DASHBOARD);
@@ -25,17 +26,19 @@ public class TraceProcessingServiceImpl implements TraceProcessingService {
             Map<String, List<HttpResponseParams>> responseParamsToAccountIdMap = new HashMap<>();
             responseParamsToAccountIdMap.put(String.valueOf(accountId), traces);
 
-            APIConfig apiConfig = new APIConfig();
+            SingleTypeInfo.fetchCustomDataTypes(accountId);
+            AccountHTTPCallParserAktoPolicyInfo info = RuntimeListener.accountHTTPParserMap.get(accountId);
+            if (info == null) { // account created after docker run
+                info = new AccountHTTPCallParserAktoPolicyInfo();
+                HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false, true);
+                info.setHttpCallParser(callParser);
+                RuntimeListener.accountHTTPParserMap.put(accountId, info);
+            }
 
-            Main.handleResponseParams(
-                responseParamsToAccountIdMap,
-                new HashMap<>(),
-                false,
-                new HashMap<>(),
-                apiConfig,
-                false,
-                true
-            );
+            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+
+            info.getHttpCallParser().syncFunction(traces, true, false, accountSettings, true);
+            info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
 
             logger.infoAndAddToDb("Successfully processed " + traces.size() + " converted traces through API pipeline");
         } catch (Exception e) {

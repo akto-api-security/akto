@@ -1,18 +1,18 @@
 package com.akto.action.quick_start;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
 import com.akto.action.UserAction;
-import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.ApiTokensDao;
-import com.akto.dao.AwsResourcesDao;
-import com.akto.dao.BackwardCompatibilityDao;
-import com.akto.dao.ConfigsDao;
+import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.database_abstractor_authenticator.JwtAuthenticator;
-import com.akto.dto.ApiToken;
-import com.akto.dto.AwsResource;
-import com.akto.dto.AwsResources;
-import com.akto.dto.BackwardCompatibility;
-import com.akto.dto.User;
+import com.akto.dto.*;
 import com.akto.dto.Config.DataDogConfig;
 import com.akto.dto.jobs.DatadogTrafficCollectorJobParams;
 import com.akto.dto.jobs.JobExecutorType;
@@ -45,21 +45,10 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 
-import lombok.Setter;
-
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
+
+import lombok.Setter;
 
 public class QuickStartAction extends UserAction {
 
@@ -540,8 +529,8 @@ public class QuickStartAction extends UserAction {
         }
         return Action.SUCCESS.toUpperCase();
     }
-
     private void createDatadogTrafficCollectorJob(String datadogApiKey, String datadogAppKey, String datadogSite, List<String> serviceNames) {
+
         DatadogTrafficCollectorJobParams jobParams = new DatadogTrafficCollectorJobParams(
                 0,
                 datadogApiKey,
