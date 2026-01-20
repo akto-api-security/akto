@@ -74,6 +74,7 @@ import static com.akto.utils.jira.Utils.buildAdditionalIssueFieldsForJira;
 import static com.akto.utils.jira.Utils.buildApiToken;
 import static com.akto.utils.jira.Utils.buildBasicRequest;
 import static com.akto.utils.jira.Utils.buildBearerRequest;
+import static com.akto.utils.jira.Utils.buildJiraDescription;
 import static com.akto.utils.jira.Utils.buildPayloadForJiraTicket;
 import static com.akto.utils.jira.Utils.getAccountJiraFields;
 import static com.akto.utils.jira.Utils.isLabelsFieldError;
@@ -130,16 +131,6 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
      * - Authentication: Personal Access Token (PAT) or Basic Auth
      * - Base URL format: http://your-server.com:port
      * 
-     * KEY DIFFERENCES:
-     * - API version in URI: v3 (Cloud) vs v2 (Data Center)
-     * - Cloud has additional features like Atlassian Document Format support
-     * - Data Center documentation explicitly states: "api - for everything else. Current version is 2"
-     * - Both use same endpoint patterns, just different version numbers
-     * 
-     * IMPLEMENTATION STRATEGY:
-     * - Try v3 first (Cloud)
-     * - Fallback to v2 if v3 fails (Data Center)
-     * - Maintain compatibility with both deployment types
      */
     
     // Cloud (v3) endpoints - Primary
@@ -288,7 +279,6 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         try {
             setProjId(projId.replaceAll("\\s+", ""));
 
-            // Try v3 API first (Cloud), fallback to v2 (Data Center)
             // Reference: https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-projects/#api-rest-api-3-project-projectidorkey-statuses-get
             // Reference: https://developer.atlassian.com/server/jira/platform/rest/v11002/api-group-project/#api-rest-api-2-project-projectidorkey-statuses-get
             String statusUrl = baseUrl + String.format(getIssueStatusEndpoint(), projId) + "?maxResults=100";
@@ -555,7 +545,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             Updates.set("projId", projId),
             Updates.set("userEmail", userEmail),
             Updates.set("issueType", issueType),
-            Updates.set("jiraType", jiraType != null && !jiraType.isEmpty() ? jiraType : "CLOUD"),
+            Updates.set("jiraType", jiraType),
             Updates.setOnInsert("createdTs", Context.now()),
             Updates.set("updatedTs", Context.now()),
             Updates.set("projectIdsMap", projectAndIssueMap),
@@ -716,14 +706,6 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         return Action.SUCCESS.toUpperCase();
     }
 
-    /**
-     * Fetches project metadata (issue types) from Jira API
-     * Uses appropriate API version based on deployment type
-     * 
-     * @param projectId The Jira project key/ID
-     * @return List of issue types with their IDs
-     * @throws Exception if API call fails or parsing fails
-     */
     private List<BasicDBObject> getProjectMetadata(String projectId) throws Exception {
         setApiToken(buildApiToken(apiToken));
         if (apiToken == null) {
@@ -837,14 +819,6 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         return issueTypes;
     }
 
-    /**
-     * Parses Data Center v2 API response
-     * Response format: [{"id":"10002","name":"Task","statuses":[...]}]
-     * 
-     * @param responsePayload Raw JSON response
-     * @return List of issue types
-     * @throws Exception if parsing fails
-     */
     private BasicDBList parseDataCenterResponse(String responsePayload) throws Exception {
         BasicDBList issueTypes = new BasicDBList();
         
@@ -867,14 +841,6 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         return issueTypes;
     }
 
-    /**
-     * Parses Cloud v3 API response
-     * Response format: {"issueTypes": [{"id": "10001", "name": "Bug"}]}
-     * 
-     * @param responsePayload Raw JSON response
-     * @return List of issue types
-     * @throws Exception if parsing fails
-     */
     private BasicDBList parseCloudResponse(String responsePayload) throws Exception {
         try {
             BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
@@ -928,7 +894,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         }
         
         // Set jiraType from integration to use correct endpoint
-        jiraType = jiraIntegration.getJiraType() != null ? jiraIntegration.getJiraType().name() : "CLOUD";
+        jiraType = jiraIntegration.getJiraType().name();
 
         TestingRunIssues testingRunIssues = TestingRunIssuesDao.instance.findOne(
             Filters.eq(Constants.ID, jiraMetaData.getTestingIssueId()));
@@ -1079,29 +1045,41 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     }
 
     private BasicDBObject buildContentDetails(String txt, String link) {
-        BasicDBObject details = new BasicDBObject();
-        details.put("type", "paragraph");
-        BasicDBList contentInnerList = new BasicDBList();
-        BasicDBObject innerDetails = new BasicDBObject();
-        innerDetails.put("text", txt);
-        innerDetails.put("type", "text");
+        JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+        boolean isDataCenter = jiraIntegration.getJiraType() == JiraIntegration.JiraType.DATA_CENTER;
+        
+        if (isDataCenter) {
+            BasicDBObject details = new BasicDBObject();
+            details.put("type", "paragraph");
+            if (link != null) {
+                details.put("text", txt + " (" + link + ")");
+            } else {
+                details.put("text", txt);
+            }
+            return details;
+        } else {
+            BasicDBObject details = new BasicDBObject();
+            details.put("type", "paragraph");
+            BasicDBList contentInnerList = new BasicDBList();
+            BasicDBObject innerDetails = new BasicDBObject();
+            innerDetails.put("text", txt);
+            innerDetails.put("type", "text");
 
-        if (link != null) {
-            BasicDBList marksList = new BasicDBList();
-            BasicDBObject marks = new BasicDBObject();
-            marks.put("type", "link");
-            BasicDBObject attrs = new BasicDBObject();
-            attrs.put("href", link);
-            marks.put("attrs", attrs);
-            marksList.add(marks);
-            innerDetails.put("marks", marksList);
+            if (link != null) {
+                BasicDBList marksList = new BasicDBList();
+                BasicDBObject marks = new BasicDBObject();
+                marks.put("type", "link");
+                BasicDBObject attrs = new BasicDBObject();
+                attrs.put("href", link);
+                marks.put("attrs", attrs);
+                marksList.add(marks);
+                innerDetails.put("marks", marksList);
+            }
+
+            contentInnerList.add(innerDetails);
+            details.put("content", contentInnerList);
+            return details;
         }
-
-        contentInnerList.add(innerDetails);
-        details.put("content", contentInnerList);
-
-
-        return details;
     }
 
     String aktoDashboardHost;
@@ -1385,18 +1363,17 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         // issue title
         String summary = "Akto Report - " + jiraMetaData.getIssueTitle() + " (" + endpointMethod + " - " + truncatedEndpoint + ")";
 
-        BasicDBList contentList = new BasicDBList();
-        contentList.add(buildContentDetails(jiraMetaData.getHostStr(), null));
-        contentList.add(buildContentDetails(jiraMetaData.getEndPointStr(), null));
-        contentList.add(buildContentDetails("Issue link - Akto dashboard", jiraMetaData.getIssueUrl()));
-        contentList.add(buildContentDetails(jiraMetaData.getIssueDescription(), null));
+        List<BasicDBObject> baseContent = new ArrayList<>();
+        baseContent.add(buildContentDetails(jiraMetaData.getHostStr(), null));
+        baseContent.add(buildContentDetails(jiraMetaData.getEndPointStr(), null));
+        baseContent.add(buildContentDetails("Issue link - Akto dashboard", jiraMetaData.getIssueUrl()));
+        baseContent.add(buildContentDetails(jiraMetaData.getIssueDescription(), null));
 
-        List<BasicDBObject> additionalFields = buildAdditionalIssueFieldsForJira(info, issue, remediation);
-        if (!CollectionUtils.isEmpty(additionalFields)) {
-            contentList.addAll(additionalFields);
-        }
+        List<BasicDBObject> additionalFields = buildAdditionalIssueFieldsForJira(info, issue, remediation, jiraIntegration.getJiraType());
+        
+        Object description = buildJiraDescription(baseContent, additionalFields, jiraIntegration.getJiraType());
 
-        BasicDBObject fields = buildPayloadForJiraTicket(summary, this.projId, this.issueType, contentList,jiraMetaData.getAdditionalIssueFields(), issue.getSeverity(), jiraIntegration);
+        BasicDBObject fields = buildPayloadForJiraTicket(summary, this.projId, this.issueType, description, jiraMetaData.getAdditionalIssueFields(), issue.getSeverity(), jiraIntegration);
         
         // Combine user labels with AKTO_SYNC label
         List<String> labelsList = new ArrayList<>();
@@ -1710,12 +1687,15 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         }
         
         // Set jiraType from integration to use correct endpoint
-        jiraType = jiraIntegration.getJiraType() != null ? jiraIntegration.getJiraType().name() : "CLOUD";
+        jiraType = jiraIntegration.getJiraType().name();
 
         try {
-            BasicDBList contentList = new BasicDBList();
-            contentList.add(buildContentDetails(this.description, null));
-            BasicDBObject fields = buildPayloadForJiraTicket(this.title, this.projId, this.issueType, contentList, null, null, jiraIntegration);
+            List<BasicDBObject> baseContent = new ArrayList<>();
+            baseContent.add(buildContentDetails(this.description, null));
+            
+            Object description = buildJiraDescription(baseContent, new ArrayList<>(), jiraIntegration.getJiraType());
+            
+            BasicDBObject fields = buildPayloadForJiraTicket(this.title, this.projId, this.issueType, description, null, null, jiraIntegration);
             
             // Combine user labels with AKTO_SYNC label
             List<String> labelsList = new ArrayList<>();

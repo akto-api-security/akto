@@ -450,115 +450,14 @@ public class Utils {
         return new Pair<>(jiraBaseUrl + "/browse/" + jiraTicketKey, jiraTicketKey);
     }
 
-    /**
-     * Extracts plain text from Atlassian Document Format (ADF) content.
-     * Jira Cloud uses ADF for descriptions, while Data Center v2 API uses plain text.
-     * Reference: https://developer.atlassian.com/cloud/jira/platform/apis/document/structure/
-     * 
-     * @param content ADF content block
-     * @return Plain text extracted from ADF
-     */
-    private static String extractTextFromADF(BasicDBObject content) {
-        StringBuilder text = new StringBuilder();
-        String type = content.getString("type");
-        
-        if ("text".equals(type)) {
-            // Base case: text node
-            String textValue = content.getString("text");
-            if (textValue != null) {
-                text.append(textValue);
-            }
-        } else if ("paragraph".equals(type)) {
-            // Paragraph contains text or other inline nodes
-            Object contentObj = content.get("content");
-            if (contentObj instanceof BasicDBList) {
-                BasicDBList contentList = (BasicDBList) contentObj;
-                for (Object item : contentList) {
-                    if (item instanceof BasicDBObject) {
-                        text.append(extractTextFromADF((BasicDBObject) item));
-                    }
-                }
-            }
-        } else if ("heading".equals(type)) {
-            // Heading with level attribute
-            Object attrsObj = content.get("attrs");
-            int level = 1;
-            if (attrsObj instanceof BasicDBObject) {
-                BasicDBObject attrs = (BasicDBObject) attrsObj;
-                Object levelObj = attrs.get("level");
-                if (levelObj instanceof Integer) {
-                    level = (Integer) levelObj;
-                }
-            }
-            
-            Object contentObj = content.get("content");
-            if (contentObj instanceof BasicDBList) {
-                BasicDBList contentList = (BasicDBList) contentObj;
-                for (Object item : contentList) {
-                    if (item instanceof BasicDBObject) {
-                        text.append(extractTextFromADF((BasicDBObject) item));
-                    }
-                }
-            }
-        } else if ("bulletList".equals(type)) {
-            // Bullet list contains list items
-            Object contentObj = content.get("content");
-            if (contentObj instanceof BasicDBList) {
-                BasicDBList contentList = (BasicDBList) contentObj;
-                for (Object item : contentList) {
-                    if (item instanceof BasicDBObject) {
-                        String itemText = extractTextFromADF((BasicDBObject) item);
-                        if (itemText != null && !itemText.trim().isEmpty()) {
-                            text.append("- ").append(itemText).append("\n");
-                        }
-                    }
-                }
-            }
-        } else if ("listItem".equals(type)) {
-            // List item contains a paragraph
-            Object contentObj = content.get("content");
-            if (contentObj instanceof BasicDBList) {
-                BasicDBList contentList = (BasicDBList) contentObj;
-                for (Object item : contentList) {
-                    if (item instanceof BasicDBObject) {
-                        text.append(extractTextFromADF((BasicDBObject) item));
-                    }
-                }
-            }
-        }
-        
-        return text.toString();
-    }
 
-    public static BasicDBObject buildPayloadForJiraTicket(String summary, String projectKey, String issueType, BasicDBList contentList, Map<String, Object> additionalIssueFields, Severity severity, JiraIntegration jiraIntegration) {
+
+    public static BasicDBObject buildPayloadForJiraTicket(String summary, String projectKey, String issueType, Object description, Map<String, Object> additionalIssueFields, Severity severity, JiraIntegration jiraIntegration) {
         BasicDBObject fields = new BasicDBObject();
         fields.put("summary", summary);
         fields.put("project", new BasicDBObject("key", projectKey));
         fields.put("issuetype", new BasicDBObject("id", issueType));
-        
-        // Description format differs between Cloud and Data Center
-        // Cloud (v3): Uses Atlassian Document Format (ADF) - complex JSON structure
-        // Data Center (v2): Uses plain text string
-        boolean isDataCenter = jiraIntegration != null && 
-            jiraIntegration.getJiraType() == JiraIntegration.JiraType.DATA_CENTER;
-        
-        if (isDataCenter) {
-            // Data Center: Convert ADF content to plain text
-            StringBuilder plainTextDescription = new StringBuilder();
-            for (Object contentObj : contentList) {
-                if (contentObj instanceof BasicDBObject) {
-                    BasicDBObject content = (BasicDBObject) contentObj;
-                    String text = extractTextFromADF(content);
-                    if (text != null && !text.isEmpty()) {
-                        plainTextDescription.append(text).append("\n");
-                    }
-                }
-            }
-            fields.put("description", plainTextDescription.toString().trim());
-        } else {
-            // Cloud: Use ADF format directly
-            fields.put("description", new BasicDBObject("type", "doc").append("version", 1).append("content", contentList));
-        }
+        fields.put("description", description);
 
         // Apply severity to priority mapping
         if (severity != null && jiraIntegration != null) {
@@ -612,7 +511,50 @@ public class Utils {
         return fields;
     }
 
+    public static Object buildJiraDescription(List<BasicDBObject> baseContent, List<BasicDBObject> additionalContent, JiraIntegration.JiraType jiraType) {
+        if (jiraType == JiraIntegration.JiraType.DATA_CENTER) {
+            StringBuilder description = new StringBuilder();
+            
+            for (BasicDBObject content : baseContent) {
+                String type = content.getString("type");
+                if ("paragraph".equals(type)) {
+                    description.append(content.getString("text")).append("\n");
+                }
+            }
+            
+            for (BasicDBObject content : additionalContent) {
+                String type = content.getString("type");
+                if ("heading".equals(type)) {
+                    int level = content.getInt("level", 1);
+                    String prefix = String.join("", Collections.nCopies(level, "#"));
+                    description.append("\n").append(prefix).append(" ").append(content.getString("text")).append("\n");
+                } else if ("paragraph".equals(type)) {
+                    description.append(content.getString("text")).append("\n");
+                } else if ("listItem".equals(type)) {
+                    description.append("- ").append(content.getString("text")).append("\n");
+                }
+            }
+            
+            return description.toString().trim();
+        } else {
+            BasicDBList contentList = new BasicDBList();
+            contentList.addAll(baseContent);
+            contentList.addAll(additionalContent);
+            return new BasicDBObject("type", "doc").append("version", 1).append("content", contentList);
+        }
+    }
+
     public static List<BasicDBObject> buildAdditionalIssueFieldsForJira(Info info,
+        TestingRunIssues issue, Remediation remediation, JiraIntegration.JiraType jiraType) {
+        
+        if (jiraType == JiraIntegration.JiraType.DATA_CENTER) {
+            return buildAdditionalIssueFieldsForDataCenter(info, issue, remediation);
+        } else {
+            return buildAdditionalIssueFieldsForCloud(info, issue, remediation);
+        }
+    }
+
+    private static List<BasicDBObject> buildAdditionalIssueFieldsForCloud(Info info,
         TestingRunIssues issue, Remediation remediation) {
         List<BasicDBObject> contentList = new ArrayList<>();
 
@@ -633,6 +575,36 @@ public class Utils {
                     ? info.getRemediation()
                     : remediation != null ? remediation.getRemediationText() : "No remediation provided.";
                 addTextSection(contentList, 3, "Remediation", remediationText);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e,
+                "Error while adding additional issue details in Jira Payload: " + e.getMessage(),
+                LoggerMaker.LogDb.DASHBOARD);
+        }
+        return contentList;
+    }
+
+    private static List<BasicDBObject> buildAdditionalIssueFieldsForDataCenter(Info info,
+        TestingRunIssues issue, Remediation remediation) {
+        List<BasicDBObject> contentList = new ArrayList<>();
+
+        try {
+            contentList.add(addPlainTextHeading(3, "Overview"));
+            addPlainTextSection(contentList, 4, "Severity", issue.getSeverity().name());
+            addPlainTextListSection(contentList, 3, "Timelines (UTC)", getIssueTimelines(issue));
+
+            if (info != null) {
+                addPlainTextSection(contentList, 4, "Impact", info.getImpact());
+                addPlainTextListSection(contentList, 4, "Tags", info.getTags());
+                addPlainTextComplianceSection(contentList, info.getCompliance());
+                addPlainTextListSection(contentList, 4, "CWE", info.getCwe());
+                addPlainTextListSection(contentList, 4, "CVE", info.getCve());
+                addPlainTextListSection(contentList, 4, "References", info.getReferences());
+
+                String remediationText = StringUtils.isNotBlank(info.getRemediation())
+                    ? info.getRemediation()
+                    : remediation != null ? remediation.getRemediationText() : "No remediation provided.";
+                addPlainTextSection(contentList, 3, "Remediation", remediationText);
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e,
@@ -712,5 +684,52 @@ public class Utils {
                         Collections.singletonList(
                             new BasicDBObject("type", "text").append("text", StringUtils.defaultString(text, ""))))
             ));
+    }
+
+    // Plain text helpers for Data Center
+    private static void addPlainTextSection(List<BasicDBObject> list, int level, String heading, String text) {
+        list.add(addPlainTextHeading(level, heading));
+        list.add(addPlainTextParagraph(text));
+    }
+
+    private static void addPlainTextListSection(List<BasicDBObject> list, int level, String heading, List<String> items) {
+        if (CollectionUtils.isNotEmpty(items)) {
+            list.add(addPlainTextHeading(level, heading));
+            for (String item : items) {
+                list.add(addPlainTextListItem(item));
+            }
+        }
+    }
+
+    private static void addPlainTextComplianceSection(List<BasicDBObject> list, ComplianceMapping compliance) {
+        if (compliance == null || MapUtils.isEmpty(compliance.getMapComplianceToListClauses())) return;
+
+        list.add(addPlainTextHeading(4, "Compliance"));
+        for (Map.Entry<String, List<String>> entry : compliance.getMapComplianceToListClauses().entrySet()) {
+            list.add(addPlainTextHeading(5, entry.getKey()));
+            if (CollectionUtils.isNotEmpty(entry.getValue())) {
+                for (String item : entry.getValue()) {
+                    list.add(addPlainTextListItem(item));
+                }
+            } else {
+                list.add(addPlainTextParagraph("No clauses available."));
+            }
+        }
+    }
+
+    private static BasicDBObject addPlainTextHeading(int level, String text) {
+        return new BasicDBObject("type", "heading")
+            .append("level", level)
+            .append("text", StringUtils.defaultString(text, ""));
+    }
+
+    private static BasicDBObject addPlainTextParagraph(String text) {
+        return new BasicDBObject("type", "paragraph")
+            .append("text", StringUtils.defaultString(text, ""));
+    }
+
+    private static BasicDBObject addPlainTextListItem(String text) {
+        return new BasicDBObject("type", "listItem")
+            .append("text", StringUtils.defaultString(text, ""));
     }
 }
