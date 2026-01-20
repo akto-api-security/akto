@@ -37,6 +37,7 @@ import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
 import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isGenAISecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import useAgenticFilter, { FILTER_TYPES } from "./useAgenticFilter";
 import AgentEndpointTreeTable from "./AgentEndpointTreeTable";
+import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "./endpointShieldHelper";
   
 const CenterViewType = {
     Table: 0,
@@ -71,6 +72,16 @@ const headers = [
             value: "endpointId",
             filterKey: "endpointId",
             textValue: 'endpointId',
+            showFilter: true,
+            isText: CellType.TEXT,
+            boxWidth: '100px'
+        },
+        {
+            title: "Username",
+            text: "Username",
+            value: "username",
+            filterKey: "username",
+            textValue: 'username',
             showFilter: true,
             isText: CellType.TEXT,
         }
@@ -235,7 +246,7 @@ const resourceName = {
     plural: 'collections',
   };
 
-const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, isLoading) => {
+const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, isLoading, usernameMap = {}) => {
     // Ensure collectionsArr is an array
     if (!Array.isArray(collectionsArr)) {
         return { prettify: [], normal: [] };
@@ -304,6 +315,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             discovered: func.prettifyEpoch(c.startTs || 0),
             descriptionComp: (<Box maxWidth="350px"><Text>{c.description}</Text></Box>),
             outOfTestingScopeComp: c.isOutOfTestingScope ? (<Text>Yes</Text>) : (<Text>No</Text>),
+            username: getUsernameForCollection(c, usernameMap),
         ...((tagsList.includes("mcp-server")) ? {
             iconComp: (<Box><CollectionIcon hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>)
         } : (tagsList.includes("gen-ai")) ? {
@@ -326,6 +338,7 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
     const riskScoreMap = transformMaps?.riskScoreMap || {};
     const severityInfoMap = transformMaps?.severityInfoMap || {};
     const sensitiveInfoMap = transformMaps?.sensitiveInfoMap || {};
+    const usernameMap = transformMaps?.usernameMap || {};
 
     const detected = func.prettifyEpoch(trafficInfoMap[rawCollection.id] || 0);
     const discovered = func.prettifyEpoch(rawCollection.startTs || 0);
@@ -413,6 +426,7 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         disableClick: rawCollection.deactivated || false,
         deactivatedRiskScore: rawCollection.deactivated ? (riskScore - 10) : riskScore,
         activatedRiskScore: -1 * (rawCollection.deactivated ? riskScore : (riskScore - 10)),
+        username: getUsernameForCollection(rawCollection, usernameMap),
     };
 };
 
@@ -487,6 +501,7 @@ function ApiCollections(props) {
     const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0, totalAllowedForTesting: 0})
     const [hasUsageEndpoints, setHasUsageEndpoints] = useState(true)
     const [envTypeMap, setEnvTypeMap] = useState({})
+    const [usernameMap, setUsernameMap] = useState({})
     const [refreshData, setRefreshData] = useState(false)
     const [popover,setPopover] = useState(false)
     const [teamData, setTeamData] = useState([])
@@ -582,6 +597,13 @@ function ApiCollections(props) {
                     const riskScoreMap = lastFetchedResp?.riskScoreMap || {};
                     const trafficInfoMap = PersistStore.getState().trafficMap || {};
 
+                    // Fetch endpoint shield usernames even when using cache (for endpoint security only)
+                    let cachedUsernameMap = usernameMap || {};
+                    if (isEndpointSecurityCategory() && Object.keys(cachedUsernameMap).length === 0) {
+                        cachedUsernameMap = await fetchEndpointShieldUsernameMap();
+                        setUsernameMap(cachedUsernameMap);
+                    }
+
                     let finalArr = allCollections;
                     if(customCollectionDataFilter){
                         finalArr = finalArr.filter(customCollectionDataFilter)
@@ -599,7 +621,8 @@ function ApiCollections(props) {
                         coverageMap: coverageMapCached,
                         riskScoreMap,
                         severityInfoMap,
-                        sensitiveInfoMap
+                        sensitiveInfoMap,
+                        usernameMap: cachedUsernameMap
                     };
 
                     // OPTIMIZATION: For large datasets (>COLLECTIONS_LAZY_RENDER_THRESHOLD items), store RAW data + transform function
@@ -696,6 +719,7 @@ function ApiCollections(props) {
                 apiPromises.push(settingRequests.getTeamData()); // index varies
             }
 
+
             let results = await Promise.allSettled(apiPromises);
 
             // Extract collections response (index 0)
@@ -773,6 +797,13 @@ function ApiCollections(props) {
             setTeamData(userList)
         }
 
+        // Fetch endpoint shield usernames (for endpoint security only)
+        let collectionToUsernameMap = {};
+        if (isEndpointSecurityCategory()) {
+            collectionToUsernameMap = await fetchEndpointShieldUsernameMap();
+            setUsernameMap(collectionToUsernameMap);
+        }
+
         // Ensure all parameters are defined before calling convertToNewData
         const sensitiveInfoMap = sensitiveInfo?.sensitiveInfoMap || {};
         const severityInfoMap = severityObj || {};
@@ -808,13 +839,14 @@ function ApiCollections(props) {
                 severityInfoMap,
                 coverageMap,
                 trafficInfoMap,
-                riskScoreMap
+                riskScoreMap,
+                usernameMap: collectionToUsernameMap
             };
 
             dataObj = { prettify: rawData, normal: rawData };
         } else {
             // Small dataset (<500 items) - use old approach with JSX components
-            dataObj = convertToNewData(finalArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, false);
+            dataObj = convertToNewData(finalArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, false, collectionToUsernameMap);
         }
 
         // Ensure dataObj.prettify exists
