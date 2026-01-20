@@ -110,7 +110,7 @@ public class MaliciousEventService {
     String filterId = evt.getFilterId();
 
     // Skip recording for ParamEnumeration filter on specific account
-    if ("ParamEnumeration".equals(filterId) && "1763355072".equals(accountId)) {
+    if ("WeakOrMissingAuth".equals(filterId) && "1763355072".equals(accountId)) {
       return;
     }
 
