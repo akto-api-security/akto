@@ -431,8 +431,7 @@ public final class FilterAction {
         if (!filterActionRequest.getOperand().equals(TestEditorEnums.DataOperands.REGEX.toString()) || (filterActionRequest.getCollectionProperty() != null && filterActionRequest.getCollectionProperty().equals(TestEditorEnums.CollectionOperands.FOR_ONE.toString())) ) {
             try {
                 payload = Utils.jsonifyIfArray(payload);
-                JSONObject jsonObj = JSON.parseObject(payload);
-                payloadObj = new BasicDBObject(jsonObj);
+                payloadObj = BasicDBObject.parse(payload);
             } catch(Exception e) {
                 // add log
             }
@@ -441,7 +440,6 @@ public final class FilterAction {
         Set<String> matchingKeySet = new HashSet<>();
         List<String> matchingKeys = new ArrayList<>();
         List<String> matchingValueKeySet = new ArrayList<>();
-        Boolean res = false;
 
         boolean allShouldSatisfy = false;
         boolean doAllSatisfy = true;

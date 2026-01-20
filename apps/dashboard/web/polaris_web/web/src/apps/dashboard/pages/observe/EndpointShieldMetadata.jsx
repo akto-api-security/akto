@@ -738,7 +738,7 @@ function EndpointShieldMetadata() {
                         {mapLabel("Endpoint Shield", dashboardCategory)}
                     </Text>
                 }
-                backUrl="/dashboard/observe"
+                isFirstPage={true}
                 primaryAction={primaryActions}
                 components = {[
                     <GithubServerTable

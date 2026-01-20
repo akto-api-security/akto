@@ -92,7 +92,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
   private Map<String, FilterConfig> apiFilters;
   private int filterLastUpdatedAt = 0;
-  private int filterUpdateIntervalSec = 900;
+  private int filterUpdateIntervalSec = 300;
 
   private final KafkaProtoProducer internalKafka;
 

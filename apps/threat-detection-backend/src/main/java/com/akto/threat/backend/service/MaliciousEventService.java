@@ -39,6 +39,7 @@ public class MaliciousEventService {
   private static final LoggerMaker logger = new LoggerMaker(MaliciousEventService.class);
 
   private static final HashMap<String, Boolean> shouldNotCreateIndexes = new HashMap<>();
+  private static final List<String> IGNORED_POLICIES_FOR_ACCOUNT = Arrays.asList("WeakOrMissingAuth", "PIIDataLeak");
 
   public MaliciousEventService(
       KafkaConfig kafkaConfig, MaliciousEventDao maliciousEventDao) {
@@ -109,8 +110,12 @@ public class MaliciousEventService {
     String actor = evt.getActor();
     String filterId = evt.getFilterId();
 
-    // Skip recording for ParamEnumeration filter on specific account
-    if ("ParamEnumeration".equals(filterId) && "1763355072".equals(accountId)) {
+    // Skip recording for specific policies on specific account
+    if (IGNORED_POLICIES_FOR_ACCOUNT.contains(filterId) && "1763355072".equals(accountId)) {
+      return;
+    }
+    // Skip recording for specific policies on specific account
+    if ("OSCommandInjection".equals(filterId) && "1763355072".equals(accountId) && evt.getLatestApiEndpoint().contains("api-transactions")) {
       return;
     }
 
