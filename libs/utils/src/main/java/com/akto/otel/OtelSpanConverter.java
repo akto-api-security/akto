@@ -9,6 +9,7 @@ import com.akto.dto.traffic.CollectionTags;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Pair;
+import com.akto.utils.RedactParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -35,7 +36,7 @@ public class OtelSpanConverter {
 
     private String extractString(JsonNode attributes, String key) {
         JsonNode node = attributes.get(key);
-        return (node != null && !node.isNull()) ? node.asText() : null;
+        return (node != null && !node.isNull()) ? node.toString() : null;
     }
 
     public ConversionResult convert(String datadogResponseJson, int accountId) throws Exception {
@@ -135,7 +136,7 @@ public class OtelSpanConverter {
 
         String ipString = "0.0.0.0/0";
 
-        return new HttpResponseParams(
+        HttpResponseParams responseParams = new HttpResponseParams(
             "HTTP/1.1",
             status,
             "OK",
@@ -146,11 +147,22 @@ public class OtelSpanConverter {
             String.valueOf(accountId),
             false,
             HttpResponseParams.Source.OTHER,
-            "opentelemetry",
+            "",
             ipString,
             ipString,
             ""
         );
+
+        // Generate and set the orig field in Akto format using existing utility
+        try {
+            String aktoFormatString = RedactParser.convertHttpRespToOriginalString(responseParams);
+            responseParams.setOrig(aktoFormatString);
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Error creating Akto format string: " + e.getMessage());
+            responseParams.setOrig("{}");
+        }
+
+        return responseParams;
     }
 
     private Map<String, List<String>> extractHeaders(JsonNode attributes, boolean responseHeaders) {

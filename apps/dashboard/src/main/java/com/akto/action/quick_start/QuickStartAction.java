@@ -529,35 +529,21 @@ public class QuickStartAction extends UserAction {
         }
         return Action.SUCCESS.toUpperCase();
     }
-
-    private List<String> extractValidServiceNames(List<String> serviceNames) {
-        List<String> validServiceNames = new ArrayList<>();
-        if (serviceNames != null) {
-            for (String serviceName : serviceNames) {
-                if (!StringUtils.isEmpty(serviceName) && !serviceName.trim().isEmpty()) {
-                    validServiceNames.add(serviceName.trim());
-                }
-            }
-        }
-        return validServiceNames;
-    }
-
     private void createDatadogTrafficCollectorJob(String datadogApiKey, String datadogAppKey, String datadogSite, List<String> serviceNames) {
-        List<String> validServiceNames = extractValidServiceNames(serviceNames);
 
         DatadogTrafficCollectorJobParams jobParams = new DatadogTrafficCollectorJobParams(
                 0,
                 datadogApiKey,
                 datadogAppKey,
                 datadogSite,
-                validServiceNames,
+                serviceNames,
                 1000
             );
         JobScheduler.scheduleRecurringJob(
             Context.accountId.get(),
             jobParams,
             JobExecutorType.DASHBOARD,
-            60
+            60*60
         );
 
         logger.infoAndAddToDb("Datadog traffic collector job scheduled to run every hour");
