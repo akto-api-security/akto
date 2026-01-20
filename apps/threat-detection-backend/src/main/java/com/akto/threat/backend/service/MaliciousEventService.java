@@ -114,6 +114,10 @@ public class MaliciousEventService {
     if (IGNORED_POLICIES_FOR_ACCOUNT.contains(filterId) && "1763355072".equals(accountId)) {
       return;
     }
+    // Skip recording for specific policies on specific account
+    if ("OSCommandInjection".equals(filterId) && "1763355072".equals(accountId) && evt.getLatestApiEndpoint().contains("api-transactions")) {
+      return;
+    }
 
     String refId = UUID.randomUUID().toString();
     logger.debug("received malicious event " + evt.getLatestApiEndpoint() + " filterId " + evt.getFilterId() + " eventType " + evt.getEventType().toString());
