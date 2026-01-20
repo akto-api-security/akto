@@ -1,13 +1,13 @@
 package com.akto.otel;
 
+import java.util.*;
+
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.ApiExecutor;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
-import java.util.*;
 
 public class DatadogOtelClient {
 
@@ -30,6 +30,9 @@ public class DatadogOtelClient {
         String apiUrl = buildApiUrl();
         String requestBody = buildRequestBody(startTimeSeconds, endTimeSeconds, serviceNames, limit);
 
+        logger.infoAndAddToDb("Datadog API Request URL: " + apiUrl);
+        logger.infoAndAddToDb("Datadog API Request Body: " + requestBody);
+
         OriginalHttpRequest request = createRequest(apiUrl, requestBody);
         OriginalHttpResponse response = ApiExecutor.sendRequest(request, false, null, false, new ArrayList<>());
 
@@ -49,11 +52,11 @@ public class DatadogOtelClient {
 
     private String buildRequestBody(long startTimeSeconds, long endTimeSeconds, List<String> serviceNames, int limit) throws Exception {
         Map<String, Object> filter = new HashMap<>();
-        filter.put("from", startTimeSeconds * MILLISECONDS_PER_SECOND);
-        filter.put("to", endTimeSeconds * MILLISECONDS_PER_SECOND);
+        filter.put("from", String.valueOf(startTimeSeconds));
+        filter.put("to", String.valueOf(endTimeSeconds));
 
         if (serviceNames != null && !serviceNames.isEmpty()) {
-            filter.put("query", String.join(" OR service:", serviceNames));
+            filter.put("query", "service:" + String.join(" OR service:", serviceNames));
         } else {
             filter.put("query", "*");
         }
