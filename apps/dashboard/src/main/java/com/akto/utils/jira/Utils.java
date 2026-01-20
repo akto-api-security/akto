@@ -19,7 +19,6 @@ import org.apache.commons.lang3.StringUtils;
 import com.akto.calendar.DateUtils;
 import com.akto.dao.JiraIntegrationDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.AccountSettings;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.jira_integration.JiraIntegration;
@@ -40,7 +39,6 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
 import okhttp3.Request;
-import okhttp3.Response;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 
@@ -378,6 +376,14 @@ public class Utils {
         return builder;
     }
 
+    public static Request.Builder buildJiraRequest(String url, String userEmail, String apiToken, boolean isGzipEnabled, boolean isDataCenter) {
+        if (isDataCenter) {
+            return buildBearerRequest(url, apiToken, isGzipEnabled);
+        } else {
+            return buildBasicRequest(url, userEmail, apiToken, isGzipEnabled);
+        }
+    }
+
     public static Request retryWithoutGzipRequest(Request.Builder builder, String url) {
         builder.removeHeader("Accept-Encoding");
         builder = builder.url(url);
@@ -466,28 +472,6 @@ public class Utils {
             }
         } else {
             loggerMaker.infoAndAddToDb("Severity or JiraIntegration is null - Severity: " + severity + ", JiraIntegration: " + jiraIntegration, LogDb.DASHBOARD);
-        }
-
-        // Auto-generate Epic Name for Jira Data Center if issue type is Epic
-        if (jiraIntegration != null && jiraIntegration.getJiraType() == JiraIntegration.JiraType.DATA_CENTER) {
-            try {
-                // Check if issue type is Epic (ID 10000 is typically Epic in Jira)
-                if (issueType != null && issueType.equals("10000")) {
-                    // Fetch Epic Name custom field ID dynamically
-                    String epicNameFieldId = findEpicNameFieldId(projectKey, issueType, jiraIntegration);
-                    if (epicNameFieldId != null && !epicNameFieldId.isEmpty()) {
-                        // Auto-populate Epic Name with summary (truncate to 100 chars if needed)
-                        String epicName = summary;
-                        if (epicName.length() > 100) {
-                            epicName = epicName.substring(0, 97) + "...";
-                        }
-                        fields.put(epicNameFieldId, epicName);
-                        loggerMaker.infoAndAddToDb("Auto-generated Epic Name for Data Center", LogDb.DASHBOARD);
-                    }
-                }
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error setting auto-generated Epic Name for Data Center");
-            }
         }
 
         if (additionalIssueFields != null) {
@@ -582,65 +566,28 @@ public class Utils {
 
     public static List<BasicDBObject> buildAdditionalIssueFieldsForJira(Info info,
         TestingRunIssues issue, Remediation remediation, JiraIntegration.JiraType jiraType) {
-        
-        if (jiraType == JiraIntegration.JiraType.DATA_CENTER) {
-            return buildAdditionalIssueFieldsForDataCenter(info, issue, remediation);
-        } else {
-            return buildAdditionalIssueFieldsForCloud(info, issue, remediation);
-        }
-    }
 
-    private static List<BasicDBObject> buildAdditionalIssueFieldsForCloud(Info info,
-        TestingRunIssues issue, Remediation remediation) {
         List<BasicDBObject> contentList = new ArrayList<>();
+        boolean isDataCenter = jiraType == JiraIntegration.JiraType.DATA_CENTER;
 
         try {
-            contentList.add(addHeading(3, "Overview"));
-            addTextSection(contentList, 4, "Severity", issue.getSeverity().name());
-            addListSection(contentList, 3, "Timelines (UTC)", getIssueTimelines(issue));
+            contentList.add(isDataCenter ? addPlainTextHeading(3, "Overview") : addHeading(3, "Overview"));
+            addTextSection(contentList, 4, "Severity", issue.getSeverity().name(), isDataCenter);
+            addListSection(contentList, 3, "Timelines (UTC)", getIssueTimelines(issue), isDataCenter);
 
             if (info != null) {
-                addTextSection(contentList, 4, "Impact", info.getImpact());
-                addListSection(contentList, 4, "Tags", info.getTags());
-                addComplianceSection(contentList, info.getCompliance());
-                addListSection(contentList, 4, "CWE", info.getCwe());
-                addListSection(contentList, 4, "CVE", info.getCve());
-                addListSection(contentList, 4, "References", info.getReferences());
+                addTextSection(contentList, 4, "Impact", info.getImpact(), isDataCenter);
+                addListSection(contentList, 4, "Tags", info.getTags(), isDataCenter);
+                addComplianceSection(contentList, info.getCompliance(), isDataCenter);
+                addListSection(contentList, 4, "CWE", info.getCwe(), isDataCenter);
+                addListSection(contentList, 4, "CVE", info.getCve(), isDataCenter);
+                addListSection(contentList, 4, "References", info.getReferences(), isDataCenter);
 
                 String remediationText = StringUtils.isNotBlank(info.getRemediation())
                     ? info.getRemediation()
                     : remediation != null ? remediation.getRemediationText() : "No remediation provided.";
-                addTextSection(contentList, 3, "Remediation", remediationText);
-            }
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e,
-                "Error while adding additional issue details in Jira Payload: " + e.getMessage(),
-                LoggerMaker.LogDb.DASHBOARD);
-        }
-        return contentList;
-    }
 
-    private static List<BasicDBObject> buildAdditionalIssueFieldsForDataCenter(Info info,
-        TestingRunIssues issue, Remediation remediation) {
-        List<BasicDBObject> contentList = new ArrayList<>();
-
-        try {
-            contentList.add(addPlainTextHeading(3, "Overview"));
-            addPlainTextSection(contentList, 4, "Severity", issue.getSeverity().name());
-            addPlainTextListSection(contentList, 3, "Timelines (UTC)", getIssueTimelines(issue));
-
-            if (info != null) {
-                addPlainTextSection(contentList, 4, "Impact", info.getImpact());
-                addPlainTextListSection(contentList, 4, "Tags", info.getTags());
-                addPlainTextComplianceSection(contentList, info.getCompliance());
-                addPlainTextListSection(contentList, 4, "CWE", info.getCwe());
-                addPlainTextListSection(contentList, 4, "CVE", info.getCve());
-                addPlainTextListSection(contentList, 4, "References", info.getReferences());
-
-                String remediationText = StringUtils.isNotBlank(info.getRemediation())
-                    ? info.getRemediation()
-                    : remediation != null ? remediation.getRemediationText() : "No remediation provided.";
-                addPlainTextSection(contentList, 3, "Remediation", remediationText);
+                addTextSection(contentList, 3, "Remediation", remediationText, isDataCenter);
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e,
@@ -666,27 +613,41 @@ public class Utils {
         return timelines;
     }
 
-    private static void addTextSection(List<BasicDBObject> list, int level, String heading, String text) {
-        list.add(addHeading(level, heading));
-        list.add(addParagraph(text));
+    private static void addTextSection(List<BasicDBObject> list, int level, String heading, String text, boolean isDataCenter) {
+        list.add(isDataCenter ? addPlainTextHeading(level, heading) : addHeading(level, heading));
+        list.add(isDataCenter ? addPlainTextParagraph(text) : addParagraph(text));
     }
 
-    private static void addListSection(List<BasicDBObject> list, int level, String heading, List<String> items) {
+    private static void addListSection(List<BasicDBObject> list, int level, String heading, List<String> items, boolean isDataCenter) {
         if (CollectionUtils.isNotEmpty(items)) {
-            list.add(addHeading(level, heading));
-            list.add(addList(items));
+            list.add(isDataCenter ? addPlainTextHeading(level, heading) : addHeading(level, heading));
+            if (isDataCenter) {
+                for (String item : items) {
+                    list.add(addPlainTextListItem(item));
+                }
+            } else {
+                list.add(addList(items));
+            }
         }
     }
 
-    private static void addComplianceSection(List<BasicDBObject> list, ComplianceMapping compliance) {
+    private static void addComplianceSection(List<BasicDBObject> list, ComplianceMapping compliance, boolean isDataCenter) {
         if (compliance == null || MapUtils.isEmpty(compliance.getMapComplianceToListClauses())) return;
 
-        list.add(addHeading(4, "Compliance"));
+        list.add(isDataCenter ? addPlainTextHeading(4, "Compliance") : addHeading(4, "Compliance"));
         for (Map.Entry<String, List<String>> entry : compliance.getMapComplianceToListClauses().entrySet()) {
-            list.add(addHeading(5, entry.getKey()));
-            list.add(CollectionUtils.isNotEmpty(entry.getValue())
-                ? addList(entry.getValue())
-                : addParagraph("No clauses available."));
+            list.add(isDataCenter ? addPlainTextHeading(5, entry.getKey()) : addHeading(5, entry.getKey()));
+            if (CollectionUtils.isNotEmpty(entry.getValue())) {
+                if (isDataCenter) {
+                    for (String item : entry.getValue()) {
+                        list.add(addPlainTextListItem(item));
+                    }
+                } else {
+                    list.add(addList(entry.getValue()));
+                }
+            } else {
+                list.add(isDataCenter ? addPlainTextParagraph("No clauses available.") : addParagraph("No clauses available."));
+            }
         }
     }
 
@@ -722,37 +683,6 @@ public class Utils {
             ));
     }
 
-    // Plain text helpers for Data Center
-    private static void addPlainTextSection(List<BasicDBObject> list, int level, String heading, String text) {
-        list.add(addPlainTextHeading(level, heading));
-        list.add(addPlainTextParagraph(text));
-    }
-
-    private static void addPlainTextListSection(List<BasicDBObject> list, int level, String heading, List<String> items) {
-        if (CollectionUtils.isNotEmpty(items)) {
-            list.add(addPlainTextHeading(level, heading));
-            for (String item : items) {
-                list.add(addPlainTextListItem(item));
-            }
-        }
-    }
-
-    private static void addPlainTextComplianceSection(List<BasicDBObject> list, ComplianceMapping compliance) {
-        if (compliance == null || MapUtils.isEmpty(compliance.getMapComplianceToListClauses())) return;
-
-        list.add(addPlainTextHeading(4, "Compliance"));
-        for (Map.Entry<String, List<String>> entry : compliance.getMapComplianceToListClauses().entrySet()) {
-            list.add(addPlainTextHeading(5, entry.getKey()));
-            if (CollectionUtils.isNotEmpty(entry.getValue())) {
-                for (String item : entry.getValue()) {
-                    list.add(addPlainTextListItem(item));
-                }
-            } else {
-                list.add(addPlainTextParagraph("No clauses available."));
-            }
-        }
-    }
-
     private static BasicDBObject addPlainTextHeading(int level, String text) {
         return new BasicDBObject("type", "heading")
             .append("level", level)
@@ -767,57 +697,5 @@ public class Utils {
     private static BasicDBObject addPlainTextListItem(String text) {
         return new BasicDBObject("type", "listItem")
             .append("text", StringUtils.defaultString(text, ""));
-    }
-
-    /**
-     * Finds the Epic Name custom field ID for Jira Data Center dynamically
-     * Uses the createmeta endpoint to retrieve required fields for the Epic issue type
-     */
-    private static String findEpicNameFieldId(String projectKey, String issueTypeId, JiraIntegration jiraIntegration) {
-        try {
-            String endpoint = jiraIntegration.getBaseUrl() + "/rest/api/2/issue/createmeta/" + projectKey + "/issuetypes/" + issueTypeId;
-
-            Request request = new Request.Builder()
-                .url(endpoint)
-                .get()
-                .addHeader("Authorization", "Bearer " + jiraIntegration.getApiToken())
-                .addHeader("Accept", "application/json")
-                .build();
-
-            Response response = com.akto.util.http_util.CoreHTTPClient.client.newCall(request).execute();
-
-            if (!response.isSuccessful() || response.body() == null) {
-                loggerMaker.infoAndAddToDb("Could not fetch issue metadata from Data Center", LogDb.DASHBOARD);
-                response.close();
-                return null;
-            }
-
-            String responseBody = response.body().string();
-            response.close();
-
-            BasicDBObject metadata = BasicDBObject.parse(responseBody);
-            // Data Center v2 API returns "values" array, not "fields"
-            BasicDBList fields = (BasicDBList) metadata.get("values");
-
-            if (fields == null) {
-                return null;
-            }
-
-            // Search for Epic Name field in the required fields
-            for (Object fieldObj : fields) {
-                BasicDBObject field = (BasicDBObject) fieldObj;
-                String fieldName = field.getString("name");
-                String fieldId = field.getString("fieldId");
-
-                if (fieldName != null && fieldName.toLowerCase().contains("epic") &&
-                    fieldName.toLowerCase().contains("name") && fieldId != null) {
-                    return fieldId;
-                }
-            }
-            return null;
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error finding Epic Name field ID for Data Center");
-            return null;
-        }
     }
 }

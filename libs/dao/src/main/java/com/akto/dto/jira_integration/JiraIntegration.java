@@ -7,15 +7,6 @@ import com.mongodb.BasicDBObject;
 
 public class JiraIntegration {
 
-    /**
-     * Enum representing Jira deployment type
-     * CLOUD: Jira Cloud (REST API v3, Basic authentication with email:token)
-     * DATA_CENTER: Jira Data Center/Server (REST API v2, Bearer token authentication)
-     * 
-     * Reference: 
-     * - Cloud: https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/
-     * - Data Center: https://developer.atlassian.com/server/jira/platform/rest-apis/
-     */
     public enum JiraType {
         CLOUD,
         DATA_CENTER
@@ -28,7 +19,7 @@ public class JiraIntegration {
     private String issueType;
     private int createdTs;
     private int updatedTs;
-    private JiraType jiraType; // Cloud vs Data Center
+    private JiraType jiraType;
     private Map<String,List<BasicDBObject>> projectIdsMap;
     private Map<String, ProjectMapping> projectMappings;
     private Map<String, String> issueSeverityToPriorityMap;

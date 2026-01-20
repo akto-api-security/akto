@@ -60,7 +60,6 @@ import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import okhttp3.*;
 
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.bson.Document;
@@ -72,9 +71,8 @@ import com.akto.dao.AccountSettingsDao;
 
 import static com.akto.utils.jira.Utils.buildAdditionalIssueFieldsForJira;
 import static com.akto.utils.jira.Utils.buildApiToken;
-import static com.akto.utils.jira.Utils.buildBasicRequest;
-import static com.akto.utils.jira.Utils.buildBearerRequest;
 import static com.akto.utils.jira.Utils.buildJiraDescription;
+import static com.akto.utils.jira.Utils.buildJiraRequest;
 import static com.akto.utils.jira.Utils.buildPayloadForJiraTicket;
 import static com.akto.utils.jira.Utils.getAccountJiraFields;
 import static com.akto.utils.jira.Utils.isLabelsFieldError;
@@ -198,12 +196,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         String url = baseUrl + getMetaEndpoint();
         setApiToken(buildApiToken(apiToken));
         try {
-            Request.Builder builder;
-            if (isDataCenter()) {
-                builder = buildBearerRequest(url, apiToken, true);
-            } else {
-                builder = buildBasicRequest(url, userEmail, apiToken, true);
-            }
+            Request.Builder builder = buildJiraRequest(url, userEmail, apiToken, true, isDataCenter());
             Request okHttpRequest = builder.build();
             Call call = client.newCall(okHttpRequest);
             Response response = null;
@@ -294,13 +287,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             // Reference: https://developer.atlassian.com/server/jira/platform/rest/v11002/api-group-project/#api-rest-api-2-project-projectidorkey-statuses-get
             String statusUrl = baseUrl + String.format(getIssueStatusEndpoint(), projId) + "?maxResults=100";
 
-            Request.Builder builder;
-            if (isDataCenter()) {
-                builder = buildBearerRequest(statusUrl, apiToken, false);
-            } else {
-                builder = buildBasicRequest(statusUrl, userEmail, apiToken, false);
-            }
-            
+            Request.Builder builder = buildJiraRequest(statusUrl, userEmail, apiToken, false, isDataCenter());
             Request okHttpRequest = builder.build();
 
             Response response = null;
@@ -385,15 +372,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         try {
             String priorityUrl = baseUrl + getPriorityEndpoint();
             
-            Request.Builder builder;
-            if (isDataCenter()) {
-                // Data Center uses Bearer token authentication
-                builder = buildBearerRequest(priorityUrl, apiToken, false);
-            } else {
-                // Cloud uses Basic authentication (email:token)
-                builder = buildBasicRequest(priorityUrl, userEmail, apiToken, false);
-            }
-            
+            Request.Builder builder = buildJiraRequest(priorityUrl, userEmail, apiToken, false, isDataCenter());
             Request okHttpRequest = builder.build();
 
             Response response = null;
@@ -735,17 +714,6 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         return getIssueTypesWithIds(issueTypes);
     }
 
-    /**
-     * Makes HTTP request to Jira API to fetch project metadata
-     *
-     * Jira Cloud (v3): GET /rest/api/3/issue/createmeta/{projectKey}/issuetypes
-     * Reference: https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-createmeta-projectidorkey-issuetypes-get
-     * Response: {"issueTypes": [{"id": "10001", "name": "Bug"}]}
-     *
-     * Jira Data Center (v2): GET /rest/api/2/project/{projectKey}/statuses
-     * Reference: https://developer.atlassian.com/server/jira/platform/rest/v11002/api-group-project/#api-rest-api-2-project-projectidorkey-statuses-get
-     * Response: [{"id":"10002","name":"Task","statuses":[...]}]
-     */
     private String fetchProjectMetadataFromJira(String projectId) throws Exception {
         String url;
 
@@ -759,15 +727,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             loggerMaker.infoAndAddToDb("Fetching Cloud v3 metadata from: " + url);
         }
         
-        Request.Builder builder;
-        if (isDataCenter()) {
-            // Data Center uses Bearer token authentication
-            builder = buildBearerRequest(url, apiToken, true);
-        } else {
-            // Cloud uses Basic authentication (email:token)
-            builder = buildBasicRequest(url, userEmail, apiToken, true);
-        }
-        
+        Request.Builder builder = buildJiraRequest(url, userEmail, apiToken, true, isDataCenter());
         Request okHttpRequest = builder.build();
         
         Response response = null;
@@ -1019,13 +979,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                             RequestBody.create(tmpOutputFile, mType))
                     .build();
             
-            Request.Builder builder;
-            if (isDataCenter()) {
-                builder = buildBearerRequest(url, jiraIntegration.getApiToken(), false);
-            } else {
-                builder = buildBasicRequest(url, jiraIntegration.getUserEmail(), jiraIntegration.getApiToken(), false);
-            }
-
+            Request.Builder builder = buildJiraRequest(url, jiraIntegration.getUserEmail(), jiraIntegration.getApiToken(), false, isDataCenter());
             builder.removeHeader("Accept");
             builder.addHeader("X-Atlassian-Token", "no-check");
             Request request = builder.post(requestBody).build();
@@ -1728,21 +1682,13 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             BasicDBObject reqPayload = new BasicDBObject();
             reqPayload.put("fields", fields);
             
-            Request.Builder requestBuilder;
-            if (isDataCenter()) {
-                requestBuilder = buildBearerRequest(
-                    jiraIntegration.getBaseUrl() + getCreateIssueEndpoint(),
-                    jiraIntegration.getApiToken(),
-                    false
-                );
-            } else {
-                requestBuilder = buildBasicRequest(
-                    jiraIntegration.getBaseUrl() + getCreateIssueEndpoint(),
-                    jiraIntegration.getUserEmail(),
-                    jiraIntegration.getApiToken(),
-                    false
-                );
-            }
+            Request.Builder requestBuilder = buildJiraRequest(
+                jiraIntegration.getBaseUrl() + getCreateIssueEndpoint(),
+                jiraIntegration.getUserEmail(),
+                jiraIntegration.getApiToken(),
+                false,
+                isDataCenter()
+            );
             RequestBody body = RequestBody.create(
                 reqPayload.toJson(),
                 MediaType.parse("application/json")
