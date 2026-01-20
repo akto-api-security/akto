@@ -121,14 +121,12 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
      * JIRA CLOUD:
      * - Uses REST API v3: /rest/api/3/
      * - Documentation: https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/
-     * - Authentication: API Token (email + token)
      * - Base URL format: https://your-domain.atlassian.net
      * 
      * JIRA DATA CENTER/SERVER:
      * - Uses REST API v2: /rest/api/2/
      * - Documentation: https://developer.atlassian.com/server/jira/platform/rest-apis/
      * - Latest version (v11.3.1) still uses v2: https://developer.atlassian.com/server/jira/platform/rest/v11002/intro/
-     * - Authentication: Personal Access Token (PAT) or Basic Auth
      * - Base URL format: http://your-server.com:port
      * 
      */
@@ -141,7 +139,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private static final String ISSUE_STATUS_ENDPOINT = "/rest/api/3/project/%s/statuses";
     private static final String PRIORITY_ENDPOINT = "/rest/api/3/priority";
     
-    // Data Center (v2) endpoints - Fallback
+    // Data Center (v2) endpoints
     private static final String META_ENDPOINT_V2 = "/rest/api/2/issue/createmeta";
     private static final String CREATE_ISSUE_ENDPOINT_V2 = "/rest/api/2/issue";
     private static final String CREATE_ISSUE_ENDPOINT_BULK_V2 = "/rest/api/2/issue/bulk";
@@ -334,7 +332,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
         } catch (Exception e) {
             addActionError("Error while fetching jira project status mappings");
-            loggerMaker.error("Error while fetching jira project status mappings. p[rojId: {}", projId, e);
+            loggerMaker.error("Error while fetching jira project status mappings. projId: {}", projId, e);
             return Action.ERROR.toUpperCase();
         }
     }
@@ -367,7 +365,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         baseUrl = jiraIntegration.getBaseUrl();
         userEmail = jiraIntegration.getUserEmail();
         apiToken = jiraIntegration.getApiToken();
-        jiraType = jiraIntegration.getJiraType() != null ? jiraIntegration.getJiraType().name() : "CLOUD";
+        jiraType = jiraIntegration.getJiraType().name();
 
         loggerMaker.infoAndAddToDb("Fetching Jira priorities from " + baseUrl);
         setApiToken(buildApiToken(apiToken));
@@ -994,7 +992,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             }
             
             // Set jiraType from integration
-            jiraType = jiraIntegration.getJiraType() != null ? jiraIntegration.getJiraType().name() : "CLOUD";
+            jiraType = jiraIntegration.getJiraType().name();
             
             String url = jiraIntegration.getBaseUrl() + getCreateIssueEndpoint() + "/" + issueId + ATTACH_FILE_ENDPOINT;
             File tmpOutputFile = createRequestFile(origReq, testReq);
@@ -1100,7 +1098,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         }
         
         // Set jiraType from integration to use correct endpoint
-        jiraType = jiraIntegration.getJiraType() != null ? jiraIntegration.getJiraType().name() : "CLOUD";
+        jiraType = jiraIntegration.getJiraType().name();
 
         List<JiraMetaData> jiraMetaDataList = new ArrayList<>();
         Bson projection = Projections.include(YamlTemplate.INFO);

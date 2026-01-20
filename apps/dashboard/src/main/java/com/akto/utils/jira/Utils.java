@@ -47,23 +47,10 @@ public class Utils {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class, LogDb.DASHBOARD);
 
-    /*
-     * Jira REST API Endpoint Documentation:
-     * 
-     * CLOUD (v3): https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/
-     * - Create Issue Metadata: /rest/api/3/issue/createmeta/{projectKey}/issuetypes/{issueTypeId}
-     * - Field Search: /rest/api/3/field/search
-     * 
-     * DATA CENTER (v2): https://developer.atlassian.com/server/jira/platform/rest/v11002/intro/
-     * - Create Issue Metadata: /rest/api/2/issue/createmeta (returns all projects)
-     * - Field Search: /rest/api/2/field (returns all fields)
-     * 
-     * Note: Field search pagination and filtering differs between versions
-     */
     private static final String CREATE_ISSUE_FIELD_METADATA_ENDPOINT = "/rest/api/3/issue/createmeta/%s/issuetypes/%s"; 
     private static final String FIELD_SEARCH_ENDPOINT = "/rest/api/3/field/search";
     
-    // Data Center v2 fallback endpoints
+    // Data Center v2 endpoints
     private static final String CREATE_ISSUE_FIELD_METADATA_ENDPOINT_V2 = "/rest/api/2/issue/createmeta";
     private static final String FIELD_SEARCH_ENDPOINT_V2 = "/rest/api/2/field";
 
@@ -377,11 +364,6 @@ public class Utils {
     /**
      * Builds HTTP request with Bearer token authentication for Jira Data Center
      * Data Center uses Personal Access Tokens (PAT) with Bearer authentication
-     * 
-     * @param url The API endpoint URL
-     * @param apiToken The Personal Access Token (already in correct format)
-     * @param isGzipEnabled Whether to enable gzip compression
-     * @return Configured Request.Builder
      */
     public static Request.Builder buildBearerRequest(String url, String apiToken, boolean isGzipEnabled) {
         Request.Builder builder = new Request.Builder();
