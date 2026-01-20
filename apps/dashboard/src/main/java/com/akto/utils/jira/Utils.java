@@ -49,10 +49,6 @@ public class Utils {
     private static final String CREATE_ISSUE_FIELD_METADATA_ENDPOINT = "/rest/api/3/issue/createmeta/%s/issuetypes/%s"; 
     private static final String FIELD_SEARCH_ENDPOINT = "/rest/api/3/field/search";
     
-    // Data Center v2 endpoints
-    private static final String CREATE_ISSUE_FIELD_METADATA_ENDPOINT_V2 = "/rest/api/2/issue/createmeta";
-    private static final String FIELD_SEARCH_ENDPOINT_V2 = "/rest/api/2/field";
-
     //Caching for Account Wise Jira Integration Issue Creation Fields
     private static final ConcurrentHashMap<Integer, Pair<Map<String, Map<String, BasicDBList>>, Integer>> accountWiseJiraFieldsMap = new ConcurrentHashMap<>();
     private static final int EXPIRY_TIME = 30 * 60; // 30 minutes
