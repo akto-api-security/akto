@@ -1297,7 +1297,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     }
 
                     Organization matchingOrganization = null;
-                    if (userDomain != null && DashboardMode.isSaasDeployment()) {
+                    if (userDomain != null) {
                         logger.info("[createUserAndRedirect] Searching for existing organizations with matching domain");
 
                         // Get all organizations and check for domain matches
@@ -1355,7 +1355,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
                         // Create organization for new user
                         newOrgSetup = true;
-                        if (DashboardMode.isSaasDeployment()) {
                             logger.info("[createUserAndRedirect] SaaS deployment, creating organization for new user");
                             String organizationUUID = UUID.randomUUID().toString();
 
@@ -1368,9 +1367,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
                             Boolean attemptSyncWithAktoSuccess = OrganizationUtils.syncOrganizationWithAkto(organization);
                             logger.infoAndAddToDb(String.format("[createUserAndRedirect] Organization %s for new user %s - Akto sync status: %s", organizationUUID, userEmail, attemptSyncWithAktoSuccess));
-                        } else {
-                            logger.info("[createUserAndRedirect] On-prem deployment, skipping organization creation");
-                        }
 
                         // Note: If no planType is set on the organization, user will see FreeApp UI
                         logger.info("[createUserAndRedirect] Organization created without planType - user will see FreeApp UI");
