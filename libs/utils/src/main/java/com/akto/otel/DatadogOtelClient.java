@@ -30,9 +30,6 @@ public class DatadogOtelClient {
         String apiUrl = buildApiUrl();
         String requestBody = buildRequestBody(startTimeSeconds, endTimeSeconds, serviceNames, limit);
 
-        logger.infoAndAddToDb("Datadog API Request URL: " + apiUrl);
-        logger.infoAndAddToDb("Datadog API Request Body: " + requestBody);
-
         OriginalHttpRequest request = createRequest(apiUrl, requestBody);
         OriginalHttpResponse response = ApiExecutor.sendRequest(request, false, null, false, new ArrayList<>());
 

@@ -530,8 +530,7 @@ public class QuickStartAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    private void createDatadogTrafficCollectorJob(String datadogApiKey, String datadogAppKey, String datadogSite, List<String> serviceNames) {
-        // Filter out empty or blank service names
+    private List<String> extractValidServiceNames(List<String> serviceNames) {
         List<String> validServiceNames = new ArrayList<>();
         if (serviceNames != null) {
             for (String serviceName : serviceNames) {
@@ -540,6 +539,11 @@ public class QuickStartAction extends UserAction {
                 }
             }
         }
+        return validServiceNames;
+    }
+
+    private void createDatadogTrafficCollectorJob(String datadogApiKey, String datadogAppKey, String datadogSite, List<String> serviceNames) {
+        List<String> validServiceNames = extractValidServiceNames(serviceNames);
 
         DatadogTrafficCollectorJobParams jobParams = new DatadogTrafficCollectorJobParams(
                 0,
