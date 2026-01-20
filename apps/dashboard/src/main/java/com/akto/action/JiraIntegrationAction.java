@@ -765,21 +765,12 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         }
     }
 
-    /**
-     * Parses Jira API response based on deployment type
-     * 
-     * @param responsePayload Raw JSON response from Jira API
-     * @return Parsed list of issue types
-     * @throws Exception if parsing fails
-     */
     private BasicDBList parseProjectMetadataResponse(String responsePayload) throws Exception {
         BasicDBList issueTypes = null;
         
         if (isDataCenter()) {
-            // Data Center v2 API returns: [{"id":"10002","name":"Task","subtask":false,"statuses":[...]}]
             issueTypes = parseDataCenterResponse(responsePayload);
         } else {
-            // Cloud v3 API returns: {"issueTypes": [{"id": "10001", "name": "Bug"}]}
             issueTypes = parseCloudResponse(responsePayload);
         }
         
@@ -790,7 +781,6 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         BasicDBList issueTypes = new BasicDBList();
 
         try {
-            // Data Center v2 API returns: [{"id":"10002","name":"Task","subtask":false,"statuses":[...]}]
             ObjectMapper mapper = new ObjectMapper();
             List<Map<String, Object>> projectStatuses = mapper.readValue(responsePayload, new TypeReference<List<Map<String, Object>>>() {});
 
