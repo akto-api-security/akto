@@ -8,6 +8,7 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.Pair;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -22,7 +23,6 @@ public class OtelSpanConverter {
 
     private static final LoggerMaker logger = new LoggerMaker(OtelSpanConverter.class, LogDb.DASHBOARD);
     private static final ObjectMapper objectMapper = new ObjectMapper();
-    private static final long NANOSECONDS_TO_SECONDS = 1_000_000L;
 
     // OpenTelemetry semantic convention attribute names
     private static final class OtelAttributes {
@@ -63,8 +63,9 @@ public class OtelSpanConverter {
         return new ConversionResult(convertedTraces, totalProcessed, convertedTraces.size());
     }
 
-    private int getApiCollectionId(JsonNode attributes) {
+    private Pair<Integer, String> getApiCollectionId(JsonNode attributes) {
         int apiCollectionId = 0;
+        String hostName = null;
         JsonNode tagsNode = attributes.get("tags");
         if (tagsNode != null && tagsNode.isArray()) {
             String serviceName = null;
@@ -75,7 +76,7 @@ public class OtelSpanConverter {
                 }
             }
             String[] serviceNameParts = serviceName.split(":");
-            String hostName = serviceNameParts[1];
+            hostName = serviceNameParts[1];
 
             ApiCollection apiCollection = ApiCollectionsDao.instance.findByHost(hostName);
             if(apiCollection == null){
@@ -88,9 +89,10 @@ public class OtelSpanConverter {
                 ApiCollectionsDao.instance.insertOne(newApiCollection);
             }else{
                 apiCollectionId = apiCollection.getId();
+                hostName = apiCollection.getHostName();
             }
         }
-        return apiCollectionId;
+        return new Pair<>(apiCollectionId, hostName);
     }
 
     private HttpResponseParams convertSpan(JsonNode span, int accountId) {
@@ -99,13 +101,13 @@ public class OtelSpanConverter {
             return null;
         }
 
-        int apiCollectionId = getApiCollectionId(attributes);
+        Pair<Integer, String> apiCollectionInfo = getApiCollectionId(attributes);
 
-        HttpRequestParams requestParams = buildRequestParams(attributes, apiCollectionId);
+        HttpRequestParams requestParams = buildRequestParams(attributes, apiCollectionInfo.getFirst(), apiCollectionInfo.getSecond());
         return buildResponseParams(attributes, requestParams, accountId);
     }
 
-    private HttpRequestParams buildRequestParams(JsonNode attributes, int apiCollectionId) {
+    private HttpRequestParams buildRequestParams(JsonNode attributes, int apiCollectionId, String hostName) {
         HttpRequestParams requestParams = new HttpRequestParams();
         requestParams.setMethod("POST"); // TODO: get the method from the attributes for tools call
         requestParams.setUrl("/invoke"); // TODO: get the url from the attributes for tools call
@@ -113,6 +115,7 @@ public class OtelSpanConverter {
 
         // Map<String, List<String>> requestHeaders = extractHeaders(attributes, OtelAttributes.HTTP_REQUEST_HEADERS_PREFIX);
         Map<String, List<String>> requestHeaders = extractHeaders(attributes, false);
+        requestHeaders.put("host", Collections.singletonList(hostName));
         requestParams.setHeaders(requestHeaders);
 
         String requestBody = extractString(attributes, OtelAttributes.INPUT);
@@ -128,7 +131,7 @@ public class OtelSpanConverter {
 
         int status = 200;
         long timestampNanos = attributes.has("start_ns") ? attributes.get("start_ns").asLong() : 0;
-        int timestampSeconds = timestampNanos > 0 ? (int) (timestampNanos / NANOSECONDS_TO_SECONDS) : Context.now();
+        int timestampSeconds = timestampNanos > 0 ? (int) (timestampNanos / 1000) : Context.now();
 
         String ipString = "0.0.0.0/0";
 
