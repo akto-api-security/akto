@@ -734,10 +734,6 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
      * Jira Data Center (v2): GET /rest/api/2/project/{projectKey}/statuses
      * Reference: https://developer.atlassian.com/server/jira/platform/rest/v11002/api-group-project/#api-rest-api-2-project-projectidorkey-statuses-get
      * Response: [{"id":"10002","name":"Task","statuses":[...]}]
-     * 
-     * @param projectId The Jira project key/ID
-     * @return Raw JSON response as string
-     * @throws Exception if HTTP request fails
      */
     private String fetchProjectMetadataFromJira(String projectId) throws Exception {
         String url;
