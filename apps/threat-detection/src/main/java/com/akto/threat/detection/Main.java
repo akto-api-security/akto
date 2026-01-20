@@ -29,7 +29,6 @@ import com.akto.threat.detection.crons.ApiCountInfoRelayCron;
 import com.akto.threat.detection.ip_api_counter.CmsCounterLayer;
 import com.akto.threat.detection.ip_api_counter.DistributionCalculator;
 import com.akto.threat.detection.ip_api_counter.DistributionDataForwardLayer;
-import com.akto.threat.detection.ip_api_counter.ParamEnumerationDetector;
 import com.akto.threat.detection.tasks.MaliciousTrafficDetectorTask;
 import com.akto.threat.detection.tasks.SendMaliciousEventsToBackend;
 import com.akto.threat.detection.utils.Utils;
@@ -125,7 +124,6 @@ public class Main {
 
     initCustomDataTypeScheduler();
     CmsCounterLayer.initialize(localRedis);
-    ParamEnumerationDetector.initialize(localRedis, 50, 5);
     DistributionCalculator distributionCalculator = new DistributionCalculator();
     DistributionDataForwardLayer distributionDataForwardLayer = new DistributionDataForwardLayer(localRedis, distributionCalculator);
 

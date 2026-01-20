@@ -46,6 +46,7 @@ import {
     INTERVAL_COPILOT_STUDIO,
     COPILOT_STUDIO_FIELDS
 } from "./constants/aiAgentConnectorConstants"
+import DataDogConnector from "./components/DataDogConnector"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -929,6 +930,14 @@ const copilotStudioImportObj = {
     />
 }
 
+const dataDogConnectorObj = {
+    icon: '/public/datadog-1.svg',
+    label: "DataDog Connector",
+    text: "Connect your Datadog account to Akto to visualize your traces in the dashboard.",
+    key: "DATA_DOG_CONNECTOR",
+    component: <DataDogConnector />
+}
+
 
 const quick_start_policy_lines= [
     `{`,
@@ -1511,7 +1520,7 @@ const quickStartFunc = {
 
         // Manual
         const manual = [
-            burpObj, postmanObj, harFileUploadObj, openApiObj, wsdlApiObj, graphqlApiIObj, impervaImportObj
+            burpObj, postmanObj, harFileUploadObj, openApiObj, wsdlApiObj, graphqlApiIObj, impervaImportObj, dataDogConnectorObj
         ];
 
         // Crawler

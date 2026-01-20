@@ -87,9 +87,7 @@ public class ThreatDetector {
 
     public List<Pair<String, String>> getUrlParamNamesAndValues(String url, URLTemplate urlTemplate) {
         url = cleanThreatUrl(url, lfiTrie, osCommandInjectionTrie, ssrfTrie);
-        if (url.startsWith("/")) {
-            url = url.substring(1);
-        }
+        url = ApiInfo.getForwardNormalizedUrl(url);
         List<Pair<String, String>> paramNameAndValue = new ArrayList<>();
         String[] urlTokens = url.split("/");
 

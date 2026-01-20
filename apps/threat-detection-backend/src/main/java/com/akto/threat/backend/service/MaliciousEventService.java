@@ -109,6 +109,11 @@ public class MaliciousEventService {
     String actor = evt.getActor();
     String filterId = evt.getFilterId();
 
+    // Skip recording for ParamEnumeration filter on specific account
+    if ("ParamEnumeration".equals(filterId) && "1763355072".equals(accountId)) {
+      return;
+    }
+
     String refId = UUID.randomUUID().toString();
     logger.debug("received malicious event " + evt.getLatestApiEndpoint() + " filterId " + evt.getFilterId() + " eventType " + evt.getEventType().toString());
 
