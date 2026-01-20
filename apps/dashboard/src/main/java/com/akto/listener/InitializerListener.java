@@ -2610,7 +2610,7 @@ public class InitializerListener implements ServletContextListener {
                     tokenGeneratorCron.tokenGeneratorScheduler();
                     logger.warn("Started test template scheduler", LogDb.DASHBOARD);
                     setUpTestEditorTemplatesScheduler();
-                    JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
+                    // JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
                     if (DashboardMode.isMetered()) {
                         setupUsageScheduler();
                     }
