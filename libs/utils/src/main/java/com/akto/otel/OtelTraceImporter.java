@@ -6,10 +6,6 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 
-/**
- * Service for importing OpenTelemetry traces from Datadog
- * Orchestrates the fetching and conversion process
- */
 public class OtelTraceImporter {
 
     private static final LoggerMaker logger = new LoggerMaker(OtelTraceImporter.class, LogDb.DASHBOARD);
@@ -22,14 +18,6 @@ public class OtelTraceImporter {
         this.spanConverter = new OtelSpanConverter();
     }
 
-    /**
-     * Imports traces from Datadog and converts them to Akto format
-     *
-     * @param request Import request parameters
-     * @param accountId Account ID for the traces
-     * @return Import result containing converted traces and statistics
-     * @throws Exception if import fails
-     */
     public ImportResult importTraces(ImportRequest request, int accountId) throws Exception {
         logger.info("Fetching spans from Datadog...");
         String rawSpansJson = datadogClient.fetchSpans(

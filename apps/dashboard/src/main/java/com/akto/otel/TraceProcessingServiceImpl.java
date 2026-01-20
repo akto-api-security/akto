@@ -10,9 +10,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Implementation of TraceProcessingService that uses the runtime Main handler
- */
 public class TraceProcessingServiceImpl implements TraceProcessingService {
 
     private static final LoggerMaker logger = new LoggerMaker(TraceProcessingServiceImpl.class, LoggerMaker.LogDb.DASHBOARD);
