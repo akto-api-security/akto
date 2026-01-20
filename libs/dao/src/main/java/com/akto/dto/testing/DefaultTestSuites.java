@@ -18,7 +18,7 @@ public class DefaultTestSuites extends TestSuites {
         testSuitesPerType.put(DefaultSuitesType.SEVERITY.name(), 4);
         testSuitesPerType.put(DefaultSuitesType.DURATION.name(), 2);
         testSuitesPerType.put(DefaultSuitesType.MCP_SECURITY.name(), 8);
-        testSuitesPerType.put(DefaultSuitesType.AI_AGENT_SECURITY.name(), 8);
+        testSuitesPerType.put(DefaultSuitesType.AI_AGENT_SECURITY.name(), 16);
     }
 
     public DefaultTestSuites() {}
@@ -73,6 +73,14 @@ public class DefaultTestSuites extends TestSuites {
         aiAgentSecurityList.put("Excessive Agency", Arrays.asList("EXCESSIVE_AGENCY"));
         aiAgentSecurityList.put("Misinformation", Arrays.asList("MISINFORMATION"));
         aiAgentSecurityList.put("Resource Management", Arrays.asList("UNBOUNDED_CONSUMPTION"));
+        aiAgentSecurityList.put("Agent Business Alignment", Arrays.asList("AGENTIC_BUSINESS_ALIGNMENT"));
+        aiAgentSecurityList.put("Agent Hallucination & Trustworthiness", Arrays.asList("AGENTIC_HALLUCINATION_AND_TRUSTWORTHINESS"));
+        aiAgentSecurityList.put("Agent Safety", Arrays.asList("AGENTIC_SAFETY"));
+        aiAgentSecurityList.put("Agent Security", Arrays.asList("AGENTIC_SECURITY"));
+        aiAgentSecurityList.put("Agent Security - Prompt Injection", Arrays.asList("AGENTIC_SECURITY_PROMPT_INJECTION"));
+        aiAgentSecurityList.put("Agent Security - Agent Exploitation", Arrays.asList("AGENTIC_SECURITY_AGENT_EXPLOITATION"));
+        aiAgentSecurityList.put("Agent Security - Infrastructure", Arrays.asList("AGENTIC_SECURITY_INFRASTRUCTURE"));
+        aiAgentSecurityList.put("Agent Security - Data Exposure & Code Execution", Arrays.asList("AGENTIC_SECURITY_DATA_EXPOSURE", "AGENTIC_SECURITY_CODE_EXECUTION"));
     }
 
     public DefaultSuitesType getSuiteType() {

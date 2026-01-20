@@ -9,7 +9,7 @@ import { getDashboardCategory, mapLabel, isAgenticSecurityCategory } from "../..
 
 function RunTestSuites({ apiCollectionName, activeFromTesting, setTestSuiteIds, testSuiteIds,setTestNameSuiteModal,testNameSuiteModal }) {
 
-    const [data, setData] = useState({ owaspTop10List: {}, testingMethods:{}, custom : {}, severity: {} });
+    const [data, setData] = useState({ agenticSecurity: {}, owaspTop10List: {}, testingMethods:{}, custom : {}, severity: {}, duration: {} });
     const [testSuiteIdsNameMap, setTestSuiteIdsNameMap] = useState({});
 
 
@@ -42,6 +42,11 @@ function RunTestSuites({ apiCollectionName, activeFromTesting, setTestSuiteIds, 
             return { name: testSuiteItem.name, tests: testSuiteItem.subCategoryList, id: testSuiteItem.hexId }
         })
 
+        const agenticSecurityTestSuites = testSuitesFromBackend?.filter(testSuiteItem => testSuiteItem.suiteType === "AI_AGENT_SECURITY").map((testSuiteItem) => {
+            idsNameMap[testSuiteItem.hexId] = testSuiteItem.name;
+            return { name: testSuiteItem.name, tests: testSuiteItem.subCategoryList, id: testSuiteItem.hexId }
+        })
+
         const fetchedData = fetchedTestSuite?.testSuiteList?.map((testSuiteItem) => {
             idsNameMap[testSuiteItem.hexId] = testSuiteItem.name;
             return { name: testSuiteItem.name, tests: testSuiteItem.subCategoryList, id: testSuiteItem.hexId }
@@ -49,6 +54,7 @@ function RunTestSuites({ apiCollectionName, activeFromTesting, setTestSuiteIds, 
         });
         setData(prev => {
             if (
+                !func.deepArrayComparison(prev?.agenticSecurity?.testSuite||[], agenticSecurityTestSuites) ||
                 !func.deepArrayComparison(prev?.owaspTop10List?.testSuite||[],newOwaspTop10TestSuites) ||
                 !func.deepArrayComparison(prev?.testingMethods?.testSuite||[], newTestingMethodsTestSuites) ||
                 !func.deepArrayComparison(prev?.custom?.testSuite||[], fetchedData) ||
@@ -57,6 +63,7 @@ function RunTestSuites({ apiCollectionName, activeFromTesting, setTestSuiteIds, 
             ) {
                 return {
                     ...prev,
+                    agenticSecurity: { rowName: "Agentic Security", testSuite: agenticSecurityTestSuites },
                     owaspTop10List: { rowName: "OWASP top 10", testSuite: newOwaspTop10TestSuites },
                     testingMethods: { rowName: "Testing Methods", testSuite: newTestingMethodsTestSuites },
                     custom: { rowName: "Custom", testSuite: fetchedData },
@@ -150,17 +157,25 @@ function RunTestSuites({ apiCollectionName, activeFromTesting, setTestSuiteIds, 
                     </div>
                     {
                         Object.entries(data)
-                            .filter(([key]) => !(isAgenticSecurityCategory() && key === 'owaspTop10List'))
+                            .filter(([key]) => {
+                                if (isAgenticSecurityCategory()) {
+                                    return key !== 'owaspTop10List';
+                                }
+                                return key !== 'agenticSecurity';
+                            })
                             .map(([, value]) => {
+                                const filteredTestSuite = (value?.testSuite || []).filter(suite => suite?.tests?.length > 0);
+                                if (filteredTestSuite.length === 0) return null;
                                 return (
                                     <RunTestSuiteRow 
-                                        data={value} 
+                                        data={{ ...value, testSuite: filteredTestSuite }}
                                         checkifSelected={checkifSelected} 
                                         checkedSelected={checkedSelected} 
                                         handleTestSuiteSelection={handleTestSuiteSelection}
                                     />
                                 );
-                            })   
+                            })
+                            .filter(Boolean)
                     }
 
                 </VerticalStack>
