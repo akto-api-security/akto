@@ -2488,7 +2488,6 @@ public class InitializerListener implements ServletContextListener {
                     public void accept(Account account) {
                         AccountSettingsDao.instance.getStats();
                         Intercom.setToken(System.getenv("INTERCOM_TOKEN"));
-                        setDashboardVersionForAccount();
                     }
                 }, "context-initializer");
 
