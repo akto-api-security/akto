@@ -43,7 +43,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                     if (existingMessages.length > 0) {
                         let messages = [];
                         const title = existingMessages[0].title;
-                        existingMessages[0].messages.forEach((item) => {
+                        existingMessages[0].messages.reverse().forEach((item) => {
                             messages.push({
                                 _id: "user_" + item.prompt,
                                 message: item.prompt,
