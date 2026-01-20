@@ -273,6 +273,19 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     }
 
     public String fetchJiraStatusMappings() {
+        // Always fetch credentials from database
+        JiraIntegration existingIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+        if (existingIntegration == null) {
+            loggerMaker.errorAndAddToDb("Jira integration not found");
+            addActionError("Jira is not integrated. Please integrate Jira first.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        baseUrl = existingIntegration.getBaseUrl();
+        userEmail = existingIntegration.getUserEmail();
+        apiToken = existingIntegration.getApiToken();
+        jiraType = existingIntegration.getJiraType().name();
+
         setApiToken(buildApiToken(apiToken));
         try {
             setProjId(projId.replaceAll("\\s+", ""));
@@ -280,7 +293,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             // Reference: https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-projects/#api-rest-api-3-project-projectidorkey-statuses-get
             // Reference: https://developer.atlassian.com/server/jira/platform/rest/v11002/api-group-project/#api-rest-api-2-project-projectidorkey-statuses-get
             String statusUrl = baseUrl + String.format(getIssueStatusEndpoint(), projId) + "?maxResults=100";
-            
+
             Request.Builder builder;
             if (isDataCenter()) {
                 builder = buildBearerRequest(statusUrl, apiToken, false);
@@ -724,18 +737,18 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
     /**
      * Makes HTTP request to Jira API to fetch project metadata
-     * 
+     *
      * Jira Cloud (v3): GET /rest/api/3/issue/createmeta/{projectKey}/issuetypes
      * Reference: https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-createmeta-projectidorkey-issuetypes-get
      * Response: {"issueTypes": [{"id": "10001", "name": "Bug"}]}
-     * 
+     *
      * Jira Data Center (v2): GET /rest/api/2/project/{projectKey}/statuses
      * Reference: https://developer.atlassian.com/server/jira/platform/rest/v11002/api-group-project/#api-rest-api-2-project-projectidorkey-statuses-get
      * Response: [{"id":"10002","name":"Task","statuses":[...]}]
      */
     private String fetchProjectMetadataFromJira(String projectId) throws Exception {
         String url;
-        
+
         if (isDataCenter()) {
             // Data Center v2: use project statuses endpoint which returns issue types
             url = baseUrl + "/rest/api/2/project/" + projectId + "/statuses";
@@ -815,12 +828,12 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
     private BasicDBList parseDataCenterResponse(String responsePayload) throws Exception {
         BasicDBList issueTypes = new BasicDBList();
-        
+
         try {
-            // Use ObjectMapper for complex nested JSON parsing
+            // Data Center v2 API returns: [{"id":"10002","name":"Task","subtask":false,"statuses":[...]}]
             ObjectMapper mapper = new ObjectMapper();
             List<Map<String, Object>> projectStatuses = mapper.readValue(responsePayload, new TypeReference<List<Map<String, Object>>>() {});
-            
+
             for (Map<String, Object> typeObj : projectStatuses) {
                 BasicDBObject issueTypeItem = new BasicDBObject();
                 issueTypeItem.put("id", typeObj.get("id") != null ? typeObj.get("id").toString() : "");
@@ -831,7 +844,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             loggerMaker.errorAndAddToDb(e, "Error parsing Data Center v2 API response: " + responsePayload);
             throw new IllegalStateException("Failed to parse Data Center API response", e);
         }
-        
+
         return issueTypes;
     }
 

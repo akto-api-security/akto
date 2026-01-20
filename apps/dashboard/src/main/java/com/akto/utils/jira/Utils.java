@@ -495,28 +495,36 @@ public class Utils {
 
     public static Object buildJiraDescription(List<BasicDBObject> baseContent, List<BasicDBObject> additionalContent, JiraIntegration.JiraType jiraType) {
         if (jiraType == JiraIntegration.JiraType.DATA_CENTER) {
+            // Jira Data Center uses Wiki Markup format
             StringBuilder description = new StringBuilder();
-            
+
             for (BasicDBObject content : baseContent) {
                 String type = content.getString("type");
                 if ("paragraph".equals(type)) {
-                    description.append(content.getString("text")).append("\n");
+                    String text = content.getString("text");
+                    if (text != null && !text.isEmpty()) {
+                        description.append(text).append("\n\n");
+                    }
                 }
             }
-            
+
             for (BasicDBObject content : additionalContent) {
                 String type = content.getString("type");
                 if ("heading".equals(type)) {
                     int level = content.getInt("level", 1);
-                    String prefix = String.join("", Collections.nCopies(level, "#"));
-                    description.append("\n").append(prefix).append(" ").append(content.getString("text")).append("\n");
+                    // Jira Wiki Markup: h1. heading, h2. heading, h3. heading, etc.
+                    description.append("h").append(level).append(". ").append(content.getString("text")).append("\n\n");
                 } else if ("paragraph".equals(type)) {
-                    description.append(content.getString("text")).append("\n");
+                    String text = content.getString("text");
+                    if (text != null && !text.isEmpty()) {
+                        description.append(text).append("\n\n");
+                    }
                 } else if ("listItem".equals(type)) {
-                    description.append("- ").append(content.getString("text")).append("\n");
+                    // Jira Wiki Markup: * for bullet points
+                    description.append("* ").append(content.getString("text")).append("\n");
                 }
             }
-            
+
             return description.toString().trim();
         } else {
             BasicDBList contentList = new BasicDBList();
