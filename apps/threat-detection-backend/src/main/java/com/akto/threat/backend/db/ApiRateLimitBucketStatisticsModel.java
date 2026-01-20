@@ -12,6 +12,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ApiDistributionDataRequestPayload;
 import com.akto.threat.backend.cron.PercentilesCron;
+import com.akto.threat.backend.dao.ApiRateLimitBucketStatisticsDao;
 import com.akto.utils.ThreatApiDistributionUtils;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.ReplaceOptions;
@@ -77,7 +78,7 @@ public class ApiRateLimitBucketStatisticsModel {
 
     public static void calculateStatistics(
             String accountId,
-            com.akto.threat.backend.dao.ApiRateLimitBucketStatisticsDao dao,
+            ApiRateLimitBucketStatisticsDao dao,
             Map<String, List<ApiDistributionDataRequestPayload.DistributionData>> frequencyBuckets) {
         if (frequencyBuckets == null || frequencyBuckets.isEmpty()) return;
 
@@ -107,6 +108,18 @@ public class ApiRateLimitBucketStatisticsModel {
         }
     }
 
+    /**
+     * Applies new distribution data updates to the bucket statistics model.
+     *
+     * For each bucket (b1-b14), this method:
+     * 1. Adds/updates user counts for the given time windows
+     * 2. Maintains a sliding window of historical data (evicts old windows beyond capacity)
+     * 3. Recalculates percentile statistics (min, max, p25, p50, p75) from all user counts
+     *
+     * @param doc The existing statistics document (or null to create new)
+     * @param updates List of distribution data updates to apply
+     * @return Updated statistics model with recalculated percentiles
+     */
     static ApiRateLimitBucketStatisticsModel applyUpdates(ApiRateLimitBucketStatisticsModel doc, List<ApiDistributionDataRequestPayload.DistributionData> updates) {
         if (doc == null) {
             ApiRateLimitBucketStatisticsModel m = new ApiRateLimitBucketStatisticsModel();

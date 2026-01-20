@@ -23,6 +23,10 @@ import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.UpdateOptions;
 import com.akto.utils.ThreatApiDistributionUtils;
 import com.akto.dao.context.Context;
+import com.akto.util.AccountTask;
+import com.akto.dto.Account;
+
+import java.util.function.Consumer;
 
 public class PercentilesCron {
 
@@ -36,24 +40,57 @@ public class PercentilesCron {
         this.mongoClient = mongoClient;
     }
 
-    public void cron(String accountId) {
+    /**
+     * Starts the PercentilesCron scheduler that runs every 2 hours for all accounts.
+     * This method should only be called ONCE during application startup.
+     */
+    public void startCron() {
+        logger.infoAndAddToDb("Starting PercentilesCron scheduler (runs every 2 hours for all accounts)");
+
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 try {
-                    try {
-                        int accId = Integer.parseInt(accountId);
-                        Context.accountId.set(accId);
-                    } catch (Exception ignore) {
-                        // keep context unset if accountId isn't a number
-                    }
-                    runOnce(accountId);
+                    runForAllAccounts();
                 } catch (Exception e) {
-                    logger.errorAndAddToDb("error in PercentilesCron: accountId " + accountId + " " + e.getMessage());
+                    logger.errorAndAddToDb("Error in PercentilesCron scheduler: " + e.getMessage());
+                }
+            }
+        }, 0, 2, TimeUnit.HOURS);
+    }
+
+    /**
+     * Runs the percentiles calculation for all accounts.
+     * Called by the scheduler every 2 hours.
+     */
+    private void runForAllAccounts() {
+        logger.infoAndAddToDb("PercentilesCron: Processing all accounts");
+        long overallStartTime = System.currentTimeMillis();
+
+        AccountTask.instance.executeTask(new Consumer<Account>() {
+            @Override
+            public void accept(Account account) {
+                long accountStartTime = System.currentTimeMillis();
+                try {
+                    String accountId = String.valueOf(account.getId());
+                    Context.accountId.set(account.getId());
+
+                    logger.infoAndAddToDb("PercentilesCron: Processing account " + accountId);
+                    runOnce(accountId);
+
+                    long accountDuration = System.currentTimeMillis() - accountStartTime;
+                    logger.infoAndAddToDb("PercentilesCron: Completed account " + accountId + " in " + accountDuration + "ms");
+
+                } catch (Exception e) {
+                    long accountDuration = System.currentTimeMillis() - accountStartTime;
+                    logger.errorAndAddToDb("PercentilesCron failed for account " + account.getId() + " after " + accountDuration + "ms: " + e.getMessage());
                 } finally {
                     Context.resetContextThreadLocals();
                 }
             }
-        }, 0, 2, TimeUnit.DAYS);
+        }, "percentiles-cron");
+
+        long overallDuration = System.currentTimeMillis() - overallStartTime;
+        logger.infoAndAddToDb("PercentilesCron: Completed all accounts in " + overallDuration + "ms");
     }
 
 
@@ -209,19 +246,6 @@ public class PercentilesCron {
         return lowerBoundWindowStart;
     }
 
-    /**
-     * OPTIMIZED: Fetches pre-calculated bucket statistics from api_rate_limit_bucket_statistics collection.
-     * This is much faster than fetching raw distribution data and recalculating stats.
-     *
-     * Performance: Queries 1 document instead of ~576 documents, resulting in 10-50x speedup.
-     *
-     * @param accountId The account ID
-     * @param apiCollectionId The API collection ID
-     * @param url The API URL
-     * @param method The HTTP method
-     * @param windowSize The window size (5, 15, or 30 minutes)
-     * @return List of BucketStats with pre-calculated p75 values
-     */
     public List<BucketStats> fetchBucketStatsFromStatistics(String accountId, int apiCollectionId, String url, String method, int windowSize) {
         long startTime = System.currentTimeMillis();
 

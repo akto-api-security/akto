@@ -17,8 +17,6 @@ import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
 import com.akto.threat.backend.tasks.FlushMessagesToDB;
 import com.akto.threat.backend.cron.PercentilesCron;
-import com.akto.util.AccountTask;
-import com.akto.dto.Account;
 import com.akto.threat.backend.cron.ArchiveOldMaliciousEventsCron;
 import com.akto.threat.backend.cron.RiskScoreSyncCron;
 import com.mongodb.ConnectionString;
@@ -29,7 +27,6 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.codecs.pojo.PojoCodecProvider;
-import java.util.function.Consumer;
 
 public class Main {
 
@@ -90,23 +87,11 @@ public class Main {
     ApiDistributionDataService apiDistributionDataService = new ApiDistributionDataService(ApiDistributionDataDao.instance);
     com.akto.log.LoggerMaker logger = new com.akto.log.LoggerMaker(Main.class);
 
-     // Start PercentilesCron for all accounts
-
+     // Start PercentilesCron (single scheduler for all accounts, runs every 2 hours)
     try {
       PercentilesCron percentilesCron = new PercentilesCron(threatProtectionMongo);
-      logger.infoAndAddToDb("Starting PercentilesCron for all accounts", com.akto.log.LoggerMaker.LogDb.RUNTIME);
-      AccountTask.instance.executeTask(new Consumer<Account>() {
-        @Override
-        public void accept(Account account) {
-          try {
-            String accountDb = String.valueOf(account.getId());
-            percentilesCron.cron(accountDb);
-            logger.infoAndAddToDb("Scheduled PercentilesCron for account " + accountDb, com.akto.log.LoggerMaker.LogDb.RUNTIME);
-          } catch (Exception e) {
-            logger.errorAndAddToDb("Failed scheduling PercentilesCron for account: " + account.getId() + " due to: " + e.getMessage(), com.akto.log.LoggerMaker.LogDb.RUNTIME);
-          }
-        }
-      }, "percentiles-cron");
+      percentilesCron.startCron();
+      logger.infoAndAddToDb("Started PercentilesCron scheduler (runs every 2 hours for all accounts)", com.akto.log.LoggerMaker.LogDb.RUNTIME);
     } catch (Exception e) {
       logger.errorAndAddToDb("Error starting PercentilesCron: " + e.getMessage(), com.akto.log.LoggerMaker.LogDb.RUNTIME);
     }

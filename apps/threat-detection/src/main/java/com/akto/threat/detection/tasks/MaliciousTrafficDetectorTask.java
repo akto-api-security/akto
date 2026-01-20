@@ -491,7 +491,9 @@ public class MaliciousTrafficDetectorTask implements Task {
 
       // Check and raise alert for RateLimits
       RatelimitConfigItem ratelimitConfig = this.threatConfigEvaluator.getDefaultRateLimitConfig();
-      long ratelimit = this.threatConfigEvaluator.getRatelimit(apiInfoKey);
+
+      ApiInfo.ApiInfoKey templateApiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, templateUrl, method);
+      long ratelimit = this.threatConfigEvaluator.getRatelimit(templateApiInfoKey);
 
       long count = this.distributionCalculator.getSlidingWindowCount(ipApiCmsKey, curEpochMin,
           ratelimitConfig.getPeriod());
