@@ -425,7 +425,7 @@ export default function LeftNav() {
                         navigate("/dashboard/protection/threat-actor");
                         setActive("normal");
                     },
-                    selected: leftNavSelected.includes("_threat") ||  leftNavSelected.includes("_guardrails"),
+                    selected: (leftNavSelected.includes("_threat") && !leftNavSelected.includes("_reports")) || leftNavSelected.includes("_guardrails"),
                     url: "#",
                     key: "7",
                     subNavigationItems: [
