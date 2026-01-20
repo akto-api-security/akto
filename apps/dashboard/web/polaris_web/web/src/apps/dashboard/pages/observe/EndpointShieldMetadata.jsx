@@ -19,6 +19,7 @@ import PersistStore from "../../../main/PersistStore";
 import { mapLabel } from "../../../main/labelHelper";
 import FlyLayout from "../../components/layouts/FlyLayout";
 import LayoutWithTabs from "../../components/layouts/LayoutWithTabs";
+import { MODULE_TYPE, DEFAULT_VALUE } from "./api_collections/endpointShieldHelper";
 
 // Helper function to create table heading configuration
 const createHeading = (text, value = null, sortKey = null) => ({
@@ -69,11 +70,7 @@ const resourceName = {
     plural: 'agents',
 };
 
-// Constants for better maintainability
-const MODULE_TYPE = {
-    MCP_ENDPOINT_SHIELD: 'MCP_ENDPOINT_SHIELD'
-};
-const LOG_STREAMING_DELAY_MS = 500;
+// Constants for better maintainability (MODULE_TYPE, DEFAULT_VALUE imported from endpointShieldHelper)
 const ANIMATION_DURATION = 0.2;
 const LOG_LEVEL_TONES = {
     INFO: 'info',
@@ -83,7 +80,6 @@ const LOG_LEVEL_TONES = {
 const ICON_SIZE = { maxWidth: "1rem", maxHeight: "1rem" };
 const LOG_TIMESTAMP_WIDTH = "180px";
 const LOG_LEVEL_WIDTH = "60px";
-const DEFAULT_VALUE = '-';
 
 // Log fetching modes
 const LOG_MODES = {
@@ -136,12 +132,6 @@ const getMetadataFields = (agent) => [
 ];
 
 function EndpointShieldMetadata() {
-    const isDemoAccount = func.isDemoAccount();
-
-    // Show demo version for demo accounts
-    if (isDemoAccount) {
-        return <EndpointShieldMetadataDemo />;
-    }
 
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
