@@ -370,7 +370,7 @@ export default function LeftNav() {
                 selected: leftNavSelected === "dashboard_prompt_hardening",
                 key: "prompt_hardening",
             }] : []),
-            ...(dashboardCategory !== "Endpoint Security" ? [{
+            {
                 url: "#",
                 label: (
                     <Text
@@ -389,14 +389,30 @@ export default function LeftNav() {
                 ),
                 icon: ReportFilledMinor,
                 onClick: () => {
-                    navigate("/dashboard/reports/issues");
-                    handleSelect("dashboard_reports_issues");
+                    const targetPath = dashboardCategory === CATEGORY_ENDPOINT_SECURITY
+                        ? "/dashboard/reports/threat"
+                        : "/dashboard/reports/issues";
+                    const targetHandle = dashboardCategory === CATEGORY_ENDPOINT_SECURITY
+                        ? "dashboard_reports_threat"
+                        : "dashboard_reports_issues";
+                    navigate(targetPath);
+                    handleSelect(targetHandle);
                     setActive("normal");
                 },
                 selected: leftNavSelected.includes("_reports"),
-                subNavigationItems: reportsSubNavigationItems,
+                subNavigationItems: dashboardCategory === CATEGORY_ENDPOINT_SECURITY
+                    ? [{
+                        label: "Threat",
+                        onClick: () => {
+                            navigate("/dashboard/reports/threat");
+                            handleSelect("dashboard_reports_threat");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_reports_threat",
+                    }]
+                    : reportsSubNavigationItems,
                 key: "6",
-            }] : []),
+            },
             ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted && dashboardCategory !== CATEGORY_DAST  ?  [{
                     label: (
                         <Text variant="bodyMd" fontWeight="medium">
