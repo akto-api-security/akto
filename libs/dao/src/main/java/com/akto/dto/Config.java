@@ -366,9 +366,9 @@ public abstract class Config {
         private int accountId;
         public static final String CONFIG_ID = ConfigType.DATA_DOG.name() + CONFIG_SALT;
 
-        public DataDogConfig() {
+        public DataDogConfig(int accountId) {
             this.configType = ConfigType.DATA_DOG;
-            this.id = CONFIG_ID;
+            this.id = CONFIG_ID + "_" + accountId;
         }
     }
 
