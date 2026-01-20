@@ -58,6 +58,8 @@ import com.akto.threat.detection.cache.RedisBackedCounterCache;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.constants.RedisKeyInfo;
 import com.akto.threat.detection.ip_api_counter.DistributionCalculator;
+import com.akto.threat.detection.ip_api_counter.ParamEnumerationDetector;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ParamEnumerationConfig;
 import com.akto.threat.detection.kafka.KafkaProtoProducer;
 import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedThresholdNotifier;
 import com.akto.threat.detection.utils.ThreatDetector;
@@ -156,6 +158,11 @@ public class MaliciousTrafficDetectorTask implements Task {
     }
 
     this.threatConfigEvaluator = new ThreatConfigurationEvaluator(null, dataActor, apiCacheCountLayer);
+
+    // Initialize ParamEnumerationDetector with config values (or defaults)
+    ParamEnumerationConfig paramEnumConfig = this.threatConfigEvaluator.getParamEnumerationConfig();
+    ParamEnumerationDetector.initialize(redisClient, paramEnumConfig.getUniqueParamThreshold(), paramEnumConfig.getWindowSizeMinutes());
+
     this.internalKafka = new KafkaProtoProducer(internalConfig);
     this.rawApiFactory = new RawApiMetadataFactory(new IPLookupClient());
     this.distributionCalculator = distributionCalculator;
