@@ -1252,7 +1252,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         logger.info("[createUserAndRedirect] Looking up existing user by email");
         User user = UsersDao.instance.findOne(eq("login", userEmail));
         logger.infoAndAddToDb("[createUserAndRedirect] User lookup result: " + (user != null ? "EXISTING USER FOUND (id: " + user.getId() + ")" : "NEW USER (no existing record)"));
-
+        boolean newOrgSetup = false;
         if (user == null && "false".equalsIgnoreCase(shouldLogin)) {
             logger.infoAndAddToDb("[createUserAndRedirect] Path: NEW USER + shouldLogin=false -> Creating signup record without full account");
             SignupUserInfo signupUserInfo = SignupDao.instance.insertSignUp(userEmail, username, signupInfo, invitationToAccount);
@@ -1303,17 +1303,18 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                         // Get all organizations and check for domain matches
                         List<Organization> allOrganizations = OrganizationsDao.instance.findAll(new BasicDBObject());
                         logger.info("[createUserAndRedirect] Found " + allOrganizations.size() + " organizations to check");
+                        if (!allOrganizations.isEmpty()) {
+                            for (Organization org : allOrganizations) {
+                                if (org.getAdminEmail() != null && org.getAdminEmail().contains("@")) {
+                                    String orgAdminDomain = org.getAdminEmail().split("@")[1].toLowerCase();
+                                    logger.debug("[createUserAndRedirect] Checking organization admin domain: " + orgAdminDomain + " against user domain: " + userDomain);
 
-                        for (Organization org : allOrganizations) {
-                            if (org.getAdminEmail() != null && org.getAdminEmail().contains("@")) {
-                                String orgAdminDomain = org.getAdminEmail().split("@")[1].toLowerCase();
-                                logger.debug("[createUserAndRedirect] Checking organization admin domain: " + orgAdminDomain + " against user domain: " + userDomain);
-
-                                // Use the existing domain matching logic from InviteUserAction
-                                if (InviteUserAction.isSameDomain(userDomain, orgAdminDomain)) {
-                                    matchingOrganization = org;
-                                    logger.infoAndAddToDb("[createUserAndRedirect] Found matching organization: " + org.getId() + " with admin email domain: " + orgAdminDomain);
-                                    break;
+                                    // Use the existing domain matching logic from InviteUserAction
+                                    if (InviteUserAction.isSameDomain(userDomain, orgAdminDomain)) {
+                                        matchingOrganization = org;
+                                        logger.infoAndAddToDb("[createUserAndRedirect] Found matching organization: " + org.getId() + " with admin email domain: " + orgAdminDomain);
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -1353,6 +1354,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                         logger.infoAndAddToDb("[createUserAndRedirect] Created new accountId: " + accountId);
 
                         // Create organization for new user
+                        newOrgSetup = true;
                         if (DashboardMode.isSaasDeployment()) {
                             logger.info("[createUserAndRedirect] SaaS deployment, creating organization for new user");
                             String organizationUUID = UUID.randomUUID().toString();
@@ -1421,7 +1423,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
 
             logger.infoAndAddToDb("[createUserAndRedirect] Initializing account for new user");
-            if(invitationToAccount>0){
+            if(!newOrgSetup){
                 Account oldAccount = AccountsDao.instance.findOne("_id", invitationToAccount);
                 user = AccountAction.initializeAccount(userEmail, invitationToAccount, oldAccount.getName(),false, invitedRole == null ? RBAC.Role.GUEST.name() : invitedRole);
             }else {

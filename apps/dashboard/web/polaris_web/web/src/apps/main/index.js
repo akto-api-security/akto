@@ -26,7 +26,7 @@ let free = false;
 const planType = window.PLAN_TYPE?.toLowerCase();
 
 // Bypass FreeApp for signup/login related pages
-const signupPages = ['/check-inbox', '/business-email', '/signup', '/sso-login', '/addUserToAccount'];
+const signupPages = ['/check-inbox', '/business-email', '/signup', '/sso-login', '/addUserToAccount', '/login'];
 const currentPath = window.location.pathname;
 const isSignupPage = signupPages.some(page => currentPath.startsWith(page));
 
