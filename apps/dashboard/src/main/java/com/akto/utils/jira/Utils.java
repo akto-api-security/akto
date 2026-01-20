@@ -40,6 +40,7 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
 import okhttp3.Request;
+import okhttp3.Response;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 
@@ -467,6 +468,28 @@ public class Utils {
             loggerMaker.infoAndAddToDb("Severity or JiraIntegration is null - Severity: " + severity + ", JiraIntegration: " + jiraIntegration, LogDb.DASHBOARD);
         }
 
+        // Auto-generate Epic Name for Jira Data Center if issue type is Epic
+        if (jiraIntegration != null && jiraIntegration.getJiraType() == JiraIntegration.JiraType.DATA_CENTER) {
+            try {
+                // Check if issue type is Epic (ID 10000 is typically Epic in Jira)
+                if (issueType != null && issueType.equals("10000")) {
+                    // Fetch Epic Name custom field ID dynamically
+                    String epicNameFieldId = findEpicNameFieldId(projectKey, issueType, jiraIntegration);
+                    if (epicNameFieldId != null && !epicNameFieldId.isEmpty()) {
+                        // Auto-populate Epic Name with summary (truncate to 100 chars if needed)
+                        String epicName = summary;
+                        if (epicName.length() > 100) {
+                            epicName = epicName.substring(0, 97) + "...";
+                        }
+                        fields.put(epicNameFieldId, epicName);
+                        loggerMaker.infoAndAddToDb("Auto-generated Epic Name for Data Center", LogDb.DASHBOARD);
+                    }
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error setting auto-generated Epic Name for Data Center");
+            }
+        }
+
         if (additionalIssueFields != null) {
             try {
                 Object fieldsObj = additionalIssueFields.get("customIssueFields");
@@ -503,7 +526,7 @@ public class Utils {
                 if ("paragraph".equals(type)) {
                     String text = content.getString("text");
                     if (text != null && !text.isEmpty()) {
-                        description.append(text).append("\n\n");
+                        description.append(convertMarkdownToWikiMarkup(text)).append("\n\n");
                     }
                 }
             }
@@ -517,7 +540,7 @@ public class Utils {
                 } else if ("paragraph".equals(type)) {
                     String text = content.getString("text");
                     if (text != null && !text.isEmpty()) {
-                        description.append(text).append("\n\n");
+                        description.append(convertMarkdownToWikiMarkup(text)).append("\n\n");
                     }
                 } else if ("listItem".equals(type)) {
                     // Jira Wiki Markup: * for bullet points
@@ -532,6 +555,29 @@ public class Utils {
             contentList.addAll(additionalContent);
             return new BasicDBObject("type", "doc").append("version", 1).append("content", contentList);
         }
+    }
+
+    /**
+     * Converts Markdown format to Jira Wiki Markup format
+     * Handles code blocks, inline code, headings, etc.
+     */
+    private static String convertMarkdownToWikiMarkup(String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+
+        // Convert code blocks: ```language\ncode\n``` to {code:language}code{code}
+        text = text.replaceAll("```(\\w+)\\n([\\s\\S]*?)```", "{code:$1}\n$2{code}");
+        // Convert code blocks without language: ```\ncode\n``` to {code}code{code}
+        text = text.replaceAll("```\\n([\\s\\S]*?)```", "{code}\n$1{code}");
+        // Convert inline code: `code` to {{code}}
+        text = text.replaceAll("`([^`]+)`", "{{$1}}");
+        // Convert markdown headings: ### Heading to h3. Heading
+        text = text.replaceAll("(?m)^### (.+)$", "h3. $1");
+        text = text.replaceAll("(?m)^## (.+)$", "h2. $1");
+        text = text.replaceAll("(?m)^# (.+)$", "h1. $1");
+
+        return text;
     }
 
     public static List<BasicDBObject> buildAdditionalIssueFieldsForJira(Info info,
@@ -721,5 +767,57 @@ public class Utils {
     private static BasicDBObject addPlainTextListItem(String text) {
         return new BasicDBObject("type", "listItem")
             .append("text", StringUtils.defaultString(text, ""));
+    }
+
+    /**
+     * Finds the Epic Name custom field ID for Jira Data Center dynamically
+     * Uses the createmeta endpoint to retrieve required fields for the Epic issue type
+     */
+    private static String findEpicNameFieldId(String projectKey, String issueTypeId, JiraIntegration jiraIntegration) {
+        try {
+            String endpoint = jiraIntegration.getBaseUrl() + "/rest/api/2/issue/createmeta/" + projectKey + "/issuetypes/" + issueTypeId;
+
+            Request request = new Request.Builder()
+                .url(endpoint)
+                .get()
+                .addHeader("Authorization", "Bearer " + jiraIntegration.getApiToken())
+                .addHeader("Accept", "application/json")
+                .build();
+
+            Response response = com.akto.util.http_util.CoreHTTPClient.client.newCall(request).execute();
+
+            if (!response.isSuccessful() || response.body() == null) {
+                loggerMaker.infoAndAddToDb("Could not fetch issue metadata from Data Center", LogDb.DASHBOARD);
+                response.close();
+                return null;
+            }
+
+            String responseBody = response.body().string();
+            response.close();
+
+            BasicDBObject metadata = BasicDBObject.parse(responseBody);
+            // Data Center v2 API returns "values" array, not "fields"
+            BasicDBList fields = (BasicDBList) metadata.get("values");
+
+            if (fields == null) {
+                return null;
+            }
+
+            // Search for Epic Name field in the required fields
+            for (Object fieldObj : fields) {
+                BasicDBObject field = (BasicDBObject) fieldObj;
+                String fieldName = field.getString("name");
+                String fieldId = field.getString("fieldId");
+
+                if (fieldName != null && fieldName.toLowerCase().contains("epic") &&
+                    fieldName.toLowerCase().contains("name") && fieldId != null) {
+                    return fieldId;
+                }
+            }
+            return null;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error finding Epic Name field ID for Data Center");
+            return null;
+        }
     }
 }
