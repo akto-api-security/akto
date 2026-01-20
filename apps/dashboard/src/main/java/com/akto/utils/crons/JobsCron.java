@@ -4,7 +4,9 @@ import com.akto.dao.context.Context;
 import com.akto.dao.jobs.JobsDao;
 import com.akto.dto.jobs.Job;
 import com.akto.dto.jobs.JobExecutorType;
+import com.akto.dto.jobs.JobParams;
 import com.akto.dto.jobs.JobStatus;
+import com.akto.dto.jobs.JobType;
 import com.akto.jobs.JobExecutorFactory;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -89,12 +91,18 @@ public class JobsCron {
             }
 
             Job finalJob = job;
-            executorService.submit(
-                () -> {
-                    Context.accountId.set(finalJob.getAccountId());
-                    JobExecutorFactory.getExecutor(finalJob.getJobParams().getJobType()).execute(finalJob);
+            try {
+                JobParams params = finalJob.getJobParams();
+                if(!(params.getJobType() == JobType.DATADOG_TRAFFIC_COLLECTOR)) {
+                    executorService.submit(
+                        () -> {
+                            Context.accountId.set(finalJob.getAccountId());
+                            JobExecutorFactory.getExecutor(finalJob.getJobParams().getJobType()).execute(finalJob);
+                        }
+                    );
                 }
-            );
+            } catch (Exception e) {
+            }
 
         }, 0, 5, TimeUnit.SECONDS);
     }
