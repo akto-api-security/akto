@@ -1,10 +1,10 @@
 package com.akto.otel;
 
+import java.util.List;
+
 import com.akto.dto.HttpResponseParams;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-
-import java.util.List;
 
 /**
  * Service for importing OpenTelemetry traces from Datadog
@@ -31,22 +31,23 @@ public class OtelTraceImporter {
      * @throws Exception if import fails
      */
     public ImportResult importTraces(ImportRequest request, int accountId) throws Exception {
-
+        logger.info("Fetching spans from Datadog...");
         String rawSpansJson = datadogClient.fetchSpans(
-            request.getStartTimeSeconds(),
-            request.getEndTimeSeconds(),
+            request.getStartTimeMillis(),
+            request.getEndTimeMillis(),
             request.getServiceNames(),
             request.getLimit()
         );
 
+        logger.info("Raw spans JSON length: {}", rawSpansJson != null ? rawSpansJson.length() : 0);
+        logger.info("Converting spans to Akto format...");
+
         OtelSpanConverter.ConversionResult conversionResult = spanConverter.convert(rawSpansJson, accountId);
         // here call processResponseParams to process the converted traces
 
-        logger.infoAndAddToDb(String.format(
-            "Import complete: processed=%d, converted=%d",
+        logger.info("Import complete: processed={}, converted={}",
             conversionResult.getTotalProcessed(),
-            conversionResult.getSuccessfullyConverted()
-        ));
+            conversionResult.getSuccessfullyConverted());
 
         return new ImportResult(
             conversionResult.getTraces(),
@@ -59,24 +60,24 @@ public class OtelTraceImporter {
      * Request parameters for trace import
      */
     public static class ImportRequest {
-        private final long startTimeSeconds;
-        private final long endTimeSeconds;
+        private final long startTimeMillis;
+        private final long endTimeMillis;
         private final List<String> serviceNames;
         private final int limit;
 
-        public ImportRequest(long startTimeSeconds, long endTimeSeconds, List<String> serviceNames, int limit) {
-            this.startTimeSeconds = startTimeSeconds;
-            this.endTimeSeconds = endTimeSeconds;
+        public ImportRequest(long startTimeMillis, long endTimeMillis, List<String> serviceNames, int limit) {
+            this.startTimeMillis = startTimeMillis;
+            this.endTimeMillis = endTimeMillis;
             this.serviceNames = serviceNames;
             this.limit = limit > 0 ? limit : 100;
         }
 
-        public long getStartTimeSeconds() {
-            return startTimeSeconds;
+        public long getStartTimeMillis() {
+            return startTimeMillis;
         }
 
-        public long getEndTimeSeconds() {
-            return endTimeSeconds;
+        public long getEndTimeMillis() {
+            return endTimeMillis;
         }
 
         public List<String> getServiceNames() {
