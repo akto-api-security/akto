@@ -874,9 +874,9 @@ function Jira() {
                     <TextField 
                         label="Email" 
                         value={userEmail} 
-                        helpText="Specify your email id for which api token will be generated" 
+                        helpText={jiraType === 'DATA_CENTER' ? 'Specify your email id associated with Jira Data Center' : 'Specify your email id for which api token will be generated'}
                         placeholder='Email' 
-                        requiredIndicator 
+                        requiredIndicator
                         onChange={(value) => actions.setCredentials('userEmail', value)} 
                     />
                     <PasswordTextField 
