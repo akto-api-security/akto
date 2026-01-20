@@ -6,6 +6,9 @@ import urllib.request
 import urllib.error
 
 GUARDRAILS_URL = os.getenv("AKTO_GUARDRAILS_URL", "http://localhost:80")
+if GUARDRAILS_URL and not GUARDRAILS_URL.lower().startswith(("http://", "https://")):
+    print("AKTO_GUARDRAILS_URL uses an unsafe scheme; ignoring", file=sys.stderr)
+    GUARDRAILS_URL = ""
 AUTH_TOKEN = os.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN", "")
 TIMEOUT = float(os.getenv("AKTO_GUARDRAILS_TIMEOUT", "5"))
 FAIL_OPEN = os.getenv("AKTO_GUARDRAILS_FAIL_OPEN", "true").lower() == "true"
