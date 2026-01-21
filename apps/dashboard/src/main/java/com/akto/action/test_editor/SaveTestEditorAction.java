@@ -5,7 +5,6 @@ import com.akto.action.testing_issues.IssuesAction;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.CustomAuthTypeDao;
-import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.test_editor.CommonTemplateDao;
@@ -45,7 +44,6 @@ import com.akto.rules.RequiredConfigs;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.test_editor.TestingUtilsSingleton;
-import com.akto.test_editor.execution.VariableResolver;
 import com.akto.testing.TestExecutor;
 import com.akto.testing.Utils;
 import com.akto.util.Constants;
@@ -348,25 +346,7 @@ public class SaveTestEditorAction extends UserAction {
         // initiating map creation for storing required
         RequiredConfigs.initiate();
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
-        Map<ApiInfo.ApiInfoKey, List<String>> newSampleDataMap = new HashMap<>();
-        
-        Bson filters = Filters.and(
-            Filters.eq("_id.apiCollectionId", infoKey.getApiCollectionId()),
-            Filters.eq("_id.method", infoKey.getMethod()),
-            Filters.in("_id.url", infoKey.getUrl())
-        );
-        SampleData sd = SampleDataDao.instance.findOne(filters);
-        if (sd != null && sd.getSamples().size() > 0) {
-            sd.getSamples().remove(0);
-            newSampleDataMap.put(infoKey, sd.getSamples());
-        }
         sampleDataMap.put(infoKey, sampleDataList.get(0).getSamples());
-        Map<String, List<String>> wordListsMap = testConfig.getWordlists();
-        if (wordListsMap == null) {
-            wordListsMap = new HashMap<String, List<String>>();
-        }
-
-        wordListsMap = VariableResolver.resolveWordList(wordListsMap, infoKey, newSampleDataMap);
 
         SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
         List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
