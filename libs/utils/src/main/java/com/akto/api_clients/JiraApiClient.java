@@ -36,14 +36,55 @@ public class JiraApiClient {
         .writeTimeout(60, TimeUnit.SECONDS)
         .build();
 
-    private static final String GET_TRANSITIONS_ENDPOINT = "/rest/api/3/issue/%s/transitions";
-    private static final String PUT_TRANSITIONS_ENDPOINT = "/rest/api/3/issue/%s/transitions";
-    private static final String JIRA_SEARCH_ENDPOINT = "/rest/api/3/search/jql";
-    private static final String GET_BULK_TRANSITIONS_ENDPOINT = "/rest/api/3/bulk/issues/transition?issueIdsOrKeys=";
-    private static final String POST_BULK_TRANSITIONS_ENDPOINT = "/rest/api/3/bulk/issues/transition";
+    // Cloud (v3) API endpoints
+    private static final String GET_TRANSITIONS_ENDPOINT_V3 = "/rest/api/3/issue/%s/transitions";
+    private static final String PUT_TRANSITIONS_ENDPOINT_V3 = "/rest/api/3/issue/%s/transitions";
+    private static final String JIRA_SEARCH_ENDPOINT_V3 = "/rest/api/3/search/jql";
+    private static final String GET_BULK_TRANSITIONS_ENDPOINT_V3 = "/rest/api/3/bulk/issues/transition?issueIdsOrKeys=";
+    private static final String POST_BULK_TRANSITIONS_ENDPOINT_V3 = "/rest/api/3/bulk/issues/transition"; 
+
+    //Data Center(v2) API endpoints
+    private static final String GET_TRANSITIONS_ENDPOINT_V2 = "/rest/api/2/issue/%s/transitions";
+    private static final String PUT_TRANSITIONS_ENDPOINT_V2 = "/rest/api/2/issue/%s/transitions";
+    private static final String JIRA_SEARCH_ENDPOINT_V2 = "/rest/api/2/search";
+    private static final String GET_BULK_TRANSITIONS_ENDPOINT_V2 = "/rest/api/2/bulk/issues/transition?issueIdsOrKeys=";
+    private static final String POST_BULK_TRANSITIONS_ENDPOINT_V2 = "/rest/api/2/bulk/issues/transition";
+
     private static final String SEARCH_JQL = "project = \"%s\" AND updated >= \"-%dm\" AND labels = \"%s\" ORDER BY updated ASC";
 
     private static final String PROJECT_KEY_REGEX = "^[A-Z][A-Z0-9]+$";
+
+    private static boolean isDataCenter(JiraIntegration jira) {
+        return jira.getJiraType() == JiraIntegration.JiraType.DATA_CENTER;
+    }
+
+    private static String getTransitionsEndpoint(JiraIntegration jira) {
+        return isDataCenter(jira) ? GET_TRANSITIONS_ENDPOINT_V2 : GET_TRANSITIONS_ENDPOINT_V3;
+    }
+
+    private static String getPutTransitionsEndpoint(JiraIntegration jira) {
+        return isDataCenter(jira) ? PUT_TRANSITIONS_ENDPOINT_V2 : PUT_TRANSITIONS_ENDPOINT_V3;
+    }
+
+    private static String getSearchEndpoint(JiraIntegration jira) {
+        return isDataCenter(jira) ? JIRA_SEARCH_ENDPOINT_V2 : JIRA_SEARCH_ENDPOINT_V3;
+    }
+
+    private static String getBulkTransitionsEndpoint(JiraIntegration jira) {
+        return isDataCenter(jira) ? GET_BULK_TRANSITIONS_ENDPOINT_V2 : GET_BULK_TRANSITIONS_ENDPOINT_V3;
+    }
+
+    private static String getPostBulkTransitionsEndpoint(JiraIntegration jira) {
+        return isDataCenter(jira) ? POST_BULK_TRANSITIONS_ENDPOINT_V2 : POST_BULK_TRANSITIONS_ENDPOINT_V3;
+    }
+
+    private static String getAuthorizationHeader(JiraIntegration jira) {
+        if (isDataCenter(jira)) {
+            return "Bearer " + jira.getApiToken();
+        } else {
+            return getBasicAuthHeaders(jira.getUserEmail(), jira.getApiToken());
+        }
+    }
 
     public static String getTransitionIdForStatus(JiraIntegration jira, String issueKey, String statusName)
         throws Exception {
@@ -56,12 +97,12 @@ public class JiraApiClient {
             throw new Exception("Status name cannot be empty.");
         }
 
-        String url = jira.getBaseUrl() + String.format(GET_TRANSITIONS_ENDPOINT, issueKey);
+        String url = jira.getBaseUrl() + String.format(getTransitionsEndpoint(jira), issueKey);
 
         Request request = new Request.Builder()
             .url(url)
             .get()
-            .addHeader("Authorization", getBasicAuthHeaders(jira.getUserEmail(), jira.getApiToken()))
+            .addHeader("Authorization", getAuthorizationHeader(jira))
             .addHeader("Accept", "application/json")
             .build();
 
@@ -94,7 +135,7 @@ public class JiraApiClient {
     }
 
     public static void transitionIssue(JiraIntegration jira, String issueKey, String transitionId) throws IOException {
-        String url = jira.getBaseUrl() + String.format(PUT_TRANSITIONS_ENDPOINT, issueKey);
+        String url = jira.getBaseUrl() + String.format(getPutTransitionsEndpoint(jira), issueKey);
 
         BasicDBObject payload = new BasicDBObject();
         payload.put("transition", new BasicDBObject("id", transitionId));
@@ -102,7 +143,7 @@ public class JiraApiClient {
         Request request = new Request.Builder()
             .url(url)
             .post(RequestBody.create(payload.toString().getBytes()))
-            .addHeader("Authorization", getBasicAuthHeaders(jira.getUserEmail(), jira.getApiToken()))
+            .addHeader("Authorization", getAuthorizationHeader(jira))
             .addHeader("Content-Type", "application/json")
             .build();
 
@@ -134,11 +175,11 @@ public class JiraApiClient {
                 body.append("nextPageToken", nextPageToken);
             }
 
-            String url = jira.getBaseUrl() + JIRA_SEARCH_ENDPOINT;
+            String url = jira.getBaseUrl() + getSearchEndpoint(jira);
             Request request = new Request.Builder()
                 .url(url)
                 .post(RequestBody.create(body.toJson().getBytes()))
-                .addHeader("Authorization", getBasicAuthHeaders(jira.getUserEmail(), jira.getApiToken()))
+                .addHeader("Authorization", getAuthorizationHeader(jira))
                 .addHeader("Content-Type", "application/json")
                 .build();
 
@@ -205,12 +246,12 @@ public class JiraApiClient {
                 "Issue keys list size cannot exceed 1000. Jira transition API supports 1000 issues at a time.");
         }
         String joinedKeys = String.join(",", issueKeys);
-        String url = jira.getBaseUrl() + GET_BULK_TRANSITIONS_ENDPOINT + joinedKeys;
+        String url = jira.getBaseUrl() + getBulkTransitionsEndpoint(jira) + joinedKeys;
 
         Request request = new Request.Builder()
             .url(url)
             .get()
-            .addHeader("Authorization", getBasicAuthHeaders(jira.getUserEmail(), jira.getApiToken()))
+            .addHeader("Authorization", getAuthorizationHeader(jira))
             .addHeader("Accept", "application/json")
             .build();
 
@@ -264,7 +305,7 @@ public class JiraApiClient {
     }
 
     public static boolean bulkTransitionIssues(JiraIntegration jira, Map<Integer, List<String>> issueKeysToTransitionId) throws IOException {
-        String url = jira.getBaseUrl() + POST_BULK_TRANSITIONS_ENDPOINT;
+        String url = jira.getBaseUrl() + getPostBulkTransitionsEndpoint(jira);
 
         // Prepare the request payload
         Map<String, Object> payload = new HashMap<>();
@@ -292,7 +333,7 @@ public class JiraApiClient {
         Request request = new Request.Builder()
             .url(url)
             .post(RequestBody.create(jsonPayload.getBytes()))
-            .addHeader("Authorization", getBasicAuthHeaders(jira.getUserEmail(), jira.getApiToken()))
+            .addHeader("Authorization", getAuthorizationHeader(jira))
             .addHeader("Content-Type", "application/json")
             .build();
 

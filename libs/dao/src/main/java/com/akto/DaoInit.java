@@ -404,7 +404,8 @@ public class DaoInit {
                 new EnumCodec<>(ModelType.class),
                 new EnumCodec<>(ModuleInfo.ModuleType.class),
                 new EnumCodec<>(TLSAuthParam.CertificateType.class),
-                new EnumCodec<>(TicketSource.class)
+                new EnumCodec<>(TicketSource.class),
+                new EnumCodec<>(JiraIntegration.JiraType.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,

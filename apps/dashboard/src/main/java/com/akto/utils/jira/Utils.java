@@ -29,7 +29,7 @@ import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.ComplianceMapping;
 import com.akto.dto.testing.Remediation;
-
+import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.mongodb.BasicDBList;
@@ -54,6 +54,19 @@ public class Utils {
 
     // Thread pool for making calls to jira in parallel
     private static final ExecutorService multiFieldPool = Executors.newFixedThreadPool(10);
+
+    // Helper methods to determine if Jira type is Data Center
+    public static boolean isDataCenter() {
+        JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+        if (jiraIntegration == null) {
+            return false;
+        }
+        return isDataCenter(jiraIntegration.getJiraType());
+    }
+
+    public static boolean isDataCenter(JiraIntegration.JiraType jiraType) {
+        return jiraType == JiraIntegration.JiraType.DATA_CENTER;
+    }
 
     public static Pair<Integer, Map<String, BasicDBObject>> parseJiraFieldSearchPayload(String responsePayload) {
         int total = 0;
@@ -355,6 +368,30 @@ public class Utils {
         return builder;
     }
 
+    /**
+     * Builds HTTP request with Bearer token authentication for Jira Data Center
+     * Data Center uses Personal Access Tokens (PAT) with Bearer authentication
+     */
+    public static Request.Builder buildBearerRequest(String url, String apiToken, boolean isGzipEnabled) {
+        Request.Builder builder = new Request.Builder();
+        builder.addHeader("Authorization", "Bearer " + apiToken);
+        if (isGzipEnabled) {
+            builder.addHeader("Accept-Encoding", "gzip");
+        } else {
+            builder.addHeader("Accept", "application/json");
+        }
+        builder = builder.url(url);
+        return builder;
+    }
+
+    public static Request.Builder buildJiraRequest(String url, String userEmail, String apiToken, boolean isGzipEnabled, boolean isDataCenter) {
+        if (isDataCenter) {
+            return buildBearerRequest(url, apiToken, isGzipEnabled);
+        } else {
+            return buildBasicRequest(url, userEmail, apiToken, isGzipEnabled);
+        }
+    }
+
     public static Request retryWithoutGzipRequest(Request.Builder builder, String url) {
         builder.removeHeader("Accept-Encoding");
         builder = builder.url(url);
@@ -410,12 +447,23 @@ public class Utils {
         return new Pair<>(jiraBaseUrl + "/browse/" + jiraTicketKey, jiraTicketKey);
     }
 
-    public static BasicDBObject buildPayloadForJiraTicket(String summary, String projectKey, String issueType, BasicDBList contentList, Map<String, Object> additionalIssueFields) {
+    public static BasicDBObject buildPayloadForJiraTicket(String summary, String projectKey, String issueType, Object description, Map<String, Object> additionalIssueFields, Severity severity, JiraIntegration jiraIntegration) {
         BasicDBObject fields = new BasicDBObject();
         fields.put("summary", summary);
         fields.put("project", new BasicDBObject("key", projectKey));
         fields.put("issuetype", new BasicDBObject("id", issueType));
-        fields.put("description", new BasicDBObject("type", "doc").append("version", 1).append("content", contentList));
+        fields.put("description", description);
+
+        // Apply severity to priority mapping
+        if (severity != null && jiraIntegration != null) {
+            Map<String, String> severityToPriorityMap = jiraIntegration.getIssueSeverityToPriorityMap();
+            if (severityToPriorityMap != null && !severityToPriorityMap.isEmpty()) {
+                String priorityId = severityToPriorityMap.get(severity.name());
+                if (priorityId != null && !priorityId.isEmpty()) {
+                    fields.put("priority", new BasicDBObject("id", priorityId));
+                }
+            }
+        }
 
         if (additionalIssueFields != null) {
             try {
@@ -443,27 +491,94 @@ public class Utils {
         return fields;
     }
 
+    public static Object buildJiraDescription(List<BasicDBObject> baseContent, List<BasicDBObject> additionalContent, JiraIntegration.JiraType jiraType) {
+        if (isDataCenter(jiraType)) {
+            // Jira Data Center uses Wiki Markup format
+            StringBuilder description = new StringBuilder();
+
+            for (BasicDBObject content : baseContent) {
+                String type = content.getString("type");
+                if ("paragraph".equals(type)) {
+                    String text = content.getString("text");
+                    if (text != null && !text.isEmpty()) {
+                        description.append(convertMarkdownToWikiMarkup(text)).append("\n\n");
+                    }
+                }
+            }
+
+            for (BasicDBObject content : additionalContent) {
+                String type = content.getString("type");
+                if ("heading".equals(type)) {
+                    int level = content.getInt("level", 1);
+                    // Jira Wiki Markup: h1. heading, h2. heading, h3. heading, etc.
+                    description.append("h").append(level).append(". ").append(content.getString("text")).append("\n\n");
+                } else if ("paragraph".equals(type)) {
+                    String text = content.getString("text");
+                    if (text != null && !text.isEmpty()) {
+                        description.append(convertMarkdownToWikiMarkup(text)).append("\n\n");
+                    }
+                } else if ("listItem".equals(type)) {
+                    // Jira Wiki Markup: * for bullet points
+                    description.append("* ").append(content.getString("text")).append("\n");
+                }
+            }
+
+            return description.toString().trim();
+        } else {
+            BasicDBList contentList = new BasicDBList();
+            contentList.addAll(baseContent);
+            contentList.addAll(additionalContent);
+            return new BasicDBObject("type", "doc").append("version", 1).append("content", contentList);
+        }
+    }
+
+    /**
+     * Converts Markdown format to Jira Wiki Markup format
+     * Handles code blocks, inline code, headings, etc.
+     */
+    private static String convertMarkdownToWikiMarkup(String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+
+        // Convert code blocks: ```language\ncode\n``` to {code:language}code{code}
+        text = text.replaceAll("```(\\w+)\\n([\\s\\S]*?)```", "{code:$1}\n$2{code}");
+        // Convert code blocks without language: ```\ncode\n``` to {code}code{code}
+        text = text.replaceAll("```\\n([\\s\\S]*?)```", "{code}\n$1{code}");
+        // Convert inline code: `code` to {{code}}
+        text = text.replaceAll("`([^`]+)`", "{{$1}}");
+        // Convert markdown headings: ### Heading to h3. Heading
+        text = text.replaceAll("(?m)^### (.+)$", "h3. $1");
+        text = text.replaceAll("(?m)^## (.+)$", "h2. $1");
+        text = text.replaceAll("(?m)^# (.+)$", "h1. $1");
+
+        return text;
+    }
+
     public static List<BasicDBObject> buildAdditionalIssueFieldsForJira(Info info,
-        TestingRunIssues issue, Remediation remediation) {
+        TestingRunIssues issue, Remediation remediation, JiraIntegration.JiraType jiraType) {
+
         List<BasicDBObject> contentList = new ArrayList<>();
+        boolean isDataCenter = isDataCenter(jiraType);
 
         try {
-            contentList.add(addHeading(3, "Overview"));
-            addTextSection(contentList, 4, "Severity", issue.getSeverity().name());
-            addListSection(contentList, 3, "Timelines (UTC)", getIssueTimelines(issue));
+            contentList.add(isDataCenter ? addPlainTextHeading(3, "Overview") : addHeading(3, "Overview"));
+            addTextSection(contentList, 4, "Severity", issue.getSeverity().name(), isDataCenter);
+            addListSection(contentList, 3, "Timelines (UTC)", getIssueTimelines(issue), isDataCenter);
 
             if (info != null) {
-                addTextSection(contentList, 4, "Impact", info.getImpact());
-                addListSection(contentList, 4, "Tags", info.getTags());
-                addComplianceSection(contentList, info.getCompliance());
-                addListSection(contentList, 4, "CWE", info.getCwe());
-                addListSection(contentList, 4, "CVE", info.getCve());
-                addListSection(contentList, 4, "References", info.getReferences());
+                addTextSection(contentList, 4, "Impact", info.getImpact(), isDataCenter());
+                addListSection(contentList, 4, "Tags", info.getTags(), isDataCenter()       );
+                addComplianceSection(contentList, info.getCompliance(), isDataCenter());
+                addListSection(contentList, 4, "CWE", info.getCwe(), isDataCenter());
+                addListSection(contentList, 4, "CVE", info.getCve(), isDataCenter());
+                addListSection(contentList, 4, "References", info.getReferences(), isDataCenter());
 
                 String remediationText = StringUtils.isNotBlank(info.getRemediation())
                     ? info.getRemediation()
                     : remediation != null ? remediation.getRemediationText() : "No remediation provided.";
-                addTextSection(contentList, 3, "Remediation", remediationText);
+
+                addTextSection(contentList, 3, "Remediation", remediationText, isDataCenter());
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e,
@@ -489,27 +604,41 @@ public class Utils {
         return timelines;
     }
 
-    private static void addTextSection(List<BasicDBObject> list, int level, String heading, String text) {
-        list.add(addHeading(level, heading));
-        list.add(addParagraph(text));
+    private static void addTextSection(List<BasicDBObject> list, int level, String heading, String text, boolean isDataCenter) {
+        list.add(isDataCenter ? addPlainTextHeading(level, heading) : addHeading(level, heading));
+        list.add(isDataCenter ? addPlainTextParagraph(text) : addParagraph(text));
     }
 
-    private static void addListSection(List<BasicDBObject> list, int level, String heading, List<String> items) {
+    private static void addListSection(List<BasicDBObject> list, int level, String heading, List<String> items, boolean isDataCenter) {
         if (CollectionUtils.isNotEmpty(items)) {
-            list.add(addHeading(level, heading));
-            list.add(addList(items));
+            list.add(isDataCenter ? addPlainTextHeading(level, heading) : addHeading(level, heading));
+            if (isDataCenter) {
+                for (String item : items) {
+                    list.add(addPlainTextListItem(item));
+                }
+            } else {
+                list.add(addList(items));
+            }
         }
     }
 
-    private static void addComplianceSection(List<BasicDBObject> list, ComplianceMapping compliance) {
+    private static void addComplianceSection(List<BasicDBObject> list, ComplianceMapping compliance, boolean isDataCenter) {
         if (compliance == null || MapUtils.isEmpty(compliance.getMapComplianceToListClauses())) return;
 
-        list.add(addHeading(4, "Compliance"));
+        list.add(isDataCenter ? addPlainTextHeading(4, "Compliance") : addHeading(4, "Compliance"));
         for (Map.Entry<String, List<String>> entry : compliance.getMapComplianceToListClauses().entrySet()) {
-            list.add(addHeading(5, entry.getKey()));
-            list.add(CollectionUtils.isNotEmpty(entry.getValue())
-                ? addList(entry.getValue())
-                : addParagraph("No clauses available."));
+            list.add(isDataCenter ? addPlainTextHeading(5, entry.getKey()) : addHeading(5, entry.getKey()));
+            if (CollectionUtils.isNotEmpty(entry.getValue())) {
+                if (isDataCenter) {
+                    for (String item : entry.getValue()) {
+                        list.add(addPlainTextListItem(item));
+                    }
+                } else {
+                    list.add(addList(entry.getValue()));
+                }
+            } else {
+                list.add(isDataCenter ? addPlainTextParagraph("No clauses available.") : addParagraph("No clauses available."));
+            }
         }
     }
 
@@ -543,5 +672,21 @@ public class Utils {
                         Collections.singletonList(
                             new BasicDBObject("type", "text").append("text", StringUtils.defaultString(text, ""))))
             ));
+    }
+
+    private static BasicDBObject addPlainTextHeading(int level, String text) {
+        return new BasicDBObject("type", "heading")
+            .append("level", level)
+            .append("text", StringUtils.defaultString(text, ""));
+    }
+
+    private static BasicDBObject addPlainTextParagraph(String text) {
+        return new BasicDBObject("type", "paragraph")
+            .append("text", StringUtils.defaultString(text, ""));
+    }
+
+    private static BasicDBObject addPlainTextListItem(String text) {
+        return new BasicDBObject("type", "listItem")
+            .append("text", StringUtils.defaultString(text, ""));
     }
 }

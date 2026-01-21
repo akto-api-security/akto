@@ -7,6 +7,11 @@ import com.mongodb.BasicDBObject;
 
 public class JiraIntegration {
 
+    public enum JiraType {
+        CLOUD,
+        DATA_CENTER
+    }
+
     private String baseUrl;
     private String projId;
     private String userEmail;
@@ -14,10 +19,14 @@ public class JiraIntegration {
     private String issueType;
     private int createdTs;
     private int updatedTs;
+    private JiraType jiraType;
     private Map<String,List<BasicDBObject>> projectIdsMap;
     private Map<String, ProjectMapping> projectMappings;
+    private Map<String, String> issueSeverityToPriorityMap;
 
     public static final String API_TOKEN = "apiToken";
+    public static final String ISSUE_SEVERITY_TO_PRIORITY_MAP = "issueSeverityToPriorityMap";
+    public static final String JIRA_TYPE = "jiraType";
 
     public String getBaseUrl() {
         return baseUrl;
@@ -89,6 +98,22 @@ public class JiraIntegration {
 
     public void setProjectMappings(Map<String, ProjectMapping> projectMappings) {
         this.projectMappings = projectMappings;
+    }
+
+    public Map<String, String> getIssueSeverityToPriorityMap() {
+        return issueSeverityToPriorityMap;
+    }
+
+    public void setIssueSeverityToPriorityMap(Map<String, String> issueSeverityToPriorityMap) {
+        this.issueSeverityToPriorityMap = issueSeverityToPriorityMap;
+    }
+
+    public JiraType getJiraType() {
+        return jiraType;
+    }
+
+    public void setJiraType(JiraType jiraType) {
+        this.jiraType = jiraType;
     }
 
 }
