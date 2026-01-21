@@ -40,6 +40,7 @@ public class FastDiscoveryConsumer {
     private final DataActor dataActor;
     private final ConcurrentHashMap<String, Integer> hostnameToCollectionId;
 
+    // TODO: clean the code in this consumer
     public FastDiscoveryConsumer(
             BloomFilterManager bloomFilter,
             Map<String, Integer> hostnameToCollectionId
