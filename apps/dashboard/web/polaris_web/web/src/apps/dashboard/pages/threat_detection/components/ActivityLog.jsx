@@ -14,7 +14,7 @@ import {useState} from 'react';
 import GetPrettifyEndpoint from '../../observe/GetPrettifyEndpoint';
 import PersistStore from "../../../../main/PersistStore";
 import { labelMap } from '../../../../main/labelHelperMap';
-import { isAgenticSecurityCategory, isEndpointSecurityCategory } from '../../../../main/labelHelper';
+import { isAgenticSecurityCategory, isEndpointSecurityCategory, mapLabel } from '../../../../main/labelHelper';
 import { extractRuleViolated } from '../utils/formatUtils';
   
  export const ActivityLog = ({ activityLog, actorDetails }) => {
@@ -158,7 +158,7 @@ import { extractRuleViolated } from '../utils/formatUtils';
               itemCount={data.length}
               headings={[
                   {title: 'Time'},
-                  {title: 'Attack type'},
+                  {title: labelMap[PersistStore.getState().dashboardCategory]["Attack type"]},
                   ...((isAgenticSecurityCategory() || isEndpointSecurityCategory()) ? [{title: 'Rule Violated'}] : []),
                   {title: 'Severity'},
                   {title: 'Host'},

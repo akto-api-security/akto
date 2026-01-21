@@ -58,7 +58,7 @@ const getHeaders = () => {
     {
       text: "Filter",
       value: "filterId",
-      title: "Attack type",
+      title: labelMap[PersistStore.getState().dashboardCategory]["Attack type"],
     });
 
   if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
@@ -660,7 +660,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       },
       {
         key: 'latestAttack',
-        label: 'Latest attack sub-category',
+        label: labelMap[PersistStore.getState().dashboardCategory]["Latest attack sub-category"],
         type: 'select',
         choices: attackTypeChoices,
         multiple: true
