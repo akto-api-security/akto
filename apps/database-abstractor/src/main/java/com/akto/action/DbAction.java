@@ -11,6 +11,9 @@ import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.CommonTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dao.testing.TestRolesDao;
+import com.akto.dao.testing.TestingRunConfigDao;
+import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.traffic_collector.TrafficCollectorInfoDao;
 import com.akto.dao.traffic_collector.TrafficCollectorMetricsDao;
 import com.akto.data_actor.DbLayer;
@@ -3330,10 +3333,120 @@ public class DbAction extends ActionSupport {
                     updates
             );
 
+            // Trigger tests after successful crawling completion
+            if (status.equals(CrawlerRun.CrawlerRunStatus.COMPLETED.name())) {
+                CrawlerRun crawlerRun = CrawlerRunDao.instance.findOne(
+                        Filters.eq(CrawlerRun.CRAWL_ID, crawlId)
+                );
+                triggerTestsAfterCrawling(crawlerRun);
+            }
+
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in updateDastJobStatus");
             return Action.ERROR.toUpperCase();
+        }
+    }
+
+    private TestingRun triggerTestsAfterCrawling(CrawlerRun crawlerRun) {
+        // Validate input
+        if (crawlerRun == null || !crawlerRun.isRunTestAfterCrawling()) {
+            return null;
+        }
+
+        try {
+            // Validate collection ID
+            Integer collectionId = crawlerRun.getCollectionId();
+            if (collectionId == null || collectionId == 0) {
+                loggerMaker.errorAndAddToDb("Cannot trigger tests: No collection ID found in crawler run");
+                return null;
+            }
+
+            // Fetch authentication mechanism
+            AuthMechanism authMechanism = TestRolesDao.instance.fetchAttackerToken(0);
+            if (authMechanism == null) {
+                loggerMaker.errorAndAddToDb("Cannot trigger tests: No authentication mechanism found");
+                return null;
+            }
+
+            // Fetch only active test template IDs (efficient - no YAML parsing)
+            Bson filter = Filters.or(
+                Filters.exists(YamlTemplate.INACTIVE, false),
+                Filters.eq(YamlTemplate.INACTIVE, false)
+            );
+            List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(
+                filter,
+                Projections.include("_id")
+            );
+
+            if (yamlTemplates == null || yamlTemplates.isEmpty()) {
+                loggerMaker.errorAndAddToDb("Cannot trigger tests: No test templates found");
+                return null;
+            }
+
+            // Extract test IDs
+            List<String> selectedTests = new ArrayList<>();
+            for (YamlTemplate template : yamlTemplates) {
+                selectedTests.add(template.getId());
+            }
+
+            // Create TestingRunConfig with all available tests
+            int testConfigId = UUID.randomUUID().hashCode() & 0xfffffff;
+            TestingRunConfig testingRunConfig = new TestingRunConfig(
+                testConfigId,                   // id
+                null,                           // collectionWiseApiInfoKey (null for collection-wise)
+                selectedTests,                  // testSubCategoryList (all active tests)
+                authMechanism.getId(),          // authMechanismId
+                null,                           // overriddenTestAppUrl
+                "",                             // testRoleId
+                false                           // cleanUp
+            );
+            testingRunConfig.setTestSuiteIds(new ArrayList<>());
+            TestingRunConfigDao.instance.insertOne(testingRunConfig);
+
+            // Create testing endpoints for the crawled collection
+            CollectionWiseTestingEndpoints testingEndpoints = new CollectionWiseTestingEndpoints(collectionId);
+
+            // Handle optional mini testing service
+            String miniTestingServiceName = null;
+            if (crawlerRun.getSelectedMiniTestingService() != null
+                && !crawlerRun.getSelectedMiniTestingService().isEmpty()) {
+                miniTestingServiceName = crawlerRun.getSelectedMiniTestingService();
+            }
+
+            // Create testing run
+            String testName = "Auto-test after crawl: " + crawlerRun.getHostname();
+            TestingRun testingRun = new TestingRun(
+                Context.now(),                  // scheduleTimestamp
+                crawlerRun.getStartedBy(),      // userEmail
+                testingEndpoints,               // testingEndpoints
+                testConfigId,                   // testIdConfig (links to TestingRunConfig)
+                TestingRun.State.SCHEDULED,     // state
+                0,                              // periodInSeconds (0 = one-time run)
+                testName,                       // name
+                -1,                             // testRunTime (-1 = use default)
+                -1,                             // maxConcurrentRequests (-1 = use default)
+                false,                          // sendSlackAlert
+                miniTestingServiceName          // miniTestingServiceName (can be null)
+            );
+
+            testingRun.setTriggeredBy("DAST_CRAWLER_AUTO_TEST");
+            TestingRunDao.instance.insertOne(testingRun);
+
+            loggerMaker.infoAndAddToDb(
+                "Successfully triggered tests after crawling. " +
+                "CrawlId: " + crawlerRun.getCrawlId() +
+                ", CollectionId: " + collectionId +
+                ", TestingRunId: " + testingRun.getId().toHexString() +
+                ", TestCount: " + selectedTests.size() +
+                (miniTestingServiceName != null ? ", MiniTestingService: " + miniTestingServiceName : "")
+            );
+
+            return testingRun;
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error triggering tests after crawling for crawlId: " + crawlerRun.getCrawlId());
+            return null;
         }
     }
 
@@ -4735,7 +4848,6 @@ public class DbAction extends ActionSupport {
      * Uses same pagination pattern as fetchApiRateLimits.
      * Endpoint: POST /api/fetchApiIds
      *
-     * @param lastApiInfoKey Cursor for pagination (null for first page)
      * @return List of API IDs (max 1000 records per page)
      */
     public String fetchApiIds() {
