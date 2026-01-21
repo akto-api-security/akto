@@ -673,12 +673,14 @@ function Jira() {
                             <TextField maxLength={10} showCharacterCount value={project?.projectId || ""} label="Project key" placeholder={"Project Key"} requiredIndicator
                                 onChange={(val)=> projectKeyChangeHandler(index,val)} />
                             {loadingProjectIndex === index ? (
-                                <div style={{ display: 'flex', alignItems: 'center', margin: '8px 0' }}>
-                                    <Spinner size="small" />
-                                    <Text variant="bodyMd" as="span" style={{ marginLeft: '8px' }}>&nbsp;&nbsp;Loading status mappings...</Text>
-                                    </div>
+                                <Box paddingBlock="2">
+                                    <HorizontalStack gap="2" align="center">
+                                        <Spinner size="small" />
+                                        <Text variant="bodyMd" as="span">&nbsp;&nbsp;Loading status mappings...</Text>
+                                    </HorizontalStack>
+                                </Box>
                             ) : (
-                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                <HorizontalStack gap="1" align="center">
                                     <Checkbox
                                         disabled={!project?.projectId?.trim()}
                                         checked={project.enableBiDirIntegration}
@@ -689,10 +691,10 @@ function Jira() {
                                         }}
                                         label=""
                                     />
-                                    <span style={{ marginLeft: '4px', opacity: project?.projectId?.trim() ? 1 : 0.5 }}>
+                                    <span style={{ opacity: project?.projectId?.trim() ? 1 : 0.5 }}>
                                         Enable bi-directional integration
                                     </span>
-                                    </div>
+                                </HorizontalStack>
                             )}
                             {project.enableBiDirIntegration &&
                                 <VerticalStack gap={3} align='start'>
@@ -768,30 +770,32 @@ function Jira() {
                                             <Text variant='bodyMd' color='subdued'>Mapped to Jira field:</Text>
                                             <Text variant='bodyMd' fontWeight='semibold'>{project.priorityFieldMapping?.fieldName || project.priorityFieldMapping?.fieldId}</Text>
                                         </HorizontalStack>
-                                        <Box width="100%">
+                                        <Box width="100%" paddingBlockStart="4">
                                             {/* Table Header */}
-                                            <div style={{ display: 'flex', width: '100%', marginBottom: '12px' }}>
-                                                <Box
-                                                    padding="4"
-                                                    background="bg-surface-secondary"
-                                                    borderWidth="1"
-                                                    borderColor="border"
-                                                    borderRadius="2"
-                                                    style={{ textAlign: 'center', flex: 1, marginRight: '4px' }}
-                                                >
-                                                    <Text variant='bodyMd' fontWeight='semibold' alignment='center'>Akto Severity</Text>
-                                                </Box>
-                                                <Box
-                                                    padding="4"
-                                                    background="bg-surface-secondary"
-                                                    borderWidth="1"
-                                                    borderColor="border"
-                                                    borderRadius="2"
-                                                    style={{ textAlign: 'center', flex: 1, marginLeft: '4px' }}
-                                                >
-                                                    <Text variant='bodyMd' fontWeight='semibold' alignment='center'>Jira Priority</Text>
-                                                </Box>
-                                            </div>
+                                            <Box paddingBlockEnd="3">
+                                                <HorizontalStack gap="0" align="space-evenly">
+                                                    <Box
+                                                        padding="4"
+                                                        background="bg-surface-secondary"
+                                                        borderWidth="1"
+                                                        borderColor="border"
+                                                        borderRadius="2"
+                                                        style={{ textAlign: 'center', flex: 1 }}
+                                                    >
+                                                        <Text variant='bodyMd' fontWeight='semibold' alignment='center'>Akto Severity</Text>
+                                                    </Box>
+                                                    <Box
+                                                        padding="4"
+                                                        background="bg-surface-secondary"
+                                                        borderWidth="1"
+                                                        borderColor="border"
+                                                        borderRadius="2"
+                                                        style={{ textAlign: 'center', flex: 1 }}
+                                                    >
+                                                        <Text variant='bodyMd' fontWeight='semibold' alignment='center'>Jira Priority</Text>
+                                                    </Box>
+                                                </HorizontalStack>
+                                            </Box>
 
                                             {/* Table Rows */}
                                             {(() => {
@@ -807,28 +811,32 @@ function Jira() {
                                                     const isLastRow = idx === mappedSeverities.length - 1;
 
                                                     return (
-                                                        <div key={`view-${severity}-${index}`} style={{ display: 'flex', width: '100%', marginBottom: isLastRow ? '0' : '8px' }}>
-                                                            <Box
-                                                                padding="4"
-                                                                borderWidth="1"
-                                                                borderColor="border"
-                                                                borderRadius="2"
-                                                                style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1, marginRight: '4px' }}
-                                                            >
-                                                                <Badge status={getSeverityBadgeColor(severity)}>
-                                                                    {severity.charAt(0) + severity.slice(1).toLowerCase()}
-                                                                </Badge>
-                                                            </Box>
-                                                            <Box
-                                                                padding="4"
-                                                                borderWidth="1"
-                                                                borderColor="border"
-                                                                borderRadius="2"
-                                                                style={{ textAlign: 'center', flex: 1, marginLeft: '4px' }}
-                                                            >
-                                                                <Text variant='bodyMd' alignment='center'>{mappedDisplayName}</Text>
-                                                            </Box>
-                                                        </div>
+                                                        <Box key={`view-${severity}-${index}`} paddingBlockEnd={isLastRow ? '0' : '2'}>
+                                                            <HorizontalStack gap="0" align="space-evenly">
+                                                                <Box
+                                                                    padding="4"
+                                                                    borderWidth="1"
+                                                                    borderColor="border"
+                                                                    borderRadius="2"
+                                                                    style={{ flex: 1 }}
+                                                                >
+                                                                    <HorizontalStack align="center" blockAlign="center">
+                                                                        <Badge status={getSeverityBadgeColor(severity)}>
+                                                                            {severity.charAt(0) + severity.slice(1).toLowerCase()}
+                                                                        </Badge>
+                                                                    </HorizontalStack>
+                                                                </Box>
+                                                                <Box
+                                                                    padding="4"
+                                                                    borderWidth="1"
+                                                                    borderColor="border"
+                                                                    borderRadius="2"
+                                                                    style={{ textAlign: 'center', flex: 1 }}
+                                                                >
+                                                                    <Text variant='bodyMd' alignment='center'>{mappedDisplayName}</Text>
+                                                                </Box>
+                                                            </HorizontalStack>
+                                                        </Box>
                                                     );
                                                 });
                                             })()}
@@ -837,12 +845,14 @@ function Jira() {
                                 )}
 
                                 {loadingFieldsProjectIndex === index || loadingFieldValuesProjectIndex === index ? (
-                                    <div style={{ display: 'flex', alignItems: 'center', margin: '8px 0' }}>
-                                        <Spinner size="small" />
-                                        <Text variant="bodyMd" as="span" style={{ marginLeft: '8px' }}>
-                                            &nbsp;&nbsp;{loadingFieldsProjectIndex === index ? 'Loading fields...' : 'Loading values...'}
-                                        </Text>
-                                    </div>
+                                    <Box paddingBlock="2">
+                                        <HorizontalStack gap="2" align="center">
+                                            <Spinner size="small" />
+                                            <Text variant="bodyMd" as="span">
+                                                &nbsp;&nbsp;{loadingFieldsProjectIndex === index ? 'Loading fields...' : 'Loading values...'}
+                                            </Text>
+                                        </HorizontalStack>
+                                    </Box>
                                 ) : project.enablePriorityMapping && (
                                     <VerticalStack gap={3} align='start'>
                                         <Text variant='bodyMd' color='subdued'>
