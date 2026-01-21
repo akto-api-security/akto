@@ -56,6 +56,19 @@ public class Utils {
     // Thread pool for making calls to jira in parallel
     private static final ExecutorService multiFieldPool = Executors.newFixedThreadPool(10);
 
+    // Helper methods to determine if Jira type is Data Center
+    public static boolean isDataCenter() {
+        JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+        if (jiraIntegration == null) {
+            return false;
+        }
+        return isDataCenter(jiraIntegration.getJiraType());
+    }
+
+    public static boolean isDataCenter(JiraIntegration.JiraType jiraType) {
+        return jiraType == JiraIntegration.JiraType.DATA_CENTER;
+    }
+
     public static Pair<Integer, Map<String, BasicDBObject>> parseJiraFieldSearchPayload(String responsePayload) {
         int total = 0;
         Map<String, BasicDBObject> fieldSearchMap = new HashMap<>();
@@ -497,7 +510,7 @@ public class Utils {
     }
 
     public static Object buildJiraDescription(List<BasicDBObject> baseContent, List<BasicDBObject> additionalContent, JiraIntegration.JiraType jiraType) {
-        if (jiraType == JiraIntegration.JiraType.DATA_CENTER) {
+        if (isDataCenter(jiraType)) {
             // Jira Data Center uses Wiki Markup format
             StringBuilder description = new StringBuilder();
 
@@ -564,7 +577,7 @@ public class Utils {
         TestingRunIssues issue, Remediation remediation, JiraIntegration.JiraType jiraType) {
 
         List<BasicDBObject> contentList = new ArrayList<>();
-        boolean isDataCenter = jiraType == JiraIntegration.JiraType.DATA_CENTER;
+        boolean isDataCenter = isDataCenter(jiraType);
 
         try {
             contentList.add(isDataCenter ? addPlainTextHeading(3, "Overview") : addHeading(3, "Overview"));
@@ -572,18 +585,18 @@ public class Utils {
             addListSection(contentList, 3, "Timelines (UTC)", getIssueTimelines(issue), isDataCenter);
 
             if (info != null) {
-                addTextSection(contentList, 4, "Impact", info.getImpact(), isDataCenter);
-                addListSection(contentList, 4, "Tags", info.getTags(), isDataCenter);
-                addComplianceSection(contentList, info.getCompliance(), isDataCenter);
-                addListSection(contentList, 4, "CWE", info.getCwe(), isDataCenter);
-                addListSection(contentList, 4, "CVE", info.getCve(), isDataCenter);
-                addListSection(contentList, 4, "References", info.getReferences(), isDataCenter);
+                addTextSection(contentList, 4, "Impact", info.getImpact(), isDataCenter());
+                addListSection(contentList, 4, "Tags", info.getTags(), isDataCenter()       );
+                addComplianceSection(contentList, info.getCompliance(), isDataCenter());
+                addListSection(contentList, 4, "CWE", info.getCwe(), isDataCenter());
+                addListSection(contentList, 4, "CVE", info.getCve(), isDataCenter());
+                addListSection(contentList, 4, "References", info.getReferences(), isDataCenter());
 
                 String remediationText = StringUtils.isNotBlank(info.getRemediation())
                     ? info.getRemediation()
                     : remediation != null ? remediation.getRemediationText() : "No remediation provided.";
 
-                addTextSection(contentList, 3, "Remediation", remediationText, isDataCenter);
+                addTextSection(contentList, 3, "Remediation", remediationText, isDataCenter());
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e,

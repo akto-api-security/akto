@@ -2,6 +2,7 @@ package com.akto.action;
 
 import static com.akto.utils.Utils.createRequestFile;
 import static com.akto.utils.Utils.getTestResultFromTestingRunResult;
+import static com.akto.utils.jira.Utils.isDataCenter;
 
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.JiraIntegrationDao;
@@ -88,7 +89,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private String userEmail;
     private String apiToken;
     private String issueType;
-    private String jiraType;
+    private JiraIntegration.JiraType jiraType;
     private JiraIntegration jiraIntegration;
     private JiraMetaData jiraMetaData;
 
@@ -140,29 +141,24 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
     private static final String REMEDIATION_INFO_URL = "tests-library-master/remediation/%s.md";
 
-    // Helper methods to determine API version
-    private boolean isDataCenter() {
-        return JiraIntegration.JiraType.DATA_CENTER.name().equals(jiraType);
-    }
-
     private String getMetaEndpoint() {
-        return isDataCenter() ? META_ENDPOINT_V2 : META_ENDPOINT;
+        return isDataCenter(jiraType) ? META_ENDPOINT_V2 : META_ENDPOINT;
     }
 
     private String getCreateIssueEndpoint() {
-        return isDataCenter() ? CREATE_ISSUE_ENDPOINT_V2 : CREATE_ISSUE_ENDPOINT;
+        return isDataCenter(jiraType) ? CREATE_ISSUE_ENDPOINT_V2 : CREATE_ISSUE_ENDPOINT;
     }
 
     private String getCreateIssueEndpointBulk() {
-        return isDataCenter() ? CREATE_ISSUE_ENDPOINT_BULK_V2 : CREATE_ISSUE_ENDPOINT_BULK;
+        return isDataCenter(jiraType) ? CREATE_ISSUE_ENDPOINT_BULK_V2 : CREATE_ISSUE_ENDPOINT_BULK;
     }
 
     private String getIssueStatusEndpoint() {
-        return isDataCenter() ? ISSUE_STATUS_ENDPOINT_V2 : ISSUE_STATUS_ENDPOINT;
+        return isDataCenter(jiraType) ? ISSUE_STATUS_ENDPOINT_V2 : ISSUE_STATUS_ENDPOINT;
     }
 
     private String getPriorityEndpoint() {
-        return isDataCenter() ? PRIORITY_ENDPOINT_V2 : PRIORITY_ENDPOINT;
+        return isDataCenter(jiraType) ? PRIORITY_ENDPOINT_V2 : PRIORITY_ENDPOINT;
     }
 
     @Setter
@@ -178,7 +174,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         String url = baseUrl + getMetaEndpoint();
         setApiToken(buildApiToken(apiToken));
         try {
-            Request.Builder builder = buildJiraRequest(url, userEmail, apiToken, true, isDataCenter());
+            Request.Builder builder = buildJiraRequest(url, userEmail, apiToken, true, isDataCenter(jiraType));
             Request okHttpRequest = builder.build();
             Call call = client.newCall(okHttpRequest);
             Response response = null;
@@ -259,7 +255,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         baseUrl = existingIntegration.getBaseUrl();
         userEmail = existingIntegration.getUserEmail();
         apiToken = existingIntegration.getApiToken();
-        jiraType = existingIntegration.getJiraType().name();
+        jiraType = existingIntegration.getJiraType();
 
         setApiToken(buildApiToken(apiToken));
         try {
@@ -267,7 +263,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
             String statusUrl = baseUrl + String.format(getIssueStatusEndpoint(), projId) + "?maxResults=100";
 
-            Request.Builder builder = buildJiraRequest(statusUrl, userEmail, apiToken, false, isDataCenter());
+            Request.Builder builder = buildJiraRequest(statusUrl, userEmail, apiToken, false, isDataCenter(jiraType));
             Request okHttpRequest = builder.build();
 
             Response response = null;
@@ -279,7 +275,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                 if (!response.isSuccessful()) {
                     loggerMaker.error(
                         "Error while fetching Jira Project statuses. Response code: {}, accountId: {}, projectId: {}, API version: {}",
-                        response.code(), Context.accountId.get(), projId, (isDataCenter() ? "v2 Data Center" : "v3 Cloud"));
+                        response.code(), Context.accountId.get(), projId, (isDataCenter(jiraType) ? "v2 Data Center" : "v3 Cloud"));
                     return Action.ERROR.toUpperCase();
                 }
 
@@ -345,14 +341,14 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         baseUrl = jiraIntegration.getBaseUrl();
         userEmail = jiraIntegration.getUserEmail();
         apiToken = jiraIntegration.getApiToken();
-        jiraType = jiraIntegration.getJiraType().name();
+        jiraType = jiraIntegration.getJiraType();
 
         loggerMaker.infoAndAddToDb("Fetching Jira priorities from " + baseUrl);
         setApiToken(buildApiToken(apiToken));
         try {
             String priorityUrl = baseUrl + getPriorityEndpoint();
             
-            Request.Builder builder = buildJiraRequest(priorityUrl, userEmail, apiToken, false, isDataCenter());
+            Request.Builder builder = buildJiraRequest(priorityUrl, userEmail, apiToken, false, isDataCenter(jiraType));
             Request okHttpRequest = builder.build();
 
             Response response = null;
@@ -362,7 +358,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                 response = client.newCall(okHttpRequest).execute();
                 
                 loggerMaker.infoAndAddToDb("Jira priorities API response code: " + response.code() + 
-                    " (using " + (isDataCenter() ? "v2 Data Center" : "v3 Cloud") + ")");
+                    " (using " + (isDataCenter(jiraType) ? "v2 Data Center" : "v3 Cloud") + ")");
 
                 if (!response.isSuccessful()) {
                     loggerMaker.errorAndAddToDb("Failed to fetch Jira priorities - response not successful");
@@ -690,14 +686,14 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         }
         
         loggerMaker.infoAndAddToDb("Successfully fetched " + issueTypes.size() + " issue types for project " + projectId + 
-            " using " + (isDataCenter() ? "v2 (Data Center)" : "v3 (Cloud)") + " API");
+            " using " + (isDataCenter(jiraType) ? "v2 (Data Center)" : "v3 (Cloud)") + " API");
         return getIssueTypesWithIds(issueTypes);
     }
 
     private String fetchProjectMetadataFromJira(String projectId) throws Exception {
         String url;
 
-        if (isDataCenter()) {
+        if (isDataCenter(jiraType)) {
             // Data Center v2: use project statuses endpoint which returns issue types
             url = baseUrl + "/rest/api/2/project/" + projectId + "/statuses";
             loggerMaker.infoAndAddToDb("Fetching Data Center v2 metadata from: " + url);
@@ -707,7 +703,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             loggerMaker.infoAndAddToDb("Fetching Cloud v3 metadata from: " + url);
         }
         
-        Request.Builder builder = buildJiraRequest(url, userEmail, apiToken, true, isDataCenter());
+        Request.Builder builder = buildJiraRequest(url, userEmail, apiToken, true, isDataCenter(jiraType));
         Request okHttpRequest = builder.build();
         
         Response response = null;
@@ -748,7 +744,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private BasicDBList parseProjectMetadataResponse(String responsePayload) throws Exception {
         BasicDBList issueTypes = null;
         
-        if (isDataCenter()) {
+        if (isDataCenter(jiraType)) {
             issueTypes = parseDataCenterResponse(responsePayload);
         } else {
             issueTypes = parseCloudResponse(responsePayload);
@@ -831,7 +827,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         }
         
         // Set jiraType from integration to use correct endpoint
-        jiraType = jiraIntegration.getJiraType().name();
+        jiraType = jiraIntegration.getJiraType();
 
         TestingRunIssues testingRunIssues = TestingRunIssuesDao.instance.findOne(
             Filters.eq(Constants.ID, jiraMetaData.getTestingIssueId()));
@@ -849,7 +845,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         String url = jiraIntegration.getBaseUrl() + getCreateIssueEndpoint();
         
         Map<String, List<String>> headers = new HashMap<>();
-        if (isDataCenter()) {
+        if (isDataCenter(jiraType)) {
             // Data Center uses Bearer token authentication
             headers.put("Authorization", Collections.singletonList("Bearer " + jiraIntegration.getApiToken()));
         } else {
@@ -935,7 +931,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             }
             
             // Set jiraType from integration
-            jiraType = jiraIntegration.getJiraType().name();
+            jiraType = jiraIntegration.getJiraType();
             
             String url = jiraIntegration.getBaseUrl() + getCreateIssueEndpoint() + "/" + issueId + ATTACH_FILE_ENDPOINT;
             File tmpOutputFile = createRequestFile(origReq, testReq);
@@ -949,7 +945,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                             RequestBody.create(tmpOutputFile, mType))
                     .build();
             
-            Request.Builder builder = buildJiraRequest(url, jiraIntegration.getUserEmail(), jiraIntegration.getApiToken(), false, isDataCenter());
+            Request.Builder builder = buildJiraRequest(url, jiraIntegration.getUserEmail(), jiraIntegration.getApiToken(), false, isDataCenter(jiraType));
             builder.removeHeader("Accept");
             builder.addHeader("X-Atlassian-Token", "no-check");
             Request request = builder.post(requestBody).build();
@@ -977,9 +973,8 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
     private BasicDBObject buildContentDetails(String txt, String link) {
         JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
-        boolean isDataCenter = jiraIntegration.getJiraType() == JiraIntegration.JiraType.DATA_CENTER;
         
-        if (isDataCenter) {
+        if (isDataCenter(jiraType)) {
             BasicDBObject details = new BasicDBObject();
             details.put("type", "paragraph");
             if (link != null) {
@@ -1035,7 +1030,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         }
         
         // Set jiraType from integration to use correct endpoint
-        jiraType = jiraIntegration.getJiraType().name();
+        jiraType = jiraIntegration.getJiraType();
 
         List<JiraMetaData> jiraMetaDataList = new ArrayList<>();
         Bson projection = Projections.include(YamlTemplate.INFO);
@@ -1171,7 +1166,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         String url = jiraIntegration.getBaseUrl() + getCreateIssueEndpointBulk();
         
         Map<String, List<String>> headers = new HashMap<>();
-        if (isDataCenter()) {
+        if (isDataCenter(jiraType)) {
             // Data Center uses Bearer token authentication
             headers.put("Authorization", Collections.singletonList("Bearer " + jiraIntegration.getApiToken()));
         } else {
@@ -1618,7 +1613,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         }
         
         // Set jiraType from integration to use correct endpoint
-        jiraType = jiraIntegration.getJiraType().name();
+        jiraType = jiraIntegration.getJiraType();
 
         try {
             List<BasicDBObject> baseContent = new ArrayList<>();
@@ -1657,7 +1652,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                 jiraIntegration.getUserEmail(),
                 jiraIntegration.getApiToken(),
                 false,
-                isDataCenter()
+                isDataCenter(jiraType)
             );
             RequestBody body = RequestBody.create(
                 reqPayload.toJson(),
@@ -1722,11 +1717,11 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         }
     }
 
-    public String getJiraType() {
+    public JiraIntegration.JiraType getJiraType() {
         return jiraType;
     }
 
-    public void setJiraType(String jiraType) {
+    public void setJiraType(JiraIntegration.JiraType jiraType) {
         this.jiraType = jiraType;
     }
 }
