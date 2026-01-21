@@ -772,7 +772,7 @@ function TestRunResultFlyout(props) {
 
         // TODO: Replace with real AI analysis from backend
         // Mock analysis for UI development - replace when backend endpoint is ready
-        const analysis = "Your Ai Agent exposed its system instructions after a follow up request framed as internal debugging. The disclosure occurred while interacting with getAutomationTestCommandLogs, indicating a multi part prompt injection vulnerability.";
+        const analysis = "Your AI Agent exposed its system instructions after a follow up request framed as internal debugging. The disclosure occurred while interacting with getAutomationTestCommandLogs, indicating a multi part prompt injection vulnerability.";
 
         // TODO: Implement real message sending handler
         // Replace with actual API call when chat endpoint is available

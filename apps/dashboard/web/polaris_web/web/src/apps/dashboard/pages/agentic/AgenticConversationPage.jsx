@@ -270,16 +270,8 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
 
                             {/* Loading state */}
                             {isLoading && (
-                                <AgenticThinkingBox thinkingItems={[]} />
+                                <AgenticThinkingBox />
                             )}
-
-                            {/* Streaming response */}
-                            {/* {isStreaming && streamedContent && (
-                                <AgenticResponseContent
-                                    content={streamedContent}
-                                    timeTaken={currentTimeTaken}
-                                />
-                            )} */}
                                     </VerticalStack>
                                 </Box>
                             </Box>
