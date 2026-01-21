@@ -71,6 +71,7 @@ export const labelMap = {
     "Attack type": "Attack type",
     "Attack Type": "Attack Type",
     "Latest Attack": "Latest Attack",
+    "Latest attack sub-category": "Latest attack sub-category",
   },
   "DAST": {
     "API Security Posture": "Security Posture",
@@ -144,6 +145,7 @@ export const labelMap = {
     "Attack type": "Attack type",
     "Attack Type": "Attack Type",
     "Latest Attack": "Latest Attack",
+    "Latest attack sub-category": "Latest attack sub-category"
   },
   "MCP Security": {
     "API Security Posture": "MCP Security Posture",
@@ -366,6 +368,7 @@ export const labelMap = {
     "Attack type": "Policy Triggered",
     "Attack Type": "Policy Triggered",
     "Latest Attack": "Latest Policy Triggered",
+    "Latest attack sub-category": "Policy triggered"
   },
   "Endpoint Security": {
     "Quick Start": "Connectors",
@@ -446,5 +449,6 @@ export const labelMap = {
     "Attack type": "Policy Triggered",
     "Attack Type": "Policy Triggered",
     "Latest Attack": "Latest Policy Triggered",
+    "Latest attack sub-category": "Policy triggered"
   },
 }
