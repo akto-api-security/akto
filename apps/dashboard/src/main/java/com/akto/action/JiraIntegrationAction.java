@@ -1763,73 +1763,45 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             Map<String, List<String>> headers = new HashMap<>();
             headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
 
-            availableFieldValues = new ArrayList<>();
+            // Get all issue types for the project - first try from cache, then fetch fresh if needed
+            List<String> issueTypeIds = new ArrayList<>();
+            Map<String, List<BasicDBObject>> projectIdsMap = jiraIntegration.getProjectIdsMap();
 
-            // For priority field, use priority endpoint
-            if (fieldId.equals("priority")) {
-                String prioritiesUrl = baseUrl + "/rest/api/3/priority";
-                OriginalHttpRequest request = new OriginalHttpRequest(prioritiesUrl, "", "GET", null, headers, "");
-                OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-
-                String responseBody = response.getBody();
-                List<Map<String, Object>> prioritiesArray = JsonUtils.fromJson(responseBody,
-                    new TypeReference<List<Map<String, Object>>>() {});
-
-                for (Map<String, Object> priority : prioritiesArray) {
-                    BasicDBObject valueInfo = new BasicDBObject();
-                    valueInfo.put("id", (String) priority.get("id"));
-                    valueInfo.put("name", (String) priority.get("name"));
-                    availableFieldValues.add(valueInfo);
+            if (projectIdsMap != null && projectIdsMap.containsKey(projectKey)) {
+                List<BasicDBObject> issueTypes = projectIdsMap.get(projectKey);
+                for (BasicDBObject issueType : issueTypes) {
+                    String issueTypeId = issueType.getString("issueId");
+                    if (issueTypeId != null) {
+                        issueTypeIds.add(issueTypeId);
+                    }
                 }
-            } else {
-                // For custom fields, get values from createmeta
-                Map<String, List<BasicDBObject>> projectIdsMap = jiraIntegration.getProjectIdsMap();
-                if (projectIdsMap != null && projectIdsMap.containsKey(projectKey)) {
-                    List<BasicDBObject> issueTypes = projectIdsMap.get(projectKey);
-                    if (!issueTypes.isEmpty()) {
-                        String issueTypeId = issueTypes.get(0).getString("issueId");
+            }
 
-                        String createMetaUrl = baseUrl + "/rest/api/3/issue/createmeta/" + projectKey + "/issuetypes/" + issueTypeId;
-                        OriginalHttpRequest request = new OriginalHttpRequest(createMetaUrl, "", "GET", null, headers, "");
-                        OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+            // If not in cache, fetch issue types fresh from API
+            if (issueTypeIds.isEmpty()) {
+                loggerMaker.infoAndAddToDb("Issue types not found in cache for project " + projectKey + ", fetching from API");
+                String createMetaProjectUrl = baseUrl + "/rest/api/3/issue/createmeta?projectKeys=" + projectKey + "&expand=projects.issuetypes.fields";
+                OriginalHttpRequest projectRequest = new OriginalHttpRequest(createMetaProjectUrl, "", "GET", null, headers, "");
+                OriginalHttpResponse projectResponse = ApiExecutor.sendRequest(projectRequest, true, null, false, new ArrayList<>());
 
-                        String responseBody = response.getBody();
-                        Map<String, Object> metadata = JsonUtils.fromJson(responseBody,
-                            new TypeReference<Map<String, Object>>() {});
+                String projectResponseBody = projectResponse.getBody();
+                Map<String, Object> projectMetadata = JsonUtils.fromJson(projectResponseBody,
+                    new TypeReference<Map<String, Object>>() {});
 
-                        Object fieldsObj = metadata.get("fields");
-                        if (fieldsObj instanceof List) {
-                            List<?> fieldsList = (List<?>) fieldsObj;
-
-                            // Find the field in the array
-                            for (Object fieldObj : fieldsList) {
-                                if (fieldObj instanceof Map) {
-                                    Map<String, Object> fieldMetadata = (Map<String, Object>) fieldObj;
-                                    Object fieldIdObj = fieldMetadata.get("fieldId");
-                                    String currentFieldId = fieldIdObj != null ? fieldIdObj.toString() : null;
-
-                                    if (currentFieldId != null && currentFieldId.equals(fieldId)) {
-                                        Object allowedValuesObj = fieldMetadata.get("allowedValues");
-
-                                        if (allowedValuesObj instanceof List) {
-                                            List<?> allowedValuesList = (List<?>) allowedValuesObj;
-
-                                            for (Object valueObj : allowedValuesList) {
-                                                if (valueObj instanceof Map) {
-                                                    Map<String, Object> value = (Map<String, Object>) valueObj;
-                                                    BasicDBObject valueInfo = new BasicDBObject();
-
-                                                    Object idObj = value.get("id");
-                                                    Object nameObj = value.get("name");
-                                                    Object valueObjProp = value.get("value");
-
-                                                    valueInfo.put("id", idObj != null ? idObj.toString() : "");
-                                                    valueInfo.put("name", nameObj != null ? nameObj.toString() : (valueObjProp != null ? valueObjProp.toString() : ""));
-                                                    availableFieldValues.add(valueInfo);
-                                                }
-                                            }
-                                        }
-                                        break; // Found the field, stop searching
+                Object projectsObj = projectMetadata.get("projects");
+                if (projectsObj instanceof List) {
+                    List<?> projectsList = (List<?>) projectsObj;
+                    if (!projectsList.isEmpty() && projectsList.get(0) instanceof Map) {
+                        Map<String, Object> project = (Map<String, Object>) projectsList.get(0);
+                        Object issueTypesObj = project.get("issuetypes");
+                        if (issueTypesObj instanceof List) {
+                            List<?> issueTypesList = (List<?>) issueTypesObj;
+                            for (Object issueTypeObj : issueTypesList) {
+                                if (issueTypeObj instanceof Map) {
+                                    Map<String, Object> issueType = (Map<String, Object>) issueTypeObj;
+                                    Object issueTypeIdObj = issueType.get("id");
+                                    if (issueTypeIdObj != null) {
+                                        issueTypeIds.add(issueTypeIdObj.toString());
                                     }
                                 }
                             }
@@ -1837,6 +1809,74 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                     }
                 }
             }
+
+            // If still no issue types found, return error
+            if (issueTypeIds.isEmpty()) {
+                loggerMaker.errorAndAddToDb("No issue types found for project: " + projectKey);
+                addActionError("No issue types found for project: " + projectKey);
+                return Action.ERROR.toUpperCase();
+            }
+
+            // Use a Map to deduplicate field values by ID
+            Map<String, BasicDBObject> uniqueFieldValues = new LinkedHashMap<>();
+
+            // Iterate through all issue types and collect field values
+            for (String issueTypeId : issueTypeIds) {
+                String createMetaUrl = baseUrl + "/rest/api/3/issue/createmeta/" + projectKey + "/issuetypes/" + issueTypeId;
+                OriginalHttpRequest request = new OriginalHttpRequest(createMetaUrl, "", "GET", null, headers, "");
+                OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+
+                String responseBody = response.getBody();
+                Map<String, Object> metadata = JsonUtils.fromJson(responseBody,
+                    new TypeReference<Map<String, Object>>() {});
+
+                Object fieldsObj = metadata.get("fields");
+                if (fieldsObj instanceof List) {
+                    List<?> fieldsList = (List<?>) fieldsObj;
+
+                    // Find the field in the array
+                    for (Object fieldObj : fieldsList) {
+                        if (fieldObj instanceof Map) {
+                            Map<String, Object> fieldMetadata = (Map<String, Object>) fieldObj;
+                            Object fieldIdObj = fieldMetadata.get("fieldId");
+                            String currentFieldId = fieldIdObj != null ? fieldIdObj.toString() : null;
+
+                            if (currentFieldId != null && currentFieldId.equals(fieldId)) {
+                                Object allowedValuesObj = fieldMetadata.get("allowedValues");
+
+                                if (allowedValuesObj instanceof List) {
+                                    List<?> allowedValuesList = (List<?>) allowedValuesObj;
+
+                                    for (Object valueObj : allowedValuesList) {
+                                        if (valueObj instanceof Map) {
+                                            Map<String, Object> value = (Map<String, Object>) valueObj;
+
+                                            Object idObj = value.get("id");
+                                            Object nameObj = value.get("name");
+                                            Object valueObjProp = value.get("value");
+
+                                            String valueId = idObj != null ? idObj.toString() : "";
+                                            String valueName = nameObj != null ? nameObj.toString() : (valueObjProp != null ? valueObjProp.toString() : "");
+
+                                            // Deduplicate by ID
+                                            if (!valueId.isEmpty() && !uniqueFieldValues.containsKey(valueId)) {
+                                                BasicDBObject valueInfo = new BasicDBObject();
+                                                valueInfo.put("id", valueId);
+                                                valueInfo.put("name", valueName);
+                                                uniqueFieldValues.put(valueId, valueInfo);
+                                            }
+                                        }
+                                    }
+                                }
+                                break; // Found the field in this issue type, move to next issue type
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Convert the map values to a list
+            availableFieldValues = new ArrayList<>(uniqueFieldValues.values());
 
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
