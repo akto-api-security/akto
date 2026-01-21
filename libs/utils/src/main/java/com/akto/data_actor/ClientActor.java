@@ -1,57 +1,33 @@
 package com.akto.data_actor;
 
+import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 import com.akto.DaoInit;
 import com.akto.dao.context.Context;
-import com.akto.dto.filter.MergedUrls;
-import com.akto.dto.jobs.Job;
-import com.akto.dto.jobs.JobExecutorType;
-import com.akto.dto.jobs.JobParams;
-import com.akto.dto.jobs.JobStatus;
-import com.akto.dto.jobs.ScheduleType;
-import com.akto.dto.metrics.MetricData;
-import com.akto.dto.monitoring.ModuleInfo;
-import com.akto.dto.notifications.SlackWebhook;
-import com.akto.dto.settings.DataControlSettings;
-import com.akto.testing.ApiExecutor;
-import com.auth0.jwt.JWT;
-import com.auth0.jwt.interfaces.DecodedJWT;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.bulk_updates.BulkUpdates;
-import com.akto.dto.data_types.BelongsToPredicate;
-import com.akto.dto.data_types.Conditions;
-import com.akto.dto.data_types.ContainsPredicate;
-import com.akto.dto.data_types.EndsWithPredicate;
-import com.akto.dto.data_types.EqualsToPredicate;
-import com.akto.dto.data_types.IsNumberPredicate;
-import com.akto.dto.data_types.NotBelongsToPredicate;
-import com.akto.dto.data_types.Predicate;
-import com.akto.dto.data_types.RegexPredicate;
-import com.akto.dto.data_types.StartsWithPredicate;
-import com.akto.dto.dependency_flow.Node;
+import com.akto.dto.data_types.*;
 import com.akto.dto.data_types.Conditions.Operator;
+import com.akto.dto.dependency_flow.Node;
+import com.akto.dto.filter.MergedUrls;
+import com.akto.dto.jobs.*;
+import com.akto.dto.metrics.MetricData;
+import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.runtime_filters.FieldExistsFilter;
 import com.akto.dto.runtime_filters.ResponseCodeRuntimeFilter;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
-import com.akto.dto.testing.AccessMatrixTaskInfo;
-import com.akto.dto.testing.AccessMatrixUrlToRole;
-import com.akto.dto.testing.AgentConversationResult;
-import com.akto.dto.testing.EndpointLogicalGroup;
-import com.akto.dto.testing.LoginFlowStepsData;
-import com.akto.dto.testing.OtpTestData;
-import com.akto.dto.testing.TestRoles;
-import com.akto.dto.testing.TestingRun;
-import com.akto.dto.testing.TestingRunConfig;
-import com.akto.dto.testing.TestingRunResult;
-import com.akto.dto.testing.TestingRunResultSummary;
-import com.akto.dto.testing.WorkflowTest;
-import com.akto.dto.testing.WorkflowTestResult;
+import com.akto.dto.testing.*;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.CollectionTags;
@@ -61,8 +37,15 @@ import com.akto.dto.type.URLMethods;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.testing.ApiExecutor;
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.interfaces.DecodedJWT;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
@@ -73,23 +56,6 @@ import org.bson.codecs.DecoderContext;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 import org.json.JSONObject;
 
 public class ClientActor extends DataActor {
@@ -1001,6 +967,10 @@ public class ClientActor extends DataActor {
     }
 
     public void bulkWriteApiInfo(List<ApiInfo> apiInfoList) {
+        bulkWriteApiInfoWithPath(apiInfoList, "/bulkWriteApiInfo");
+    }
+
+    private void bulkWriteApiInfoWithPath(List<ApiInfo> apiInfoList, String path) {
         ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
 
         List<ApiInfo> apiInfoBatch = new ArrayList<>();
@@ -1009,7 +979,7 @@ public class ClientActor extends DataActor {
             if (apiInfoBatch.size() % batchWriteLimit == 0) {
                 List<ApiInfo> finalWrites = apiInfoBatch;
                 threadPool.submit(
-                        () -> writeApiInfoBatch(finalWrites)
+                        () -> writeApiInfoBatch(finalWrites, path)
                 );
                 apiInfoBatch = new ArrayList<>();
             }
@@ -1017,27 +987,25 @@ public class ClientActor extends DataActor {
         if (apiInfoBatch.size() > 0) {
             List<ApiInfo> finalWrites = apiInfoBatch;
             threadPool.submit(
-                    () -> writeApiInfoBatch(finalWrites)
+                    () -> writeApiInfoBatch(finalWrites, path)
             );
         }
     }
 
-    public void writeApiInfoBatch(List<ApiInfo> writesForApiInfo) {
+    private void writeApiInfoBatch(List<ApiInfo> writesForApiInfo, String path) {
         BasicDBObject obj = new BasicDBObject();
         obj.put("apiInfoList", writesForApiInfo);
 
         String objString = gson.toJson(obj);
-        loggerMaker.info("api info batch" + objString);
-
         Map<String, List<String>> headers = buildHeaders();
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/bulkWriteApiInfo", "", "POST", objString, headers, "");
+        OriginalHttpRequest request = new OriginalHttpRequest(url + path, "", "POST", objString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             if (response.getStatusCode() != 200) {
-                loggerMaker.errorAndAddToDb("non 2xx response in bulkWriteApiInfo", LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("non 2xx response in " + path, LoggerMaker.LogDb.RUNTIME);
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in bulkWriteApiInfo" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("error in " + path + ": " + e, LoggerMaker.LogDb.RUNTIME);
         }
     }
 
@@ -1046,44 +1014,7 @@ public class ClientActor extends DataActor {
     }
 
     public void fastDiscoveryBulkWriteApiInfo(List<ApiInfo> apiInfoList) {
-        ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
-
-        List<ApiInfo> apiInfoBatch = new ArrayList<>();
-        for (int i = 0; i < apiInfoList.size(); i++) {
-            apiInfoBatch.add(apiInfoList.get(i));
-            if (apiInfoBatch.size() % batchWriteLimit == 0) {
-                List<ApiInfo> finalWrites = apiInfoBatch;
-                threadPool.submit(
-                        () -> fastDiscoveryWriteApiInfoBatch(finalWrites)
-                );
-                apiInfoBatch = new ArrayList<>();
-            }
-        }
-        if (apiInfoBatch.size() > 0) {
-            List<ApiInfo> finalWrites = apiInfoBatch;
-            threadPool.submit(
-                    () -> fastDiscoveryWriteApiInfoBatch(finalWrites)
-            );
-        }
-    }
-
-    public void fastDiscoveryWriteApiInfoBatch(List<ApiInfo> writesForApiInfo) {
-        BasicDBObject obj = new BasicDBObject();
-        obj.put("apiInfoList", writesForApiInfo);
-
-        String objString = gson.toJson(obj);
-        loggerMaker.info("fast-discovery api info batch" + objString);
-
-        Map<String, List<String>> headers = buildHeaders();
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fastDiscoveryBulkWriteApiInfo", "", "POST", objString, headers, "");
-        try {
-            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
-            if (response.getStatusCode() != 200) {
-                loggerMaker.errorAndAddToDb("non 2xx response in fastDiscoveryBulkWriteApiInfo", LoggerMaker.LogDb.RUNTIME);
-            }
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in fastDiscoveryBulkWriteApiInfo" + e, LoggerMaker.LogDb.RUNTIME);
-        }
+        bulkWriteApiInfoWithPath(apiInfoList, "/fastDiscoveryBulkWriteApiInfo");
     }
 
     private static final int FETCH_API_IDS_PAGE_SIZE = 1000;  // Must match DbLayer.API_INFO_PAGE_SIZE in cyborg
@@ -1096,39 +1027,20 @@ public class ClientActor extends DataActor {
     public List<ApiInfo.ApiInfoKey> fetchApiIds() {
         Map<String, List<String>> headers = buildHeaders();
         List<ApiInfo.ApiInfoKey> allApiIds = new ArrayList<>();
+        ApiInfo.ApiInfoKey lastApiInfoKey = null;
 
-        ApiInfo.ApiInfoKey lastApiInfoKey = null;  // Cursor starts at null (first page)
-        int pageCount = 0;
-        int totalFetched = 0;
-
-        loggerMaker.infoAndAddToDb("Starting cursor-based pagination for API IDs...", LoggerMaker.LogDb.RUNTIME);
-
-        while (true) {
+        for (int i = 0; i < 100; i++) {
             try {
-                pageCount++;
-
-                // Build request body with cursor using Gson (consistent with other methods)
-                String requestBody;
-                if (lastApiInfoKey == null) {
-                    // First page: no cursor
-                    requestBody = "{}";
-                    loggerMaker.infoAndAddToDb("Fetching first page of API IDs", LoggerMaker.LogDb.RUNTIME);
-                } else {
-                    // Subsequent pages: include cursor
-                    BasicDBObject requestObj = new BasicDBObject();
+                // Build request body with cursor
+                BasicDBObject requestObj = new BasicDBObject();
+                if (lastApiInfoKey != null) {
                     BasicDBObject cursorObj = new BasicDBObject();
                     cursorObj.put("apiCollectionId", lastApiInfoKey.getApiCollectionId());
                     cursorObj.put("method", lastApiInfoKey.getMethod().name());
                     cursorObj.put("url", lastApiInfoKey.getUrl());
                     requestObj.put("lastApiInfoKey", cursorObj);
-                    requestBody = gson.toJson(requestObj);
-
-                    loggerMaker.infoAndAddToDb(
-                        String.format("Fetching page %d with cursor: collection=%d, method=%s",
-                                     pageCount, lastApiInfoKey.getApiCollectionId(), lastApiInfoKey.getMethod()),
-                        LoggerMaker.LogDb.RUNTIME
-                    );
                 }
+                String requestBody = gson.toJson(requestObj);
 
                 OriginalHttpRequest request = new OriginalHttpRequest(
                     url + "/fetchApiIds",
@@ -1146,15 +1058,10 @@ public class ClientActor extends DataActor {
                     break;
                 }
 
-                // Parse response JSON object
                 JsonObject responseObj = gson.fromJson(response.getBody(), JsonObject.class);
-
-                // Extract apiIds array
                 JsonArray apiIdsPage = responseObj.getAsJsonArray("apiIds");
 
                 if (apiIdsPage == null || apiIdsPage.size() == 0) {
-                    // Empty page means we're done
-                    loggerMaker.infoAndAddToDb("Received empty page, pagination complete", LoggerMaker.LogDb.RUNTIME);
                     break;
                 }
 
@@ -1169,50 +1076,19 @@ public class ClientActor extends DataActor {
 
                         ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, urlStr, method);
                         allApiIds.add(apiInfoKey);
-
-                        // Update cursor to last record
                         lastApiInfoKey = apiInfoKey;
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb("Error parsing API ID: " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
                     }
                 }
 
-                totalFetched += apiIdsPage.size();
-
-                loggerMaker.infoAndAddToDb(
-                    String.format("Fetched page %d: %d API IDs (total: %d)",
-                                 pageCount, apiIdsPage.size(), totalFetched),
-                    LoggerMaker.LogDb.RUNTIME
-                );
-
-                // Stop if page is incomplete (< 1000 records means last page)
-                if (apiIdsPage.size() < FETCH_API_IDS_PAGE_SIZE) {
-                    loggerMaker.infoAndAddToDb(
-                        String.format("Received incomplete page (%d < %d), pagination complete",
-                                     apiIdsPage.size(), FETCH_API_IDS_PAGE_SIZE),
-                        LoggerMaker.LogDb.RUNTIME
-                    );
-                    break;
-                }
-
-                // Safety check: prevent infinite loop (same limit as fetchApiRateLimits)
-                if (pageCount >= 100) {  // 100 pages * 1000 = 100K records max
-                    loggerMaker.errorAndAddToDb("Safety limit reached: pageCount >= 100, stopping pagination", LoggerMaker.LogDb.RUNTIME);
-                    break;
-                }
-
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error fetching API IDs page: " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("Error fetching API IDs: " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
                 break;
             }
         }
 
-        loggerMaker.infoAndAddToDb(
-            String.format("Completed cursor-based pagination: %d pages, %d total API IDs loaded",
-                         pageCount, totalFetched),
-            LoggerMaker.LogDb.RUNTIME
-        );
-
+        loggerMaker.infoAndAddToDb("Loaded " + allApiIds.size() + " API IDs", LoggerMaker.LogDb.RUNTIME);
         return allApiIds;
     }
 
