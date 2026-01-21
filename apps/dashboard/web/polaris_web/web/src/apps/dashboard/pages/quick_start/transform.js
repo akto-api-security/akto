@@ -1575,34 +1575,13 @@ const quickStartFunc = {
         let connectors = {}
 
         if(isAgenticSecurityCategory()){
-            if(func.isDemoAccount()){
-                // Argus (Cloud Security) - ONLY these sections (DEMO ONLY)
-                connectors = {
-                    "Agentic Proxies": agenticProxies,
-                    "AI Agent Platforms": aiAgentConnectors,
-                    "AI Model Security": aiScanConnectors,
-                    "MCP": mcpScan,
-                    "Kubernetes": kubernetes,
-                    "API Gateways": apiGateways,
-                    "AWS Services": awsServices,
-                    "GCP Services": gcpServices,
-                    "Azure Services": azureServices,
-                    "Manual": manual,
-                    "Virtual Machines": vm,
-                    "Akto SDK": aktoSdk,
-                }
-            } else {
-                // Non-demo accounts: original Agentic Security structure
-                connectors["AI Agent Scan"] = agenticProxies
-                connectors["AI Agent Security"] = [
-                    awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj,
-                    ibmWatsonxObj, customAgentObj, agenticShieldObj,  // Include agenticShieldObj for non-demo
-                    n8nImportObj, langchainImportObj, copilotStudioImportObj
-                ]
-                connectors["AI Model Security"] = aiScanConnectors
-                connectors["Browser Extension"] = browserExtensions
-                connectors["Secure Web Networks"] = secureWebNetworks
-                connectors["MCP Scan"] = [mcpScanObj, mcpReconObj, mcpProxyObj, mcpGateway, mcpWrapperObj]
+            connectors = {
+                "Agentic Proxies": agenticProxies,
+                "AI Agent Platforms": aiAgentConnectors,
+                "AI Model Security": aiScanConnectors,
+                "MCP": mcpScan,
+                "Kubernetes": kubernetes,
+                "API Gateways": apiGateways,
             }
         } else if (isDastCategory()) {
             connectors["DAST"] = crawler
@@ -1666,7 +1645,8 @@ const quickStartFunc = {
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj,
                 awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
-                n8nImportObj, langchainImportObj, copilotStudioImportObj
+                n8nImportObj, langchainImportObj, copilotStudioImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj,
+                apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj
             ])
         }
 
