@@ -7401,7 +7401,7 @@
             </result>
         </action>
 
-        <!-- <action name="api/analyze_vulnerability" class="com.akto.action.gpt.VulnerabilityAnalysisAction" method="analyzeVulnerability">
+        <action name="api/analyze_vulnerability" class="com.akto.action.gpt.VulnerabilityAnalysisAction" method="analyzeVulnerability">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -7426,9 +7426,9 @@
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
-        </action> -->
+        </action>
 
-        <!-- <action name="api/fetchAktoGptConfig" class="com.akto.action.gpt.GptConfigAction" method="fetchAktoGptConfig">
+        <action name="api/fetchAktoGptConfig" class="com.akto.action.gpt.GptConfigAction" method="fetchAktoGptConfig">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -7452,7 +7452,7 @@
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
-        </action> -->
+        </action>
         <action name="api/updateScript" class="com.akto.action.testing.ScriptAction" method="updateScript">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -7537,7 +7537,7 @@
         </action>
 
 
-        <!-- <action name="api/saveAktoGptConfig" class="com.akto.action.gpt.GptConfigAction" method="saveAktoGptConfig">
+        <action name="api/saveAktoGptConfig" class="com.akto.action.gpt.GptConfigAction" method="saveAktoGptConfig">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -7557,7 +7557,7 @@
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
-        </action> -->
+        </action>
 
         <action name="api/fetchTrafficMetrics" class="com.akto.action.traffic_metrics.TrafficMetricsAction">
             <interceptor-ref name="json"/>
