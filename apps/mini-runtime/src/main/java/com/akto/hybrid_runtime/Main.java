@@ -250,18 +250,20 @@ public class Main {
     }
 
     /**
-     * Find the fast-discovery JAR file.
-     * Looks in common locations relative to mini-runtime JAR.
+     * Find the mini-runtime JAR (which contains embedded fast-discovery classes).
+     * Fast-discovery runs as a separate process using the same JAR with -cp.
      *
-     * @return Path to fast-discovery JAR, or null if not found
+     * @return Path to mini-runtime JAR, or null if not found
      */
-    private static String findFastDiscoveryJar() {
+    private static String findMiniRuntimeJar() {
         // Try multiple possible locations
         String[] possiblePaths = {
+            // Docker deployment location
+            "/app/mini-runtime-1.0-SNAPSHOT-jar-with-dependencies.jar",
             // Maven build location (development)
-            "apps/fast-discovery/target/fast-discovery-1.0-SNAPSHOT-jar-with-dependencies.jar",
+            "apps/mini-runtime/target/mini-runtime-1.0-SNAPSHOT-jar-with-dependencies.jar",
             // Environment variable override
-            System.getenv("FAST_DISCOVERY_JAR_PATH")
+            System.getenv("MINI_RUNTIME_JAR_PATH")
         };
 
         for (String path : possiblePaths) {
@@ -270,7 +272,7 @@ public class Main {
             }
         }
 
-        loggerMaker.errorAndAddToDb("Fast-discovery JAR not found. Tried locations: " +
+        loggerMaker.errorAndAddToDb("Mini-runtime JAR not found. Tried locations: " +
             String.join(", ", possiblePaths));
         return null;
     }
@@ -336,23 +338,24 @@ public class Main {
 
         initializeRuntime();
 
-        // Fast-Discovery Integration (optional) - Run as separate process
+        // Fast-Discovery Integration (optional) - Run as separate process from embedded classes
         if (isFastDiscoveryEnabled()) {
             try {
                 loggerMaker.infoAndAddToDb("Fast-Discovery is ENABLED - starting as separate process...");
 
-                // Find fast-discovery JAR
-                String fastDiscoveryJar = findFastDiscoveryJar();
-                if (fastDiscoveryJar == null) {
-                    throw new Exception("Fast-discovery JAR not found. Cannot start fast-discovery.");
+                // Find mini-runtime JAR (which contains embedded fast-discovery classes)
+                String miniRuntimeJar = findMiniRuntimeJar();
+                if (miniRuntimeJar == null) {
+                    throw new Exception("Mini-runtime JAR not found. Cannot start fast-discovery.");
                 }
 
-                // Build process with environment variables inherited from parent
+                // Build process: use -cp to run fast-discovery main class from embedded classes
                 ProcessBuilder processBuilder = new ProcessBuilder(
                     "java",
                     "-Xmx512m",  // Limit memory for fast-discovery (lightweight)
-                    "-jar",
-                    fastDiscoveryJar
+                    "-cp",
+                    miniRuntimeJar,
+                    "com.akto.fast_discovery.Main"  // Fast-discovery main class
                 );
 
                 // Inherit all environment variables from mini-runtime
@@ -363,10 +366,8 @@ public class Main {
                 // Fast-discovery must use: AKTO_KAFKA_GROUP_ID_CONFIG=fast-discovery
                 processBuilder.environment().put("AKTO_KAFKA_GROUP_ID_CONFIG", "fast-discovery");
 
-                // Redirect output to separate log file
-                java.io.File logFile = new java.io.File("/tmp/fast-discovery.log");
-                processBuilder.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile));
-                processBuilder.redirectError(ProcessBuilder.Redirect.appendTo(logFile));
+                // Output goes to stdout/stderr (captured by Docker logs)
+                processBuilder.inheritIO();
 
                 // Start the process
                 fastDiscoveryProcess = processBuilder.start();
@@ -375,8 +376,7 @@ public class Main {
                 Thread.sleep(2000); // Wait 2 seconds
                 if (!fastDiscoveryProcess.isAlive()) {
                     int exitCode = fastDiscoveryProcess.exitValue();
-                    throw new Exception("Fast-discovery process exited immediately with code " + exitCode +
-                        ". Check " + logFile.getAbsolutePath() + " for errors.");
+                    throw new Exception("Fast-discovery process exited immediately with code " + exitCode);
                 }
 
             } catch (Exception e) {

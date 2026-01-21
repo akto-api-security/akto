@@ -57,6 +57,26 @@ public class RuntimeUtil {
         return false;
     }
 
+    /**
+     * Check if hostname is valid for collection creation (not an IP address).
+     *
+     * IP addresses like "192.168.1.1" will have toLowerCase() == toUpperCase()
+     * Real hostnames like "api.example.com" will differ after case conversion.
+     *
+     * This logic is used by both mini-runtime and fast-discovery to filter out
+     * IP-based origins from creating separate collections.
+     *
+     * @param hostname The hostname to validate
+     * @return true if hostname contains letters (valid), false if IP address or null
+     */
+    public static boolean isValidHostname(String hostname) {
+        if (hostname == null || hostname.isEmpty()) {
+            return false;
+        }
+        // If lowercase equals uppercase, it means the string has no letters (likely an IP)
+        return !hostname.toLowerCase().equals(hostname.toUpperCase());
+    }
+
     private static String trim(String url) {
         if (url.startsWith("/")) url = url.substring(1, url.length());
         if (url.endsWith("/")) url = url.substring(0, url.length()-1);
