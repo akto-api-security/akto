@@ -814,24 +814,24 @@ const learnMoreObject = {
             ]
         }
     },
-    dashboard_settings_integrations_akto_gpt:{
-        api_security: {
-            title: "Akto GPT",
-            description: "Harness the power of ChatGPT for API Security on your fingertips now.",
-            docsLink: [
-                {
-                    content:"AktoGPT Guide",
-                    value:"https://docs.akto.io/aktogpt"
-                }
-            ],
-            videoLink: [
-                {
-                    content: "Watch Akto demo" ,
-                    value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
-                }
-            ]
-        }
-    },
+    // dashboard_settings_integrations_akto_gpt:{
+    //     api_security: {
+    //         title: "Akto GPT",
+    //         description: "Harness the power of ChatGPT for API Security on your fingertips now.",
+    //         docsLink: [
+    //             {
+    //                 content:"AktoGPT Guide",
+    //                 value:"https://docs.akto.io/aktogpt"
+    //             }
+    //         ],
+    //         videoLink: [
+    //             {
+    //                 content: "Watch Akto demo" ,
+    //                 value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+    //             }
+    //         ]
+    //     }
+    // },
     dashboard_settings_integrations_slack:{
         api_security: {
             docsLink: [
