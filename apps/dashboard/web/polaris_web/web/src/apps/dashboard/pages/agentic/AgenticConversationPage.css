@@ -110,31 +110,8 @@
     pointer-events: none;
 }
 
-/* AgenticThinkingBox styles */
-.thinking-text {
-    color: rgba(190, 190, 191, 1);
-    font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "San Francisco", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-    font-size: 12px;
-    font-style: normal;
-    font-weight: 400;
-    animation: pulseFade 2s ease-in-out infinite;
-}
-
-.thinking-item {
-    color: #8C9196;
-    font-feature-settings: 'liga' off, 'clig' off;
-    font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "San Francisco", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-    font-size: 10px;
-    font-style: normal;
-    font-weight: 400;
-    line-height: 14px;
-}
-
-.thinking-bullet {
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    background: #8C9196;
-    margin-top: 5px;
-    flex-shrink: 0;
+.thinking-cursor {
+    animation: blink 2s infinite;
+    margin-left: 2px;
+    color: #6D7175;
 }
