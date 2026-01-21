@@ -918,11 +918,12 @@ const AgenticDashboard = () => {
 
     const allComponentsMap = {
         'security-posture-chart': isLineChartDataEmpty(overallStats) ? (
-            <EmptyCard 
+            <EmptyCard
                 title={componentNames['security-posture-chart']}
                 subTitleComponent={<Text alignment='center' color='subdued'>No security posture data available for the selected time period</Text>}
                 itemId='security-posture-chart'
                 onRemoveComponent={removeComponent}
+                tooltipContent="Track the overall security posture over time, including API discovery, issues, and threat detection trends"
             />
         ) : (
             <CustomLineChart
@@ -939,11 +940,12 @@ const AgenticDashboard = () => {
             />
         ),
         'api-discovery-pie': isPieChartDataEmpty(apiDiscoveryData) ? (
-            <EmptyCard 
+            <EmptyCard
                 title={componentNames['api-discovery-pie']}
                 subTitleComponent={<Text alignment='center' color='subdued'>No API discovery data available for the selected time period</Text>}
                 itemId='api-discovery-pie'
                 onRemoveComponent={removeComponent}
+                tooltipContent={dashboardCategory === 'AGENTIC' ? 'Distribution of discovered agentic components including AI agents, MCP servers, and LLMs' : 'Distribution of discovered APIs categorized by shadow, sensitive, no auth, and normal'}
             />
         ) : (
             <CustomPieChart
@@ -961,6 +963,7 @@ const AgenticDashboard = () => {
                 subTitleComponent={<Text alignment='center' color='subdued'>No issues found for the selected time period</Text>}
                 itemId='issues-pie'
                 onRemoveComponent={removeComponent}
+                tooltipContent="Distribution of security issues by severity level (Critical, High, Medium, Low)"
             />
         ) : (
             <CustomPieChart
@@ -978,6 +981,7 @@ const AgenticDashboard = () => {
                 subTitleComponent={<Text alignment='center' color='subdued'>No threat detection data available for the selected time period</Text>}
                 itemId='threat-detection-pie'
                 onRemoveComponent={removeComponent}
+                tooltipContent="Distribution of flagged threat requests by severity level"
             />
         ) : (
             <CustomPieChart
@@ -990,11 +994,12 @@ const AgenticDashboard = () => {
             />
         ),
         'average-issue-age': isArrayDataEmpty(averageIssueAgeData) ? (
-            <EmptyCard 
+            <EmptyCard
                 title={componentNames['average-issue-age']}
                 subTitleComponent={<Text alignment='center' color='subdued'>No issue age data available for the selected time period</Text>}
                 itemId='average-issue-age'
                 onRemoveComponent={removeComponent}
+                tooltipContent="Average number of days security issues have been open, categorized by severity"
             />
         ) : (
             <AverageIssueAgeCard
@@ -1010,6 +1015,7 @@ const AgenticDashboard = () => {
                 subTitleComponent={<Text alignment='center' color='subdued'>No compliance data available for the selected time period</Text>}
                 itemId='compliance-at-risks'
                 onRemoveComponent={removeComponent}
+                tooltipContent="Top compliance frameworks at risk based on failing test percentages"
             />
         ) : (
             <ComplianceAtRisksCard
@@ -1020,11 +1026,12 @@ const AgenticDashboard = () => {
             />
         ),
         'tested-vs-non-tested': isLineChartDataEmpty(testedVsNonTestedChartData) ? (
-            <EmptyCard 
+            <EmptyCard
                 title={componentNames['tested-vs-non-tested']}
                 subTitleComponent={<Text alignment='center' color='subdued'>No testing data available for the selected time period</Text>}
                 itemId='tested-vs-non-tested'
                 onRemoveComponent={removeComponent}
+                tooltipContent="Track the number of APIs that have been tested vs those that haven't been tested over time"
             />
         ) : (
             <CustomLineChart
@@ -1045,6 +1052,7 @@ const AgenticDashboard = () => {
                 subTitleComponent={<Text alignment='center' color='subdued'>No issues data available for the selected time period</Text>}
                 itemId='open-resolved-issues'
                 onRemoveComponent={removeComponent}
+                tooltipContent="Trend of open vs resolved security issues over time"
             />
         ) : (
             <CustomLineChart
@@ -1065,6 +1073,7 @@ const AgenticDashboard = () => {
                 subTitleComponent={<Text alignment='center' color='subdued'>No threat requests data available for the selected time period</Text>}
                 itemId='threat-requests-chart'
                 onRemoveComponent={removeComponent}
+                tooltipContent="Number of threat requests flagged by the system over time"
             />
         ) : (
             <CustomLineChart
@@ -1085,6 +1094,7 @@ const AgenticDashboard = () => {
                 subTitleComponent={<Text alignment='center' color='subdued'>No threat data available for the selected time period</Text>}
                 itemId='open-resolved-threats'
                 onRemoveComponent={removeComponent}
+                tooltipContent="Trend of open vs resolved threats over time"
             />
         ) : (
             <CustomLineChart
@@ -1100,11 +1110,12 @@ const AgenticDashboard = () => {
             />
         ),
         'weakest-areas': isArrayDataEmpty(topIssuesByCategory) ? (
-            <EmptyCard 
+            <EmptyCard
                 title={componentNames['weakest-areas']}
                 subTitleComponent={<Text alignment='center' color='subdued'>No issues by category data available for the selected time period</Text>}
                 itemId='weakest-areas'
                 onRemoveComponent={removeComponent}
+                tooltipContent="Top vulnerability categories by percentage of total issues"
             />
         ) : (
             <CustomDataTable
@@ -1122,6 +1133,7 @@ const AgenticDashboard = () => {
                 subTitleComponent={<Text alignment='center' color='subdued'>No APIs with issues data available for the selected time period</Text>}
                 itemId='top-apis-issues'
                 onRemoveComponent={removeComponent}
+                tooltipContent="APIs with the highest number of critical and high severity security issues"
             />
         ) : (
             <CustomDataTable
@@ -1139,6 +1151,7 @@ const AgenticDashboard = () => {
                 subTitleComponent={<Text alignment='center' color='subdued'>No threats by category data available for the selected time period</Text>}
                 itemId='top-requests-by-type'
                 onRemoveComponent={removeComponent}
+                tooltipContent="Most common threat types detected by percentage"
             />
         ) : (
             <CustomDataTable
@@ -1156,6 +1169,7 @@ const AgenticDashboard = () => {
                 subTitleComponent={<Text alignment='center' color='subdued'>No attacked APIs data available for the selected time period</Text>}
                 itemId='top-attacked-apis'
                 onRemoveComponent={removeComponent}
+                tooltipContent="APIs that have received the most threat requests"
             />
         ) : (
             <CustomDataTable
@@ -1173,6 +1187,7 @@ const AgenticDashboard = () => {
                 subTitleComponent={<Text alignment='center' color='subdued'>No bad actors data available for the selected time period</Text>}
                 itemId='top-bad-actors'
                 onRemoveComponent={removeComponent}
+                tooltipContent="IP addresses or actors that have triggered the most threats"
             />
         ) : (
             <CustomDataTable
