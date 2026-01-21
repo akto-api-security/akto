@@ -40,12 +40,14 @@ const headings = [
 ]
 
 // Helper function to create sort options for a column
+// Note: GithubServerTable passes -1 for 'asc' and 1 for 'desc', but func.sortFunc
+// interprets -1 as descending and 1 as ascending, so we swap the values
 const createSortOptions = (label, sortKey, columnIndex, isTimeField = false) => {
     const descLabel = isTimeField ? 'Newest' : 'Z-A';
     const ascLabel = isTimeField ? 'Oldest' : 'A-Z';
     return [
-        { label, value: `${sortKey} desc`, directionLabel: descLabel, sortKey, columnIndex },
-        { label, value: `${sortKey} asc`, directionLabel: ascLabel, sortKey, columnIndex }
+        { label, value: `${sortKey} asc`, directionLabel: descLabel, sortKey, columnIndex },
+        { label, value: `${sortKey} desc`, directionLabel: ascLabel, sortKey, columnIndex }
     ];
 };
 
@@ -631,7 +633,7 @@ function EndpointShieldMetadata() {
                 return true;
             });
 
-            // Apply sorting
+            // Apply sorting using same logic as func.sortFunc
             if (sortKey) {
                 filteredData.sort((a, b) => {
                     let aVal = a[sortKey];
@@ -642,14 +644,15 @@ function EndpointShieldMetadata() {
                     if (aVal == null) return 1;
                     if (bVal == null) return -1;
 
-                    if (typeof aVal === 'string' && typeof bVal === 'string') {
-                        aVal = aVal.toLowerCase();
-                        bVal = bVal.toLowerCase();
+                    if (typeof aVal === 'number' && typeof bVal === 'number') {
+                        return sortOrder * (aVal - bVal);
                     }
 
-                    return sortOrder === 'asc'
-                        ? (aVal > bVal ? 1 : -1)
-                        : (aVal < bVal ? 1 : -1);
+                    if (typeof aVal === 'string' && typeof bVal === 'string') {
+                        return sortOrder * (bVal.toLowerCase().localeCompare(aVal.toLowerCase()));
+                    }
+
+                    return 0;
                 });
             }
 

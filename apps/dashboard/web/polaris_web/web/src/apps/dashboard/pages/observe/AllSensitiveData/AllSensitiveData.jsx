@@ -6,7 +6,7 @@ import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import { useNavigate } from "react-router-dom"
 import dashboardFunc from "../../transform"
-import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout"
+// import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout"
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import { CellType } from "../../../components/tables/rows/GithubRow"
 import useTable from "../../../components/tables/TableContext"
@@ -150,8 +150,8 @@ function AllSensitiveData() {
 
     const [data, setData] = useState({"all":[], "detected": [], "enabled":[], 'disabled': []})
     const [mapData, setMapData] = useState({})
-    const [prompts, setPrompts] = useState([])
-    const [isGptScreenActive, setIsGptScreenActive] = useState(false)
+    // const [prompts, setPrompts] = useState([])
+    // const [isGptScreenActive, setIsGptScreenActive] = useState(false)
     const navigate = useNavigate()
     const collectionsMap = PersistStore((state) => state.collectionsMap)
     const [summaryInfo, setSummaryInfo] = useState({
@@ -309,12 +309,12 @@ function AllSensitiveData() {
         fetchData();
     }, [])
 
-    function displayGPT(){
-        setIsGptScreenActive(true)
-        let requestObj = {key: "DATA_TYPES"}
-        const activePrompts = dashboardFunc.getPrompts(requestObj)
-        setPrompts(activePrompts)
-    }
+    // function displayGPT(){
+    //     setIsGptScreenActive(true)
+    //     let requestObj = {key: "DATA_TYPES"}
+    //     const activePrompts = dashboardFunc.getPrompts(requestObj)
+    //     setPrompts(activePrompts)
+    // }
 
     function resetSampleData(){
         api.resetSampleData();
@@ -327,7 +327,7 @@ function AllSensitiveData() {
     const secondaryActionsComp = (
         <HorizontalStack gap={"2"}>
             { (func.checkOnPrem() && window?.USER_NAME !== undefined && window.USER_NAME.includes("razorpay")) ? <Button onClick={resetSampleData}>Reset Sample Data</Button> : <></>}
-            <Button onClick={displayGPT}>Ask AktoGPT</Button>
+            {/* <Button onClick={displayGPT}>Ask AktoGPT</Button> */}
             <Button onClick={fillSensitiveDataTypes}>Fill Data Types</Button>
         </HorizontalStack>
     )
@@ -400,11 +400,11 @@ function AllSensitiveData() {
             selected={selected}
             lastColumnSticky={true}
         />,
-        <Modal key="modal" large open={isGptScreenActive} onClose={()=> setIsGptScreenActive(false)} title="Akto GPT">
+        {/* <Modal key="modal" large open={isGptScreenActive} onClose={()=> setIsGptScreenActive(false)} title="Akto GPT">
             <Modal.Section flush>
                 <AktoGptLayout prompts={prompts} closeModal={()=> setIsGptScreenActive(false)} />
             </Modal.Section>
-        </Modal>
+        </Modal> */}
     ]
     
     return (
