@@ -1,5 +1,9 @@
 package com.akto.fast_discovery;
 
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
@@ -11,13 +15,10 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.runtime.RuntimeUtil;
+
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.common.header.Header;
-
-import java.nio.charset.StandardCharsets;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * FastDiscoveryConsumer - Header-optimized API discovery.
@@ -39,6 +40,7 @@ public class FastDiscoveryConsumer {
     private final DataActor dataActor;
     private final ConcurrentHashMap<String, Integer> hostnameToCollectionId;
 
+    // TODO: clean the code in this consumer
     public FastDiscoveryConsumer(
             BloomFilterManager bloomFilter,
             Map<String, Integer> hostnameToCollectionId
@@ -125,6 +127,10 @@ public class FastDiscoveryConsumer {
                 String host = headerParts[HEADER_INDEX_HOST];
                 String method = headerParts[HEADER_INDEX_METHOD];
                 String url = headerParts[HEADER_INDEX_URL];
+
+                if (!RuntimeUtil.isValidHostname(host)) {
+                    continue;
+                }
 
                 int apiCollectionId = calculateCollectionId(host);
                 String normalizedUrl = normalizeUrl(url);
