@@ -36,6 +36,14 @@ const AUTH_TYPES = [
     { label: 'Session Token', value: 'SESSION_TOKEN' }
 ]
 
+// API Access types matching ApiInfo.ApiAccessType enum
+const API_ACCESS_TYPES = [
+    { label: 'Public', value: 'PUBLIC' },
+    { label: 'Private', value: 'PRIVATE' },
+    { label: 'Partner', value: 'PARTNER' },
+    { label: 'Third Party', value: 'THIRD_PARTY' }
+]
+
 function CollectionComponent(props) {
 
     const { condition, index, dispatch, operatorComponent } = props
@@ -44,10 +52,12 @@ function CollectionComponent(props) {
     const initialHostRegexText = (condition && condition?.type === 'HOST_REGEX') ? (condition?.data?.host_regex || '') : ''
     const initialTagsText = (condition && condition?.type === 'TAGS') ? (condition?.data?.query || '') : ''
     const initialAuthTypes = (condition && condition?.type === 'AUTH_TYPE') ? (condition?.data?.authTypes || []) : []
+    const initialApiAccessTypes = (condition && condition?.type === 'API_ACCESS_TYPES') ? (condition?.data?.apiAccessTypes || []) : []
     const [regexText, setRegexText] = useState(initialRegexText)
     const [hostRegexText, setHostRegexText] = useState(initialHostRegexText)
     const [tagsText, setTagsText] = useState(initialTagsText)
     const [selectedAuthTypes, setSelectedAuthTypes] = useState(initialAuthTypes)
+    const [selectedApiAccessTypes, setSelectedApiAccessTypes] = useState(initialApiAccessTypes)
     const dashboardCategory = PersistStore(state => state.dashboardCategory)
 
     useEffect(() => {
@@ -177,6 +187,8 @@ function CollectionComponent(props) {
                 return {}
             case "AUTH_TYPE":
                 return {authTypes:[]}
+            case "API_ACCESS_TYPES":
+                return {apiAccessTypes:[]}
             default:
                 return {}
         }
@@ -208,6 +220,10 @@ function CollectionComponent(props) {
             {
                 label: 'Auth Type',
                 value: 'AUTH_TYPE'
+            },
+            {
+                label: 'API Access Type',
+                value: 'API_ACCESS_TYPES'
             }
         ]}
             initial={condition.type}
@@ -235,6 +251,11 @@ function CollectionComponent(props) {
     const handleAuthTypesSelected = (authTypes) => {
         setSelectedAuthTypes(authTypes)
         dispatch({ type: "overwrite", index: index, key: "data", obj: {"authTypes": authTypes } })
+    }
+
+    const handleApiAccessTypesSelected = (apiAccessTypes) => {
+        setSelectedApiAccessTypes(apiAccessTypes)
+        dispatch({ type: "overwrite", index: index, key: "data", obj: {"apiAccessTypes": apiAccessTypes } })
     }
 
     const component = (condition, index) => {
@@ -274,6 +295,18 @@ function CollectionComponent(props) {
                         setSelected={(authTypes) => handleAuthTypesSelected(authTypes)}
                         preSelected={selectedAuthTypes}
                         value={selectedAuthTypes.length > 0 ? `${selectedAuthTypes.length} auth type${selectedAuthTypes.length === 1 ? '' : 's'} selected` : undefined}
+                        allowMultiple
+                    />
+                )
+            case "API_ACCESS_TYPES":
+                return(
+                    <DropdownSearch
+                        id={`api-access-type-${index}`}
+                        placeholder="Select API access types"
+                        optionsList={API_ACCESS_TYPES}
+                        setSelected={(apiAccessTypes) => handleApiAccessTypesSelected(apiAccessTypes)}
+                        preSelected={selectedApiAccessTypes}
+                        value={selectedApiAccessTypes.length > 0 ? `${selectedApiAccessTypes.length} access type${selectedApiAccessTypes.length === 1 ? '' : 's'} selected` : undefined}
                         allowMultiple
                     />
                 )
