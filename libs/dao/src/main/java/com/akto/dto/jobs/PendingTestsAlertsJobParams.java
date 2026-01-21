@@ -1,6 +1,5 @@
 package com.akto.dto.jobs;
 
-import com.akto.dto.notifications.CustomWebhook;
 import lombok.*;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 import org.bson.codecs.pojo.annotations.BsonIgnore;

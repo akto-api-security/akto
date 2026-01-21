@@ -50,8 +50,9 @@ export default function Header() {
         if (window.beamer_config) {
             const isOnPrem = window.DASHBOARD_MODE === 'ON_PREM';
             const isAgentic = dashboardCategory === 'Agentic Security';
+            const isEndpoint = dashboardCategory === 'Endpoint Security';
 
-            const productId = isAgentic
+            const productId = (isAgentic || isEndpoint)
                 ? (isOnPrem ? 'shUignSe80215' : 'ijUqfdSQ80078')
                 : (isOnPrem ? 'rggteHBr72897' : 'cJtNevEq80216');
 
@@ -61,6 +62,20 @@ export default function Header() {
                 window.beamer_config.product_id = productId;
                 window.beamer_config.filter = filterTag;
                 window.beamer_config.selector = '#beamer-btn';
+                window.beamer_config.onOpen = function () {
+                    var closeButton = document.createElement('div');
+                    closeButton.id = 'beamer-custom-close';
+                    closeButton.innerHTML = '&times;';
+                    closeButton.style.cssText = 'position: fixed; top: 7px; right: 5px; z-index: 2147483650; width: 40px; height: 40px; cursor: pointer; color: black; font-size: 30px; display: flex; align-items: center; justify-content: center; opacity: 0;';
+                    closeButton.onclick = function () {
+                        window.Beamer.hide();
+                    };
+                    document.body.appendChild(closeButton);
+                };
+                window.beamer_config.onClose = function () {
+                    var closeButton = document.getElementById('beamer-custom-close');
+                    if (closeButton) closeButton.remove();
+                };
                 if (window.Beamer) {
                     window.Beamer.destroy();
                     window.Beamer.init();
@@ -97,7 +112,7 @@ export default function Header() {
             disabled.push("DAST")
         }
         if (endpointSecurityGranted === false) {
-            // disabled.push("Endpoint Security")
+            disabled.push("Endpoint Security")
         }
         return disabled;
     }, [mcpSecurityGranted, agenticSecurityGranted, dastGranted, endpointSecurityGranted]);

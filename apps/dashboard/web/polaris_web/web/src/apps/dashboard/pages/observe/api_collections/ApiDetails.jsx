@@ -9,13 +9,13 @@ import { useEffect, useState, useRef } from "react";
 import api from "../api";
 import ApiSchema from "./ApiSchema";
 import dashboardFunc from "../../transform";
-import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout";
+// import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout";
 import func from "@/util/func" 
 import transform from "../transform";
 import ApiDependency from "./ApiDependency";
 import RunTest from "./RunTest";
 import PersistStore from "../../../../main/PersistStore";
-import gptApi from "../../../components/aktoGpt/api";
+// import gptApi from "../../../components/aktoGpt/api";
 import GraphMetric from '../../../components/GraphMetric'
 import { HorizontalDotsMinor, FileMinor } from "@shopify/polaris-icons"
 import LocalStore from "../../../../main/LocalStorageStore";
@@ -59,7 +59,7 @@ function TechCard(props){
 }
 
 function ApiDetails(props) {
-    const { showDetails, setShowDetails, apiDetail, headers, getStatus, isGptActive, collectionIssuesData } = props
+    const { showDetails, setShowDetails, apiDetail, headers, getStatus, /* isGptActive, */ collectionIssuesData } = props
 
     const localCategoryMap = LocalStore.getState().categoryMap
     const localSubCategoryMap = LocalStore.getState().subCategoryMap
@@ -67,8 +67,8 @@ function ApiDetails(props) {
     const [sampleData, setSampleData] = useState([])
     const [paramList, setParamList] = useState([])
     const [selectedUrl, setSelectedUrl] = useState({})
-    const [prompts, setPrompts] = useState([])
-    const [isGptScreenActive, setIsGptScreenActive] = useState(false)
+    // const [prompts, setPrompts] = useState([])
+    // const [isGptScreenActive, setIsGptScreenActive] = useState(false)
     const [loading, setLoading] = useState(false)
     const [showMoreActions, setShowMoreActions] = useState(false)
     const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
@@ -169,6 +169,13 @@ function ApiDetails(props) {
     };
 
     const fetchDistributionData = async () => {
+        if (!func.checkForFeatureSaas('THREAT_DETECTION')) {
+            apiDistributionAvailableRef.current = false;
+            setApiCallDistribution([]);
+            setHasApiDistribution(false);
+            updateApiCallStatsTabVisibility();
+            return;
+        }
         try {
             const { apiCollectionId, endpoint, method } = apiDetail;
             const res = await api.fetchIpLevelApiCallStats(apiCollectionId, endpoint, method, Math.floor(startTime / 60),  Math.floor(endTs / 60));
@@ -221,6 +228,13 @@ function ApiDetails(props) {
     
 
     const fetchStats = async (apiCollectionId, endpoint, method) => {
+        if (!func.checkForFeatureSaas('THREAT_DETECTION')) {
+            apiStatsAvailableRef.current = false;
+            setApiCallStats([]);
+            setHasApiStats(false);
+            updateApiCallStatsTabVisibility();
+            return;
+        }
         try {
             setApiCallStats([]); // Clear state before fetching new data
             const res = await api.fetchApiCallStats(apiCollectionId, endpoint, method, startTime, endTs);
@@ -349,21 +363,21 @@ function ApiDetails(props) {
             setTimeout(() => {
                 setLoading(false)
             }, 100)
-            const queryPayload = dashboardFunc.getApiPrompts(apiCollectionId, endpoint, method)[0].prepareQuery();
-            try{
-                if(isGptActive && window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"] && window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"]?.isGranted === true){
-                    await gptApi.ask_ai(queryPayload).then((res) => {
-                        if (res.response.responses && res.response.responses.length > 0) {
-                            const metaHeaderResp = res.response.responses.filter(x => !standardHeaders.has(x.split(" ")[0]))
-                            setHeadersWithData(metaHeaderResp)
-                        }
-                    }
-                    ).catch((err) => {
-                        console.error("Failed to fetch prompts:", err);
-                    })
-                }
-            }catch (e) {
-            }   
+            // const queryPayload = dashboardFunc.getApiPrompts(apiCollectionId, endpoint, method)[0].prepareQuery();
+            // try{
+            //     if(isGptActive && window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"] && window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"]?.isGranted === true){
+            //         await gptApi.ask_ai(queryPayload).then((res) => {
+            //             if (res.response.responses && res.response.responses.length > 0) {
+            //                 const metaHeaderResp = res.response.responses.filter(x => !standardHeaders.has(x.split(" ")[0]))
+            //                 setHeadersWithData(metaHeaderResp)
+            //             }
+            //         }
+            //         ).catch((err) => {
+            //             console.error("Failed to fetch prompts:", err);
+            //         })
+            //     }
+            // }catch (e) {
+            // }   
             fetchStats(apiCollectionId, endpoint, method)
             fetchDistributionData(); // Fetch distribution data
         }
@@ -422,12 +436,12 @@ function ApiDetails(props) {
         }
     }, [startTime, apiDetail]);
 
-    function displayGPT() {
-        setIsGptScreenActive(true)
-        let requestObj = { key: "PARAMETER", jsonStr: sampleData[0]?.message, apiCollectionId: Number(apiDetail.apiCollectionId) }
-        const activePrompts = dashboardFunc.getPrompts(requestObj)
-        setPrompts(activePrompts)
-    }
+    // function displayGPT() {
+    //     setIsGptScreenActive(true)
+    //     let requestObj = { key: "PARAMETER", jsonStr: sampleData[0]?.message, apiCollectionId: Number(apiDetail.apiCollectionId) }
+    //     const activePrompts = dashboardFunc.getPrompts(requestObj)
+    //     setPrompts(activePrompts)
+    // }
 
     function isDeMergeAllowed() {
         const { endpoint } = apiDetail
@@ -477,58 +491,6 @@ function ApiDetails(props) {
           options['legend'] = { layout: 'vertical', align: 'right', verticalAlign: 'middle' };
         }
         return options;
-    };
-
-    const distributionChartOptions = {
-        chart: {
-            type: 'column',
-            marginTop: 10,
-            marginBottom: 70,
-            marginRight: 10,
-        },
-        xAxis: {
-            title: {
-                text: mapLabel('Api', getDashboardCategory()) + ' Call Frequency',
-                style: {
-                    fontSize: '12px',
-                },
-            },
-            gridLineWidth: 0,
-            labels: {
-                style: {
-                    fontSize: '12px',
-                },
-                enabled: true,
-            },
-            tickmarkPlacement: 'on',
-            tickWidth: 1,
-            tickLength: 5,
-        },
-        yAxis: {
-            title: {
-                text: 'Number of Users',
-                style: {
-                    fontSize: '12px',
-                },
-            },
-            gridLineWidth: 0,
-        },
-        plotOptions: {
-            column: {
-                pointPadding: 0.05,
-                groupPadding: 0.1,
-                borderWidth: 0,
-            },
-        },
-        tooltip: {
-            formatter: function () {
-                const binRange = this.point?.binRange || [Math.floor(this.x) - 15, Math.floor(this.x) + 15];
-                return `<b>${this.y}</b> users made calls in range <b>${binRange[0]} to ${binRange[1] - 1}</b>`;
-            },
-        },
-        title: { text: null },
-        subtitle: { text: null },
-        legend: { enabled: false },
     };
 
     const distributionBoxplotOptions = {
@@ -824,7 +786,7 @@ function ApiDetails(props) {
                         </Box>
                     )}
                     {
-                        isGptActive || isDemergingActive ? <Popover
+                        /* isGptActive || */ isDemergingActive ? <Popover
                             active={showMoreActions}
                             activator={
                                 <Tooltip content="More actions" dismissOnMouseOut ><Button plain monochrome icon={HorizontalDotsMinor} onClick={() => setShowMoreActions(!showMoreActions)} /></Tooltip>
@@ -835,7 +797,7 @@ function ApiDetails(props) {
                             <Popover.Pane fixed>
                                 <ActionList
                                     items={[
-                                        isGptActive ? { content: "Ask AktoGPT", onAction: displayGPT } : {},
+                                        // isGptActive ? { content: "Ask AktoGPT", onAction: displayGPT } : {},
                                         isDemergingActive ? { content: "De-merge", onAction: deMergeApis } : {},
                                     ]}
                                 />
@@ -897,11 +859,11 @@ function ApiDetails(props) {
                 components={components}
                 loading={loading}
             />
-            <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
+            {/* <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
                 <Modal.Section flush>
                     <AktoGptLayout prompts={prompts} closeModal={() => setIsGptScreenActive(false)} runCustomTests={(tests) => runTests(tests)} />
                 </Modal.Section>
-            </Modal>
+            </Modal> */}
         </div>
     )
 }

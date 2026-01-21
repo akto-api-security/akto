@@ -11,7 +11,6 @@ import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.Category;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
-import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.sources.TestSourceConfig;
@@ -99,10 +98,10 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                 endTimestamp = Context.now();
             }
             long daysBetween = (endTimestamp - startTimestamp) / Constants.ONE_DAY_TIMESTAMP;
-            Set<Integer> demoCollections = getDemoCollections();
+            Set<Integer> deactivatedCollections = getDeactivatedCollections();
 
             // Fetch all issues once within the time range
-            List<TestingRunIssues> allIssues = fetchAllTestingRunIssues(startTimestamp, endTimestamp, demoCollections);
+            List<TestingRunIssues> allIssues = fetchAllTestingRunIssues(startTimestamp, endTimestamp, deactivatedCollections);
 
             // Fetch issues over time
             List<BasicDBObject> issuesData = fetchIssuesOverTime(startTimestamp, endTimestamp, daysBetween, allIssues);
@@ -352,16 +351,6 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                 );
             }
             baseFilter = Filters.and(baseFilter, timeFilter);
-            
-            // Apply RBAC filter
-            try {
-                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-                if (collectionIds != null) {
-                    baseFilter = Filters.and(baseFilter, Filters.in("collectionIds", collectionIds));
-                }
-            } catch (Exception e) {
-                // Ignore
-            }
 
             // Fetch all APIs once with needed fields to categorize them properly
             // This matches frontend logic which processes all endpoints in a single pass
@@ -1217,17 +1206,6 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                 Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, demoCollections)
             );
 
-            // Apply RBAC filter
-            try {
-                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-                if (collectionIds != null && !collectionIds.isEmpty()) {
-                    baseFilter = Filters.and(baseFilter, 
-                        Filters.in(TestingRunIssuesDao.instance.getFilterKeyString(), collectionIds));
-                }
-            } catch (Exception e) {
-                // Ignore
-            }
-
             result = TestingRunIssuesDao.instance.findAll(baseFilter);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching TestingRunIssues records: " + e.getMessage());
@@ -1282,16 +1260,6 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                 );
             }
             baseFilter = Filters.and(baseFilter, timeFilter);
-            
-            // Apply RBAC filter
-            try {
-                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-                if (collectionIds != null && !collectionIds.isEmpty()) {
-                    baseFilter = Filters.and(baseFilter, Filters.in("collectionIds", collectionIds));
-                }
-            } catch (Exception e) {
-                // Ignore
-            }
 
             result = ApiInfoDao.instance.findAll(baseFilter);
         } catch (Exception e) {

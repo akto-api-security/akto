@@ -117,6 +117,11 @@ public class TestTemplateUtils {
             TestCategory.AGENTIC_HALLUCINATION_AND_TRUSTWORTHINESS,
             TestCategory.AGENTIC_SAFETY,
             TestCategory.AGENTIC_SECURITY,
+            TestCategory.AGENTIC_SECURITY_PROMPT_INJECTION,
+            TestCategory.AGENTIC_SECURITY_AGENT_EXPLOITATION,
+            TestCategory.AGENTIC_SECURITY_INFRASTRUCTURE,
+            TestCategory.AGENTIC_SECURITY_DATA_EXPOSURE,
+            TestCategory.AGENTIC_SECURITY_CODE_EXECUTION,
         };
 
         switch (contextSource) {

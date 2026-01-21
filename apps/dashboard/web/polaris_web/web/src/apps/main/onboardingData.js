@@ -292,6 +292,66 @@ const learnMoreObject = {
                     value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
                 }
             ]
+        },
+        agentic_security: {
+            title: "Sensitive data",
+            description: "Identify and manage sensitive data in AI agents and MCP servers",
+            docsLink: [
+                {
+                    content:"What is Sensitive Data",
+                    value:"https://ai-security-docs.akto.io/agentic-ai-discovery/concepts/sensitive-data"
+                },
+                {
+                    content:"What is Data Type",
+                    value:"https://ai-security-docs.akto.io/agentic-ai-discovery/concepts/data-types"
+                },
+                {
+                    content:"How to create a Custom Data Type",
+                    value:"https://ai-security-docs.akto.io/agentic-ai-discovery/how-to/create-a-custom-data-type"
+                },
+                {
+                    content:"How to set sensitivity of a Data Type",
+                    value:"https://ai-security-docs.akto.io/agentic-ai-discovery/how-to/set-sensitivity-of-a-data-type"
+                },
+                {
+                    content:"How to De-activate a data type",
+                    value:"https://ai-security-docs.akto.io/agentic-ai-discovery/how-to/de-activate-a-data-type"
+                },
+                {
+                    content:"How to Redact sensitive data",
+                    value:"https://ai-security-docs.akto.io/agentic-ai-discovery/how-to/redact-sensitive-data"
+                }
+            ]
+        },
+        endpoint_security: {
+            title: "Sensitive data",
+            description: "Monitor and protect sensitive data on employee endpoints",
+            docsLink: [
+                {
+                    content:"What is Sensitive Data",
+                    value:"https://ai-security-docs.akto.io/agentic-ai-discovery/concepts/sensitive-data"
+                },
+                {
+                    content:"What is Data Type",
+                    value:"https://ai-security-docs.akto.io/agentic-ai-discovery/concepts/data-types"
+                },
+                {
+                    content:"How to create a Custom Data Type",
+                    value:"https://ai-security-docs.akto.io/agentic-ai-discovery/how-to/create-a-custom-data-type"
+                },
+                {
+                    content:"How to set sensitivity of a Data Type",
+                    value:"https://ai-security-docs.akto.io/agentic-ai-discovery/how-to/set-sensitivity-of-a-data-type"
+                },
+                {
+                    content:"How to De-activate a data type",
+                    value:"https://ai-security-docs.akto.io/agentic-ai-discovery/how-to/de-activate-a-data-type"
+                },
+                {
+                    content:"How to Redact sensitive data",
+                    value:"https://ai-security-docs.akto.io/agentic-ai-discovery/how-to/redact-sensitive-data"
+                }
+            ]
         }
     },
     dashboard_testing: {
@@ -754,24 +814,24 @@ const learnMoreObject = {
             ]
         }
     },
-    dashboard_settings_integrations_akto_gpt:{
-        api_security: {
-            title: "Akto GPT",
-            description: "Harness the power of ChatGPT for API Security on your fingertips now.",
-            docsLink: [
-                {
-                    content:"AktoGPT Guide",
-                    value:"https://docs.akto.io/aktogpt"
-                }
-            ],
-            videoLink: [
-                {
-                    content: "Watch Akto demo" ,
-                    value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
-                }
-            ]
-        }
-    },
+    // dashboard_settings_integrations_akto_gpt:{
+    //     api_security: {
+    //         title: "Akto GPT",
+    //         description: "Harness the power of ChatGPT for API Security on your fingertips now.",
+    //         docsLink: [
+    //             {
+    //                 content:"AktoGPT Guide",
+    //                 value:"https://docs.akto.io/aktogpt"
+    //             }
+    //         ],
+    //         videoLink: [
+    //             {
+    //                 content: "Watch Akto demo" ,
+    //                 value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+    //             }
+    //         ]
+    //     }
+    // },
     dashboard_settings_integrations_slack:{
         api_security: {
             docsLink: [
@@ -1418,6 +1478,64 @@ const learnMoreObject = {
             docsLink: []
         },
         docsLink: []
+    },
+    dashboard_observe_audit: {
+        endpoint_security: {
+            title: "Audit Data",
+            description: "View and manage audit records for agentic components",
+            docsLink: [
+                {
+                    content: "View Audit Data",
+                    value: "https://ai-security-docs.akto.io/agentic-ai-discovery/concepts/audit-data"
+                }
+            ]
+        },
+        agentic_security: {
+            title: "Audit Data",
+            description: "View and manage audit records for agentic components",
+            docsLink: [
+                {
+                    content: "View Audit Data",
+                    value: "https://ai-security-docs.akto.io/agentic-ai-discovery/concepts/audit-data"
+                }
+            ]
+        }
+    },
+    dashboard_observe_endpoint_shield: {
+        endpoint_security: {
+            title: "Endpoint Shield",
+            description: "Monitor and manage MCP Endpoint Shield agents",
+            docsLink: [
+                {
+                    content: "MCP Endpoint Shield",
+                    value: "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/mcp-endpoint-shield"
+                },
+                {
+                    content: "View Endpoint Shield Details",
+                    value: "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/view-endpoint-shield-details"
+                }
+            ]
+        }
+    },
+    dashboard_observe_agentic_assets: {
+        endpoint_security: {
+            title: "Agentic Assets (Atlas)",
+            description: "View and manage agentic assets discovered on employee endpoints through Akto Atlas",
+            docsLink: [
+                {
+                    content: "What is Akto Atlas",
+                    value: "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/overview"
+                },
+                {
+                    content: "Endpoint Discovery",
+                    value: "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents"
+                },
+                {
+                    content: "View Audit Data",
+                    value: "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/audit-data"
+                }
+            ]
+        }
     }
 }
 
