@@ -423,67 +423,6 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         this.jiraPriorities = jiraPriorities;
     }
 
-    private Map<String, String> severityToPriorityMap;
-
-    public String saveSeverityMapping() {
-        try {
-            loggerMaker.infoAndAddToDb("Saving Jira severity to priority mapping for account: " + Context.accountId.get());
-
-            if (severityToPriorityMap == null) {
-                loggerMaker.errorAndAddToDb("Severity mapping is null");
-                addActionError("Severity mapping cannot be null");
-                return Action.ERROR.toUpperCase();
-            }
-
-            JiraIntegrationDao.instance.updateOne(
-                new BasicDBObject(),
-                Updates.set(JiraIntegration.ISSUE_SEVERITY_TO_PRIORITY_MAP, severityToPriorityMap)
-            );
-
-            loggerMaker.infoAndAddToDb("Successfully updated severity to priority mapping in JiraIntegration");
-            return Action.SUCCESS.toUpperCase();
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error saving severity mapping");
-            addActionError("Error while saving severity mapping: " + e.getMessage());
-            return Action.ERROR.toUpperCase();
-        }
-    }
-
-    public String fetchSeverityMapping() {
-        try {
-            loggerMaker.infoAndAddToDb("Fetching Jira severity to priority mapping for account: " + Context.accountId.get());
-
-            JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
-
-            if (jiraIntegration != null) {
-                this.severityToPriorityMap = jiraIntegration.getIssueSeverityToPriorityMap();
-
-                if (this.severityToPriorityMap == null) {
-                    this.severityToPriorityMap = new HashMap<>();
-                    loggerMaker.infoAndAddToDb("No existing severity mapping found, initialized empty map");
-                }
-            } else {
-                loggerMaker.infoAndAddToDb("JiraIntegration not found, initialized empty severity map");
-                this.severityToPriorityMap = new HashMap<>();
-            }
-
-            loggerMaker.infoAndAddToDb("Successfully fetched severity mapping with " + this.severityToPriorityMap.size() + " entries");
-            return Action.SUCCESS.toUpperCase();
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error fetching severity mapping");
-            addActionError("Error while fetching severity mapping: " + e.getMessage());
-            return Action.ERROR.toUpperCase();
-        }
-    }
-
-    public Map<String, String> getSeverityToPriorityMap() {
-        return severityToPriorityMap;
-    }
-
-    public void setSeverityToPriorityMap(Map<String, String> severityToPriorityMap) {
-        this.severityToPriorityMap = severityToPriorityMap;
-    }
-
     private List<BasicDBObject> getIssueTypesWithIds(BasicDBList issueTypes) {
 
         List<BasicDBObject> idPairs = new ArrayList<>();
@@ -1715,6 +1654,326 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error storing Jira URL: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
         }
+    }
+
+    // Project-level priority field mapping
+    private String projectKey;
+    private String fieldId;
+    private PriorityFieldMapping priorityFieldMapping;
+    private List<BasicDBObject> availableFields;
+    private List<BasicDBObject> availableFieldValues;
+
+    /**
+     * Fetch available fields for priority mapping (priority field + custom fields)
+     */
+    public String fetchAvailableFieldsForMapping() {
+        try {
+            if (projectKey == null || projectKey.isEmpty()) {
+                loggerMaker.errorAndAddToDb("Project key is required");
+                addActionError("Project key is required");
+                return Action.ERROR.toUpperCase();
+            }
+
+            JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+            if (jiraIntegration == null) {
+                loggerMaker.errorAndAddToDb("JiraIntegration not found");
+                addActionError("Jira integration not found");
+                return Action.ERROR.toUpperCase();
+            }
+
+            String baseUrl = jiraIntegration.getBaseUrl();
+            String userEmail = jiraIntegration.getUserEmail();
+            String apiToken = jiraIntegration.getApiToken();
+            String authHeader = Base64.getEncoder().encodeToString((userEmail + ":" + apiToken).getBytes());
+
+            // Fetch all fields
+            String fieldsUrl = baseUrl + "/rest/api/3/field";
+            Map<String, List<String>> headers = new HashMap<>();
+            headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
+            OriginalHttpRequest request = new OriginalHttpRequest(fieldsUrl, "", "GET", null, headers, "");
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+
+            String responseBody = response.getBody();
+            // Parse JSON array response
+            List<Map<String, Object>> fieldsArray = JsonUtils.fromJson(responseBody,
+                new TypeReference<List<Map<String, Object>>>() {});
+
+            availableFields = new ArrayList<>();
+            for (Map<String, Object> field : fieldsArray) {
+                Object fIdObj = field.get("id");
+                Object fNameObj = field.get("name");
+                String fId = fIdObj != null ? fIdObj.toString() : null;
+                String fName = fNameObj != null ? fNameObj.toString() : null;
+
+                String fType = "unknown";
+                Object schemaObj = field.get("schema");
+                if (schemaObj instanceof Map) {
+                    Map<String, Object> schema = (Map<String, Object>) schemaObj;
+                    Object typeObj = schema.get("type");
+                    fType = typeObj != null ? typeObj.toString() : "unknown";
+                }
+
+                // Include all fields - no filtering
+                if (fId != null && fName != null) {
+                    BasicDBObject fieldInfo = new BasicDBObject();
+                    fieldInfo.put("id", fId);
+                    fieldInfo.put("name", fName);
+                    fieldInfo.put("type", fType);
+                    availableFields.add(fieldInfo);
+                }
+            }
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error fetching available fields");
+            addActionError("Error fetching available fields: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Fetch available values for a specific field (e.g., p0, p1, High, Low)
+     */
+    public String fetchFieldValues() {
+        try {
+            if (projectKey == null || projectKey.isEmpty()) {
+                loggerMaker.errorAndAddToDb("Project key is required");
+                addActionError("Project key is required");
+                return Action.ERROR.toUpperCase();
+            }
+
+            if (fieldId == null || fieldId.isEmpty()) {
+                // Default to priority field
+                fieldId = "priority";
+            }
+
+            JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+            if (jiraIntegration == null) {
+                loggerMaker.errorAndAddToDb("JiraIntegration not found");
+                addActionError("Jira integration not found");
+                return Action.ERROR.toUpperCase();
+            }
+
+            String baseUrl = jiraIntegration.getBaseUrl();
+            String userEmail = jiraIntegration.getUserEmail();
+            String apiToken = jiraIntegration.getApiToken();
+            String authHeader = Base64.getEncoder().encodeToString((userEmail + ":" + apiToken).getBytes());
+
+            Map<String, List<String>> headers = new HashMap<>();
+            headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
+
+            availableFieldValues = new ArrayList<>();
+
+            // For priority field, use priority endpoint
+            if (fieldId.equals("priority")) {
+                String prioritiesUrl = baseUrl + "/rest/api/3/priority";
+                OriginalHttpRequest request = new OriginalHttpRequest(prioritiesUrl, "", "GET", null, headers, "");
+                OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+
+                String responseBody = response.getBody();
+                List<Map<String, Object>> prioritiesArray = JsonUtils.fromJson(responseBody,
+                    new TypeReference<List<Map<String, Object>>>() {});
+
+                for (Map<String, Object> priority : prioritiesArray) {
+                    BasicDBObject valueInfo = new BasicDBObject();
+                    valueInfo.put("id", (String) priority.get("id"));
+                    valueInfo.put("name", (String) priority.get("name"));
+                    availableFieldValues.add(valueInfo);
+                }
+            } else {
+                // For custom fields, get values from createmeta
+                Map<String, List<BasicDBObject>> projectIdsMap = jiraIntegration.getProjectIdsMap();
+                if (projectIdsMap != null && projectIdsMap.containsKey(projectKey)) {
+                    List<BasicDBObject> issueTypes = projectIdsMap.get(projectKey);
+                    if (!issueTypes.isEmpty()) {
+                        String issueTypeId = issueTypes.get(0).getString("issueId");
+
+                        String createMetaUrl = baseUrl + "/rest/api/3/issue/createmeta/" + projectKey + "/issuetypes/" + issueTypeId;
+                        OriginalHttpRequest request = new OriginalHttpRequest(createMetaUrl, "", "GET", null, headers, "");
+                        OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+
+                        String responseBody = response.getBody();
+                        Map<String, Object> metadata = JsonUtils.fromJson(responseBody,
+                            new TypeReference<Map<String, Object>>() {});
+
+                        Object fieldsObj = metadata.get("fields");
+                        if (fieldsObj instanceof List) {
+                            List<?> fieldsList = (List<?>) fieldsObj;
+
+                            // Find the field in the array
+                            for (Object fieldObj : fieldsList) {
+                                if (fieldObj instanceof Map) {
+                                    Map<String, Object> fieldMetadata = (Map<String, Object>) fieldObj;
+                                    Object fieldIdObj = fieldMetadata.get("fieldId");
+                                    String currentFieldId = fieldIdObj != null ? fieldIdObj.toString() : null;
+
+                                    if (currentFieldId != null && currentFieldId.equals(fieldId)) {
+                                        Object allowedValuesObj = fieldMetadata.get("allowedValues");
+
+                                        if (allowedValuesObj instanceof List) {
+                                            List<?> allowedValuesList = (List<?>) allowedValuesObj;
+
+                                            for (Object valueObj : allowedValuesList) {
+                                                if (valueObj instanceof Map) {
+                                                    Map<String, Object> value = (Map<String, Object>) valueObj;
+                                                    BasicDBObject valueInfo = new BasicDBObject();
+
+                                                    Object idObj = value.get("id");
+                                                    Object nameObj = value.get("name");
+                                                    Object valueObjProp = value.get("value");
+
+                                                    valueInfo.put("id", idObj != null ? idObj.toString() : "");
+                                                    valueInfo.put("name", nameObj != null ? nameObj.toString() : (valueObjProp != null ? valueObjProp.toString() : ""));
+                                                    availableFieldValues.add(valueInfo);
+                                                }
+                                            }
+                                        }
+                                        break; // Found the field, stop searching
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error fetching field values");
+            addActionError("Error fetching field values: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Save priority field mapping for a specific project
+     */
+    public String savePriorityFieldMapping() {
+        try {
+            loggerMaker.infoAndAddToDb("Saving priority field mapping for project: " + projectKey);
+
+            if (projectKey == null || projectKey.isEmpty()) {
+                loggerMaker.errorAndAddToDb("Project key is required");
+                addActionError("Project key is required");
+                return Action.ERROR.toUpperCase();
+            }
+
+            if (priorityFieldMapping == null) {
+                loggerMaker.errorAndAddToDb("Priority field mapping is null");
+                addActionError("Priority field mapping cannot be null");
+                return Action.ERROR.toUpperCase();
+            }
+
+            // Set default field to "priority" if not provided
+            if (priorityFieldMapping.getFieldId() == null || priorityFieldMapping.getFieldId().isEmpty()) {
+                priorityFieldMapping.setFieldId("priority");
+            }
+
+            JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+            if (jiraIntegration == null) {
+                loggerMaker.errorAndAddToDb("JiraIntegration not found");
+                addActionError("Jira integration not found");
+                return Action.ERROR.toUpperCase();
+            }
+
+            // Save to database
+            JiraIntegrationDao.instance.updateOne(
+                new BasicDBObject(),
+                Updates.set("projectMappings." + projectKey + ".priorityFieldMapping", priorityFieldMapping)
+            );
+
+            loggerMaker.infoAndAddToDb("Successfully saved priority field mapping for project: " + projectKey);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error saving priority field mapping");
+            addActionError("Error saving priority field mapping: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Fetch priority field mapping for a specific project
+     */
+    public String fetchPriorityFieldMapping() {
+        try {
+            loggerMaker.infoAndAddToDb("Fetching priority field mapping for project: " + projectKey);
+
+            if (projectKey == null || projectKey.isEmpty()) {
+                loggerMaker.errorAndAddToDb("Project key is required");
+                addActionError("Project key is required");
+                return Action.ERROR.toUpperCase();
+            }
+
+            JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+
+            if (jiraIntegration != null && jiraIntegration.getProjectMappings() != null) {
+                ProjectMapping projectMapping = jiraIntegration.getProjectMappings().get(projectKey);
+
+                if (projectMapping != null && projectMapping.getPriorityFieldMapping() != null) {
+                    this.priorityFieldMapping = projectMapping.getPriorityFieldMapping();
+                } else {
+                    // Initialize with default priority field
+                    this.priorityFieldMapping = new PriorityFieldMapping();
+                    this.priorityFieldMapping.setFieldId("priority");
+                    this.priorityFieldMapping.setFieldName("Priority");
+                    this.priorityFieldMapping.setSeverityToValueMap(new HashMap<>());
+                    this.priorityFieldMapping.setSeverityToDisplayNameMap(new HashMap<>());
+                }
+            } else {
+                // Initialize with default
+                this.priorityFieldMapping = new PriorityFieldMapping();
+                this.priorityFieldMapping.setFieldId("priority");
+                this.priorityFieldMapping.setFieldName("Priority");
+                this.priorityFieldMapping.setSeverityToValueMap(new HashMap<>());
+                this.priorityFieldMapping.setSeverityToDisplayNameMap(new HashMap<>());
+            }
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error fetching priority field mapping");
+            addActionError("Error fetching priority field mapping: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    public String getProjectKey() {
+        return projectKey;
+    }
+
+    public void setProjectKey(String projectKey) {
+        this.projectKey = projectKey;
+    }
+
+    public String getFieldId() {
+        return fieldId;
+    }
+
+    public void setFieldId(String fieldId) {
+        this.fieldId = fieldId;
+    }
+
+    public PriorityFieldMapping getPriorityFieldMapping() {
+        return priorityFieldMapping;
+    }
+
+    public void setPriorityFieldMapping(PriorityFieldMapping priorityFieldMapping) {
+        this.priorityFieldMapping = priorityFieldMapping;
+    }
+
+    public List<BasicDBObject> getAvailableFields() {
+        return availableFields;
+    }
+
+    public void setAvailableFields(List<BasicDBObject> availableFields) {
+        this.availableFields = availableFields;
+    }
+
+    public List<BasicDBObject> getAvailableFieldValues() {
+        return availableFieldValues;
+    }
+
+    public void setAvailableFieldValues(List<BasicDBObject> availableFieldValues) {
+        this.availableFieldValues = availableFieldValues;
     }
 
     public JiraIntegration.JiraType getJiraType() {

@@ -22,7 +22,6 @@ public class JiraIntegration {
     private JiraType jiraType;
     private Map<String,List<BasicDBObject>> projectIdsMap;
     private Map<String, ProjectMapping> projectMappings;
-    private Map<String, String> issueSeverityToPriorityMap;
 
     public static final String API_TOKEN = "apiToken";
     public static final String ISSUE_SEVERITY_TO_PRIORITY_MAP = "issueSeverityToPriorityMap";

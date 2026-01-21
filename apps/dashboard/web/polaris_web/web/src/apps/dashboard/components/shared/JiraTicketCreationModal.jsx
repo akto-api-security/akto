@@ -61,25 +61,34 @@ const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handl
         if (!isAzureModal && !isServiceNowModal && !isDevRevModal && projId && issueType) {
             const initialFieldMetaData = createJiraIssueFieldMetaData?.[projId]?.[issueType] || [];
 
-            let prioritySystemField = null, customFields = []; 
-            initialFieldMetaData.forEach(field => {
+            // Filter out priority fields - they are set automatically based on severity mapping
+            const filteredFieldMetaData = initialFieldMetaData.filter(field => {
                 const fieldSchema = field?.schema;
-                if (typeof fieldSchema !== "object") return;
-                
+                if (typeof fieldSchema !== "object") return false;
+
+                // Exclude system priority field
                 if (Object.hasOwn(fieldSchema, 'system')) {
                     const systemFieldURI = fieldSchema.system;
-
-                    if (systemFieldURI === 'priority') 
-                        prioritySystemField = field;
-
-                } else if (Object.hasOwn(fieldSchema, 'custom')) {
-                    customFields.push(field);
+                    if (systemFieldURI === 'priority') {
+                        return false; // Skip priority field
+                    }
                 }
-            });
 
-            const filteredFieldMetaData = [];
-            if (prioritySystemField) filteredFieldMetaData.push(prioritySystemField);
-            filteredFieldMetaData.push(...customFields);
+                // Exclude custom fields with type "option" that contain "priority" or "severity" in name
+                // These are handled by the priority field mapping
+                if (Object.hasOwn(fieldSchema, 'custom')) {
+                    const fieldName = field?.name?.toLowerCase() || '';
+                    const schemaType = fieldSchema?.type || '';
+
+                    if ((schemaType === 'option' || schemaType === 'priority') &&
+                        (fieldName.includes('priority') || fieldName.includes('severity'))) {
+                        return false; // Skip priority-related custom fields
+                    }
+                    return true; // Include other custom fields
+                }
+
+                return false;
+            });
 
             setDisplayJiraIssueFieldMetadata(filteredFieldMetaData);
 
