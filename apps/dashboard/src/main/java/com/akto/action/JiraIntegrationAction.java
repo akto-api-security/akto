@@ -88,7 +88,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private String userEmail;
     private String apiToken;
     private String issueType;
-    private String jiraType; // "CLOUD" or "DATA_CENTER"
+    private String jiraType;
     private JiraIntegration jiraIntegration;
     private JiraMetaData jiraMetaData;
 
@@ -113,21 +113,6 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private Map<String,List<BasicDBObject>> projectAndIssueMap;
     private Map<String, ProjectMapping> projectMappings;
 
-    /*
-     * Jira REST API Version Compatibility Documentation:
-     * 
-     * JIRA CLOUD:
-     * - Uses REST API v3: /rest/api/3/
-     * - Documentation: https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/
-     * - Base URL format: https://your-domain.atlassian.net
-     * 
-     * JIRA DATA CENTER/SERVER:
-     * - Uses REST API v2: /rest/api/2/
-     * - Documentation: https://developer.atlassian.com/server/jira/platform/rest-apis/
-     * - Latest version (v11.3.1) still uses v2: https://developer.atlassian.com/server/jira/platform/rest/v11002/intro/
-     * - Base URL format: http://your-server.com:port
-     * 
-     */
     
     // Cloud (v3) endpoints - Primary
     private static final String META_ENDPOINT = "/rest/api/3/issue/createmeta";
@@ -157,10 +142,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
     // Helper methods to determine API version
     private boolean isDataCenter() {
-        if (jiraType == null || jiraType.trim().isEmpty()) {
-            return false; // Default to Cloud if not specified
-        }
-        return "DATA_CENTER".equalsIgnoreCase(jiraType.trim());
+        return JiraIntegration.JiraType.DATA_CENTER.name().equals(jiraType);
     }
 
     private String getMetaEndpoint() {
@@ -283,8 +265,6 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         try {
             setProjId(projId.replaceAll("\\s+", ""));
 
-            // Reference: https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-projects/#api-rest-api-3-project-projectidorkey-statuses-get
-            // Reference: https://developer.atlassian.com/server/jira/platform/rest/v11002/api-group-project/#api-rest-api-2-project-projectidorkey-statuses-get
             String statusUrl = baseUrl + String.format(getIssueStatusEndpoint(), projId) + "?maxResults=100";
 
             Request.Builder builder = buildJiraRequest(statusUrl, userEmail, apiToken, false, isDataCenter());
