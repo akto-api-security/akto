@@ -63,16 +63,23 @@ public class CrawlerRun {
     public static final String CUSTOM_HEADERS = "customHeaders";
     private Map<String, String> customHeaders;
 
+    public static final String RUN_TEST_AFTER_CRAWLING = "runTestAfterCrawling";
+    private boolean runTestAfterCrawling;
+
+    public static final String SELECTED_MINI_TESTING_SERVICE = "selectedMiniTestingService";
+    private String selectedMiniTestingService;
+
     public CrawlerRun() {
     }
 
-    public CrawlerRun(String startedBy, int startTimestamp, int endTimestamp, String crawlId, String hostname, String outScopeUrls) {
+    public CrawlerRun(String startedBy, int startTimestamp, int endTimestamp, String crawlId, String hostname, String outScopeUrls, boolean runTestAfterCrawling) {
         this.startedBy = startedBy;
         this.startTimestamp = startTimestamp;
         this.endTimestamp = endTimestamp;
         this.crawlId = crawlId;
         this.hostname = hostname;
         this.outScopeUrls = outScopeUrls;
+        this.runTestAfterCrawling = runTestAfterCrawling;
     }
 
     public enum CrawlerRunStatus {
@@ -90,6 +97,7 @@ public class CrawlerRun {
                 ", outScopeUrls=" + outScopeUrls +
                 ", status='" + status.name() + '\'' +
                 ", moduleName='" + moduleName + '\'' +
+                ", runTestAfterCrawling='" + runTestAfterCrawling + '\'' +
                 '}';
     }
 }
