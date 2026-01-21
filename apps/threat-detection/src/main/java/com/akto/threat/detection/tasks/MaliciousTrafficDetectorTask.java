@@ -467,6 +467,13 @@ public class MaliciousTrafficDetectorTask implements Task {
     List<SchemaConformanceError> errors = null; 
 
 
+    // Convert static URL to template URL once for reuse
+    // This is used for: 1) Redis/CMS aggregation, 2) ParamEnumeration filter
+    URLTemplate matchedTemplate = null;
+    if (apiDistributionEnabled && apiCollectionId != 0) {
+      matchedTemplate = threatDetector.findMatchingUrlTemplate(responseParam);
+    }
+
     // Check SuccessfulExploit category filters
     boolean successfulExploit = false; 
     if (!successfulExploitFilters.isEmpty()) {
@@ -479,14 +486,21 @@ public class MaliciousTrafficDetectorTask implements Task {
     }
     if (apiDistributionEnabled && apiCollectionId != 0) {
       String apiCollectionIdStr = Integer.toString(apiCollectionId);
-      String distributionKey = Utils.buildApiDistributionKey(apiCollectionIdStr, url, method.toString());
-      String ipApiCmsKey = Utils.buildIpApiCmsDataKey(actor, apiCollectionIdStr, url, method.toString());
+
+      // Use pre-matched template for Redis storage
+      // This aggregates requests like /api/users/1, /api/users/2 under /api/users/INTEGER
+      String templateUrl = matchedTemplate != null ? matchedTemplate.getTemplateString() : url;
+
+      String distributionKey = Utils.buildApiDistributionKey(apiCollectionIdStr, templateUrl, method.toString());
+      String ipApiCmsKey = Utils.buildIpApiCmsDataKey(actor, apiCollectionIdStr, templateUrl, method.toString());
       long curEpochMin = responseParam.getTime() / 60;
       this.distributionCalculator.updateFrequencyBuckets(distributionKey, curEpochMin, ipApiCmsKey);
 
       // Check and raise alert for RateLimits
       RatelimitConfigItem ratelimitConfig = this.threatConfigEvaluator.getDefaultRateLimitConfig();
-      long ratelimit = this.threatConfigEvaluator.getRatelimit(apiInfoKey);
+
+      ApiInfo.ApiInfoKey templateApiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, templateUrl, method);
+      long ratelimit = this.threatConfigEvaluator.getRatelimit(templateApiInfoKey);
 
       long count = this.distributionCalculator.getSlidingWindowCount(ipApiCmsKey, curEpochMin,
           ratelimitConfig.getPeriod());
@@ -540,7 +554,9 @@ public class MaliciousTrafficDetectorTask implements Task {
         hasPassedFilter = vulnerable != null && !vulnerable.isEmpty();
 
       }else {
-        hasPassedFilter = threatDetector.applyFilter(apiFilter, responseParam, rawApi, apiInfoKey);
+        // Pass pre-matched template to avoid duplicate findMatchingUrlTemplate calls
+        // (especially important for ParamEnumeration filter)
+        hasPassedFilter = threatDetector.applyFilter(apiFilter, responseParam, rawApi, apiInfoKey, matchedTemplate);
 
         if (applyFilterLogCount.get() < MAX_APPLY_FILTER_LOGS || isDebugRequest(responseParam)) {
           logger.warnAndAddToDb("applyFilter - apiInfoKey: " + apiInfoKey.toString() +
