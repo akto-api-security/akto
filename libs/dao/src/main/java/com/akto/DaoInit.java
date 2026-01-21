@@ -29,8 +29,8 @@ import com.akto.dto.data_types.*;
 import com.akto.dto.demo.VulnerableRequestForTemplate;
 import com.akto.dto.dependency_flow.*;
 import com.akto.dto.events.EventsExample;
-import com.akto.dto.gpt.AktoGptConfig;
-import com.akto.dto.gpt.AktoGptConfigState;
+// import com.akto.dto.gpt.AktoGptConfig;
+// import com.akto.dto.gpt.AktoGptConfigState;
 import com.akto.dto.jira_integration.JiraIntegration;
 import com.akto.dto.jobs.AutoTicketParams;
 import com.akto.dto.jobs.JobParams;
@@ -254,7 +254,7 @@ public class DaoInit {
         ClassModel<Loader> loaderClassModel = ClassModel.builder(Loader.class).enableDiscriminator(true).build();
         ClassModel<NormalLoader> normalLoaderClassModel = ClassModel.builder(NormalLoader.class).enableDiscriminator(true).build();
         ClassModel<PostmanUploadLoader> postmanUploadLoaderClassModel = ClassModel.builder(PostmanUploadLoader.class).enableDiscriminator(true).build();
-        ClassModel<AktoGptConfig> aktoGptConfigClassModel = ClassModel.builder(AktoGptConfig.class).enableDiscriminator(true).build();
+        // ClassModel<AktoGptConfig> aktoGptConfigClassModel = ClassModel.builder(AktoGptConfig.class).enableDiscriminator(true).build();
 
         ClassModel<LoginFlowStepsData> loginFlowStepsData = ClassModel.builder(LoginFlowStepsData.class)
         .enableDiscriminator(true).build();
@@ -340,7 +340,7 @@ public class DaoInit {
                 containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel,
                 loginFlowStepsData,
                 accessMatrixUrlToRoleClassModel, accessMatrixTaskInfoClassModel,
-                loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel,
+                loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, /* aktoGptConfigClassModel, */
                 vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel, jiraintegrationClassModel,
                 setupClassModel,
                 cronTimersClassModel, connectionInfoClassModel, testLibraryClassModel,
@@ -392,7 +392,7 @@ public class DaoInit {
                 new EnumCodec<>(Loader.Type.class),
                 new EnumCodec<>(CustomWebhook.WebhookOptions.class),
                 new EnumCodec<>(GlobalEnums.YamlTemplateSource.class),
-                new EnumCodec<>(AktoGptConfigState.class),
+                // new EnumCodec<>(AktoGptConfigState.class),
                 new EnumCodec<>(CustomWebhook.WebhookOptions.class),
                 new EnumCodec<>(TestingEndpoints.Operator.class),
                 new EnumCodec<>(MetricTypes.class),

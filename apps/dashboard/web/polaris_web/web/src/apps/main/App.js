@@ -23,7 +23,7 @@ import Roles from "../dashboard/pages/settings/roles/Roles";
 import Postman from "../dashboard/pages/settings/integrations/Postman";
 import Jira from "../dashboard/pages/settings/integrations/Jira";
 import ApiTokens from "../dashboard/pages/settings/integrations/ApiTokens";
-import AktoGPT from "../dashboard/pages/settings/integrations/AktoGPT";
+// import AktoGPT from "../dashboard/pages/settings/integrations/AktoGPT";
 import GithubSso from "../dashboard/pages/settings/integrations/GithubSso";
 import GithubAppIntegration from "../dashboard/pages/settings/integrations/GithubAppIntegration";
 import HealthLogs from "../dashboard/pages/settings/health_logs/HealthLogs";
@@ -437,10 +437,10 @@ const router = createBrowserRouter([
                         path: "integrations/akto_apis",
                         element: <ApiTokens/>,
                     },
-                    {
-                        path: "integrations/akto_gpt",
-                        element: <AktoGPT/>,
-                    },
+                    // {
+                    //     path: "integrations/akto_gpt",
+                    //     element: <AktoGPT/>,
+                    // },
                     {
                         path: "integrations/mcp_registry",
                         element: <McpRegistry/>,
