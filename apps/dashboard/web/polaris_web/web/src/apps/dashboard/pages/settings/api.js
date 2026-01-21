@@ -87,24 +87,24 @@ const settingRequests = {
     },
     
 
-    fetchAktoGptConfig(apiCollectionId){
-        return request({
-            url: '/api/fetchAktoGptConfig',
-            method: 'post',
-            data: {
-                "apiCollectionId": apiCollectionId
-            }
-        })
-    },
-    saveAktoGptConfig(aktoConfigList){
-        return request({
-            url: '/api/saveAktoGptConfig',
-            method: 'post',
-            data: {
-                "currentState": aktoConfigList
-            }
-        })
-    },
+    // fetchAktoGptConfig(apiCollectionId){
+    //     return request({
+    //         url: '/api/fetchAktoGptConfig',
+    //         method: 'post',
+    //         data: {
+    //             "apiCollectionId": apiCollectionId
+    //         }
+    //     })
+    // },
+    // saveAktoGptConfig(aktoConfigList){
+    //     return request({
+    //         url: '/api/saveAktoGptConfig',
+    //         method: 'post',
+    //         data: {
+    //             "currentState": aktoConfigList
+    //         }
+    //     })
+    // },
     fetchLogsFromDb(startTime, endTime, logDb) {
         return request({
             url: '/api/fetchLogsFromDb',

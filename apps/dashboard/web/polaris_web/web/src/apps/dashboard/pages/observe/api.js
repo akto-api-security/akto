@@ -572,15 +572,15 @@ export default {
         })
         return resp
     },
-    fetchAktoGptConfig(apiCollectionId) {
-        return request({
-            url: '/api/fetchAktoGptConfig',
-            method: 'post',
-            data: { apiCollectionId }
-        }).then((resp) => {
-            return resp
-        })
-    },
+    // fetchAktoGptConfig(apiCollectionId) {
+    //     return request({
+    //         url: '/api/fetchAktoGptConfig',
+    //         method: 'post',
+    //         data: { apiCollectionId }
+    //     }).then((resp) => {
+    //         return resp
+    //     })
+    // },
     fetchAllMarketplaceSubcategories() {
         return request({
             url: 'api/fetchAllMarketplaceSubcategories',

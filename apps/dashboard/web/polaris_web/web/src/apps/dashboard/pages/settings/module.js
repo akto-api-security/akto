@@ -144,26 +144,26 @@ const settingFunctions = {
       await settingRequests.addOrUpdatePostmanCred(postman_id,workspace_id)
     },
 
-    fetchGptCollections: async function(){
-      let arr = []
-      await settingRequests.fetchAktoGptConfig(-1).then((resp)=>{
-        resp.currentState.forEach((collection) =>{
-          if(collection.state === 'ENABLED'){
-            arr.push(collection.id)
-          }
-        })
-      })
-      return arr
-    },
-    updateGptCollections: async function(selectedList,allCollections){
-      let selectedSet = new Set(selectedList)
-      const arr = allCollections.map(item => ({
-				id: item.id,
-				state: selectedSet.has(item.id) ? 'ENABLED' : 'DISABLED'
-			}));
+    // fetchGptCollections: async function(){
+    //   let arr = []
+    //   await settingRequests.fetchAktoGptConfig(-1).then((resp)=>{
+    //     resp.currentState.forEach((collection) =>{
+    //       if(collection.state === 'ENABLED'){
+    //         arr.push(collection.id)
+    //       }
+    //     })
+    //   })
+    //   return arr
+    // },
+    // updateGptCollections: async function(selectedList,allCollections){
+    //   let selectedSet = new Set(selectedList)
+    //   const arr = allCollections.map(item => ({
+		// 		id: item.id,
+		// 		state: selectedSet.has(item.id) ? 'ENABLED' : 'DISABLED'
+		// 	}));
 
-      await settingRequests.saveAktoGptConfig(arr)
-    },
+    //   await settingRequests.saveAktoGptConfig(arr)
+    // },
     fetchLoginInfo: async function(){
       let lastLogin = ''
       await settingRequests.fetchUserLastLoginTs().then((resp)=>{
