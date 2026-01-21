@@ -1,5 +1,6 @@
 import React, {useEffect} from 'react'
 import {
+  Autocomplete,
   Badge,
   Box,
   Button,
@@ -8,6 +9,7 @@ import {
   Divider,
   HorizontalStack,
   LegacyCard,
+  RadioButton,
   Spinner,
   Text,
   TextField,
@@ -31,17 +33,15 @@ function Jira() {
 
     const {
         credentials: { baseUrl, apiToken, userEmail },
+        jiraType,
         projects,
         existingProjectIds,
         isSaving,
         initialFormData,
         loadingProjectIndex,
-        jiraPriorities,
-        severityToPriorityMap,
-        initialSeverityMapping,
-        isLoadingPriorities,
-        isSavingSeverityMapping,
-        isAlreadyIntegrated
+        isAlreadyIntegrated,
+        loadingFieldsProjectIndex,
+        loadingFieldValuesProjectIndex
     } = state;
 
 
@@ -53,6 +53,11 @@ function Jira() {
             actions.setCredentials('baseUrl', jiraInteg.baseUrl);
             actions.setCredentials('apiToken', jiraInteg.apiToken);
             actions.setCredentials('userEmail', jiraInteg.userEmail);
+            
+            // Set jiraType from backend
+            if (jiraInteg.jiraType) {
+                actions.setJiraType(jiraInteg.jiraType);
+            }
 
             updateProjectMap(jiraInteg);
 
@@ -60,7 +65,8 @@ function Jira() {
                 baseUrl: jiraInteg.baseUrl,
                 apiToken: jiraInteg.apiToken,
                 userEmail: jiraInteg.userEmail,
-                projectMappings: jiraInteg.projectMappings || {}
+                projectMappings: jiraInteg.projectMappings || {},
+                jiraType: jiraInteg.jiraType || 'CLOUD'
             });
         } else {
             actions.addProject();
@@ -93,12 +99,34 @@ function Jira() {
 
             let isBidirectionalEnabled = projectMapping?.biDirectionalSyncSettings?.enabled || false;
 
+            // Load priority field mapping if exists
+            const priorityFieldMapping = projectMapping?.priorityFieldMapping || {
+                fieldId: "priority",
+                fieldName: "Priority",
+                fieldType: "priority",
+                severityToValueMap: {},
+                severityToDisplayNameMap: {}
+            };
+
+            // Ensure severityToDisplayNameMap exists for backwards compatibility
+            if (priorityFieldMapping && !priorityFieldMapping.severityToDisplayNameMap) {
+                priorityFieldMapping.severityToDisplayNameMap = {};
+            }
+
+            const hasValidMapping = priorityFieldMapping?.severityToValueMap &&
+                Object.keys(priorityFieldMapping.severityToValueMap).length > 0;
+
             newProjects.push({
                 projectId,
                 enableBiDirIntegration: isBidirectionalEnabled,
                 aktoToJiraStatusMap,
                 statuses: isBidirectionalEnabled ? statuses : null,
                 jiraStatusLabel,
+                priorityFieldMapping,
+                availableFields: [],
+                availableFieldValues: [],
+                enablePriorityMapping: false,  // Always start in view mode
+                hasSavedMapping: hasValidMapping  // Track if mapping exists
             });
         });
 
@@ -109,7 +137,18 @@ function Jira() {
                     enableBiDirIntegration: false,
                     aktoToJiraStatusMap: JSON.parse(JSON.stringify(initialEmptyMapping)),
                     statuses: [],
-                    jiraStatusLabel: []
+                    jiraStatusLabel: [],
+                    priorityFieldMapping: {
+                        fieldId: "priority",
+                        fieldName: "Priority",
+                        fieldType: "priority",
+                        severityToValueMap: {},
+                        severityToDisplayNameMap: {}
+                    },
+                    availableFields: [],
+                    availableFieldValues: [],
+                    enablePriorityMapping: false,
+                    hasSavedMapping: false
                 });
             }
             projectIds.add(projectId);
@@ -196,78 +235,7 @@ function Jira() {
       });
     }
 
-    async function fetchSeverityMapping() {
-        try {
-            const response = await api.fetchSeverityMapping();
 
-            // Handle response - it might be the map directly or wrapped
-            let mapping = {};
-            if (response && typeof response === 'object' && !Array.isArray(response)) {
-                if (response.severityToPriorityMap) {
-                    mapping = response.severityToPriorityMap;
-                } else {
-                    mapping = response;
-                }
-            }
-
-            actions.setSeverityToPriorityMap(mapping);
-            actions.setInitialSeverityMapping(mapping);
-        } catch (err) {
-            actions.setSeverityToPriorityMap({});
-            actions.setInitialSeverityMapping({});
-        }
-    }
-
-    async function fetchPriorities() {
-        // Backend always fetches credentials from database
-        if (!isAlreadyIntegrated) {
-            return;
-        }
-
-        actions.setIsLoadingPriorities(true);
-        try {
-            const response = await api.fetchJiraPriorities();
-
-            // Handle response - it might be an array directly or wrapped in an object
-            let priorities = [];
-            if (Array.isArray(response)) {
-                priorities = response;
-            } else if (response && Array.isArray(response.jiraPriorities)) {
-                priorities = response.jiraPriorities;
-            } else if (response && typeof response === 'object') {
-                // If response is an object, try to get the array from it
-                const values = Object.values(response);
-                if (values.length > 0 && values[0] && typeof values[0] === 'object' && values[0].id && values[0].name) {
-                    priorities = values;
-                }
-            }
-
-            actions.setJiraPriorities(priorities);
-        } catch (err) {
-            func.setToast(true, true, "Failed to fetch Jira priorities");
-            actions.setJiraPriorities([]);
-        } finally {
-            actions.setIsLoadingPriorities(false);
-        }
-    }
-
-    async function saveSeverityMapping() {
-        actions.setIsSavingSeverityMapping(true);
-        try {
-            await api.saveSeverityMapping(severityToPriorityMap);
-            func.setToast(true, false, "Severity mapping saved successfully");
-            // Update initial mapping to match current state after successful save
-            actions.setInitialSeverityMapping({...severityToPriorityMap});
-        } catch (err) {
-            func.setToast(true, true, "Failed to save severity mapping");
-        } finally {
-            actions.setIsSavingSeverityMapping(false);
-        }
-    }
-
-    function handleSeverityMappingChange(severity, priorityId) {
-        actions.updateSeverityMapping(severity, priorityId);
-    }
 
     function getSeverityBadgeColor(severity) {
         switch(severity) {
@@ -279,37 +247,10 @@ function Jira() {
         }
     }
 
-    function hasSeverityMappingChanged() {
-        // Compare current mapping with initial mapping
-        const currentKeys = Object.keys(severityToPriorityMap || {});
-        const initialKeys = Object.keys(initialSeverityMapping || {});
-
-        // If different number of keys, there's a change
-        if (currentKeys.length !== initialKeys.length) {
-            return true;
-        }
-
-        // Check if any value is different
-        for (const key of currentKeys) {
-            if (severityToPriorityMap[key] !== initialSeverityMapping[key]) {
-                return true;
-            }
-        }
-
-        return false;
-    }
 
     useEffect(() => {
         fetchJiraInteg();
-        fetchSeverityMapping();
     }, []);
-
-    useEffect(() => {
-        // Fetch priorities from database when Jira is already integrated
-        if (isAlreadyIntegrated) {
-            fetchPriorities();
-        }
-    }, [isAlreadyIntegrated]);
 
 
     function transformJiraObject() {
@@ -364,10 +305,13 @@ function Jira() {
                     aktoStatusMappings: project?.enableBiDirIntegration
                         ? aktoStatusMappings : null,
                 },
-                statuses: project?.statuses || []
+                statuses: project?.statuses || [],
+                priorityFieldMapping: project?.enablePriorityMapping && project?.priorityFieldMapping
+                    ? project.priorityFieldMapping
+                    : null
             };
         })
-        return {apiToken, userEmail, baseUrl, projectMappings};
+        return {apiToken, userEmail, baseUrl, projectMappings, jiraType};
     }
 
 
@@ -385,6 +329,7 @@ function Jira() {
                 apiToken: data.apiToken,
                 userEmail: data.userEmail,
                 projectMappings: data.projectMappings,
+                jiraType: data.jiraType
             });
 
             func.setToast(true, false, "Jira configurations saved successfully");
@@ -527,6 +472,174 @@ function Jira() {
         }
     }
 
+    // Priority field mapping handlers
+    async function fetchAvailableFields(projectKey, index) {
+        if (loadingFieldsProjectIndex !== null) {
+            return;
+        }
+
+        try {
+            actions.setLoadingFieldsProjectIndex(index);
+            const response = await api.fetchAvailableFieldsForMapping(projectKey);
+
+            // Handle both wrapped and unwrapped responses
+            const fields = Array.isArray(response) ? response : response?.availableFields;
+
+            if (fields && fields.length > 0) {
+                actions.updateProject(index, {
+                    availableFields: fields
+                });
+            }
+        } catch (error) {
+            func.setToast(true, true, `Failed to fetch fields: ${error.message || 'Unknown error'}`);
+        } finally {
+            actions.setLoadingFieldsProjectIndex(null);
+        }
+    }
+
+    async function fetchFieldValues(projectKey, fieldId, index) {
+        if (loadingFieldValuesProjectIndex !== null) {
+            return;
+        }
+
+        try {
+            actions.setLoadingFieldValuesProjectIndex(index);
+            const response = await api.fetchFieldValues(projectKey, fieldId);
+
+            // Handle both wrapped and unwrapped responses
+            const values = Array.isArray(response) ? response : response?.availableFieldValues;
+
+            if (values && values.length > 0) {
+                actions.updateProject(index, {
+                    availableFieldValues: values
+                });
+            }
+        } catch (error) {
+            func.setToast(true, true, `Failed to fetch field values: ${error.message || 'Unknown error'}`);
+        } finally {
+            actions.setLoadingFieldValuesProjectIndex(null);
+        }
+    }
+
+    async function handleStartPriorityMapping(index, project) {
+        if (!project.projectId) {
+            func.setToast(true, true, "Please enter project key first");
+            return;
+        }
+
+        // Enable the mapping section
+        actions.updateProject(index, {
+            enablePriorityMapping: true
+        });
+
+        // Fetch available fields (priority, custom fields)
+        await fetchAvailableFields(project.projectId, index);
+
+        // Auto-fetch values for the default "priority" field
+        const defaultFieldId = project.priorityFieldMapping?.fieldId || "priority";
+        fetchFieldValues(project.projectId, defaultFieldId, index);
+    }
+
+    function handleCancelPriorityMapping(index, project) {
+        // If there's a saved mapping, just close edit mode
+        // Otherwise, reset to default
+        if (project.hasSavedMapping) {
+            actions.updateProject(index, {
+                enablePriorityMapping: false,
+                availableFields: [],
+                availableFieldValues: []
+            });
+        } else {
+            actions.updateProject(index, {
+                enablePriorityMapping: false,
+                availableFields: [],
+                availableFieldValues: [],
+                priorityFieldMapping: {
+                    fieldId: "priority",
+                    fieldName: "Priority",
+                    fieldType: "priority",
+                    severityToValueMap: {},
+                    severityToDisplayNameMap: {}
+                }
+            });
+        }
+    }
+
+    function handleFieldSelection(index, project, fieldId) {
+        const selectedField = project.availableFields.find(f => f.id === fieldId);
+
+        actions.updateProject(index, {
+            priorityFieldMapping: {
+                ...project.priorityFieldMapping,
+                fieldId: fieldId,
+                fieldName: selectedField?.name || fieldId,
+                fieldType: selectedField?.type || "unknown"
+            },
+            fieldSearchQuery: undefined
+        });
+
+        // Fetch values for the selected field
+        if (project.projectId) {
+            fetchFieldValues(project.projectId, fieldId, index);
+        }
+    }
+
+    async function handleSavePriorityMapping(index, project) {
+        try {
+            const { projectId, priorityFieldMapping } = project;
+
+            if (!projectId || !priorityFieldMapping?.fieldId) {
+                func.setToast(true, true, "Please select a priority field");
+                return;
+            }
+
+            // Check if at least one severity is mapped
+            const hasMappings = priorityFieldMapping.severityToValueMap &&
+                Object.keys(priorityFieldMapping.severityToValueMap).length > 0;
+
+            if (!hasMappings) {
+                func.setToast(true, true, "Please map at least one severity level");
+                return;
+            }
+
+            await api.savePriorityFieldMapping(projectId, priorityFieldMapping);
+
+            // Update the project to mark it as saved and close edit mode
+            actions.updateProject(index, {
+                enablePriorityMapping: false,
+                hasSavedMapping: true,
+                availableFields: [],
+                availableFieldValues: []
+            });
+
+            func.setToast(true, false, "Priority field mapping saved successfully");
+        } catch (error) {
+            func.setToast(true, true, "Failed to save priority field mapping");
+        }
+    }
+
+    function handlePriorityValueSelection(index, project, severity, value) {
+        // Find the display name for this value
+        const selectedValue = (project.availableFieldValues || []).find(v =>
+            (v.id && v.id === value) || v.name === value
+        );
+        const displayName = selectedValue?.name || value;
+
+        actions.updateProject(index, {
+            priorityFieldMapping: {
+                ...project.priorityFieldMapping,
+                severityToValueMap: {
+                    ...project.priorityFieldMapping.severityToValueMap,
+                    [severity]: value
+                },
+                severityToDisplayNameMap: {
+                    ...project.priorityFieldMapping.severityToDisplayNameMap,
+                    [severity]: displayName
+                }
+            }
+        });
+    }
+
     function projectKeyChangeHandler(index, val) {
       if (val && !/^[A-Z0-9]+$/.test(val)) {
         func.setToast(true, true, "Project key must contain only capital letters and numbers");
@@ -560,12 +673,14 @@ function Jira() {
                             <TextField maxLength={10} showCharacterCount value={project?.projectId || ""} label="Project key" placeholder={"Project Key"} requiredIndicator
                                 onChange={(val)=> projectKeyChangeHandler(index,val)} />
                             {loadingProjectIndex === index ? (
-                                <div style={{ display: 'flex', alignItems: 'center', margin: '8px 0' }}>
-                                    <Spinner size="small" />
-                                    <Text variant="bodyMd" as="span" style={{ marginLeft: '8px' }}>&nbsp;&nbsp;Loading status mappings...</Text>
-                                    </div>
+                                <Box paddingBlock="2">
+                                    <HorizontalStack gap="2" align="center">
+                                        <Spinner size="small" />
+                                        <Text variant="bodyMd" as="span">&nbsp;&nbsp;Loading status mappings...</Text>
+                                    </HorizontalStack>
+                                </Box>
                             ) : (
-                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                <HorizontalStack gap="1" align="center">
                                     <Checkbox
                                         disabled={!project?.projectId?.trim()}
                                         checked={project.enableBiDirIntegration}
@@ -576,10 +691,10 @@ function Jira() {
                                         }}
                                         label=""
                                     />
-                                    <span style={{ marginLeft: '4px', opacity: project?.projectId?.trim() ? 1 : 0.5 }}>
+                                    <span style={{ opacity: project?.projectId?.trim() ? 1 : 0.5 }}>
                                         Enable bi-directional integration
                                     </span>
-                                    </div>
+                                </HorizontalStack>
                             )}
                             {project.enableBiDirIntegration &&
                                 <VerticalStack gap={3} align='start'>
@@ -613,6 +728,248 @@ function Jira() {
                                     }
                                 </VerticalStack>
                             }
+
+                            {/* Priority Field Mapping Section */}
+                            <Divider />
+                            <VerticalStack gap={3} align='start'>
+                                <HorizontalStack align='space-between'>
+                                    <VerticalStack gap={1}>
+                                        <Text fontWeight='semibold' variant='headingSm'>Priority Field Mapping (Optional)</Text>
+                                        {!project.enablePriorityMapping && !project.hasSavedMapping && (
+                                            <Text variant='bodyMd' color='subdued'>
+                                                Map Akto severity to Jira priority values
+                                            </Text>
+                                        )}
+                                    </VerticalStack>
+                                    {project.enablePriorityMapping ? (
+                                        <Button plain size='slim' onClick={() => handleCancelPriorityMapping(index, project)}>
+                                            Cancel
+                                        </Button>
+                                    ) : project.hasSavedMapping ? (
+                                        <Button
+                                            size='slim'
+                                            onClick={() => handleStartPriorityMapping(index, project)}
+                                        >
+                                            Edit Mapping
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            size='slim'
+                                            disabled={!project?.projectId?.trim()}
+                                            onClick={() => handleStartPriorityMapping(index, project)}
+                                        >
+                                            Configure Mapping
+                                        </Button>
+                                    )}
+                                </HorizontalStack>
+
+                                {/* Show saved mapping in view mode */}
+                                {!project.enablePriorityMapping && project.hasSavedMapping && (
+                                    <VerticalStack gap={2} align='start'>
+                                        <HorizontalStack gap={2} align='center'>
+                                            <Text variant='bodyMd' color='subdued'>Mapped to Jira field:</Text>
+                                            <Text variant='bodyMd' fontWeight='semibold'>{project.priorityFieldMapping?.fieldName || project.priorityFieldMapping?.fieldId}</Text>
+                                        </HorizontalStack>
+                                        <Box width="100%" paddingBlockStart="4">
+                                            {/* Table Header */}
+                                            <Box paddingBlockEnd="3">
+                                                <HorizontalStack gap="0" align="space-evenly">
+                                                    <Box
+                                                        padding="4"
+                                                        background="bg-surface-secondary"
+                                                        borderWidth="1"
+                                                        borderColor="border"
+                                                        borderRadius="2"
+                                                        style={{ textAlign: 'center', flex: 1 }}
+                                                    >
+                                                        <Text variant='bodyMd' fontWeight='semibold' alignment='center'>Akto Severity</Text>
+                                                    </Box>
+                                                    <Box
+                                                        padding="4"
+                                                        background="bg-surface-secondary"
+                                                        borderWidth="1"
+                                                        borderColor="border"
+                                                        borderRadius="2"
+                                                        style={{ textAlign: 'center', flex: 1 }}
+                                                    >
+                                                        <Text variant='bodyMd' fontWeight='semibold' alignment='center'>Jira Priority</Text>
+                                                    </Box>
+                                                </HorizontalStack>
+                                            </Box>
+
+                                            {/* Table Rows */}
+                                            {(() => {
+                                                const mappedSeverities = aktoSeverities.filter(severity => {
+                                                    const val = project.priorityFieldMapping?.severityToDisplayNameMap?.[severity] ||
+                                                        project.priorityFieldMapping?.severityToValueMap?.[severity];
+                                                    return !!val;
+                                                });
+
+                                                return mappedSeverities.map((severity, idx) => {
+                                                    const mappedDisplayName = project.priorityFieldMapping?.severityToDisplayNameMap?.[severity] ||
+                                                        project.priorityFieldMapping?.severityToValueMap?.[severity];
+                                                    const isLastRow = idx === mappedSeverities.length - 1;
+
+                                                    return (
+                                                        <Box key={`view-${severity}-${index}`} paddingBlockEnd={isLastRow ? '0' : '2'}>
+                                                            <HorizontalStack gap="0" align="space-evenly">
+                                                                <Box
+                                                                    padding="4"
+                                                                    borderWidth="1"
+                                                                    borderColor="border"
+                                                                    borderRadius="2"
+                                                                    style={{ flex: 1 }}
+                                                                >
+                                                                    <HorizontalStack align="center" blockAlign="center">
+                                                                        <Badge status={getSeverityBadgeColor(severity)}>
+                                                                            {severity.charAt(0) + severity.slice(1).toLowerCase()}
+                                                                        </Badge>
+                                                                    </HorizontalStack>
+                                                                </Box>
+                                                                <Box
+                                                                    padding="4"
+                                                                    borderWidth="1"
+                                                                    borderColor="border"
+                                                                    borderRadius="2"
+                                                                    style={{ textAlign: 'center', flex: 1 }}
+                                                                >
+                                                                    <Text variant='bodyMd' alignment='center'>{mappedDisplayName}</Text>
+                                                                </Box>
+                                                            </HorizontalStack>
+                                                        </Box>
+                                                    );
+                                                });
+                                            })()}
+                                        </Box>
+                                    </VerticalStack>
+                                )}
+
+                                {loadingFieldsProjectIndex === index || loadingFieldValuesProjectIndex === index ? (
+                                    <Box paddingBlock="2">
+                                        <HorizontalStack gap="2" align="center">
+                                            <Spinner size="small" />
+                                            <Text variant="bodyMd" as="span">
+                                                &nbsp;&nbsp;{loadingFieldsProjectIndex === index ? 'Loading fields...' : 'Loading values...'}
+                                            </Text>
+                                        </HorizontalStack>
+                                    </Box>
+                                ) : project.enablePriorityMapping && (
+                                    <VerticalStack gap={3} align='start'>
+                                        <Text variant='bodyMd' color='subdued'>
+                                            Map Akto severity levels to Jira field values for automatic ticket creation
+                                        </Text>
+
+                                        {/* Field Selection - show if custom fields available */}
+                                        {project.availableFields && project.availableFields.length > 1 && (
+                                            <VerticalStack gap="2">
+                                                <HorizontalStack gap="5" align="start">
+                                                    <Box minWidth="110px" paddingBlockStart="1">
+                                                        <Text variant='bodyMd' fontWeight='medium' alignment="start">Priority Field:</Text>
+                                                    </Box>
+                                                    <Box width="500px">
+                                                        <Autocomplete
+                                                            options={(project.availableFields || [])
+                                                                .filter(f => {
+                                                                    const searchQuery = project.fieldSearchQuery || '';
+                                                                    if (!searchQuery) return true;
+                                                                    const query = searchQuery.toLowerCase();
+                                                                    return f.name.toLowerCase().includes(query) ||
+                                                                           f.id.toLowerCase().includes(query) ||
+                                                                           f.type.toLowerCase().includes(query);
+                                                                })
+                                                                .map(f => ({
+                                                                    label: `${f.name} (${f.id})`,
+                                                                    value: f.id
+                                                                }))
+                                                            }
+                                                            selected={project.priorityFieldMapping?.fieldId ? [project.priorityFieldMapping.fieldId] : []}
+                                                            onSelect={(selected) => {
+                                                                if (selected.length > 0) {
+                                                                    handleFieldSelection(index, project, selected[0]);
+                                                                }
+                                                            }}
+                                                            textField={
+                                                                <Autocomplete.TextField
+                                                                    label=""
+                                                                    value={project.fieldSearchQuery !== undefined ? project.fieldSearchQuery : (project.priorityFieldMapping?.fieldName || '')}
+                                                                    onChange={(value) => {
+                                                                        actions.updateProject(index, {
+                                                                            fieldSearchQuery: value
+                                                                        });
+                                                                    }}
+                                                                    placeholder="Type to search fields..."
+                                                                    autoComplete="off"
+                                                                    helpText="Click to change or type to search"
+                                                                />
+                                                            }
+                                                        />
+                                                    </Box>
+                                                </HorizontalStack>
+                                                <Box paddingInlineStart="32">
+                                                    <Text variant='bodySm' color='subdued'>
+                                                        Search by field name, ID, or type
+                                                    </Text>
+                                                </Box>
+                                            </VerticalStack>
+                                        )}
+
+                                        {/* Severity Value Mapping */}
+                                        {project.availableFieldValues && project.availableFieldValues.length > 0 && (
+                                            <>
+                                                <HorizontalStack gap={12}>
+                                                    <Text fontWeight='semibold' variant='headingXs'>Akto Severity</Text>
+                                                    <Text fontWeight='semibold' variant='headingXs'>Jira Value</Text>
+                                                </HorizontalStack>
+                                                {aktoSeverities.map(severity => {
+                                                    const valueOptions = project.availableFieldValues.map(v => ({
+                                                        label: v.name,
+                                                        value: v.id || v.name
+                                                    }));
+                                                    const selectedValueId = project.priorityFieldMapping?.severityToValueMap?.[severity];
+                                                    const selectedValue = project.availableFieldValues.find(v =>
+                                                        (v.id && v.id === selectedValueId) || v.name === selectedValueId
+                                                    );
+
+                                                    return (
+                                                        <HorizontalStack key={`severity-${severity}-${index}`} gap={8}>
+                                                            <Box width='82px'>
+                                                                <Badge status={getSeverityBadgeColor(severity)}>
+                                                                    {severity.charAt(0) + severity.slice(1).toLowerCase()}
+                                                                </Badge>
+                                                            </Box>
+                                                            <Dropdown
+                                                                id={`severity-value-${project.projectId}-${severity}`}
+                                                                selected={(value) => {
+                                                                    const valueId = Array.isArray(value) ? value[0] : value;
+                                                                    handlePriorityValueSelection(index, project, severity, valueId);
+                                                                }}
+                                                                menuItems={valueOptions}
+                                                                placeholder="Select Value"
+                                                                showSelectedItemLabels={true}
+                                                                allowMultiple={false}
+                                                                preSelected={selectedValueId ? [selectedValueId] : []}
+                                                                value={selectedValue?.name || "Select Value"}
+                                                            />
+                                                        </HorizontalStack>
+                                                    );
+                                                })}
+                                            </>
+                                        )}
+
+                                        {/* Save Button */}
+                                        {project.availableFieldValues && project.availableFieldValues.length > 0 && (
+                                            <HorizontalStack gap={2}>
+                                                <Button
+                                                    primary
+                                                    onClick={() => handleSavePriorityMapping(index, project)}
+                                                >
+                                                    Save Mapping
+                                                </Button>
+                                            </HorizontalStack>
+                                        )}
+                                    </VerticalStack>
+                                )}
+                            </VerticalStack>
                         </VerticalStack>
                     </Card>
                 )
@@ -738,81 +1095,6 @@ function Jira() {
         return !hasFormChanges();
     }
 
-    const SeverityMappingCard = (
-        <Card roundedAbove="sm">
-            <VerticalStack gap={4}>
-                <HorizontalStack align='space-between'>
-                    <Text fontWeight='semibold' variant='headingMd'>Map Severity</Text>
-                    <Button
-                        size='slim'
-                        variant={hasSeverityMappingChanged() ? 'primary' : undefined}
-                        onClick={saveSeverityMapping}
-                        disabled={isSavingSeverityMapping || isLoadingPriorities || !Array.isArray(jiraPriorities) || jiraPriorities.length === 0 || !hasSeverityMappingChanged()}
-                        loading={isSavingSeverityMapping}
-                    >
-                        {isSavingSeverityMapping ? 'Saving...' : 'Save Mapping'}
-                    </Button>
-                </HorizontalStack>
-                {isLoadingPriorities ? (
-                    <HorizontalStack gap="2" align="center">
-                        <Spinner size="small" />
-                        <Text variant="bodyMd" as="span">Loading Jira priorities...</Text>
-                    </HorizontalStack>
-                ) : !Array.isArray(jiraPriorities) || jiraPriorities.length === 0 ? (
-                    <Text variant="bodyMd" color="subdued">
-                        Please configure Jira credentials above to load priorities
-                    </Text>
-                ) : (
-                    <VerticalStack gap={3} align='start'>
-                        <HorizontalStack gap={12}>
-                            <Text fontWeight='semibold' variant='headingXs'>Akto Severity</Text>
-                            <Text fontWeight='semibold' variant='headingXs'>Jira Priority</Text>
-                        </HorizontalStack>
-                        {aktoSeverities.map(severity => {
-                            const priorityOptions = (Array.isArray(jiraPriorities) ? jiraPriorities : []).map(p => ({
-                                label: p.name,
-                                value: p.id
-                            }));
-                            const selectedPriorityId = severityToPriorityMap[severity];
-                            const selectedPriority = (Array.isArray(jiraPriorities) ? jiraPriorities : []).find(p => p.id === selectedPriorityId);
-
-                            // Build display value for the dropdown
-                            let displayValue = "Select Priority";
-                            if (selectedPriority && selectedPriority.name) {
-                                displayValue = selectedPriority.name;
-                            } else if (selectedPriorityId) {
-                                // If we have an ID but can't find the priority, show the ID
-                                displayValue = `Priority (${selectedPriorityId})`;
-                            }
-
-                            return (
-                                <HorizontalStack key={`severity-${severity}`} gap={8}>
-                                    <Box width='82px'>
-                                        <Badge status={getSeverityBadgeColor(severity)}>
-                                            {severity.charAt(0) + severity.slice(1).toLowerCase()}
-                                        </Badge>
-                                    </Box>
-                                    <Dropdown
-                                        id={`severity-${severity}`}
-                                        selected={(value) => {
-                                            handleSeverityMappingChange(severity, value[0]);
-                                        }}
-                                        menuItems={priorityOptions}
-                                        placeholder="Select Jira Priority"
-                                        showSelectedItemLabels={true}
-                                        allowMultiple={false}
-                                        preSelected={selectedPriorityId ? [selectedPriorityId] : []}
-                                        value={displayValue}
-                                    />
-                                </HorizontalStack>
-                            );
-                        })}
-                    </VerticalStack>
-                )}
-            </VerticalStack>
-        </Card>
-    );
-
     const JCard = (
         <LegacyCard
             primaryFooterAction={{
@@ -828,16 +1110,60 @@ function Jira() {
 
           <LegacyCard.Section>
                 <VerticalStack gap={"4"}>
-                    <TextField label="Base Url" value={baseUrl} helpText="Specify the base url of your jira project(for ex - https://jiraintegloc.atlassian.net)"  placeholder='Base Url' requiredIndicator onChange={(value) => actions.setCredentials('baseUrl', value)} />
-                    <TextField label="Email" value={userEmail} helpText="Specify your email id for which api token will be generated" placeholder='Email' requiredIndicator onChange={(value) => actions.setCredentials('userEmail', value)} />
-                    <PasswordTextField label="Api Token" helpText="Specify the api token created for your user email" field={apiToken} onFunc={true} setField={(value) => actions.setCredentials('apiToken', value)} />
+                    {/* Simple Jira Type Selector */}
+                    <VerticalStack gap={2}>
+                        <Text variant="bodyMd" fontWeight="semibold">Deployment Type</Text>
+                        <HorizontalStack gap={4}>
+                            <RadioButton
+                                label="Jira Cloud"
+                                checked={jiraType === 'CLOUD' || !jiraType}
+                                id="jira-cloud"
+                                name="jiraType"
+                                onChange={() => actions.setJiraType('CLOUD')}
+                            />
+                            <RadioButton
+                                label="Jira Data Center"
+                                checked={jiraType === 'DATA_CENTER'}
+                                id="jira-datacenter"
+                                name="jiraType"
+                                onChange={() => actions.setJiraType('DATA_CENTER')}
+                            />
+                        </HorizontalStack>
+                        <Text variant="bodySm" color="subdued">
+                            {jiraType === 'DATA_CENTER' 
+                                ? 'For self-hosted Jira (e.g., http://localhost:8081)' 
+                                : 'For Jira Cloud (e.g., https://your-domain.atlassian.net)'}
+                        </Text>
+                    </VerticalStack>
+                    
+                    <TextField 
+                        label="Base Url" 
+                        value={baseUrl} 
+                        helpText="Specify the base url of your jira project" 
+                        placeholder={jiraType === 'DATA_CENTER' ? 'http://localhost:8081' : 'https://your-domain.atlassian.net'} 
+                        requiredIndicator 
+                        onChange={(value) => actions.setCredentials('baseUrl', value)} 
+                    />
+                    <TextField 
+                        label="Email" 
+                        value={userEmail} 
+                        helpText={jiraType === 'DATA_CENTER' ? 'Specify your email id associated with Jira Data Center' : 'Specify your email id for which api token will be generated'}
+                        placeholder='Email' 
+                        requiredIndicator
+                        onChange={(value) => actions.setCredentials('userEmail', value)} 
+                    />
+                    <PasswordTextField 
+                        label={jiraType === 'DATA_CENTER' ? 'Personal Access Token(PAT)' : 'API Token'}
+                        helpText= {jiraType === 'DATA_CENTER' ? 'Specify your PAT (Personal Access Token) for Jira Data Center' : 'Specify your API token generated from Jira Cloud'}
+                        field={apiToken} 
+                        onFunc={true} 
+                        setField={(value) => actions.setCredentials('apiToken', value)} 
+                    />
                     <HorizontalStack align='space-between'>
                         <Text fontWeight='semibold' variant='headingMd'>Projects</Text>
                         <Button plain monochrome onClick={() => actions.addProject()}>Add Project</Button>
                     </HorizontalStack>
                     {projects.length !== 0 ? ProjectsCard : null}
-                    <Divider />
-                    {SeverityMappingCard}
                 </VerticalStack>
           </LegacyCard.Section>
           <Divider />

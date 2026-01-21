@@ -46,6 +46,7 @@ import {
     INTERVAL_COPILOT_STUDIO,
     COPILOT_STUDIO_FIELDS
 } from "./constants/aiAgentConnectorConstants"
+import DataDogConnector from "./components/DataDogConnector"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -369,8 +370,8 @@ const awsBedrockObj = {
 
 const aiAgentGlobalProxy = {
     icon: '/public/aws_bedrock.svg',
-    label: "Agentic Proxy",
-    text: "A publicly hosted secure gateway that enforces guardrails and advanced threat protection for all requests to your public AI agents and MCP servers, ensuring safe and compliant communication.",
+    label: "Global Proxy",
+    text: "A publicly hosted secure proxy that enforces guardrails and advanced threat protection for all requests to your public AI agents and MCP servers, ensuring safe and compliant communication.",
     docsUrl: 'https://docs.akto.io/akto-agent-proxy',
     key: "AI_AGENT_GLOBAL_PROXY",
     component : <AIAgentsGateway />
@@ -378,8 +379,8 @@ const aiAgentGlobalProxy = {
 
 const aiAgentGateway = {
     icon: '/public/aws_bedrock.svg',
-    label: "Agentic Gateway",
-    text: "Agentic gateway to be deployed on premise for securing AI agents and MCP servers in your network",
+    label: "Gateway",
+    text: "Gateway to be deployed on premise for securing AI agents and MCP servers in your network",
     docsUrl: 'https://docs.akto.io/akto-agent-proxy',
     key: "AI_AGENT_GATEWAY",
     component : <AIAgentsGateway />
@@ -927,6 +928,14 @@ const copilotStudioImportObj = {
         docsUrl={DOCS_URL_COPILOT_STUDIO}
         recurringIntervalSeconds={INTERVAL_COPILOT_STUDIO}
     />
+}
+
+const dataDogConnectorObj = {
+    icon: '/public/datadog-1.svg',
+    label: "DataDog Connector",
+    text: "Connect your Datadog account to Akto to visualize your traces in the dashboard.",
+    key: "DATA_DOG_CONNECTOR",
+    component: <DataDogConnector />
 }
 
 
@@ -1511,7 +1520,7 @@ const quickStartFunc = {
 
         // Manual
         const manual = [
-            burpObj, postmanObj, harFileUploadObj, openApiObj, wsdlApiObj, graphqlApiIObj, impervaImportObj
+            burpObj, postmanObj, harFileUploadObj, openApiObj, wsdlApiObj, graphqlApiIObj, impervaImportObj, dataDogConnectorObj
         ];
 
         // Crawler

@@ -60,8 +60,8 @@ const getBaseHeaders = () => {
       value: "latestApi",
     },
     {
-      text: "Latest Attack",
-      title: "Latest Attack",
+      text: labelMap[PersistStore.getState().dashboardCategory]["Latest Attack"],
+      title: labelMap[PersistStore.getState().dashboardCategory]["Latest Attack"],
       value: "latestAttack",
     },
   );
@@ -130,7 +130,7 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
     },
     {
       key: 'latestAttack',
-      label: 'Latest attack sub-category',
+      label: labelMap[PersistStore.getState().dashboardCategory]["Latest attack sub-category"],
       type: 'select',
       choices: [],
       multiple: true
@@ -327,7 +327,7 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
       },
       {
         key: 'latestAttack',
-        label: 'Latest attack sub-category',
+        label: labelMap[PersistStore.getState().dashboardCategory]["Latest attack sub-category"],
         type: 'select',
         choices: attackTypeChoices,
         multiple: true

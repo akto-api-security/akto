@@ -36,6 +36,8 @@ import ReactFlow, {
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
 import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isGenAISecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import useAgenticFilter, { FILTER_TYPES } from "./useAgenticFilter";
+import AgentEndpointTreeTable from "./AgentEndpointTreeTable";
+import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "./endpointShieldHelper";
   
 const CenterViewType = {
     Table: 0,
@@ -70,6 +72,16 @@ const headers = [
             value: "endpointId",
             filterKey: "endpointId",
             textValue: 'endpointId',
+            showFilter: true,
+            isText: CellType.TEXT,
+            boxWidth: '100px'
+        },
+        {
+            title: "Username",
+            text: "Username",
+            value: "username",
+            filterKey: "username",
+            textValue: 'username',
             showFilter: true,
             isText: CellType.TEXT,
         }
@@ -216,8 +228,8 @@ const tempSortOptions = [
 ]
 
 const sortOptions = [
-    { label: 'Endpoints', value: 'urlsCount asc', directionLabel: 'More', sortKey: 'urlsCount', columnIndex: endpointColIndex },
-    { label: 'Endpoints', value: 'urlsCount desc', directionLabel: 'Less', sortKey: 'urlsCount', columnIndex: endpointColIndex },
+    { label: mapLabel("Endpoints", getDashboardCategory()), value: 'urlsCount asc', directionLabel: 'More', sortKey: 'urlsCount', columnIndex: endpointColIndex },
+    { label: mapLabel("Endpoints", getDashboardCategory()), value: 'urlsCount desc', directionLabel: 'Less', sortKey: 'urlsCount', columnIndex: endpointColIndex },
     { label: 'Activity', value: 'deactivatedScore asc', directionLabel: 'Active', sortKey: 'deactivatedRiskScore' },
     { label: 'Activity', value: 'deactivatedScore desc', directionLabel: 'Inactive', sortKey: 'activatedRiskScore' },
     { label: 'Risk Score', value: 'score asc', directionLabel: 'High risk', sortKey: 'riskScore', columnIndex: riskColIndex },
@@ -234,7 +246,7 @@ const resourceName = {
     plural: 'collections',
   };
 
-const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, isLoading) => {
+const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, isLoading, usernameMap = {}) => {
     // Ensure collectionsArr is an array
     if (!Array.isArray(collectionsArr)) {
         return { prettify: [], normal: [] };
@@ -247,17 +259,22 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
         }
         const tagsList = JSON.stringify(c?.tagsList || "")
 
-        // Split collection name for Endpoint Security category
+        // Split collection name - always extract endpointId/sourceId/serviceName for agentic collections
+        // Pattern: <endpoint-id>.<source-id>.<service-name>
         let displayText = c.displayName;
         let endpointId = '';
         let sourceId = '';
         let serviceName = '';
-        if (isEndpointSecurityCategory()) {
-            const splitResult = transform.splitCollectionNameForEndpointSecurity(c.displayName);
-            displayText = splitResult.apiCollectionName;
+        // Always try to split if the name has dots (for agentic collections)
+        const splitResult = transform.splitCollectionNameForEndpointSecurity(c.displayName);
+        if (splitResult.endpointId) {
             endpointId = splitResult.endpointId;
             sourceId = splitResult.sourceId;
             serviceName = splitResult.serviceName;
+        }
+        // Only modify displayText for Endpoint Security category
+        if (isEndpointSecurityCategory()) {
+            displayText = splitResult.apiCollectionName;
         }
 
         // Build result object directly without spread operator for better memory efficiency
@@ -298,6 +315,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             discovered: func.prettifyEpoch(c.startTs || 0),
             descriptionComp: (<Box maxWidth="350px"><Text>{c.description}</Text></Box>),
             outOfTestingScopeComp: c.isOutOfTestingScope ? (<Text>Yes</Text>) : (<Text>No</Text>),
+            username: getUsernameForCollection(c, usernameMap),
         ...((tagsList.includes("mcp-server")) ? {
             iconComp: (<Box><CollectionIcon hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>)
         } : (tagsList.includes("gen-ai")) ? {
@@ -320,6 +338,7 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
     const riskScoreMap = transformMaps?.riskScoreMap || {};
     const severityInfoMap = transformMaps?.severityInfoMap || {};
     const sensitiveInfoMap = transformMaps?.sensitiveInfoMap || {};
+    const usernameMap = transformMaps?.usernameMap || {};
 
     const detected = func.prettifyEpoch(trafficInfoMap[rawCollection.id] || 0);
     const discovered = func.prettifyEpoch(rawCollection.startTs || 0);
@@ -351,17 +370,22 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         });
     }
 
-    // Split collection name for Endpoint Security category
+    // Split collection name - always extract endpointId/sourceId/serviceName for agentic collections
+    // Pattern: <endpoint-id>.<source-id>.<service-name>
     let splitApiCollectionName = rawCollection.displayName;
     let endpointId = '';
     let sourceId = '';
     let serviceName = '';
-    if (isEndpointSecurityCategory()) {
-        const splitResult = transform.splitCollectionNameForEndpointSecurity(rawCollection.displayName);
-        splitApiCollectionName = splitResult.apiCollectionName;
+    // Always try to split if the name has dots (for agentic collections)
+    const splitResult = transform.splitCollectionNameForEndpointSecurity(rawCollection.displayName);
+    if (splitResult.endpointId) {
         endpointId = splitResult.endpointId;
         sourceId = splitResult.sourceId;
         serviceName = splitResult.serviceName;
+    }
+    // Only modify splitApiCollectionName for Endpoint Security category
+    if (isEndpointSecurityCategory()) {
+        splitApiCollectionName = splitResult.apiCollectionName;
     }
 
     // Return minimal object - only fields needed for filtering, sorting, and categorization
@@ -402,6 +426,7 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         disableClick: rawCollection.deactivated || false,
         deactivatedRiskScore: rawCollection.deactivated ? (riskScore - 10) : riskScore,
         activatedRiskScore: -1 * (rawCollection.deactivated ? riskScore : (riskScore - 10)),
+        username: getUsernameForCollection(rawCollection, usernameMap),
     };
 };
 
@@ -476,6 +501,7 @@ function ApiCollections(props) {
     const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0, totalAllowedForTesting: 0})
     const [hasUsageEndpoints, setHasUsageEndpoints] = useState(true)
     const [envTypeMap, setEnvTypeMap] = useState({})
+    const [usernameMap, setUsernameMap] = useState({})
     const [refreshData, setRefreshData] = useState(false)
     const [popover,setPopover] = useState(false)
     const [teamData, setTeamData] = useState([])
@@ -521,7 +547,6 @@ function ApiCollections(props) {
     }
 
     const allCollections = PersistStore(state => state.allCollections)
-    // const allCollections = dummyData.allCollections;
     const setAllCollections = PersistStore(state => state.setAllCollections)
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const setCollectionsRegistryStatusMap = PersistStore(state => state.setCollectionsRegistryStatusMap)
@@ -572,6 +597,13 @@ function ApiCollections(props) {
                     const riskScoreMap = lastFetchedResp?.riskScoreMap || {};
                     const trafficInfoMap = PersistStore.getState().trafficMap || {};
 
+                    // Fetch endpoint shield usernames even when using cache (for endpoint security only)
+                    let cachedUsernameMap = usernameMap || {};
+                    if (isEndpointSecurityCategory() && Object.keys(cachedUsernameMap).length === 0) {
+                        cachedUsernameMap = await fetchEndpointShieldUsernameMap();
+                        setUsernameMap(cachedUsernameMap);
+                    }
+
                     let finalArr = allCollections;
                     if(customCollectionDataFilter){
                         finalArr = finalArr.filter(customCollectionDataFilter)
@@ -589,7 +621,8 @@ function ApiCollections(props) {
                         coverageMap: coverageMapCached,
                         riskScoreMap,
                         severityInfoMap,
-                        sensitiveInfoMap
+                        sensitiveInfoMap,
+                        usernameMap: cachedUsernameMap
                     };
 
                     // OPTIMIZATION: For large datasets (>COLLECTIONS_LAZY_RENDER_THRESHOLD items), store RAW data + transform function
@@ -686,6 +719,7 @@ function ApiCollections(props) {
                 apiPromises.push(settingRequests.getTeamData()); // index varies
             }
 
+
             let results = await Promise.allSettled(apiPromises);
 
             // Extract collections response (index 0)
@@ -763,6 +797,13 @@ function ApiCollections(props) {
             setTeamData(userList)
         }
 
+        // Fetch endpoint shield usernames (for endpoint security only)
+        let collectionToUsernameMap = {};
+        if (isEndpointSecurityCategory()) {
+            collectionToUsernameMap = await fetchEndpointShieldUsernameMap();
+            setUsernameMap(collectionToUsernameMap);
+        }
+
         // Ensure all parameters are defined before calling convertToNewData
         const sensitiveInfoMap = sensitiveInfo?.sensitiveInfoMap || {};
         const severityInfoMap = severityObj || {};
@@ -798,13 +839,14 @@ function ApiCollections(props) {
                 severityInfoMap,
                 coverageMap,
                 trafficInfoMap,
-                riskScoreMap
+                riskScoreMap,
+                usernameMap: collectionToUsernameMap
             };
 
             dataObj = { prettify: rawData, normal: rawData };
         } else {
             // Small dataset (<500 items) - use old approach with JSX components
-            dataObj = convertToNewData(finalArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, false);
+            dataObj = convertToNewData(finalArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, false, collectionToUsernameMap);
         }
 
         // Ensure dataObj.prettify exists
@@ -1025,7 +1067,7 @@ function ApiCollections(props) {
     }
 
     // Use custom hook for Agentic filter detection and summary calculation
-    const { filteredSummaryData, activeFilterTitle, activeFilterType } = useAgenticFilter(normalData);
+    const { filteredSummaryData, activeFilterTitle, activeFilterType, filteredCollections } = useAgenticFilter(normalData);
 
     useEffect(() => {
         const isMountedRef = { current: true };
@@ -1419,8 +1461,8 @@ function ApiCollections(props) {
               ]
             : []),
     
-        // For agentic filter: show Unique Endpoints and Unique Sources
-        ...(activeFilterTitle
+        // For agentic filter: show Unique Endpoints and Unique Sources (except for AI Agent which uses tree view)
+        ...(activeFilterTitle && activeFilterType !== FILTER_TYPES.AI_AGENT
             ? [
                   {
                       title: "Unique Endpoints",
@@ -1478,7 +1520,7 @@ function ApiCollections(props) {
                                         }
                                     ]
                                 },
-                                {
+                                !activeFilterType && {
                                     title: 'Switch view',
                                     items: [
                                         {
@@ -1493,12 +1535,12 @@ function ApiCollections(props) {
                                         }
                                     ]
                                 }
-                            ]
+                            ].filter(Boolean)
                         }
                     />
                 </Popover.Pane>
             </Popover>
-            <Button id={"create-new-collection-popup"} secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>
+            {!activeFilterType && <Button id={"create-new-collection-popup"} secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>}
         </HorizontalStack>
     )
 
@@ -1551,10 +1593,12 @@ function ApiCollections(props) {
             // Move source column after Endpoint ID
             modifiedHeaders = moveSourceColumnAfterEndpointId(modifiedHeaders);
         } else if (activeFilterType === FILTER_TYPES.AI_AGENT) {
-            // Rename column to "Agentic resource name" with proper filter
+            // Remove "Total components" column for AI Agent
+            modifiedHeaders = modifiedHeaders.filter(h => h.value !== 'urlsCount');
+            // Rename column to "Agentic resource name", remove filter
             modifiedHeaders = modifiedHeaders.map(h => {
                 if (h.value === 'displayNameComp') {
-                    return { ...h, title: 'Agentic resource name', text: 'Agentic resource name', filterLabel: 'Agentic resource name', textValue: 'serviceName', filterKey: 'serviceName', showFilter: true };
+                    return { ...h, title: 'Agentic resource name', text: 'Agentic resource name', textValue: 'serviceName', showFilter: false };
                 }
                 return h;
             });
@@ -1576,6 +1620,30 @@ function ApiCollections(props) {
     };
     const dynamicHeaders = getModifiedHeaders();
 
+    // Get modified sort options based on filter type
+    const getModifiedSortOptions = () => {
+        let modifiedSortOptions = [...sortOptions];
+        
+        if (activeFilterType === FILTER_TYPES.BROWSER_LLM) {
+            // Remove endpoints sorting for LLM
+            modifiedSortOptions = modifiedSortOptions.filter(opt => opt.sortKey !== 'urlsCount');
+        } else if (activeFilterType === FILTER_TYPES.AI_AGENT) {
+            // Remove "Components" sorting for AI Agents (column is hidden)
+            modifiedSortOptions = modifiedSortOptions.filter(opt => opt.sortKey !== 'urlsCount');
+        } else if (activeFilterType === FILTER_TYPES.MCP_SERVER) {
+            // Change "Endpoints" to "Tools" for MCP Servers
+            modifiedSortOptions = modifiedSortOptions.map(opt => {
+                if (opt.sortKey === 'urlsCount') {
+                    return { ...opt, label: 'Tools' };
+                }
+                return opt;
+            });
+        }
+        
+        return modifiedSortOptions;
+    };
+    const dynamicSortOptions = getModifiedSortOptions();
+
     // Ensure all headers have unique IDs for IndexTable headings to avoid duplicate key warnings
     const headingsWithIds = dynamicHeaders.map((header, index) => ({
         ...header,
@@ -1584,52 +1652,87 @@ function ApiCollections(props) {
         title: (typeof header.title === 'string' && header.title.trim() === '') ? ' ' : header.title
     }));
 
-    const tableComponent = (
-        centerView === CenterViewType.Tree ?
-        <TreeViewTable
-            collectionsArr={filterTreeViewData(normalData)}
-            sortOptions={sortOptions}
-            resourceName={resourceName}
-            tableHeaders={headingsWithIds.filter((x) => x.shouldMerge !== undefined)}
-            promotedBulkActions={promotedBulkActions}
-        />:
-        (centerView === CenterViewType.Table ?
-        <GithubSimpleTable
-            key={refreshData}
-            filterStateUrl={"/dashboard/observe/inventory/"}
-            pageLimit={100}
-            data={data[selectedTab]}
-            sortOptions={ selectedTab === 'groups' ? [...tempSortOptions, ...sortOptions] : sortOptions}
-            resourceName={resourceName}
-            filters={[]}
-            disambiguateLabel={disambiguateLabel}
-            headers={headingsWithIds}
-            selectable={true}
-            promotedBulkActions={promotedBulkActions}
-            mode={IndexFiltersMode.Default}
-            headings={headingsWithIds}
-            useNewRow={true}
-            condensedHeight={true}
-            tableTabs={tableTabs}
-            onSelect={handleSelectedTab}
-            selected={selected}
-            csvFileName={"Inventory"}
-            prettifyPageData={(pageData) => selectedTab === 'untracked' ? transform.prettifyUntrackedCollectionsData(pageData) : transform.prettifyCollectionsData(pageData, false, selectedTab, activeFilterType)}
-            transformRawData={transformRawCollectionData}
-        />:    <div style={{height: "800px"}}>
+    // Check if we should use tree view (for agentic filter types) - only for Atlas (Endpoint Security)
+    const useTreeView = isEndpointSecurityCategory() && (
+                        activeFilterType === FILTER_TYPES.AI_AGENT || 
+                        activeFilterType === FILTER_TYPES.MCP_SERVER || 
+                        activeFilterType === FILTER_TYPES.BROWSER_LLM);
+    
+    // For agentic filters, use the tree view component grouped by endpoint ID
+    const getTableComponent = () => {
+        // Tree view for AI Agent, MCP Server, and LLM (grouped by endpoint ID with expandable resources)
+        if (useTreeView && filteredCollections.length > 0) {
+            return (
+                <AgentEndpointTreeTable
+                    collections={filteredCollections}
+                    promotedBulkActions={promotedBulkActions}
+                    filterType={activeFilterType}
+                />
+            );
+        }
+        
+        // Standard tree view
+        if (centerView === CenterViewType.Tree) {
+            return (
+                <TreeViewTable
+                    collectionsArr={filterTreeViewData(normalData)}
+                    sortOptions={dynamicSortOptions}
+                    resourceName={resourceName}
+                    tableHeaders={headingsWithIds.filter((x) => x.shouldMerge !== undefined)}
+                    promotedBulkActions={promotedBulkActions}
+                />
+            );
+        }
+        
+        // Graph view
+        if (centerView === CenterViewType.Graph) {
+            return (
+                <div style={{height: "800px"}}>
+                    <ReactFlow
+                        nodes={allNodes}
+                        edges={allEdges}
+                        onNodesChange={onAllNodesChange}
+                        onEdgesChange={onAllEdgesChange}
+                    >
+                        <Background color="#aaa" gap={16} />
+                    </ReactFlow>
+                </div>
+            );
+        }
+        
+        // Default table view
+        return (
+            <GithubSimpleTable
+                key={refreshData}
+                filterStateUrl={"/dashboard/observe/inventory/"}
+                pageLimit={100}
+                data={data[selectedTab]}
+                sortOptions={selectedTab === 'groups' ? [...tempSortOptions, ...dynamicSortOptions] : dynamicSortOptions}
+                resourceName={resourceName}
+                filters={[]}
+                disambiguateLabel={disambiguateLabel}
+                headers={headingsWithIds}
+                selectable={true}
+                promotedBulkActions={promotedBulkActions}
+                mode={IndexFiltersMode.Default}
+                headings={headingsWithIds}
+                useNewRow={true}
+                condensedHeight={true}
+                tableTabs={tableTabs}
+                onSelect={handleSelectedTab}
+                selected={selected}
+                csvFileName={"Inventory"}
+                prettifyPageData={(pageData) => selectedTab === 'untracked' ? transform.prettifyUntrackedCollectionsData(pageData) : transform.prettifyCollectionsData(pageData, false, selectedTab, activeFilterType)}
+                transformRawData={transformRawCollectionData}
+            />
+        );
+    };
+    
+    const tableComponent = getTableComponent();
 
-        <ReactFlow
-            nodes={allNodes}
-            edges={allEdges}
-            onNodesChange={onAllNodesChange}
-            onEdgesChange={onAllEdgesChange}
-        >
-            <Background color="#aaa" gap={16} />
-        </ReactFlow>    </div>    
-        )
-    )
-
-    const components = loading ? [<SpinnerCentered key={"loading"}/>]: [<SummaryCardInfo summaryItems={summaryItems} key="summary"/>, (!hasUsageEndpoints ? <CollectionsPageBanner key="page-banner" /> : null) ,modalComponent, tableComponent]
+    // Hide summary card for tree view types (AI Agent, MCP Server, LLM)
+    const showSummaryCard = !useTreeView;
+    const components = loading ? [<SpinnerCentered key={"loading"}/>]: [(showSummaryCard ? <SummaryCardInfo summaryItems={summaryItems} key="summary"/> : null), (!hasUsageEndpoints ? <CollectionsPageBanner key="page-banner" /> : null) ,modalComponent, tableComponent]
 
     if(onlyShowCollectionsTable){
         sendData(data)

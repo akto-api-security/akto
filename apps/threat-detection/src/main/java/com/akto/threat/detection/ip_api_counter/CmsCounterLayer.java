@@ -29,27 +29,54 @@ public class CmsCounterLayer {
      * 12:03 -> CMS
      * Each CMS stores: IP|API -> Count of calls for this API from this IP
      */
-    private static final ConcurrentHashMap<String, CountMinSketch> sketches = new ConcurrentHashMap<>();
-    private static CounterCache cache;
-    private static final LoggerMaker logger = new LoggerMaker(CmsCounterLayer.class, LogDb.THREAT_DETECTION);
-    private static final CmsCounterLayer INSTANCE = new CmsCounterLayer();
+    private final ConcurrentHashMap<String, CountMinSketch> sketches = new ConcurrentHashMap<>();
+    private final CounterCache cache;
+    private final String redisKeyPrefix;
+    private final LoggerMaker logger;
 
-    private CmsCounterLayer() {
+    // Default singleton for backward compatibility
+    private static CmsCounterLayer DEFAULT_INSTANCE;
+
+    /**
+     * Constructor for creating new instances with custom cache and Redis key prefix.
+     */
+    public CmsCounterLayer(CounterCache cache, String redisKeyPrefix) {
+        this.cache = cache;
+        this.redisKeyPrefix = redisKeyPrefix;
+        this.logger = new LoggerMaker(CmsCounterLayer.class, LogDb.THREAT_DETECTION);
     }
 
+    /**
+     * Backward compatible singleton access.
+     */
     public static CmsCounterLayer getInstance() {
-        return INSTANCE;
+        return DEFAULT_INSTANCE;
     }
 
+    /**
+     * Initialize the default instance (called from Main).
+     * This maintains backward compatibility with existing code.
+     */
     public static void initialize(RedisClient redisClient) {
-        if (redisClient != null) {
-            cache = new ApiCountCacheLayer(redisClient);
-            ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
-            scheduler.scheduleAtFixedRate(CmsCounterLayer::cleanupOldWindows, 0, 1, TimeUnit.MINUTES);
-            scheduler.scheduleAtFixedRate(CmsCounterLayer::syncToRedis, 0, 1, TimeUnit.MINUTES);
-        } else {
-            cache = null;
-        }
+        CounterCache cache = redisClient != null ? new ApiCountCacheLayer(redisClient) : null;
+        DEFAULT_INSTANCE = new CmsCounterLayer(cache, RedisKeyInfo.IP_API_CMS_DATA_PREFIX);
+        DEFAULT_INSTANCE.startScheduledTasks();
+    }
+
+    /**
+     * Factory method for creating new instances with custom configuration.
+     */
+    public static CmsCounterLayer create(CounterCache cache, String redisKeyPrefix) {
+        return new CmsCounterLayer(cache, redisKeyPrefix);
+    }
+
+    /**
+     * Start scheduled tasks for cleanup and Redis sync.
+     */
+    public void startScheduledTasks() {
+        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+        scheduler.scheduleAtFixedRate(this::cleanupOldWindows, 0, 1, TimeUnit.MINUTES);
+        scheduler.scheduleAtFixedRate(this::syncToRedis, 0, 1, TimeUnit.MINUTES);
     }
 
     public void increment(String key, String windowKey) {
@@ -59,14 +86,10 @@ public class CmsCounterLayer {
         cms.add(key, 1);
     }
 
-    // Key is count of API calls for this IP,
-    // e.g., "ipApiCmsData|10.2.3.4|123|/api/v1/resource|GET"
-
-    // windowKey is timestamp in minutes.
     public long estimateCount(String key, String windowKey) {
         CountMinSketch cms = sketches.get(windowKey);
         if (cms == null) {
-            cms = fetchFromRedis(RedisKeyInfo.IP_API_CMS_DATA_PREFIX + "|" + windowKey);
+            cms = fetchFromRedis(redisKeyPrefix + "|" + windowKey);
             if (cms != null) {
                 sketches.put(windowKey, cms);
             } else {
@@ -77,10 +100,27 @@ public class CmsCounterLayer {
     }
 
     /**
+     *   Estimate count across a sliding window range.
+     *   Sliding because we are storing CMS for each minute.
+     *   [12:01-12:05] [12:06-12:10] [12:11-12:15]
+     *   ↑             ↑             ↑
+     *   All requests   All requests  All requests
+     *   at 12:03       at 12:08      at 12:13
+     *   check here     check here    check here
+     */
+    public long estimateCountInWindow(String key, long windowStart, long windowEnd) {
+        long sum = 0;
+        for (long min = windowStart; min <= windowEnd; min++) {
+            sum += estimateCount(key, String.valueOf(min));
+        }
+        return sum;
+    }
+
+    /**
      * Cleanup CMS from in-memory HashMap that are more than 60 minutes old.
      * Redis will automatically handle the expiration of keys.
      */
-    public static void cleanupOldWindows() {
+    public void cleanupOldWindows() {
         logger.debug("cleanupOldWindows triggered at " + Context.now());
         long currentEpochMin = Context.now() / 60;
         long startWindow = currentEpochMin - 90;
@@ -94,11 +134,14 @@ public class CmsCounterLayer {
         }
     }
 
-    private static void syncToRedis() {
+    private void syncToRedis() {
+        if (cache == null) {
+            return;
+        }
         logger.debug("syncToRedis triggered at " + Context.now());
         long currentEpochMin = Context.now()/60;
         long startWindow = currentEpochMin - 5;
-   
+
         for (long i = startWindow; i < currentEpochMin; i++) {
             String windowKey = String.valueOf(i);
             CountMinSketch cms = sketches.get(windowKey);
@@ -106,7 +149,7 @@ public class CmsCounterLayer {
 
             try {
                 byte[] serialized = CountMinSketch.serialize(cms);
-                String redisKey = RedisKeyInfo.IP_API_CMS_DATA_PREFIX + "|" + windowKey;
+                String redisKey = redisKeyPrefix + "|" + windowKey;
                 cache.setBytesWithExpiry(redisKey, serialized, CMS_DATA_RETENTION_MINUTES * 60);
             } catch (Exception e) {
                 logger.errorAndAddToDb(e, "Error in sync to redis CountMinSketch for window " + windowKey);
@@ -115,7 +158,7 @@ public class CmsCounterLayer {
         }
     }
 
-    private static CountMinSketch fetchFromRedis(String windowKey) {
+    private CountMinSketch fetchFromRedis(String windowKey) {
         if (cache == null) {
             return null;
         }
@@ -138,7 +181,7 @@ public class CmsCounterLayer {
         return CountMinSketch.deserialize(data);
     }
 
-    public static void reset() {
+    public void reset() {
         sketches.clear();
     }
 

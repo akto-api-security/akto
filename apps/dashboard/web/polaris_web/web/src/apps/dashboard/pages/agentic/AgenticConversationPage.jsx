@@ -11,7 +11,7 @@ import AgenticHistoryModal from './components/AgenticHistoryModal';
 import './AgenticConversationPage.css';
 import { sendQuery, getConversationsList } from './services/agenticService';
 
-function AgenticConversationPage({ initialQuery, existingConversationId, onBack, existingMessages = [], onLoadConversation }) {
+function AgenticConversationPage({ initialQuery, existingConversationId, onBack, existingMessages = [], onLoadConversation, conversationType }) {
     // Conversation state
     const [conversationId, setConversationId] = useState(existingConversationId || null);
     const [messages, setMessages] = useState([]);
@@ -43,7 +43,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                     if (existingMessages.length > 0) {
                         let messages = [];
                         const title = existingMessages[0].title;
-                        existingMessages[0].messages.forEach((item) => {
+                        existingMessages[0].messages.reverse().forEach((item) => {
                             messages.push({
                                 _id: "user_" + item.prompt,
                                 message: item.prompt,
@@ -76,7 +76,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                     setMessages([userMessage]);
 
                     // Process the initial query
-                    await processQuery(initialQuery);
+                    await processQuery(initialQuery, "", conversationType);
                 }
             } catch (err) {
                 setError('Failed to initialize conversation');
@@ -154,11 +154,11 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
     }, []);
 
     // Process a query and handle streaming
-    const processQuery = async (query, convId) => {
+    const processQuery = async (query, convId, conversationType) => {
         try {
             setIsLoading(true);
 
-            let res = await sendQuery(query, convId);
+            let res = await sendQuery(query, convId, conversationType);
             if(res && res.conversationId) {
                 setConversationId(res.conversationId);
             }
@@ -197,7 +197,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
             setFollowUpValue('');
 
             // Process the query
-            await processQuery(query, conversationId);
+            await processQuery(query, conversationId, conversationType);
         }
     };
 

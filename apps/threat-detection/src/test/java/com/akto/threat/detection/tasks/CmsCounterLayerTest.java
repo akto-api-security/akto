@@ -1,17 +1,14 @@
 package com.akto.threat.detection.tasks;
 import com.akto.dao.context.Context;
-import com.akto.threat.detection.cache.ApiCountCacheLayer;
 import com.akto.threat.detection.cache.CounterCache;
 import com.akto.threat.detection.ip_api_counter.CmsCounterLayer;
 import com.clearspring.analytics.stream.frequency.CountMinSketch;
 
-import io.lettuce.core.RedisClient;
-
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
@@ -19,7 +16,7 @@ import static org.mockito.Mockito.when;
 
 public class CmsCounterLayerTest {
 
-    private CmsCounterLayer cmsCounterLayer;
+    private static CmsCounterLayer cmsCounterLayer;
 
     private String windowKeyNow() {
         long ts = Context.now();
@@ -32,18 +29,16 @@ public class CmsCounterLayerTest {
         return String.valueOf(shifted / 60);
     }
 
+    @BeforeAll
+    static void setUpOnce() {
+        // Create single instance without starting scheduled tasks
+        cmsCounterLayer = new CmsCounterLayer(null, "test-prefix");
+    }
+
     @BeforeEach
     void setUp() {
-        CmsCounterLayer.initialize(null);
-        cmsCounterLayer = CmsCounterLayer.getInstance();
-        Field cacheField;
-        try {
-            cacheField = CmsCounterLayer.class.getDeclaredField("cache");
-            cacheField.setAccessible(true);
-            cacheField.set(null, null);
-        } catch (Exception e) {
-            // TODO: handle exception
-        }
+        // Reset state between tests
+        cmsCounterLayer.reset();
     }
     
     @Test
@@ -135,20 +130,15 @@ public class CmsCounterLayerTest {
         mockCMS.add("test-key", 1);
         byte[] serialized = CountMinSketch.serialize(mockCMS);
 
-        // Mock Redis and cache
+        // Mock cache
         CounterCache mockCache = mock(CounterCache.class);
         when(mockCache.fetchDataBytes(windowKey)).thenReturn(serialized);
 
-        RedisClient mockRedisClient = mock(RedisClient.class);
-        ApiCountCacheLayer mockApiCountCacheLayer = mock(ApiCountCacheLayer.class);
-
-        // Override static cache field in CmsCounterLayer
-        Field cacheField = CmsCounterLayer.class.getDeclaredField("cache");
-        cacheField.setAccessible(true);
-        cacheField.set(null, mockCache);
+        // Create instance with mocked cache
+        CmsCounterLayer testLayer = new CmsCounterLayer(mockCache, "test-prefix");
 
         // When
-        CountMinSketch result = invokeFetchFromRedis(windowKey);
+        CountMinSketch result = invokeFetchFromRedis(testLayer, windowKey);
 
         // Then
         assertNotNull(result);
@@ -162,13 +152,11 @@ public class CmsCounterLayerTest {
         CounterCache mockCache = mock(CounterCache.class);
         when(mockCache.fetchDataBytes(windowKey)).thenReturn(null);
 
-        // Set static cache
-        Field cacheField = CmsCounterLayer.class.getDeclaredField("cache");
-        cacheField.setAccessible(true);
-        cacheField.set(null, mockCache);
+        // Create instance with mocked cache
+        CmsCounterLayer testLayer = new CmsCounterLayer(mockCache, "test-prefix");
 
         // When
-        CountMinSketch result = invokeFetchFromRedis(windowKey);
+        CountMinSketch result = invokeFetchFromRedis(testLayer, windowKey);
 
         // Then
         assertNull(result);
@@ -176,22 +164,20 @@ public class CmsCounterLayerTest {
 
     @Test
     public void testFetchFromRedisReturnsNullWhenCacheIsNull() throws Exception {
-        // Ensure static cache is null
-        Field cacheField = CmsCounterLayer.class.getDeclaredField("cache");
-        cacheField.setAccessible(true);
-        cacheField.set(null, null);
+        // Create instance with null cache
+        CmsCounterLayer testLayer = new CmsCounterLayer(null, "test-prefix");
 
         // When
-        CountMinSketch result = invokeFetchFromRedis("any-key");
+        CountMinSketch result = invokeFetchFromRedis(testLayer, "any-key");
 
         // Then
         assertNull(result);
     }
 
-    private CountMinSketch invokeFetchFromRedis(String windowKey) throws Exception {
+    private CountMinSketch invokeFetchFromRedis(CmsCounterLayer instance, String windowKey) throws Exception {
         java.lang.reflect.Method method = CmsCounterLayer.class.getDeclaredMethod("fetchFromRedis", String.class);
         method.setAccessible(true);
-        return (CountMinSketch) method.invoke(null, windowKey);
+        return (CountMinSketch) method.invoke(instance, windowKey);
     }
 
     @Test
@@ -222,7 +208,7 @@ public class CmsCounterLayerTest {
         // CmsCounterLayer.class.getDeclaredMethod("cleanupOldWindows").setAccessible(true);
         // CmsCounterLayer.class.getDeclaredMethod("cleanupOldWindows").invoke(null);
 
-        CmsCounterLayer.cleanupOldWindows();
+        cmsCounterLayer.cleanupOldWindows();
 
         // Post-cleanup: oldWindow1 and oldWindow2 should be gone
         assertEquals(0, cmsCounterLayer.estimateCount(key, oldWindow1));
