@@ -99,14 +99,6 @@ public class JiraIntegration {
         this.projectMappings = projectMappings;
     }
 
-    public Map<String, String> getIssueSeverityToPriorityMap() {
-        return issueSeverityToPriorityMap;
-    }
-
-    public void setIssueSeverityToPriorityMap(Map<String, String> issueSeverityToPriorityMap) {
-        this.issueSeverityToPriorityMap = issueSeverityToPriorityMap;
-    }
-
     public JiraType getJiraType() {
         return jiraType;
     }
