@@ -16,10 +16,8 @@ public class JiraIntegration {
     private int updatedTs;
     private Map<String,List<BasicDBObject>> projectIdsMap;
     private Map<String, ProjectMapping> projectMappings;
-    private Map<String, String> issueSeverityToPriorityMap;
 
     public static final String API_TOKEN = "apiToken";
-    public static final String ISSUE_SEVERITY_TO_PRIORITY_MAP = "issueSeverityToPriorityMap";
 
     public String getBaseUrl() {
         return baseUrl;
@@ -91,14 +89,6 @@ public class JiraIntegration {
 
     public void setProjectMappings(Map<String, ProjectMapping> projectMappings) {
         this.projectMappings = projectMappings;
-    }
-
-    public Map<String, String> getIssueSeverityToPriorityMap() {
-        return issueSeverityToPriorityMap;
-    }
-
-    public void setIssueSeverityToPriorityMap(Map<String, String> issueSeverityToPriorityMap) {
-        this.issueSeverityToPriorityMap = issueSeverityToPriorityMap;
     }
 
 }

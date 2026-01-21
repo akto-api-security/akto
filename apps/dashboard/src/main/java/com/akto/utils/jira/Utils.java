@@ -23,6 +23,8 @@ import com.akto.dto.AccountSettings;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.jira_integration.JiraIntegration;
+import com.akto.dto.jira_integration.PriorityFieldMapping;
+import com.akto.dto.jira_integration.ProjectMapping;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.ApiExecutor;
@@ -419,30 +421,46 @@ public class Utils {
         fields.put("issuetype", new BasicDBObject("id", issueType));
         fields.put("description", new BasicDBObject("type", "doc").append("version", 1).append("content", contentList));
 
-        // Apply severity to priority mapping
+        // Apply project-level priority field mapping only
+        // If no mapping configured, Jira will use default priority (medium)
         if (severity != null && jiraIntegration != null) {
             try {
-                Map<String, String> severityToPriorityMap = jiraIntegration.getIssueSeverityToPriorityMap();
-                loggerMaker.infoAndAddToDb("Severity: " + severity.name() + ", Priority Map: " + severityToPriorityMap, LogDb.DASHBOARD);
+                ProjectMapping projectMapping = jiraIntegration.getProjectMappings() != null
+                    ? jiraIntegration.getProjectMappings().get(projectKey)
+                    : null;
 
-                if (severityToPriorityMap != null && !severityToPriorityMap.isEmpty()) {
-                    String priorityId = severityToPriorityMap.get(severity.name());
-                    loggerMaker.infoAndAddToDb("Priority ID from map: " + priorityId + " for severity: " + severity.name(), LogDb.DASHBOARD);
+                PriorityFieldMapping priorityFieldMapping = projectMapping != null
+                    ? projectMapping.getPriorityFieldMapping()
+                    : null;
 
-                    if (priorityId != null && !priorityId.isEmpty()) {
-                        fields.put("priority", new BasicDBObject("id", priorityId));
-                        loggerMaker.infoAndAddToDb("Set priority field with ID: " + priorityId, LogDb.DASHBOARD);
-                    } else {
-                        loggerMaker.infoAndAddToDb("Priority ID is null or empty for severity: " + severity.name(), LogDb.DASHBOARD);
+                if (priorityFieldMapping != null &&
+                    priorityFieldMapping.getSeverityToValueMap() != null &&
+                    !priorityFieldMapping.getSeverityToValueMap().isEmpty()) {
+
+                    String fieldId = priorityFieldMapping.getFieldId();
+                    String priorityValue = priorityFieldMapping.getSeverityToValueMap().get(severity.name());
+
+                    loggerMaker.infoAndAddToDb("Using project-level mapping for " + projectKey +
+                        " - Field: " + fieldId + ", Severity: " + severity.name() +
+                        ", Value: " + priorityValue, LogDb.DASHBOARD);
+
+                    if (priorityValue != null && !priorityValue.isEmpty()) {
+                        if ("priority".equals(fieldId)) {
+                            // Standard priority field
+                            fields.put("priority", new BasicDBObject("id", priorityValue));
+                        } else {
+                            // Custom field - always use ID structure
+                            fields.put(fieldId, new BasicDBObject("id", priorityValue));
+                        }
+                        loggerMaker.infoAndAddToDb("Set " + fieldId + " field with value: " + priorityValue, LogDb.DASHBOARD);
                     }
                 } else {
-                    loggerMaker.infoAndAddToDb("Priority map is null or empty", LogDb.DASHBOARD);
+                    loggerMaker.infoAndAddToDb("No project-level priority mapping configured for " + projectKey +
+                        " - Jira will use default priority", LogDb.DASHBOARD);
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error setting Jira priority from severity mapping");
             }
-        } else {
-            loggerMaker.infoAndAddToDb("Severity or JiraIntegration is null - Severity: " + severity + ", JiraIntegration: " + jiraIntegration, LogDb.DASHBOARD);
         }
 
         if (additionalIssueFields != null) {

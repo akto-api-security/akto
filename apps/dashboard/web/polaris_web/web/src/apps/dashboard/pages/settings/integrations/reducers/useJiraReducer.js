@@ -20,11 +20,8 @@ const initialState = {
   isSaving: false,
   initialFormData: null,
   loadingProjectIndex: null,
-  jiraPriorities: [],
-  severityToPriorityMap: {},
-  initialSeverityMapping: {},
-  isLoadingPriorities: false,
-  isSavingSeverityMapping: false
+  loadingFieldsProjectIndex: null,
+  loadingFieldValuesProjectIndex: null
 };
 
 const ACTION_TYPES = {
@@ -39,12 +36,8 @@ const ACTION_TYPES = {
   SET_INITIAL_FORM_DATA: 'SET_INITIAL_FORM_DATA',
   CLEAR_PROJECTS: 'CLEAR_PROJECTS',
   SET_LOADING_PROJECT_INDEX: 'SET_LOADING_PROJECT_INDEX',
-  SET_JIRA_PRIORITIES: 'SET_JIRA_PRIORITIES',
-  SET_SEVERITY_TO_PRIORITY_MAP: 'SET_SEVERITY_TO_PRIORITY_MAP',
-  SET_INITIAL_SEVERITY_MAPPING: 'SET_INITIAL_SEVERITY_MAPPING',
-  UPDATE_SEVERITY_MAPPING: 'UPDATE_SEVERITY_MAPPING',
-  SET_IS_LOADING_PRIORITIES: 'SET_IS_LOADING_PRIORITIES',
-  SET_IS_SAVING_SEVERITY_MAPPING: 'SET_IS_SAVING_SEVERITY_MAPPING'
+  SET_LOADING_FIELDS_PROJECT_INDEX: 'SET_LOADING_FIELDS_PROJECT_INDEX',
+  SET_LOADING_FIELD_VALUES_PROJECT_INDEX: 'SET_LOADING_FIELD_VALUES_PROJECT_INDEX'
 };
 
 function jiraReducer(state, action) {
@@ -74,7 +67,18 @@ function jiraReducer(state, action) {
             enableBiDirIntegration: false,
             aktoToJiraStatusMap: JSON.parse(JSON.stringify(initialEmptyMapping)),
             statuses: [],
-            jiraStatusLabel: []
+            jiraStatusLabel: [],
+            priorityFieldMapping: {
+              fieldId: "priority",
+              fieldName: "Priority",
+              fieldType: "priority",
+              severityToValueMap: {},
+              severityToDisplayNameMap: {}
+            },
+            availableFields: [],
+            availableFieldValues: [],
+            enablePriorityMapping: false,
+            hasSavedMapping: false
           }
         ]
       };
@@ -146,43 +150,16 @@ function jiraReducer(state, action) {
         loadingProjectIndex: action.payload
       };
 
-    case ACTION_TYPES.SET_JIRA_PRIORITIES:
+    case ACTION_TYPES.SET_LOADING_FIELDS_PROJECT_INDEX:
       return {
         ...state,
-        jiraPriorities: action.payload
+        loadingFieldsProjectIndex: action.payload
       };
 
-    case ACTION_TYPES.SET_SEVERITY_TO_PRIORITY_MAP:
+    case ACTION_TYPES.SET_LOADING_FIELD_VALUES_PROJECT_INDEX:
       return {
         ...state,
-        severityToPriorityMap: action.payload
-      };
-
-    case ACTION_TYPES.SET_INITIAL_SEVERITY_MAPPING:
-      return {
-        ...state,
-        initialSeverityMapping: action.payload
-      };
-
-    case ACTION_TYPES.UPDATE_SEVERITY_MAPPING:
-      return {
-        ...state,
-        severityToPriorityMap: {
-          ...state.severityToPriorityMap,
-          ...action.payload
-        }
-      };
-
-    case ACTION_TYPES.SET_IS_LOADING_PRIORITIES:
-      return {
-        ...state,
-        isLoadingPriorities: action.payload
-      };
-
-    case ACTION_TYPES.SET_IS_SAVING_SEVERITY_MAPPING:
-      return {
-        ...state,
-        isSavingSeverityMapping: action.payload
+        loadingFieldValuesProjectIndex: action.payload
       };
 
     default:
@@ -265,45 +242,17 @@ export function useJiraReducer() {
       });
     },
 
-    setJiraPriorities: (priorities) => {
+    setLoadingFieldsProjectIndex: (index) => {
       dispatch({
-        type: ACTION_TYPES.SET_JIRA_PRIORITIES,
-        payload: priorities
+        type: ACTION_TYPES.SET_LOADING_FIELDS_PROJECT_INDEX,
+        payload: index
       });
     },
 
-    setSeverityToPriorityMap: (mapping) => {
+    setLoadingFieldValuesProjectIndex: (index) => {
       dispatch({
-        type: ACTION_TYPES.SET_SEVERITY_TO_PRIORITY_MAP,
-        payload: mapping
-      });
-    },
-
-    setInitialSeverityMapping: (mapping) => {
-      dispatch({
-        type: ACTION_TYPES.SET_INITIAL_SEVERITY_MAPPING,
-        payload: mapping
-      });
-    },
-
-    updateSeverityMapping: (severity, priorityId) => {
-      dispatch({
-        type: ACTION_TYPES.UPDATE_SEVERITY_MAPPING,
-        payload: { [severity]: priorityId }
-      });
-    },
-
-    setIsLoadingPriorities: (value) => {
-      dispatch({
-        type: ACTION_TYPES.SET_IS_LOADING_PRIORITIES,
-        payload: value
-      });
-    },
-
-    setIsSavingSeverityMapping: (value) => {
-      dispatch({
-        type: ACTION_TYPES.SET_IS_SAVING_SEVERITY_MAPPING,
-        payload: value
+        type: ACTION_TYPES.SET_LOADING_FIELD_VALUES_PROJECT_INDEX,
+        payload: index
       });
     }
   };
