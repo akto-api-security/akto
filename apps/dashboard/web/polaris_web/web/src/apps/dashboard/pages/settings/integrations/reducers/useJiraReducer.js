@@ -14,6 +14,7 @@ const initialState = {
     apiToken: '',
     userEmail: ''
   },
+  jiraType: 'CLOUD', // 'CLOUD' or 'DATA_CENTER'
   projects: [],
   existingProjectIds: [],
   isAlreadyIntegrated: false,
@@ -29,6 +30,7 @@ const initialState = {
 
 const ACTION_TYPES = {
   SET_CREDENTIALS: 'SET_CREDENTIALS',
+  SET_JIRA_TYPE: 'SET_JIRA_TYPE',
   SET_PROJECTS: 'SET_PROJECTS',
   ADD_PROJECT: 'ADD_PROJECT',
   REMOVE_PROJECT: 'REMOVE_PROJECT',
@@ -56,6 +58,12 @@ function jiraReducer(state, action) {
           ...state.credentials,
           ...action.payload
         }
+      };
+
+    case ACTION_TYPES.SET_JIRA_TYPE:
+      return {
+        ...state,
+        jiraType: action.payload
       };
 
     case ACTION_TYPES.SET_PROJECTS:
@@ -303,6 +311,13 @@ export function useJiraReducer() {
     setIsSavingSeverityMapping: (value) => {
       dispatch({
         type: ACTION_TYPES.SET_IS_SAVING_SEVERITY_MAPPING,
+        payload: value
+      });
+    },
+
+    setJiraType: (value) => {
+      dispatch({
+        type: ACTION_TYPES.SET_JIRA_TYPE,
         payload: value
       });
     }

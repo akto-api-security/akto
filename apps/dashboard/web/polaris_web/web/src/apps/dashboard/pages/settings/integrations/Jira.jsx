@@ -8,6 +8,7 @@ import {
   Divider,
   HorizontalStack,
   LegacyCard,
+  RadioButton,
   Spinner,
   Text,
   TextField,
@@ -31,6 +32,7 @@ function Jira() {
 
     const {
         credentials: { baseUrl, apiToken, userEmail },
+        jiraType,
         projects,
         existingProjectIds,
         isSaving,
@@ -53,6 +55,11 @@ function Jira() {
             actions.setCredentials('baseUrl', jiraInteg.baseUrl);
             actions.setCredentials('apiToken', jiraInteg.apiToken);
             actions.setCredentials('userEmail', jiraInteg.userEmail);
+            
+            // Set jiraType from backend
+            if (jiraInteg.jiraType) {
+                actions.setJiraType(jiraInteg.jiraType);
+            }
 
             updateProjectMap(jiraInteg);
 
@@ -60,7 +67,8 @@ function Jira() {
                 baseUrl: jiraInteg.baseUrl,
                 apiToken: jiraInteg.apiToken,
                 userEmail: jiraInteg.userEmail,
-                projectMappings: jiraInteg.projectMappings || {}
+                projectMappings: jiraInteg.projectMappings || {},
+                jiraType: jiraInteg.jiraType || 'CLOUD'
             });
         } else {
             actions.addProject();
@@ -367,7 +375,7 @@ function Jira() {
                 statuses: project?.statuses || []
             };
         })
-        return {apiToken, userEmail, baseUrl, projectMappings};
+        return {apiToken, userEmail, baseUrl, projectMappings, jiraType};
     }
 
 
@@ -385,6 +393,7 @@ function Jira() {
                 apiToken: data.apiToken,
                 userEmail: data.userEmail,
                 projectMappings: data.projectMappings,
+                jiraType: data.jiraType
             });
 
             func.setToast(true, false, "Jira configurations saved successfully");
@@ -828,9 +837,55 @@ function Jira() {
 
           <LegacyCard.Section>
                 <VerticalStack gap={"4"}>
-                    <TextField label="Base Url" value={baseUrl} helpText="Specify the base url of your jira project(for ex - https://jiraintegloc.atlassian.net)"  placeholder='Base Url' requiredIndicator onChange={(value) => actions.setCredentials('baseUrl', value)} />
-                    <TextField label="Email" value={userEmail} helpText="Specify your email id for which api token will be generated" placeholder='Email' requiredIndicator onChange={(value) => actions.setCredentials('userEmail', value)} />
-                    <PasswordTextField label="Api Token" helpText="Specify the api token created for your user email" field={apiToken} onFunc={true} setField={(value) => actions.setCredentials('apiToken', value)} />
+                    {/* Simple Jira Type Selector */}
+                    <VerticalStack gap={2}>
+                        <Text variant="bodyMd" fontWeight="semibold">Deployment Type</Text>
+                        <HorizontalStack gap={4}>
+                            <RadioButton
+                                label="Jira Cloud"
+                                checked={jiraType === 'CLOUD' || !jiraType}
+                                id="jira-cloud"
+                                name="jiraType"
+                                onChange={() => actions.setJiraType('CLOUD')}
+                            />
+                            <RadioButton
+                                label="Jira Data Center"
+                                checked={jiraType === 'DATA_CENTER'}
+                                id="jira-datacenter"
+                                name="jiraType"
+                                onChange={() => actions.setJiraType('DATA_CENTER')}
+                            />
+                        </HorizontalStack>
+                        <Text variant="bodySm" color="subdued">
+                            {jiraType === 'DATA_CENTER' 
+                                ? 'For self-hosted Jira (e.g., http://localhost:8081)' 
+                                : 'For Jira Cloud (e.g., https://your-domain.atlassian.net)'}
+                        </Text>
+                    </VerticalStack>
+                    
+                    <TextField 
+                        label="Base Url" 
+                        value={baseUrl} 
+                        helpText="Specify the base url of your jira project" 
+                        placeholder={jiraType === 'DATA_CENTER' ? 'http://localhost:8081' : 'https://your-domain.atlassian.net'} 
+                        requiredIndicator 
+                        onChange={(value) => actions.setCredentials('baseUrl', value)} 
+                    />
+                    <TextField 
+                        label="Email" 
+                        value={userEmail} 
+                        helpText={jiraType === 'DATA_CENTER' ? 'Specify your email id associated with Jira Data Center' : 'Specify your email id for which api token will be generated'}
+                        placeholder='Email' 
+                        requiredIndicator
+                        onChange={(value) => actions.setCredentials('userEmail', value)} 
+                    />
+                    <PasswordTextField 
+                        label={jiraType === 'DATA_CENTER' ? 'Personal Access Token(PAT)' : 'API Token'}
+                        helpText= {jiraType === 'DATA_CENTER' ? 'Specify your PAT (Personal Access Token) for Jira Data Center' : 'Specify your API token generated from Jira Cloud'}
+                        field={apiToken} 
+                        onFunc={true} 
+                        setField={(value) => actions.setCredentials('apiToken', value)} 
+                    />
                     <HorizontalStack align='space-between'>
                         <Text fontWeight='semibold' variant='headingMd'>Projects</Text>
                         <Button plain monochrome onClick={() => actions.addProject()}>Add Project</Button>
