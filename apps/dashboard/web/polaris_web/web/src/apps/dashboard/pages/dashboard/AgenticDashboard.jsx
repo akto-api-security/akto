@@ -321,10 +321,10 @@ const AgenticDashboard = () => {
                     // Issues by Severity
                     const issuesBySeverity = data.issuesBySeverity || {};
                     setIssuesData({
-                        "Critical": { text: issuesBySeverity.critical || 0, color: "#E45357" },
-                        "High": { text: issuesBySeverity.high || 0, color: "#EF864C" },
-                        "Medium": { text: issuesBySeverity.medium || 0, color: "#F6C564" },
-                        "Low": { text: issuesBySeverity.low || 0, color: "#E0E0E0" }
+                        "Critical": { text: issuesBySeverity.critical || 0, color: "#DF2909" },
+                        "High": { text: issuesBySeverity.high || 0, color: "#FED3D1" },
+                        "Medium": { text: issuesBySeverity.medium || 0, color: "#FFD79D" },
+                        "Low": { text: issuesBySeverity.low || 0, color: "#E4E5E7" }
                     });
 
                     // Average Issue Age
@@ -474,10 +474,10 @@ const AgenticDashboard = () => {
                     // Threats by Severity
                     const threatsBySeverity = data.threatsBySeverity || {};
                     setThreatData({
-                        "Critical": { text: threatsBySeverity.critical || 0, color: "#E45357" },
-                        "High": { text: threatsBySeverity.high || 0, color: "#EF864C" },
-                        "Medium": { text: threatsBySeverity.medium || 0, color: "#F6C564" },
-                        "Low": { text: threatsBySeverity.low || 0, color: "#E0E0E0" }
+                        "Critical": { text: threatsBySeverity.critical || 0, color: "#DF2909" },
+                        "High": { text: threatsBySeverity.high || 0, color: "#FED3D1" },
+                        "Medium": { text: threatsBySeverity.medium || 0, color: "#FFD79D" },
+                        "Low": { text: threatsBySeverity.low || 0, color: "#E4E5E7" }
                     });
 
                     // Threats over time - will be processed from threatActorsCountResponse below
