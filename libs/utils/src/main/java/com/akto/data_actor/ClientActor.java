@@ -1017,7 +1017,6 @@ public class ClientActor extends DataActor {
         bulkWriteApiInfoWithPath(apiInfoList, "/fastDiscoveryBulkWriteApiInfo");
     }
 
-    private static final int FETCH_API_IDS_PAGE_SIZE = 1000;  // Must match DbLayer.API_INFO_PAGE_SIZE in cyborg
 
     /**
      * Fetch API IDs with cursor-based pagination for Bloom filter initialization.
