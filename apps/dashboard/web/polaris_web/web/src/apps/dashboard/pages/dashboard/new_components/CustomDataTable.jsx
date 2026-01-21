@@ -9,7 +9,7 @@ const CustomDataTable = ({ title = "", data = [], showSignalIcon = true, itemId 
                 <Text variant='bodyMd' fontWeight='medium'>{item.name}</Text>
             </div>
         </HorizontalStack>,
-        <div style={{color: '#D72C0D'}}>
+        <div>
             <Text variant='bodyMd' fontWeight='medium'>{item.value}</Text>
         </div>
     ])
