@@ -302,6 +302,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             this.projectMappings = new HashMap<>();
             this.projectMappings.put(projId, new ProjectMapping(
                 extractUniqueStatusCategories(responsePayload),
+                null,
                 null
             ));
             return Action.SUCCESS.toUpperCase();
