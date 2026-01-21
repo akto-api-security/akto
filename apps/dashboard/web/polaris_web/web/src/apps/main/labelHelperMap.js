@@ -432,5 +432,7 @@ export const labelMap = {
     "Test library":"Probe library",
     "Endpoint Shield": "Endpoint Shield",
     "Threat": "Guardrail",
+    "Number of endpoints": "Number of components",
+    "Domains": "Resource",
   },
 }
