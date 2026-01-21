@@ -1,11 +1,11 @@
 import { Card, VerticalStack, Box, HorizontalStack, HorizontalGrid, Text } from '@shopify/polaris'
 import ComponentHeader from './ComponentHeader'
 
-const ComplianceAtRisksCard = ({ complianceData = [], itemId = "", onRemoveComponent }) => {
+const ComplianceAtRisksCard = ({ complianceData = [], itemId = "", onRemoveComponent, tooltipContent = "" }) => {
     return (
         <Card>
             <VerticalStack gap={4}>
-                <ComponentHeader title='Compliance at Risks' itemId={itemId} onRemove={onRemoveComponent} />
+                <ComponentHeader title='Compliance at Risks' itemId={itemId} onRemove={onRemoveComponent} tooltipContent={tooltipContent} />
 
                 <Box width='100%'>
                     <HorizontalGrid columns={4} gap={3}>

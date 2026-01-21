@@ -1,7 +1,7 @@
 import { Card, VerticalStack, Box, HorizontalStack, Text, DataTable } from '@shopify/polaris'
 import ComponentHeader from './ComponentHeader'
 
-const CustomDataTable = ({ title = "", data = [], showSignalIcon = true, itemId = "", onRemoveComponent }) => {
+const CustomDataTable = ({ title = "", data = [], showSignalIcon = true, itemId = "", onRemoveComponent, tooltipContent = "" }) => {
     const rows = data.map(item => [
         <HorizontalStack gap={3} blockAlign='center'>
             {showSignalIcon && <img src='/public/menu-graph.svg' alt='growth-icon' />}
@@ -17,7 +17,7 @@ const CustomDataTable = ({ title = "", data = [], showSignalIcon = true, itemId 
     return (
         <Card>
             <VerticalStack gap="4">
-                <ComponentHeader title={title} itemId={itemId} onRemove={onRemoveComponent} />
+                <ComponentHeader title={title} itemId={itemId} onRemove={onRemoveComponent} tooltipContent={tooltipContent} />
 
                 <Box width='100%'>
                     <DataTable

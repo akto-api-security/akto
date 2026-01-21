@@ -1,33 +1,38 @@
-import { useState } from 'react'
-import { Box, Button, HorizontalStack, Text, Icon } from '@shopify/polaris'
-import { DeleteMinor, DragHandleMinor } from '@shopify/polaris-icons'
+import { Box, Button, HorizontalStack, Text, Tooltip } from '@shopify/polaris'
+import { DeleteMinor } from '@shopify/polaris-icons'
 
-const ComponentHeader = ({ title, itemId, onRemove }) => {
-    const [isHovered, setIsHovered] = useState(false)
+const ComponentHeader = ({ title, itemId, onRemove, tooltipContent }) => {
+    const titleStyle = {
+        borderBottom: '1px dotted #BEBEBF',
+        display: 'inline-block',
+        cursor: 'default'
+    }
+
+    const tooltipContent300 = tooltipContent ? (
+        <div style={{ maxWidth: '300px' }}>
+            {tooltipContent}
+        </div>
+    ) : null
 
     return (
         <Box width='100%'>
-            <Box 
-                className='graph-menu'
-                paddingBlockStart="1" 
-                paddingBlockEnd="1"
-                borderRadius="100"
-                background={isHovered ? "bg-surface-hover" : undefined}
-                onMouseEnter={() => setIsHovered(true)}
-                onMouseLeave={() => setIsHovered(false)}
-            >
-                <HorizontalStack blockAlign="center" align='space-between'>
-                    <HorizontalStack gap="2" blockAlign="center">
-                        <Box opacity={isHovered ? "1" : "0"}>
-                            <Icon source={DragHandleMinor} color="subdued" />
-                        </Box>
-                        <Text variant='headingMd'>{title}</Text>
-                    </HorizontalStack>
-                    <Box opacity={isHovered ? "1" : "0"}>
-                        <Button monochrome plain icon={DeleteMinor} onClick={() => onRemove(itemId)} />
-                    </Box>
+            <HorizontalStack blockAlign="center" align='space-between'>
+                {tooltipContent ? (
+                    <Tooltip content={tooltipContent300} dismissOnMouseOut preferredPosition="above">
+                        <Text variant='headingMd' as="span">
+                            <span style={titleStyle}>{title}</span>
+                        </Text>
+                    </Tooltip>
+                ) : (
+                    <Text variant='headingMd'>{title}</Text>
+                )}
+                <HorizontalStack gap={2}>
+                    <Button monochrome plain icon={DeleteMinor} onClick={() => onRemove(itemId)} />
+                    <div className='graph-menu'>
+                        <img src={"/public/MenuVerticalIcon.svg"} alt='graph-menu' />
+                    </div>
                 </HorizontalStack>
-            </Box>
+            </HorizontalStack>
         </Box>
     )
 }

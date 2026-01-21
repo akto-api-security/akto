@@ -3,11 +3,11 @@ import LineChart from '../../../components/charts/LineChart'
 import ComponentHeader from './ComponentHeader'
 import GraphCustomLabels from './GraphCustomLabels'
 
-const CustomLineChart = ({ title = "", chartData = [], labels = [], itemId = "", onRemoveComponent, chartHeight = 290 }) => {
+const CustomLineChart = ({ title = "", chartData = [], labels = [], itemId = "", onRemoveComponent, chartHeight = 290, tooltipContent = "" }) => {
     return (
         <Card>
             <VerticalStack gap="6" inlineAlign='start' blockAlign="center">
-                <ComponentHeader title={title} itemId={itemId} onRemove={onRemoveComponent} />
+                <ComponentHeader title={title} itemId={itemId} onRemove={onRemoveComponent} tooltipContent={tooltipContent} />
 
                 <Box width='100%'>
                     <LineChart
