@@ -768,9 +768,6 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
     private List<BasicDBObject> fetchComplianceAtRisksInternal(List<TestingRunIssues> allIssues) {
         List<BasicDBObject> result = new ArrayList<>();
         try {
-            // Map to count issues per compliance standard
-            Map<String, Long> complianceCounts = new HashMap<>();
-            
             // Collect unique testSubCategories to fetch compliance mappings
             Set<String> regularTestSubCategories = new HashSet<>();
             Map<String, String> testSubCategoryToTestCategoryFromSourceConfig = new HashMap<>();
@@ -811,11 +808,16 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                 }
             }
             
-            // Count issues per compliance standard
-            int totalIssuesWithCompliance = 0;
+            // Count unique APIs per compliance standard
+            // Map to store unique APIs (by ApiInfoKey) for each compliance standard
+            Map<String, Set<ApiInfo.ApiInfoKey>> complianceToApis = new HashMap<>();
+            // Set to track all unique APIs that have been tested (have any issues)
+            Set<ApiInfo.ApiInfoKey> totalTestedApis = new HashSet<>();
+            
             for (TestingRunIssues issue : allIssues) {
-                if (issue.getId() == null) continue;
+                if (issue.getId() == null || issue.getId().getApiInfoKey() == null) continue;
                 
+                ApiInfo.ApiInfoKey apiInfoKey = issue.getId().getApiInfoKey();
                 String testSubCategory = issue.getId().getTestSubCategory();
                 if (testSubCategory == null || testSubCategory.isEmpty()) continue;
                 
@@ -833,32 +835,36 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                 if (complianceMapping != null && complianceMapping.getMapComplianceToListClauses() != null) {
                     Map<String, List<String>> complianceMap = complianceMapping.getMapComplianceToListClauses();
                     if (!complianceMap.isEmpty()) {
-                        totalIssuesWithCompliance++;
-                        // Count this issue for each compliance standard it belongs to
+                        // Track this API as tested
+                        totalTestedApis.add(apiInfoKey);
+                        
+                        // Add this API to each compliance standard it belongs to
                         for (String complianceName : complianceMap.keySet()) {
-                            complianceCounts.put(complianceName, complianceCounts.getOrDefault(complianceName, 0L) + 1);
+                            complianceToApis.computeIfAbsent(complianceName, k -> new HashSet<>()).add(apiInfoKey);
                         }
                     }
                 }
             }
             
-            // Calculate percentages and create result objects
+            // Calculate percentages: (unique APIs with compliance issues / total unique APIs tested) * 100
+            int totalTestedApisCount = totalTestedApis.size();
+            
             // Sort by count descending and take top 4 compliances
-            List<Map.Entry<String, Long>> sortedCompliances = complianceCounts.entrySet().stream()
-                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+            List<Map.Entry<String, Set<ApiInfo.ApiInfoKey>>> sortedCompliances = complianceToApis.entrySet().stream()
+                .sorted(Map.Entry.<String, Set<ApiInfo.ApiInfoKey>>comparingByValue((a, b) -> Integer.compare(b.size(), a.size())))
                 .limit(4)
                 .collect(Collectors.toList());
             
-            for (Map.Entry<String, Long> entry : sortedCompliances) {
+            for (Map.Entry<String, Set<ApiInfo.ApiInfoKey>> entry : sortedCompliances) {
                 BasicDBObject complianceObj = new BasicDBObject();
                 complianceObj.put("name", entry.getKey());
-                long count = entry.getValue();
-                // Calculate percentage: (count / totalIssuesWithCompliance) * 100
-                double percentage = totalIssuesWithCompliance > 0 
-                    ? (count * 100.0 / totalIssuesWithCompliance) 
+                int uniqueApisCount = entry.getValue().size();
+                // Calculate percentage: (unique APIs with compliance issues / total unique APIs tested) * 100
+                double percentage = totalTestedApisCount > 0 
+                    ? (uniqueApisCount * 100.0 / totalTestedApisCount) 
                     : 0.0;
                 complianceObj.put("percentage", Math.round(percentage * 100.0) / 100.0); // Round to 2 decimal places
-                complianceObj.put("count", count);
+                complianceObj.put("count", uniqueApisCount);
                 // Note: color and icon should be handled on frontend based on compliance name
                 result.add(complianceObj);
             }
@@ -1022,21 +1028,18 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             for (DashboardMaliciousEvent threat : allThreats) {
                 String host = threat.getHost();
                 if (host != null && !host.isEmpty()) {
-                    hostCounts.put(host, hostCounts.getOrDefault(host, 0L) + 1);
+                    // Validate that it's a hostname (contains a dot or is a valid hostname format)
+                    if (isValidHostname(host)) {
+                        hostCounts.put(host, hostCounts.getOrDefault(host, 0L) + 1);
+                    }
                 } else {
                     // Fallback to url if host is not available
                     String endpoint = threat.getUrl();
                     if (endpoint != null && !endpoint.isEmpty()) {
                         // Extract hostname from URL if possible
-                        try {
-                            java.net.URL url = new java.net.URL(endpoint);
-                            String hostname = url.getHost();
-                            if (hostname != null && !hostname.isEmpty()) {
-                                hostCounts.put(hostname, hostCounts.getOrDefault(hostname, 0L) + 1);
-                            }
-                        } catch (Exception e) {
-                            // If URL parsing fails, use endpoint as-is
-                            hostCounts.put(endpoint, hostCounts.getOrDefault(endpoint, 0L) + 1);
+                        String hostname = extractHostnameFromUrl(endpoint);
+                        if (hostname != null && !hostname.isEmpty() && isValidHostname(hostname)) {
+                            hostCounts.put(hostname, hostCounts.getOrDefault(hostname, 0L) + 1);
                         }
                     }
                 }
@@ -1061,18 +1064,73 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
     }
 
     /**
+     * Helper method to validate if a string is a valid hostname (not a path)
+     * Rejects paths (starting with '/') and validates hostname format
+     */
+    private boolean isValidHostname(String hostname) {
+        if (hostname == null || hostname.isEmpty()) {
+            return false;
+        }
+        // Reject paths (starting with /)
+        if (hostname.startsWith("/")) {
+            return false;
+        }
+        // Reject if it looks like a path (contains slashes but no protocol)
+        if (hostname.contains("/") && !hostname.contains("://")) {
+            return false;
+        }
+        // Hostnames typically contain a dot (for domain names) or are localhost/ip addresses
+        return hostname.contains(".") || hostname.equals("localhost") || hostname.matches("^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$");
+    }
+
+    /**
+     * Helper method to extract hostname from URL
+     * Uses Java's standard URL class for parsing
+     * Returns null if URL parsing fails (e.g., if it's just a path)
+     */
+    private String extractHostnameFromUrl(String url) {
+        if (url == null || url.isEmpty()) {
+            return null;
+        }
+        try {
+            // If URL doesn't start with http:// or https://, try to add it
+            String urlToParse = url;
+            if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                urlToParse = "https://" + url;
+            }
+            java.net.URL parsedUrl = new java.net.URL(urlToParse);
+            String host = parsedUrl.getHost();
+            // Return null if host is empty (e.g., for paths like "/path")
+            return (host != null && !host.isEmpty()) ? host : null;
+        } catch (Exception e) {
+            // If URL parsing fails (e.g., for paths), return null
+            return null;
+        }
+    }
+
+    /**
      * Internal method: Fetch top 5 bad actors by threats
      * Collection: MaliciousEventDao
      */
     private List<BasicDBObject> fetchTopBadActorsInternal(List<DashboardMaliciousEvent> allThreats) {
         List<BasicDBObject> result = new ArrayList<>();
         try {
-            // Group by actor in Java
+            // Group by actor in Java, tracking count and most common country
             Map<String, Long> actorCounts = new HashMap<>();
+            Map<String, Map<String, Long>> actorCountryCounts = new HashMap<>();
+            
             for (DashboardMaliciousEvent threat : allThreats) {
                 String actor = threat.getActor();
                 if (actor != null && !actor.isEmpty()) {
                     actorCounts.put(actor, actorCounts.getOrDefault(actor, 0L) + 1);
+                    
+                    // Track country for this actor
+                    String country = threat.getCountry();
+                    if (country != null && !country.isEmpty()) {
+                        actorCountryCounts.putIfAbsent(actor, new HashMap<>());
+                        Map<String, Long> countryCounts = actorCountryCounts.get(actor);
+                        countryCounts.put(country, countryCounts.getOrDefault(country, 0L) + 1);
+                    }
                 }
             }
             
@@ -1086,6 +1144,19 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                 BasicDBObject doc = new BasicDBObject();
                 doc.put("actor", entry.getKey());
                 doc.put("count", entry.getValue());
+                
+                // Get the most common country for this actor
+                Map<String, Long> countryCounts = actorCountryCounts.get(entry.getKey());
+                if (countryCounts != null && !countryCounts.isEmpty()) {
+                    String mostCommonCountry = countryCounts.entrySet().stream()
+                        .max(Map.Entry.comparingByValue())
+                        .map(Map.Entry::getKey)
+                        .orElse(null);
+                    if (mostCommonCountry != null) {
+                        doc.put("country", mostCommonCountry);
+                    }
+                }
+                
                 result.add(doc);
             }
         } catch (Exception e) {

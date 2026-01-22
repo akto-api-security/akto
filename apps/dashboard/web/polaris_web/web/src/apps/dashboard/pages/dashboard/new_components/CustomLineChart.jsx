@@ -3,7 +3,7 @@ import LineChart from '../../../components/charts/LineChart'
 import ComponentHeader from './ComponentHeader'
 import GraphCustomLabels from './GraphCustomLabels'
 
-const CustomLineChart = ({ title = "", chartData = [], labels = [], itemId = "", onRemoveComponent, chartHeight = 290, tooltipContent = "" }) => {
+const CustomLineChart = ({ title = "", chartData = [], labels = [], itemId = "", onRemoveComponent, chartHeight = 290, tooltipContent = "", graphPointClick = null }) => {
     return (
         <Card>
             <VerticalStack gap="6" inlineAlign='start' blockAlign="center">
@@ -17,6 +17,7 @@ const CustomLineChart = ({ title = "", chartData = [], labels = [], itemId = "",
                         text={true}
                         showGridLines={true}
                         exportingDisabled={true}
+                        graphPointClick={graphPointClick}
                         defaultChartOptions={{
                             xAxis: {
                                 type: 'datetime',
