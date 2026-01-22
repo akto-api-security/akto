@@ -184,12 +184,13 @@ public class CmsCounterLayerTest {
     void testCleanupOldWindows() throws Exception {
         String key = "11111|8.8.8.8|/api/test";
 
-        // Add windows: 70, 65, 60, 59, 55 minutes ago
-        String oldWindow1 = windowKeyOffsetMinutes(70);
-        String oldWindow2 = windowKeyOffsetMinutes(65);
-        String boundaryWindow = windowKeyOffsetMinutes(60);
-        String recentWindow1 = windowKeyOffsetMinutes(59);
-        String recentWindow2 = windowKeyOffsetMinutes(55);
+        // Retention is 480 minutes (8 hours)
+        // Add windows: 490, 485, 480 (boundary), 479, 240 minutes ago
+        String oldWindow1 = windowKeyOffsetMinutes(490);       // Should be deleted (> 480)
+        String oldWindow2 = windowKeyOffsetMinutes(485);       // Should be deleted (> 480)
+        String boundaryWindow = windowKeyOffsetMinutes(480);   // Boundary - should be kept (== 480)
+        String recentWindow1 = windowKeyOffsetMinutes(479);    // Should be kept (< 480)
+        String recentWindow2 = windowKeyOffsetMinutes(240);    // Should be kept (< 480)
 
         cmsCounterLayer.increment(key, oldWindow1);
         cmsCounterLayer.increment(key, oldWindow2);
@@ -204,17 +205,14 @@ public class CmsCounterLayerTest {
         assertEquals(1, cmsCounterLayer.estimateCount(key, recentWindow1));
         assertEquals(1, cmsCounterLayer.estimateCount(key, recentWindow2));
 
-        // // Call cleanup via reflection or helper method
-        // CmsCounterLayer.class.getDeclaredMethod("cleanupOldWindows").setAccessible(true);
-        // CmsCounterLayer.class.getDeclaredMethod("cleanupOldWindows").invoke(null);
-
+        // Call cleanup
         cmsCounterLayer.cleanupOldWindows();
 
-        // Post-cleanup: oldWindow1 and oldWindow2 should be gone
+        // Post-cleanup: oldWindow1 and oldWindow2 should be gone (> 480 minutes)
         assertEquals(0, cmsCounterLayer.estimateCount(key, oldWindow1));
         assertEquals(0, cmsCounterLayer.estimateCount(key, oldWindow2));
 
-        // Boundary and recent should still exist
+        // Boundary and recent should still exist (>= 480 minutes retained)
         assertEquals(1, cmsCounterLayer.estimateCount(key, boundaryWindow));
         assertEquals(1, cmsCounterLayer.estimateCount(key, recentWindow1));
         assertEquals(1, cmsCounterLayer.estimateCount(key, recentWindow2));

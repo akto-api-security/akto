@@ -3,14 +3,14 @@ import GithubServerTable from "../../../components/tables/GithubServerTable"
 import { useReducer, useState, useEffect, useCallback } from "react";
 import func from "@/util/func";
 import PersistStore from "../../../../main/PersistStore";
-import { Button, Popover, Box, Avatar, Text, HorizontalStack, IndexFiltersMode, VerticalStack, Badge } from "@shopify/polaris";
+import { Button, Popover, Box, Avatar, Text, HorizontalStack, IndexFiltersMode, VerticalStack, Badge, Spinner } from "@shopify/polaris";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import DateRangeFilter from "../../../components/layouts/DateRangeFilter.jsx";
 import { produce } from "immer";
 import "./style.css"
 import values from "@/util/values";
-import { isMCPSecurityCategory, isGenAISecurityCategory, isAgenticSecurityCategory } from "../../../../main/labelHelper";
+import { isMCPSecurityCategory, isGenAISecurityCategory, isAgenticSecurityCategory, mapLabel, getDashboardCategory } from "../../../../main/labelHelper";
 import threatDetectionApi from "../../threat_detection/api.js"
 import SessionStore from "../../../../main/SessionStore"
 import ShowListInBadge from "../../../components/shared/ShowListInBadge";
@@ -20,10 +20,11 @@ import useTable from "../../../components/tables/TableContext.js";
 import TableStore from "../../../components/tables/TableStore.js";
 import transform from "../transform.js";
 import useThreatReportDownload from "../../../hooks/useThreatReportDownload";
+import { updateThreatFiltersStore } from "../../threat_detection/utils/threatFilters";
 
-const sortOptions = [
-    { label: 'Number of endpoints', value: 'numberOfEndpoints asc', directionLabel: 'More', sortKey: 'numberOfEndpoints', columnIndex: 3 },
-    { label: 'Number of endpoints', value: 'numberOfEndpoints desc', directionLabel: 'Less', sortKey: 'numberOfEndpoints', columnIndex: 3 },
+const getSortOptions = (category) => [
+    { label: mapLabel('Number of endpoints', category), value: 'numberOfEndpoints asc', directionLabel: 'More', sortKey: 'numberOfEndpoints', columnIndex: 3 },
+    { label: mapLabel('Number of endpoints', category), value: 'numberOfEndpoints desc', directionLabel: 'Less', sortKey: 'numberOfEndpoints', columnIndex: 3 },
     { label: 'Discovered time', value: 'creationTime asc', directionLabel: 'Newest', sortKey: 'creationTime', columnIndex: 6 },
     { label: 'Discovered time', value: 'creationTime desc', directionLabel: 'Oldest', sortKey: 'creationTime', columnIndex: 6 },
 ];
@@ -68,11 +69,68 @@ function ThreatCompliancePage() {
     const [detailsLoading, setDetailsLoading] = useState(false);
     const [tableKey, setTableKey] = useState(false);
     const [currentAppliedFilters, setCurrentAppliedFilters] = useState({});
+    const [threatFiltersLoading, setThreatFiltersLoading] = useState(true);
 
     const collectionsMap = PersistStore((state) => state.collectionsMap);
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
+    const setThreatFiltersMap = SessionStore((state) => state.setThreatFiltersMap);
 
     const { tabsInfo, selectItems } = useTable();
+    const dashboardCategory = getDashboardCategory();
+
+    // Fetch threat filters data on mount
+    useEffect(() => {
+        const fetchThreatFiltersData = async () => {
+            setThreatFiltersLoading(true);
+            try {
+                // Fetch threat filter templates
+                const resp = await threatDetectionApi.fetchFilterYamlTemplate();
+                const templates = Array.isArray(resp?.templates) ? resp.templates : [];
+                
+                if (templates.length === 0) {
+                    setThreatFiltersLoading(false);
+                    return;
+                }
+
+                // Update threat filters store
+                updateThreatFiltersStore(templates);
+
+                // Fetch and merge compliance info
+                const complianceResp = await threatDetectionApi.fetchThreatComplianceInfos();
+                if (complianceResp?.threatComplianceInfos && Array.isArray(complianceResp.threatComplianceInfos)) {
+                    const threatComplianceMap = {};
+                    complianceResp.threatComplianceInfos.forEach((compliance) => {
+                        threatComplianceMap[compliance._id] = compliance;
+                    });
+
+                    const currentThreatFiltersMap = SessionStore.getState().threatFiltersMap || {};
+                    const updatedThreatFiltersMap = { ...currentThreatFiltersMap };
+
+                    Object.keys(updatedThreatFiltersMap).forEach((filterId) => {
+                        const complianceKey = `threat_compliance/${filterId}.conf`;
+                        const compliance = threatComplianceMap[complianceKey];
+
+                        if (compliance) {
+                            updatedThreatFiltersMap[filterId] = {
+                                ...updatedThreatFiltersMap[filterId],
+                                compliance: {
+                                    mapComplianceToListClauses: compliance.mapComplianceToListClauses
+                                }
+                            };
+                        }
+                    });
+
+                    setThreatFiltersMap(updatedThreatFiltersMap);
+                }
+            } catch (e) {
+                console.error(`Failed to fetch threat filters data: ${e?.message}`);
+            } finally {
+                setThreatFiltersLoading(false);
+            }
+        };
+
+        fetchThreatFiltersData();
+    }, []);
 
     const resetResourcesSelected = () => {
         TableStore.getState().setSelectedItems([])
@@ -114,14 +172,14 @@ function ThreatCompliancePage() {
             value: "issueName",
         },
         {
-            title: "Number of endpoints",
-            text: "Number of endpoints",
+            title: mapLabel("Number of endpoints", dashboardCategory),
+            text: mapLabel("Number of endpoints", dashboardCategory),
             value: "numberOfEndpoints",
             sortActive: true
         },
         {
-            title: "Domains",
-            text: "Domains",
+            title: mapLabel("Domains", dashboardCategory),
+            text: mapLabel("Domains", dashboardCategory),
             value: "domains"
         },
         {
@@ -339,7 +397,7 @@ function ThreatCompliancePage() {
             if (severityFilter.length > 0) appliedFilters.severity = severityFilter;
             setCurrentAppliedFilters(appliedFilters);
 
-            const sort = sortKey && sortOrder ? { [sortKey]: sortOrder === 'asc' ? 1 : -1 } : {};
+            const sort = sortKey && sortOrder ? { [sortKey]: sortOrder === -1 ? 1 : -1 } : {};
             const successfulBool = true;
 
             const res = await threatDetectionApi.fetchSuspectSampleData(
@@ -387,6 +445,17 @@ function ThreatCompliancePage() {
 
                 const key = `${item?.filterId}|${threatPolicy.severity || 'HIGH'}`;
 
+                // Get domain from collectionsMap, fall back to host field, then "-"
+                const getDomain = (item) => {
+                    if (item?.apiCollectionId && collectionsMap[item.apiCollectionId]) {
+                        return collectionsMap[item.apiCollectionId];
+                    }
+                    if (item?.host) {
+                        return item.host;
+                    }
+                    return "-";
+                };
+
                 if (!uniqueThreatsMap.has(key)) {
                     uniqueThreatsMap.set(key, {
                         id: { testSubCategory: item?.filterId },
@@ -397,7 +466,7 @@ function ThreatCompliancePage() {
                         category: 'Threat',
                         numberOfEndpoints: 1,
                         creationTime: item?.timestamp || Math.floor(Date.now() / 1000),
-                        domains: [collectionsMap[item?.apiCollectionId] || "-"],
+                        domains: [getDomain(item)],
                         urls: [{
                             method: item?.method,
                             url: item?.url,
@@ -407,7 +476,7 @@ function ThreatCompliancePage() {
                     });
                 } else {
                     const existingThreat = uniqueThreatsMap.get(key);
-                    const domain = collectionsMap[item?.apiCollectionId] || "-";
+                    const domain = getDomain(item);
                     if (!existingThreat.domains.includes(domain)) {
                         existingThreat.domains.push(domain);
                     }
@@ -431,14 +500,14 @@ function ThreatCompliancePage() {
                 if (sortKey === 'numberOfEndpoints') {
                     aValue = a.numberOfEndpoints;
                     bValue = b.numberOfEndpoints;
-                    order = sortOrder === 'asc' ? 1 : -1;
+                    order = sortOrder === -1 ? 1 : -1;
                     if (aValue !== bValue) {
                         return aValue < bValue ? -1 * order : 1 * order;
                     }
                 } else if (sortKey === 'creationTime') {
                     aValue = a.creationTime;
                     bValue = b.creationTime;
-                    order = sortOrder === 'asc' ? 1 : -1;
+                    order = sortOrder === -1 ? 1 : -1;
                     if (aValue !== bValue) {
                         return aValue < bValue ? -1 * order : 1 * order;
                     }
@@ -692,7 +761,8 @@ function ThreatCompliancePage() {
         return actions;
     }
 
-    const key = startTimestamp + endTimestamp + currentTab + complianceView;
+    const threatFiltersCount = threatFiltersMap ? Object.keys(threatFiltersMap).length : 0;
+    const key = startTimestamp + endTimestamp + currentTab + complianceView + threatFiltersCount;
 
     return (
         <PageWithMultipleCards
@@ -745,7 +815,13 @@ function ThreatCompliancePage() {
             }
             isFirstPage={true}
             components={
-                (!threatFiltersMap || Object.keys(threatFiltersMap).length === 0) ? [
+                threatFiltersLoading ? [
+                    <Box key="loading" padding="10">
+                        <HorizontalStack align="center">
+                            <Spinner size="large" />
+                        </HorizontalStack>
+                    </Box>
+                ] : (!threatFiltersMap || Object.keys(threatFiltersMap).length === 0) ? [
                     <EmptyScreensLayout
                         key="emptyScreen"
                         iconSrc={"/public/alert_hexagon.svg"}
@@ -761,7 +837,7 @@ function ThreatCompliancePage() {
                         pageLimit={50}
                         headers={headers}
                         resourceName={resourceName}
-                        sortOptions={sortOptions}
+                        sortOptions={getSortOptions(dashboardCategory)}
                         disambiguateLabel={disambiguateLabel}
                         loading={loading}
                         fetchData={fetchData}

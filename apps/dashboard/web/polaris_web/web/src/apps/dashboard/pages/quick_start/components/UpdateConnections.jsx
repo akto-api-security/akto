@@ -62,7 +62,7 @@ function UpdateConnections(props) {
     };
 
     const handleSeeDocsEndpointShield = () => {
-        window.open('https://docs.akto.io/mcp-endpoint-shield', '_blank');
+        window.open('https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/mcp-endpoint-shield', '_blank');
     };
 
     const showRecommendedSetup = !func.checkLocal() && isEndpointSecurityCategory();

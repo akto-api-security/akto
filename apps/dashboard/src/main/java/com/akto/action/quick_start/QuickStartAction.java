@@ -511,7 +511,7 @@ public class QuickStartAction extends UserAction {
                 addActionError("Datadog API key, App key and Site are required");
                 return Action.ERROR.toUpperCase();
             }
-            DataDogConfig dataDogConfig = new DataDogConfig();
+            DataDogConfig dataDogConfig = new DataDogConfig(Context.accountId.get());
             dataDogConfig.setApiKey(datadogApiKey);
             dataDogConfig.setAppKey(datadogAppKey);
             dataDogConfig.setSite(datadogSite);
@@ -543,7 +543,8 @@ public class QuickStartAction extends UserAction {
             Context.accountId.get(),
             jobParams,
             JobExecutorType.DASHBOARD,
-            60*60
+            60*60,
+            Context.now()
         );
 
         logger.infoAndAddToDb("Datadog traffic collector job scheduled to run every hour");

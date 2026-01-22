@@ -145,6 +145,8 @@ public class ApiCountCacheLayer implements CounterCache {
     public void setLongWithExpiry(String key, long value, long expirySeconds) {
         try {
             this.redis.sync().setex(key, expirySeconds, value);
+            // Also update local cache so get() doesn't return stale data
+            this.localCache.put(key, value);
         } catch (Exception e) {
             e.printStackTrace();
         }

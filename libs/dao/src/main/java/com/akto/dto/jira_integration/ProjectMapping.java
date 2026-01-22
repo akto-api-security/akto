@@ -13,4 +13,5 @@ import lombok.Setter;
 public class ProjectMapping {
     private Set<JiraStatus> statuses;
     private BiDirectionalSyncSettings biDirectionalSyncSettings;
+    private PriorityFieldMapping priorityFieldMapping;
 }

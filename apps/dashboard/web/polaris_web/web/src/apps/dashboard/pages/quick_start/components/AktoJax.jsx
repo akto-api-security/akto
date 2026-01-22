@@ -32,6 +32,8 @@ const AktoJax = () => {
     const [clickExternalLinks, setClickExternalLinks] = useState(false);
     const [crawlingTime, setCrawlingTime] = useState(600);
     const [customHeaders, setCustomHeaders] = useState([]);
+    const [runTestAfterCrawling, setRunTestAfterCrawling] = useState(false);
+    const [selectedMiniTestingService, setSelectedMiniTestingService] = useState('');
 
     const [availableModules, setAvailableModules] = useState([])
     const [selectedModule, setSelectedModule] = useState("")
@@ -77,7 +79,7 @@ const AktoJax = () => {
         });
 
         setLoading(true)
-        api.initiateCrawler(hostname, email, password, apiKey, window.location.origin, testRole, outscopeUrls, crawlingTime, selectedModule, customHeadersMap).then((res) => {
+        api.initiateCrawler(hostname, email, password, apiKey, window.location.origin, testRole, outscopeUrls, crawlingTime, selectedModule, customHeadersMap, runTestAfterCrawling, selectedMiniTestingService).then((res) => {
             func.setToast(true, false, "Crawler initiated successfully. Please check your dashboard for updates.")
         }).catch((err) => {
             console.error("Error initiating crawler:", err)
@@ -89,6 +91,8 @@ const AktoJax = () => {
             setPassword('')
             setTestRole('')
             setCustomHeaders([])
+            setRunTestAfterCrawling(false)
+            setSelectedMiniTestingService('')
         })
     }
 
@@ -137,6 +141,10 @@ const AktoJax = () => {
                 setClickExternalLinks={setClickExternalLinks}
                 crawlingTime={crawlingTime}
                 setCrawlingTime={setCrawlingTime}
+                runTestAfterCrawling={runTestAfterCrawling}
+                setRunTestAfterCrawling={setRunTestAfterCrawling}
+                selectedMiniTestingService={selectedMiniTestingService}
+                setSelectedMiniTestingService={setSelectedMiniTestingService}
             />
 
             <Box paddingBlockStart={3}><Divider /></Box>

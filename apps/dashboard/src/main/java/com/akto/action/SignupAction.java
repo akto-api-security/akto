@@ -3,6 +3,10 @@ package com.akto.action;
 import static com.akto.dao.MCollection.SET;
 import static com.mongodb.client.model.Filters.eq;
 
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Updates;
+
 import com.akto.dao.AccountsDao;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.CustomRoleDao;
@@ -40,7 +44,9 @@ import com.akto.utils.GithubLogin;
 import com.akto.utils.JWT;
 import com.akto.utils.OktaLogin;
 import com.akto.utils.billing.OrganizationUtils;
+import com.akto.utils.crons.OrganizationCache;
 import com.akto.utils.sso.CustomSamlSettings;
+import com.akto.util.Pair;
 import com.akto.utils.sso.SsoUtils;
 import com.auth0.Tokens;
 import com.auth0.jwk.Jwk;
@@ -64,15 +70,10 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import lombok.Setter;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.security.interfaces.RSAPublicKey;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
@@ -528,7 +529,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
             // All headers
             logger.infoAndAddToDb("[registerViaOkta] === ALL REQUEST HEADERS ===");
-            java.util.Enumeration<String> headerNames = servletRequest.getHeaderNames();
+            Enumeration<String> headerNames = servletRequest.getHeaderNames();
             if(headerNames != null) {
                 while(headerNames.hasMoreElements()) {
                     String headerName = headerNames.nextElement();
@@ -1234,8 +1235,29 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         createUserAndRedirect(userEmail, username, signupInfo, invitationToAccount, method, defaultRole);
     }
 
+    // Organization cache initialization - only done once
+    private static boolean organizationCacheInitialized = false;
+    private static final OrganizationCache organizationCache = new OrganizationCache();
+
     private void createUserAndRedirect(String userEmail, String username, SignupInfo signupInfo,
                                        int invitationToAccount, String method, String invitedRole) throws IOException {
+        
+        // Trigger organization cache once
+        if (!organizationCacheInitialized) {
+            synchronized (SignupAction.class) {
+                if (!organizationCacheInitialized) {
+                    try {
+                        logger.infoAndAddToDb("Initializing organization cache scheduler for signup flow", LogDb.DASHBOARD);
+                        organizationCache.setUpOrganizationCacheScheduler();
+                        organizationCacheInitialized = true;
+                        logger.infoAndAddToDb("Organization cache scheduler initialized successfully. Cache will refresh every 10 minutes.", LogDb.DASHBOARD);
+                    } catch (Exception e) {
+                        logger.errorAndAddToDb(e, "Failed to initialize organization cache: " + e.getMessage(), LogDb.DASHBOARD);
+                    }
+                }
+            }
+        }
+        
         logger.infoAndAddToDb("[createUserAndRedirect] ========== USER CREATION/LOGIN FLOW ==========");
         logger.infoAndAddToDb("[createUserAndRedirect] Called with parameters:");
         logger.infoAndAddToDb("  - userEmail: " + userEmail);
@@ -1249,7 +1271,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         logger.info("[createUserAndRedirect] Looking up existing user by email");
         User user = UsersDao.instance.findOne(eq("login", userEmail));
         logger.infoAndAddToDb("[createUserAndRedirect] User lookup result: " + (user != null ? "EXISTING USER FOUND (id: " + user.getId() + ")" : "NEW USER (no existing record)"));
-
+        boolean newOrgSetup = false;
         if (user == null && "false".equalsIgnoreCase(shouldLogin)) {
             logger.infoAndAddToDb("[createUserAndRedirect] Path: NEW USER + shouldLogin=false -> Creating signup record without full account");
             SignupUserInfo signupUserInfo = SignupDao.instance.insertSignUp(userEmail, username, signupInfo, invitationToAccount);
@@ -1284,26 +1306,78 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 logger.infoAndAddToDb("[createUserAndRedirect] Creating NEW USER account");
 
                 if (accountId == 0) {
-                    logger.info("[createUserAndRedirect] No accountId from invitation, creating new account");
-                    accountId = AccountAction.createAccountRecord("My account");
-                    logger.infoAndAddToDb("[createUserAndRedirect] Created new accountId: " + accountId);
+                    logger.info("[createUserAndRedirect] No accountId from invitation, checking for existing organization by domain matching");
 
-                    // Create organization for new user
-                    if (DashboardMode.isSaasDeployment()) {
-                        logger.info("[createUserAndRedirect] SaaS deployment, creating organization for new user");
-                        String organizationUUID = UUID.randomUUID().toString();
+                    // Extract domain from user email for domain matching
+                    String userDomain = null;
+                    if (userEmail != null && userEmail.contains("@")) {
+                        userDomain = userEmail.split("@")[1].toLowerCase();
+                        logger.info("[createUserAndRedirect] User domain extracted: " + userDomain);
+                    }
+                    Pair<String, String> matchedOrgInfo = null;
 
-                        Set<Integer> organizationAccountsSet = new HashSet<Integer>();
-                        organizationAccountsSet.add(accountId);
+                    if (userDomain != null) {
+                        logger.info("[createUserAndRedirect] Searching for existing organizations with matching domain using cache");
 
-                        Organization organization = new Organization(organizationUUID, userEmail, userEmail, organizationAccountsSet, false);
-                        OrganizationsDao.instance.insertOne(organization);
-                        logger.infoAndAddToDb(String.format("[createUserAndRedirect] Created organization %s for new user %s", organizationUUID, userEmail));
+                            logger.info("[createUserAndRedirect] Cache populated with " + OrganizationCache.getCacheSize() + " organizations");
+                            matchedOrgInfo = OrganizationCache.getOrganizationInfoByDomain(userDomain);
+                    }
 
-                        Boolean attemptSyncWithAktoSuccess = OrganizationUtils.syncOrganizationWithAkto(organization);
-                        logger.infoAndAddToDb(String.format("[createUserAndRedirect] Organization %s for new user %s - Akto sync status: %s", organizationUUID, userEmail, attemptSyncWithAktoSuccess));
+                    if (matchedOrgInfo != null) {
+                        logger.infoAndAddToDb("[createUserAndRedirect] Adding user to existing organization: " + matchedOrgInfo.getFirst());
+
+                        // Fetch organization with projection to get only ACCOUNTS field for performance
+                        Organization matchedOrganization = OrganizationsDao.instance.findOne(
+                            Filters.eq(Organization.ID, matchedOrgInfo.getFirst()),
+                            Projections.include(Organization.ID, Organization.ACCOUNTS)
+                        );
+                        Set<Integer> orgAccounts = matchedOrganization.getAccounts();
+                        logger.info("[createUserAndRedirect] Organization has " + orgAccounts.size() + " account(s)");
+
+                        if (orgAccounts.size() == 1) {
+                            // Single account - link user to this account
+                            accountId = orgAccounts.iterator().next();
+                            logger.infoAndAddToDb("[createUserAndRedirect] Single account organization - linking user to accountId: " + accountId);
+                        } else {
+                            // Multiple accounts organization - link user to admin's first account
+                            logger.info("[createUserAndRedirect] Multiple account organization found, finding admin user");
+                            
+                            String orgAdminEmail = matchedOrgInfo.getSecond(); // Get admin email from cache
+                            
+                            // Find the admin user in users collection
+                            User adminUser = UsersDao.instance.findOne(eq(User.LOGIN, orgAdminEmail));
+                            // Get the first account from admin's account array
+                            String firstAdminAccountId = adminUser.getAccounts().keySet().iterator().next();
+                            accountId = Integer.parseInt(firstAdminAccountId);
+                            logger.infoAndAddToDb("[createUserAndRedirect] Multiple account organization - linking user to admin's first accountId: " + accountId);
+                        }
+                        invitationToAccount = accountId;
+                        if (UsageMetricCalculator.isRbacFeatureAvailable(invitationToAccount)) {
+                            invitedRole = fetchDefaultInviteRole(invitationToAccount, RBAC.Role.GUEST.name());
+                        }
                     } else {
-                        logger.info("[createUserAndRedirect] On-prem deployment, skipping organization creation");
+                        logger.info("[createUserAndRedirect] No matching organization found by domain, creating new account and organization");
+
+                        accountId = AccountAction.createAccountRecord("My account");
+                        logger.infoAndAddToDb("[createUserAndRedirect] Created new accountId: " + accountId);
+
+                        // Create organization for new user
+                        newOrgSetup = true;
+                            logger.info("[createUserAndRedirect] SaaS deployment, creating organization for new user");
+                            String organizationUUID = UUID.randomUUID().toString();
+
+                            Set<Integer> organizationAccountsSet = new HashSet<Integer>();
+                            organizationAccountsSet.add(accountId);
+
+                            Organization organization = new Organization(organizationUUID, userEmail, userEmail, organizationAccountsSet, false);
+                            OrganizationsDao.instance.insertOne(organization);
+                            logger.infoAndAddToDb(String.format("[createUserAndRedirect] Created organization %s for new user %s", organizationUUID, userEmail));
+
+                            Boolean attemptSyncWithAktoSuccess = OrganizationUtils.syncOrganizationWithAkto(organization);
+                            logger.infoAndAddToDb(String.format("[createUserAndRedirect] Organization %s for new user %s - Akto sync status: %s", organizationUUID, userEmail, attemptSyncWithAktoSuccess));
+
+                        // Note: If no planType is set on the organization, user will see FreeApp UI
+                        logger.info("[createUserAndRedirect] Organization created without planType - user will see FreeApp UI");
                     }
                 }
 
@@ -1353,7 +1427,12 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
 
             logger.infoAndAddToDb("[createUserAndRedirect] Initializing account for new user");
-            user = AccountAction.initializeAccount(userEmail, accountId, "My account",invitationToAccount == 0, invitedRole == null ? RBAC.Role.ADMIN.name() : invitedRole);
+            if(!newOrgSetup){
+                Account oldAccount = AccountsDao.instance.findOne("_id", invitationToAccount);
+                user = AccountAction.initializeAccount(userEmail, invitationToAccount, oldAccount.getName(),false, invitedRole == null ? RBAC.Role.MEMBER.name() : invitedRole);
+            }else {
+                user = AccountAction.initializeAccount(userEmail, accountId, "My account", invitationToAccount == 0, invitedRole == null ? RBAC.Role.ADMIN.name() : invitedRole);
+            }
             logger.infoAndAddToDb("[createUserAndRedirect] Account initialized successfully for accountId: " + accountId);
 
             servletRequest.getSession().setAttribute("user", user);

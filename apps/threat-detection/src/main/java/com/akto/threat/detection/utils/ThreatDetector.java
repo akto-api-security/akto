@@ -56,7 +56,7 @@ public class ThreatDetector {
     }
 
     public boolean applyFilter(FilterConfig threatFilter, HttpResponseParams httpResponseParams, RawApi rawApi,
-            ApiInfoKey apiInfoKey) {
+            ApiInfoKey apiInfoKey, URLTemplate matchedTemplate) {
         try {
             if(threatFilter.getId().equals(USER_AUTH_MISMATCH_FILTER_ID)){
                 return isUserAuthMismatchThreat(httpResponseParams, rawApi);
@@ -68,13 +68,13 @@ public class ThreatDetector {
             //     return isSqliThreat(httpResponseParams);
             // }
             if (threatFilter.getId().equals(OS_COMMAND_INJECTION_FILTER_ID)) {
-                return isOsCommandInjectionThreat(httpResponseParams); 
+                return isOsCommandInjectionThreat(httpResponseParams);
             }
             if (threatFilter.getId().equals(SSRF_FILTER_ID)) {
-                return isSSRFThreat(httpResponseParams); 
+                return isSSRFThreat(httpResponseParams);
             }
             if (threatFilter.getId().equals(PARAM_ENUMERATION_FILTER_ID)) {
-                return isParamEnumerationThreat(httpResponseParams);
+                return isParamEnumerationThreat(httpResponseParams, matchedTemplate);
             }
             return validateFilterForRequest(threatFilter, rawApi, apiInfoKey);
         } catch (Exception e) {
@@ -113,7 +113,7 @@ public class ThreatDetector {
         return paramNameAndValue;
     }
 
-    private URLTemplate findMatchingUrlTemplate(HttpResponseParams httpResponseParams){
+    public URLTemplate findMatchingUrlTemplate(HttpResponseParams httpResponseParams){
         AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
         Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates = config.getApiCollectionUrlTemplates();
 
@@ -121,7 +121,7 @@ public class ThreatDetector {
         String url = httpResponseParams.getRequestParams().getURL();
         String method = httpResponseParams.getRequestParams().getMethod();
 
-        // Get matching api template for this static url. 
+        // Get matching api template for this static url.
         // Example:
         // threat traffic url: /v1/users/123/?/etc/passwd -> clean this url ->
         // /v1/users/123
@@ -133,9 +133,9 @@ public class ThreatDetector {
 
     }
 
-    public boolean isParamEnumerationThreat(HttpResponseParams httpResponseParams) {
-        
-        URLTemplate urlTemplate = findMatchingUrlTemplate(httpResponseParams);
+    public boolean isParamEnumerationThreat(HttpResponseParams httpResponseParams, URLTemplate matchedTemplate) {
+
+        URLTemplate urlTemplate = matchedTemplate;
         if(urlTemplate == null){
             return false;
         }
@@ -143,16 +143,16 @@ public class ThreatDetector {
         String url = httpResponseParams.getRequestParams().getURL();
 
         List<Pair<String, String>> paramNamesAndValues = getUrlParamNamesAndValues(url, urlTemplate);
-        
+
 
         for(Pair<String, String> paramNameAndValue : paramNamesAndValues){
             String paramName = paramNameAndValue.getFirst();
             String paramValue = paramNameAndValue.getSecond();
             boolean isUserEnumAttack = ParamEnumerationDetector.getInstance().recordAndCheck(
                 httpResponseParams.getSourceIP(),
-                httpResponseParams.requestParams.getApiCollectionId(), 
+                httpResponseParams.requestParams.getApiCollectionId(),
                 httpResponseParams.getRequestParams().getMethod(),
-                urlTemplate.getTemplateString(), 
+                urlTemplate.getTemplateString(),
                 paramName,
                 paramValue
             );

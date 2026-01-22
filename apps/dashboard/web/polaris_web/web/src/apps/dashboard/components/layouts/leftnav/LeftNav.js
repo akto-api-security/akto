@@ -421,8 +421,13 @@ export default function LeftNav() {
                     ),
                     icon: DiamondAlertMinor,
                     onClick: () => {
-                        handleSelect("dashboard_threat_actor");
-                        navigate("/dashboard/protection/threat-actor");
+                        if (dashboardCategory === CATEGORY_API_SECURITY) {
+                            handleSelect("dashboard_threat_dashboard");
+                            navigate("/dashboard/protection/threat-dashboard");
+                        } else {
+                            handleSelect("dashboard_threat_actor");
+                            navigate("/dashboard/protection/threat-actor");
+                        }
                         setActive("normal");
                     },
                     selected: (leftNavSelected.includes("_threat") && !leftNavSelected.includes("_reports")) || leftNavSelected.includes("_guardrails"),
@@ -476,7 +481,7 @@ export default function LeftNav() {
                             },
                             selected: leftNavSelected === "dashboard_guardrails_policies",
                             }] : []),
-                        ...(dashboardCategory !== "Endpoint Security" ? [{
+                        ...(dashboardCategory === CATEGORY_API_SECURITY || dashboardCategory === CATEGORY_DAST ? [{
                             label: "Threat Policies",
                             onClick: () => {
                                 navigate("/dashboard/protection/threat-policy");
@@ -582,7 +587,7 @@ export default function LeftNav() {
         ]
 
         // Add Ask AI navigation item
-        const askAiExists = true;
+        const askAiExists = items.find(item => item.key === "ask_ai")
         if (!askAiExists && window.USER_NAME.indexOf("@akto.io")) {
             items.splice(1, 0, {
                 label: "Ask Akto",

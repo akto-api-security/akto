@@ -28,6 +28,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.rbac.UsersCollectionsList;
+import com.akto.dto.testing.AccessTypeTestingEndpoints;
 import com.akto.dto.testing.AuthTypeTestingEndpoints;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.testing.SensitiveDataEndpoints;
@@ -80,7 +81,8 @@ public class ApiCollectionUsers {
         }
         List<Bson> filterList = SingleTypeInfoDao.filterForHostHostHeaderRaw();
         boolean hasAuthFilter = checkAuthTypeFilter(conditions);
-        if (hasAuthFilter) {
+        boolean hasApiAccessType = checkApiAccessTypeFilter(conditions);
+        if (hasAuthFilter || hasApiAccessType) {
             int apiInfoCount = getApisCountFromConditions(conditions, deactivatedCollections);
             if (apiInfoCount >= MAX_ALLOWED_API_COUNT) {
                 Bson apiInfoFilter = getFilters(conditions,CollectionType.Id_ApiCollectionId);
@@ -327,6 +329,15 @@ public class ApiCollectionUsers {
     private static boolean checkAuthTypeFilter(List<TestingEndpoints> conditions) {
         for (TestingEndpoints condition : conditions) {
             if (condition instanceof AuthTypeTestingEndpoints) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean checkApiAccessTypeFilter(List<TestingEndpoints> conditions) {
+        for (TestingEndpoints condition : conditions) {
+            if (condition instanceof AccessTypeTestingEndpoints) {
                 return true;
             }
         }

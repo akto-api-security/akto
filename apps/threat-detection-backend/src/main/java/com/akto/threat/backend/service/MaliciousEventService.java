@@ -110,13 +110,26 @@ public class MaliciousEventService {
     String actor = evt.getActor();
     String filterId = evt.getFilterId();
 
+    MaliciousEventDto.Builder builder = MaliciousEventDto.newBuilder();
     // Skip recording for specific policies on specific account
-    if (IGNORED_POLICIES_FOR_ACCOUNT.contains(filterId) && "1763355072".equals(accountId)) {
-      return;
-    }
-    // Skip recording for specific policies on specific account
-    if ("OSCommandInjection".equals(filterId) && "1763355072".equals(accountId) && evt.getLatestApiEndpoint().contains("api-transactions")) {
-      return;
+    if("1763355072".equals(accountId)){
+      if (IGNORED_POLICIES_FOR_ACCOUNT.contains(filterId)) {
+        return;
+      }
+
+      if ("OSCommandInjection".equals(filterId) && evt.getLatestApiEndpoint().contains("api-transactions")) {
+        return;
+      }
+
+      if (("WeakAuthentication").equals(filterId)) {
+        String host = evt.getHost() != null ? evt.getHost() : "";
+        String hostWithoutPort = host.replaceAll(":\\d+$", "");
+        boolean isInternalHost = host.contains(".svc") ||
+            !hostWithoutPort.matches(".*\\.[a-zA-Z]{2,}$");
+        if (isInternalHost) {
+          builder.setSeverity("LOW");
+        }
+      }
     }
 
     String refId = UUID.randomUUID().toString();
@@ -140,27 +153,26 @@ public class MaliciousEventService {
         contextSource = evt.getContextSource();
     }
 
-    MaliciousEventDto.Builder builder = MaliciousEventDto.newBuilder()
-            .setDetectedAt(evt.getDetectedAt())
-            .setActor(actor)
-            .setFilterId(filterId)
-            .setLatestApiEndpoint(evt.getLatestApiEndpoint())
-            .setLatestApiMethod(URLMethods.Method.fromString(evt.getLatestApiMethod()))
-            .setLatestApiOrig(evt.getLatestApiPayload())
-            .setLatestApiCollectionId(evt.getLatestApiCollectionId())
-            .setEventType(maliciousEventType)
-            .setLatestApiIp(evt.getLatestApiIp())
-            .setCountry(evt.getMetadata().getCountryCode())
-            .setCategory(evt.getCategory())
-            .setSubCategory(evt.getSubCategory())
-            .setRefId(refId)
-            .setSeverity(evt.getSeverity())
-            .setType(evt.getType())
-            .setMetadata(evt.getMetadata().toString())
-            .setSuccessfulExploit(evt.getSuccessfulExploit())
-            .setStatus(MaliciousEventDto.Status.valueOf(status.toUpperCase()))
-            .setLabel(label)
-            .setHost(evt.getHost() != null ? evt.getHost() : "");
+    builder.setDetectedAt(evt.getDetectedAt())
+        .setActor(actor)
+        .setFilterId(filterId)
+        .setLatestApiEndpoint(evt.getLatestApiEndpoint())
+        .setLatestApiMethod(URLMethods.Method.fromString(evt.getLatestApiMethod()))
+        .setLatestApiOrig(evt.getLatestApiPayload())
+        .setLatestApiCollectionId(evt.getLatestApiCollectionId())
+        .setEventType(maliciousEventType)
+        .setLatestApiIp(evt.getLatestApiIp())
+        .setCountry(evt.getMetadata().getCountryCode())
+        .setCategory(evt.getCategory())
+        .setSubCategory(evt.getSubCategory())
+        .setRefId(refId)
+        .setSeverity(evt.getSeverity())
+        .setType(evt.getType())
+        .setMetadata(evt.getMetadata().toString())
+        .setSuccessfulExploit(evt.getSuccessfulExploit())
+        .setStatus(MaliciousEventDto.Status.valueOf(status.toUpperCase()))
+        .setLabel(label)
+        .setHost(evt.getHost() != null ? evt.getHost() : "");
 
     // Set contextSource if available
     if (contextSource != null && !contextSource.isEmpty()) {

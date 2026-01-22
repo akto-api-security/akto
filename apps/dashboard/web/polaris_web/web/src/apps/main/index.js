@@ -6,12 +6,14 @@ import { AppProvider } from "@shopify/polaris";
 import en from "@shopify/polaris/locales/en.json";
 import { StiggProvider } from '@stigg/react-sdk';
 import "@shopify/polaris/build/esm/styles.css";
-import ExpiredApp from "./ExpiredApp"
+import ExpiredApp from "./ExpiredApp";
+import FreeApp from "./FreeApp";
 
 const container = document.getElementById("root");
 const root = createRoot(container);
 
 let expired = false;
+const ALLOWED_PLANS = ['enterprise', 'professional', 'trial'];
 
 if (
   window.STIGG_CUSTOMER_ID &&
@@ -20,13 +22,39 @@ if (
   expired = true;
 }
 
+let free = false;
+const planType = window.PLAN_TYPE?.toLowerCase();
+
+// Bypass FreeApp for signup/login related pages
+const signupPages = ['/check-inbox', '/business-email', '/signup', '/sso-login', '/addUserToAccount', '/login'];
+const currentPath = window.location.pathname;
+const isSignupPage = signupPages.some(page => currentPath.startsWith(page));
+
+if (!isSignupPage && (!window.PLAN_TYPE || !ALLOWED_PLANS.includes(planType))) {
+  free = true;
+}
+
 if (expired) {
 
-  window.mixpanel.track("DASHBOARD_EXPIRED")
+  if (window.mixpanel && window.mixpanel.track) {
+    window.mixpanel.track("DASHBOARD_EXPIRED")
+  }
 
   root.render(
     <AppProvider i18n={en}>
       <ExpiredApp />
+    </AppProvider>
+  )
+
+} else if (free) {
+
+  if (window.mixpanel && window.mixpanel.track) {
+    window.mixpanel.track("DASHBOARD_FREE")
+  }
+
+  root.render(
+    <AppProvider i18n={en}>
+      <FreeApp />
     </AppProvider>
   )
 
