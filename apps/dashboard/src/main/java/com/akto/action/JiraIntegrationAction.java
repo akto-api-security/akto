@@ -1008,15 +1008,13 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         String url = jiraIntegration.getBaseUrl() + getCreateIssueEndpointBulk();
         
         Map<String, List<String>> headers = new HashMap<>();
-        String authHeader;
         if (isDataCenter(jiraType)) {
-            authHeader = "Bearer " + jiraIntegration.getApiToken();
+            headers.put("Authorization", Collections.singletonList("Bearer " + jiraIntegration.getApiToken()));
         } else {
-            authHeader = "Basic " + Base64.getEncoder().encodeToString(
+            headers.put("Authorization", Collections.singletonList("Basic " + Base64.getEncoder().encodeToString(
                 (jiraIntegration.getUserEmail() + ":" + jiraIntegration.getApiToken()).getBytes()
-            );
+            )));
         }
-        headers.put("Authorization", Collections.singletonList(authHeader));
 
         OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", reqPayload.toString(), headers, "");
 
