@@ -977,36 +977,8 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                 // Use display name from FilterYamlTemplate if available
                 String displayName = filterIdToNameMap.get(filterId);
                 
-                // If no mapping found, convert filterId to readable name
-                // e.g., "SSRFInParams" -> "SSRF In Params", "DataExfiltrationInParams" -> "Data Exfiltration In Params"
-                if (displayName == null || displayName.isEmpty()) {
-                    // Insert space before capital letters (except the first one)
-                    String readable = filterId.replaceAll("([a-z])([A-Z])", "$1 $2");
-                    // Replace underscores with spaces
-                    readable = readable.replaceAll("_", " ");
-                    // Capitalize first letter of each word
-                    String[] words = readable.split("\\s+");
-                    StringBuilder resultBuilder = new StringBuilder();
-                    for (int i = 0; i < words.length; i++) {
-                        if (i > 0) {
-                            resultBuilder.append(" ");
-                        }
-                        if (!words[i].isEmpty()) {
-                            // Preserve acronyms (all caps) but capitalize first letter of other words
-                            if (words[i].matches("^[A-Z]+$")) {
-                                resultBuilder.append(words[i]);
-                            } else {
-                                resultBuilder.append(words[i].substring(0, 1).toUpperCase());
-                                if (words[i].length() > 1) {
-                                    resultBuilder.append(words[i].substring(1));
-                                }
-                            }
-                        }
-                    }
-                    displayName = resultBuilder.toString();
-                }
-                
-                doc.put("_id", displayName);
+                // Use displayName if available, otherwise fallback to filterId
+                doc.put("_id", (displayName != null && !displayName.isEmpty()) ? displayName : filterId);
                 doc.put("count", entry.getValue());
                 result.add(doc);
             }
