@@ -2148,6 +2148,17 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
+                <param name="root">crawlerRunsData</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+            </result>
+        </action>
+
+        <action name="api/fetchPendingDastJobsV2" class="com.akto.action.DbAction" method="fetchPendingDastJobsV2">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
                 <param name="root">crawlerRuns</param>
             </result>
             <result name="ERROR" type="json">
