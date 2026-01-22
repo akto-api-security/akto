@@ -942,8 +942,11 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                     if (filterConfig != null && filterConfig.getInfo() != null) {
                         Info info = filterConfig.getInfo();
                         
-                        // Try to get display name from category, fallback to name, then to filterId
-                        if (info.getCategory() != null) {
+                        // Try to get display name from info name first
+                        if (info.getName() != null && !info.getName().isEmpty()) {
+                            filterIdToNameMap.put(filterId, info.getName());
+                        } else if (info.getCategory() != null) {
+                            // Fallback to category display name or category name
                             Category category = info.getCategory();
                             String displayName = category.getDisplayName();
                             String categoryName = category.getName();
@@ -953,10 +956,6 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                             } else if (categoryName != null && !categoryName.isEmpty()) {
                                 filterIdToNameMap.put(filterId, categoryName);
                             }
-                        }
-                        // If no category, try to get name from info
-                        if (!filterIdToNameMap.containsKey(filterId) && info.getName() != null && !info.getName().isEmpty()) {
-                            filterIdToNameMap.put(filterId, info.getName());
                         }
                     }
                 }
