@@ -1552,9 +1552,6 @@ const getDocsUrl = (connector, dashboardCategory) => {
         if (isEndpointSecurityCategory(dashboardCategory) && urlMap.endpoint) {
             return urlMap.endpoint;
         }
-        if (isMCPSecurityCategory(dashboardCategory) && urlMap.mcp) {
-            return urlMap.mcp;
-        }
         if (isDastCategory(dashboardCategory) && urlMap.dast) {
             return urlMap.dast;
         }
@@ -1565,7 +1562,6 @@ const getDocsUrl = (connector, dashboardCategory) => {
         // If no category match found, return the first available URL as fallback
         const availableUrls = Object.values(urlMap).filter(url => url);
         if (availableUrls.length > 0) {
-            console.warn(`No URL found for category ${dashboardCategory} in connector ${connector.key}, using first available URL`);
             return availableUrls[0];
         }
 
@@ -1577,7 +1573,6 @@ const getDocsUrl = (connector, dashboardCategory) => {
         try {
             return connector.docsUrl(dashboardCategory);
         } catch (error) {
-            console.error(`Error calling docsUrl function for connector ${connector.key}:`, error);
             return null;
         }
     }
