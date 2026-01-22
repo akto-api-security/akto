@@ -1,6 +1,5 @@
 package com.akto.jobs.executors;
 
-import com.akto.api_clients.JiraApiClient;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.JiraIntegrationDao;
@@ -31,11 +30,9 @@ import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
-import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TicketSource;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.utils.FileUtils;
-
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -99,8 +96,6 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
             }
         }
 
-        Map<String, Info> infoMap = fetchYamlInfoMap(issues);
-
         List<JiraMetaData> batchMetaList = new ArrayList<>();
 
         for (TestingRunIssues issue : issues) {
@@ -111,7 +106,7 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
             }
 
             TestingIssuesId id = issue.getId();
-            Info info = infoMap.get(id.getTestSubCategory());
+            Info info = YamlTemplateDao.instance.fetchTestInfoMap(Filters.eq(YamlTemplateDao.ID, id.getTestSubCategory())).get(id.getTestSubCategory());
             if (info == null) {
                 logger.error("Yaml Template not found. issueId: {}", id);
                 continue;
@@ -157,14 +152,14 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
             batchMetaList.add(meta);
 
             if (batchMetaList.size() == BATCH_SIZE) {
-                processJiraBatch(batchMetaList, issueType, projId, jira, infoMap);
+                processJiraBatch(batchMetaList, issueType, projId, jira);
                 batchMetaList.clear();
                 updateJobHeartbeat(job);
             }
         }
 
         if (!batchMetaList.isEmpty()) {
-            processJiraBatch(batchMetaList, issueType, projId, jira, infoMap);
+            processJiraBatch(batchMetaList, issueType, projId, jira);
             updateJobHeartbeat(job);
         }
     }
@@ -202,16 +197,8 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         return TestingRunIssuesDao.instance.findAll(filter);
     }
 
-    private Map<String, Info> fetchYamlInfoMap(List<TestingRunIssues> issues) {
-        List<String> subCategories = issues.stream()
-            .map(i -> i.getId().getTestSubCategory())
-            .distinct()
-            .collect(Collectors.toList());
-        return YamlTemplateDao.instance.fetchTestInfoMap(Filters.in(YamlTemplateDao.ID, subCategories));
-    }
-
-    private void processJiraBatch(List<JiraMetaData> batch, String issueType, String projId, JiraIntegration jira, Map<String, Info> infoMap) throws Exception {
-        BasicDBObject payload = buildJiraPayload(batch, issueType, projId, jira, infoMap);
+    private void processJiraBatch(List<JiraMetaData> batch, String issueType, String projId, JiraIntegration jira) throws Exception {
+        BasicDBObject payload = buildJiraPayload(batch, issueType, projId, jira);
         List<String> createdKeys = sendJiraBulkCreate(jira, payload, batch, projId);
         logger.info("Created {} Jira issues out of {} Akto issues", createdKeys.size(), batch.size());
         List<TestingRunResult> results = fetchRunResults(batch);
@@ -234,12 +221,10 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         return results;
     }
 
-    private BasicDBObject buildJiraPayload(List<JiraMetaData> metaList, String issueType, String projId, JiraIntegration jira, Map<String, Info> infoMap) {
+    private BasicDBObject buildJiraPayload(List<JiraMetaData> metaList, String issueType, String projId, JiraIntegration jira) {
         BasicDBList issueUpdates = new BasicDBList();
         for (JiraMetaData meta : metaList) {
-            Info info = infoMap.get(meta.getTestingIssueId().getTestSubCategory());
-            Severity severity = parseSeverity(info);
-            BasicDBObject fields = buildJiraTicketPayload(meta, issueType, projId, jira, severity);
+            BasicDBObject fields = buildJiraTicketFields(meta, issueType, projId, jira);
             BasicDBObject issueObject = new BasicDBObject("fields", fields);
             issueUpdates.add(issueObject);
         }
@@ -247,28 +232,7 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         return payload;
     }
 
-    private Severity parseSeverity(Info info) {
-        if (info == null || info.getSeverity() == null) {
-            return null;
-        }
-        
-        String severityStr = info.getSeverity().toUpperCase();
-        
-        // Handle dynamic_severity or other non-standard severity values
-        if ("DYNAMIC_SEVERITY".equals(severityStr)) {
-            // For dynamic severity, we can't determine the actual severity here
-            // Default to null which will use the Jira project's default
-            return null;
-        }
-        
-        try {
-            return Severity.valueOf(severityStr);
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
-    }
-
-    private BasicDBObject buildJiraTicketPayload(JiraMetaData meta, String issueType, String projId, JiraIntegration jira, Severity severity) {
+    private BasicDBObject buildJiraTicketFields(JiraMetaData meta, String issueType, String projId, JiraIntegration jira) {
         String method = meta.getTestingIssueId().getApiInfoKey().getMethod().name();
         String endpoint = meta.getEndPointStr().replace("Endpoint - ", "");
         String truncated = endpoint.length() > 30 ? endpoint.substring(0, 15) + "..." + endpoint.substring(endpoint.length() - 15) : endpoint;
@@ -280,6 +244,7 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         fields.put("issuetype", new BasicDBObject("id", issueType));
         fields.put("labels", new String[]{JobConstants.TICKET_LABEL_AKTO_SYNC});
 
+        // Build description content
         List<BasicDBObject> contentList = new ArrayList<>();
         contentList.add(buildContentDetails(meta.getHostStr(), null));
         contentList.add(buildContentDetails(meta.getEndPointStr(), null));
@@ -287,7 +252,9 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         contentList.add(buildContentDetails(meta.getIssueDescription(), null));
 
         boolean isDataCenter = jira.getJiraType() == JiraIntegration.JiraType.DATA_CENTER;
+        
         if (isDataCenter) {
+            // Data Center uses Wiki Markup format
             StringBuilder description = new StringBuilder();
             for (BasicDBObject content : contentList) {
                 BasicDBList innerContent = (BasicDBList) content.get("content");
@@ -295,10 +262,13 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
                     BasicDBObject textObj = (BasicDBObject) innerContent.get(0);
                     String text = textObj.getString("text");
                     Object marks = textObj.get("marks");
+                    
+                    // Handle links
                     if (marks != null && marks instanceof List) {
-                        List<?> marksList = (List<?>) marks;
-                        if (!marksList.isEmpty() && marksList.get(0) instanceof BasicDBObject) {
-                            BasicDBObject mark = (BasicDBObject) marksList.get(0);
+                        @SuppressWarnings("unchecked")
+                        List<BasicDBObject> marksList = (List<BasicDBObject>) marks;
+                        if (!marksList.isEmpty()) {
+                            BasicDBObject mark = marksList.get(0);
                             if ("link".equals(mark.getString("type"))) {
                                 BasicDBObject attrs = (BasicDBObject) mark.get("attrs");
                                 String href = attrs.getString("href");
@@ -312,17 +282,13 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
             }
             fields.put("description", description.toString().trim());
         } else {
+            // Cloud uses Atlassian Document Format (ADF)
             BasicDBList fullContentList = new BasicDBList();
             fullContentList.addAll(contentList);
-            BasicDBObject description = new BasicDBObject("type", "doc").append("version", 1).append("content", fullContentList);
+            BasicDBObject description = new BasicDBObject("type", "doc")
+                .append("version", 1)
+                .append("content", fullContentList);
             fields.put("description", description);
-        }
-
-        if (severity != null && jira.getIssueSeverityToPriorityMap() != null) {
-            String priorityId = jira.getIssueSeverityToPriorityMap().get(severity.name());
-            if (priorityId != null && !priorityId.isEmpty()) {
-                fields.put("priority", new BasicDBObject("id", priorityId));
-            }
         }
 
         return fields;
@@ -423,9 +389,10 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
 
     private void attachFileToIssue(JiraIntegration jira, String issueId, String origReq, String testReq) {
         try {
-            String url = jira.getBaseUrl() + "/rest/api/3/issue/" + issueId + ATTACH_FILE_ENDPOINT;
-            String authHeader = Base64.getEncoder().encodeToString((jira.getUserEmail() + ":" + jira.getApiToken()).getBytes());
-
+            boolean isDataCenter = jira.getJiraType() == JiraIntegration.JiraType.DATA_CENTER;
+            String apiVersion = isDataCenter ? "2" : "3";
+            String url = jira.getBaseUrl() + "/rest/api/" + apiVersion + "/issue/" + issueId + ATTACH_FILE_ENDPOINT;
+            
             File file = FileUtils.createRequestFile(origReq, testReq);
             if (file == null) return;
 
@@ -434,12 +401,22 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
                 .addFormDataPart("file", file.getName(), RequestBody.create(file, mediaType))
                 .build();
 
-            Request request = new Request.Builder()
+            Request.Builder requestBuilder = new Request.Builder()
                 .url(url)
                 .post(requestBody)
-                .header("Authorization", "Basic " + authHeader)
-                .header("X-Atlassian-Token", "nocheck")
-                .build();
+                .header("X-Atlassian-Token", "nocheck");
+
+            // Set authentication based on deployment type
+            if (isDataCenter) {
+                // Data Center uses Bearer token
+                requestBuilder.header("Authorization", "Bearer " + jira.getApiToken());
+            } else {
+                // Cloud uses Basic auth
+                String authHeader = Base64.getEncoder().encodeToString((jira.getUserEmail() + ":" + jira.getApiToken()).getBytes());
+                requestBuilder.header("Authorization", "Basic " + authHeader);
+            }
+
+            Request request = requestBuilder.build();
 
             try (Response ignored = client.newCall(request).execute()) {
                 logger.info("File attached to Jira issue: {}", issueId);
