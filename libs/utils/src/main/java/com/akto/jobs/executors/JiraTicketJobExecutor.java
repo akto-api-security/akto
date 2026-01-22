@@ -1,5 +1,6 @@
 package com.akto.jobs.executors;
 
+import com.akto.api_clients.JiraApiClient;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.JiraIntegrationDao;
@@ -249,13 +250,7 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         String url = jira.getBaseUrl() + endpoint;
 
         Map<String, List<String>> headers = new HashMap<>();
-        if (isDataCenter) {
-            headers.put("Authorization", Collections.singletonList("Bearer " + jira.getApiToken()));
-        } else {
-            String authHeader = Base64.getEncoder().encodeToString(
-                (jira.getUserEmail() + ":" + jira.getApiToken()).getBytes());
-            headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
-        }
+        headers.put("Authorization", Collections.singletonList(JiraApiClient.getAuthorizationHeader(jira)));
 
         OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", payload.toString(), headers, "");
 
@@ -352,17 +347,8 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
             Request.Builder requestBuilder = new Request.Builder()
                 .url(url)
                 .post(requestBody)
+                .header("Authorization", JiraApiClient.getAuthorizationHeader(jira))
                 .header("X-Atlassian-Token", "nocheck");
-
-            // Set authentication based on deployment type
-            if (isDataCenter) {
-                // Data Center uses Bearer token
-                requestBuilder.header("Authorization", "Bearer " + jira.getApiToken());
-            } else {
-                // Cloud uses Basic auth
-                String authHeader = Base64.getEncoder().encodeToString((jira.getUserEmail() + ":" + jira.getApiToken()).getBytes());
-                requestBuilder.header("Authorization", "Basic " + authHeader);
-            }
 
             Request request = requestBuilder.build();
 
