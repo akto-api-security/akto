@@ -2352,8 +2352,8 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   },
 
    isWhiteListedOrganization(orgId){
-      window.USER_NAME?.toLowerCase().includes("akto");
-    }
+      return window.USER_NAME?.toLowerCase().includes("akto");
+    },
 
   isLimitedAccount(){
     return window?.ACTIVE_ACCOUNT === 1753372418

@@ -8,6 +8,7 @@ import { StiggProvider } from '@stigg/react-sdk';
 import "@shopify/polaris/build/esm/styles.css";
 import ExpiredApp from "./ExpiredApp";
 import FreeApp from "./FreeApp";
+import func from "../../util/func";
 
 const container = document.getElementById("root");
 const root = createRoot(container);
@@ -29,7 +30,7 @@ const planType = window.PLAN_TYPE?.toLowerCase();
 const signupPages = ['/check-inbox', '/business-email', '/signup', '/sso-login', '/addUserToAccount', '/login'];
 const currentPath = window.location.pathname;
 const isSignupPage = signupPages.some(page => currentPath.startsWith(page));
-const isWhitelisted = func.isWhiteListedOrganization(organizationId);
+const isWhitelisted = func.isWhiteListedOrganization();
 
 if (!isSignupPage && (!window.PLAN_TYPE || !ALLOWED_PLANS.includes(planType))) {
    free = !isWhitelisted;
