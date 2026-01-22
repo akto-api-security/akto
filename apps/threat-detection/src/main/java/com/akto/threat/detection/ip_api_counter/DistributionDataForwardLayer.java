@@ -65,17 +65,28 @@ public class DistributionDataForwardLayer {
                 // Look back 8 hours unconditionally to handle Kafka lag
                 long windowStart = safeWindowEnd - (LOOKBACK_HOURS * 60);
 
+                // Counters for this window size
+                int totalWindows = 0;
+                int alreadySentWindows = 0;
+                int emptyApiToBucketsWindows = 0;
+                int emptyBatchWindows = 0;
+                int successfulSends = 0;
+                int failedSends = 0;
+
                 for (long i = windowStart; i <= safeWindowEnd; i += windowSize) {
+                    totalWindows++;
 
                     // Check if this window was already sent (per-window tracking)
                     if (isWindowAlreadySent(windowSize, i + 1)) {
                         logger.debug("Window {} for windowSize {} already sent, skipping", i + 1, windowSize);
+                        alreadySentWindows++;
                         continue;
                     }
 
                     Map<String, Map<String, Integer>> apiToBuckets = distributionCalculator.getBucketDistribution(windowSize, i + 1);
                     if (apiToBuckets == null || apiToBuckets.isEmpty()) {
                         logger.debug("No distribution data for windowSize={} windowStart={}", windowSize, i + 1);
+                        emptyApiToBucketsWindows++;
                         continue;
                     }
 
@@ -111,14 +122,26 @@ public class DistributionDataForwardLayer {
                         boolean success = sendDistributionDataToBackend(batch, windowSize, i + 1);
                         if (success) {
                             markWindowAsSent(windowSize, i + 1);
+                            successfulSends++;
+                            logger.infoAndAddToDb(String.format("Sent distribution data to backend: windowSize=%d windowStart=%d batchSize=%d success=true",
+                                windowSize, i + 1, batch.size()));
+                        } else {
+                            failedSends++;
+                            logger.errorAndAddToDb(String.format("Failed to send distribution data for windowSize=%d windowStart=%d - will retry in next cron",
+                                windowSize, i + 1));
                         }
                     } else {
+                        emptyBatchWindows++;
                         logger.debug("Empty batch for windowSize={} windowStart={}", windowSize, i + 1);
                     }
                 }
+
+                // Log summary for this window size
+                logger.infoAndAddToDb(String.format("WindowSize=%d summary: totalWindows=%d alreadySent=%d emptyApiToBuckets=%d emptyBatch=%d successfulSends=%d failedSends=%d",
+                    windowSize, totalWindows, alreadySentWindows, emptyApiToBucketsWindows, emptyBatchWindows, successfulSends, failedSends));
             }
         } catch (Exception e) {
-            logger.error("Error in sendLastFiveMinuteDistributionData: {}", e.getMessage(), e);
+            logger.errorAndAddToDb(e, "Error in distribution data forward cron");
         }
     }
 
@@ -179,8 +202,8 @@ public class DistributionDataForwardLayer {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
 
             if (response.getStatusCode() == 200 && response.getBody() != null) {
-                logger.info("Successfully sent distribution data for windowSize={} windowStart={} (batch size: {})",
-                    windowSize, windowStart, batch.size());
+                logger.infoAndAddToDb(String.format("Successfully sent distribution data to threat backend: windowSize=%d windowStart=%d batchSize=%d",
+                    windowSize, windowStart, batch.size()));
                 return true;
             } else {
                 logger.errorAndAddToDb(String.format("Non-200 response from backend for windowSize=%d windowStart=%d: status=%d body=%s",
