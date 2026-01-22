@@ -508,26 +508,10 @@ function Jira() {
 
             // Handle both wrapped and unwrapped responses
             const values = Array.isArray(response) ? response : response?.availableFieldValues;
-            const fieldName = response?.fieldName;
-            const fieldType = response?.fieldType;
-            const fieldSchema = response?.fieldSchema;
 
-            const currentProject = projects[index];
-            const updates = {
+            actions.updateProject(index, {
                 availableFieldValues: values || []
-            };
-
-            // Update field metadata if provided by API
-            if (fieldName || fieldType) {
-                updates.priorityFieldMapping = {
-                    ...currentProject?.priorityFieldMapping,
-                    fieldId: fieldId,
-                    fieldName: fieldName || fieldId,
-                    fieldType: fieldType || 'unknown'
-                };
-            }
-
-            actions.updateProject(index, updates);
+            });
         } catch (error) {
             func.setToast(true, true, `Failed to fetch field values: ${error.message || 'Unknown error'}`);
         } finally {
@@ -929,51 +913,22 @@ function Jira() {
                                         )}
 
                                         {/* Severity Value Mapping */}
-                                        {project.priorityFieldMapping?.fieldId && (
+                                        {project.priorityFieldMapping?.fieldId && project.availableFieldValues && project.availableFieldValues.length > 0 && (
                                             <>
                                                 <HorizontalStack gap={12}>
                                                     <Text fontWeight='semibold' variant='headingXs'>Akto Severity</Text>
                                                     <Text fontWeight='semibold' variant='headingXs'>Jira Value</Text>
                                                 </HorizontalStack>
                                                 {aktoSeverities.map(severity => {
-                                                    const hasDropdownOptions = project.availableFieldValues && project.availableFieldValues.length > 0;
                                                     const selectedValueId = project.priorityFieldMapping?.severityToValueMap?.[severity];
+                                                    const valueOptions = project.availableFieldValues.map(v => ({
+                                                        label: v.name,
+                                                        value: v.id || v.name
+                                                    }));
+                                                    const selectedValue = project.availableFieldValues.find(v =>
+                                                        (v.id && v.id === selectedValueId) || v.name === selectedValueId
+                                                    );
 
-                                                    // If field has dropdown options, show dropdown
-                                                    if (hasDropdownOptions) {
-                                                        const valueOptions = project.availableFieldValues.map(v => ({
-                                                            label: v.name,
-                                                            value: v.id || v.name
-                                                        }));
-                                                        const selectedValue = project.availableFieldValues.find(v =>
-                                                            (v.id && v.id === selectedValueId) || v.name === selectedValueId
-                                                        );
-
-                                                        return (
-                                                            <HorizontalStack key={`severity-${severity}-${index}`} gap={8}>
-                                                                <Box width='82px'>
-                                                                    <Badge status={getSeverityBadgeColor(severity)}>
-                                                                        {severity.charAt(0) + severity.slice(1).toLowerCase()}
-                                                                    </Badge>
-                                                                </Box>
-                                                                <Dropdown
-                                                                    id={`severity-value-${project.projectId}-${severity}`}
-                                                                    selected={(value) => {
-                                                                        const valueId = Array.isArray(value) ? value[0] : value;
-                                                                        handlePriorityValueSelection(index, project, severity, valueId);
-                                                                    }}
-                                                                    menuItems={valueOptions}
-                                                                    placeholder="Select Value"
-                                                                    showSelectedItemLabels={true}
-                                                                    allowMultiple={false}
-                                                                    preSelected={selectedValueId ? [selectedValueId] : []}
-                                                                    value={selectedValue?.name || "Select Value"}
-                                                                />
-                                                            </HorizontalStack>
-                                                        );
-                                                    }
-
-                                                    // Otherwise, show text field (for freeform fields or when no options available)
                                                     return (
                                                         <HorizontalStack key={`severity-${severity}-${index}`} gap={8}>
                                                             <Box width='82px'>
@@ -981,13 +936,18 @@ function Jira() {
                                                                     {severity.charAt(0) + severity.slice(1).toLowerCase()}
                                                                 </Badge>
                                                             </Box>
-                                                            <TextField
-                                                                value={selectedValueId || ''}
-                                                                onChange={(value) => {
-                                                                    handlePriorityValueSelection(index, project, severity, value);
+                                                            <Dropdown
+                                                                id={`severity-value-${project.projectId}-${severity}`}
+                                                                selected={(value) => {
+                                                                    const valueId = Array.isArray(value) ? value[0] : value;
+                                                                    handlePriorityValueSelection(index, project, severity, valueId);
                                                                 }}
-                                                                placeholder='Enter value'
-                                                                autoComplete="off"
+                                                                menuItems={valueOptions}
+                                                                placeholder="Select Value"
+                                                                showSelectedItemLabels={true}
+                                                                allowMultiple={false}
+                                                                preSelected={selectedValueId ? [selectedValueId] : []}
+                                                                value={selectedValue?.name || "Select Value"}
                                                             />
                                                         </HorizontalStack>
                                                     );
@@ -996,7 +956,7 @@ function Jira() {
                                         )}
 
                                         {/* Save Button */}
-                                        {project.priorityFieldMapping?.fieldId && (
+                                        {project.priorityFieldMapping?.fieldId && project.availableFieldValues && project.availableFieldValues.length > 0 && (
                                             <HorizontalStack gap={2}>
                                                 <Button
                                                     primary

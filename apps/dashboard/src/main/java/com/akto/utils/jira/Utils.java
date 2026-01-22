@@ -527,36 +527,10 @@ public class Utils {
     }
 
     /**
-     * Converts plain text to Atlassian Document Format (ADF)
-     * @param text The plain text to convert
-     * @return ADF structured document
-     */
-    private static BasicDBObject buildAtlassianDocumentFormat(String text) {
-        BasicDBObject doc = new BasicDBObject();
-        doc.put("type", "doc");
-        doc.put("version", 1);
-
-        BasicDBList content = new BasicDBList();
-        BasicDBObject paragraph = new BasicDBObject();
-        paragraph.put("type", "paragraph");
-
-        BasicDBList paragraphContent = new BasicDBList();
-        BasicDBObject textNode = new BasicDBObject();
-        textNode.put("type", "text");
-        textNode.put("text", text);
-        paragraphContent.add(textNode);
-
-        paragraph.put("content", paragraphContent);
-        content.add(paragraph);
-        doc.put("content", content);
-
-        return doc;
-    }
-
-    /**
      * Formats a field value based on Jira field type
+     * Only handles dropdown field types since priority mapping only works with dropdown fields
      * @param fieldId The field ID (e.g., "priority", "customfield_10106")
-     * @param fieldType The field type (e.g., "priority", "option", "string", "number")
+     * @param fieldType The field type (e.g., "priority", "option", "array")
      * @param value The value to format
      * @return Formatted value object suitable for Jira API
      */
@@ -567,52 +541,13 @@ public class Utils {
             return new BasicDBObject("id", value);
         }
 
-        // Special handling for well-known field IDs
-        if ("labels".equals(fieldId)) {
-            // Labels field - array of strings
-            List<String> labels = new ArrayList<>();
-            String[] labelValues = value.split(",");
-            for (String label : labelValues) {
-                label = label.trim();
-                if (!label.isEmpty()) {
-                    labels.add(label);
-                }
-            }
-            return labels.isEmpty() ? null : labels;
-        }
-
-        // Format based on field type
+        // Format based on field type (only dropdown field types are supported for priority mapping)
         switch (fieldType.toLowerCase()) {
             case "priority":
             case "option":
             case "select":
                 // Select dropdown - use ID structure
                 return new BasicDBObject("id", value);
-
-            case "doc":
-            case "document":
-                // Rich text field - needs Atlassian Document Format (ADF)
-                return buildAtlassianDocumentFormat(value);
-
-            case "string":
-            case "text":
-                // Text field - return as plain string
-                // Note: Some string fields might actually be rich text (textarea)
-                // If Jira rejects with "Atlassian Document" error, the field needs ADF format
-                return value;
-
-            case "number":
-                // Number field - parse as number
-                try {
-                    if (value.contains(".")) {
-                        return Double.parseDouble(value);
-                    } else {
-                        return Integer.parseInt(value);
-                    }
-                } catch (NumberFormatException e) {
-                    loggerMaker.errorAndAddToDb("Failed to parse number value: " + value + " for field " + fieldId);
-                    return value; // Fallback to string
-                }
 
             case "array":
             case "multiselect":
@@ -628,18 +563,6 @@ public class Utils {
                     }
                 }
                 return array.isEmpty() ? null : array;
-
-            case "user":
-                // User picker - use accountId
-                return new BasicDBObject("accountId", value);
-
-            case "date":
-            case "datetime":
-                // Date/DateTime field - expects ISO 8601 format
-                // Date: "2026-01-22" or "2026-01-22"
-                // DateTime: "2026-01-22T10:30:00.000+0000"
-                // Return as-is, assuming user provided correct format
-                return value;
 
             default:
                 // Unknown type - log warning and default to ID structure for safety
