@@ -1,28 +1,62 @@
-import { Card, VerticalStack, Box, HorizontalStack, Text, DataTable } from '@shopify/polaris'
+import { Card, VerticalStack, Box, HorizontalStack, Text, DataTable, Tooltip } from '@shopify/polaris'
 import ComponentHeader from './ComponentHeader'
+import { flags } from '../../threat_detection/components/flags/index.mjs'
 
-const CustomDataTable = ({ title = "", data = [], showSignalIcon = true, itemId = "", onRemoveComponent }) => {
-    const rows = data.map(item => [
-        <HorizontalStack gap={3} blockAlign='center'>
-            {showSignalIcon && <img src='/public/menu-graph.svg' alt='growth-icon' />}
-            <div style={{ maxWidth: '300px', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-                <Text variant='bodyMd' fontWeight='medium'>{item.name}</Text>
+const CustomDataTable = ({ title = "", data = [], showSignalIcon = true, iconType = 'signal', itemId = "", onRemoveComponent, tooltipContent = "", columnHeaders = [] }) => {
+    const rows = data.map(item => {
+        // Render country icon if country is present
+        const countryIcon = item.country ? (
+            <Tooltip content={item.country || "Unknown"}>
+                <img
+                    src={item.country && item.country in flags ? flags[item.country] : flags["earth"]}
+                    alt={item.country}
+                    style={{ width: '20px', height: '20px', marginRight: '8px', flexShrink: 0 }}
+                />
+            </Tooltip>
+        ) : null;
+
+        // Determine which icon to show based on iconType
+        let iconElement = null;
+        if (showSignalIcon) {
+            if (iconType === 'globe') {
+                iconElement = <img src='/public/Globe_icon.svg' alt='globe-icon' style={{ width: '20px', height: '20px', flexShrink: 0 }} />;
+            } else {
+                iconElement = <img src='/public/menu-graph.svg' alt='growth-icon' style={{ width: '16px', height: '16px', flexShrink: 0 }} />;
+            }
+        }
+
+        return [
+            <HorizontalStack gap={3} blockAlign='center'>
+                {iconElement}
+                {countryIcon}
+                <div style={{ flex: 1, minWidth: 0, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+                    <Text variant='bodyMd' fontWeight='medium'>{item.name}</Text>
+                </div>
+            </HorizontalStack>,
+            <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                <Text variant='bodyMd' fontWeight='medium'>{item.value}</Text>
             </div>
-        </HorizontalStack>,
-        <div style={{color: '#D72C0D'}}>
-            <Text variant='bodyMd' fontWeight='medium'>{item.value}</Text>
-        </div>
-    ])
+        ]
+    })
+
+    // Use provided headers or default empty array, wrap in Text components with bold font weight and subdued color
+    const headings = columnHeaders.length > 0 
+        ? columnHeaders.map(header => 
+            typeof header === 'string' 
+                ? <Text as="span" fontWeight="semibold" color="subdued">{header}</Text>
+                : header
+          )
+        : []
 
     return (
         <Card>
             <VerticalStack gap="4">
-                <ComponentHeader title={title} itemId={itemId} onRemove={onRemoveComponent} />
+                <ComponentHeader title={title} itemId={itemId} onRemove={onRemoveComponent} tooltipContent={tooltipContent} />
 
                 <Box width='100%'>
                     <DataTable
                         columnContentTypes={['text', 'numeric']}
-                        headings={[]}
+                        headings={headings}
                         rows={rows}
                         hideScrollIndicator
                     />
