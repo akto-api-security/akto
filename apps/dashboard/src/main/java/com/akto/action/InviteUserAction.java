@@ -87,7 +87,7 @@ public class InviteUserAction extends UserAction{
         return null;
     }
 
-    public static boolean isSameDomain(String inviteeDomain, String adminDomain) {
+    private static boolean isSameDomain(String inviteeDomain, String adminDomain) {
         if (inviteeDomain == null || adminDomain == null) return false;
         if (inviteeDomain.equalsIgnoreCase(adminDomain)) return true;
 
