@@ -96,6 +96,8 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
             }
         }
 
+        Map<String, Info> infoMap = fetchYamlInfoMap(issues);
+
         List<JiraMetaData> batchMetaList = new ArrayList<>();
 
         for (TestingRunIssues issue : issues) {
@@ -106,7 +108,7 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
             }
 
             TestingIssuesId id = issue.getId();
-            Info info = YamlTemplateDao.instance.fetchTestInfoMap(Filters.eq(YamlTemplateDao.ID, id.getTestSubCategory())).get(id.getTestSubCategory());
+            Info info = infoMap.get(id.getTestSubCategory());
             if (info == null) {
                 logger.error("Yaml Template not found. issueId: {}", id);
                 continue;
@@ -197,6 +199,14 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         return TestingRunIssuesDao.instance.findAll(filter);
     }
 
+    private Map<String, Info> fetchYamlInfoMap(List<TestingRunIssues> issues) {
+        List<String> subCategories = issues.stream()
+            .map(i -> i.getId().getTestSubCategory())
+            .distinct()
+            .collect(Collectors.toList());
+        return YamlTemplateDao.instance.fetchTestInfoMap(Filters.in(YamlTemplateDao.ID, subCategories));
+    }
+
     private void processJiraBatch(List<JiraMetaData> batch, String issueType, String projId, JiraIntegration jira) throws Exception {
         BasicDBObject payload = buildJiraPayload(batch, issueType, projId, jira);
         List<String> createdKeys = sendJiraBulkCreate(jira, payload, batch, projId);
@@ -224,7 +234,7 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
     private BasicDBObject buildJiraPayload(List<JiraMetaData> metaList, String issueType, String projId, JiraIntegration jira) {
         BasicDBList issueUpdates = new BasicDBList();
         for (JiraMetaData meta : metaList) {
-            BasicDBObject fields = buildJiraTicketFields(meta, issueType, projId, jira);
+            BasicDBObject fields = jiraTicketPayloadCreator(meta, issueType, projId, jira);
             BasicDBObject issueObject = new BasicDBObject("fields", fields);
             issueUpdates.add(issueObject);
         }
@@ -232,20 +242,18 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         return payload;
     }
 
-    private BasicDBObject buildJiraTicketFields(JiraMetaData meta, String issueType, String projId, JiraIntegration jira) {
+    private BasicDBObject jiraTicketPayloadCreator(JiraMetaData meta, String issueType, String projId, JiraIntegration jira) {
         String method = meta.getTestingIssueId().getApiInfoKey().getMethod().name();
         String endpoint = meta.getEndPointStr().replace("Endpoint - ", "");
         String truncated = endpoint.length() > 30 ? endpoint.substring(0, 15) + "..." + endpoint.substring(endpoint.length() - 15) : endpoint;
-        String summary = "Akto Report - " + meta.getIssueTitle() + " (" + method + " - " + truncated + ")";
 
         BasicDBObject fields = new BasicDBObject();
-        fields.put("summary", summary);
-        fields.put("project", new BasicDBObject("key", projId));
+        fields.put("summary", "Akto Report - " + meta.getIssueTitle() + " (" + method + " - " + truncated + ")");
         fields.put("issuetype", new BasicDBObject("id", issueType));
+        fields.put("project", new BasicDBObject("key", projId));
         fields.put("labels", new String[]{JobConstants.TICKET_LABEL_AKTO_SYNC});
 
-        // Build description content
-        List<BasicDBObject> contentList = new ArrayList<>();
+        BasicDBList contentList = new BasicDBList();
         contentList.add(buildContentDetails(meta.getHostStr(), null));
         contentList.add(buildContentDetails(meta.getEndPointStr(), null));
         contentList.add(buildContentDetails("Issue link - Akto dashboard", meta.getIssueUrl()));
@@ -254,16 +262,16 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         boolean isDataCenter = jira.getJiraType() == JiraIntegration.JiraType.DATA_CENTER;
         
         if (isDataCenter) {
-            // Data Center uses Wiki Markup format
+            // Data Center uses plain text/Wiki Markup
             StringBuilder description = new StringBuilder();
-            for (BasicDBObject content : contentList) {
+            for (Object obj : contentList) {
+                BasicDBObject content = (BasicDBObject) obj;
                 BasicDBList innerContent = (BasicDBList) content.get("content");
                 if (innerContent != null && !innerContent.isEmpty()) {
                     BasicDBObject textObj = (BasicDBObject) innerContent.get(0);
                     String text = textObj.getString("text");
                     Object marks = textObj.get("marks");
                     
-                    // Handle links
                     if (marks != null && marks instanceof List) {
                         @SuppressWarnings("unchecked")
                         List<BasicDBObject> marksList = (List<BasicDBObject>) marks;
@@ -282,12 +290,10 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
             }
             fields.put("description", description.toString().trim());
         } else {
-            // Cloud uses Atlassian Document Format (ADF)
-            BasicDBList fullContentList = new BasicDBList();
-            fullContentList.addAll(contentList);
+            // Cloud uses Atlassian Document Format
             BasicDBObject description = new BasicDBObject("type", "doc")
                 .append("version", 1)
-                .append("content", fullContentList);
+                .append("content", contentList);
             fields.put("description", description);
         }
 
