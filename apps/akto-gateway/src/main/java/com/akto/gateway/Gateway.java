@@ -12,9 +12,11 @@ public class Gateway {
     private static final Logger logger = LogManager.getLogger(Gateway.class);
     private static Gateway instance;
     private final GuardrailsClient guardrailsClient;
+    private final AktoIngestAdapter aktoIngestAdapter;
 
     private Gateway() {
         this.guardrailsClient = new GuardrailsClient();
+        this.aktoIngestAdapter = new AktoIngestAdapter();
         logger.info("Gateway instance initialized");
     }
 
@@ -105,6 +107,9 @@ public class Gateway {
                 logger.info("Request passed guardrails validation");
             }
 
+            Map<String, Object> aktoIngestData = aktoIngestAdapter.convertToAktoIngestFormat(proxyData);
+            logger.info("Converted to Akto ingest format");
+
             // Process the proxy request
             Map<String, Object> processedResponse = executeProxyRequest(url, path, request, response);
 
@@ -120,6 +125,7 @@ public class Gateway {
                 result.put("guardrailsResult", guardrailsResponse);
             }
 
+            result.put("aktoIngestData", aktoIngestData);
             result.put("proxyResponse", processedResponse);
             result.put("timestamp", System.currentTimeMillis());
 
@@ -176,7 +182,15 @@ public class Gateway {
         return blocked;
     }
 
+    public Map<String, Object> convertToAktoIngestFormat(Map<String, Object> proxyData) {
+        return aktoIngestAdapter.convertToAktoIngestFormat(proxyData);
+    }
+
     public GuardrailsClient getGuardrailsClient() {
         return guardrailsClient;
+    }
+
+    public AktoIngestAdapter getAktoIngestAdapter() {
+        return aktoIngestAdapter;
     }
 }
