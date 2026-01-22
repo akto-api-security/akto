@@ -289,7 +289,6 @@ public class InitializerListener implements ServletContextListener {
     Crons crons = new Crons();
     TestingAlertsCron testingAlertsCron = new TestingAlertsCron();
 
-
     public static String getDomain() {
         if (domain == null) {
             if (true) {
