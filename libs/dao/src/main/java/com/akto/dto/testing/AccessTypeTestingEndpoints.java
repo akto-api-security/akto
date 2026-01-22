@@ -39,6 +39,13 @@ public class AccessTypeTestingEndpoints extends TestingEndpoints {
             return false;
         }
 
+        // Special case: if only THIRD_PARTY is selected, exclude APIs that also have PUBLIC
+        boolean onlyThirdParty = apiAccessTypes.size() == 1 && apiAccessTypes.contains("THIRD_PARTY");
+        if (onlyThirdParty) {
+            return apiInfo.getApiAccessTypes().contains(ApiInfo.ApiAccessType.THIRD_PARTY)
+                && !apiInfo.getApiAccessTypes().contains(ApiInfo.ApiAccessType.PUBLIC);
+        }
+
         for (String accessTypeStr : apiAccessTypes) {
             try {
                 ApiInfo.ApiAccessType accessType = ApiInfo.ApiAccessType.valueOf(accessTypeStr);
@@ -82,8 +89,16 @@ public class AccessTypeTestingEndpoints extends TestingEndpoints {
             return MCollection.noMatchFilter;
         }
 
-        // apiAccessTypes is a Set<ApiAccessType> on ApiInfo, use $in filter
-        Bson accessTypeFilter = Filters.in(ApiInfo.API_ACCESS_TYPES, accessTypeEnums);
+        // Special case: if only THIRD_PARTY is selected, exclude APIs that also have PUBLIC
+        Bson accessTypeFilter;
+        if (accessTypeEnums.size() == 1 && accessTypeEnums.contains(ApiInfo.ApiAccessType.THIRD_PARTY)) {
+            accessTypeFilter = Filters.and(
+                Filters.in(ApiInfo.API_ACCESS_TYPES, accessTypeEnums),
+                Filters.nin(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.PUBLIC)
+            );
+        } else {
+            accessTypeFilter = Filters.in(ApiInfo.API_ACCESS_TYPES, accessTypeEnums);
+        }
 
         // For ApiInfo-based collections, use the filter directly
         if (type == ApiCollectionUsers.CollectionType.Id_ApiCollectionId) {
