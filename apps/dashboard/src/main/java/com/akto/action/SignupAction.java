@@ -1235,8 +1235,29 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         createUserAndRedirect(userEmail, username, signupInfo, invitationToAccount, method, defaultRole);
     }
 
+    // Organization cache initialization - only done once
+    private static boolean organizationCacheInitialized = false;
+    private static final OrganizationCache organizationCache = new OrganizationCache();
+
     private void createUserAndRedirect(String userEmail, String username, SignupInfo signupInfo,
                                        int invitationToAccount, String method, String invitedRole) throws IOException {
+        
+        // Trigger organization cache once
+        if (!organizationCacheInitialized) {
+            synchronized (SignupAction.class) {
+                if (!organizationCacheInitialized) {
+                    try {
+                        logger.infoAndAddToDb("Initializing organization cache scheduler for signup flow", LogDb.DASHBOARD);
+                        organizationCache.setUpOrganizationCacheScheduler();
+                        organizationCacheInitialized = true;
+                        logger.infoAndAddToDb("Organization cache scheduler initialized successfully. Cache will refresh every 10 minutes.", LogDb.DASHBOARD);
+                    } catch (Exception e) {
+                        logger.errorAndAddToDb(e, "Failed to initialize organization cache: " + e.getMessage(), LogDb.DASHBOARD);
+                    }
+                }
+            }
+        }
+        
         logger.infoAndAddToDb("[createUserAndRedirect] ========== USER CREATION/LOGIN FLOW ==========");
         logger.infoAndAddToDb("[createUserAndRedirect] Called with parameters:");
         logger.infoAndAddToDb("  - userEmail: " + userEmail);
@@ -1408,7 +1429,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.infoAndAddToDb("[createUserAndRedirect] Initializing account for new user");
             if(!newOrgSetup){
                 Account oldAccount = AccountsDao.instance.findOne("_id", invitationToAccount);
-                user = AccountAction.initializeAccount(userEmail, invitationToAccount, oldAccount.getName(),false, invitedRole == null ? RBAC.Role.GUEST.name() : invitedRole);
+                user = AccountAction.initializeAccount(userEmail, invitationToAccount, oldAccount.getName(),false, invitedRole == null ? RBAC.Role.MEMBER.name() : invitedRole);
             }else {
                 user = AccountAction.initializeAccount(userEmail, accountId, "My account", invitationToAccount == 0, invitedRole == null ? RBAC.Role.ADMIN.name() : invitedRole);
             }

@@ -2648,8 +2648,6 @@ public class InitializerListener implements ServletContextListener {
                         crons.deleteTestRunsScheduler();
                         setUpUpdateCustomCollections();
                         setUpFillCollectionIdArrayJob();
-                        // 10-minute cron to update organization admin email cache for signup flow
-                        organizationCache.setUpOrganizationCacheScheduler();
 
 
                         // CleanInventory.cleanInventoryJobRunner();
