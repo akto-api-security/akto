@@ -281,7 +281,7 @@ function GuardrailPolicies() {
         const serverDetails = [];
         const effectiveMcpServers = getEffectiveSelectedMcpServers(policy);
         const effectiveAgentServers = getEffectiveSelectedAgentServers(policy);
-        
+
         if (effectiveMcpServers.length > 0) {
             serverDetails.push(`${effectiveMcpServers.length} MCP Server${effectiveMcpServers.length > 1 ? 's' : ''}`);
         }
@@ -290,6 +290,13 @@ function GuardrailPolicies() {
         }
         if (serverDetails.length > 0) {
             details.push({ label: "Target Servers", value: serverDetails.join(", ") });
+        }
+
+        // Add target domains if present
+        if (policy.targetDomains && policy.targetDomains.length > 0) {
+            const domainPreview = policy.targetDomains.slice(0, 2).join(", ");
+            const moreCount = policy.targetDomains.length > 2 ? ` +${policy.targetDomains.length - 2} more` : '';
+            details.push({ label: "Target Domains", value: `${domainPreview}${moreCount}` });
         }
 
         // Application scope
@@ -439,6 +446,8 @@ function GuardrailPolicies() {
                 // Add V2 fields for enhanced server data
                 selectedMcpServersV2: guardrailData.selectedMcpServersV2 || [],
                 selectedAgentServersV2: guardrailData.selectedAgentServersV2 || [],
+                // Add target domains
+                targetDomains: guardrailData.targetDomains || [],
                 deniedTopics: guardrailData.deniedTopics || [],
                 piiTypes: guardrailData.piiFilters || [],
                 regexPatterns: guardrailData.regexPatterns || [],
