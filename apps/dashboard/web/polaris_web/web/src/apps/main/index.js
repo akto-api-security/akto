@@ -29,9 +29,10 @@ const planType = window.PLAN_TYPE?.toLowerCase();
 const signupPages = ['/check-inbox', '/business-email', '/signup', '/sso-login', '/addUserToAccount', '/login'];
 const currentPath = window.location.pathname;
 const isSignupPage = signupPages.some(page => currentPath.startsWith(page));
+const isWhitelisted = func.isWhiteListedOrganization(organizationId);
 
 if (!isSignupPage && (!window.PLAN_TYPE || !ALLOWED_PLANS.includes(planType))) {
-  free = true;
+   free = !isWhitelisted;
 }
 
 if (expired) {
