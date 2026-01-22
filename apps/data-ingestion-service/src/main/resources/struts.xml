@@ -36,6 +36,18 @@
             </result>
         </action>
 
+        <action name="api/http-proxy" class="com.akto.action.HttpProxyAction" method="httpProxy">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^success,^message,^response.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^success,^message,^response.*</param>
+            </result>
+        </action>
     </package>
 
 </struts>
