@@ -242,64 +242,6 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         return payload;
     }
 
-    private BasicDBObject jiraTicketPayloadCreator(JiraMetaData meta, String issueType, String projId, JiraIntegration jira) {
-        String method = meta.getTestingIssueId().getApiInfoKey().getMethod().name();
-        String endpoint = meta.getEndPointStr().replace("Endpoint - ", "");
-        String truncated = endpoint.length() > 30 ? endpoint.substring(0, 15) + "..." + endpoint.substring(endpoint.length() - 15) : endpoint;
-
-        BasicDBObject fields = new BasicDBObject();
-        fields.put("summary", "Akto Report - " + meta.getIssueTitle() + " (" + method + " - " + truncated + ")");
-        fields.put("issuetype", new BasicDBObject("id", issueType));
-        fields.put("project", new BasicDBObject("key", projId));
-        fields.put("labels", new String[]{JobConstants.TICKET_LABEL_AKTO_SYNC});
-
-        BasicDBList contentList = new BasicDBList();
-        contentList.add(buildContentDetails(meta.getHostStr(), null));
-        contentList.add(buildContentDetails(meta.getEndPointStr(), null));
-        contentList.add(buildContentDetails("Issue link - Akto dashboard", meta.getIssueUrl()));
-        contentList.add(buildContentDetails(meta.getIssueDescription(), null));
-
-        boolean isDataCenter = jira.getJiraType() == JiraIntegration.JiraType.DATA_CENTER;
-        
-        if (isDataCenter) {
-            // Data Center uses plain text/Wiki Markup
-            StringBuilder description = new StringBuilder();
-            for (Object obj : contentList) {
-                BasicDBObject content = (BasicDBObject) obj;
-                BasicDBList innerContent = (BasicDBList) content.get("content");
-                if (innerContent != null && !innerContent.isEmpty()) {
-                    BasicDBObject textObj = (BasicDBObject) innerContent.get(0);
-                    String text = textObj.getString("text");
-                    Object marks = textObj.get("marks");
-                    
-                    if (marks != null && marks instanceof List) {
-                        @SuppressWarnings("unchecked")
-                        List<BasicDBObject> marksList = (List<BasicDBObject>) marks;
-                        if (!marksList.isEmpty()) {
-                            BasicDBObject mark = marksList.get(0);
-                            if ("link".equals(mark.getString("type"))) {
-                                BasicDBObject attrs = (BasicDBObject) mark.get("attrs");
-                                String href = attrs.getString("href");
-                                description.append("[").append(text).append("|").append(href).append("]\n\n");
-                                continue;
-                            }
-                        }
-                    }
-                    description.append(text).append("\n\n");
-                }
-            }
-            fields.put("description", description.toString().trim());
-        } else {
-            // Cloud uses Atlassian Document Format
-            BasicDBObject description = new BasicDBObject("type", "doc")
-                .append("version", 1)
-                .append("content", contentList);
-            fields.put("description", description);
-        }
-
-        return fields;
-    }
-
     private List<String> sendJiraBulkCreate(JiraIntegration jira, BasicDBObject payload, List<JiraMetaData> metaList,
         String projId) throws Exception {
         boolean isDataCenter = jira.getJiraType() == JiraIntegration.JiraType.DATA_CENTER;
@@ -431,6 +373,65 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
             logger.error("Error attaching file to Jira: issueId: {}", issueId, e.getMessage());
         }
     }
+
+    private BasicDBObject jiraTicketPayloadCreator(JiraMetaData meta, String issueType, String projId, JiraIntegration jira) {
+        String method = meta.getTestingIssueId().getApiInfoKey().getMethod().name();
+        String endpoint = meta.getEndPointStr().replace("Endpoint - ", "");
+        String truncated = endpoint.length() > 30 ? endpoint.substring(0, 15) + "..." + endpoint.substring(endpoint.length() - 15) : endpoint;
+
+        BasicDBObject fields = new BasicDBObject();
+        fields.put("summary", "Akto Report - " + meta.getIssueTitle() + " (" + method + " - " + truncated + ")");
+        fields.put("issuetype", new BasicDBObject("id", issueType));
+        fields.put("project", new BasicDBObject("key", projId));
+        fields.put("labels", new String[]{JobConstants.TICKET_LABEL_AKTO_SYNC});
+
+        BasicDBList contentList = new BasicDBList();
+        contentList.add(buildContentDetails(meta.getHostStr(), null));
+        contentList.add(buildContentDetails(meta.getEndPointStr(), null));
+        contentList.add(buildContentDetails("Issue link - Akto dashboard", meta.getIssueUrl()));
+        contentList.add(buildContentDetails(meta.getIssueDescription(), null));
+
+        boolean isDataCenter = jira.getJiraType() == JiraIntegration.JiraType.DATA_CENTER;
+        
+        if (isDataCenter) {
+            // Data Center uses plain text/Wiki Markup
+            StringBuilder description = new StringBuilder();
+            for (Object obj : contentList) {
+                BasicDBObject content = (BasicDBObject) obj;
+                BasicDBList innerContent = (BasicDBList) content.get("content");
+                if (innerContent != null && !innerContent.isEmpty()) {
+                    BasicDBObject textObj = (BasicDBObject) innerContent.get(0);
+                    String text = textObj.getString("text");
+                    Object marks = textObj.get("marks");
+                    
+                    if (marks != null && marks instanceof List) {
+                        @SuppressWarnings("unchecked")
+                        List<BasicDBObject> marksList = (List<BasicDBObject>) marks;
+                        if (!marksList.isEmpty()) {
+                            BasicDBObject mark = marksList.get(0);
+                            if ("link".equals(mark.getString("type"))) {
+                                BasicDBObject attrs = (BasicDBObject) mark.get("attrs");
+                                String href = attrs.getString("href");
+                                description.append("[").append(text).append("|").append(href).append("]\n\n");
+                                continue;
+                            }
+                        }
+                    }
+                    description.append(text).append("\n\n");
+                }
+            }
+            fields.put("description", description.toString().trim());
+        } else {
+            // Cloud uses Atlassian Document Format
+            BasicDBObject description = new BasicDBObject("type", "doc")
+                .append("version", 1)
+                .append("content", contentList);
+            fields.put("description", description);
+        }
+
+        return fields;
+    }
+
 
     private BasicDBObject buildContentDetails(String text, String link) {
         BasicDBObject content = new BasicDBObject("type", "paragraph");
