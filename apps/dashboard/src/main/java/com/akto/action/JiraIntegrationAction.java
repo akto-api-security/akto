@@ -1758,39 +1758,58 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             Map<String, List<String>> headers = new HashMap<>();
             headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
 
-            // Get ALL issue type IDs - different issue types may have different fields
-            List<String> issueTypeIds = getAllIssueTypeIds(projectKey, jiraIntegration, headers);
-            if (issueTypeIds.isEmpty()) {
-                loggerMaker.errorAndAddToDb("No issue types found for project: " + projectKey);
-                addActionError("No issue types found for project: " + projectKey);
-                return Action.ERROR.toUpperCase();
-            }
+            // Fetch project metadata with ALL issue types and their fields in ONE API call
+            String createMetaProjectUrl = baseUrl + "/rest/api/3/issue/createmeta?projectKeys=" + projectKey + "&expand=projects.issuetypes.fields";
+            OriginalHttpRequest projectRequest = new OriginalHttpRequest(createMetaProjectUrl, "", "GET", null, headers, "");
+            OriginalHttpResponse projectResponse = ApiExecutor.sendRequest(projectRequest, true, null, false, new ArrayList<>());
 
-            // Iterate through ALL issue types and collect fields with allowedValues
+            String projectResponseBody = projectResponse.getBody();
+            Map<String, Object> projectMetadata = JsonUtils.fromJson(projectResponseBody,
+                new TypeReference<Map<String, Object>>() {});
+
+            // Extract fields with dropdown values from ALL issue types
             Set<String> fieldsWithDropdowns = new HashSet<>();
-            for (String issueTypeId : issueTypeIds) {
-                String createMetaUrl = baseUrl + "/rest/api/3/issue/createmeta/" + projectKey + "/issuetypes/" + issueTypeId;
-                OriginalHttpRequest request = new OriginalHttpRequest(createMetaUrl, "", "GET", null, headers, "");
-                OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+            Object projectsObj = projectMetadata.get("projects");
 
-                String responseBody = response.getBody();
-                Map<String, Object> metadata = JsonUtils.fromJson(responseBody,
-                    new TypeReference<Map<String, Object>>() {});
+            if (projectsObj instanceof List) {
+                List<?> projectsList = (List<?>) projectsObj;
+                if (projectsList.isEmpty()) {
+                    loggerMaker.errorAndAddToDb("No projects found in createmeta response for project: " + projectKey);
+                    addActionError("No projects found for project: " + projectKey);
+                    return Action.ERROR.toUpperCase();
+                }
 
-                Object fieldsObj = metadata.get("fields");
-                if (fieldsObj instanceof List) {
-                    List<?> fieldsList = (List<?>) fieldsObj;
-                    for (Object fieldObj : fieldsList) {
-                        if (fieldObj instanceof Map) {
-                            Map<String, Object> fieldMetadata = (Map<String, Object>) fieldObj;
-                            Object fieldIdObj = fieldMetadata.get("fieldId");
-                            Object allowedValuesObj = fieldMetadata.get("allowedValues");
+                if (projectsList.get(0) instanceof Map) {
+                    Map<String, Object> project = (Map<String, Object>) projectsList.get(0);
+                    Object issueTypesObj = project.get("issuetypes");
 
-                            // Only include fields that have allowedValues (dropdown options)
-                            if (fieldIdObj != null && allowedValuesObj instanceof List) {
-                                List<?> allowedValuesList = (List<?>) allowedValuesObj;
-                                if (!allowedValuesList.isEmpty()) {
-                                    fieldsWithDropdowns.add(fieldIdObj.toString());
+                    if (issueTypesObj instanceof List) {
+                        List<?> issueTypesList = (List<?>) issueTypesObj;
+
+                        // Iterate through all issue types
+                        for (Object issueTypeObj : issueTypesList) {
+                            if (issueTypeObj instanceof Map) {
+                                Map<String, Object> issueType = (Map<String, Object>) issueTypeObj;
+                                Object fieldsObj = issueType.get("fields");
+
+                                // Extract fields with allowedValues
+                                if (fieldsObj instanceof Map) {
+                                    Map<?, ?> fieldsMap = (Map<?, ?>) fieldsObj;
+
+                                    for (Map.Entry<?, ?> entry : fieldsMap.entrySet()) {
+                                        if (entry.getValue() instanceof Map) {
+                                            Map<String, Object> fieldMetadata = (Map<String, Object>) entry.getValue();
+                                            Object allowedValuesObj = fieldMetadata.get("allowedValues");
+
+                                            // Only include fields that have allowedValues (dropdown options)
+                                            if (allowedValuesObj instanceof List) {
+                                                List<?> allowedValuesList = (List<?>) allowedValuesObj;
+                                                if (!allowedValuesList.isEmpty()) {
+                                                    fieldsWithDropdowns.add(entry.getKey().toString());
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1832,7 +1851,6 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                 }
             }
 
-            loggerMaker.infoAndAddToDb("Found " + availableFields.size() + " fields with dropdown values for project " + projectKey);
 
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
