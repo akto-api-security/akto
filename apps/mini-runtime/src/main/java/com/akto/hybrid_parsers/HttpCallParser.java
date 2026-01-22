@@ -256,7 +256,7 @@ public class HttpCallParser {
      * @param responseParam The HTTP response parameters
      * @return The hostname to use for collection creation
      */
-    private static String getHostnameForCollection(HttpResponseParams responseParam) {
+    public static String getHostnameForCollection(HttpResponseParams responseParam) {
         // Get base hostname from headers
         String baseHostname = getHeaderValue(responseParam.getRequestParams().getHeaders(), "host");
         if (baseHostname == null || baseHostname.isEmpty()) {
@@ -521,12 +521,7 @@ public class HttpCallParser {
 
     public static boolean useHostCondition(String hostName, HttpResponseParams.Source source) {
         List<HttpResponseParams.Source> whiteListSource = Arrays.asList(HttpResponseParams.Source.MIRRORING);
-        boolean hostNameCondition;
-        if (hostName == null) {
-            hostNameCondition = false;
-        } else {
-            hostNameCondition = ! ( hostName.toLowerCase().equals(hostName.toUpperCase()) );
-        }
+        boolean hostNameCondition = RuntimeUtil.isValidHostname(hostName);
         return whiteListSource.contains(source) &&  hostNameCondition && ApiCollection.useHost;
     }
 

@@ -1,57 +1,33 @@
 package com.akto.data_actor;
 
+import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 import com.akto.DaoInit;
 import com.akto.dao.context.Context;
-import com.akto.dto.filter.MergedUrls;
-import com.akto.dto.jobs.Job;
-import com.akto.dto.jobs.JobExecutorType;
-import com.akto.dto.jobs.JobParams;
-import com.akto.dto.jobs.JobStatus;
-import com.akto.dto.jobs.ScheduleType;
-import com.akto.dto.metrics.MetricData;
-import com.akto.dto.monitoring.ModuleInfo;
-import com.akto.dto.notifications.SlackWebhook;
-import com.akto.dto.settings.DataControlSettings;
-import com.akto.testing.ApiExecutor;
-import com.auth0.jwt.JWT;
-import com.auth0.jwt.interfaces.DecodedJWT;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.bulk_updates.BulkUpdates;
-import com.akto.dto.data_types.BelongsToPredicate;
-import com.akto.dto.data_types.Conditions;
-import com.akto.dto.data_types.ContainsPredicate;
-import com.akto.dto.data_types.EndsWithPredicate;
-import com.akto.dto.data_types.EqualsToPredicate;
-import com.akto.dto.data_types.IsNumberPredicate;
-import com.akto.dto.data_types.NotBelongsToPredicate;
-import com.akto.dto.data_types.Predicate;
-import com.akto.dto.data_types.RegexPredicate;
-import com.akto.dto.data_types.StartsWithPredicate;
-import com.akto.dto.dependency_flow.Node;
+import com.akto.dto.data_types.*;
 import com.akto.dto.data_types.Conditions.Operator;
+import com.akto.dto.dependency_flow.Node;
+import com.akto.dto.filter.MergedUrls;
+import com.akto.dto.jobs.*;
+import com.akto.dto.metrics.MetricData;
+import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.runtime_filters.FieldExistsFilter;
 import com.akto.dto.runtime_filters.ResponseCodeRuntimeFilter;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
-import com.akto.dto.testing.AccessMatrixTaskInfo;
-import com.akto.dto.testing.AccessMatrixUrlToRole;
-import com.akto.dto.testing.AgentConversationResult;
-import com.akto.dto.testing.EndpointLogicalGroup;
-import com.akto.dto.testing.LoginFlowStepsData;
-import com.akto.dto.testing.OtpTestData;
-import com.akto.dto.testing.TestRoles;
-import com.akto.dto.testing.TestingRun;
-import com.akto.dto.testing.TestingRunConfig;
-import com.akto.dto.testing.TestingRunResult;
-import com.akto.dto.testing.TestingRunResultSummary;
-import com.akto.dto.testing.WorkflowTest;
-import com.akto.dto.testing.WorkflowTestResult;
+import com.akto.dto.testing.*;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.CollectionTags;
@@ -61,8 +37,15 @@ import com.akto.dto.type.URLMethods;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.testing.ApiExecutor;
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.interfaces.DecodedJWT;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
@@ -73,20 +56,6 @@ import org.bson.codecs.DecoderContext;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
-import com.google.gson.Gson;
 import org.json.JSONObject;
 
 public class ClientActor extends DataActor {
@@ -615,6 +584,7 @@ public class ClientActor extends DataActor {
 
         return allStis;
     }
+
     public List<SingleTypeInfo> fetchStiInBatches(int batchCount, int lastStiFetchTs) {
         Map<String, List<String>> headers = buildHeaders();
         List<SingleTypeInfo> allStis = new ArrayList<>();
@@ -997,6 +967,10 @@ public class ClientActor extends DataActor {
     }
 
     public void bulkWriteApiInfo(List<ApiInfo> apiInfoList) {
+        bulkWriteApiInfoWithPath(apiInfoList, "/bulkWriteApiInfo");
+    }
+
+    private void bulkWriteApiInfoWithPath(List<ApiInfo> apiInfoList, String path) {
         ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
 
         List<ApiInfo> apiInfoBatch = new ArrayList<>();
@@ -1005,7 +979,7 @@ public class ClientActor extends DataActor {
             if (apiInfoBatch.size() % batchWriteLimit == 0) {
                 List<ApiInfo> finalWrites = apiInfoBatch;
                 threadPool.submit(
-                        () -> writeApiInfoBatch(finalWrites)
+                        () -> writeApiInfoBatch(finalWrites, path)
                 );
                 apiInfoBatch = new ArrayList<>();
             }
@@ -1013,29 +987,110 @@ public class ClientActor extends DataActor {
         if (apiInfoBatch.size() > 0) {
             List<ApiInfo> finalWrites = apiInfoBatch;
             threadPool.submit(
-                    () -> writeApiInfoBatch(finalWrites)
+                    () -> writeApiInfoBatch(finalWrites, path)
             );
         }
     }
 
-    public void writeApiInfoBatch(List<ApiInfo> writesForApiInfo) {
+    private void writeApiInfoBatch(List<ApiInfo> writesForApiInfo, String path) {
         BasicDBObject obj = new BasicDBObject();
         obj.put("apiInfoList", writesForApiInfo);
 
         String objString = gson.toJson(obj);
-        loggerMaker.info("api info batch" + objString);
-
         Map<String, List<String>> headers = buildHeaders();
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/bulkWriteApiInfo", "", "POST", objString, headers, "");
+        OriginalHttpRequest request = new OriginalHttpRequest(url + path, "", "POST", objString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             if (response.getStatusCode() != 200) {
-                loggerMaker.errorAndAddToDb("non 2xx response in bulkWriteApiInfo", LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("non 2xx response in " + path, LoggerMaker.LogDb.RUNTIME);
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in bulkWriteApiInfo" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("error in " + path + ": " + e, LoggerMaker.LogDb.RUNTIME);
         }
     }
+
+    public void fastDiscoveryBulkWriteSingleTypeInfo(List<Object> writesForSti) {
+        bulkWrite(writesForSti, "/fastDiscoveryBulkWriteSti", "writesForSti");
+    }
+
+    public void fastDiscoveryBulkWriteApiInfo(List<ApiInfo> apiInfoList) {
+        bulkWriteApiInfoWithPath(apiInfoList, "/fastDiscoveryBulkWriteApiInfo");
+    }
+
+
+    /**
+     * Fetch API IDs with cursor-based pagination for Bloom filter initialization.
+     * Uses same pagination pattern as fetchApiRateLimits.
+     * @return List of all API IDs (fetched across multiple paginated calls)
+     */
+    public List<ApiInfo.ApiInfoKey> fetchApiIds() {
+        Map<String, List<String>> headers = buildHeaders();
+        List<ApiInfo.ApiInfoKey> allApiIds = new ArrayList<>();
+        ApiInfo.ApiInfoKey lastApiInfoKey = null;
+
+        for (int i = 0; i < 100; i++) {
+            try {
+                // Build request body with cursor
+                BasicDBObject requestObj = new BasicDBObject();
+                if (lastApiInfoKey != null) {
+                    BasicDBObject cursorObj = new BasicDBObject();
+                    cursorObj.put("apiCollectionId", lastApiInfoKey.getApiCollectionId());
+                    cursorObj.put("method", lastApiInfoKey.getMethod().name());
+                    cursorObj.put("url", lastApiInfoKey.getUrl());
+                    requestObj.put("lastApiInfoKey", cursorObj);
+                }
+                String requestBody = gson.toJson(requestObj);
+
+                OriginalHttpRequest request = new OriginalHttpRequest(
+                    url + "/fetchApiIds",
+                    "",
+                    "POST",
+                    requestBody,
+                    headers,
+                    ""
+                );
+
+                OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+
+                if (response == null || response.getBody() == null || response.getStatusCode() != 200) {
+                    loggerMaker.errorAndAddToDb("Error fetching API IDs: invalid response", LoggerMaker.LogDb.RUNTIME);
+                    break;
+                }
+
+                JsonObject responseObj = gson.fromJson(response.getBody(), JsonObject.class);
+                JsonArray apiIdsPage = responseObj.getAsJsonArray("apiIds");
+
+                if (apiIdsPage == null || apiIdsPage.size() == 0) {
+                    break;
+                }
+
+                // Convert to ApiInfo.ApiInfoKey objects
+                for (JsonElement elem : apiIdsPage) {
+                    try {
+                        JsonObject apiIdObj = elem.getAsJsonObject();
+                        int apiCollectionId = apiIdObj.get("apiCollectionId").getAsInt();
+                        String urlStr = apiIdObj.get("url").getAsString();
+                        String methodStr = apiIdObj.get("method").getAsString();
+                        URLMethods.Method method = URLMethods.Method.fromString(methodStr);
+
+                        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, urlStr, method);
+                        allApiIds.add(apiInfoKey);
+                        lastApiInfoKey = apiInfoKey;
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("Error parsing API ID: " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+                    }
+                }
+
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error fetching API IDs: " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+                break;
+            }
+        }
+
+        loggerMaker.infoAndAddToDb("Loaded " + allApiIds.size() + " API IDs", LoggerMaker.LogDb.RUNTIME);
+        return allApiIds;
+    }
+
 
     public List<RuntimeFilter> fetchRuntimeFilters() {
         List<RuntimeFilter> runtimeFilters = new ArrayList<>();
@@ -1243,6 +1298,40 @@ public class ClientActor extends DataActor {
             loggerMaker.errorAndAddToDb("error in fetchAllApiCollections" + e, LoggerMaker.LogDb.RUNTIME);
         }
         loggerMaker.infoAndAddToDb("fetchAllApiCollections api called size " + apiCollections.size(), LoggerMaker.LogDb.RUNTIME);
+        return apiCollections;
+    }
+
+    public List<ApiCollection> fetchAllCollections() {
+        Map<String, List<String>> headers = buildHeaders();
+        List<ApiCollection> apiCollections = new ArrayList<>();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchAllCollections", "", "GET", null, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("invalid response in fetchAllCollections", LoggerMaker.LogDb.RUNTIME);
+                return apiCollections;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList collectionsList = (BasicDBList) payloadObj.get("collections");
+
+                for (Object obj : collectionsList) {
+                    BasicDBObject colObj = (BasicDBObject) obj;
+                    int id = colObj.getInt("id");
+                    String hostName = colObj.getString("hostName");
+
+                    ApiCollection col = new ApiCollection(id, null, 0, null, null, 0, false, true);
+                    col.setHostName(hostName);
+                    apiCollections.add(col);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchAllCollections" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchAllCollections" + e, LoggerMaker.LogDb.RUNTIME);
+        }
         return apiCollections;
     }
 

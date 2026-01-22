@@ -52,6 +52,17 @@
             </modules>
         </profile>
         <profile>
+            <id>fast-discovery</id>
+            <activation>
+                <file>
+                    <exists>fast-discovery/pom.xml</exists>
+                </file>
+            </activation>
+            <modules>
+                <module>fast-discovery</module>
+            </modules>
+        </profile>
+        <profile>
             <id>mini-runtime-service</id>
             <activation>
                 <file>
