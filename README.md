@@ -79,11 +79,11 @@ Step 2: Run tests
 
 ## How to get Started?
 
-### Using docker-compose (works for any machine which has Docker installed)
+### Using docker compose (works for any machine which has Docker installed)
 Run the following commands to install Akto. You'll need to have curl and Docker installed in order to run the container..
 1. Clone the Akto repo by using this command `git clone https://github.com/akto-api-security/akto.git`
 2. Go to the cloned directory `cd akto` 
-3. Run `docker-compose up -d`
+3. Run `docker compose up -d`
 <details>
   <summary><h4>If you are setting this up in your own Cloud (AWS/GCP/Heroku), read this section</h4></summary>
 
