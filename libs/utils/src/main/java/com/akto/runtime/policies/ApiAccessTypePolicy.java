@@ -80,8 +80,10 @@ public class ApiAccessTypePolicy {
 
         List<String> ipList = new ArrayList<>();
         for (String ip: clientIps) {
-            String[] parts = ip.trim().split("\\s*,\\s*"); // This approach splits the string by commas and also trims any whitespaces around the individual elements. 
-            ipList.addAll(Arrays.asList(parts));
+            String[] parts = ip.trim().split("\\s*,\\s*"); // This approach splits the string by commas and also trims any whitespaces around the individual elements.
+            for (String part : parts) {
+                ipList.add(cleanIp(part));
+            }
         }
 
         String sourceIP = httpResponseParams.getSourceIP();
@@ -126,6 +128,9 @@ public class ApiAccessTypePolicy {
                             apiInfo.getApiAccessTypes().add(ApiAccessType.PUBLIC);
                         } else {
                             String host = RuntimeUtil.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "host");
+                            if (host == null) {
+                                host = "";
+                            }
                             String hostWithoutPort = host.replaceAll(":\\d+$", "").toLowerCase();
                             boolean hasValidTLD = commonTLDs.stream().anyMatch(hostWithoutPort::endsWith);
                             boolean isInternalHost = host.contains(".svc.cluster.local") || !hasValidTLD;
