@@ -37,6 +37,10 @@ import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
+
+import lombok.Getter;
+import lombok.Setter;
+
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -56,6 +60,12 @@ public class AktoJaxAction extends UserAction {
     private String testRoleHaxId;
 
     private String outscopeUrls;
+    @Getter
+    @Setter
+    private String urlTemplatePatterns;
+    @Getter
+    @Setter
+    private String applicationPages;
 
     private String crawlerData;
 
@@ -225,9 +235,9 @@ public class AktoJaxAction extends UserAction {
             } else {
                 // Fallback to internal DAST API
                 initiateInternalCrawl(crawlId, hostname, username, password, apiKey,
-                    dashboardUrl, collectionId, cookies, crawlingTime, outscopeUrls, runTestAfterCrawling);
+                    dashboardUrl, collectionId, cookies, crawlingTime, outscopeUrls, runTestAfterCrawling,
+                    urlTemplatePatterns, applicationPages);
             }
-
 
             // Send Slack alert for crawler initiation
             try {
@@ -291,7 +301,8 @@ public class AktoJaxAction extends UserAction {
     private void initiateInternalCrawl(String crawlId, String hostname, String username,
                                      String password, String apiKey, String dashboardUrl,
                                      int collectionId, Object cookies, int crawlingTime,
-                                     String outscopeUrls, boolean runTestAfterCrawling) throws Exception {
+                                     String outscopeUrls, boolean runTestAfterCrawling,
+                                     String urlTemplatePatterns, String applicationPages) throws Exception {
         String url = System.getenv("AKTOJAX_SERVICE_URL") + "/triggerCrawler";
         loggerMaker.infoAndAddToDb("Using internal DAST crawler service: " + url);
 
@@ -316,6 +327,14 @@ public class AktoJaxAction extends UserAction {
 
         if (customHeaders != null && !customHeaders.isEmpty()) {
             requestBody.put("customHeaders", customHeaders);
+        }
+
+        if (!StringUtils.isEmpty(urlTemplatePatterns)) {
+            requestBody.put("urlTemplatePatterns", urlTemplatePatterns);
+        }
+
+        if (!StringUtils.isEmpty(applicationPages)) {
+            requestBody.put("applicationPages", applicationPages);
         }
 
         String reqData = requestBody.toString();
@@ -347,6 +366,8 @@ public class AktoJaxAction extends UserAction {
             crawlerRun.setCookies(cookies);
             crawlerRun.setCrawlingTime(crawlingTime);
             crawlerRun.setCustomHeaders(customHeaders);
+            crawlerRun.setUrlTemplatePatterns(urlTemplatePatterns);
+            crawlerRun.setApplicationPages(applicationPages);
 
             if(runTestAfterCrawling && selectedMiniTestingService != null && !selectedMiniTestingService.isEmpty()) {
                 crawlerRun.setSelectedMiniTestingService(selectedMiniTestingService);
