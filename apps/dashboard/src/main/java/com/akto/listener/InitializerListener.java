@@ -234,7 +234,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.akto.utils.crons.TestingAlertsCron;
-import com.akto.utils.crons.OrganizationCache;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.ReadPreference;
@@ -289,7 +288,7 @@ public class InitializerListener implements ServletContextListener {
     private static Map<String, String> piiFileMap;
     Crons crons = new Crons();
     TestingAlertsCron testingAlertsCron = new TestingAlertsCron();
-    OrganizationCache organizationCache = new OrganizationCache();
+
 
     public static String getDomain() {
         if (domain == null) {
