@@ -192,7 +192,19 @@ jobs:
         with:
           payload: |
             {
-              "text": "Akto Open Source v${{ github.event.inputs.release_version }} released!"
+              "text": "Akto Open Source v${{ github.event.inputs.release_version }} released!",
+              "attachments": [
+                {
+                  "color": "#36a64f",
+                  "fields": [
+                    {
+                      "title": "Services Deployed",
+                      "value": "${{ github.event.inputs.dashboard == 'true' && 'Dashboard ✅\\\n' || '' }}${{ github.event.inputs.testing == 'true' && 'Testing ✅\\\n' || '' }}${{ github.event.inputs.billing == 'true' && 'Billing ✅\\\n' || '' }}${{ github.event.inputs.internal == 'true' && 'Internal ✅' || '' }}",
+                      "short": false
+                    }
+                  ]
+                }
+              ]
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -449,7 +461,19 @@ jobs:
         with:
           payload: |
             {
-              "text": "Akto Open Source Threat v${{ github.event.inputs.release_version_threat }} released!"
+              "text": "Akto Open Source Threat v${{ github.event.inputs.release_version_threat }} released!",
+              "attachments": [
+                {
+                  "color": "#36a64f",
+                  "fields": [
+                    {
+                      "title": "Services Deployed",
+                      "value": "${{ github.event.inputs.threat_detection == 'true' && 'Threat Detection ✅\\\n' || '' }}${{ github.event.inputs.threat_detection_backend == 'true' && 'Threat Detection Backend ✅' || '' }}",
+                      "short": false
+                    }
+                  ]
+                }
+              ]
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
