@@ -123,15 +123,7 @@ public class HttpCallParser {
     }
 
     public static String getHeaderValue(Map<String,List<String>> headers, String headerKey) {
-        if (headers == null) return null;
-        for (String k: headers.keySet()) {
-            if (k.equalsIgnoreCase(headerKey)) {
-                List<String> hosts = headers.getOrDefault(k, new ArrayList<>());
-                if (hosts.size() > 0) return hosts.get(0);
-                return null;
-            }
-        }
-        return null;
+        return RuntimeUtil.getHeaderValue(headers, headerKey);
     }
 
     public int createCollectionSimple(int vxlanId) {

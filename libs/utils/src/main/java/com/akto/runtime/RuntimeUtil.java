@@ -45,6 +45,18 @@ public class RuntimeUtil {
         return false;
     }
 
+    public static String getHeaderValue(Map<String,List<String>> headers, String headerKey) {
+        if (headers == null) return null;
+        for (String k: headers.keySet()) {
+            if (k.equalsIgnoreCase(headerKey)) {
+                List<String> hosts = headers.getOrDefault(k, new ArrayList<>());
+                if (hosts.size() > 0) return hosts.get(0);
+                return null;
+            }
+        }
+        return null;
+    }
+
     public static boolean hasSpecialCharacters(String input) {
         // Define the special characters
         String specialCharacters = "<>%/?#[]@!$&'()*+,;=";
