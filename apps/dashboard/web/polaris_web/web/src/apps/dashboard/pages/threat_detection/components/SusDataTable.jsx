@@ -526,7 +526,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     let ret = res?.maliciousEvents.map((x) => {
       const severity = (isAgenticSecurityCategory() || isEndpointSecurityCategory())
         ? (x?.severity || "HIGH")
-        : (threatFiltersMap[x?.filterId]?.severity || "HIGH")
+        : (x?.severity || threatFiltersMap[x?.filterId]?.severity || "HIGH")
 
       const filterTemplate = threatFiltersMap[x?.filterId];
       const complianceMap = filterTemplate?.compliance?.mapComplianceToListClauses || {};
