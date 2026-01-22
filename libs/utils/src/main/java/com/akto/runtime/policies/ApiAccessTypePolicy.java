@@ -25,7 +25,6 @@ public class ApiAccessTypePolicy {
     public ApiAccessTypePolicy(List<String> privateCidrList, List<String> partnerIpList) {
         this.privateCidrList = privateCidrList == null ? Collections.emptyList() : new ArrayList<>(privateCidrList);
         this.partnerIpList   = partnerIpList == null ? Collections.emptyList() : new ArrayList<>(partnerIpList);
-        privateMatchers = buildMatchers(this.privateCidrList);
     }
 
     // RFC standard list. To be used later.
@@ -129,8 +128,8 @@ public class ApiAccessTypePolicy {
                             String hostWithoutPort = host.replaceAll(":\\d+$", "").toLowerCase();
                             boolean hasValidTLD = commonTLDs.stream().anyMatch(hostWithoutPort::endsWith);
                             boolean isInternalHost = host.contains(".svc.cluster.local") || !hasValidTLD;
-                            if(!isInternalHost){
-                                apiInfo.getApiAccessTypes().add(ApiAccessType.THIRD_PARTY);
+                            if(isInternalHost){
+                                apiInfo.getApiAccessTypes().add(ApiAccessType.PRIVATE);
                             }else{
                                 apiInfo.getApiAccessTypes().add(ApiAccessType.THIRD_PARTY);
                             }
