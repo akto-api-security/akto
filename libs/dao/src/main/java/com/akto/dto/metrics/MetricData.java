@@ -69,7 +69,10 @@ public class MetricData {
         NON_HEAP_MEMORY_USED_MB("Non-Heap Memory Used", "JVM non-heap memory currently in use (MB)"),
         THREAD_COUNT("Thread Count", "Number of live threads in the JVM"),
         AVAILABLE_PROCESSORS("Available Processors", "Number of processors available to the JVM"),
-        TOTAL_PHYSICAL_MEMORY_MB("Total Physical Memory", "Total physical memory available (MB)");
+        TOTAL_PHYSICAL_MEMORY_MB("Total Physical Memory", "Total physical memory available (MB)"),
+
+        TC_CPU_USAGE("Traffic Collector CPU Usage", "CPU usage percentage of traffic collector modules"),
+        TC_MEMORY_USAGE("Traffic Collector Memory Used", "Memory used in MB by traffic collector modules");
 
 
         private final String descriptionName;
