@@ -15,33 +15,24 @@ public class HttpProxyAction extends ActionSupport {
     private static final LoggerMaker loggerMaker = new LoggerMaker(HttpProxyAction.class, LoggerMaker.LogDb.DATA_INGESTION);
     private static final Gateway gateway = Gateway.getInstance();
 
-    // Request fields
     private Map<String, Object> requestData;
 
-    // Response fields
     private Map<String, Object> response;
     private boolean success;
     private String message;
 
-    /**
-     * HTTP Proxy endpoint that processes requests through akto-gateway
-     * @return Action result
-     */
     public String httpProxy() {
         try {
-            loggerMaker.infoAndAddToDb("HTTP Proxy called with request: " + requestData);
+            loggerMaker.info("HTTP Proxy called with request: " + requestData);
 
-            // Validate request data
             if (requestData == null || requestData.isEmpty()) {
-                loggerMaker.warnAndAddToDb("Empty or null request data received");
+                loggerMaker.warn("Empty or null request data received");
                 requestData = new HashMap<>();
                 requestData.put("message", "Empty request - using default");
             }
 
-            // Process request through gateway
             response = gateway.processRequest(requestData);
 
-            // Log activity through gateway
             Map<String, Object> metadata = new HashMap<>();
             metadata.put("endpoint", "/api/http-proxy");
             metadata.put("service", "data-ingestion-service");
@@ -50,11 +41,11 @@ public class HttpProxyAction extends ActionSupport {
             success = true;
             message = "Request processed successfully through gateway";
 
-            loggerMaker.infoAndAddToDb("HTTP Proxy processed successfully");
+            loggerMaker.info("HTTP Proxy processed successfully");
             return Action.SUCCESS.toUpperCase();
 
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error in HTTP Proxy: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
+            loggerMaker.error("Error in HTTP Proxy: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
             e.printStackTrace();
 
             success = false;
@@ -66,7 +57,6 @@ public class HttpProxyAction extends ActionSupport {
         }
     }
 
-    // Getters and Setters (Lombok handles most, but explicit for clarity)
     public Map<String, Object> getRequestData() {
         return requestData;
     }
