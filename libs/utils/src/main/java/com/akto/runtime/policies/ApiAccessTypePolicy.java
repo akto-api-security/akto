@@ -3,6 +3,8 @@ package com.akto.runtime.policies;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.ApiInfo.ApiAccessType;
+import com.akto.runtime.RuntimeUtil;
+
 import org.springframework.security.web.util.matcher.IpAddressMatcher;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -15,6 +17,10 @@ public class ApiAccessTypePolicy {
 
 	public static final String X_FORWARDED_FOR = "x-forwarded-for";
     private static List<IpAddressMatcher> privateMatchers;
+    List<String> commonTLDs = Arrays.asList(".com", ".org", ".net", ".io", ".ai", ".co", ".dev", ".app",
+        ".edu", ".gov", ".mil", ".int", ".biz", ".info", ".xyz",
+        ".in", ".uk", ".us", ".de", ".fr", ".jp", ".cn", ".au", ".ca"
+    );
 
     public ApiAccessTypePolicy(List<String> privateCidrList, List<String> partnerIpList) {
         this.privateCidrList = privateCidrList == null ? Collections.emptyList() : new ArrayList<>(privateCidrList);
@@ -74,8 +80,10 @@ public class ApiAccessTypePolicy {
 
         List<String> ipList = new ArrayList<>();
         for (String ip: clientIps) {
-            String[] parts = ip.trim().split("\\s*,\\s*"); // This approach splits the string by commas and also trims any whitespaces around the individual elements. 
-            ipList.addAll(Arrays.asList(parts));
+            String[] parts = ip.trim().split("\\s*,\\s*"); // This approach splits the string by commas and also trims any whitespaces around the individual elements.
+            for (String part : parts) {
+                ipList.add(cleanIp(part));
+            }
         }
 
         String sourceIP = httpResponseParams.getSourceIP();
@@ -119,7 +127,18 @@ public class ApiAccessTypePolicy {
                         if(directionInt == 1){
                             apiInfo.getApiAccessTypes().add(ApiAccessType.PUBLIC);
                         } else {
-                            apiInfo.getApiAccessTypes().add(ApiAccessType.THIRD_PARTY);
+                            String host = RuntimeUtil.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "host");
+                            if (host == null) {
+                                host = "";
+                            }
+                            String hostWithoutPort = host.replaceAll(":\\d+$", "").toLowerCase();
+                            boolean hasValidTLD = commonTLDs.stream().anyMatch(hostWithoutPort::endsWith);
+                            boolean isInternalHost = host.contains(".svc.cluster.local") || !hasValidTLD;
+                            if(isInternalHost){
+                                apiInfo.getApiAccessTypes().add(ApiAccessType.PRIVATE);
+                            }else{
+                                apiInfo.getApiAccessTypes().add(ApiAccessType.THIRD_PARTY);
+                            }
                         }
                         return;
                     }
