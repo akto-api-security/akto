@@ -210,6 +210,7 @@ function SampleDetails(props) {
                     heading={"Attempt"}
                     minHeight={"30vh"}
                     vertical={true}
+                    apiCollectionId={moreInfoData?.apiCollectionId}
                     sampleData={data && Array.isArray(data) && data.length > 0 ? data.map((result) => {
                         return { message: result.orig, highlightPaths: [], metadata: result.metadata }
                     }) : []}
