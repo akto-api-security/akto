@@ -1660,9 +1660,43 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     // Project-level priority field mapping
     private String projectKey;
     private String fieldId;
+    private String fieldName;
+    private String fieldType;
+    private Map<String, Object> fieldSchema;
     private PriorityFieldMapping priorityFieldMapping;
     private List<BasicDBObject> availableFields;
     private List<BasicDBObject> availableFieldValues;
+
+    /**
+     * Helper method to determine field type from schema
+     * Detects rich text fields that need ADF formatting
+     */
+    private String determineFieldType(Map<String, Object> schema, String fieldId) {
+        if (schema == null) {
+            return "unknown";
+        }
+
+        Object typeObj = schema.get("type");
+        String baseType = typeObj != null ? typeObj.toString() : "unknown";
+
+        // Check for custom field types that need special formatting
+        Object customObj = schema.get("custom");
+        if (customObj != null) {
+            String customType = customObj.toString();
+            // Rich text fields (textarea, paragraph, richtext) need ADF formatting
+            if (customType.contains("textarea") || customType.contains("paragraph") || customType.contains("richtext")) {
+                return "doc"; // Mark as document type for ADF formatting
+            }
+            return baseType;
+        }
+
+        // System fields - check for known rich text fields
+        if ("description".equals(fieldId) || "environment".equals(fieldId)) {
+            return "doc"; // These are rich text fields
+        }
+
+        return baseType;
+    }
 
     /**
      * Fetch available fields for priority mapping (priority field + custom fields)
@@ -1706,15 +1740,15 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                 String fId = fIdObj != null ? fIdObj.toString() : null;
                 String fName = fNameObj != null ? fNameObj.toString() : null;
 
+                // Determine field type using helper method
                 String fType = "unknown";
                 Object schemaObj = field.get("schema");
                 if (schemaObj instanceof Map) {
                     Map<String, Object> schema = (Map<String, Object>) schemaObj;
-                    Object typeObj = schema.get("type");
-                    fType = typeObj != null ? typeObj.toString() : "unknown";
+                    fType = determineFieldType(schema, fId);
                 }
 
-                // Include all fields - no filtering
+                // Include all fields - filtering done in frontend
                 if (fId != null && fName != null) {
                     BasicDBObject fieldInfo = new BasicDBObject();
                     fieldInfo.put("id", fId);
@@ -1819,6 +1853,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
             // Use a Map to deduplicate field values by ID
             Map<String, BasicDBObject> uniqueFieldValues = new LinkedHashMap<>();
+            boolean fieldMetadataCaptured = false;
 
             // Iterate through all issue types and collect field values
             for (String issueTypeId : issueTypeIds) {
@@ -1842,6 +1877,23 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                             String currentFieldId = fieldIdObj != null ? fieldIdObj.toString() : null;
 
                             if (currentFieldId != null && currentFieldId.equals(fieldId)) {
+                                // Capture field metadata (name, type, schema) on first occurrence
+                                if (!fieldMetadataCaptured) {
+                                    Object nameObj = fieldMetadata.get("name");
+                                    this.fieldName = nameObj != null ? nameObj.toString() : fieldId;
+
+                                    Object schemaObj = fieldMetadata.get("schema");
+                                    if (schemaObj instanceof Map) {
+                                        this.fieldSchema = (Map<String, Object>) schemaObj;
+                                        this.fieldType = determineFieldType(this.fieldSchema, currentFieldId);
+                                    } else {
+                                        this.fieldType = "unknown";
+                                        this.fieldSchema = new HashMap<>();
+                                    }
+
+                                    fieldMetadataCaptured = true;
+                                }
+
                                 Object allowedValuesObj = fieldMetadata.get("allowedValues");
 
                                 if (allowedValuesObj instanceof List) {
@@ -1991,6 +2043,30 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
     public void setFieldId(String fieldId) {
         this.fieldId = fieldId;
+    }
+
+    public String getFieldName() {
+        return fieldName;
+    }
+
+    public void setFieldName(String fieldName) {
+        this.fieldName = fieldName;
+    }
+
+    public String getFieldType() {
+        return fieldType;
+    }
+
+    public void setFieldType(String fieldType) {
+        this.fieldType = fieldType;
+    }
+
+    public Map<String, Object> getFieldSchema() {
+        return fieldSchema;
+    }
+
+    public void setFieldSchema(Map<String, Object> fieldSchema) {
+        this.fieldSchema = fieldSchema;
     }
 
     public PriorityFieldMapping getPriorityFieldMapping() {
