@@ -151,11 +151,14 @@ const settingRequests = {
             data: {groupBy, startTimestamp, endTimestamp, names, host}
         })
     },
-    fetchMetrics(startTimestamp, endTimestamp) {
+    fetchMetrics(startTimestamp, endTimestamp, metricIdPrefix, instanceId) {
+        const data = {startTime:startTimestamp, endTime:endTimestamp}
+        if (metricIdPrefix) data.metricIdPrefix = metricIdPrefix
+        if (instanceId) data.instanceId = instanceId
         return request({
             url: '/api/metrics',
             method: 'post',
-            data: {startTime:startTimestamp, endTime:endTimestamp}
+            data
         })
     },
 
