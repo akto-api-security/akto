@@ -27,16 +27,23 @@ function TrafficCollectorsMetrics() {
     const tcMetrics = [
         'TC_CPU_USAGE',
         'TC_MEMORY_USAGE',
+        'TC_TOTAL_CPU_USAGE',
+        'TC_TOTAL_MEMORY_USAGE',
     ];
 
     const tcMetricNames = {
         'TC_CPU_USAGE': { title: 'CPU Usage', description: 'Traffic Collector CPU usage percentage' },
-        'TC_MEMORY_USAGE': { title: 'Memory Usage', description: 'Traffic Collector memory usage in MB' }
+        'TC_MEMORY_USAGE': { title: 'Memory Usage', description: 'Traffic Collector memory usage in MB' },
+        'TC_TOTAL_CPU_USAGE': { title: 'Total CPU Cores', description: 'Total CPU cores available on traffic collector instances' },
+        'TC_TOTAL_MEMORY_USAGE': { title: 'Total Memory', description: 'Total memory in MB available on traffic collector instances' }
     };
 
-    const fetchModuleInfo = async() => {
+    const fetchModuleInfo = async(startTime, endTime) => {
         try {
-            const filter = { moduleType: 'TRAFFIC_COLLECTOR' }
+            const filter = {
+                moduleType: 'TRAFFIC_COLLECTOR',
+                lastHeartbeatReceived: { $gte: startTime, $lte: endTime }
+            }
             const response = await settingRequests.fetchModuleInfo(filter)
             const modules = response?.moduleInfos || []
 
@@ -150,7 +157,7 @@ function TrafficCollectorsMetrics() {
 
     useEffect(() => {
         const fetchData = async () => {
-            await fetchModuleInfo();
+            await fetchModuleInfo(startTime, endTime);
             await getGraphData(startTime, endTime);
         };
 

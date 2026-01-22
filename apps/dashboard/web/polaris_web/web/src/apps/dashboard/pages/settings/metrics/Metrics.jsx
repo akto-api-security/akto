@@ -1,4 +1,4 @@
-import { EmptyState, LegacyCard, Page, Button } from '@shopify/polaris'
+import { EmptyState, LegacyCard, Page } from '@shopify/polaris'
 import React, { useEffect, useReducer, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DateRangeFilter from '../../../components/layouts/DateRangeFilter'
@@ -341,9 +341,18 @@ function Metrics() {
                                     subContent="Group by Id"
                                     subClick={changeItems}
                         />
-                        <Button onClick={() => navigate("/dashboard/settings/traffic-collectors-metrics")}>
-                            Traffic Collectors
-                        </Button>
+                        <Dropdown
+                            menuItems={[
+                                { label: "All", value: "ALL" },
+                                { label: "Traffic Collectors", value: "TRAFFIC_COLLECTORS" }
+                            ]}
+                            initial="ALL"
+                            selected={(val) => {
+                                if (val === "TRAFFIC_COLLECTORS") {
+                                    navigate("/dashboard/settings/traffic-collectors-metrics");
+                                }
+                            }}
+                        />
                     </LegacyCard.Header>
                 </LegacyCard.Section>
                 {graphContainer}
