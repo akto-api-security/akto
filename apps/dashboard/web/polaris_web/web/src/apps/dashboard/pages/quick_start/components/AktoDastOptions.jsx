@@ -1,16 +1,17 @@
-import { Box, Checkbox, HorizontalStack, Text, TextField, VerticalStack } from '@shopify/polaris'
+import { Box, Checkbox, HorizontalStack, Icon, Text, TextField, Tooltip, VerticalStack } from '@shopify/polaris'
+import { InfoMinor } from '@shopify/polaris-icons'
 import React, { useEffect, useState } from 'react'
 import Dropdown from '../../../components/layouts/Dropdown'
 import testingApi from '../../testing/api';
 
-const AktoDastOptions = ({ outscopeUrls, setOutscopeUrls, maxPageVisits, setMaxPageVisits, domLoadTimeout, setDomLoadTimeout, waitAfterEvent, setWaitAfterEvent, enableJsRendering, setEnableJsRendering, parseSoapServices, setParseSoapServices, parseRestServices, setParseRestServices, clickExternalLinks, setClickExternalLinks, crawlingTime, setCrawlingTime, runTestAfterCrawling, setRunTestAfterCrawling, selectedMiniTestingService, setSelectedMiniTestingService }) => {
+const AktoDastOptions = ({ outscopeUrls, setOutscopeUrls, urlTemplatePatterns, setUrlTemplatePatterns, applicationPages, setApplicationPages, maxPageVisits, setMaxPageVisits, domLoadTimeout, setDomLoadTimeout, waitAfterEvent, setWaitAfterEvent, enableJsRendering, setEnableJsRendering, parseSoapServices, setParseSoapServices, parseRestServices, setParseRestServices, clickExternalLinks, setClickExternalLinks, crawlingTime, setCrawlingTime, runTestAfterCrawling, setRunTestAfterCrawling, selectedMiniTestingService, setSelectedMiniTestingService }) => {
     const [miniTestingServiceNames, setMiniTestingServiceNames] = useState([]);
     const handleMiniTestingServiceChange = (value) => {
         setSelectedMiniTestingService(value)
     }
 
     useEffect(() => {
-        testingApi.fetchMiniTestingServiceNames().then(({miniTestingServiceNames}) => {
+        testingApi.fetchMiniTestingServiceNames().then(({ miniTestingServiceNames }) => {
             const miniTestingServiceNamesOptions = (miniTestingServiceNames || []).map(name => {
                 return {
                     label: name,
@@ -44,6 +45,34 @@ const AktoDastOptions = ({ outscopeUrls, setOutscopeUrls, maxPageVisits, setMaxP
                     onChange={(value) => setMaxPageVisits(value)}
                 />
             </HorizontalStack>
+
+            <TextField
+                label={
+                    <HorizontalStack gap="1">
+                        <Text>URL Template Patterns</Text>
+                        <Tooltip content="URL patterns to make templates (eg: /api/users/*, /products/*). Separate multiple patterns with a comma." dismissOnMouseOut>
+                            <Icon source={InfoMinor} color="subdued" />
+                        </Tooltip>
+                    </HorizontalStack>
+                }
+                placeholder="URL patterns to make templates (eg: /api/users/*, /products/*). Separate multiple patterns with a comma."
+                value={urlTemplatePatterns}
+                onChange={(value) => setUrlTemplatePatterns(value)}
+            />
+
+            <TextField
+                label={
+                    <HorizontalStack gap="1">
+                        <Text>Application Pages</Text>
+                        <Tooltip content="Application pages to crawl (eg: /login, /dashboard, /settings). Separate multiple pages with a comma. These pages will be crawled first." dismissOnMouseOut>
+                            <Icon source={InfoMinor} color="subdued" />
+                        </Tooltip>
+                    </HorizontalStack>
+                }
+                placeholder="Application pages to crawl (eg: /login, /dashboard, /settings). Separate multiple pages with a comma. These pages will be crawled first."
+                value={applicationPages}
+                onChange={(value) => setApplicationPages(value)}
+            />
 
             <HorizontalStack gap={2} wrap={false}>
                 <TextField
@@ -123,8 +152,8 @@ const AktoDastOptions = ({ outscopeUrls, setOutscopeUrls, maxPageVisits, setMaxP
                 {runTestAfterCrawling && miniTestingServiceNames.length > 0 && (
                     <Dropdown
                         label="Select testing module:"
-                        menuItems={miniTestingServiceNames} 
-                        selected={handleMiniTestingServiceChange} 
+                        menuItems={miniTestingServiceNames}
+                        selected={handleMiniTestingServiceChange}
                         initial={selectedMiniTestingService}
                     />
                 )}
