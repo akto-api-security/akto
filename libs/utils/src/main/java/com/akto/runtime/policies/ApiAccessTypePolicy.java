@@ -3,6 +3,8 @@ package com.akto.runtime.policies;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.ApiInfo.ApiAccessType;
+import com.akto.runtime.RuntimeUtil;
+
 import org.springframework.security.web.util.matcher.IpAddressMatcher;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -119,7 +121,14 @@ public class ApiAccessTypePolicy {
                         if(directionInt == 1){
                             apiInfo.getApiAccessTypes().add(ApiAccessType.PUBLIC);
                         } else {
-                            apiInfo.getApiAccessTypes().add(ApiAccessType.THIRD_PARTY);
+                            String host = RuntimeUtil.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "host");
+                            String hostWithoutPort = host.replaceAll(":\\d+$", "");
+                            boolean isInternalHost = host.contains("svc.cluster") || !hostWithoutPort.matches(".*\\.[a-zA-Z]{2,}$");
+                            if(!isInternalHost){
+                                apiInfo.getApiAccessTypes().add(ApiAccessType.THIRD_PARTY);
+                            }else{
+                                apiInfo.getApiAccessTypes().add(ApiAccessType.THIRD_PARTY);
+                            }
                         }
                         return;
                     }
