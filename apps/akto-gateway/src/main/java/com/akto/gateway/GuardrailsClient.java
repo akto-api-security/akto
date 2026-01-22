@@ -1,5 +1,13 @@
 package com.akto.gateway;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -9,6 +17,7 @@ import java.util.Map;
 public class GuardrailsClient {
 
     private static final Logger logger = LogManager.getLogger(GuardrailsClient.class);
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     private String guardrailsServiceUrl;
     private int timeout;
@@ -90,142 +99,73 @@ public class GuardrailsClient {
     }
 
     /**
-     * TODO: Replace with actual HTTP client call
+     * Calls the guardrails service API to validate the request
      */
     private Map<String, Object> callGuardrailsService(Map<String, Object> request) {
-        logger.info("Calling guardrails service at: {}", guardrailsServiceUrl);
+        logger.info("Calling guardrails service at: {}/api/validate/request", guardrailsServiceUrl);
 
-        return performDummyValidation(request);
-    }
-
-    private Map<String, Object> performDummyValidation(Map<String, Object> request) {
-        Map<String, Object> result = new HashMap<>();
+        CloseableHttpClient httpClient = null;
+        CloseableHttpResponse response = null;
 
         try {
-            String url = (String) request.get("url");
-            String path = (String) request.get("path");
+            // Configure request timeout
+            RequestConfig requestConfig = RequestConfig.custom()
+                    .setConnectTimeout(timeout)
+                    .setConnectionRequestTimeout(timeout)
+                    .setSocketTimeout(timeout)
+                    .build();
+
+            // Create HTTP client
+            httpClient = HttpClients.createDefault();
+
+            // Create POST request
+            HttpPost httpPost = new HttpPost(guardrailsServiceUrl + "/api/validate/request");
+            httpPost.setConfig(requestConfig);
+            httpPost.setHeader("Content-Type", "application/json");
+            httpPost.setHeader("Accept", "application/json");
+
+            // Convert request to JSON
+            String jsonRequest = objectMapper.writeValueAsString(request);
+            httpPost.setEntity(new StringEntity(jsonRequest, "UTF-8"));
+
+            logger.debug("Sending request to guardrails service: {}", jsonRequest);
+
+            // Execute request
+            response = httpClient.execute(httpPost);
+            int statusCode = response.getStatusLine().getStatusCode();
+
+            // Parse response
+            String responseBody = EntityUtils.toString(response.getEntity(), "UTF-8");
+            logger.debug("Received response from guardrails service (status {}): {}", statusCode, responseBody);
+
+            // Convert response to Map
             @SuppressWarnings("unchecked")
-            Map<String, Object> requestData = (Map<String, Object>) request.get("request");
+            Map<String, Object> result = objectMapper.readValue(responseBody, Map.class);
 
-            boolean passed = checkDummyRules(url, path, requestData);
-
-            result.put("passed", passed);
-            result.put("guardrailsVersion", "1.0.0");
-            result.put("checkTimestamp", System.currentTimeMillis());
-            result.put("url", url);
-            result.put("path", path);
-            result.put("serviceUrl", guardrailsServiceUrl);
-
-            if (passed) {
-                result.put("status", "ALLOWED");
-                result.put("message", "Request passed guardrails validation");
-                result.put("confidence", 0.95);
-                logger.info("Guardrails check PASSED for {}", url);
+            if (statusCode >= 200 && statusCode < 300) {
+                logger.info("Guardrails service call successful");
+                return result;
             } else {
-                result.put("status", "BLOCKED");
-                result.put("message", "Request blocked by guardrails");
-                result.put("reason", "Suspicious pattern detected in request");
-                result.put("confidence", 0.98);
-                logger.warn("Guardrails check BLOCKED for {}", url);
+                logger.warn("Guardrails service returned error status: {}", statusCode);
+                return buildErrorResponse("Guardrails service error: HTTP " + statusCode);
             }
-
-            Map<String, Object> validationDetails = new HashMap<>();
-            validationDetails.put("sql_injection_check", "PASSED");
-            validationDetails.put("xss_check", "PASSED");
-            validationDetails.put("command_injection_check", "PASSED");
-            validationDetails.put("path_traversal_check", passed ? "PASSED" : "BLOCKED");
-            result.put("validationDetails", validationDetails);
-
-            result.put("riskScore", passed ? 0.05 : 0.92);
 
         } catch (Exception e) {
-            logger.error("Error in dummy validation: {}", e.getMessage(), e);
-            result.put("passed", false);
-            result.put("status", "ERROR");
-            result.put("message", "Validation failed: " + e.getMessage());
-        }
-
-        return result;
-    }
-
-    private boolean checkDummyRules(String url, String path, Map<String, Object> request) {
-        if (url != null && containsSuspiciousPatterns(url.toLowerCase())) {
-            logger.warn("Suspicious pattern in URL: {}", url);
-            return false;
-        }
-
-        if (path != null && containsSuspiciousPatterns(path.toLowerCase())) {
-            logger.warn("Suspicious pattern in path: {}", path);
-            return false;
-        }
-
-        if (request != null) {
-            Object body = request.get("body");
-            if (body != null && containsMaliciousContent(body.toString().toLowerCase())) {
-                logger.warn("Malicious content detected in request body");
-                return false;
-            }
-
-            @SuppressWarnings("unchecked")
-            Map<String, Object> headers = (Map<String, Object>) request.get("headers");
-            if (headers != null && containsSuspiciousHeaders(headers)) {
-                logger.warn("Suspicious headers detected");
-                return false;
+            logger.error("Error calling guardrails service: {}", e.getMessage(), e);
+            return buildErrorResponse("Failed to call guardrails service: " + e.getMessage());
+        } finally {
+            // Close resources
+            try {
+                if (response != null) {
+                    response.close();
+                }
+                if (httpClient != null) {
+                    httpClient.close();
+                }
+            } catch (Exception e) {
+                logger.warn("Error closing HTTP resources: {}", e.getMessage());
             }
         }
-
-        return true;
-    }
-
-    private boolean containsSuspiciousPatterns(String text) {
-        if (text == null) return false;
-
-        String[] suspiciousKeywords = {
-            "malicious", "attack", "../", "..\\",
-            "etc/passwd", "cmd.exe", "/dev/null"
-        };
-
-        for (String keyword : suspiciousKeywords) {
-            if (text.contains(keyword)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Check for malicious content in body
-     */
-    private boolean containsMaliciousContent(String body) {
-        if (body == null) return false;
-
-        String[] maliciousPatterns = {
-            "drop table", "delete from", "union select",
-            "<script>", "javascript:",
-            "'; exec", "; drop",
-            "cmd /c", "powershell"
-        };
-
-        for (String pattern : maliciousPatterns) {
-            if (body.contains(pattern)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean containsSuspiciousHeaders(Map<String, Object> headers) {
-        if (headers == null) return false;
-
-        // Check for header injection attempts
-        for (Map.Entry<String, Object> entry : headers.entrySet()) {
-            String headerValue = String.valueOf(entry.getValue()).toLowerCase();
-            if (headerValue.contains("\r") || headerValue.contains("\n")) {
-                logger.warn("Header injection attempt detected in: {}", entry.getKey());
-                return true;
-            }
-        }
-        return false;
     }
 
     public boolean isValidationPassed(Map<String, Object> guardrailsResponse) {
