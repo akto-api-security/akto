@@ -17,6 +17,10 @@ public class ApiAccessTypePolicy {
 
 	public static final String X_FORWARDED_FOR = "x-forwarded-for";
     private static List<IpAddressMatcher> privateMatchers;
+    List<String> commonTLDs = Arrays.asList(".com", ".org", ".net", ".io", ".ai", ".co", ".dev", ".app",
+        ".edu", ".gov", ".mil", ".int", ".biz", ".info", ".xyz",
+        ".in", ".uk", ".us", ".de", ".fr", ".jp", ".cn", ".au", ".ca"
+    );
 
     public ApiAccessTypePolicy(List<String> privateCidrList, List<String> partnerIpList) {
         this.privateCidrList = privateCidrList == null ? Collections.emptyList() : new ArrayList<>(privateCidrList);
@@ -122,8 +126,9 @@ public class ApiAccessTypePolicy {
                             apiInfo.getApiAccessTypes().add(ApiAccessType.PUBLIC);
                         } else {
                             String host = RuntimeUtil.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "host");
-                            String hostWithoutPort = host.replaceAll(":\\d+$", "");
-                            boolean isInternalHost = host.contains("svc.cluster") || !hostWithoutPort.matches(".*\\.[a-zA-Z]{2,}$");
+                            String hostWithoutPort = host.replaceAll(":\\d+$", "").toLowerCase();
+                            boolean hasValidTLD = commonTLDs.stream().anyMatch(hostWithoutPort::endsWith);
+                            boolean isInternalHost = host.contains(".svc.cluster.local") || !hasValidTLD;
                             if(!isInternalHost){
                                 apiInfo.getApiAccessTypes().add(ApiAccessType.THIRD_PARTY);
                             }else{
