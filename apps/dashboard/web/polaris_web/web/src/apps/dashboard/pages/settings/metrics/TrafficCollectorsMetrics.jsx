@@ -1,4 +1,4 @@
-import { Page, LegacyCard, EmptyState, Text } from "@shopify/polaris"
+import { Page, LegacyCard, EmptyState, Text, HorizontalStack, VerticalStack, Box } from "@shopify/polaris"
 import { useEffect, useReducer, useState } from "react"
 import { produce } from "immer"
 import DateRangeFilter from "../../../components/layouts/DateRangeFilter"
@@ -202,39 +202,43 @@ function TrafficCollectorsMetrics() {
         >
             <LegacyCard >
                 <LegacyCard.Section>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                        <Text variant="headingLg" as="h2">Traffic Collectors Metrics</Text>
-                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                            <DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>
-                            {instanceIds.length > 1 && (
-                                <Dropdown
-                                    menuItems={instanceIds}
-                                    initial={selectedInstanceId}
-                                    selected={(val) => setSelectedInstanceId(val)}
-                                />
-                            )}
-                        </div>
-                    </div>
-                    {selectedInstanceId && moduleInfoData[selectedInstanceId] && (
-                        <div style={{ display: 'flex', gap: '24px', padding: '12px 16px', backgroundColor: '#f6f6f7', borderRadius: '8px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Text variant="bodySm" color="subdued">Instance:</Text>
-                                <Text variant="bodySm" fontWeight="semibold">{selectedInstanceId}</Text>
-                            </div>
-                            {moduleInfoData[selectedInstanceId]?.totalCpuCores && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <Text variant="bodySm" color="subdued">CPU Cores:</Text>
-                                    <Text variant="bodySm" fontWeight="semibold">{moduleInfoData[selectedInstanceId].totalCpuCores}</Text>
-                                </div>
-                            )}
-                            {moduleInfoData[selectedInstanceId]?.totalMemoryMB && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <Text variant="bodySm" color="subdued">Memory:</Text>
-                                    <Text variant="bodySm" fontWeight="semibold">{moduleInfoData[selectedInstanceId].totalMemoryMB} MB</Text>
-                                </div>
-                            )}
-                        </div>
-                    )}
+                    <VerticalStack gap="4">
+                        <HorizontalStack align="space-between" blockAlign="center">
+                            <Text variant="headingLg" as="h2">Traffic Collectors Metrics</Text>
+                            <HorizontalStack gap="3" blockAlign="center">
+                                <DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>
+                                {instanceIds.length > 1 && (
+                                    <Dropdown
+                                        menuItems={instanceIds}
+                                        initial={selectedInstanceId}
+                                        selected={(val) => setSelectedInstanceId(val)}
+                                    />
+                                )}
+                            </HorizontalStack>
+                        </HorizontalStack>
+                        {selectedInstanceId && moduleInfoData[selectedInstanceId] && (
+                            <Box background="bg-fill-tertiary" padding="3" borderRadius="200">
+                                <HorizontalStack gap="6">
+                                    <HorizontalStack gap="2" blockAlign="center">
+                                        <Text variant="bodySm" tone="subdued">Instance:</Text>
+                                        <Text variant="bodySm" fontWeight="semibold">{selectedInstanceId}</Text>
+                                    </HorizontalStack>
+                                    {moduleInfoData[selectedInstanceId]?.totalCpuCores && (
+                                        <HorizontalStack gap="2" blockAlign="center">
+                                            <Text variant="bodySm" tone="subdued">CPU Cores:</Text>
+                                            <Text variant="bodySm" fontWeight="semibold">{moduleInfoData[selectedInstanceId].totalCpuCores}</Text>
+                                        </HorizontalStack>
+                                    )}
+                                    {moduleInfoData[selectedInstanceId]?.totalMemoryMB && (
+                                        <HorizontalStack gap="2" blockAlign="center">
+                                            <Text variant="bodySm" tone="subdued">Memory:</Text>
+                                            <Text variant="bodySm" fontWeight="semibold">{moduleInfoData[selectedInstanceId].totalMemoryMB} MB</Text>
+                                        </HorizontalStack>
+                                    )}
+                                </HorizontalStack>
+                            </Box>
+                        )}
+                    </VerticalStack>
                 </LegacyCard.Section>
                 {orderedResult.map((element) => (
                     element.value && element.value.length > 0 ? (
