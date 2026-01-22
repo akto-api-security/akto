@@ -3285,10 +3285,28 @@ public class DbAction extends ActionSupport {
 
 
     private List<CrawlerRun> crawlerRuns;
+    private List<CrawlerRunDTO> crawlerRunsData;
     private String moduleName;
     private String crawlId;
     private String status;
     private String errorMessage;
+
+    public String fetchPendingDastJobsV2() {
+        try {
+            crawlerRuns = CrawlerRunDao.instance.findAll(
+                    Filters.and(
+                            Filters.eq(CrawlerRun.MODULE_NAME, moduleName),
+                            Filters.eq(CrawlerRun.STATUS, CrawlerRun.CrawlerRunStatus.PENDING.name())
+                    ),
+                    0, 1,
+                    Sorts.ascending(CrawlerRun.START_TIMESTAMP)
+            );
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetchPendingDastJobsV2");
+            return Action.ERROR.toUpperCase();
+        }
+    }
 
     public String fetchPendingDastJobs() {
         try {
@@ -3300,6 +3318,14 @@ public class DbAction extends ActionSupport {
                     0, 1,
                     Sorts.ascending(CrawlerRun.START_TIMESTAMP)
             );
+
+            // Convert CrawlerRun objects to CrawlerRunDTO with only required fields
+            crawlerRunsData = new ArrayList<>();
+            for (CrawlerRun crawlerRun : crawlerRuns) {
+                CrawlerRunDTO dto = CrawlerRunDTO.fromCrawlerRun(crawlerRun);
+                crawlerRunsData.add(dto);
+            }
+
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in fetchPendingDastJobs");
@@ -4782,6 +4808,10 @@ public class DbAction extends ActionSupport {
 
     public List<CrawlerRun> getCrawlerRuns() {
         return crawlerRuns;
+    }
+
+    public List<CrawlerRunDTO> getCrawlerRunsData() {
+        return crawlerRunsData;
     }
 
     public void setCrawlerRuns(List<CrawlerRun> crawlerRuns) {
