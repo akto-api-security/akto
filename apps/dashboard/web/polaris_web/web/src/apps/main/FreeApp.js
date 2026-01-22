@@ -1,13 +1,27 @@
-import { Link, Text, Box, Button, HorizontalStack, VerticalStack, Avatar } from "@shopify/polaris";
+import { Text, Box, Button, HorizontalStack, VerticalStack } from "@shopify/polaris";
 import EmptyScreensLayout from "../dashboard/components/banners/EmptyScreensLayout";
 import {
     createBrowserRouter,
     RouterProvider
 } from "react-router-dom";
+import api from "../signup/api";
 
 function FreeApp() {
     const contactSalesUrl = "https://www.akto.io/demo";
-    const signInUrl = "https://app.akto.io/";
+
+    const handleLogout = async () => {
+        try {
+            const res = await api.logout();
+            if (res.logoutUrl) {
+                window.location.href = res.logoutUrl;
+            } else {
+                window.location.href = "/login";
+            }
+        } catch (error) {
+            console.error("Logout failed:", error);
+            window.location.href = "/login";
+        }
+    };
 
     const description = (
         <Text>
@@ -41,8 +55,8 @@ function FreeApp() {
                         />
                         <Box paddingBlockStart={4}>
                             <VerticalStack align="center" gap={2} inlineAlign="center">
-                                <Text variant="bodySm" color="subdued">Already a customer?</Text>
-                                <Link url={signInUrl}>Sign in with your organization account</Link>
+                                <Text variant="bodySm" color="subdued">Need to sign in with a different account?</Text>
+                                <Button plain onClick={handleLogout}>Log out</Button>
                             </VerticalStack>
                         </Box>
                     </Box>
