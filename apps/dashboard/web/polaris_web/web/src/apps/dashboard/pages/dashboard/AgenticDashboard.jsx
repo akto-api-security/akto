@@ -382,24 +382,37 @@ const AgenticDashboard = () => {
 
                 // Fetch all consolidated APIs in parallel
                 // Note: Endpoints over time is fetched via existing InventoryAction APIs
-                // Threats over time is fetched via getDailyThreatActorsCount API
-                const [
-                    endpointDiscoveryResponse,
-                    issuesResponse,
-                    testingResponse,
-                    threatResponse,
-                    hostTrendResponse,
-                    nonHostTrendResponse,
-                    threatActorsCountResponse
-                ] = await Promise.allSettled([
+                // Threats over time is fetched via getDailyThreatActorsCount API (only if THREAT_DETECTION feature is enabled)
+                const hasThreatDetectionFeature = func.checkForFeatureSaas('THREAT_DETECTION');
+                
+                const apiPromises = [
                     api.fetchEndpointDiscoveryData(startTs, endTs),
                     api.fetchIssuesData(startTs, endTs),
                     api.fetchTestingData(startTs, endTs),
                     api.fetchThreatData(startTs, endTs),
                     observeApi.fetchNewEndpointsTrendForHostCollections(startTs, endTs),
                     observeApi.fetchNewEndpointsTrendForNonHostCollections(startTs, endTs),
-                    threatApi.getDailyThreatActorsCount(startTs, endTs, [])
-                ]);
+                ];
+                
+                // Only add getDailyThreatActorsCount if THREAT_DETECTION feature is enabled
+                if (hasThreatDetectionFeature) {
+                    apiPromises.push(threatApi.getDailyThreatActorsCount(startTs, endTs, []));
+                }
+                
+                const results = await Promise.allSettled(apiPromises);
+                
+                // Extract responses based on whether threat detection API was called
+                const [
+                    endpointDiscoveryResponse,
+                    issuesResponse,
+                    testingResponse,
+                    threatResponse,
+                    hostTrendResponse,
+                    nonHostTrendResponse
+                ] = results.slice(0, 6);
+                
+                // threatActorsCountResponse is only present if feature is enabled
+                const threatActorsCountResponse = hasThreatDetectionFeature ? results[6] : { status: 'rejected', reason: { skipRetry: true } };
 
                 // Process Endpoint Discovery Data
                 if (endpointDiscoveryResponse.status === 'fulfilled' && endpointDiscoveryResponse.value) {
