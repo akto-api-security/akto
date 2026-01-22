@@ -382,6 +382,11 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             return Action.ERROR.toUpperCase();
         }
 
+        // Ensure jiraType is not null - set default for backward compatibility
+        if (jiraType == null) {
+            jiraType = JiraIntegration.JiraType.CLOUD;
+        }
+
         this.projectAndIssueMap = new HashMap<>();
         try {
             for (Map.Entry<String, ProjectMapping> entry : projectMappings.entrySet()) {
@@ -1287,6 +1292,14 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
     public void setProjectMappings(Map<String, ProjectMapping> projectMappings) {
         this.projectMappings = projectMappings;
+    }
+
+    public JiraIntegration.JiraType getJiraType() {
+        return jiraType;
+    }
+
+    public void setJiraType(JiraIntegration.JiraType jiraType) {
+        this.jiraType = jiraType;
     }
 
     @Override
