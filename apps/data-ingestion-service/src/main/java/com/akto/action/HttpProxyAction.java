@@ -8,6 +8,7 @@ import com.opensymphony.xwork2.ActionSupport;
 import java.util.HashMap;
 import java.util.Map;
 
+
 @lombok.Getter
 @lombok.Setter
 public class HttpProxyAction extends ActionSupport {
@@ -15,62 +16,69 @@ public class HttpProxyAction extends ActionSupport {
     private static final LoggerMaker loggerMaker = new LoggerMaker(HttpProxyAction.class, LoggerMaker.LogDb.DATA_INGESTION);
     private static final Gateway gateway = Gateway.getInstance();
 
-    private Map<String, Object> requestData;
+    private Map<String, Object> proxyData;
 
-    private Map<String, Object> response;
+    private Map<String, Object> result;
     private boolean success;
     private String message;
 
+    
     public String httpProxy() {
         try {
-            loggerMaker.info("HTTP Proxy called with request: " + requestData);
+            loggerMaker.info("HTTP Proxy API called");
 
-            if (requestData == null || requestData.isEmpty()) {
-                loggerMaker.warn("Empty or null request data received");
-                requestData = new HashMap<>();
-                requestData.put("message", "Empty request - using default");
+            // Validate input
+            if (proxyData == null || proxyData.isEmpty()) {
+                loggerMaker.warnAndAddToDb("Empty proxy data received");
+                success = false;
+                message = "Empty or null proxy data";
+                result = new HashMap<>();
+                result.put("error", "Proxy data is required");
+                return Action.ERROR.toUpperCase();
             }
 
-            response = gateway.processRequest(requestData);
+            result = gateway.processHttpProxy(proxyData);
 
-            Map<String, Object> metadata = new HashMap<>();
-            metadata.put("endpoint", "/api/http-proxy");
-            metadata.put("service", "data-ingestion-service");
-            metadata.put("requestSize", requestData.size());
+            Object successObj = result.get("success");
+            success = (successObj instanceof Boolean) ? (Boolean) successObj : false;
 
-            success = true;
-            message = "Request processed successfully through gateway";
+            if (success) {
+                message = "Request processed successfully";
+            } else {
+                Object errorObj = result.get("error");
+                message = (errorObj != null) ? errorObj.toString() : "Request processing failed";
+            }
 
-            loggerMaker.info("HTTP Proxy processed successfully");
-            return Action.SUCCESS.toUpperCase();
+            loggerMaker.info("HTTP Proxy processed - success: " + success);
+
+            return success ? Action.SUCCESS.toUpperCase() : Action.ERROR.toUpperCase();
 
         } catch (Exception e) {
-            loggerMaker.error("Error in HTTP Proxy: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
-            e.printStackTrace();
+            loggerMaker.errorAndAddToDb("Error in HTTP Proxy action: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
 
             success = false;
-            message = "Error processing request: " + e.getMessage();
-            response = new HashMap<>();
-            response.put("error", e.getMessage());
+            message = "Unexpected error: " + e.getMessage();
+            result = new HashMap<>();
+            result.put("error", e.getMessage());
 
             return Action.ERROR.toUpperCase();
         }
     }
 
-    public Map<String, Object> getRequestData() {
-        return requestData;
+    public Map<String, Object> getProxyData() {
+        return proxyData;
     }
 
-    public void setRequestData(Map<String, Object> requestData) {
-        this.requestData = requestData;
+    public void setProxyData(Map<String, Object> proxyData) {
+        this.proxyData = proxyData;
     }
 
-    public Map<String, Object> getResponse() {
-        return response;
+    public Map<String, Object> getResult() {
+        return result;
     }
 
-    public void setResponse(Map<String, Object> response) {
-        this.response = response;
+    public void setResult(Map<String, Object> result) {
+        this.result = result;
     }
 
     public boolean isSuccess() {
