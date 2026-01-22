@@ -194,6 +194,21 @@ public class DbActor extends DataActor {
     public void bulkWriteApiInfo(List<ApiInfo> apiInfoList) {
         DbLayer.bulkWriteApiInfo(apiInfoList);
     }
+
+    public void fastDiscoveryBulkWriteSingleTypeInfo(List<Object> writesForSti) {
+        // For local DB access, just delegate to regular bulk write
+        bulkWriteSingleTypeInfo(writesForSti);
+    }
+
+    public void fastDiscoveryBulkWriteApiInfo(List<ApiInfo> apiInfoList) {
+        // For local DB access, just delegate to regular bulk write
+        bulkWriteApiInfo(apiInfoList);
+    }
+
+    public List<ApiInfo.ApiInfoKey> fetchApiIds() {
+        return DbLayer.fetchAllApiInfoKeys();
+    }
+
     public List<RuntimeFilter> fetchRuntimeFilters() {
         return DbLayer.fetchRuntimeFilters();
     }
@@ -220,6 +235,10 @@ public class DbActor extends DataActor {
 
     public List<ApiCollection> fetchAllApiCollections() {
         return DbLayer.fetchAllApiCollections();
+    }
+
+    public List<ApiCollection> fetchAllCollections() {
+        return DbLayer.fetchAllCollections();
     }
 
     public void createCollectionSimple(int vxlanId) {

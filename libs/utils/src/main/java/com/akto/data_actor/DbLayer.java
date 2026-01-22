@@ -171,6 +171,23 @@ public class DbLayer {
         List<WriteModel<ApiInfo>> writesForApiInfo = ApiInfoBulkUpdate.getUpdatesForApiInfo(apiInfoList);
         ApiInfoDao.instance.getMCollection().bulkWrite(writesForApiInfo);
     }
+
+    public static List<ApiInfo.ApiInfoKey> fetchAllApiInfoKeys() {
+        com.mongodb.client.FindIterable<ApiInfo> cursor = ApiInfoDao.instance
+            .getMCollection()
+            .find()
+            .projection(Projections.include("_id"))
+            .batchSize(10000);
+
+        List<ApiInfo.ApiInfoKey> apiIds = new ArrayList<>();
+        for (ApiInfo apiInfo : cursor) {
+            if (apiInfo != null && apiInfo.getId() != null) {
+                apiIds.add(apiInfo.getId());
+            }
+        }
+        return apiIds;
+    }
+
     public static void bulkWriteSingleTypeInfo(List<WriteModel<SingleTypeInfo>> writesForSingleTypeInfo) {
         BulkWriteResult res = SingleTypeInfoDao.instance.getMCollection().bulkWrite(writesForSingleTypeInfo);
         loggerMaker.debug("bulk write result: del:" + res.getDeletedCount() + " ins:" + res.getInsertedCount() + " match:" + res.getMatchedCount() + " modify:" +res.getModifiedCount());
@@ -443,6 +460,7 @@ public class DbLayer {
 
         Bson updates = Updates.combine(
             Updates.setOnInsert("_id", id),
+            Updates.setOnInsert(ApiCollection.HOST_NAME, host),
             Updates.setOnInsert("startTs", Context.now()),
             Updates.setOnInsert("urls", new HashSet<>()),
             Updates.set("userSetEnvType", vpcId)
@@ -514,6 +532,11 @@ public class DbLayer {
     public static List<ApiCollection> fetchAllApiCollections() {
         return ApiCollectionsDao.instance.findAll(new BasicDBObject(),
             Projections.exclude("urls"));
+    }
+
+    public static List<ApiCollection> fetchAllCollections() {
+        return ApiCollectionsDao.instance.findAll(new BasicDBObject(),
+            Projections.include("_id", "hostName"));
     }
 
     public static Organization fetchOrganization(int accountId) {
