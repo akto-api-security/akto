@@ -6,10 +6,7 @@ import org.apache.logging.log4j.Logger;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Central Gateway class providing gateway functionality for Akto services.
- * Handles HTTP proxy requests and guardrails integration.
- */
+
 public class Gateway {
 
     private static final Logger logger = LogManager.getLogger(Gateway.class);
@@ -136,7 +133,6 @@ public class Gateway {
     }
 
     /**
-     * Execute the actual proxy request
      * TODO: Implement actual HTTP client call to target URL
      */
     private Map<String, Object> executeProxyRequest(String url, String path,
@@ -152,52 +148,6 @@ public class Gateway {
         result.put("response", response);
         result.put("executedAt", System.currentTimeMillis());
         result.put("status", "EXECUTED");
-
-        // TODO: Replace with actual HTTP client call
-        // Example using HttpClient (Java 11+):
-        //
-        // try {
-        //     HttpClient httpClient = HttpClient.newHttpClient();
-        //
-        //     // Build request
-        //     HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
-        //         .uri(URI.create(url))
-        //         .timeout(Duration.ofSeconds(30));
-        //
-        //     // Add method and body
-        //     String method = (String) request.get("method");
-        //     Object body = request.get("body");
-        //
-        //     if ("POST".equals(method) || "PUT".equals(method)) {
-        //         String bodyStr = (body != null) ? body.toString() : "";
-        //         requestBuilder.POST(HttpRequest.BodyPublishers.ofString(bodyStr));
-        //     } else {
-        //         requestBuilder.GET();
-        //     }
-        //
-        //     // Add headers
-        //     Map<String, Object> headers = (Map<String, Object>) request.get("headers");
-        //     if (headers != null) {
-        //         for (Map.Entry<String, Object> header : headers.entrySet()) {
-        //             requestBuilder.header(header.getKey(), String.valueOf(header.getValue()));
-        //         }
-        //     }
-        //
-        //     // Send request
-        //     HttpResponse<String> httpResponse = httpClient.send(
-        //         requestBuilder.build(),
-        //         HttpResponse.BodyHandlers.ofString()
-        //     );
-        //
-        //     // Build response
-        //     result.put("statusCode", httpResponse.statusCode());
-        //     result.put("responseBody", httpResponse.body());
-        //     result.put("responseHeaders", httpResponse.headers().map());
-        //
-        // } catch (Exception e) {
-        //     logger.error("Error executing proxy request: {}", e.getMessage(), e);
-        //     result.put("error", e.getMessage());
-        // }
 
         return result;
     }
@@ -226,23 +176,7 @@ public class Gateway {
         return blocked;
     }
 
-    /**
-     * Get the guardrails client instance
-     * @return GuardrailsClient instance
-     */
     public GuardrailsClient getGuardrailsClient() {
         return guardrailsClient;
-    }
-
-    /**
-     * Legacy method for backward compatibility
-     */
-    public Map<String, Object> processRequest(Map<String, Object> request) {
-        logger.info("Processing request through gateway (legacy method)");
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("data", request);
-        response.put("timestamp", System.currentTimeMillis());
-        return response;
     }
 }
