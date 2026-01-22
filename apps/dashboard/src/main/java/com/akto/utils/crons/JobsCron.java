@@ -93,7 +93,8 @@ public class JobsCron {
             Job finalJob = job;
             try {
                 JobParams params = finalJob.getJobParams();
-                if(!(params.getJobType() == JobType.DATADOG_TRAFFIC_COLLECTOR)) {
+                if(!(params.getJobType() == JobType.DATADOG_TRAFFIC_COLLECTOR || 
+                     params.getJobType() == JobType.JIRA_AUTO_CREATE_TICKETS)) {
                     executorService.submit(
                         () -> {
                             Context.accountId.set(finalJob.getAccountId());
