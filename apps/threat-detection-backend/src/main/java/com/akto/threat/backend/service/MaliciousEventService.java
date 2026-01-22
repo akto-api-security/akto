@@ -112,7 +112,7 @@ public class MaliciousEventService {
 
     MaliciousEventDto.Builder builder = MaliciousEventDto.newBuilder();
     // Skip recording for specific policies on specific account
-    if(accountId.equals("1763355072")){
+    if("1763355072".equals(accountId)){
       if (IGNORED_POLICIES_FOR_ACCOUNT.contains(filterId)) {
         return;
       }
