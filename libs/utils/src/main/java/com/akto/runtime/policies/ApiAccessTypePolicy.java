@@ -25,6 +25,7 @@ public class ApiAccessTypePolicy {
     public ApiAccessTypePolicy(List<String> privateCidrList, List<String> partnerIpList) {
         this.privateCidrList = privateCidrList == null ? Collections.emptyList() : new ArrayList<>(privateCidrList);
         this.partnerIpList   = partnerIpList == null ? Collections.emptyList() : new ArrayList<>(partnerIpList);
+        privateMatchers = buildMatchers(this.privateCidrList);
     }
 
     // RFC standard list. To be used later.
