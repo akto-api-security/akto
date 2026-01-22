@@ -180,14 +180,14 @@ public class AktoTrafficCollectorTelemetry {
             if (profiling.containsKey("cpu_percent")) {
                 float cpuUsage = extractFloat(profiling.get("cpu_percent"));
                 AllMetrics.instance.setTcCpuUsage(instanceId, cpuUsage);
-                loggerMaker.infoAndAddToDb("Recorded CPU metric for " + instanceId + ": " + cpuUsage + "%");
+                loggerMaker.debugInfoAddToDb("Recorded CPU metric for " + instanceId + ": " + cpuUsage + "%");
             }
 
             // Record Memory metric
             if (profiling.containsKey("memory_used_mb")) {
                 float memoryUsedMB = extractFloat(profiling.get("memory_used_mb"));
                 AllMetrics.instance.setTcMemoryUsage(instanceId, memoryUsedMB);
-                loggerMaker.infoAndAddToDb("Recorded Memory metric for " + instanceId + ": " +
+                loggerMaker.debugInfoAddToDb("Recorded Memory metric for " + instanceId + ": " +
                     (int)memoryUsedMB + " MB");
             }
 
