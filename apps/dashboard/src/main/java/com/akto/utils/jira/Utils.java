@@ -459,48 +459,7 @@ public class Utils {
         fields.put("issuetype", new BasicDBObject("id", issueType));
         fields.put("description", description);
 
-        // Apply project-level priority field mapping only
-        // If no mapping configured, Jira will use default priority (medium)
-        if (severity != null && jiraIntegration != null) {
-            try {
-                ProjectMapping projectMapping = jiraIntegration.getProjectMappings() != null
-                    ? jiraIntegration.getProjectMappings().get(projectKey)
-                    : null;
-
-                PriorityFieldMapping priorityFieldMapping = projectMapping != null
-                    ? projectMapping.getPriorityFieldMapping()
-                    : null;
-
-                if (priorityFieldMapping != null &&
-                    priorityFieldMapping.getSeverityToValueMap() != null &&
-                    !priorityFieldMapping.getSeverityToValueMap().isEmpty()) {
-
-                    String fieldId = priorityFieldMapping.getFieldId();
-                    String priorityValue = priorityFieldMapping.getSeverityToValueMap().get(severity.name());
-
-                    loggerMaker.infoAndAddToDb("Using project-level mapping for " + projectKey +
-                        " - Field: " + fieldId + ", Severity: " + severity.name() +
-                        ", Value: " + priorityValue, LogDb.DASHBOARD);
-
-                    if (priorityValue != null && !priorityValue.isEmpty()) {
-                        if ("priority".equals(fieldId)) {
-                            // Standard priority field
-                            fields.put("priority", new BasicDBObject("id", priorityValue));
-                        } else {
-                            // Custom field - always use ID structure
-                            fields.put(fieldId, new BasicDBObject("id", priorityValue));
-                        }
-                        loggerMaker.infoAndAddToDb("Set " + fieldId + " field with value: " + priorityValue, LogDb.DASHBOARD);
-                    }
-                } else {
-                    loggerMaker.infoAndAddToDb("No project-level priority mapping configured for " + projectKey +
-                        " - Jira will use default priority", LogDb.DASHBOARD);
-                }
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error setting Jira priority from severity mapping");
-            }
-        }
-
+        // First, apply additionalIssueFields (user-provided custom fields)
         if (additionalIssueFields != null) {
             try {
                 Object fieldsObj = additionalIssueFields.get("customIssueFields");
@@ -524,7 +483,92 @@ public class Utils {
                 e.printStackTrace();
             }
         }
+
+        // Then apply priority field mapping - this takes precedence and will override additionalIssueFields
+        if (severity != null && jiraIntegration != null) {
+            try {
+                ProjectMapping projectMapping = jiraIntegration.getProjectMappings() != null
+                    ? jiraIntegration.getProjectMappings().get(projectKey)
+                    : null;
+
+                PriorityFieldMapping priorityFieldMapping = projectMapping != null
+                    ? projectMapping.getPriorityFieldMapping()
+                    : null;
+
+                if (priorityFieldMapping != null &&
+                    priorityFieldMapping.getSeverityToValueMap() != null &&
+                    !priorityFieldMapping.getSeverityToValueMap().isEmpty()) {
+
+                    String fieldId = priorityFieldMapping.getFieldId();
+                    String fieldType = priorityFieldMapping.getFieldType();
+                    String priorityValue = priorityFieldMapping.getSeverityToValueMap().get(severity.name());
+
+                    loggerMaker.infoAndAddToDb("Using project-level mapping for " + projectKey +
+                        " - Field: " + fieldId + ", Type: " + fieldType + ", Severity: " + severity.name() +
+                        ", Value: " + priorityValue, LogDb.DASHBOARD);
+
+                    if (priorityValue != null && !priorityValue.isEmpty()) {
+                        Object fieldValue = formatJiraFieldValue(fieldId, fieldType, priorityValue);
+                        if (fieldValue != null) {
+                            fields.put(fieldId, fieldValue);
+                            loggerMaker.infoAndAddToDb("Set " + fieldId + " field with value: " + fieldValue, LogDb.DASHBOARD);
+                        }
+                    }
+                } else {
+                    loggerMaker.infoAndAddToDb("No project-level priority mapping configured for " + projectKey +
+                        " - Jira will use default priority", LogDb.DASHBOARD);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error setting Jira priority from severity mapping");
+            }
+        }
+
         return fields;
+    }
+
+    /**
+     * Formats a field value based on Jira field type
+     * Only handles dropdown field types since priority mapping only works with dropdown fields
+     * @param fieldId The field ID (e.g., "priority", "customfield_10106")
+     * @param fieldType The field type (e.g., "priority", "option", "array")
+     * @param value The value to format
+     * @return Formatted value object suitable for Jira API
+     */
+    private static Object formatJiraFieldValue(String fieldId, String fieldType, String value) {
+        // Backward compatibility: if fieldType is null or empty, assume it's a select/option field
+        if (fieldType == null || fieldType.isEmpty()) {
+            loggerMaker.infoAndAddToDb("Field type not specified for " + fieldId + ", defaulting to option format");
+            return new BasicDBObject("id", value);
+        }
+
+        // Format based on field type (only dropdown field types are supported for priority mapping)
+        switch (fieldType.toLowerCase()) {
+            case "priority":
+            case "option":
+            case "select":
+                // Select dropdown - use ID structure
+                return new BasicDBObject("id", value);
+
+            case "array":
+            case "multiselect":
+                // Multi-select - array of IDs
+                // Support comma-separated values: "10001,10002,10003"
+                List<BasicDBObject> array = new ArrayList<>();
+                String[] values = value.split(",");
+                for (String val : values) {
+                    val = val.trim();
+                    if (!val.isEmpty()) {
+                        BasicDBObject arrayItem = new BasicDBObject("id", val);
+                        array.add(arrayItem);
+                    }
+                }
+                return array.isEmpty() ? null : array;
+
+            default:
+                // Unknown type - log warning and default to ID structure for safety
+                loggerMaker.infoAndAddToDb("Unknown field type '" + fieldType + "' for " + fieldId + ", using ID format");
+                return new BasicDBObject("id", value);
+        }
     }
 
     public static Object buildJiraDescription(List<BasicDBObject> baseContent, List<BasicDBObject> additionalContent, JiraIntegration.JiraType jiraType) {

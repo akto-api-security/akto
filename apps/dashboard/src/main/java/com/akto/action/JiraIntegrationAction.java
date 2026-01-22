@@ -1665,7 +1665,75 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private List<BasicDBObject> availableFieldValues;
 
     /**
-     * Fetch available fields for priority mapping (priority field + custom fields)
+     * Helper method to determine field type from schema
+     */
+    private String determineFieldType(Map<String, Object> schema, String fieldId) {
+        if (schema == null) {
+            return "unknown";
+        }
+
+        Object typeObj = schema.get("type");
+        return typeObj != null ? typeObj.toString() : "unknown";
+    }
+
+    /**
+     * Helper method to get ALL issue type IDs for a project
+     * Tries cache first, then fetches from API if needed
+     */
+    private List<String> getAllIssueTypeIds(String projectKey, JiraIntegration jiraIntegration, Map<String, List<String>> headers) throws Exception {
+        List<String> issueTypeIds = new ArrayList<>();
+        Map<String, List<BasicDBObject>> projectIdsMap = jiraIntegration.getProjectIdsMap();
+
+        // Try to get from cache first
+        if (projectIdsMap != null && projectIdsMap.containsKey(projectKey)) {
+            List<BasicDBObject> issueTypes = projectIdsMap.get(projectKey);
+            for (BasicDBObject issueType : issueTypes) {
+                String issueTypeId = issueType.getString("issueId");
+                if (issueTypeId != null) {
+                    issueTypeIds.add(issueTypeId);
+                }
+            }
+        }
+
+        // If not in cache, fetch from API
+        if (issueTypeIds.isEmpty()) {
+            loggerMaker.infoAndAddToDb("Issue types not found in cache for project " + projectKey + ", fetching from API");
+            String baseUrl = jiraIntegration.getBaseUrl();
+            String createMetaProjectUrl = baseUrl + "/rest/api/3/issue/createmeta?projectKeys=" + projectKey + "&expand=projects.issuetypes.fields";
+            OriginalHttpRequest projectRequest = new OriginalHttpRequest(createMetaProjectUrl, "", "GET", null, headers, "");
+            OriginalHttpResponse projectResponse = ApiExecutor.sendRequest(projectRequest, true, null, false, new ArrayList<>());
+
+            String projectResponseBody = projectResponse.getBody();
+            Map<String, Object> projectMetadata = JsonUtils.fromJson(projectResponseBody,
+                new TypeReference<Map<String, Object>>() {});
+
+            Object projectsObj = projectMetadata.get("projects");
+            if (projectsObj instanceof List) {
+                List<?> projectsList = (List<?>) projectsObj;
+                if (!projectsList.isEmpty() && projectsList.get(0) instanceof Map) {
+                    Map<String, Object> project = (Map<String, Object>) projectsList.get(0);
+                    Object issueTypesObj = project.get("issuetypes");
+                    if (issueTypesObj instanceof List) {
+                        List<?> issueTypesList = (List<?>) issueTypesObj;
+                        for (Object issueTypeObj : issueTypesList) {
+                            if (issueTypeObj instanceof Map) {
+                                Map<String, Object> issueType = (Map<String, Object>) issueTypeObj;
+                                Object issueTypeIdObj = issueType.get("id");
+                                if (issueTypeIdObj != null) {
+                                    issueTypeIds.add(issueTypeIdObj.toString());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return issueTypeIds;
+    }
+
+    /**
+     * Fetch available fields for priority mapping (only fields with dropdown values)
      */
     public String fetchAvailableFieldsForMapping() {
         try {
@@ -1687,16 +1755,75 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             String apiToken = jiraIntegration.getApiToken();
             String authHeader = Base64.getEncoder().encodeToString((userEmail + ":" + apiToken).getBytes());
 
-            // Fetch all fields
-            String fieldsUrl = baseUrl + "/rest/api/3/field";
             Map<String, List<String>> headers = new HashMap<>();
             headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
-            OriginalHttpRequest request = new OriginalHttpRequest(fieldsUrl, "", "GET", null, headers, "");
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
 
-            String responseBody = response.getBody();
-            // Parse JSON array response
-            List<Map<String, Object>> fieldsArray = JsonUtils.fromJson(responseBody,
+            // Fetch project metadata with ALL issue types and their fields in ONE API call
+            String createMetaProjectUrl = baseUrl + "/rest/api/3/issue/createmeta?projectKeys=" + projectKey + "&expand=projects.issuetypes.fields";
+            OriginalHttpRequest projectRequest = new OriginalHttpRequest(createMetaProjectUrl, "", "GET", null, headers, "");
+            OriginalHttpResponse projectResponse = ApiExecutor.sendRequest(projectRequest, true, null, false, new ArrayList<>());
+
+            String projectResponseBody = projectResponse.getBody();
+            Map<String, Object> projectMetadata = JsonUtils.fromJson(projectResponseBody,
+                new TypeReference<Map<String, Object>>() {});
+
+            // Extract fields with dropdown values from ALL issue types
+            Set<String> fieldsWithDropdowns = new HashSet<>();
+            Object projectsObj = projectMetadata.get("projects");
+
+            if (projectsObj instanceof List) {
+                List<?> projectsList = (List<?>) projectsObj;
+                if (projectsList.isEmpty()) {
+                    loggerMaker.errorAndAddToDb("No projects found in createmeta response for project: " + projectKey);
+                    addActionError("No projects found for project: " + projectKey);
+                    return Action.ERROR.toUpperCase();
+                }
+
+                if (projectsList.get(0) instanceof Map) {
+                    Map<String, Object> project = (Map<String, Object>) projectsList.get(0);
+                    Object issueTypesObj = project.get("issuetypes");
+
+                    if (issueTypesObj instanceof List) {
+                        List<?> issueTypesList = (List<?>) issueTypesObj;
+
+                        // Iterate through all issue types
+                        for (Object issueTypeObj : issueTypesList) {
+                            if (issueTypeObj instanceof Map) {
+                                Map<String, Object> issueType = (Map<String, Object>) issueTypeObj;
+                                Object fieldsObj = issueType.get("fields");
+
+                                // Extract fields with allowedValues
+                                if (fieldsObj instanceof Map) {
+                                    Map<?, ?> fieldsMap = (Map<?, ?>) fieldsObj;
+
+                                    for (Map.Entry<?, ?> entry : fieldsMap.entrySet()) {
+                                        if (entry.getValue() instanceof Map) {
+                                            Map<String, Object> fieldMetadata = (Map<String, Object>) entry.getValue();
+                                            Object allowedValuesObj = fieldMetadata.get("allowedValues");
+
+                                            // Only include fields that have allowedValues (dropdown options)
+                                            if (allowedValuesObj instanceof List) {
+                                                List<?> allowedValuesList = (List<?>) allowedValuesObj;
+                                                if (!allowedValuesList.isEmpty()) {
+                                                    fieldsWithDropdowns.add(entry.getKey().toString());
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Fetch all fields to get their names and types
+            String fieldsUrl = baseUrl + "/rest/api/3/field";
+            OriginalHttpRequest fieldsRequest = new OriginalHttpRequest(fieldsUrl, "", "GET", null, headers, "");
+            OriginalHttpResponse fieldsResponse = ApiExecutor.sendRequest(fieldsRequest, true, null, false, new ArrayList<>());
+
+            String fieldsResponseBody = fieldsResponse.getBody();
+            List<Map<String, Object>> fieldsArray = JsonUtils.fromJson(fieldsResponseBody,
                 new TypeReference<List<Map<String, Object>>>() {});
 
             availableFields = new ArrayList<>();
@@ -1706,16 +1833,16 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                 String fId = fIdObj != null ? fIdObj.toString() : null;
                 String fName = fNameObj != null ? fNameObj.toString() : null;
 
-                String fType = "unknown";
-                Object schemaObj = field.get("schema");
-                if (schemaObj instanceof Map) {
-                    Map<String, Object> schema = (Map<String, Object>) schemaObj;
-                    Object typeObj = schema.get("type");
-                    fType = typeObj != null ? typeObj.toString() : "unknown";
-                }
+                // Only include fields that have dropdown values
+                if (fId != null && fName != null && fieldsWithDropdowns.contains(fId)) {
+                    // Determine field type using helper method
+                    String fType = "unknown";
+                    Object schemaObj = field.get("schema");
+                    if (schemaObj instanceof Map) {
+                        Map<String, Object> schema = (Map<String, Object>) schemaObj;
+                        fType = determineFieldType(schema, fId);
+                    }
 
-                // Include all fields - no filtering
-                if (fId != null && fName != null) {
                     BasicDBObject fieldInfo = new BasicDBObject();
                     fieldInfo.put("id", fId);
                     fieldInfo.put("name", fName);
@@ -1723,6 +1850,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                     availableFields.add(fieldInfo);
                 }
             }
+
 
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
@@ -1763,54 +1891,8 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             Map<String, List<String>> headers = new HashMap<>();
             headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
 
-            // Get all issue types for the project - first try from cache, then fetch fresh if needed
-            List<String> issueTypeIds = new ArrayList<>();
-            Map<String, List<BasicDBObject>> projectIdsMap = jiraIntegration.getProjectIdsMap();
-
-            if (projectIdsMap != null && projectIdsMap.containsKey(projectKey)) {
-                List<BasicDBObject> issueTypes = projectIdsMap.get(projectKey);
-                for (BasicDBObject issueType : issueTypes) {
-                    String issueTypeId = issueType.getString("issueId");
-                    if (issueTypeId != null) {
-                        issueTypeIds.add(issueTypeId);
-                    }
-                }
-            }
-
-            // If not in cache, fetch issue types fresh from API
-            if (issueTypeIds.isEmpty()) {
-                loggerMaker.infoAndAddToDb("Issue types not found in cache for project " + projectKey + ", fetching from API");
-                String createMetaProjectUrl = baseUrl + "/rest/api/3/issue/createmeta?projectKeys=" + projectKey + "&expand=projects.issuetypes.fields";
-                OriginalHttpRequest projectRequest = new OriginalHttpRequest(createMetaProjectUrl, "", "GET", null, headers, "");
-                OriginalHttpResponse projectResponse = ApiExecutor.sendRequest(projectRequest, true, null, false, new ArrayList<>());
-
-                String projectResponseBody = projectResponse.getBody();
-                Map<String, Object> projectMetadata = JsonUtils.fromJson(projectResponseBody,
-                    new TypeReference<Map<String, Object>>() {});
-
-                Object projectsObj = projectMetadata.get("projects");
-                if (projectsObj instanceof List) {
-                    List<?> projectsList = (List<?>) projectsObj;
-                    if (!projectsList.isEmpty() && projectsList.get(0) instanceof Map) {
-                        Map<String, Object> project = (Map<String, Object>) projectsList.get(0);
-                        Object issueTypesObj = project.get("issuetypes");
-                        if (issueTypesObj instanceof List) {
-                            List<?> issueTypesList = (List<?>) issueTypesObj;
-                            for (Object issueTypeObj : issueTypesList) {
-                                if (issueTypeObj instanceof Map) {
-                                    Map<String, Object> issueType = (Map<String, Object>) issueTypeObj;
-                                    Object issueTypeIdObj = issueType.get("id");
-                                    if (issueTypeIdObj != null) {
-                                        issueTypeIds.add(issueTypeIdObj.toString());
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // If still no issue types found, return error
+            // Get all issue types for the project
+            List<String> issueTypeIds = getAllIssueTypeIds(projectKey, jiraIntegration, headers);
             if (issueTypeIds.isEmpty()) {
                 loggerMaker.errorAndAddToDb("No issue types found for project: " + projectKey);
                 addActionError("No issue types found for project: " + projectKey);
