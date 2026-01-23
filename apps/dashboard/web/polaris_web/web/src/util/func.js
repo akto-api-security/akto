@@ -2350,6 +2350,11 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       return (nameA || '').localeCompare(nameB || '');
     })
   },
+
+   isWhiteListedOrganization(){
+      return window.USER_NAME?.toLowerCase().includes("akto");
+    },
+
   isLimitedAccount(){
     return window?.ACTIVE_ACCOUNT === 1753372418
   },
