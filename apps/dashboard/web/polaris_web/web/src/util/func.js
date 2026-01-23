@@ -2352,7 +2352,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   },
 
    isWhiteListedOrganization(){
-      return true;
+      return window.USER_NAME?.toLowerCase().includes("akto");
     },
 
   isLimitedAccount(){
