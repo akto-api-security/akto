@@ -22,6 +22,10 @@ public class HttpProxyAction extends ActionSupport {
     private Map<String, Object> request;
     private Map<String, Object> response;
 
+    // Query parameters (from URL query string)
+    private String guardrails;
+    private String akto_connector;
+
     // Output
     private Map<String, Object> result;
     private boolean success;
@@ -65,6 +69,17 @@ public class HttpProxyAction extends ActionSupport {
                 return Action.ERROR.toUpperCase();
             }
 
+            // Build query parameters map from actual URL query params
+            Map<String, Object> urlQueryParams = new HashMap<>();
+            if (guardrails != null && !guardrails.isEmpty()) {
+                urlQueryParams.put("guardrails", guardrails);
+            }
+            if (akto_connector != null && !akto_connector.isEmpty()) {
+                urlQueryParams.put("akto_connector", akto_connector);
+            }
+
+            loggerMaker.info("URL Query Params - guardrails: " + guardrails + ", akto_connector: " + akto_connector);
+
             // Build proxyData object for Gateway
             Map<String, Object> proxyData = new HashMap<>();
             proxyData.put("url", url);
@@ -73,6 +88,7 @@ public class HttpProxyAction extends ActionSupport {
             if (response != null) {
                 proxyData.put("response", response);
             }
+            proxyData.put("urlQueryParams", urlQueryParams);
 
             // Process through Gateway
             result = gateway.processHttpProxy(proxyData);

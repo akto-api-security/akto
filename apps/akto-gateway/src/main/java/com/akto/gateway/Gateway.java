@@ -38,43 +38,30 @@ public class Gateway {
         logger.info("Processing HTTP proxy request");
 
         try {
-            // Extract core fields
             String url = (String) proxyData.get("url");
             String path = (String) proxyData.get("path");
             Map<String, Object> request = (Map<String, Object>) proxyData.get("request");
             Map<String, Object> response = (Map<String, Object>) proxyData.get("response");
 
-            // Validate required fields
-            if (url == null || url.isEmpty()) {
-                logger.warn("Missing required field: url");
-                return buildErrorResponse("Missing required field: url");
-            }
+            // Extract URL query parameters (from the actual HTTP request URL)
+            Map<String, Object> urlQueryParams = (Map<String, Object>) proxyData.get("urlQueryParams");
 
-            if (path == null || path.isEmpty()) {
-                logger.warn("Missing required field: path");
-                return buildErrorResponse("Missing required field: path");
-            }
+            logger.debug("Request map contents: {}", request);
+            logger.debug("URL Query Params: {}", urlQueryParams);
 
-            if (request == null) {
-                logger.warn("Missing required field: request");
-                return buildErrorResponse("Missing required field: request");
-            }
-
-            // Extract request details
-            String method = (String) request.get("method");
-            Map<String, Object> queryParams = (Map<String, Object>) request.get("queryParams");
+            String method = String.valueOf(request.getOrDefault("method", ""));
 
             logger.info("Request - Method: {}, URL: {}, Path: {}", method, url, path);
 
-            // Use Strategy pattern: check if guardrails should be applied
-            boolean shouldApplyGuardrails = adapterFactory.shouldApplyGuardrails(queryParams);
+            // Use Strategy pattern: check if guardrails should be applied (using URL query params)
+            boolean shouldApplyGuardrails = adapterFactory.shouldApplyGuardrails(urlQueryParams);
 
             Map<String, Object> guardrailsResponse = null;
             String adapterUsed = "none";
 
             if (shouldApplyGuardrails) {
-                // Select appropriate adapter based on query parameters
-                GuardrailsAdapter adapter = adapterFactory.selectAdapter(queryParams);
+                // Select appropriate adapter based on URL query parameters
+                GuardrailsAdapter adapter = adapterFactory.selectAdapter(urlQueryParams);
                 adapterUsed = adapter.getAdapterName();
 
                 logger.info("Guardrails enabled - using {} adapter", adapterUsed);

@@ -44,27 +44,12 @@ public class AdapterFactory {
             return false;
         }
 
-        Object connectorValue = queryParams.get("akto_connector");
-        if (connectorValue != null) {
-            logger.debug("akto_connector present - guardrails will be applied");
-            return true;
-        }
+        // Check for guardrails parameter (from URL query string, always comes as String)
+        String guardrailsValue = String.valueOf(queryParams.getOrDefault("guardrails", ""));
+        boolean result = "true".equalsIgnoreCase(guardrailsValue);
 
-        Object guardrailsValue = queryParams.get("guardrails");
-        if (guardrailsValue == null) {
-            return false;
-        }
-
-        if (guardrailsValue instanceof Boolean) {
-            return (Boolean) guardrailsValue;
-        }
-
-        if (guardrailsValue instanceof String) {
-            String strValue = (String) guardrailsValue;
-            return "true".equalsIgnoreCase(strValue) || "1".equals(strValue);
-        }
-
-        return false;
+        logger.debug("guardrails parameter value: {}, result: {}", guardrailsValue, result);
+        return result;
     }
 
     public StandardGuardrailsAdapter getStandardAdapter() {
