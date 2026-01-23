@@ -87,11 +87,8 @@ public class HttpProxyAction extends ActionSupport {
 
             // Process through Gateway
             result = gateway.processHttpProxy(proxyData);
-
-            // Extract success flag
-            Object successObj = result.get("success");
-            success = (successObj instanceof Boolean) ? (Boolean) successObj : false;
-
+            
+            success = result != null;
             // Build message
             if (success) {
                 message = "Request processed successfully";

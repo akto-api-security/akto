@@ -131,7 +131,6 @@ public class Gateway {
      */
     private Map<String, Object> buildGuardrailsBlockedResponse(Map<String, Object> guardrailsResponse) {
         Map<String, Object> blocked = new HashMap<>();
-        blocked.put("success", true);
         blocked.put("guardrailsResult", guardrailsResponse);
         return blocked;
     }
