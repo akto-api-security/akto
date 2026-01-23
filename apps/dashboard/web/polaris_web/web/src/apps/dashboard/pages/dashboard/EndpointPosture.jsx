@@ -40,24 +40,24 @@ function EndpointPosture() {
         </HorizontalGrid>
     )
 
-    const worldMapComponent = (
-        <AttackWorldMap
-            attackRequests={attackRequests}
-            style={{
-                width: "100%",
-                height: "300px",
-                marginRight: "auto",
-            }}
-        />
+    const threatCategoryStackedChartComponent = (
+        <ThreatCategoryStackedChartWrapper/>
     )
 
-    const complianceComponent = (
+    const attackWorldMapComponent = (
         <HorizontalGrid columns={2} gap={4}>
+            <AttackWorldMap
+                attackRequests={attackRequests}
+                style={{
+                    width: "100%",
+                    height: "300px",
+                    marginRight: "auto",
+                }}
+            />
             <ComplianceAtRisksCard
                 complianceData={complianceData}
                 tooltipContent="Overview of compliance risks across different security standards"
             />
-            <ThreatCategoryStackedChartWrapper />
         </HorizontalGrid>
     )
 
@@ -110,7 +110,7 @@ function EndpointPosture() {
                     />
                 </HorizontalStack>
             }
-            components={[summaryHeader, coverageComponent, worldMapComponent, complianceComponent, chartsComponent]}
+            components={[summaryHeader, coverageComponent, attackWorldMapComponent, threatCategoryStackedChartComponent, chartsComponent]}
         />
     )
 }
