@@ -35,28 +35,6 @@ public class GuardrailsClient {
                 serviceUrl, timeout);
     }
 
-    public boolean shouldApplyGuardrails(Map<String, Object> queryParams) {
-        if (queryParams == null || queryParams.isEmpty()) {
-            return false;
-        }
-
-        Object guardrailsValue = queryParams.get("guardrails");
-        if (guardrailsValue == null) {
-            return false;
-        }
-
-        if (guardrailsValue instanceof Boolean) {
-            return (Boolean) guardrailsValue;
-        }
-
-        if (guardrailsValue instanceof String) {
-            String strValue = (String) guardrailsValue;
-            return "true".equalsIgnoreCase(strValue) || "1".equals(strValue);
-        }
-
-        return false;
-    }
-
     /**
      * Call guardrails service with formatted API request
      * Takes the formatted request from adapter and makes the actual API call
@@ -85,57 +63,6 @@ public class GuardrailsClient {
         } catch (Exception e) {
             logger.error("Error calling guardrails service: {}", e.getMessage(), e);
             return buildErrorResponse(e.getMessage());
-        }
-    }
-
-    public Map<String, Object> validateRequest(String url, String path,
-                                                Map<String, Object> request,
-                                                Map<String, Object> response) {
-        logger.info("Validating request through guardrails service - URL: {}", url);
-
-        try {
-            // Extract request payload/body
-            String payload = extractPayload(request);
-            if (payload == null || payload.isEmpty()) {
-                logger.debug("No request payload to validate, allowing request");
-                return buildPassedResponse("No payload to validate");
-            }
-
-            // Call guardrails service with AGENTIC context
-            Map<String, Object> guardrailsResponse = callGuardrailsService(payload, "AGENTIC");
-
-            logger.info("Guardrails validation completed - Allowed: {}", guardrailsResponse.get("allowed"));
-            return guardrailsResponse;
-
-        } catch (Exception e) {
-            logger.error("Error calling guardrails service: {}", e.getMessage(), e);
-            return buildErrorResponse(e.getMessage());
-        }
-    }
-
-    /**
-     * Extract payload from request map
-     */
-    private String extractPayload(Map<String, Object> request) {
-        if (request == null) {
-            return null;
-        }
-
-        Object body = request.get("body");
-        if (body == null) {
-            return null;
-        }
-
-        try {
-            if (body instanceof String) {
-                return (String) body;
-            } else {
-                // Convert object to JSON string
-                return objectMapper.writeValueAsString(body);
-            }
-        } catch (Exception e) {
-            logger.warn("Failed to extract payload: {}", e.getMessage());
-            return null;
         }
     }
 
