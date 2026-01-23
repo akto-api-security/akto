@@ -3,7 +3,7 @@ import DonutChart from '../../../components/shared/DonutChart'
 import ComponentHeader from './ComponentHeader'
 import GraphCustomLabels from './GraphCustomLabels'
 
-const CustomPieChart = ({ title = "", subtitle = "", graphData = {}, itemId = "", onRemoveComponent }) => {
+const CustomPieChart = ({ title = "", subtitle = "", graphData = {}, itemId = "", onRemoveComponent, tooltipContent = "" }) => {
     const total = Object.values(graphData).reduce((sum, item) => sum + item.text, 0)
     const formattedTotal = total.toLocaleString()
 
@@ -15,7 +15,7 @@ const CustomPieChart = ({ title = "", subtitle = "", graphData = {}, itemId = ""
     return (
         <Card>
             <VerticalStack gap="4" inlineAlign='start' blockAlign="center">
-                <ComponentHeader title={title} itemId={itemId} onRemove={onRemoveComponent} />
+                <ComponentHeader title={title} itemId={itemId} onRemove={onRemoveComponent} tooltipContent={tooltipContent} />
                 <Box width='100%' minHeight='210px'>
                     <VerticalStack gap="2" inlineAlign='center' blockAlign='center'>
                         <DonutChart

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Page, VerticalStack, HorizontalStack } from '@shopify/polaris';
+import { Page, VerticalStack, HorizontalStack, Button, ButtonGroup } from '@shopify/polaris';
+import { InfoMinor, MagicMinor } from '@shopify/polaris-icons';
 import AgenticWelcomeHeader from './components/AgenticWelcomeHeader';
 import AgenticSearchInput from './components/AgenticSearchInput';
 import AgenticSuggestions from './components/AgenticSuggestions';
@@ -22,6 +23,7 @@ function AgenticMainPage() {
     const [historySearchQuery, setHistorySearchQuery] = useState('');
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
     const [pendingConversationId, setPendingConversationId] = useState(null);
+    const [conversationType, setConversationType] = useState('ASK_AKTO');
 
     const handleSearchSubmit = useCallback((query) => {
         setCurrentQuery(query);
@@ -101,18 +103,28 @@ function AgenticMainPage() {
             <AgenticConversationPage
                 initialQuery={currentQuery}
                 existingConversationId={loadConversationId}
-                existingMessages={historyItems.find(item => item.id === loadConversationId)?.messages || []}
+                existingMessages={historyItems.filter(item => item.id === loadConversationId).map(item => ({
+                    messages: item.messages,
+                    title: item.title
+                }))}
                 onBack={() => {
                     setShowConversation(false);
                     setSearchValue(''); // Clear search input when going back
                 }}
                 onLoadConversation={handleHistoryClick}
+                conversationType={conversationType}
             />
         );
     }
 
     return (
         <Page id="agentic-main-page" fullWidth>
+            <div style={{display: 'flex', justifyContent: 'end'}}>
+                <ButtonGroup segmented={true}>
+                    <Button icon={MagicMinor} onClick={() => setConversationType('ASK_AKTO')} pressed={conversationType === 'ASK_AKTO'}>Know About Dashboard</Button>
+                    <Button icon={InfoMinor} onClick={() => setConversationType('DOCS_AGENT')} pressed={conversationType === 'DOCS_AGENT'}>Learn about Akto</Button>
+                </ButtonGroup>
+            </div>
             <div style={{height: '100vh', display: 'flex', justifyContent: 'center'}}>
             <HorizontalStack align="center" blockAlign="center">
                 <VerticalStack gap="16" align="center">
@@ -129,7 +141,7 @@ function AgenticMainPage() {
                         />
                     </VerticalStack>    
                     <AgenticHistoryCards
-                        historyItems={historyItems.slice(0, 3)}
+                        historyItems={historyItems.sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt).slice(0, 3)}
                         onHistoryClick={handleHistoryClick}
                         onViewAllClick={handleViewAllClick}
                     />
@@ -143,12 +155,12 @@ function AgenticMainPage() {
                     setHistorySearchQuery(''); // Reset search query when closing
                 }}
                 onHistoryClick={handleHistoryClick}
-                historyItems={historyItems}
+                historyItems={historyItems.sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt)}
                 searchQuery={historySearchQuery}
                 onSearchQueryChange={setHistorySearchQuery}
                 isLoading={isLoadingHistory}
                 onDelete={(conversationId) => {
-                    setHistoryItems(historyItems.filter(item => item.id !== conversationId));
+                    setHistoryItems(historyItems.filter(item => item.id !== conversationId).sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt));
                 }}
             />
             </div>

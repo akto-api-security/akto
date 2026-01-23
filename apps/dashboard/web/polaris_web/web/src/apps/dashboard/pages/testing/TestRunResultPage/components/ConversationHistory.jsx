@@ -17,7 +17,7 @@ function ConversationHistory({ conversations }) {
                             type={isUser ? 'request' : 'response'}
                             content={msg.message}
                             timestamp={msg.creationTimestamp} // Normalize then convert to seconds for ChatMessage
-                            customLabel={isUser ? MESSAGE_LABELS.TESTED_INTERACTION : MESSAGE_LABELS.HR_AGENT_RESPONSE}
+                            customLabel={isUser ? MESSAGE_LABELS.TESTED_INTERACTION : MESSAGE_LABELS.AKTO_AI_AGENT_RESPONSE}
                             isVulnerable={msg.validation}
                             isCode={false}
                         />

@@ -1,10 +1,8 @@
-.graph-menu {
-    width: 20px;
-    height: 20px;
+.drag-handle-icon {
     cursor: grab;
 }
 
-.graph-menu:active {
+.drag-handle-icon:active {
     cursor: grabbing;
 }
 
@@ -21,4 +19,39 @@
 .react-grid-item .Polaris-Card {
     height: 100%;
     box-sizing: border-box;
+}
+
+/* Make resize handle visible but subtle, blending with the design */
+.react-grid-item .react-resizable-handle {
+    width: 16px !important;
+    height: 16px !important;
+    opacity: 0.3 !important;
+    transition: opacity 0.2s ease !important;
+    cursor: nwse-resize !important;
+    right: 0 !important;
+    bottom: 0 !important;
+}
+
+.react-grid-item:hover .react-resizable-handle {
+    opacity: 0.6 !important;
+}
+
+.react-grid-item .react-resizable-handle:hover {
+    opacity: 0.9 !important;
+}
+
+.react-grid-item .react-resizable-handle::after {
+    content: '' !important;
+    position: absolute !important;
+    right: 2px !important;
+    bottom: 2px !important;
+    width: 0 !important;
+    height: 0 !important;
+    border-style: solid !important;
+    border-width: 0 0 10px 10px !important;
+    border-color: transparent transparent rgba(0, 0, 0, 0.4) transparent !important;
+}
+
+.react-grid-item .react-resizable-handle:hover::after {
+    border-color: transparent transparent rgba(0, 0, 0, 0.7) transparent !important;
 }

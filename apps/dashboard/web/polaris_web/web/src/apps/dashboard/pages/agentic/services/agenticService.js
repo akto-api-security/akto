@@ -1,11 +1,11 @@
 import request from "@/util/request"
 
-export const sendQuery = async (query, conversationId) => {
+export const sendQuery = async (query, conversationId, conversationType) => {
     return await request({
         url: '/api/chatAndStore',
         method: 'post',
         data: {
-            conversationType: "ASK_AKTO",
+            conversationType: conversationType || "ASK_AKTO",
             message: query,
             ...(conversationId && { conversationId })
         }

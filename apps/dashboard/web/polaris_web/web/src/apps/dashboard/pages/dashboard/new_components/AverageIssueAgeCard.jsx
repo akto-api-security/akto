@@ -2,11 +2,11 @@ import { Card, VerticalStack, Box, HorizontalGrid } from '@shopify/polaris'
 import SemiCircleProgress from '../../../components/shared/SemiCircleProgress'
 import ComponentHeader from './ComponentHeader'
 
-const AverageIssueAgeCard = ({ issueAgeData = [], itemId = "", onRemoveComponent }) => {
+const AverageIssueAgeCard = ({ issueAgeData = [], itemId = "", onRemoveComponent, tooltipContent = "" }) => {
     return (
         <Card>
             <VerticalStack gap={4} align='space-between'>
-                <ComponentHeader title='Average Issue Age' itemId={itemId} onRemove={onRemoveComponent} />
+                <ComponentHeader title='Average Issue Age' itemId={itemId} onRemove={onRemoveComponent} tooltipContent={tooltipContent} />
 
                 <Box width='100%'>
                     <HorizontalGrid columns={2} gap={4} alignItems='center' blockAlign='center'>
