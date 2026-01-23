@@ -19,6 +19,7 @@ import PersistStore from "../../../main/PersistStore";
 import { mapLabel } from "../../../main/labelHelper";
 import FlyLayout from "../../components/layouts/FlyLayout";
 import LayoutWithTabs from "../../components/layouts/LayoutWithTabs";
+import { MODULE_TYPE, DEFAULT_VALUE } from "./api_collections/endpointShieldHelper";
 
 // Helper function to create table heading configuration
 const createHeading = (text, value = null, sortKey = null) => ({
@@ -39,12 +40,14 @@ const headings = [
 ]
 
 // Helper function to create sort options for a column
+// Note: GithubServerTable passes -1 for 'asc' and 1 for 'desc', but func.sortFunc
+// interprets -1 as descending and 1 as ascending, so we swap the values
 const createSortOptions = (label, sortKey, columnIndex, isTimeField = false) => {
     const descLabel = isTimeField ? 'Newest' : 'Z-A';
     const ascLabel = isTimeField ? 'Oldest' : 'A-Z';
     return [
-        { label, value: `${sortKey} desc`, directionLabel: descLabel, sortKey, columnIndex },
-        { label, value: `${sortKey} asc`, directionLabel: ascLabel, sortKey, columnIndex }
+        { label, value: `${sortKey} asc`, directionLabel: descLabel, sortKey, columnIndex },
+        { label, value: `${sortKey} desc`, directionLabel: ascLabel, sortKey, columnIndex }
     ];
 };
 
@@ -69,11 +72,7 @@ const resourceName = {
     plural: 'agents',
 };
 
-// Constants for better maintainability
-const MODULE_TYPE = {
-    MCP_ENDPOINT_SHIELD: 'MCP_ENDPOINT_SHIELD'
-};
-const LOG_STREAMING_DELAY_MS = 500;
+// Constants for better maintainability (MODULE_TYPE, DEFAULT_VALUE imported from endpointShieldHelper)
 const ANIMATION_DURATION = 0.2;
 const LOG_LEVEL_TONES = {
     INFO: 'info',
@@ -83,7 +82,6 @@ const LOG_LEVEL_TONES = {
 const ICON_SIZE = { maxWidth: "1rem", maxHeight: "1rem" };
 const LOG_TIMESTAMP_WIDTH = "180px";
 const LOG_LEVEL_WIDTH = "60px";
-const DEFAULT_VALUE = '-';
 
 // Log fetching modes
 const LOG_MODES = {
@@ -136,12 +134,6 @@ const getMetadataFields = (agent) => [
 ];
 
 function EndpointShieldMetadata() {
-    const isDemoAccount = func.isDemoAccount();
-
-    // Show demo version for demo accounts
-    if (isDemoAccount) {
-        return <EndpointShieldMetadataDemo />;
-    }
 
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
@@ -641,7 +633,7 @@ function EndpointShieldMetadata() {
                 return true;
             });
 
-            // Apply sorting
+            // Apply sorting using same logic as func.sortFunc
             if (sortKey) {
                 filteredData.sort((a, b) => {
                     let aVal = a[sortKey];
@@ -652,14 +644,15 @@ function EndpointShieldMetadata() {
                     if (aVal == null) return 1;
                     if (bVal == null) return -1;
 
-                    if (typeof aVal === 'string' && typeof bVal === 'string') {
-                        aVal = aVal.toLowerCase();
-                        bVal = bVal.toLowerCase();
+                    if (typeof aVal === 'number' && typeof bVal === 'number') {
+                        return sortOrder * (aVal - bVal);
                     }
 
-                    return sortOrder === 'asc'
-                        ? (aVal > bVal ? 1 : -1)
-                        : (aVal < bVal ? 1 : -1);
+                    if (typeof aVal === 'string' && typeof bVal === 'string') {
+                        return sortOrder * (bVal.toLowerCase().localeCompare(aVal.toLowerCase()));
+                    }
+
+                    return 0;
                 });
             }
 
@@ -748,7 +741,7 @@ function EndpointShieldMetadata() {
                         {mapLabel("Endpoint Shield", dashboardCategory)}
                     </Text>
                 }
-                backUrl="/dashboard/observe"
+                isFirstPage={true}
                 primaryAction={primaryActions}
                 components = {[
                     <GithubServerTable

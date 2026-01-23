@@ -112,6 +112,14 @@ public class ApiCollection {
 
     public static final String DEFAULT_TAG_KEY = "userSetEnvType";
 
+    // Service tag for service-tag based collections
+    String serviceTag;
+    public static final String SERVICE_TAG = "serviceTag";
+
+    // List of hostnames for service-tag based collections
+    List<String> hostNames;
+    public static final String HOST_NAMES = "hostNames";
+
     public ApiCollection() {
     }
 
@@ -259,7 +267,12 @@ public class ApiCollection {
     // to be used in front end
     public String getDisplayName() {
         String result;
-        if (this.hostName != null) {
+
+        // For service-tag collections, display only the service tag value (name)
+        if (this.serviceTag != null && !this.serviceTag.isEmpty()) {
+            result = this.name;
+        } else if (this.hostName != null) {
+            // For hostname-based collections, display "hostname - name"
             result = this.hostName + " - " + this.name;
         } else {
             result = this.name + "";
@@ -487,5 +500,21 @@ public class ApiCollection {
 
     public void setMcpMaliciousnessLastCheck(int mcpMaliciousnessLastCheck) {
         this.mcpMaliciousnessLastCheck = mcpMaliciousnessLastCheck;
+    }
+
+    public String getServiceTag() {
+        return serviceTag;
+    }
+
+    public void setServiceTag(String serviceTag) {
+        this.serviceTag = serviceTag;
+    }
+
+    public List<String> getHostNames() {
+        return hostNames;
+    }
+
+    public void setHostNames(List<String> hostNames) {
+        this.hostNames = hostNames;
     }
 }

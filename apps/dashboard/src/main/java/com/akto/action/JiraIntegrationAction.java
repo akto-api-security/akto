@@ -2,6 +2,7 @@ package com.akto.action;
 
 import static com.akto.utils.Utils.createRequestFile;
 import static com.akto.utils.Utils.getTestResultFromTestingRunResult;
+import static com.akto.utils.jira.Utils.isDataCenter;
 
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.JiraIntegrationDao;
@@ -40,6 +41,7 @@ import com.akto.util.enums.GlobalEnums.TicketSource;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.utils.JsonUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
@@ -59,7 +61,6 @@ import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import okhttp3.*;
 
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.bson.Document;
@@ -71,7 +72,8 @@ import com.akto.dao.AccountSettingsDao;
 
 import static com.akto.utils.jira.Utils.buildAdditionalIssueFieldsForJira;
 import static com.akto.utils.jira.Utils.buildApiToken;
-import static com.akto.utils.jira.Utils.buildBasicRequest;
+import static com.akto.utils.jira.Utils.buildJiraDescription;
+import static com.akto.utils.jira.Utils.buildJiraRequest;
 import static com.akto.utils.jira.Utils.buildPayloadForJiraTicket;
 import static com.akto.utils.jira.Utils.getAccountJiraFields;
 import static com.akto.utils.jira.Utils.isLabelsFieldError;
@@ -87,6 +89,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private String userEmail;
     private String apiToken;
     private String issueType;
+    private JiraIntegration.JiraType jiraType;
     private JiraIntegration jiraIntegration;
     private JiraMetaData jiraMetaData;
 
@@ -111,12 +114,21 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private Map<String,List<BasicDBObject>> projectAndIssueMap;
     private Map<String, ProjectMapping> projectMappings;
 
+    
+    // Cloud (v3) endpoints - Primary
     private static final String META_ENDPOINT = "/rest/api/3/issue/createmeta";
     private static final String CREATE_ISSUE_ENDPOINT = "/rest/api/3/issue";
     private static final String CREATE_ISSUE_ENDPOINT_BULK = "/rest/api/3/issue/bulk";
     private static final String ATTACH_FILE_ENDPOINT = "/attachments";
     private static final String ISSUE_STATUS_ENDPOINT = "/rest/api/3/project/%s/statuses";
     private static final String PRIORITY_ENDPOINT = "/rest/api/3/priority";
+    
+    // Data Center (v2) endpoints
+    private static final String META_ENDPOINT_V2 = "/rest/api/2/issue/createmeta";
+    private static final String CREATE_ISSUE_ENDPOINT_V2 = "/rest/api/2/issue";
+    private static final String CREATE_ISSUE_ENDPOINT_BULK_V2 = "/rest/api/2/issue/bulk";
+    private static final String ISSUE_STATUS_ENDPOINT_V2 = "/rest/api/2/project/%s/statuses";
+    private static final String PRIORITY_ENDPOINT_V2 = "/rest/api/2/priority";
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.DASHBOARD);
 
@@ -129,6 +141,26 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
     private static final String REMEDIATION_INFO_URL = "tests-library-master/remediation/%s.md";
 
+    private String getMetaEndpoint() {
+        return isDataCenter(jiraType) ? META_ENDPOINT_V2 : META_ENDPOINT;
+    }
+
+    private String getCreateIssueEndpoint() {
+        return isDataCenter(jiraType) ? CREATE_ISSUE_ENDPOINT_V2 : CREATE_ISSUE_ENDPOINT;
+    }
+
+    private String getCreateIssueEndpointBulk() {
+        return isDataCenter(jiraType) ? CREATE_ISSUE_ENDPOINT_BULK_V2 : CREATE_ISSUE_ENDPOINT_BULK;
+    }
+
+    private String getIssueStatusEndpoint() {
+        return isDataCenter(jiraType) ? ISSUE_STATUS_ENDPOINT_V2 : ISSUE_STATUS_ENDPOINT;
+    }
+
+    private String getPriorityEndpoint() {
+        return isDataCenter(jiraType) ? PRIORITY_ENDPOINT_V2 : PRIORITY_ENDPOINT;
+    }
+
     @Setter
     private String title;
     @Setter
@@ -139,10 +171,10 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
     public String testIntegration() {
 
-        String url = baseUrl + META_ENDPOINT;
+        String url = baseUrl + getMetaEndpoint();
         setApiToken(buildApiToken(apiToken));
         try {
-            Request.Builder builder = buildBasicRequest(url, userEmail, apiToken, true);
+            Request.Builder builder = buildJiraRequest(url, userEmail, apiToken, true, isDataCenter(jiraType));
             Request okHttpRequest = builder.build();
             Call call = client.newCall(okHttpRequest);
             Response response = null;
@@ -212,13 +244,26 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     }
 
     public String fetchJiraStatusMappings() {
+        // Always fetch credentials from database
+        JiraIntegration existingIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+        if (existingIntegration == null) {
+            loggerMaker.errorAndAddToDb("Jira integration not found");
+            addActionError("Jira is not integrated. Please integrate Jira first.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        baseUrl = existingIntegration.getBaseUrl();
+        userEmail = existingIntegration.getUserEmail();
+        apiToken = existingIntegration.getApiToken();
+        jiraType = existingIntegration.getJiraType();
+
         setApiToken(buildApiToken(apiToken));
         try {
             setProjId(projId.replaceAll("\\s+", ""));
 
-            // Step 2: Call the API to get issue types for the project
-            String statusUrl = baseUrl + String.format(ISSUE_STATUS_ENDPOINT, projId) + "?maxResults=100";
-            Request.Builder builder = buildBasicRequest(statusUrl, userEmail, apiToken, false);
+            String statusUrl = baseUrl + String.format(getIssueStatusEndpoint(), projId) + "?maxResults=100";
+
+            Request.Builder builder = buildJiraRequest(statusUrl, userEmail, apiToken, false, isDataCenter(jiraType));
             Request okHttpRequest = builder.build();
 
             Response response = null;
@@ -229,8 +274,8 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
                 if (!response.isSuccessful()) {
                     loggerMaker.error(
-                        "Error while fetching Jira Project statuses. Response code: {}, accountId: {}, projectId: {}",
-                        response.code(), Context.accountId.get(), projId);
+                        "Error while fetching Jira Project statuses. Response code: {}, accountId: {}, projectId: {}, API version: {}",
+                        response.code(), Context.accountId.get(), projId, (isDataCenter(jiraType) ? "v2 Data Center" : "v3 Cloud"));
                     return Action.ERROR.toUpperCase();
                 }
 
@@ -257,13 +302,14 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             this.projectMappings = new HashMap<>();
             this.projectMappings.put(projId, new ProjectMapping(
                 extractUniqueStatusCategories(responsePayload),
+                null,
                 null
             ));
             return Action.SUCCESS.toUpperCase();
 
         } catch (Exception e) {
             addActionError("Error while fetching jira project status mappings");
-            loggerMaker.error("Error while fetching jira project status mappings. p[rojId: {}", projId, e);
+            loggerMaker.error("Error while fetching jira project status mappings. projId: {}", projId, e);
             return Action.ERROR.toUpperCase();
         }
     }
@@ -296,12 +342,14 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         baseUrl = jiraIntegration.getBaseUrl();
         userEmail = jiraIntegration.getUserEmail();
         apiToken = jiraIntegration.getApiToken();
+        jiraType = jiraIntegration.getJiraType();
 
         loggerMaker.infoAndAddToDb("Fetching Jira priorities from " + baseUrl);
         setApiToken(buildApiToken(apiToken));
         try {
-            String priorityUrl = baseUrl + PRIORITY_ENDPOINT;
-            Request.Builder builder = buildBasicRequest(priorityUrl, userEmail, apiToken, false);
+            String priorityUrl = baseUrl + getPriorityEndpoint();
+            
+            Request.Builder builder = buildJiraRequest(priorityUrl, userEmail, apiToken, false, isDataCenter(jiraType));
             Request okHttpRequest = builder.build();
 
             Response response = null;
@@ -309,7 +357,9 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
             try {
                 response = client.newCall(okHttpRequest).execute();
-                loggerMaker.infoAndAddToDb("Jira priorities API response code: " + response.code());
+                
+                loggerMaker.infoAndAddToDb("Jira priorities API response code: " + response.code() + 
+                    " (using " + (isDataCenter(jiraType) ? "v2 Data Center" : "v3 Cloud") + ")");
 
                 if (!response.isSuccessful()) {
                     loggerMaker.errorAndAddToDb("Failed to fetch Jira priorities - response not successful");
@@ -374,67 +424,6 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         this.jiraPriorities = jiraPriorities;
     }
 
-    private Map<String, String> severityToPriorityMap;
-
-    public String saveSeverityMapping() {
-        try {
-            loggerMaker.infoAndAddToDb("Saving Jira severity to priority mapping for account: " + Context.accountId.get());
-
-            if (severityToPriorityMap == null) {
-                loggerMaker.errorAndAddToDb("Severity mapping is null");
-                addActionError("Severity mapping cannot be null");
-                return Action.ERROR.toUpperCase();
-            }
-
-            JiraIntegrationDao.instance.updateOne(
-                new BasicDBObject(),
-                Updates.set(JiraIntegration.ISSUE_SEVERITY_TO_PRIORITY_MAP, severityToPriorityMap)
-            );
-
-            loggerMaker.infoAndAddToDb("Successfully updated severity to priority mapping in JiraIntegration");
-            return Action.SUCCESS.toUpperCase();
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error saving severity mapping");
-            addActionError("Error while saving severity mapping: " + e.getMessage());
-            return Action.ERROR.toUpperCase();
-        }
-    }
-
-    public String fetchSeverityMapping() {
-        try {
-            loggerMaker.infoAndAddToDb("Fetching Jira severity to priority mapping for account: " + Context.accountId.get());
-
-            JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
-
-            if (jiraIntegration != null) {
-                this.severityToPriorityMap = jiraIntegration.getIssueSeverityToPriorityMap();
-
-                if (this.severityToPriorityMap == null) {
-                    this.severityToPriorityMap = new HashMap<>();
-                    loggerMaker.infoAndAddToDb("No existing severity mapping found, initialized empty map");
-                }
-            } else {
-                loggerMaker.infoAndAddToDb("JiraIntegration not found, initialized empty severity map");
-                this.severityToPriorityMap = new HashMap<>();
-            }
-
-            loggerMaker.infoAndAddToDb("Successfully fetched severity mapping with " + this.severityToPriorityMap.size() + " entries");
-            return Action.SUCCESS.toUpperCase();
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error fetching severity mapping");
-            addActionError("Error while fetching severity mapping: " + e.getMessage());
-            return Action.ERROR.toUpperCase();
-        }
-    }
-
-    public Map<String, String> getSeverityToPriorityMap() {
-        return severityToPriorityMap;
-    }
-
-    public void setSeverityToPriorityMap(Map<String, String> severityToPriorityMap) {
-        this.severityToPriorityMap = severityToPriorityMap;
-    }
-
     private List<BasicDBObject> getIssueTypesWithIds(BasicDBList issueTypes) {
 
         List<BasicDBObject> idPairs = new ArrayList<>();
@@ -462,6 +451,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             Updates.set("projId", projId),
             Updates.set("userEmail", userEmail),
             Updates.set("issueType", issueType),
+            Updates.set("jiraType", jiraType),
             Updates.setOnInsert("createdTs", Context.now()),
             Updates.set("updatedTs", Context.now()),
             Updates.set("projectIdsMap", projectAndIssueMap),
@@ -623,55 +613,119 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     }
 
     private List<BasicDBObject> getProjectMetadata(String projectId) throws Exception {
-
         setApiToken(buildApiToken(apiToken));
-        if(apiToken == null){
+        if (apiToken == null) {
             throw new IllegalStateException("No jira integration found. Please integrate Jira first.");
         }
-        // Use new endpoint: /rest/api/3/issue/createmeta/{projectKey}/issuetypes
-        // Old deprecated endpoint: /rest/api/3/issue/createmeta returns empty projects array
-        String url = baseUrl + "/rest/api/3/issue/createmeta/" + projectId + "/issuetypes";
-        Request.Builder builder = buildBasicRequest(url, userEmail, apiToken, true);
+        
+        String responsePayload = fetchProjectMetadataFromJira(projectId);
+        BasicDBList issueTypes = parseProjectMetadataResponse(responsePayload);
+        
+        if (issueTypes == null || issueTypes.isEmpty()) {
+            throw new IllegalArgumentException("No issue types found for project '" + projectId + "'. Check if the API token has access to this project.");
+        }
+        
+        loggerMaker.infoAndAddToDb("Successfully fetched " + issueTypes.size() + " issue types for project " + projectId + 
+            " using " + (isDataCenter(jiraType) ? "v2 (Data Center)" : "v3 (Cloud)") + " API");
+        return getIssueTypesWithIds(issueTypes);
+    }
+
+    private String fetchProjectMetadataFromJira(String projectId) throws Exception {
+        String url;
+
+        if (isDataCenter(jiraType)) {
+            // Data Center v2: use project statuses endpoint which returns issue types
+            url = baseUrl + "/rest/api/2/project/" + projectId + "/statuses";
+            loggerMaker.infoAndAddToDb("Fetching Data Center v2 metadata from: " + url);
+        } else {
+            // Cloud v3: use createmeta endpoint
+            url = baseUrl + "/rest/api/3/issue/createmeta/" + projectId + "/issuetypes";
+            loggerMaker.infoAndAddToDb("Fetching Cloud v3 metadata from: " + url);
+        }
+        
+        Request.Builder builder = buildJiraRequest(url, userEmail, apiToken, true, isDataCenter(jiraType));
         Request okHttpRequest = builder.build();
-
+        
         Response response = null;
-        String responsePayload;
-
         try {
             response = client.newCall(okHttpRequest).execute();
-
+            
+            if (response.code() != 200) {
+                String errorBody = response.body() != null ? response.body().string() : "No error body";
+                throw new IllegalStateException("Jira API returned status " + response.code() + ": " + errorBody);
+            }
+            
             if (response.body() == null) {
                 throw new IllegalStateException("Received null response body from Jira API");
             }
-
-            responsePayload = response.body().string();
-
+            
+            String responsePayload = response.body().string();
+            
             if (!Utils.isJsonPayload(responsePayload)) {
-                response.close(); // Close before retry to prevent resource leak
+                response.close();
                 okHttpRequest = retryWithoutGzipRequest(builder, url);
                 response = client.newCall(okHttpRequest).execute();
-
+                
                 if (response.body() == null) {
                     throw new IllegalStateException("Received null response body from Jira API after retry");
                 }
-
+                
                 responsePayload = response.body().string();
             }
+            
+            return responsePayload;
         } finally {
             if (response != null) {
                 response.close();
             }
         }
+    }
 
-        // New API response structure: {"issueTypes": [{"id": "10001", "name": "Bug"}]}
-        BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
-        BasicDBList issueTypes = (BasicDBList) payloadObj.get("issueTypes");
+    private BasicDBList parseProjectMetadataResponse(String responsePayload) throws Exception {
+        BasicDBList issueTypes = null;
+        
+        if (isDataCenter(jiraType)) {
+            issueTypes = parseDataCenterResponse(responsePayload);
+        } else {
+            issueTypes = parseCloudResponse(responsePayload);
+        }
+        
+        return issueTypes;
+    }
 
-        if (issueTypes == null || issueTypes.isEmpty()) {
-            throw new IllegalArgumentException("No issue types found for project '" + projectId + "'. Check if the API token has access to this project.");
+    private BasicDBList parseDataCenterResponse(String responsePayload) throws Exception {
+        BasicDBList issueTypes = new BasicDBList();
+
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            List<Map<String, Object>> projectStatuses = mapper.readValue(responsePayload, new TypeReference<List<Map<String, Object>>>() {});
+
+            for (Map<String, Object> typeObj : projectStatuses) {
+                BasicDBObject issueTypeItem = new BasicDBObject();
+                issueTypeItem.put("id", typeObj.get("id") != null ? typeObj.get("id").toString() : "");
+                issueTypeItem.put("name", typeObj.get("name") != null ? typeObj.get("name").toString() : "");
+                issueTypes.add(issueTypeItem);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error parsing Data Center v2 API response: " + responsePayload);
+            throw new IllegalStateException("Failed to parse Data Center API response", e);
         }
 
-        return getIssueTypesWithIds(issueTypes);
+        return issueTypes;
+    }
+
+    private BasicDBList parseCloudResponse(String responsePayload) throws Exception {
+        try {
+            BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+            BasicDBList issueTypes = (BasicDBList) payloadObj.get("issueTypes");
+            if (issueTypes == null) {
+                throw new IllegalStateException("Cloud API response missing 'issueTypes' field");
+            }
+            return issueTypes;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error parsing Cloud v3 API response: " + responsePayload);
+            throw new IllegalStateException("Failed to parse Cloud API response", e);
+        }
     }
 
     public String fetchIntegration() {
@@ -681,6 +735,10 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
         if(jiraIntegration != null){
             jiraIntegration.setApiToken("****************************");
+            // Also set jiraType for frontend
+            if (jiraIntegration.getJiraType() == null) {
+                jiraIntegration.setJiraType(JiraIntegration.JiraType.CLOUD); // Default
+            }
         }
         return Action.SUCCESS.toUpperCase();
     }
@@ -707,6 +765,9 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             addActionError("Jira is not integrated.");
             return ERROR.toUpperCase();
         }
+        
+        // Set jiraType from integration to use correct endpoint
+        jiraType = jiraIntegration.getJiraType();
 
         TestingRunIssues testingRunIssues = TestingRunIssuesDao.instance.findOne(
             Filters.eq(Constants.ID, jiraMetaData.getTestingIssueId()));
@@ -721,16 +782,24 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
         reqPayload.put("fields", fields);
 
-        String url = jiraIntegration.getBaseUrl() + CREATE_ISSUE_ENDPOINT;
-        String authHeader = Base64.getEncoder().encodeToString((jiraIntegration.getUserEmail() + ":" + jiraIntegration.getApiToken()).getBytes());
+        String url = jiraIntegration.getBaseUrl() + getCreateIssueEndpoint();
+        
+        Map<String, List<String>> headers = new HashMap<>();
+        if (isDataCenter(jiraType)) {
+            // Data Center uses Bearer token authentication
+            headers.put("Authorization", Collections.singletonList("Bearer " + jiraIntegration.getApiToken()));
+        } else {
+            // Cloud uses Basic authentication (email:token)
+            String authHeader = Base64.getEncoder().encodeToString((jiraIntegration.getUserEmail() + ":" + jiraIntegration.getApiToken()).getBytes());
+            headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
+        }
 
         String jiraTicketUrl = "";
-        Map<String, List<String>> headers = new HashMap<>();
-        headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
         OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", reqPayload.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
             String responsePayload = response.getBody();
+            
             if (response.getStatusCode() > 201 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("error while creating jira issue, url not accessible, requestbody " + request.getBody() + " ,responsebody " + response.getBody() + " ,responsestatus " + response.getStatusCode(), LoggerMaker.LogDb.DASHBOARD);
                 
@@ -796,7 +865,15 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
         try {
             jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
-            String url = jiraIntegration.getBaseUrl() + CREATE_ISSUE_ENDPOINT + "/" + issueId + ATTACH_FILE_ENDPOINT;
+            if (jiraIntegration == null) {
+                loggerMaker.errorAndAddToDb("Jira integration not found");
+                return Action.ERROR.toUpperCase();
+            }
+            
+            // Set jiraType from integration
+            jiraType = jiraIntegration.getJiraType();
+            
+            String url = jiraIntegration.getBaseUrl() + getCreateIssueEndpoint() + "/" + issueId + ATTACH_FILE_ENDPOINT;
             File tmpOutputFile = createRequestFile(origReq, testReq);
             if(tmpOutputFile == null) {
                 return Action.SUCCESS.toUpperCase();
@@ -807,8 +884,8 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                     .addFormDataPart("file", tmpOutputFile.getName(),
                             RequestBody.create(tmpOutputFile, mType))
                     .build();
-            Request.Builder builder = buildBasicRequest(url, jiraIntegration.getUserEmail(), jiraIntegration.getApiToken(), false);
-
+            
+            Request.Builder builder = buildJiraRequest(url, jiraIntegration.getUserEmail(), jiraIntegration.getApiToken(), false, isDataCenter(jiraType));
             builder.removeHeader("Accept");
             builder.addHeader("X-Atlassian-Token", "no-check");
             Request request = builder.post(requestBody).build();
@@ -835,29 +912,40 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     }
 
     private BasicDBObject buildContentDetails(String txt, String link) {
-        BasicDBObject details = new BasicDBObject();
-        details.put("type", "paragraph");
-        BasicDBList contentInnerList = new BasicDBList();
-        BasicDBObject innerDetails = new BasicDBObject();
-        innerDetails.put("text", txt);
-        innerDetails.put("type", "text");
+        JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+        
+        if (isDataCenter(jiraType)) {
+            BasicDBObject details = new BasicDBObject();
+            details.put("type", "paragraph");
+            if (link != null) {
+                details.put("text", txt + " (" + link + ")");
+            } else {
+                details.put("text", txt);
+            }
+            return details;
+        } else {
+            BasicDBObject details = new BasicDBObject();
+            details.put("type", "paragraph");
+            BasicDBList contentInnerList = new BasicDBList();
+            BasicDBObject innerDetails = new BasicDBObject();
+            innerDetails.put("text", txt);
+            innerDetails.put("type", "text");
 
-        if (link != null) {
-            BasicDBList marksList = new BasicDBList();
-            BasicDBObject marks = new BasicDBObject();
-            marks.put("type", "link");
-            BasicDBObject attrs = new BasicDBObject();
-            attrs.put("href", link);
-            marks.put("attrs", attrs);
-            marksList.add(marks);
-            innerDetails.put("marks", marksList);
+            if (link != null) {
+                BasicDBList marksList = new BasicDBList();
+                BasicDBObject marks = new BasicDBObject();
+                marks.put("type", "link");
+                BasicDBObject attrs = new BasicDBObject();
+                attrs.put("href", link);
+                marks.put("attrs", attrs);
+                marksList.add(marks);
+                innerDetails.put("marks", marksList);
+            }
+
+            contentInnerList.add(innerDetails);
+            details.put("content", contentInnerList);
+            return details;
         }
-
-        contentInnerList.add(innerDetails);
-        details.put("content", contentInnerList);
-
-
-        return details;
     }
 
     String aktoDashboardHost;
@@ -880,6 +968,9 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             addActionError("Jira is not integrated.");
             return ERROR.toUpperCase();
         }
+        
+        // Set jiraType from integration to use correct endpoint
+        jiraType = jiraIntegration.getJiraType();
 
         List<JiraMetaData> jiraMetaDataList = new ArrayList<>();
         Bson projection = Projections.include(YamlTemplate.INFO);
@@ -1012,11 +1103,17 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         reqPayload.put("issueUpdates", issueUpdates);
 
         // URL for bulk create issues
-        String url = jiraIntegration.getBaseUrl() + CREATE_ISSUE_ENDPOINT_BULK;
-        String authHeader = Base64.getEncoder().encodeToString((jiraIntegration.getUserEmail() + ":" + jiraIntegration.getApiToken()).getBytes());
-
+        String url = jiraIntegration.getBaseUrl() + getCreateIssueEndpointBulk();
+        
         Map<String, List<String>> headers = new HashMap<>();
-        headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
+        if (isDataCenter(jiraType)) {
+            // Data Center uses Bearer token authentication
+            headers.put("Authorization", Collections.singletonList("Bearer " + jiraIntegration.getApiToken()));
+        } else {
+            // Cloud uses Basic authentication (email:token)
+            String authHeader = Base64.getEncoder().encodeToString((jiraIntegration.getUserEmail() + ":" + jiraIntegration.getApiToken()).getBytes());
+            headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
+        }
 
         OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", reqPayload.toString(), headers, "");
 
@@ -1132,18 +1229,17 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         // issue title
         String summary = "Akto Report - " + jiraMetaData.getIssueTitle() + " (" + endpointMethod + " - " + truncatedEndpoint + ")";
 
-        BasicDBList contentList = new BasicDBList();
-        contentList.add(buildContentDetails(jiraMetaData.getHostStr(), null));
-        contentList.add(buildContentDetails(jiraMetaData.getEndPointStr(), null));
-        contentList.add(buildContentDetails("Issue link - Akto dashboard", jiraMetaData.getIssueUrl()));
-        contentList.add(buildContentDetails(jiraMetaData.getIssueDescription(), null));
+        List<BasicDBObject> baseContent = new ArrayList<>();
+        baseContent.add(buildContentDetails(jiraMetaData.getHostStr(), null));
+        baseContent.add(buildContentDetails(jiraMetaData.getEndPointStr(), null));
+        baseContent.add(buildContentDetails("Issue link - Akto dashboard", jiraMetaData.getIssueUrl()));
+        baseContent.add(buildContentDetails(jiraMetaData.getIssueDescription(), null));
 
-        List<BasicDBObject> additionalFields = buildAdditionalIssueFieldsForJira(info, issue, remediation);
-        if (!CollectionUtils.isEmpty(additionalFields)) {
-            contentList.addAll(additionalFields);
-        }
+        List<BasicDBObject> additionalFields = buildAdditionalIssueFieldsForJira(info, issue, remediation, jiraIntegration.getJiraType());
+        
+        Object description = buildJiraDescription(baseContent, additionalFields, jiraIntegration.getJiraType());
 
-        BasicDBObject fields = buildPayloadForJiraTicket(summary, this.projId, this.issueType, contentList,jiraMetaData.getAdditionalIssueFields(), issue.getSeverity(), jiraIntegration);
+        BasicDBObject fields = buildPayloadForJiraTicket(summary, this.projId, this.issueType, description, jiraMetaData.getAdditionalIssueFields(), issue.getSeverity(), jiraIntegration);
         
         // Combine user labels with AKTO_SYNC label
         List<String> labelsList = new ArrayList<>();
@@ -1453,13 +1549,19 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
         if (jiraIntegration == null) {
             addActionError("Jira is not integrated.");
-            return ERROR.toUpperCase();
+            return Action.ERROR.toUpperCase();
         }
+        
+        // Set jiraType from integration to use correct endpoint
+        jiraType = jiraIntegration.getJiraType();
 
         try {
-            BasicDBList contentList = new BasicDBList();
-            contentList.add(buildContentDetails(this.description, null));
-            BasicDBObject fields = buildPayloadForJiraTicket(this.title, this.projId, this.issueType, contentList, null, null, jiraIntegration);
+            List<BasicDBObject> baseContent = new ArrayList<>();
+            baseContent.add(buildContentDetails(this.description, null));
+            
+            Object description = buildJiraDescription(baseContent, new ArrayList<>(), jiraIntegration.getJiraType());
+            
+            BasicDBObject fields = buildPayloadForJiraTicket(this.title, this.projId, this.issueType, description, null, null, jiraIntegration);
             
             // Combine user labels with AKTO_SYNC label
             List<String> labelsList = new ArrayList<>();
@@ -1484,11 +1586,13 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
             BasicDBObject reqPayload = new BasicDBObject();
             reqPayload.put("fields", fields);
-            Request.Builder requestBuilder = buildBasicRequest(
-                jiraIntegration.getBaseUrl() + CREATE_ISSUE_ENDPOINT,
+            
+            Request.Builder requestBuilder = buildJiraRequest(
+                jiraIntegration.getBaseUrl() + getCreateIssueEndpoint(),
                 jiraIntegration.getUserEmail(),
                 jiraIntegration.getApiToken(),
-                false
+                false,
+                isDataCenter(jiraType)
             );
             RequestBody body = RequestBody.create(
                 reqPayload.toJson(),
@@ -1551,5 +1655,455 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error storing Jira URL: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
         }
+    }
+
+    // Project-level priority field mapping
+    private String projectKey;
+    private String fieldId;
+    private PriorityFieldMapping priorityFieldMapping;
+    private List<BasicDBObject> availableFields;
+    private List<BasicDBObject> availableFieldValues;
+
+    /**
+     * Helper method to determine field type from schema
+     */
+    private String determineFieldType(Map<String, Object> schema, String fieldId) {
+        if (schema == null) {
+            return "unknown";
+        }
+
+        Object typeObj = schema.get("type");
+        return typeObj != null ? typeObj.toString() : "unknown";
+    }
+
+    /**
+     * Helper method to get ALL issue type IDs for a project
+     * Tries cache first, then fetches from API if needed
+     */
+    private List<String> getAllIssueTypeIds(String projectKey, JiraIntegration jiraIntegration, Map<String, List<String>> headers) throws Exception {
+        List<String> issueTypeIds = new ArrayList<>();
+        Map<String, List<BasicDBObject>> projectIdsMap = jiraIntegration.getProjectIdsMap();
+
+        // Try to get from cache first
+        if (projectIdsMap != null && projectIdsMap.containsKey(projectKey)) {
+            List<BasicDBObject> issueTypes = projectIdsMap.get(projectKey);
+            for (BasicDBObject issueType : issueTypes) {
+                String issueTypeId = issueType.getString("issueId");
+                if (issueTypeId != null) {
+                    issueTypeIds.add(issueTypeId);
+                }
+            }
+        }
+
+        // If not in cache, fetch from API
+        if (issueTypeIds.isEmpty()) {
+            loggerMaker.infoAndAddToDb("Issue types not found in cache for project " + projectKey + ", fetching from API");
+            String baseUrl = jiraIntegration.getBaseUrl();
+            String createMetaProjectUrl = baseUrl + "/rest/api/3/issue/createmeta?projectKeys=" + projectKey + "&expand=projects.issuetypes.fields";
+            OriginalHttpRequest projectRequest = new OriginalHttpRequest(createMetaProjectUrl, "", "GET", null, headers, "");
+            OriginalHttpResponse projectResponse = ApiExecutor.sendRequest(projectRequest, true, null, false, new ArrayList<>());
+
+            String projectResponseBody = projectResponse.getBody();
+            Map<String, Object> projectMetadata = JsonUtils.fromJson(projectResponseBody,
+                new TypeReference<Map<String, Object>>() {});
+
+            Object projectsObj = projectMetadata.get("projects");
+            if (projectsObj instanceof List) {
+                List<?> projectsList = (List<?>) projectsObj;
+                if (!projectsList.isEmpty() && projectsList.get(0) instanceof Map) {
+                    Map<String, Object> project = (Map<String, Object>) projectsList.get(0);
+                    Object issueTypesObj = project.get("issuetypes");
+                    if (issueTypesObj instanceof List) {
+                        List<?> issueTypesList = (List<?>) issueTypesObj;
+                        for (Object issueTypeObj : issueTypesList) {
+                            if (issueTypeObj instanceof Map) {
+                                Map<String, Object> issueType = (Map<String, Object>) issueTypeObj;
+                                Object issueTypeIdObj = issueType.get("id");
+                                if (issueTypeIdObj != null) {
+                                    issueTypeIds.add(issueTypeIdObj.toString());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return issueTypeIds;
+    }
+
+    /**
+     * Fetch available fields for priority mapping (only fields with dropdown values)
+     */
+    public String fetchAvailableFieldsForMapping() {
+        try {
+            if (projectKey == null || projectKey.isEmpty()) {
+                loggerMaker.errorAndAddToDb("Project key is required");
+                addActionError("Project key is required");
+                return Action.ERROR.toUpperCase();
+            }
+
+            JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+            if (jiraIntegration == null) {
+                loggerMaker.errorAndAddToDb("JiraIntegration not found");
+                addActionError("Jira integration not found");
+                return Action.ERROR.toUpperCase();
+            }
+
+            String baseUrl = jiraIntegration.getBaseUrl();
+            String userEmail = jiraIntegration.getUserEmail();
+            String apiToken = jiraIntegration.getApiToken();
+            String authHeader = Base64.getEncoder().encodeToString((userEmail + ":" + apiToken).getBytes());
+
+            Map<String, List<String>> headers = new HashMap<>();
+            headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
+
+            // Fetch project metadata with ALL issue types and their fields in ONE API call
+            String createMetaProjectUrl = baseUrl + "/rest/api/3/issue/createmeta?projectKeys=" + projectKey + "&expand=projects.issuetypes.fields";
+            OriginalHttpRequest projectRequest = new OriginalHttpRequest(createMetaProjectUrl, "", "GET", null, headers, "");
+            OriginalHttpResponse projectResponse = ApiExecutor.sendRequest(projectRequest, true, null, false, new ArrayList<>());
+
+            String projectResponseBody = projectResponse.getBody();
+            Map<String, Object> projectMetadata = JsonUtils.fromJson(projectResponseBody,
+                new TypeReference<Map<String, Object>>() {});
+
+            // Extract fields with dropdown values from ALL issue types
+            Set<String> fieldsWithDropdowns = new HashSet<>();
+            Object projectsObj = projectMetadata.get("projects");
+
+            if (projectsObj instanceof List) {
+                List<?> projectsList = (List<?>) projectsObj;
+                if (projectsList.isEmpty()) {
+                    loggerMaker.errorAndAddToDb("No projects found in createmeta response for project: " + projectKey);
+                    addActionError("No projects found for project: " + projectKey);
+                    return Action.ERROR.toUpperCase();
+                }
+
+                if (projectsList.get(0) instanceof Map) {
+                    Map<String, Object> project = (Map<String, Object>) projectsList.get(0);
+                    Object issueTypesObj = project.get("issuetypes");
+
+                    if (issueTypesObj instanceof List) {
+                        List<?> issueTypesList = (List<?>) issueTypesObj;
+
+                        // Iterate through all issue types
+                        for (Object issueTypeObj : issueTypesList) {
+                            if (issueTypeObj instanceof Map) {
+                                Map<String, Object> issueType = (Map<String, Object>) issueTypeObj;
+                                Object fieldsObj = issueType.get("fields");
+
+                                // Extract fields with allowedValues
+                                if (fieldsObj instanceof Map) {
+                                    Map<?, ?> fieldsMap = (Map<?, ?>) fieldsObj;
+
+                                    for (Map.Entry<?, ?> entry : fieldsMap.entrySet()) {
+                                        if (entry.getValue() instanceof Map) {
+                                            Map<String, Object> fieldMetadata = (Map<String, Object>) entry.getValue();
+                                            Object allowedValuesObj = fieldMetadata.get("allowedValues");
+
+                                            // Only include fields that have allowedValues (dropdown options)
+                                            if (allowedValuesObj instanceof List) {
+                                                List<?> allowedValuesList = (List<?>) allowedValuesObj;
+                                                if (!allowedValuesList.isEmpty()) {
+                                                    fieldsWithDropdowns.add(entry.getKey().toString());
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Fetch all fields to get their names and types
+            String fieldsUrl = baseUrl + "/rest/api/3/field";
+            OriginalHttpRequest fieldsRequest = new OriginalHttpRequest(fieldsUrl, "", "GET", null, headers, "");
+            OriginalHttpResponse fieldsResponse = ApiExecutor.sendRequest(fieldsRequest, true, null, false, new ArrayList<>());
+
+            String fieldsResponseBody = fieldsResponse.getBody();
+            List<Map<String, Object>> fieldsArray = JsonUtils.fromJson(fieldsResponseBody,
+                new TypeReference<List<Map<String, Object>>>() {});
+
+            availableFields = new ArrayList<>();
+            for (Map<String, Object> field : fieldsArray) {
+                Object fIdObj = field.get("id");
+                Object fNameObj = field.get("name");
+                String fId = fIdObj != null ? fIdObj.toString() : null;
+                String fName = fNameObj != null ? fNameObj.toString() : null;
+
+                // Only include fields that have dropdown values
+                if (fId != null && fName != null && fieldsWithDropdowns.contains(fId)) {
+                    // Determine field type using helper method
+                    String fType = "unknown";
+                    Object schemaObj = field.get("schema");
+                    if (schemaObj instanceof Map) {
+                        Map<String, Object> schema = (Map<String, Object>) schemaObj;
+                        fType = determineFieldType(schema, fId);
+                    }
+
+                    BasicDBObject fieldInfo = new BasicDBObject();
+                    fieldInfo.put("id", fId);
+                    fieldInfo.put("name", fName);
+                    fieldInfo.put("type", fType);
+                    availableFields.add(fieldInfo);
+                }
+            }
+
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error fetching available fields");
+            addActionError("Error fetching available fields: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Fetch available values for a specific field (e.g., p0, p1, High, Low)
+     */
+    public String fetchFieldValues() {
+        try {
+            if (projectKey == null || projectKey.isEmpty()) {
+                loggerMaker.errorAndAddToDb("Project key is required");
+                addActionError("Project key is required");
+                return Action.ERROR.toUpperCase();
+            }
+
+            if (fieldId == null || fieldId.isEmpty()) {
+                // Default to priority field
+                fieldId = "priority";
+            }
+
+            JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+            if (jiraIntegration == null) {
+                loggerMaker.errorAndAddToDb("JiraIntegration not found");
+                addActionError("Jira integration not found");
+                return Action.ERROR.toUpperCase();
+            }
+
+            String baseUrl = jiraIntegration.getBaseUrl();
+            String userEmail = jiraIntegration.getUserEmail();
+            String apiToken = jiraIntegration.getApiToken();
+            String authHeader = Base64.getEncoder().encodeToString((userEmail + ":" + apiToken).getBytes());
+
+            Map<String, List<String>> headers = new HashMap<>();
+            headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
+
+            // Get all issue types for the project
+            List<String> issueTypeIds = getAllIssueTypeIds(projectKey, jiraIntegration, headers);
+            if (issueTypeIds.isEmpty()) {
+                loggerMaker.errorAndAddToDb("No issue types found for project: " + projectKey);
+                addActionError("No issue types found for project: " + projectKey);
+                return Action.ERROR.toUpperCase();
+            }
+
+            // Use a Map to deduplicate field values by ID
+            Map<String, BasicDBObject> uniqueFieldValues = new LinkedHashMap<>();
+
+            // Iterate through all issue types and collect field values
+            for (String issueTypeId : issueTypeIds) {
+                String createMetaUrl = baseUrl + "/rest/api/3/issue/createmeta/" + projectKey + "/issuetypes/" + issueTypeId;
+                OriginalHttpRequest request = new OriginalHttpRequest(createMetaUrl, "", "GET", null, headers, "");
+                OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+
+                String responseBody = response.getBody();
+                Map<String, Object> metadata = JsonUtils.fromJson(responseBody,
+                    new TypeReference<Map<String, Object>>() {});
+
+                Object fieldsObj = metadata.get("fields");
+                if (fieldsObj instanceof List) {
+                    List<?> fieldsList = (List<?>) fieldsObj;
+
+                    // Find the field in the array
+                    for (Object fieldObj : fieldsList) {
+                        if (fieldObj instanceof Map) {
+                            Map<String, Object> fieldMetadata = (Map<String, Object>) fieldObj;
+                            Object fieldIdObj = fieldMetadata.get("fieldId");
+                            String currentFieldId = fieldIdObj != null ? fieldIdObj.toString() : null;
+
+                            if (currentFieldId != null && currentFieldId.equals(fieldId)) {
+                                Object allowedValuesObj = fieldMetadata.get("allowedValues");
+
+                                if (allowedValuesObj instanceof List) {
+                                    List<?> allowedValuesList = (List<?>) allowedValuesObj;
+
+                                    for (Object valueObj : allowedValuesList) {
+                                        if (valueObj instanceof Map) {
+                                            Map<String, Object> value = (Map<String, Object>) valueObj;
+
+                                            Object idObj = value.get("id");
+                                            Object nameObj = value.get("name");
+                                            Object valueObjProp = value.get("value");
+
+                                            String valueId = idObj != null ? idObj.toString() : "";
+                                            String valueName = nameObj != null ? nameObj.toString() : (valueObjProp != null ? valueObjProp.toString() : "");
+
+                                            // Deduplicate by ID
+                                            if (!valueId.isEmpty() && !uniqueFieldValues.containsKey(valueId)) {
+                                                BasicDBObject valueInfo = new BasicDBObject();
+                                                valueInfo.put("id", valueId);
+                                                valueInfo.put("name", valueName);
+                                                uniqueFieldValues.put(valueId, valueInfo);
+                                            }
+                                        }
+                                    }
+                                }
+                                break; // Found the field in this issue type, move to next issue type
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Convert the map values to a list
+            availableFieldValues = new ArrayList<>(uniqueFieldValues.values());
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error fetching field values");
+            addActionError("Error fetching field values: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Save priority field mapping for a specific project
+     */
+    public String savePriorityFieldMapping() {
+        try {
+            loggerMaker.infoAndAddToDb("Saving priority field mapping for project: " + projectKey);
+
+            if (projectKey == null || projectKey.isEmpty()) {
+                loggerMaker.errorAndAddToDb("Project key is required");
+                addActionError("Project key is required");
+                return Action.ERROR.toUpperCase();
+            }
+
+            if (priorityFieldMapping == null) {
+                loggerMaker.errorAndAddToDb("Priority field mapping is null");
+                addActionError("Priority field mapping cannot be null");
+                return Action.ERROR.toUpperCase();
+            }
+
+            // Set default field to "priority" if not provided
+            if (priorityFieldMapping.getFieldId() == null || priorityFieldMapping.getFieldId().isEmpty()) {
+                priorityFieldMapping.setFieldId("priority");
+            }
+
+            JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+            if (jiraIntegration == null) {
+                loggerMaker.errorAndAddToDb("JiraIntegration not found");
+                addActionError("Jira integration not found");
+                return Action.ERROR.toUpperCase();
+            }
+
+            // Save to database
+            JiraIntegrationDao.instance.updateOne(
+                new BasicDBObject(),
+                Updates.set("projectMappings." + projectKey + ".priorityFieldMapping", priorityFieldMapping)
+            );
+
+            loggerMaker.infoAndAddToDb("Successfully saved priority field mapping for project: " + projectKey);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error saving priority field mapping");
+            addActionError("Error saving priority field mapping: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Fetch priority field mapping for a specific project
+     */
+    public String fetchPriorityFieldMapping() {
+        try {
+            loggerMaker.infoAndAddToDb("Fetching priority field mapping for project: " + projectKey);
+
+            if (projectKey == null || projectKey.isEmpty()) {
+                loggerMaker.errorAndAddToDb("Project key is required");
+                addActionError("Project key is required");
+                return Action.ERROR.toUpperCase();
+            }
+
+            JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+
+            if (jiraIntegration != null && jiraIntegration.getProjectMappings() != null) {
+                ProjectMapping projectMapping = jiraIntegration.getProjectMappings().get(projectKey);
+
+                if (projectMapping != null && projectMapping.getPriorityFieldMapping() != null) {
+                    this.priorityFieldMapping = projectMapping.getPriorityFieldMapping();
+                } else {
+                    // Initialize with default priority field
+                    this.priorityFieldMapping = new PriorityFieldMapping();
+                    this.priorityFieldMapping.setFieldId("priority");
+                    this.priorityFieldMapping.setFieldName("Priority");
+                    this.priorityFieldMapping.setSeverityToValueMap(new HashMap<>());
+                    this.priorityFieldMapping.setSeverityToDisplayNameMap(new HashMap<>());
+                }
+            } else {
+                // Initialize with default
+                this.priorityFieldMapping = new PriorityFieldMapping();
+                this.priorityFieldMapping.setFieldId("priority");
+                this.priorityFieldMapping.setFieldName("Priority");
+                this.priorityFieldMapping.setSeverityToValueMap(new HashMap<>());
+                this.priorityFieldMapping.setSeverityToDisplayNameMap(new HashMap<>());
+            }
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error fetching priority field mapping");
+            addActionError("Error fetching priority field mapping: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    public String getProjectKey() {
+        return projectKey;
+    }
+
+    public void setProjectKey(String projectKey) {
+        this.projectKey = projectKey;
+    }
+
+    public String getFieldId() {
+        return fieldId;
+    }
+
+    public void setFieldId(String fieldId) {
+        this.fieldId = fieldId;
+    }
+
+    public PriorityFieldMapping getPriorityFieldMapping() {
+        return priorityFieldMapping;
+    }
+
+    public void setPriorityFieldMapping(PriorityFieldMapping priorityFieldMapping) {
+        this.priorityFieldMapping = priorityFieldMapping;
+    }
+
+    public List<BasicDBObject> getAvailableFields() {
+        return availableFields;
+    }
+
+    public void setAvailableFields(List<BasicDBObject> availableFields) {
+        this.availableFields = availableFields;
+    }
+
+    public List<BasicDBObject> getAvailableFieldValues() {
+        return availableFieldValues;
+    }
+
+    public void setAvailableFieldValues(List<BasicDBObject> availableFieldValues) {
+        this.availableFieldValues = availableFieldValues;
+    }
+
+    public JiraIntegration.JiraType getJiraType() {
+        return jiraType;
+    }
+
+    public void setJiraType(JiraIntegration.JiraType jiraType) {
+        this.jiraType = jiraType;
     }
 }

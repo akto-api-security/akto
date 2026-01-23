@@ -13,7 +13,7 @@ export const CHAT_ASSETS = {
 // Message labels used in ConversationHistory
 export const MESSAGE_LABELS = {
     TESTED_INTERACTION: 'Tested interaction',
-    HR_AGENT_RESPONSE: 'HR agent response',
+    AKTO_AI_AGENT_RESPONSE: 'AI Agent',
 };
 
 // Placeholder text for ChatInputBar

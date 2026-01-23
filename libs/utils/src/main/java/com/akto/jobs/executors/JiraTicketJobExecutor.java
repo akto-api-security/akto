@@ -12,6 +12,8 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.jira_integration.JiraIntegration;
 import com.akto.dto.jira_integration.JiraMetaData;
+import com.akto.dto.jira_integration.PriorityFieldMapping;
+import com.akto.dto.jira_integration.ProjectMapping;
 import com.akto.dto.jobs.AutoTicketParams;
 import com.akto.dto.jobs.Job;
 import com.akto.dto.test_editor.Info;
@@ -368,22 +370,40 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         fields.put("project", new BasicDBObject("key", projId));
         fields.put("labels", new String[] {JobConstants.TICKET_LABEL_AKTO_SYNC});
 
-        // Apply severity to priority mapping
+        // Apply severity to priority field mapping (project-level)
         if (severity != null) {
             try {
                 JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
                 if (jiraIntegration != null) {
-                    Map<String, String> severityToPriorityMap = jiraIntegration.getIssueSeverityToPriorityMap();
-                    if (severityToPriorityMap != null && !severityToPriorityMap.isEmpty()) {
-                        String priorityId = severityToPriorityMap.get(severity.name());
-                        if (priorityId != null && !priorityId.isEmpty()) {
-                            fields.put("priority", new BasicDBObject("id", priorityId));
-                            logger.info("Set Jira priority {} for severity {}", priorityId, severity.name());
+                    // First try project-level mapping
+                    Map<String, ProjectMapping> projectMappings = jiraIntegration.getProjectMappings();
+                    if (projectMappings != null && projectMappings.containsKey(projId)) {
+                        ProjectMapping projectMapping = projectMappings.get(projId);
+                        PriorityFieldMapping priorityFieldMapping = projectMapping.getPriorityFieldMapping();
+
+                        if (priorityFieldMapping != null && priorityFieldMapping.getSeverityToValueMap() != null) {
+                            String fieldId = priorityFieldMapping.getFieldId();
+                            String fieldValue = priorityFieldMapping.getSeverityToValueMap().get(severity.name());
+
+                            if (fieldId != null && fieldValue != null && !fieldValue.isEmpty()) {
+                                // For standard priority field
+                                if (fieldId.equals("priority")) {
+                                    fields.put("priority", new BasicDBObject("id", fieldValue));
+                                    logger.info("Set Jira priority field '{}' to value ID '{}' for severity {}", fieldId, fieldValue, severity.name());
+                                } else {
+                                    // For custom fields, always use ID structure since we store IDs in severityToValueMap
+                                    // Jira requires {"id": "value"} format for option-type custom fields
+                                    fields.put(fieldId, new BasicDBObject("id", fieldValue));
+                                    logger.info("Set custom priority field '{}' to value ID '{}' for severity {}", fieldId, fieldValue, severity.name());
+                                }
+                            } else {
+                                logger.info("No value mapping found for severity: {} in field: {}", severity.name(), fieldId);
+                            }
                         } else {
-                            logger.info("No priority mapping found for severity: {}", severity.name());
+                            logger.info("No priority field mapping configured for project: {}, Jira will use default priority", projId);
                         }
                     } else {
-                        logger.info("Priority map is null or empty");
+                        logger.info("No project mapping found for project: {}, Jira will use default priority", projId);
                     }
                 }
             } catch (Exception e) {
@@ -419,4 +439,5 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         content.put("content", contentInner);
         return content;
     }
+
 }

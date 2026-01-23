@@ -125,7 +125,7 @@ const transform = {
                                 <Badge size="small" key={idx}>{issue.severity}</Badge>
                             </div>,
                     issueName: subCategoryMap[issue.issueName]?.testName,
-                    category: subCategoryMap[issue.issueName]?.superCategory?.shortName,
+                    category: subCategoryMap[issue.issueName]?.superCategory?.displayName,
                     numberOfEndpoints: issue.numberOfEndpoints,
                     compliance: <HorizontalStack wrap={false} gap={1}>{issue.compliance.slice(0, maxShowCompliance).map(x => <Avatar source={func.getComplianceIcon(x)} shape="square"  size="extraSmall"/>)}<Box>{badge}</Box></HorizontalStack>,
                     creationTime: func.prettifyEpoch(issue.creationTime),

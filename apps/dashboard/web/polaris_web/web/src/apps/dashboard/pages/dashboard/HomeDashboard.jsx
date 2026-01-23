@@ -33,7 +33,6 @@ import { fetchActionItemsData } from './components/actionItemsTransform';
 import { getDashboardCategory, isMCPSecurityCategory, mapLabel } from '../../../main/labelHelper';
 import GraphMetric from '../../components/GraphMetric';
 import Dropdown from '../../components/layouts/Dropdown';
-import TopThreatTypeChart from '../threat_detection/components/TopThreatTypeChart';
 
 function HomeDashboard() {
 
@@ -271,6 +270,11 @@ function HomeDashboard() {
     }
 
     const fetchPolicyGuardrailStats = async (startTs, endTs) => {
+        if (!func.checkForFeatureSaas('THREAT_DETECTION')) {
+            const emptyData = generateTimeSeriesWithGaps(startTs, endTs, {});
+            setPolicyGuardrailStats(emptyData);
+            return;
+        }
         try {
             // Get collections with guard-rail tag
             const guardRailCollections = allCollections.filter(collection => {
@@ -336,6 +340,11 @@ function HomeDashboard() {
     };
 
     const fetchMcpApiCallStats = async (startTs, endTs) => {
+        if (!func.checkForFeatureSaas('THREAT_DETECTION')) {
+            const emptyData = generateTimeSeriesWithGaps(startTs, endTs, {});
+            setMcpApiCallStats(emptyData);
+            return;
+        }
         try {
             // Get MCP collections by checking for MCP tag
             const mcpCollections = allCollections.filter(collection => {
@@ -563,7 +572,9 @@ function HomeDashboard() {
 
     useEffect(() => {
         fetchData()
-        fetchThreatData()
+        if (func.checkForFeatureSaas('THREAT_DETECTION')) {
+            fetchThreatData()
+        }
     }, [startTimestamp, endTimestamp])
     
     // Fetch MCP API call stats when time range changes
@@ -1455,7 +1466,7 @@ function HomeDashboard() {
         />
     );
 
-    const hasSeverityData = Object.keys(threatSeverityData).length > 0 && Object.values(threatSeverityData).some(item => item.text > 0);
+    const hasSeverityData = threatSeverityData && typeof threatSeverityData === 'object' && Object.keys(threatSeverityData).length > 0 && Object.values(threatSeverityData).some(item => item?.text > 0);
 
     const threatSeverityComponent = (
         <InfoCard
@@ -1518,14 +1529,18 @@ function HomeDashboard() {
         />
     );
 
+    const threatComponents = func.checkForFeatureSaas('THREAT_DETECTION') ? [
+        {id: 'threat-timeline', component: threatActorsTimelineComponent},
+        {id: 'threat-severity', component: threatSeverityComponent},
+        {id: 'threat-categories', component: threatCategoryComponent},
+    ] : [];
+
     let gridComponents = showTestingComponents ?
         [
             {id: 'critical-apis', component: criticalUnsecuredAPIsOverTime},
             {id: 'vulnerable-apis', component: vulnerableApisBySeverityComponent},
             {id: 'critical-findings', component: criticalFindings},
-            {id: 'threat-timeline', component: threatActorsTimelineComponent},
-            {id: 'threat-severity', component: threatSeverityComponent},
-            {id: 'threat-categories', component: threatCategoryComponent},
+            ...threatComponents,
             {id: 'risk-score', component: apisByRiskscoreComponent},
             {id: 'access-type', component: apisByAccessTypeComponent},
             {id: 'auth-type', component: apisByAuthTypeComponent},
@@ -1540,9 +1555,7 @@ function HomeDashboard() {
             {id: 'critical-apis', component: criticalUnsecuredAPIsOverTime},
             {id: 'vulnerable-apis', component: vulnerableApisBySeverityComponent},
             {id: 'critical-findings', component: criticalFindings},
-            {id: 'threat-timeline', component: threatActorsTimelineComponent},
-            {id: 'threat-severity', component: threatSeverityComponent},
-            {id: 'threat-categories', component: threatCategoryComponent},
+            ...threatComponents,
             {id: 'api-type', component: apisByTypeComponent},
         ]
 

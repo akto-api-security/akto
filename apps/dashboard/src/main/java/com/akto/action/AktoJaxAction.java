@@ -7,8 +7,10 @@ import com.akto.dao.CrawlerRunDao;
 import com.akto.dao.CrawlerUrlDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
-import com.akto.dao.testing.TestRolesDao;
+import com.akto.dao.testing.*;
+import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.Config;
 import com.akto.dto.CrawlerRun;
 import com.akto.dto.CrawlerRun.CrawlerRunStatus;
@@ -31,10 +33,16 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
+
+import lombok.Getter;
+import lombok.Setter;
+
 import org.apache.commons.lang3.StringUtils;
+import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
 
@@ -52,6 +60,12 @@ public class AktoJaxAction extends UserAction {
     private String testRoleHaxId;
 
     private String outscopeUrls;
+    @Getter
+    @Setter
+    private String urlTemplatePatterns;
+    @Getter
+    @Setter
+    private String applicationPages;
 
     private String crawlerData;
 
@@ -67,6 +81,10 @@ public class AktoJaxAction extends UserAction {
     private String buttonText;
     private int crawlingTime;
     private String selectedModuleName;
+    private Map<String, String> customHeaders;
+
+    private boolean runTestAfterCrawling;
+    private String selectedMiniTestingService;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AktoJaxAction.class, LogDb.DASHBOARD);
 
@@ -194,7 +212,8 @@ public class AktoJaxAction extends UserAction {
                         0,
                         crawlId,
                         hostname,
-                        outscopeUrls
+                        outscopeUrls,
+                        runTestAfterCrawling
                 );
                 crawlerRun.setStatus(CrawlerRunStatus.PENDING);
                 crawlerRun.setModuleName(selectedModuleName);
@@ -206,13 +225,19 @@ public class AktoJaxAction extends UserAction {
                 crawlerRun.setAccountId(Context.accountId.get());
                 crawlerRun.setCookies(cookies);
                 crawlerRun.setCrawlingTime(crawlingTime);
+                crawlerRun.setCustomHeaders(customHeaders);
+
+                if(runTestAfterCrawling && selectedMiniTestingService != null && !selectedMiniTestingService.isEmpty()) {
+                    crawlerRun.setSelectedMiniTestingService(selectedMiniTestingService);
+                }
+
                 CrawlerRunDao.instance.insertOne(crawlerRun);
             } else {
                 // Fallback to internal DAST API
                 initiateInternalCrawl(crawlId, hostname, username, password, apiKey,
-                    dashboardUrl, collectionId, cookies, crawlingTime, outscopeUrls);
+                    dashboardUrl, collectionId, cookies, crawlingTime, outscopeUrls, runTestAfterCrawling,
+                    urlTemplatePatterns, applicationPages);
             }
-
 
             // Send Slack alert for crawler initiation
             try {
@@ -276,7 +301,8 @@ public class AktoJaxAction extends UserAction {
     private void initiateInternalCrawl(String crawlId, String hostname, String username,
                                      String password, String apiKey, String dashboardUrl,
                                      int collectionId, Object cookies, int crawlingTime,
-                                     String outscopeUrls) throws Exception {
+                                     String outscopeUrls, boolean runTestAfterCrawling,
+                                     String urlTemplatePatterns, String applicationPages) throws Exception {
         String url = System.getenv("AKTOJAX_SERVICE_URL") + "/triggerCrawler";
         loggerMaker.infoAndAddToDb("Using internal DAST crawler service: " + url);
 
@@ -299,6 +325,18 @@ public class AktoJaxAction extends UserAction {
             requestBody.put("cookies", cookies);
         }
 
+        if (customHeaders != null && !customHeaders.isEmpty()) {
+            requestBody.put("customHeaders", customHeaders);
+        }
+
+        if (!StringUtils.isEmpty(urlTemplatePatterns)) {
+            requestBody.put("urlTemplatePatterns", urlTemplatePatterns);
+        }
+
+        if (!StringUtils.isEmpty(applicationPages)) {
+            requestBody.put("applicationPages", applicationPages);
+        }
+
         String reqData = requestBody.toString();
         loggerMaker.infoAndAddToDb("Internal DAST crawler request data: " + reqData);
 
@@ -313,13 +351,133 @@ public class AktoJaxAction extends UserAction {
                     0,
                     crawlId,
                     hostname,
-                    outscopeUrls
+                    outscopeUrls,
+                    runTestAfterCrawling
             );
+
+            crawlerRun.setStatus(CrawlerRunStatus.PENDING);
+            crawlerRun.setModuleName("Internal DAST (Akto)");
+            crawlerRun.setUsername(username);
+            crawlerRun.setPassword(password);
+            crawlerRun.setApiKey(apiKey);
+            crawlerRun.setDashboardUrl(dashboardUrl);
+            crawlerRun.setCollectionId(collectionId);
+            crawlerRun.setAccountId(Context.accountId.get());
+            crawlerRun.setCookies(cookies);
+            crawlerRun.setCrawlingTime(crawlingTime);
+            crawlerRun.setCustomHeaders(customHeaders);
+            crawlerRun.setUrlTemplatePatterns(urlTemplatePatterns);
+            crawlerRun.setApplicationPages(applicationPages);
+
+            if(runTestAfterCrawling && selectedMiniTestingService != null && !selectedMiniTestingService.isEmpty()) {
+                crawlerRun.setSelectedMiniTestingService(selectedMiniTestingService);
+            }
 
             CrawlerRunDao.instance.insertOne(crawlerRun);
         }
 
         loggerMaker.infoAndAddToDb("Internal DAST crawler status: " + status);
+    }
+
+    private TestingRun triggerTestsAfterCrawling(CrawlerRun crawlerRun) {
+        if (crawlerRun == null || !crawlerRun.isRunTestAfterCrawling()) {
+            return null;
+        }
+
+        try {
+            Integer collectionId = crawlerRun.getCollectionId();
+            if (collectionId == null || collectionId == 0) {
+                loggerMaker.errorAndAddToDb("Cannot trigger tests: No collection ID found in crawler run");
+                return null;
+            }
+
+            // Fetch auth mechanism
+            AuthMechanism authMechanism = TestRolesDao.instance.fetchAttackerToken(null);
+            if (authMechanism == null) {
+                loggerMaker.errorAndAddToDb("Cannot trigger tests: No authentication mechanism found");
+                return null;
+            }
+
+            Bson filter = Filters.or(
+                Filters.exists(YamlTemplate.INACTIVE, false),
+                Filters.eq(YamlTemplate.INACTIVE, false)
+            );
+            List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(
+                filter,
+                Projections.include("_id")
+            );
+
+            if (yamlTemplates == null || yamlTemplates.isEmpty()) {
+                loggerMaker.errorAndAddToDb("Cannot trigger tests: No test templates found");
+                return null;
+            }
+
+            List<String> selectedTests = new ArrayList<>();
+            for (YamlTemplate template : yamlTemplates) {
+                selectedTests.add(template.getId());
+            }
+
+            // Create testing run config with all tests
+            int testConfigId = UUID.randomUUID().hashCode() & 0xfffffff;
+            TestingRunConfig testingRunConfig = new TestingRunConfig(
+                testConfigId,
+                null,                              // testingEndpoints (null for collection-wise)
+                selectedTests,                     // selectedTests (all available tests)
+                null,             // authMechanismId
+                null,                              // overriddenTestAppUrl
+                ""
+            );
+            testingRunConfig.setTestSuiteIds(new ArrayList<>());
+            TestingRunConfigDao.instance.insertOne(testingRunConfig);
+
+            // Create testing endpoints for the collection
+            CollectionWiseTestingEndpoints testingEndpoints = new CollectionWiseTestingEndpoints(collectionId);
+
+            // Determine mini testing service name (null if not specified)
+            String miniTestingServiceName = null;
+            if (crawlerRun.getSelectedMiniTestingService() != null
+                && !crawlerRun.getSelectedMiniTestingService().isEmpty()) {
+                miniTestingServiceName = crawlerRun.getSelectedMiniTestingService();
+            }
+
+            // Create testing run with the config ID
+            String testName = "Auto-test after crawl: " + crawlerRun.getHostname();
+            TestingRun testingRun = new TestingRun(
+                Context.now(),                  // scheduleTimestamp
+                crawlerRun.getStartedBy(),      // userEmail
+                testingEndpoints,               // testingEndpoints
+                testConfigId,                   // testIdConfig (from TestingRunConfig)
+                TestingRun.State.SCHEDULED,     // state
+                0,                              // periodInSeconds (0 = one-time)
+                testName,                       // name
+                -1,                             // testRunTime (-1 = default)
+                -1,                             // maxConcurrentRequests (-1 = default)
+                false,                          // sendSlackAlert
+                false,                          // sendMsTeamsAlert
+                miniTestingServiceName,         // miniTestingServiceName (can be null)
+                0                               // selectedSlackChannelId
+            );
+
+            testingRun.setTriggeredBy("DAST_CRAWLER_AUTO_TEST");
+
+            // Insert testing run
+            TestingRunDao.instance.insertOne(testingRun);
+
+            loggerMaker.infoAndAddToDb(
+                "Successfully triggered tests after crawling. " +
+                "CrawlId: " + crawlerRun.getCrawlId() +
+                ", CollectionId: " + collectionId +
+                ", TestingRunId: " + testingRun.getId().toHexString() +
+                ", TestCount: " + selectedTests.size() +
+                (miniTestingServiceName != null ? ", MiniTestingService: " + miniTestingServiceName : "")
+            );
+
+            return testingRun;
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error triggering tests after crawling for crawlId: " + crawlerRun.getCrawlId());
+            return null;
+        }
     }
 
     public String uploadCrawlerData() {
@@ -406,6 +564,49 @@ public class AktoJaxAction extends UserAction {
             loggerMaker.errorAndAddToDb("Error fetching DAST modules: " + e.getMessage());
         }
         return Action.SUCCESS.toUpperCase();
+    }
+
+    private String status;
+    private String errorMessage;
+    public String updateCrawlerStatus() {
+        try {
+            Bson updates = null;
+            if (status.equals(CrawlerRun.CrawlerRunStatus.RUNNING.name())) {
+                updates = Updates.combine(
+                        Updates.set(CrawlerRun.STATUS, status),
+                        Updates.set(CrawlerRun.START_TIMESTAMP, Context.now())
+                );
+            } else if (status.equals(CrawlerRun.CrawlerRunStatus.COMPLETED.name())) {
+                updates = Updates.combine(
+                        Updates.set(CrawlerRun.STATUS, status),
+                        Updates.set(CrawlerRun.END_TIMESTAMP, Context.now())
+                );
+            } else if (status.equals(CrawlerRun.CrawlerRunStatus.FAILED.name())) {
+                updates = Updates.combine(
+                        Updates.set(CrawlerRun.STATUS, status),
+                        Updates.set(CrawlerRun.END_TIMESTAMP, Context.now()),
+                        Updates.set(CrawlerRun.ERROR_MESSAGE, errorMessage)
+                );
+            }
+
+            CrawlerRunDao.instance.updateOne(
+                    Filters.eq(CrawlerRun.CRAWL_ID, crawlId),
+                    updates
+            );
+
+            // Trigger tests after successful crawling completion
+            if (status.equals(CrawlerRun.CrawlerRunStatus.COMPLETED.name())) {
+                CrawlerRun crawlerRun = CrawlerRunDao.instance.findOne(
+                        Filters.eq(CrawlerRun.CRAWL_ID, crawlId)
+                );
+                triggerTestsAfterCrawling(crawlerRun);
+            }
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in updateCrawlerStatus");
+            return Action.ERROR.toUpperCase();
+        }
     }
 
     public String getHostname() {
@@ -558,5 +759,45 @@ public class AktoJaxAction extends UserAction {
 
     public void setAvailableModules(List<Map<String, Object>> availableModules) {
         this.availableModules = availableModules;
+    }
+
+    public Map<String, String> getCustomHeaders() {
+        return customHeaders;
+    }
+
+    public void setCustomHeaders(Map<String, String> customHeaders) {
+        this.customHeaders = customHeaders;
+    }
+
+    public boolean isRunTestAfterCrawling() {
+        return runTestAfterCrawling;
+    }
+
+    public void setRunTestAfterCrawling(boolean runTestAfterCrawling) {
+        this.runTestAfterCrawling = runTestAfterCrawling;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public String getErrorMessage() {
+        return errorMessage;
+    }
+
+    public void setErrorMessage(String errorMessage) {
+        this.errorMessage = errorMessage;
+    }
+
+    public String getSelectedMiniTestingService() {
+        return selectedMiniTestingService;
+    }
+
+    public void setSelectedMiniTestingService(String selectedMiniTestingService) {
+        this.selectedMiniTestingService = selectedMiniTestingService;
     }
 }

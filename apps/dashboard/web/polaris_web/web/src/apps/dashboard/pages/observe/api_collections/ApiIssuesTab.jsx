@@ -110,7 +110,12 @@ const ApiIssuesTab = ({ apiDetail, collectionIssuesData, isThreatEnabled }) => {
     const fetchThreatIssuesData = async (apiCollectionId, endpoint, method) => {
         try {
             setLoadingIssues(true);
-            const resp = await threatDetectionApi.fetchSuspectSampleData(0, [], [apiCollectionId], [endpoint], [], {}, 0, func.timeNow(), [], 10, 'ACTIVE', true, 'threat', [], '', [method]);
+            let finalEndpoint = endpoint;
+            if(endpoint.includes("http")){
+                const url = new URL(endpoint);
+                finalEndpoint = url.pathname;
+            }
+            const resp = await threatDetectionApi.fetchSuspectSampleData(0, [], [apiCollectionId], [finalEndpoint], [], {}, 0, func.timeNow(), [], 10, 'ACTIVE', true, 'threat', [], '', [method]);
             let threatIssuesData = [];
             if(resp?.maliciousEvents && resp?.maliciousEvents?.length > 0) {
                 resp?.maliciousEvents?.filter(event => event?.successfulExploit).forEach(event => {

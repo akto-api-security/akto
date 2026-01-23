@@ -30,6 +30,13 @@ export default {
             data: {issueIdArray, statusToBeUpdated, ignoreReason, testingRunResultHexIdsMap}
         })
     },
+    bulkUpdateIssueSeverity(issueIdArray, severityToBeUpdated) {
+        return request({
+            url: 'api/bulkUpdateIssueSeverity',
+            method: 'post',
+            data: {issueIdArray, severityToBeUpdated}
+        })
+    },
     fetchTestingRunResult (issueId) {
         return request({
             url: 'api/fetchTestingRunResult',

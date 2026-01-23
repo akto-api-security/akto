@@ -39,7 +39,8 @@ public abstract class TestingEndpoints {
 
 
     public enum Type {
-        CUSTOM, COLLECTION_WISE, WORKFLOW, LOGICAL_GROUP, METHOD, ALL, REGEX, RISK_SCORE, SENSITIVE_DATA, UNAUTHENTICATED, HOST_REGEX, TAGS, AUTH_TYPE
+        CUSTOM, COLLECTION_WISE, WORKFLOW, LOGICAL_GROUP, METHOD, ALL, REGEX, RISK_SCORE, SENSITIVE_DATA,
+        UNAUTHENTICATED, HOST_REGEX, TAGS, AUTH_TYPE, API_ACCESS_TYPES
     }
 
     public Type getType() {
@@ -91,6 +92,11 @@ public abstract class TestingEndpoints {
                     List<String> authTypes = (data != null && data.get("authTypes") != null) ? 
                         (List<String>) data.get("authTypes") : new ArrayList<>();
                     condition = new AuthTypeTestingEndpoints(operator, authTypes);
+                    break;
+                case API_ACCESS_TYPES:
+                    List<String> apiAccessTypes = (data != null && data.get("apiAccessTypes") != null) ? 
+                        (List<String>) data.get("apiAccessTypes") : new ArrayList<>();
+                    condition = new AccessTypeTestingEndpoints(operator, apiAccessTypes);
                     break;
                 default:
                     break;

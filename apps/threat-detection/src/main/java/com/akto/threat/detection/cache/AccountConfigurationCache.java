@@ -115,16 +115,16 @@ public class AccountConfigurationCache {
             // This will fetch paginated apiInfos with _id, rateLimits fields.
             List<ApiInfo> apiInfos = new ArrayList<>();
 
-            // if (accountSettings.getId() != 1758179941) {
-            //     apiInfos = dataActor.fetchApiRateLimits(null);
-            // }
+            if (accountSettings.getId() == 1763355072) {
+                apiInfos = dataActor.fetchApiRateLimits(null);
+            }
 
             // Build API info metadata structures - always non-null
             Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates = new HashMap<>();
             Map<String, Set<com.akto.dto.type.URLMethods.Method>> apiInfoUrlToMethods = new HashMap<>();
 
             // Process API infos only if available
-            RuntimeUtil.fillURLTemplatesMap(apiInfos, apiInfoUrlToMethods, apiCollectionUrlTemplates);
+            RuntimeUtil.fillURLTemplatesMap(apiInfos, apiInfoUrlToMethods, apiCollectionUrlTemplates, null);
             // Note: Maps remain empty (not null) if apiInfos is null/empty
 
             this.cachedConfig = new AccountConfig(

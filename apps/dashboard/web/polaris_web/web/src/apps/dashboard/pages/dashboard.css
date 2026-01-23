@@ -134,6 +134,9 @@
     --p-color-bg-critical-subdued: #FFF4F4 !important;
     --p-color-bg-caution-subdued: #FFF5EA !important;
     --p-color-bg-info-subdued: #A4E8F2 !important;
+
+    --p-color-bg-magic-subdued-active: #FAFAFA !important;
+    --p-color-bg-app-hover: #F6F6F7 !important;
 }
 
 .Polaris-Page{
@@ -240,4 +243,26 @@
 .action-item-card-actions .Polaris-Modal-CloseButton{
     margin-left: 0px !important;
     padding: 4px !important;
+}
+/* Remove padding from Frame's Box wrapper for ask-ai route */
+.dashboard.ask-ai-route .Polaris-Frame__Content > .Polaris-Box {
+    padding: 0 !important;
+    --pc-box-padding-block-end-xs: 0 !important;
+    --pc-box-padding-block-start-xs: 0 !important;
+    --pc-box-padding-inline-start-xs: 0 !important;
+    --pc-box-padding-inline-end-xs: 0 !important;
+}
+
+/* Ask AI gradient text in left nav (only when on ask-ai route) */
+.ask-ai-route .Polaris-Navigation__Item--selected .Polaris-Navigation__Text {
+    background: linear-gradient(90deg, rgba(98, 0, 234, 0.67) 0%, #18A4EA 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* Ask Akto selected nav item styling */
+.ask-ai-route .Polaris-Navigation__Item--selected {
+    border-radius: 4px;
+    background: var(--Background-Selected, #EDEEEF);
 }
