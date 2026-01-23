@@ -2456,15 +2456,15 @@ public class InitializerListener implements ServletContextListener {
             e.printStackTrace();
         }
 
-        boolean runJobFunctions = JobUtils.getRunJobFunctions();
-        boolean runJobFunctionsAnyway = JobUtils.getRunJobFunctionsAnyway();
+        final int runJobs = JobUtils.getRunJobFunctions();
+        final boolean runJobsAnyway = JobUtils.getRunJobFunctionsAnyway();
 
         executorService.schedule(new Runnable() {
             public void run() {
 
                 ReadPreference readPreference = ReadPreference.primary();
                 WriteConcern writeConcern = WriteConcern.ACKNOWLEDGED;
-                if (runJobFunctions || DashboardMode.isSaasDeployment()) {
+                if (runJobs > 0 || DashboardMode.isSaasDeployment()) {
                     readPreference = ReadPreference.primary();
                     writeConcern = WriteConcern.W1;
                 }
@@ -2503,10 +2503,11 @@ public class InitializerListener implements ServletContextListener {
                 SingleTypeInfo.init();
 
                 int now = Context.now();
-                if (runJobFunctions || runJobFunctionsAnyway) {
+
+                if (runJobs > 0 || runJobsAnyway) {
 
                     logger.debug("Starting init functions and scheduling jobs at " + now);
-                    logger.info("Job mode: " + JobUtils.getJobModeDescription());
+                    logger.info("Job mode: " + runJobs + " (runAnyway: " + runJobsAnyway + ")");
 
                     AccountTask.instance.executeTask(new Consumer<Account>() {
                         @Override
@@ -2517,45 +2518,40 @@ public class InitializerListener implements ServletContextListener {
 
                     updateApiGroupsForAccounts();
 
-                    if (JobUtils.shouldRunCategory1Jobs()) {
-                        logger.warn("Starting CATEGORY 1 job schedulers", LogDb.DASHBOARD);
-
-                        setUpWebhookScheduler();
-                        setUpTrafficAlertScheduler();
-                        setUpDailyScheduler();
-
-                        if (DashboardMode.isMetered()) {
-                            setupUsageScheduler();
+                    if (runJobs > 0 || runJobsAnyway) {
+                        if (runJobs == 1 || runJobsAnyway) {
+                            logger.warn("Starting CATEGORY 1 job schedulers", LogDb.DASHBOARD);
+                            setUpWebhookScheduler();
+                            setUpTrafficAlertScheduler();
+                            setUpDailyScheduler();
+                            if (DashboardMode.isMetered()) {
+                                setupUsageScheduler();
+                            }
+                            syncCronInfo.setUpUpdateCronScheduler();
+                            setUpTestEditorTemplatesScheduler();
+                            crons.trafficAlertsScheduler();
+                            JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
                         }
-
-                        syncCronInfo.setUpUpdateCronScheduler();
-                        setUpTestEditorTemplatesScheduler();
-                        crons.trafficAlertsScheduler();
-                        JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
-                    }
-
-                    if (JobUtils.shouldRunCategory2Jobs()) {
-                        logger.warn("Starting CATEGORY 2 job schedulers", LogDb.DASHBOARD);
-
-                        updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
-                        syncCronInfo.setUpMcpMaliciousnessCronScheduler();
-                        agentBasePromptDetectionCron.setUpAgentBasePromptDetectionScheduler();
-                        setupAutomatedApiGroupsScheduler();
-
-                        crons.insertHistoricalDataJob();
-                        if(DashboardMode.isOnPremDeployment()){
-                            crons.insertHistoricalDataJobForOnPrem();
+                        if (runJobs == 2 || runJobsAnyway) {
+                            logger.warn("Starting CATEGORY 2 job schedulers", LogDb.DASHBOARD);
+                            updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
+                            syncCronInfo.setUpMcpMaliciousnessCronScheduler();
+                            agentBasePromptDetectionCron.setUpAgentBasePromptDetectionScheduler();
+                            setupAutomatedApiGroupsScheduler();
+                            crons.insertHistoricalDataJob();
+                            if(DashboardMode.isOnPremDeployment()){
+                                crons.insertHistoricalDataJobForOnPrem();
+                            }
+                            trimCappedCollectionsJob();
+                            setUpPiiAndTestSourcesScheduler();
+                            cleanInventoryJobRunner();
+                            setUpDefaultPayloadRemover();
+                            setUpDependencyFlowScheduler();
+                            tokenGeneratorCron.tokenGeneratorScheduler();
+                            crons.deleteTestRunsScheduler();
+                            setUpUpdateCustomCollections();
+                            setUpFillCollectionIdArrayJob();
                         }
-
-                        trimCappedCollectionsJob();
-                        setUpPiiAndTestSourcesScheduler();
-                        cleanInventoryJobRunner();
-                        setUpDefaultPayloadRemover();
-                        setUpDependencyFlowScheduler();
-                        tokenGeneratorCron.tokenGeneratorScheduler();
-                        crons.deleteTestRunsScheduler();
-                        setUpUpdateCustomCollections();
-                        setUpFillCollectionIdArrayJob();
                     }
 
                     int now2 = Context.now();
