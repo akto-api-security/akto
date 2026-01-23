@@ -1,96 +1,127 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { IndexFiltersMode, Badge, Box } from "@shopify/polaris";
+import { IndexFiltersMode, Box, Badge } from "@shopify/polaris";
 import { useNavigate } from "react-router-dom";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
-import SummaryCardInfo from "@/apps/dashboard/components/shared/SummaryCardInfo";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
+import SummaryCardInfo from "@/apps/dashboard/components/shared/SummaryCardInfo";
 import api from "../api";
-import dashboardApi from "../../dashboard/api";
 import func from "@/util/func";
 import transform from "../transform";
 import PersistStore from "../../../../main/PersistStore";
-import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 import { CollectionIcon } from "../../../components/shared/CollectionIcon";
-import { getHeaders, sortOptions, resourceName, INVENTORY_PATH, INVENTORY_FILTER_KEY, ASSET_TAG_KEY_VALUES, groupCollectionsByTag, createEnvTypeFilter } from "./constants";
+import { 
+    getHeaders, 
+    sortOptions, 
+    resourceName, 
+    INVENTORY_PATH, 
+    INVENTORY_FILTER_KEY, 
+    groupCollectionsByAgent, 
+    groupCollectionsByService,
+    createEnvTypeFilter,
+    createHostnameFilter,
+    extractEndpointId,
+    ROW_TYPES
+} from "./constants";
 
 function Endpoints() {
     const navigate = useNavigate();
-    const [data, setData] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [summaryData, setSummaryData] = useState({
-        totalEndpoints: 0,
-        totalGroups: 0,
-        totalCollections: 0
-    });
+    const [data, setData] = useState([]);
+    const [summaryData, setSummaryData] = useState({ totalAssets: 0, totalEndpoints: 0 });
 
     const setAllCollections = PersistStore((state) => state.setAllCollections);
     const filtersMap = PersistStore((state) => state.filtersMap);
     const setFiltersMap = PersistStore((state) => state.setFiltersMap);
+    const tableSelectedTab = PersistStore((state) => state.tableSelectedTab);
+    const setTableSelectedTab = PersistStore((state) => state.setTableSelectedTab);
 
     const headers = useMemo(() => getHeaders(), []);
 
+    const getRiskScoreStatus = useCallback((riskScore) => {
+        if (riskScore >= 4.5) return "critical";
+        if (riskScore >= 4) return "attention";
+        if (riskScore >= 2.5) return "warning";
+        if (riskScore > 0) return "info";
+        return "success";
+    }, []);
+
     const prettifyGroupData = useCallback((groups) => {
         return groups.map((group) => ({
-                ...group,
-                iconComp: (
-                    <Box>
-                        <CollectionIcon
+            ...group,
+            iconComp: (
+                <Box>
+                    <CollectionIcon
                         hostName={group.firstCollection?.hostName}
-                            assetTagValue={group.tagValue}
-                            displayName={group.groupName}
-                        />
-                    </Box>
-                ),
-            riskScoreComp: <Badge status={transform.getStatus(group.riskScore)} size="small">{group.riskScore}</Badge>,
-                sensitiveSubTypes: transform.prettifySubtypes(group.sensitiveInRespTypes, false),
+                        assetTagValue={group.tagValue}
+                        displayName={group.groupName}
+                    />
+                </Box>
+            ),
+            sensitiveSubTypes: transform.prettifySubtypes(group.sensitiveInRespTypes || [], false),
+            riskScoreComp: group.riskScore !== null ? (
+                <Badge status={getRiskScoreStatus(group.riskScore)} size="small">
+                    {group.riskScore}
+                </Badge>
+            ) : "-",
         }));
-    }, []);
+    }, [getRiskScoreStatus]);
 
     async function fetchData(isMountedRef = { current: true }) {
         try {
             setLoading(true);
 
-            const results = await Promise.allSettled([
+            // Fetch all required data in parallel
+            const [
+                apiCollectionsResp,
+                trafficInfoResp,
+                riskScoreResp,
+                sensitiveInfoResp
+            ] = await Promise.all([
                 api.getAllCollectionsBasic(),
                 api.getLastTrafficSeen(),
                 api.getRiskScoreInfo(),
-                api.getSensitiveInfoForCollections(),
-                dashboardApi.fetchEndpointsCount(0, 0),
+                api.getSensitiveInfoForCollections()
             ]);
-
-            const apiCollectionsResp = results[0].status === "fulfilled" ? results[0].value : { apiCollections: [] };
-            const trafficInfo = results[1].status === "fulfilled" ? results[1].value : {};
-            const riskScoreResp = results[2].status === "fulfilled" ? results[2].value : {};
-            const sensitiveResp = results[3].status === "fulfilled" ? results[3].value : {};
-            const endpointsResp = results[4].status === "fulfilled" ? results[4].value : {};
 
             if (!isMountedRef.current) return;
 
             const collections = apiCollectionsResp.apiCollections || [];
-            const riskScoreMap = riskScoreResp.riskScoreOfCollectionsMap || {};
-            const sensitiveInfoMap = sensitiveResp.sensitiveSubtypesInCollection || {};
-            const trafficInfoMap = trafficInfo || {};
-
             setAllCollections(collections);
 
-            const groupedData = groupCollectionsByTag(collections, sensitiveInfoMap, riskScoreMap, trafficInfoMap);
-            const prettifiedData = prettifyGroupData(groupedData);
+            // Extract maps from responses
+            const trafficMap = trafficInfoResp || {};
+            const riskScoreMap = riskScoreResp?.riskScoreOfCollectionsMap || {};
+            const sensitiveMap = sensitiveInfoResp?.sensitiveSubtypesInCollection || {};
 
-            setData(prettifiedData);
+            // Group collections by agents (discovery sources) and services (discovered endpoints)
+            const agentGroups = groupCollectionsByAgent(collections, trafficMap, sensitiveMap);
+            const serviceGroups = groupCollectionsByService(collections, trafficMap, sensitiveMap, riskScoreMap);
 
-            const totalEndpoints = collections.reduce(
-                (sum, c) => sum + (c.deactivated ? 0 : c.urlsCount || 0),
-                0
-            );
+            const prettifiedAgents = prettifyGroupData(agentGroups);
+            const prettifiedServices = prettifyGroupData(serviceGroups);
 
-            setSummaryData({
-                totalEndpoints: endpointsResp.newCount || totalEndpoints,
-                totalGroups: groupedData.length,
-                totalCollections: collections.filter((c) => !c.deactivated).length,
+            // Combine all data
+            const allData = [...prettifiedAgents, ...prettifiedServices];
+
+            // Calculate unique endpoint IDs across all collections
+            const uniqueEndpointIds = new Set();
+            collections.forEach((c) => {
+                if (c.deactivated) return;
+                const hostName = c.hostName || c.displayName || c.name;
+                const endpointId = extractEndpointId(hostName);
+                if (endpointId) {
+                    uniqueEndpointIds.add(endpointId);
+                }
             });
 
+            setSummaryData({
+                totalAssets: allData.length,
+                totalEndpoints: uniqueEndpointIds.size
+            });
+
+            setData(allData);
             setLoading(false);
         } catch {
             setLoading(false);
@@ -110,35 +141,47 @@ function Endpoints() {
     const handleRowClick = useCallback((row) => {
         const updatedFiltersMap = { ...filtersMap };
 
-        if (!row.tagKey || !row.tagValue) {
-            const allTagValues = data
-                .filter(item => ASSET_TAG_KEY_VALUES.includes(item.tagKey) && item.tagValue)
-                .map(item => `${item.tagKey}=${item.tagValue}`);
-            
-            if (allTagValues.length > 0) {
-                updatedFiltersMap[INVENTORY_FILTER_KEY] = createEnvTypeFilter(allTagValues, true);
-            } else {
-                delete updatedFiltersMap[INVENTORY_FILTER_KEY];
+        if (row.rowType === ROW_TYPES.AGENT) {
+            // Agent row clicked - filter by agent tag to show resources discovered by this agent
+            if (row.tagKey && row.tagValue) {
+                const filterValue = `${row.tagKey}=${row.tagValue}`;
+                updatedFiltersMap[INVENTORY_FILTER_KEY] = createEnvTypeFilter([filterValue], false);
+            }
+        } else if (row.rowType === ROW_TYPES.SERVICE) {
+            // Service row clicked - filter by all hostnames for this service
+            if (row.hostNames && row.hostNames.length > 0) {
+                updatedFiltersMap[INVENTORY_FILTER_KEY] = createHostnameFilter(row.hostNames);
             }
         } else {
-            const filterValue = `${row.tagKey}=${row.tagValue}`;
-            updatedFiltersMap[INVENTORY_FILTER_KEY] = createEnvTypeFilter([filterValue], false);
+            // Fallback: clear filters
+            delete updatedFiltersMap[INVENTORY_FILTER_KEY];
         }
 
         setFiltersMap(updatedFiltersMap);
+        
+        // Navigate to the hostname tab in inventory
+        setTableSelectedTab({
+            ...tableSelectedTab,
+            [INVENTORY_PATH]: "hostname"
+        });
+        
         setTimeout(() => navigate(INVENTORY_PATH), 0);
-    }, [filtersMap, data, setFiltersMap, navigate]);
+    }, [filtersMap, setFiltersMap, navigate, tableSelectedTab, setTableSelectedTab]);
 
     const summaryItems = useMemo(() => [
         {
             title: "Agentic assets",
-            data: transform.formatNumberWithCommas(summaryData.totalGroups),
+            data: transform.formatNumberWithCommas(summaryData.totalAssets),
         },
         {
             title: "Total endpoints",
-            data: transform.formatNumberWithCommas(summaryData.totalCollections),
+            data: transform.formatNumberWithCommas(summaryData.totalEndpoints),
         },
-    ], [summaryData.totalGroups, summaryData.totalCollections]);
+    ], [summaryData]);
+
+    const summaryComponent = useMemo(() => (
+        <SummaryCardInfo summaryItems={summaryItems} key="summary" />
+    ), [summaryItems]);
 
     const tableComponent = useMemo(() => (
         <GithubSimpleTable
@@ -160,11 +203,11 @@ function Endpoints() {
     ), [data, headers, disambiguateLabel, handleRowClick]);
 
     const pageTitle = useMemo(() => (
-                <TitleWithInfo
-                    tooltipContent="View API endpoints grouped by tags for better organization and analysis."
-                    titleText={mapLabel("Endpoints", getDashboardCategory())}
-                    docsUrl="https://docs.akto.io/api-inventory/concepts"
-                />
+        <TitleWithInfo
+            tooltipContent="View agentic assets"
+            titleText={"Agentic assets"}
+            docsUrl="https://ai-security-docs.akto.io/agentic-ai-discovery/get-started"
+        />
     ), []);
 
     if (loading) {
@@ -181,10 +224,7 @@ function Endpoints() {
         <PageWithMultipleCards
             title={pageTitle}
             isFirstPage={true}
-            components={[
-                <SummaryCardInfo summaryItems={summaryItems} key="summary" />,
-                tableComponent
-            ]}
+            components={[summaryComponent, tableComponent]}
         />
     );
 }

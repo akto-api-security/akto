@@ -15,7 +15,6 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 
 /*

@@ -15,6 +15,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 
+import java.net.URI;
 import java.net.URL;
 import java.util.*;
 
@@ -151,7 +152,7 @@ public class RuntimeUtil {
 
     }
 
-    public static void fillURLTemplatesMap(List<ApiInfo> apiInfos, Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods, Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates){
+    public static void fillURLTemplatesMap(List<ApiInfo> apiInfos, Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods, Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates, Map<String, ApiInfo.ApiInfoKey> apiInfoKeyToApiInfo){
         if (apiInfos != null && !apiInfos.isEmpty()) {
             for (ApiInfo apiInfo : apiInfos) {
                 String url = apiInfo.getId().getUrl();
@@ -173,6 +174,17 @@ public class RuntimeUtil {
                     }
 
                     apiCollectionUrlTemplates.get(apiCollectionId).add(urlTemplate);
+                }else if(apiInfoKeyToApiInfo != null){
+                    // remove host from url
+                    String urlWithoutHost = url;
+                    if(urlWithoutHost.contains("://")){
+                        try {
+                            URI uri = new URI(urlWithoutHost);
+                            urlWithoutHost = uri.getPath();
+                        } catch (Exception e) {
+                        }
+                    }
+                    apiInfoKeyToApiInfo.put(apiCollectionId + " " + urlWithoutHost + " " + method.name(), apiInfo.getId());
                 }
             }
         }

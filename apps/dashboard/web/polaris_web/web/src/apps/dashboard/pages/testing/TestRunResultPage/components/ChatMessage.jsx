@@ -13,7 +13,7 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
     const iconAlt = isRequest ? 'Akto Logo' : 'Agent Logo';
 
     // Label
-    const label = customLabel || (isRequest ? MESSAGE_LABELS.TESTED_INTERACTION : MESSAGE_LABELS.HR_AGENT_RESPONSE);
+    const label = customLabel || (isRequest ? MESSAGE_LABELS.TESTED_INTERACTION : MESSAGE_LABELS.AKTO_AI_AGENT_RESPONSE);
 
     // Format timestamp with memoization
     const formattedTime = useMemo(() => func.formatChatTimestamp(timestamp), [timestamp]);

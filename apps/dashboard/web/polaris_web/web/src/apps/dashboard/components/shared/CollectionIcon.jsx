@@ -12,7 +12,6 @@ export { MCPIcon, LaptopIcon };
 const CollectionIcon = React.memo(({ hostName, assetTagValue, displayName, tagsList }) => {
     const [iconData, setIconData] = React.useState(null);
     const [faviconUrl, setFaviconUrl] = React.useState(null);
-
     React.useEffect(() => {
         let mounted = true;
         (async () => {
@@ -36,6 +35,7 @@ const CollectionIcon = React.memo(({ hostName, assetTagValue, displayName, tagsL
     
     if (tagsList?.some(t => t.name === "gen-ai")) return <Icon source={tagsList.some(t => t.name === "AI Agent") ? AutomationMajor : MagicMajor} color="base" />;
     if (tagsList?.some(t => t.name === "mcp-server")) return <Avatar source={MCPIcon} shape="square" size="extraSmall" />;
+    if (tagsList?.some(t => t.name === "browser-llm")) return <Avatar source={LaptopIcon} shape="square" size="extraSmall" />;
     return <Avatar source={displayName?.toLowerCase().startsWith('mcp') ? MCPIcon : LaptopIcon} shape="square" size="extraSmall" />;
 });
 

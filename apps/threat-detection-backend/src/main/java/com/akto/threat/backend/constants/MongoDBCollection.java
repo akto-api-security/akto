@@ -13,5 +13,7 @@ public class MongoDBCollection {
         "actor_info";
     public static final String API_DISTRIBUTION_DATA =
       "api_distribution_data";
+    public static final String API_RATE_LIMIT_BUCKET_STATISTICS =
+      "api_rate_limit_bucket_statistics";
   }
 }

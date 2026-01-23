@@ -46,7 +46,7 @@ const getHeaders = () => {
     },
   ];
 
-  if (func.isDemoAccount()) {
+  if (func.shouldShowIpReputation()) {
     baseHeaders.push({
       text: "Reputation",
       value: "reputationScore",
@@ -58,7 +58,7 @@ const getHeaders = () => {
     {
       text: "Filter",
       value: "filterId",
-      title: "Attack type",
+      title: labelMap[PersistStore.getState().dashboardCategory]["Attack type"],
     });
 
   if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
@@ -526,7 +526,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     let ret = res?.maliciousEvents.map((x) => {
       const severity = (isAgenticSecurityCategory() || isEndpointSecurityCategory())
         ? (x?.severity || "HIGH")
-        : (threatFiltersMap[x?.filterId]?.severity || "HIGH")
+        : (x?.severity || threatFiltersMap[x?.filterId]?.severity || "HIGH")
 
       const filterTemplate = threatFiltersMap[x?.filterId];
       const complianceMap = filterTemplate?.compliance?.mapComplianceToListClauses || {};
@@ -592,7 +592,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         nextUrl: nextUrl
       };
 
-      if (func.isDemoAccount()) {
+      if (func.shouldShowIpReputation()) {
         rowData.reputationScore = <IpReputationScore ipAddress={x.actor} />;
       }
 
@@ -660,7 +660,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       },
       {
         key: 'latestAttack',
-        label: 'Latest attack sub-category',
+        label: labelMap[PersistStore.getState().dashboardCategory]["Latest attack sub-category"],
         type: 'select',
         choices: attackTypeChoices,
         multiple: true

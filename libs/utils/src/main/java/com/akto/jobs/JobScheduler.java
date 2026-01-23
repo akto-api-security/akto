@@ -41,8 +41,12 @@ public final class JobScheduler {
         }
     }
 
+    public static Job scheduleRecurringJob(int accountId, JobParams params, JobExecutorType jobExecutorType, int recurringIntervalSeconds) {
+        return scheduleRecurringJob(accountId, params, jobExecutorType, recurringIntervalSeconds, Context.now() + recurringIntervalSeconds);
+    }
+
     public static Job scheduleRecurringJob(int accountId, JobParams params, JobExecutorType jobExecutorType,
-        int recurringIntervalSeconds) {
+        int recurringIntervalSeconds, int scheduledAt) {
         try {
             int now = Context.now();
             Job job = new Job(
@@ -51,7 +55,7 @@ public final class JobScheduler {
                 JobStatus.SCHEDULED,
                 params,
                 jobExecutorType,
-                now + recurringIntervalSeconds,
+                scheduledAt,
                 0,
                 0,
                 0,

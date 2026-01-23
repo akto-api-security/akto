@@ -2213,6 +2213,12 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   isDemoAccount(){
      return window.ACTIVE_ACCOUNT === 1669322524
   },
+
+  shouldShowIpReputation() {
+    return this.isDemoAccount() || window.ACTIVE_ACCOUNT === 1767812031 || window.ACTIVE_ACCOUNT === 1767814409
+  },
+
+  
   isSameDateAsToday (givenDate) {
       const today = new Date();
       return (
@@ -2344,6 +2350,11 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       return (nameA || '').localeCompare(nameB || '');
     })
   },
+
+   isWhiteListedOrganization(){
+      return true;
+    },
+
   isLimitedAccount(){
     return window?.ACTIVE_ACCOUNT === 1753372418
   },
@@ -2408,6 +2419,30 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       minute: 'numeric',
       hour12: true
     });
+  },
+  extractEmailDetails(email) {
+    // Define the regex pattern
+    const pattern = /^(.*?)@([\w.-]+)\.[a-z]{2,}$/;
+  
+    // Match the regex pattern
+    const match = email.match(pattern);
+  
+    if (match) {
+      let rawUsername = match[1]; // Extract username
+      let mailserver = match[2]; // Extract mailserver (including subdomains)
+  
+      let username = rawUsername
+      .split(/[^a-zA-Z]+/) // Split by any non-alphabet character
+      .filter(Boolean) // Remove empty segments
+      .map(segment => segment.charAt(0).toUpperCase() + segment.slice(1)) // Capitalize each segment
+      .join(' '); // Join segments with a space
+          
+      mailserver = mailserver.charAt(0).toUpperCase() + mailserver.slice(1);
+  
+      return { username, mailserver };
+    } else {
+      return { error: "Invalid email format" };
+    }
   }
 }
 

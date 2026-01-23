@@ -12,7 +12,7 @@ function HomePage() {
   const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
 
   const logoUrl = dashboardCategory === CATEGORY_AGENTIC_SECURITY
-    ? '/dashboard/observe/endpoints'
+    ? '/dashboard/observe/agentic-assets'
     : '/dashboard/observe/inventory';
 
   const logo = {

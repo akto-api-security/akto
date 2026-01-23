@@ -345,11 +345,17 @@ message RatelimitConfig {
   repeated RatelimitConfigItem rules = 1;
 }
 
+message ParamEnumerationConfig {
+  int32 unique_param_threshold = 1;    // Number of unique values to trigger detection (default: 50)
+  int32 window_size_minutes = 2;       // Size of sliding window in minutes (default: 5)
+}
+
 message ThreatConfiguration {
   Actor actor = 1;
   RatelimitConfig ratelimit_config = 2;
   int32 archival_days = 3;
   bool archival_enabled = 4;
+  ParamEnumerationConfig param_enumeration_config = 5;
 }
 
 message ToggleArchivalEnabledRequest {

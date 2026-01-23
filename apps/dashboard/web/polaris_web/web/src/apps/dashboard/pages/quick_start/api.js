@@ -170,11 +170,11 @@ const api = {
         })
     },
 
-    initiateCrawler(hostname, username, password, apiKey, dashboardUrl, testRoleHaxId, outscopeUrls, crawlingTime, selectedModuleName, customHeaders) {
+    initiateCrawler(hostname, username, password, apiKey, dashboardUrl, testRoleHaxId, outscopeUrls, crawlingTime, selectedModuleName, customHeaders, runTestAfterCrawling, selectedMiniTestingService, urlTemplatePatterns, applicationPages) {
         return request({
             url: '/api/initiateCrawler',
             method: 'post',
-            data: {hostname, username, password, apiKey, dashboardUrl, testRoleHaxId, outscopeUrls, crawlingTime, selectedModuleName, customHeaders}
+            data: {hostname, username, password, apiKey, dashboardUrl, testRoleHaxId, outscopeUrls, crawlingTime, selectedModuleName, customHeaders, runTestAfterCrawling, selectedMiniTestingService, urlTemplatePatterns, applicationPages}
         })
     },
 
@@ -244,6 +244,14 @@ const api = {
                 recurringIntervalSeconds,
                 ...connectorConfig
             }
+        })
+    },
+
+    saveDataDogConnector(datadogApiKey, datadogAppKey, datadogSite, serviceNames) {
+        return request({
+            url: '/api/saveDataDogConfigs',
+            method: 'post',
+            data: {datadogApiKey, datadogAppKey, datadogSite, serviceNames}
         })
     },
 

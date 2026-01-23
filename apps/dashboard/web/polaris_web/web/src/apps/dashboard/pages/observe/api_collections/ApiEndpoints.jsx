@@ -15,7 +15,7 @@ import RunTest from "./RunTest"
 import ObserveStore from "../observeStore"
 import WorkflowTests from "./WorkflowTests"
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
-import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout"
+// import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout"
 import dashboardFunc from "../../transform"
 import settingsRequests from "../../settings/api"
 import PersistStore from "../../../../main/PersistStore"
@@ -37,6 +37,7 @@ import SequencesFlow from "./SequencesFlow"
 import { CATEGORY_API_SECURITY, getDashboardCategory, isCategory, mapLabel, isEndpointSecurityCategory } from "../../../../main/labelHelper"
 import AgentDiscoverGraph from "./AgentDiscoverGraph"
 import McpToolsGraph from "./McpToolsGraph"
+import { findTypeTag, TYPE_TAG_KEYS } from "../agentic/mcpClientHelper"
 
 const headings = [
     {
@@ -248,9 +249,9 @@ function ApiEndpoints(props) {
     const setFilteredEndpoints = ObserveStore(state => state.setFilteredItems)
     const coverageInfo = PersistStore(state => state.coverageMap)
 
-    const [prompts, setPrompts] = useState([])
-    const [isGptScreenActive, setIsGptScreenActive] = useState(false)
-    const [isGptActive, setIsGptActive] = useState(false)
+    // const [prompts, setPrompts] = useState([])
+    // const [isGptScreenActive, setIsGptScreenActive] = useState(false)
+    // const [isGptActive, setIsGptActive] = useState(false)
     const [redacted, setIsRedacted] = useState(false)
     const [showRedactModal, setShowRedactModal] = useState(false)
     const [tableLoading, setTableLoading] = useState(false)
@@ -716,18 +717,18 @@ function ApiEndpoints(props) {
 
     }, [selectedUrl, selectedMethod, endpointData])
 
-    const checkGptActive = async() => {
-        await settingsRequests.fetchAktoGptConfig(apiCollectionId).then((resp) => {
-            if(resp.currentState[0].state === "ENABLED"){
-                setIsGptActive(true)
-            }
-        })
-    }
+    // const checkGptActive = async() => {
+    //     await settingsRequests.fetchAktoGptConfig(apiCollectionId).then((resp) => {
+    //         if(resp.currentState[0].state === "ENABLED"){
+    //             setIsGptActive(true)
+    //         }
+    //     })
+    // }
 
     useEffect(() => {
-        if (!isQueryPage) {
-            checkGptActive()
-        }
+        // if (!isQueryPage) {
+        //     checkGptActive()
+        // }
         fetchData()
     }, [apiCollectionId, endpointListFromConditions])
 
@@ -1067,13 +1068,13 @@ function ApiEndpoints(props) {
         }
     }
 
-    function displayGPT(){
-        setIsGptScreenActive(true)
-        let requestObj = {key: "COLLECTION",filteredItems: filteredEndpoints,apiCollectionId: Number(apiCollectionId)}
-        const activePrompts = dashboardFunc.getPrompts(requestObj)
-        setPrompts(activePrompts)
-        
-    }
+    // function displayGPT(){
+    //     setIsGptScreenActive(true)
+    //     let requestObj = {key: "COLLECTION",filteredItems: filteredEndpoints,apiCollectionId: Number(apiCollectionId)}
+    //     const activePrompts = dashboardFunc.getPrompts(requestObj)
+    //     setPrompts(activePrompts)
+    //
+    // }
 
     function getTagsCompactComponent(envTypeList) {
         const list = envTypeList || []
@@ -1086,6 +1087,30 @@ function ApiEndpoints(props) {
         const envTypeList = envType?.map(func.formatCollectionType) || []
 
         return getTagsCompactComponent(envTypeList)
+    }
+
+    function getEmptyScreenText(collectionsObj) {
+        const typeTag = findTypeTag(collectionsObj?.envType);
+        if (typeTag?.keyName === TYPE_TAG_KEYS.MCP_SERVER) {
+            return {
+                headingText: "Discover MCP tools to get started",
+                description: "Your MCP server collection is currently empty."
+            };
+        } else if (typeTag?.keyName === TYPE_TAG_KEYS.GEN_AI) {
+            return {
+                headingText: "Discover AI endpoints to get started",
+                description: "Your AI agent collection is currently empty."
+            };
+        } else if (typeTag?.keyName === TYPE_TAG_KEYS.BROWSER_LLM) {
+            return {
+                headingText: "Discover LLM endpoints to get started",
+                description: "Your LLM collection is currently empty."
+            };
+        }
+        return {
+            headingText: "Discover APIs to get started",
+            description: "Your API collection is currently empty. Import APIs from other collections now."
+        };
     }
 
     const collectionsObj = (allCollections && allCollections.length > 0) ? allCollections.filter(x => Number(x.id) === Number(apiCollectionId))[0] : {}
@@ -1247,7 +1272,7 @@ function ApiEndpoints(props) {
 
             {isApiGroup &&collectionsObj?.automated !== true ? <Button onClick={() => navigate("/dashboard/observe/query_mode?collectionId=" + apiCollectionId)}>Edit conditions</Button> : null}
 
-            {isGptActive ? <Button onClick={displayGPT} disabled={showEmptyScreen}>Ask AktoGPT</Button>: null}
+            {/* {isGptActive ? <Button onClick={displayGPT} disabled={showEmptyScreen}>Ask AktoGPT</Button>: null} */}
 
             {/* Hide Run Test button for Endpoint Security */}
             {!isEndpointSecurityCategory() && (
@@ -1494,7 +1519,7 @@ function ApiEndpoints(props) {
         setShowDetails={setShowDetails}
         apiDetail={apiDetail}
         headers={transform.getDetailsHeaders()}
-        isGptActive={isGptActive}
+        // isGptActive={isGptActive}
         collectionIssuesData={collectionIssuesData}
     />,
     ]
@@ -1511,8 +1536,8 @@ function ApiEndpoints(props) {
             ] : showEmptyScreen ? [
                 <EmptyScreensLayout key={"emptyScreen"}
                     iconSrc={"/public/file_plus.svg"}
-                    headingText={"Discover APIs to get started"}
-                    description={"Your API collection is currently empty. Import APIs from other collections now."}
+                    headingText={getEmptyScreenText(collectionsObj).headingText}
+                    description={getEmptyScreenText(collectionsObj).description}
                     buttonText={"Import from other collections"}
                     redirectUrl={"/dashboard/observe/inventory"}
                     learnText={"inventory"}
@@ -1526,11 +1551,11 @@ function ApiEndpoints(props) {
                 (!isEndpointSecurityCategory() && (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)))) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null,
                 <div className="apiEndpointsTable" key="table">
                     {apiEndpointTable}
-                      <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
+                      {/* <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
                           <Modal.Section flush>
                               <AktoGptLayout prompts={prompts} closeModal={() => setIsGptScreenActive(false)} />
                           </Modal.Section>
-                      </Modal>
+                      </Modal> */}
                   </div>,
                   <ApiGroupModal
                       key="api-group-modal"

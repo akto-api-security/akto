@@ -66,7 +66,12 @@ export const labelMap = {
     "tests selected": "tests selected",
     "testing": "testing",
     "Test library":"Test library",
-    "Endpoint Shield": "API Endpoint Shield"
+    "Endpoint Shield": "API Endpoint Shield",
+    "Endpoints": "Endpoints",
+    "Attack type": "Attack type",
+    "Attack Type": "Attack Type",
+    "Latest Attack": "Latest Attack",
+    "Latest attack sub-category": "Latest attack sub-category",
   },
   "DAST": {
     "API Security Posture": "Security Posture",
@@ -135,7 +140,12 @@ export const labelMap = {
     "tests selected": "tests selected",
     "testing": "testing",
     "Test library":"Test library",
-    "Endpoint Shield": "Endpoint Shield"
+    "Endpoint Shield": "Endpoint Shield",
+    "Endpoints": "Endpoints",
+    "Attack type": "Attack type",
+    "Attack Type": "Attack Type",
+    "Latest Attack": "Latest Attack",
+    "Latest attack sub-category": "Latest attack sub-category"
   },
   "MCP Security": {
     "API Security Posture": "MCP Security Posture",
@@ -208,7 +218,8 @@ export const labelMap = {
     "testing": "scanning",
     "Test library":"Probe library",
     "Endpoint Shield": "MCP Endpoint Shield",
-    "Threat": "Guardrail"
+    "Threat": "Guardrail",
+    "Endpoints": "Tools",
   },
   "Gen AI": {
     "API Security Posture": "AI Agent Security Posture",
@@ -277,7 +288,8 @@ export const labelMap = {
     "tests selected": "probes selected",
     "testing": "scanning",
     "Test library":"Probe library",
-    "Endpoint Shield": "AI Agent Endpoint Shield"
+    "Endpoint Shield": "AI Agent Endpoint Shield",
+    "Endpoints": "Components",
   },
   "Agentic Security": {
     "Quick Start": "Connectors",
@@ -321,6 +333,7 @@ export const labelMap = {
     "API parameters": "Agentic Parameters",
     "endpoint": "Agentic component",
     "endpoints": "Agentic components",
+    "Endpoints": "Components",
     "URLs": "Agentic components",
     "security testing": "red teaming",
     "test results": "scan results",
@@ -351,7 +364,11 @@ export const labelMap = {
     "testing": "scanning",
     "Test library":"Probe library",
     "Endpoint Shield": "Endpoint Shield",
-    "Threat": "Guardrail"
+    "Threat": "Guardrail",
+    "Attack type": "Policy Triggered",
+    "Attack Type": "Policy Triggered",
+    "Latest Attack": "Latest Policy Triggered",
+    "Latest attack sub-category": "Policy triggered"
   },
   "Endpoint Security": {
     "Quick Start": "Connectors",
@@ -363,12 +380,13 @@ export const labelMap = {
     "API collection name": "Agentic Collection Name",
     "API Testing": "AI Red Teaming",
     "Threat Detection": "Guardrails",
-    "Total APIs": "Total Agentic Components",
+    "Total APIs": "Total Components",
     "Critical APIs": "Critical Agentic Components",
     "Tested APIs (Coverage)": "Tested Agentic Components (Coverage)",
     "Sensitive in response APIs": "Sensitive in Response",
     "Untracked APIs": "Untracked Agentic Components",
-    "Total endpoints": "Total Agentic Components",
+    "Total endpoints": "Total Components",
+    "Endpoints": "Components",
     "Test your APIs": "Test your Agentic Systems",
     "API Security": "Agentic Security",
     "API endpoint": "Agentic Component",
@@ -426,5 +444,11 @@ export const labelMap = {
     "Test library":"Probe library",
     "Endpoint Shield": "Endpoint Shield",
     "Threat": "Guardrail",
+    "Number of endpoints": "Number of components",
+    "Domains": "Resource",
+    "Attack type": "Policy Triggered",
+    "Attack Type": "Policy Triggered",
+    "Latest Attack": "Latest Policy Triggered",
+    "Latest attack sub-category": "Policy triggered"
   },
 }
