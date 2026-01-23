@@ -95,7 +95,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "Database Abstractor version v${{ github.event.inputs.release_version }} released!"
+              "text": "🤖 Database Abstractor version v${{ github.event.inputs.release_version }} released!"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
