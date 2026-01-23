@@ -1373,6 +1373,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                             OrganizationsDao.instance.insertOne(organization);
                             logger.infoAndAddToDb(String.format("[createUserAndRedirect] Created organization %s for new user %s", organizationUUID, userEmail));
 
+                            String adminEmailDomain = userEmail.split("@")[1].toLowerCase();
+                            Pair<String, String> orgInfo = new Pair<>(organization.getId(), userEmail);
+                            OrganizationCache.domainToOrgInfoCache.put(adminEmailDomain, orgInfo);
+
                             Boolean attemptSyncWithAktoSuccess = OrganizationUtils.syncOrganizationWithAkto(organization);
                             logger.infoAndAddToDb(String.format("[createUserAndRedirect] Organization %s for new user %s - Akto sync status: %s", organizationUUID, userEmail, attemptSyncWithAktoSuccess));
 

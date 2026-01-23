@@ -2350,6 +2350,20 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       return (nameA || '').localeCompare(nameB || '');
     })
   },
+
+   isWhiteListedOrganization(){
+      return window.USER_NAME.indexOf("@akto.io") > 0;
+    },
+
+    isTempAccount(){
+      if (!window?.USER_NAME) return false;
+      
+      const userName = window.USER_NAME.toLowerCase();
+      const tempAccountOrganizations = ['chargebee', 'miq', 'whatfix', 'blinkrx' , 'blinkhealth'];
+      
+      return tempAccountOrganizations.some(org => userName.includes(org));
+    },
+
   isLimitedAccount(){
     return window?.ACTIVE_ACCOUNT === 1753372418
   },

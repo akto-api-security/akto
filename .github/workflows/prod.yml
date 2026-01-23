@@ -114,7 +114,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "Releasing Akto Open Source v${{ github.event.inputs.release_version }}, after skipping unit tests"
+              "text": "⚠️ Releasing Akto Open Source v${{ github.event.inputs.release_version }}, after skipping unit tests"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -192,7 +192,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "Akto Open Source v${{ github.event.inputs.release_version }} released!"
+              "text": "🚀 Akto Open Source v${{ github.event.inputs.release_version }} released!"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -274,7 +274,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "Agent Traffic Analyzer v${{ github.event.inputs.release_version }} released!"
+              "text": "🔍 Agent Traffic Analyzer v${{ github.event.inputs.release_version }} released!"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -342,7 +342,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "Guardrails Service v${{ github.event.inputs.release_version }} released!"
+              "text": "🛡️ Guardrails Service v${{ github.event.inputs.release_version }} released!"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -418,6 +418,14 @@ jobs:
             cd ../threat-detection-backend
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG_THREAT -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG_THREAT_2 . --push
           fi
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
+          aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
+          aws-region: ap-south-1
+
       - name: Configure AWS Credentials for ECR
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -428,8 +436,31 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
         with:
-          mask-password: "true"
+          mask-password: 'true'
           registry-type: public
+
+      - name: Build, tag, and push docker image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REGISTRY_ALIAS: p7q3h0z2
+          IMAGE_TAG_THREAT: latest
+          IMAGE_TAG_THREAT_2: ${{github.event.inputs.release_version_threat}}
+        run: |
+
+          docker buildx create --use
+          # Build a docker container and push it to DockerHub
+          cd apps/dashboard
+          if [[ "${{ github.event.inputs.threat_detection}}" == "true" ]]; then
+            cd ../threat-detection
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-threat-detection:$IMAGE_TAG_THREAT -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-threat-detection:$IMAGE_TAG_THREAT_2 . --push
+          fi
+
+          if [[ "${{ github.event.inputs.threat_detection_backend}}" == "true" ]]; then
+            cd ../threat-detection-backend
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-threat-detection-backend:$IMAGE_TAG_THREAT -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-threat-detection-backend:$IMAGE_TAG_THREAT_2 . --push
+          fi
+          docker buildx create --use
+          
 
       - name: Push git tag
         id: tag_version
@@ -449,7 +480,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "Akto Open Source Threat v${{ github.event.inputs.release_version_threat }} released!"
+              "text": "🔒 Akto Open Source Threat v${{ github.event.inputs.release_version_threat }} released!"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

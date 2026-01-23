@@ -374,7 +374,8 @@ function ThreatDetectionPage() {
             templateId: data.filterId,
             status: data.status || '',
             eventId: data.id || '',
-            jiraTicketUrl: data.jiraTicketUrl || ''
+            jiraTicketUrl: data.jiraTicketUrl || '',
+            severity: data.severity || ''
         });
 
         setShowDetails(true);
@@ -388,6 +389,7 @@ function ThreatDetectionPage() {
                 method: data.method || '',
                 apiCollectionId: data.apiCollectionId,
                 templateId: data.filterId,
+                severity: data.severity || '',
             },
             currentEventId: data.id || '',
             currentEventStatus: data.status || '',
@@ -485,6 +487,7 @@ function ThreatDetectionPage() {
               method: rowContext?.method || '',
               apiCollectionId: rowContext?.apiCollectionId,
               templateId: queryParams.filterId,
+              severity: rowContext?.severity || '',
             },
             currentEventId: rowContext?.eventId || '',
             currentEventStatus: queryParams.status || rowContext?.status || '',

@@ -43,4 +43,20 @@ public class MetricDataDao extends AccountsContextDao<MetricData> {
 
         return instance.findAll(Filters.and(filters), 0, 100_000, Sorts.ascending("timestamp"));
     }
+
+    public List<MetricData> getMetricsForTimeRange(long startTime, long endTime, String metricIdPrefix, String instanceId) {
+        List<Bson> filters = new ArrayList<>();
+        filters.add(Filters.gte("timestamp", startTime));
+        filters.add(Filters.lte("timestamp", endTime));
+
+        // Filter by metricId prefix (e.g., "TC_" for Traffic Collector metrics)
+        if (metricIdPrefix != null && !metricIdPrefix.isEmpty()) {
+            filters.add(Filters.regex("metricId", "^" + metricIdPrefix));
+        }
+        if (instanceId != null && !instanceId.isEmpty()) {
+            filters.add(Filters.eq("instanceId", instanceId));
+        }
+
+        return instance.findAll(Filters.and(filters), 0, 100_000, Sorts.ascending("timestamp"));
+    }
 }

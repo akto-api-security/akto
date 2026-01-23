@@ -64,6 +64,7 @@ public class ModuleInfoAction extends UserAction {
         List<Bson> filters = new ArrayList<>();
 
         boolean isEndpointShield = false;
+        boolean hasCustomHeartbeatFilter = false;
 
         // Apply filter if provided
         if (filter != null && !filter.isEmpty()) {
@@ -74,10 +75,29 @@ public class ModuleInfoAction extends UserAction {
                 }
                 filters.add(Filters.eq(ModuleInfo.MODULE_TYPE, moduleTypeStr));
             }
+
+            if (filter.containsKey(ModuleInfo.LAST_HEARTBEAT_RECEIVED)) {
+                Object heartbeatFilter = filter.get(ModuleInfo.LAST_HEARTBEAT_RECEIVED);
+                if (heartbeatFilter instanceof Map) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> heartbeatMap = (Map<String, Object>) heartbeatFilter;
+
+                    if (heartbeatMap.containsKey("$gte")) {
+                        int gte = ((Number) heartbeatMap.get("$gte")).intValue();
+                        filters.add(Filters.gte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, gte));
+                        hasCustomHeartbeatFilter = true;
+                    }
+                    if (heartbeatMap.containsKey("$lte")) {
+                        int lte = ((Number) heartbeatMap.get("$lte")).intValue();
+                        filters.add(Filters.lte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, lte));
+                        hasCustomHeartbeatFilter = true;
+                    }
+                }
+            }
             // Add more filter fields as needed
         }
 
-        if (!isEndpointShield) {
+        if (!isEndpointShield && !hasCustomHeartbeatFilter) {
             int deltaTime = Context.now() - heartbeatThresholdSeconds;
             filters.add(Filters.gte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, deltaTime));
         }

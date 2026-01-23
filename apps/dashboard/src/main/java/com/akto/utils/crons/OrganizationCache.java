@@ -1,5 +1,6 @@
 package com.akto.utils.crons;
 
+import com.akto.action.InviteUserAction;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
@@ -21,7 +22,7 @@ public class OrganizationCache {
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     
     // Cache for admin email domain -> Pair(orgId, adminEmail) mapping
-    private static final Map<String, Pair<String, String>> domainToOrgInfoCache = Collections.synchronizedMap(new HashMap<>());
+    public static final Map<String, Pair<String, String>> domainToOrgInfoCache = Collections.synchronizedMap(new HashMap<>());
     
     // Cache refresh interval: 10 minutes
     private static final int CACHE_REFRESH_INTERVAL_MINUTES = 10;
@@ -72,12 +73,31 @@ public class OrganizationCache {
     
     /**
      * Get organization info (orgId, adminEmail) by admin email domain for signup matching
+     * Handles bidirectional domain mapping using InviteUserAction.commonOrganisationsMap
      */
     public static Pair<String, String> getOrganizationInfoByDomain(String emailDomain) {
         if (emailDomain == null) {
             return null;
         }
-        return domainToOrgInfoCache.get(emailDomain.toLowerCase());
+        
+        // First, try direct lookup
+        Pair<String, String> orgInfo = domainToOrgInfoCache.get(emailDomain);
+        if (orgInfo != null) {
+            return orgInfo;
+        }
+        
+        // If not found, check bidirectional mapping
+        // Check if this domain has a canonical mapping (input domain -> canonical domain)
+        String canonicalDomain = InviteUserAction.commonOrganisationsMap.get(emailDomain);
+        if (canonicalDomain != null) {
+            canonicalDomain = canonicalDomain.trim().toLowerCase();
+            orgInfo = domainToOrgInfoCache.get(canonicalDomain);
+            if (orgInfo != null) {
+                logger.debug("Found organization for domain: " + emailDomain + " via canonical mapping to: " + canonicalDomain);
+                return orgInfo;
+            }
+        }
+        return null;
     }
     
     /**

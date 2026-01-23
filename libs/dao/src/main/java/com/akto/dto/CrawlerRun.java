@@ -27,6 +27,12 @@ public class CrawlerRun {
     public static final String OUT_SCOPE_URLS = "outScopeUrls";
     private String outScopeUrls;
 
+    public static final String URL_TEMPLATE_PATTERNS = "urlTemplatePatterns";
+    private String urlTemplatePatterns;
+
+    public static final String APPLICATION_PAGES = "applicationPages";
+    private String applicationPages;
+
     public static final String STATUS = "status";
     private CrawlerRunStatus status;
 

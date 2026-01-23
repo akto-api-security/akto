@@ -600,7 +600,7 @@ public class ThreatActorService {
     if (request.getEventType().equalsIgnoreCase(MaliciousEventDto.EventType.AGGREGATED.name())) {
         Bson matchConditions = Filters.and(
             Filters.eq("actor", request.getActor()),
-            Filters.gte("filterId", request.getFilterId())
+            Filters.eq("filterId", request.getFilterId())
         );
         matchConditions = Filters.or(
             matchConditions,
