@@ -145,10 +145,6 @@ public class AllMetrics {
                 processAndCleanupTcMetrics(tcCpuUsageMetrics, "TC_CPU_USAGE", _this.orgId, metricDataList);
                 processAndCleanupTcMetrics(tcMemoryUsageMetrics, "TC_MEMORY_USAGE", _this.orgId, metricDataList);
 
-                // Clear maps after processing to prevent unbounded growth
-                tcCpuUsageMetrics.clear();
-                tcMemoryUsageMetrics.clear();
-
                 if(!list.isEmpty() || !metricDataList.isEmpty()) {
                     _this.sendDataToAkto(list, metricDataList);
                 }
@@ -159,6 +155,8 @@ public class AllMetrics {
     }
 
     private void processAndCleanupTcMetrics(Map<String, Metric> metricsMap, String metricId, String orgId, List<MetricData> metricDataList) {
+        List<String> deadInstances = new ArrayList<>();
+
         for (Map.Entry<String, Metric> entry : metricsMap.entrySet()) {
             String tcInstanceId = entry.getKey();
             Metric metric = entry.getValue();
@@ -172,6 +170,14 @@ public class AllMetrics {
                 MetricData.MetricType.GAUGE
             );
             metricDataList.add(metricData);
+
+            if (value == 0.0f) {
+                deadInstances.add(tcInstanceId);
+            }
+        }
+
+        for (String deadInstanceId : deadInstances) {
+            metricsMap.remove(deadInstanceId);
         }
     }
 
