@@ -2516,9 +2516,7 @@ public class InitializerListener implements ServletContextListener {
                         }
                     }, "context-initializer-secondary");
 
-                    updateApiGroupsForAccounts();
-
-                    if (runJobFunctions == 1 || runJobFunctionsAnyway) {
+                    if (runJobFunctions == 1) {
                         logger.warn("Starting CATEGORY 1 job schedulers", LogDb.DASHBOARD);
                         setUpWebhookScheduler();
                         setUpTrafficAlertScheduler();
@@ -2528,15 +2526,18 @@ public class InitializerListener implements ServletContextListener {
                         }
                         syncCronInfo.setUpUpdateCronScheduler();
                         setUpTestEditorTemplatesScheduler();
-                        crons.trafficAlertsScheduler();
                         JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
                     }
-                    if (runJobFunctions == 2 || runJobFunctionsAnyway) {
+                    if (runJobFunctions == 2) {
                         logger.warn("Starting CATEGORY 2 job schedulers", LogDb.DASHBOARD);
                         updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
                         syncCronInfo.setUpMcpMaliciousnessCronScheduler();
                         agentBasePromptDetectionCron.setUpAgentBasePromptDetectionScheduler();
                         setupAutomatedApiGroupsScheduler();
+                    }
+                    updateApiGroupsForAccounts();
+                    if(runJobFunctionsAnyway) {
+                        crons.trafficAlertsScheduler();
                         crons.insertHistoricalDataJob();
                         if(DashboardMode.isOnPremDeployment()){
                             crons.insertHistoricalDataJobForOnPrem();
