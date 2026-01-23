@@ -5,6 +5,7 @@ import com.akto.data_actor.DataActor;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.AllMetrics;
 import com.akto.runtime.parser.SampleParser;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -15,6 +16,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -145,12 +147,62 @@ public class AktoTrafficCollectorTelemetry {
 
             heartbeat.setMiniRuntimeName(this.miniRuntimeName);
 
+            // Extract and send profiling metrics
+            extractAndSendProfilingMetrics(heartbeat);
+
             return heartbeat;
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error while parsing module heartbeat kafka message: " + e);
             return null;
         }
+    }
+
+    private void extractAndSendProfilingMetrics(ModuleInfo heartbeat) {
+        try {
+            if (heartbeat.getModuleType() != ModuleInfo.ModuleType.TRAFFIC_COLLECTOR) {
+                return;
+            }
+
+            Map<String, Object> additionalData = heartbeat.getAdditionalData();
+            if (additionalData == null || !additionalData.containsKey("profiling")) {
+                return;
+            }
+
+            Map<String, Object> profiling = (Map<String, Object>) additionalData.get("profiling");
+            if (profiling == null) {
+                return;
+            }
+
+            String instanceId = heartbeat.getName(); // Use pod/daemon name as instance ID
+
+            // Record CPU metric
+            if (profiling.containsKey("cpu_percent")) {
+                float cpuUsage = extractFloat(profiling.get("cpu_percent"));
+                AllMetrics.instance.setTcCpuUsage(instanceId, cpuUsage);
+                loggerMaker.debugInfoAddToDb("Recorded CPU metric for " + instanceId + ": " + cpuUsage + "%");
+            }
+
+            // Record Memory metric
+            if (profiling.containsKey("memory_used_mb")) {
+                float memoryUsedMB = extractFloat(profiling.get("memory_used_mb"));
+                AllMetrics.instance.setTcMemoryUsage(instanceId, memoryUsedMB);
+                loggerMaker.debugInfoAddToDb("Recorded Memory metric for " + instanceId + ": " +
+                    (int)memoryUsedMB + " MB");
+            }
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error extracting profiling metrics: " + e.getMessage());
+        }
+    }
+
+    private float extractFloat(Object value) {
+        if (value instanceof Number) {
+            return ((Number) value).floatValue();
+        } else if (value instanceof String) {
+            return Float.parseFloat((String) value);
+        }
+        return 0.0f;
     }
 
 
