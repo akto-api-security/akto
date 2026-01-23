@@ -2517,8 +2517,8 @@ public class InitializerListener implements ServletContextListener {
 
                     updateApiGroupsForAccounts();
 
-                    if (JobUtils.shouldRunTrafficJobs()) {
-                        logger.warn("Starting TRAFFIC & MONITORING job schedulers", LogDb.DASHBOARD);
+                    if (JobUtils.shouldRunCategory1Jobs()) {
+                        logger.warn("Starting CATEGORY 1 job schedulers", LogDb.DASHBOARD);
 
                         setUpWebhookScheduler();
                         setUpTrafficAlertScheduler();
@@ -2534,8 +2534,8 @@ public class InitializerListener implements ServletContextListener {
                         JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
                     }
 
-                    if (JobUtils.shouldRunHeavyJobs()) {
-                        logger.warn("Starting HEAVY PROCESSING & CLEANUP job schedulers", LogDb.DASHBOARD);
+                    if (JobUtils.shouldRunCategory2Jobs()) {
+                        logger.warn("Starting CATEGORY 2 job schedulers", LogDb.DASHBOARD);
 
                         updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
                         syncCronInfo.setUpMcpMaliciousnessCronScheduler();

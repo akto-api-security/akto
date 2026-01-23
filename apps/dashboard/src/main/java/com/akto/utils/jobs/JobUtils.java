@@ -33,8 +33,8 @@ public class JobUtils {
     private static final Bson sort = Sorts.ascending(ApiInfo.ID_API_COLLECTION_ID, ApiInfo.ID_URL, ApiInfo.ID_METHOD);
 
     public static final int JOB_MODE_NONE = 0;
-    public static final int JOB_MODE_TRAFFIC = 1;
-    public static final int JOB_MODE_HEAVY = 2;
+    public static final int JOB_MODE_CATEGORY_1 = 1;
+    public static final int JOB_MODE_CATEGORY_2 = 2;
 
     public static Set<Integer> getJobModes() {
         try {
@@ -42,8 +42,8 @@ public class JobUtils {
 
             if ("true".equalsIgnoreCase(envValue)) {
                 Set<Integer> allModes = new HashSet<>();
-                allModes.add(JOB_MODE_TRAFFIC);
-                allModes.add(JOB_MODE_HEAVY);
+                allModes.add(JOB_MODE_CATEGORY_1);
+                allModes.add(JOB_MODE_CATEGORY_2);
                 return allModes;
             }
             if ("false".equalsIgnoreCase(envValue)) {
@@ -54,7 +54,7 @@ public class JobUtils {
             for (String part : envValue.split(",")) {
                 try {
                     int mode = Integer.parseInt(part.trim());
-                    if (mode == JOB_MODE_TRAFFIC || mode == JOB_MODE_HEAVY) {
+                    if (mode == JOB_MODE_CATEGORY_1 || mode == JOB_MODE_CATEGORY_2) {
                         modes.add(mode);
                     }
                 } catch (NumberFormatException e) {
@@ -72,12 +72,12 @@ public class JobUtils {
         return getJobModes().contains(mode) || getRunJobFunctionsAnyway();
     }
 
-    public static boolean shouldRunTrafficJobs() {
-        return shouldRunMode(JOB_MODE_TRAFFIC);
+    public static boolean shouldRunCategory1Jobs() {
+        return shouldRunMode(JOB_MODE_CATEGORY_1);
     }
 
-    public static boolean shouldRunHeavyJobs() {
-        return shouldRunMode(JOB_MODE_HEAVY);
+    public static boolean shouldRunCategory2Jobs() {
+        return shouldRunMode(JOB_MODE_CATEGORY_2);
     }
 
     public static boolean shouldRunAnyJobs() {
@@ -90,8 +90,8 @@ public class JobUtils {
         if (getRunJobFunctionsAnyway()) return "ALL (on-prem/non-SaaS override)";
 
         List<String> descriptions = new ArrayList<>();
-        if (modes.contains(JOB_MODE_TRAFFIC)) descriptions.add("TRAFFIC");
-        if (modes.contains(JOB_MODE_HEAVY)) descriptions.add("HEAVY");
+        if (modes.contains(JOB_MODE_CATEGORY_1)) descriptions.add("CATEGORY_1");
+        if (modes.contains(JOB_MODE_CATEGORY_2)) descriptions.add("CATEGORY_2");
         return String.join("+", descriptions) + " (" + modes + ")";
     }
 
