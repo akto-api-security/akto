@@ -2506,6 +2506,7 @@ public class InitializerListener implements ServletContextListener {
                 if (runJobFunctions || runJobFunctionsAnyway) {
 
                     logger.debug("Starting init functions and scheduling jobs at " + now);
+                    logger.info("Job mode: " + JobUtils.getJobModeDescription());
 
                     AccountTask.instance.executeTask(new Consumer<Account>() {
                         @Override
@@ -2513,25 +2514,34 @@ public class InitializerListener implements ServletContextListener {
                             runInitializerFunctions();
                         }
                     }, "context-initializer-secondary");
-                    logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
-                    setUpWebhookScheduler();
-                    logger.warn("Started traffic alert schedulers", LogDb.DASHBOARD);
-                    setUpTrafficAlertScheduler();
-                    logger.warn("Started daily schedulers", LogDb.DASHBOARD);
-                    setUpDailyScheduler();
-                    if (DashboardMode.isMetered()) {
-                        setupUsageScheduler();
-                    }
-                    updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
-                    syncCronInfo.setUpUpdateCronScheduler();
-                    syncCronInfo.setUpMcpMaliciousnessCronScheduler();
-                    agentBasePromptDetectionCron.setUpAgentBasePromptDetectionScheduler();
-                    setUpTestEditorTemplatesScheduler();
-                    JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
+
                     updateApiGroupsForAccounts();
-                    setupAutomatedApiGroupsScheduler();
-                    if(runJobFunctionsAnyway) {
+
+                    if (JobUtils.shouldRunTrafficJobs()) {
+                        logger.warn("Starting TRAFFIC & MONITORING job schedulers", LogDb.DASHBOARD);
+
+                        setUpWebhookScheduler();
+                        setUpTrafficAlertScheduler();
+                        setUpDailyScheduler();
+
+                        if (DashboardMode.isMetered()) {
+                            setupUsageScheduler();
+                        }
+
+                        syncCronInfo.setUpUpdateCronScheduler();
+                        setUpTestEditorTemplatesScheduler();
                         crons.trafficAlertsScheduler();
+                        JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
+                    }
+
+                    if (JobUtils.shouldRunHeavyJobs()) {
+                        logger.warn("Starting HEAVY PROCESSING & CLEANUP job schedulers", LogDb.DASHBOARD);
+
+                        updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
+                        syncCronInfo.setUpMcpMaliciousnessCronScheduler();
+                        agentBasePromptDetectionCron.setUpAgentBasePromptDetectionScheduler();
+                        setupAutomatedApiGroupsScheduler();
+
                         crons.insertHistoricalDataJob();
                         if(DashboardMode.isOnPremDeployment()){
                             crons.insertHistoricalDataJobForOnPrem();
@@ -2546,11 +2556,6 @@ public class InitializerListener implements ServletContextListener {
                         crons.deleteTestRunsScheduler();
                         setUpUpdateCustomCollections();
                         setUpFillCollectionIdArrayJob();
-
-
-                        // CleanInventory.cleanInventoryJobRunner();
-
-                        // MatchingJob.MatchingJobRunner();
                     }
 
                     int now2 = Context.now();

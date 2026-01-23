@@ -1,7 +1,10 @@
 package com.akto.utils.jobs;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.bson.conversions.Bson;
 
@@ -29,12 +32,72 @@ public class JobUtils {
     private static final int limit = 500;
     private static final Bson sort = Sorts.ascending(ApiInfo.ID_API_COLLECTION_ID, ApiInfo.ID_URL, ApiInfo.ID_METHOD);
 
-    public static boolean getRunJobFunctions() {
+    public static final int JOB_MODE_NONE = 0;
+    public static final int JOB_MODE_TRAFFIC = 1;
+    public static final int JOB_MODE_HEAVY = 2;
+
+    public static Set<Integer> getJobModes() {
         try {
-            return Boolean.parseBoolean(System.getenv().getOrDefault("AKTO_RUN_JOB", "false"));
+            String envValue = System.getenv().getOrDefault("AKTO_RUN_JOB", "0");
+
+            if ("true".equalsIgnoreCase(envValue)) {
+                Set<Integer> allModes = new HashSet<>();
+                allModes.add(JOB_MODE_TRAFFIC);
+                allModes.add(JOB_MODE_HEAVY);
+                return allModes;
+            }
+            if ("false".equalsIgnoreCase(envValue)) {
+                return Collections.emptySet();
+            }
+
+            Set<Integer> modes = new HashSet<>();
+            for (String part : envValue.split(",")) {
+                try {
+                    int mode = Integer.parseInt(part.trim());
+                    if (mode == JOB_MODE_TRAFFIC || mode == JOB_MODE_HEAVY) {
+                        modes.add(mode);
+                    }
+                } catch (NumberFormatException e) {
+                    logger.error("Invalid job mode value: " + part);
+                }
+            }
+            return modes;
         } catch (Exception e) {
-            return true;
+            logger.error("Error parsing AKTO_RUN_JOB: " + e.getMessage());
+            return Collections.emptySet();
         }
+    }
+
+    public static boolean shouldRunMode(int mode) {
+        return getJobModes().contains(mode) || getRunJobFunctionsAnyway();
+    }
+
+    public static boolean shouldRunTrafficJobs() {
+        return shouldRunMode(JOB_MODE_TRAFFIC);
+    }
+
+    public static boolean shouldRunHeavyJobs() {
+        return shouldRunMode(JOB_MODE_HEAVY);
+    }
+
+    public static boolean shouldRunAnyJobs() {
+        return !getJobModes().isEmpty() || getRunJobFunctionsAnyway();
+    }
+
+    public static String getJobModeDescription() {
+        Set<Integer> modes = getJobModes();
+        if (modes.isEmpty() && !getRunJobFunctionsAnyway()) return "NONE (0)";
+        if (getRunJobFunctionsAnyway()) return "ALL (on-prem/non-SaaS override)";
+
+        List<String> descriptions = new ArrayList<>();
+        if (modes.contains(JOB_MODE_TRAFFIC)) descriptions.add("TRAFFIC");
+        if (modes.contains(JOB_MODE_HEAVY)) descriptions.add("HEAVY");
+        return String.join("+", descriptions) + " (" + modes + ")";
+    }
+
+    @Deprecated
+    public static boolean getRunJobFunctions() {
+        return shouldRunAnyJobs();
     }
 
     public static boolean getRunJobFunctionsAnyway() {
