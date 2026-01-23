@@ -18,13 +18,7 @@ TIMEOUT = float(os.getenv("GUARDRAILS_TIMEOUT", "5"))
 class GuardrailsHandler(CustomLogger):
     def __init__(self):
         super().__init__()
-        self.client = httpx.AsyncClient(
-            timeout=TIMEOUT,
-            limits=httpx.Limits(
-                max_connections=100,
-                max_keepalive_connections=20,
-            ),
-        )
+        self.client = httpx.AsyncClient(timeout=TIMEOUT)
 
         logger.info(
             f"GuardrailsHandler initialized | "
@@ -107,13 +101,8 @@ class GuardrailsHandler(CustomLogger):
         else:
             query = data.get("prompt", "")
 
-        query = query.strip()
-        if not query:
-            logger.info("No text content found in request; skipping guardrails validation.")
-            return True, ""
-
         payload = {
-            "query": query,
+            "query": query.strip(),
             "model": data.get("model", ""),
         }
 
