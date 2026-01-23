@@ -75,7 +75,7 @@ public class Gateway {
                 guardrailsResponse = guardrailsClient.callValidateRequest(formattedApiRequest);
 
                 // Check if guardrails blocked the request
-                if (guardrailsResponse != null && !guardrailsClient.isValidationPassed(guardrailsResponse)) {
+                if (guardrailsResponse != null) {
                     logger.warn("Request blocked by guardrails (adapter: {})", adapterUsed);
                     return buildGuardrailsBlockedResponse(guardrailsResponse);
                 }
@@ -116,26 +116,6 @@ public class Gateway {
     }
 
     /**
-     * TODO: Implement actual HTTP client call to target URL
-     */
-    private Map<String, Object> executeProxyRequest(String url, String path,
-                                                     Map<String, Object> request,
-                                                     Map<String, Object> response) {
-        logger.info("Executing proxy request to: {}", url);
-
-        // Dummy implementation - just echoing back the request/response
-        Map<String, Object> result = new HashMap<>();
-        result.put("url", url);
-        result.put("path", path);
-        result.put("request", request);
-        result.put("response", response);
-        result.put("executedAt", System.currentTimeMillis());
-        result.put("status", "EXECUTED");
-
-        return result;
-    }
-
-    /**
      * Build error response
      */
     private Map<String, Object> buildErrorResponse(String errorMessage) {
@@ -151,11 +131,8 @@ public class Gateway {
      */
     private Map<String, Object> buildGuardrailsBlockedResponse(Map<String, Object> guardrailsResponse) {
         Map<String, Object> blocked = new HashMap<>();
-        blocked.put("success", false);
-        blocked.put("blocked", true);
-        blocked.put("reason", "Request blocked by guardrails");
+        blocked.put("success", true);
         blocked.put("guardrailsResult", guardrailsResponse);
-        blocked.put("timestamp", System.currentTimeMillis());
         return blocked;
     }
 

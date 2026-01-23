@@ -31,11 +31,6 @@ public class HttpProxyAction extends ActionSupport {
     private boolean success;
     private String message;
 
-    // Additional response fields (extracted from result for convenience)
-    private Boolean guardrailsApplied;
-    private String adapterUsed;
-    private Boolean blocked;
-
     
     public String httpProxy() {
         try {
@@ -97,36 +92,14 @@ public class HttpProxyAction extends ActionSupport {
             Object successObj = result.get("success");
             success = (successObj instanceof Boolean) ? (Boolean) successObj : false;
 
-            // Extract additional fields from result
-            Object guardrailsAppliedObj = result.get("guardrailsApplied");
-            guardrailsApplied = (guardrailsAppliedObj instanceof Boolean) ? (Boolean) guardrailsAppliedObj : null;
-
-            Object adapterUsedObj = result.get("adapterUsed");
-            adapterUsed = (adapterUsedObj instanceof String) ? (String) adapterUsedObj : null;
-
-            Object blockedObj = result.get("blocked");
-            blocked = (blockedObj instanceof Boolean) ? (Boolean) blockedObj : null;
-
             // Build message
             if (success) {
-                if (Boolean.TRUE.equals(guardrailsApplied)) {
-                    message = "Request processed successfully with guardrails validation (adapter: " + adapterUsed + ")";
-                } else {
-                    message = "Request processed successfully";
-                }
+                message = "Request processed successfully";
             } else {
-                if (Boolean.TRUE.equals(blocked)) {
-                    message = "Request blocked by guardrails";
-                } else {
-                    Object errorObj = result.get("error");
-                    message = (errorObj != null) ? errorObj.toString() : "Request processing failed";
-                }
+                message = "Request processing failed";
             }
 
-            loggerMaker.info("HTTP Proxy processed - success: " + success +
-                           ", guardrailsApplied: " + guardrailsApplied +
-                           ", adapterUsed: " + adapterUsed +
-                           ", blocked: " + blocked);
+            loggerMaker.info("HTTP Proxy processed - success: " + success);
 
             return success ? Action.SUCCESS.toUpperCase() : Action.ERROR.toUpperCase();
 

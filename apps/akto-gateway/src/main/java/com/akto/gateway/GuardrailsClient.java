@@ -1,38 +1,46 @@
 package com.akto.gateway;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
+import okhttp3.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 public class GuardrailsClient {
 
     private static final Logger logger = LogManager.getLogger(GuardrailsClient.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 
     private String guardrailsServiceUrl;
     private int timeout;
+    private OkHttpClient httpClient;
 
     public GuardrailsClient() {
         this.guardrailsServiceUrl = loadServiceUrlFromEnv();
         this.timeout = 5000; // 5 seconds default timeout
+        this.httpClient = createHttpClient(timeout);
         logger.info("GuardrailsClient initialized - URL: {}", guardrailsServiceUrl);
     }
 
     public GuardrailsClient(String serviceUrl, int timeout) {
         this.guardrailsServiceUrl = serviceUrl;
         this.timeout = timeout;
+        this.httpClient = createHttpClient(timeout);
         logger.info("GuardrailsClient initialized with custom config - URL: {}, Timeout: {}ms",
                 serviceUrl, timeout);
+    }
+
+    private OkHttpClient createHttpClient(int timeoutMs) {
+        return new OkHttpClient.Builder()
+                .connectTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+                .readTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+                .writeTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+                .build();
     }
 
     /**
@@ -89,26 +97,7 @@ public class GuardrailsClient {
     private Map<String, Object> callGuardrailsService(String payload, String contextSource) {
         logger.info("Calling guardrails service at: {}/api/validate/request", guardrailsServiceUrl);
 
-        CloseableHttpClient httpClient = null;
-        CloseableHttpResponse response = null;
-
         try {
-            // Configure request timeout
-            RequestConfig requestConfig = RequestConfig.custom()
-                    .setConnectTimeout(timeout)
-                    .setConnectionRequestTimeout(timeout)
-                    .setSocketTimeout(timeout)
-                    .build();
-
-            // Create HTTP client
-            httpClient = HttpClients.createDefault();
-
-            // Create POST request
-            HttpPost httpPost = new HttpPost(guardrailsServiceUrl + "/api/validate/request");
-            httpPost.setConfig(requestConfig);
-            httpPost.setHeader("Content-Type", "application/json");
-            httpPost.setHeader("Accept", "application/json");
-
             // Build request according to API specification
             Map<String, Object> requestBody = new HashMap<>();
             requestBody.put("payload", payload);
@@ -118,80 +107,53 @@ public class GuardrailsClient {
 
             // Convert request to JSON
             String jsonRequest = objectMapper.writeValueAsString(requestBody);
-            httpPost.setEntity(new StringEntity(jsonRequest, "UTF-8"));
-
             logger.debug("Sending request to guardrails service: {}", jsonRequest);
 
+            // Create request body
+            RequestBody body = RequestBody.create(jsonRequest, JSON);
+
+            // Build HTTP request
+            Request request = new Request.Builder()
+                    .url(guardrailsServiceUrl + "/api/validate/request")
+                    .post(body)
+                    .addHeader("Content-Type", "application/json")
+                    .addHeader("Accept", "application/json")
+                    .build();
+
             // Execute request
-            response = httpClient.execute(httpPost);
-            int statusCode = response.getStatusLine().getStatusCode();
+            try (Response response = httpClient.newCall(request).execute()) {
+                int statusCode = response.code();
+                String responseBody = response.body() != null ? response.body().string() : "";
 
-            // Parse response
-            String responseBody = EntityUtils.toString(response.getEntity(), "UTF-8");
-            logger.debug("Received response from guardrails service (status {}): {}", statusCode, responseBody);
+                logger.debug("Received response from guardrails service (status {}): {}", statusCode, responseBody);
 
-            // Convert response to Map
-            @SuppressWarnings("unchecked")
-            Map<String, Object> result = objectMapper.readValue(responseBody, Map.class);
+                // Convert response to Map
+                @SuppressWarnings("unchecked")
+                Map<String, Object> result = objectMapper.readValue(responseBody, Map.class);
 
-            if (statusCode >= 200 && statusCode < 300) {
-                logger.info("Guardrails service call successful");
-                // Add 'passed' field for backward compatibility
-                Object allowed = result.get("allowed");
-                if (allowed instanceof Boolean) {
-                    result.put("passed", (Boolean) allowed);
-                    result.put("status", ((Boolean) allowed) ? "ALLOWED" : "BLOCKED");
+                if (statusCode >= 200 && statusCode < 300) {
+                    logger.info("Guardrails service call successful");
+                    // Add 'passed' field for backward compatibility
+                    Object allowed = result.get("allowed");
+                    if (allowed instanceof Boolean) {
+                        result.put("passed", (Boolean) allowed);
+                        result.put("status", ((Boolean) allowed) ? "ALLOWED" : "BLOCKED");
+                    }
+                    result.put("timestamp", System.currentTimeMillis());
+                    return result;
+                } else {
+                    logger.warn("Guardrails service returned error status: {}", statusCode);
+                    return buildErrorResponse("Guardrails service error: HTTP " + statusCode);
                 }
-                result.put("timestamp", System.currentTimeMillis());
-                return result;
-            } else {
-                logger.warn("Guardrails service returned error status: {}", statusCode);
-                return buildErrorResponse("Guardrails service error: HTTP " + statusCode);
             }
 
+        } catch (IOException e) {
+            logger.error("IO Error calling guardrails service: {}", e.getMessage(), e);
+            return buildErrorResponse("Failed to call guardrails service: " + e.getMessage());
         } catch (Exception e) {
             logger.error("Error calling guardrails service: {}", e.getMessage(), e);
             return buildErrorResponse("Failed to call guardrails service: " + e.getMessage());
-        } finally {
-            // Close resources
-            try {
-                if (response != null) {
-                    response.close();
-                }
-                if (httpClient != null) {
-                    httpClient.close();
-                }
-            } catch (Exception e) {
-                logger.warn("Error closing HTTP resources: {}", e.getMessage());
-            }
         }
-    }
-
-    public boolean isValidationPassed(Map<String, Object> guardrailsResponse) {
-        if (guardrailsResponse == null) {
-            return false;
-        }
-
-        // Check 'allowed' field (from actual API)
-        Object allowed = guardrailsResponse.get("allowed");
-        if (allowed instanceof Boolean) {
-            return (Boolean) allowed;
-        }
-
-        // Check 'passed' field (backward compatibility)
-        Object passed = guardrailsResponse.get("passed");
-        if (passed instanceof Boolean) {
-            return (Boolean) passed;
-        }
-
-        // Check 'status' field
-        Object status = guardrailsResponse.get("status");
-        if (status instanceof String) {
-            String statusStr = (String) status;
-            return "ALLOWED".equalsIgnoreCase(statusStr) || "PASS".equalsIgnoreCase(statusStr);
-        }
-
-        return false;
     }
 
     private Map<String, Object> buildErrorResponse(String errorMessage) {
