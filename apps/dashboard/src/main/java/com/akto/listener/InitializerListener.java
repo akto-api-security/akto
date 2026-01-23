@@ -2551,6 +2551,11 @@ public class InitializerListener implements ServletContextListener {
                         crons.deleteTestRunsScheduler();
                         setUpUpdateCustomCollections();
                         setUpFillCollectionIdArrayJob();
+
+
+                        // CleanInventory.cleanInventoryJobRunner();
+
+                        // MatchingJob.MatchingJobRunner();
                     }
 
                     int now2 = Context.now();
