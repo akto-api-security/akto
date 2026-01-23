@@ -2518,40 +2518,38 @@ public class InitializerListener implements ServletContextListener {
 
                     updateApiGroupsForAccounts();
 
-                    if (runJobFunctions > 0 || runJobFunctionsAnyway) {
-                        if (runJobFunctions == 1 || runJobFunctionsAnyway) {
-                            logger.warn("Starting CATEGORY 1 job schedulers", LogDb.DASHBOARD);
-                            setUpWebhookScheduler();
-                            setUpTrafficAlertScheduler();
-                            setUpDailyScheduler();
-                            if (DashboardMode.isMetered()) {
-                                setupUsageScheduler();
-                            }
-                            syncCronInfo.setUpUpdateCronScheduler();
-                            setUpTestEditorTemplatesScheduler();
-                            crons.trafficAlertsScheduler();
-                            JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
+                    if (runJobFunctions == 1 || runJobFunctionsAnyway) {
+                        logger.warn("Starting CATEGORY 1 job schedulers", LogDb.DASHBOARD);
+                        setUpWebhookScheduler();
+                        setUpTrafficAlertScheduler();
+                        setUpDailyScheduler();
+                        if (DashboardMode.isMetered()) {
+                            setupUsageScheduler();
                         }
-                        if (runJobFunctions == 2 || runJobFunctionsAnyway) {
-                            logger.warn("Starting CATEGORY 2 job schedulers", LogDb.DASHBOARD);
-                            updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
-                            syncCronInfo.setUpMcpMaliciousnessCronScheduler();
-                            agentBasePromptDetectionCron.setUpAgentBasePromptDetectionScheduler();
-                            setupAutomatedApiGroupsScheduler();
-                            crons.insertHistoricalDataJob();
-                            if(DashboardMode.isOnPremDeployment()){
-                                crons.insertHistoricalDataJobForOnPrem();
-                            }
-                            trimCappedCollectionsJob();
-                            setUpPiiAndTestSourcesScheduler();
-                            cleanInventoryJobRunner();
-                            setUpDefaultPayloadRemover();
-                            setUpDependencyFlowScheduler();
-                            tokenGeneratorCron.tokenGeneratorScheduler();
-                            crons.deleteTestRunsScheduler();
-                            setUpUpdateCustomCollections();
-                            setUpFillCollectionIdArrayJob();
+                        syncCronInfo.setUpUpdateCronScheduler();
+                        setUpTestEditorTemplatesScheduler();
+                        crons.trafficAlertsScheduler();
+                        JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
+                    }
+                    if (runJobFunctions == 2 || runJobFunctionsAnyway) {
+                        logger.warn("Starting CATEGORY 2 job schedulers", LogDb.DASHBOARD);
+                        updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
+                        syncCronInfo.setUpMcpMaliciousnessCronScheduler();
+                        agentBasePromptDetectionCron.setUpAgentBasePromptDetectionScheduler();
+                        setupAutomatedApiGroupsScheduler();
+                        crons.insertHistoricalDataJob();
+                        if(DashboardMode.isOnPremDeployment()){
+                            crons.insertHistoricalDataJobForOnPrem();
                         }
+                        trimCappedCollectionsJob();
+                        setUpPiiAndTestSourcesScheduler();
+                        cleanInventoryJobRunner();
+                        setUpDefaultPayloadRemover();
+                        setUpDependencyFlowScheduler();
+                        tokenGeneratorCron.tokenGeneratorScheduler();
+                        crons.deleteTestRunsScheduler();
+                        setUpUpdateCustomCollections();
+                        setUpFillCollectionIdArrayJob();
                     }
 
                     int now2 = Context.now();
