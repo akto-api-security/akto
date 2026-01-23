@@ -29,8 +29,9 @@ const currentPath = window.location.pathname;
 const isSignupPage = signupPages.some(page => currentPath.startsWith(page));
 const isWhitelisted = func.isWhiteListedOrganization();
 let free = !(isWhitelisted || isSignupPage);
-
 if(window.PLAN_TYPE && ALLOWED_PLANS.includes(window.PLAN_TYPE.toLowerCase())) {
+  free = true;
+}else if(!window.PLAN_TYPE) {
   free = false;
 }
 
