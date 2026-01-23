@@ -2456,15 +2456,15 @@ public class InitializerListener implements ServletContextListener {
             e.printStackTrace();
         }
 
-        int runJobs = JobUtils.getRunJobFunctions();
-        boolean runJobsAnyway = JobUtils.getRunJobFunctionsAnyway();
+        int runJobFunctions = JobUtils.getRunJobFunctions();
+        boolean runJobFunctionsAnyway = JobUtils.getRunJobFunctionsAnyway();
 
         executorService.schedule(new Runnable() {
             public void run() {
 
                 ReadPreference readPreference = ReadPreference.primary();
                 WriteConcern writeConcern = WriteConcern.ACKNOWLEDGED;
-                if (runJobs > 0 || DashboardMode.isSaasDeployment()) {
+                if (runJobFunctions > 0 || DashboardMode.isSaasDeployment()) {
                     readPreference = ReadPreference.primary();
                     writeConcern = WriteConcern.W1;
                 }
@@ -2504,10 +2504,10 @@ public class InitializerListener implements ServletContextListener {
 
                 int now = Context.now();
 
-                if (runJobs > 0 || runJobsAnyway) {
+                if (runJobFunctions > 0 || runJobFunctionsAnyway) {
 
                     logger.debug("Starting init functions and scheduling jobs at " + now);
-                    logger.info("Job mode: " + runJobs + " (runAnyway: " + runJobsAnyway + ")");
+                    logger.info("Job mode: " + runJobFunctions + " (runAnyway: " + runJobFunctionsAnyway + ")");
 
                     AccountTask.instance.executeTask(new Consumer<Account>() {
                         @Override
@@ -2518,8 +2518,8 @@ public class InitializerListener implements ServletContextListener {
 
                     updateApiGroupsForAccounts();
 
-                    if (runJobs > 0 || runJobsAnyway) {
-                        if (runJobs == 1 || runJobsAnyway) {
+                    if (runJobFunctions > 0 || runJobFunctionsAnyway) {
+                        if (runJobFunctions == 1 || runJobFunctionsAnyway) {
                             logger.warn("Starting CATEGORY 1 job schedulers", LogDb.DASHBOARD);
                             setUpWebhookScheduler();
                             setUpTrafficAlertScheduler();
@@ -2532,7 +2532,7 @@ public class InitializerListener implements ServletContextListener {
                             crons.trafficAlertsScheduler();
                             JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
                         }
-                        if (runJobs == 2 || runJobsAnyway) {
+                        if (runJobFunctions == 2 || runJobFunctionsAnyway) {
                             logger.warn("Starting CATEGORY 2 job schedulers", LogDb.DASHBOARD);
                             updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
                             syncCronInfo.setUpMcpMaliciousnessCronScheduler();
