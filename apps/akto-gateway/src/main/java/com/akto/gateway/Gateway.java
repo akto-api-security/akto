@@ -13,11 +13,13 @@ public class Gateway {
     private static Gateway instance;
     private final GuardrailsClient guardrailsClient;
     private final AktoIngestAdapter aktoIngestAdapter;
+    private final AdapterFactory adapterFactory;
 
     private Gateway() {
         this.guardrailsClient = new GuardrailsClient();
         this.aktoIngestAdapter = new AktoIngestAdapter();
-        logger.info("Gateway instance initialized");
+        this.adapterFactory = new AdapterFactory(guardrailsClient);
+        logger.info("Gateway instance initialized with adapter factory (Strategy pattern)");
     }
 
     /**
@@ -31,30 +33,6 @@ public class Gateway {
         return instance;
     }
 
-    /**
-     * Process HTTP proxy request with the new structure
-     * Expected format:
-     * {
-     *   "url": "http://example.com/api/endpoint",
-     *   "path": "/api/endpoint",
-     *   "request": {
-     *      "method": "GET|POST|...",
-     *      "headers": {},
-     *      "body": "...",
-     *      "queryParams": {}
-     *   },
-     *   "response": {
-     *      "headers": {},
-     *      "payload": "...",
-     *      "protocol": "HTTP/1.1",
-     *      "statusCode": 200,
-     *      "status": "SUCCESS"
-     *   }
-     * }
-     *
-     * @param proxyData Full proxy request data
-     * @return Processed response
-     */
     @SuppressWarnings("unchecked")
     public Map<String, Object> processHttpProxy(Map<String, Object> proxyData) {
         logger.info("Processing HTTP proxy request");
@@ -88,48 +66,60 @@ public class Gateway {
 
             logger.info("Request - Method: {}, URL: {}, Path: {}", method, url, path);
 
-            // Check if guardrails should be applied using the client
-            boolean shouldApplyGuardrails = guardrailsClient.shouldApplyGuardrails(queryParams);
+            // Use Strategy pattern: check if guardrails should be applied
+            boolean shouldApplyGuardrails = adapterFactory.shouldApplyGuardrails(queryParams);
 
             Map<String, Object> guardrailsResponse = null;
-            if (shouldApplyGuardrails) {
-                logger.info("Guardrails enabled - calling guardrails service");
+            String adapterUsed = "none";
 
-                // Delegate to GuardrailsClient
-                guardrailsResponse = guardrailsClient.validateRequest(url, path, request, response);
+            if (shouldApplyGuardrails) {
+                // Select appropriate adapter based on query parameters
+                GuardrailsAdapter adapter = adapterFactory.selectAdapter(queryParams);
+                adapterUsed = adapter.getAdapterName();
+
+                logger.info("Guardrails enabled - using {} adapter", adapterUsed);
+
+                // Format the request using the selected adapter strategy
+                Map<String, Object> formattedApiRequest = adapter.formatRequest(url, path, request, response);
+
+                logger.debug("Adapter formatted API request: {}", formattedApiRequest);
+
+                // Call guardrails service with formatted request
+                guardrailsResponse = guardrailsClient.callValidateRequest(formattedApiRequest);
 
                 // Check if guardrails blocked the request
                 if (guardrailsResponse != null && !guardrailsClient.isValidationPassed(guardrailsResponse)) {
-                    logger.warn("Request blocked by guardrails");
+                    logger.warn("Request blocked by guardrails (adapter: {})", adapterUsed);
                     return buildGuardrailsBlockedResponse(guardrailsResponse);
                 }
 
-                logger.info("Request passed guardrails validation");
+                logger.info("Request passed guardrails validation (adapter: {})", adapterUsed);
             }
 
-            Map<String, Object> aktoIngestData = aktoIngestAdapter.convertToAktoIngestFormat(proxyData);
-            logger.info("Converted to Akto ingest format");
+            // Map<String, Object> aktoIngestData = aktoIngestAdapter.convertToAktoIngestFormat(proxyData);
+            // logger.info("Converted to Akto ingest format");
 
-            // Process the proxy request
-            Map<String, Object> processedResponse = executeProxyRequest(url, path, request, response);
+            // // Process the proxy request
+            // Map<String, Object> processedResponse = executeProxyRequest(url, path, request, response);
 
-            // Build successful response
+            // // Build successful response
             Map<String, Object> result = new HashMap<>();
-            result.put("success", true);
-            result.put("url", url);
-            result.put("path", path);
-            result.put("method", method);
-            result.put("guardrailsApplied", shouldApplyGuardrails);
+            // result.put("success", true);
+            // result.put("url", url);
+            // result.put("path", path);
+            // result.put("method", method);
+            // result.put("guardrailsApplied", shouldApplyGuardrails);
+            // result.put("adapterUsed", adapterUsed);
 
-            if (guardrailsResponse != null) {
-                result.put("guardrailsResult", guardrailsResponse);
-            }
+            // if (guardrailsResponse != null) {
+            //     result.put("guardrailsResult", guardrailsResponse);
+            // }
 
-            result.put("aktoIngestData", aktoIngestData);
-            result.put("proxyResponse", processedResponse);
-            result.put("timestamp", System.currentTimeMillis());
+            // result.put("aktoIngestData", aktoIngestData);
+            // result.put("proxyResponse", processedResponse);
+            // result.put("timestamp", System.currentTimeMillis());
 
-            logger.info("HTTP proxy request processed successfully");
+            // logger.info("HTTP proxy request processed successfully - Adapter: {}", adapterUsed);
             return result;
 
         } catch (Exception e) {
@@ -192,5 +182,9 @@ public class Gateway {
 
     public AktoIngestAdapter getAktoIngestAdapter() {
         return aktoIngestAdapter;
+    }
+
+    public AdapterFactory getAdapterFactory() {
+        return adapterFactory;
     }
 }

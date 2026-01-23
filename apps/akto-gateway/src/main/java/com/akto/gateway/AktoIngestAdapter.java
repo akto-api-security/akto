@@ -37,20 +37,22 @@ public class AktoIngestAdapter {
      *
      * Input format:
      * {
-     *   "url": "http://example.com/api/endpoint",
+     *   "url": "http://example.com",
      *   "path": "/api/endpoint",
      *   "request": {
      *      "method": "POST",
      *      "headers": {},
      *      "body": "...",
-     *      "queryParams": {}
+     *      "queryParams": {},
+     *      "metadata": {}
      *   },
      *   "response": {
      *      "headers": {},
-     *      "payload": "...",
+     *      "body": "...",
      *      "protocol": "HTTP/1.1",
      *      "statusCode": 200,
-     *      "status": "SUCCESS"
+     *      "status": "SUCCESS",
+     *      "metadata": {}
      *   }
      * }
      *
@@ -131,13 +133,13 @@ public class AktoIngestAdapter {
                     aktoIngest.put("responseHeaders", "{}");
                 }
 
-                // Response payload
-                Object payload = response.get("payload");
-                if (payload != null) {
-                    if (payload instanceof String) {
-                        aktoIngest.put("responsePayload", payload);
+                // Response body (now called "body" instead of "payload")
+                Object body = response.get("body");
+                if (body != null) {
+                    if (body instanceof String) {
+                        aktoIngest.put("responsePayload", body);
                     } else {
-                        aktoIngest.put("responsePayload", objectMapper.writeValueAsString(payload));
+                        aktoIngest.put("responsePayload", objectMapper.writeValueAsString(body));
                     }
                 } else {
                     aktoIngest.put("responsePayload", "");

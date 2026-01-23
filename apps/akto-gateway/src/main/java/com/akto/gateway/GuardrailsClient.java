@@ -57,18 +57,29 @@ public class GuardrailsClient {
         return false;
     }
 
-    public Map<String, Object> validateRequest(String url, String path,
-                                                Map<String, Object> request,
-                                                Map<String, Object> response) {
-        logger.info("Validating request through guardrails service - URL: {}", url);
+    /**
+     * Call guardrails service with formatted API request
+     * Takes the formatted request from adapter and makes the actual API call
+     *
+     * @param apiRequest Formatted request with "payload" and "contextSource" fields
+     * @return Guardrails validation response
+     */
+    public Map<String, Object> callValidateRequest(Map<String, Object> apiRequest) {
+        logger.info("Calling guardrails /validate/request endpoint");
 
         try {
-            Map<String, Object> guardrailsRequest = buildGuardrailsRequest(url, path, request, response);
+            String payload = (String) apiRequest.get("payload");
+            String contextSource = (String) apiRequest.get("contextSource");
 
-            // Call guardrails service (TODO: Replace with actual HTTP call)
-            Map<String, Object> guardrailsResponse = callGuardrailsService(guardrailsRequest);
+            if (payload == null || payload.isEmpty()) {
+                logger.debug("No payload to validate, allowing request");
+                return buildPassedResponse("No payload to validate");
+            }
 
-            logger.info("Guardrails validation completed - Status: {}", guardrailsResponse.get("status"));
+            // Call guardrails service
+            Map<String, Object> guardrailsResponse = callGuardrailsService(payload, contextSource);
+
+            logger.info("Guardrails validation completed - Allowed: {}", guardrailsResponse.get("allowed"));
             return guardrailsResponse;
 
         } catch (Exception e) {
@@ -77,31 +88,78 @@ public class GuardrailsClient {
         }
     }
 
-    private Map<String, Object> buildGuardrailsRequest(String url, String path,
-                                                        Map<String, Object> request,
-                                                        Map<String, Object> response) {
-        Map<String, Object> payload = new HashMap<>();
+    public Map<String, Object> validateRequest(String url, String path,
+                                                Map<String, Object> request,
+                                                Map<String, Object> response) {
+        logger.info("Validating request through guardrails service - URL: {}", url);
 
-        // Core fields
-        payload.put("url", url);
-        payload.put("path", path);
-        payload.put("request", request);
-        payload.put("response", response);
+        try {
+            // Extract request payload/body
+            String payload = extractPayload(request);
+            if (payload == null || payload.isEmpty()) {
+                logger.debug("No request payload to validate, allowing request");
+                return buildPassedResponse("No payload to validate");
+            }
 
-        // Add metadata
-        Map<String, Object> metadata = new HashMap<>();
-        metadata.put("timestamp", System.currentTimeMillis());
-        metadata.put("clientVersion", "1.0.0");
-        metadata.put("source", "akto-gateway");
-        payload.put("metadata", metadata);
+            // Call guardrails service with AGENTIC context
+            Map<String, Object> guardrailsResponse = callGuardrailsService(payload, "AGENTIC");
 
-        return payload;
+            logger.info("Guardrails validation completed - Allowed: {}", guardrailsResponse.get("allowed"));
+            return guardrailsResponse;
+
+        } catch (Exception e) {
+            logger.error("Error calling guardrails service: {}", e.getMessage(), e);
+            return buildErrorResponse(e.getMessage());
+        }
+    }
+
+    /**
+     * Extract payload from request map
+     */
+    private String extractPayload(Map<String, Object> request) {
+        if (request == null) {
+            return null;
+        }
+
+        Object body = request.get("body");
+        if (body == null) {
+            return null;
+        }
+
+        try {
+            if (body instanceof String) {
+                return (String) body;
+            } else {
+                // Convert object to JSON string
+                return objectMapper.writeValueAsString(body);
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to extract payload: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Build response for passed validation
+     */
+    private Map<String, Object> buildPassedResponse(String message) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("allowed", true);
+        result.put("passed", true);
+        result.put("modified", false);
+        result.put("modifiedPayload", "");
+        result.put("reason", message);
+        result.put("status", "ALLOWED");
+        result.put("timestamp", System.currentTimeMillis());
+        return result;
     }
 
     /**
      * Calls the guardrails service API to validate the request
+     * API expects: {"payload": "string", "contextSource": "string"}
+     * API returns: {"allowed": boolean, "modified": boolean, "modifiedPayload": "string", "reason": "string", "metadata": {}}
      */
-    private Map<String, Object> callGuardrailsService(Map<String, Object> request) {
+    private Map<String, Object> callGuardrailsService(String payload, String contextSource) {
         logger.info("Calling guardrails service at: {}/api/validate/request", guardrailsServiceUrl);
 
         CloseableHttpClient httpClient = null;
@@ -124,8 +182,15 @@ public class GuardrailsClient {
             httpPost.setHeader("Content-Type", "application/json");
             httpPost.setHeader("Accept", "application/json");
 
+            // Build request according to API specification
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("payload", payload);
+            if (contextSource != null && !contextSource.isEmpty()) {
+                requestBody.put("contextSource", contextSource);
+            }
+
             // Convert request to JSON
-            String jsonRequest = objectMapper.writeValueAsString(request);
+            String jsonRequest = objectMapper.writeValueAsString(requestBody);
             httpPost.setEntity(new StringEntity(jsonRequest, "UTF-8"));
 
             logger.debug("Sending request to guardrails service: {}", jsonRequest);
@@ -144,6 +209,13 @@ public class GuardrailsClient {
 
             if (statusCode >= 200 && statusCode < 300) {
                 logger.info("Guardrails service call successful");
+                // Add 'passed' field for backward compatibility
+                Object allowed = result.get("allowed");
+                if (allowed instanceof Boolean) {
+                    result.put("passed", (Boolean) allowed);
+                    result.put("status", ((Boolean) allowed) ? "ALLOWED" : "BLOCKED");
+                }
+                result.put("timestamp", System.currentTimeMillis());
                 return result;
             } else {
                 logger.warn("Guardrails service returned error status: {}", statusCode);
@@ -173,7 +245,13 @@ public class GuardrailsClient {
             return false;
         }
 
-        // Check 'passed' field
+        // Check 'allowed' field (from actual API)
+        Object allowed = guardrailsResponse.get("allowed");
+        if (allowed instanceof Boolean) {
+            return (Boolean) allowed;
+        }
+
+        // Check 'passed' field (backward compatibility)
         Object passed = guardrailsResponse.get("passed");
         if (passed instanceof Boolean) {
             return (Boolean) passed;
@@ -191,8 +269,12 @@ public class GuardrailsClient {
 
     private Map<String, Object> buildErrorResponse(String errorMessage) {
         Map<String, Object> error = new HashMap<>();
+        error.put("allowed", false);
         error.put("passed", false);
+        error.put("modified", false);
+        error.put("modifiedPayload", "");
         error.put("status", "ERROR");
+        error.put("reason", "Guardrails validation failed: " + errorMessage);
         error.put("message", "Guardrails validation failed: " + errorMessage);
         error.put("error", errorMessage);
         error.put("timestamp", System.currentTimeMillis());
