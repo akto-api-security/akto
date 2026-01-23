@@ -133,13 +133,6 @@ public class GuardrailsClient {
 
                 if (statusCode >= 200 && statusCode < 300) {
                     logger.info("Guardrails service call successful");
-                    // Add 'passed' field for backward compatibility
-                    Object allowed = result.get("allowed");
-                    if (allowed instanceof Boolean) {
-                        result.put("passed", (Boolean) allowed);
-                        result.put("status", ((Boolean) allowed) ? "ALLOWED" : "BLOCKED");
-                    }
-                    result.put("timestamp", System.currentTimeMillis());
                     return result;
                 } else {
                     logger.warn("Guardrails service returned error status: {}", statusCode);

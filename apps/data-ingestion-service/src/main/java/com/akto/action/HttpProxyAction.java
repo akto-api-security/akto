@@ -16,17 +16,14 @@ public class HttpProxyAction extends ActionSupport {
     private static final LoggerMaker loggerMaker = new LoggerMaker(HttpProxyAction.class, LoggerMaker.LogDb.DATA_INGESTION);
     private static final Gateway gateway = Gateway.getInstance();
 
-    // Input fields (direct mapping from JSON)
     private String url;
     private String path;
     private Map<String, Object> request;
     private Map<String, Object> response;
 
-    // Query parameters (from URL query string)
     private String guardrails;
     private String akto_connector;
 
-    // Output
     private Map<String, Object> result;
     private boolean success;
     private String message;
@@ -64,7 +61,6 @@ public class HttpProxyAction extends ActionSupport {
                 return Action.ERROR.toUpperCase();
             }
 
-            // Build query parameters map from actual URL query params
             Map<String, Object> urlQueryParams = new HashMap<>();
             if (guardrails != null && !guardrails.isEmpty()) {
                 urlQueryParams.put("guardrails", guardrails);
@@ -75,7 +71,6 @@ public class HttpProxyAction extends ActionSupport {
 
             loggerMaker.info("URL Query Params - guardrails: " + guardrails + ", akto_connector: " + akto_connector);
 
-            // Build proxyData object for Gateway
             Map<String, Object> proxyData = new HashMap<>();
             proxyData.put("url", url);
             proxyData.put("path", path);
@@ -85,11 +80,9 @@ public class HttpProxyAction extends ActionSupport {
             }
             proxyData.put("urlQueryParams", urlQueryParams);
 
-            // Process through Gateway
             result = gateway.processHttpProxy(proxyData);
             
             success = result != null;
-            // Build message
             if (success) {
                 message = "Request processed successfully";
             } else {
