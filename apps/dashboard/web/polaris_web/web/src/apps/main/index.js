@@ -8,7 +8,7 @@ import { StiggProvider } from '@stigg/react-sdk';
 import "@shopify/polaris/build/esm/styles.css";
 import ExpiredApp from "./ExpiredApp";
 import FreeApp from "./FreeApp";
-import func from "../../util/func";
+import func from "@/util/func";
 
 const container = document.getElementById("root");
 const root = createRoot(container);
@@ -23,17 +23,15 @@ if (
   expired = true;
 }
 
-let free = false;
-const planType = window.PLAN_TYPE?.toLowerCase();
-
 // Bypass FreeApp for signup/login related pages
 const signupPages = ['/check-inbox', '/business-email', '/signup', '/sso-login', '/addUserToAccount', '/login'];
 const currentPath = window.location.pathname;
 const isSignupPage = signupPages.some(page => currentPath.startsWith(page));
 const isWhitelisted = func.isWhiteListedOrganization();
+let free = !(isWhitelisted || isSignupPage);
 
-if (!isSignupPage && (!window.PLAN_TYPE || !ALLOWED_PLANS.includes(planType))) {
-   free = !isWhitelisted;
+if(window.PLAN_TYPE && ALLOWED_PLANS.includes(window.PLAN_TYPE.toLowerCase())) {
+  free = false;
 }
 
 if (expired) {
