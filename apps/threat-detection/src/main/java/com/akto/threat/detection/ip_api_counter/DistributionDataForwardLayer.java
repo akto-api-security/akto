@@ -191,7 +191,7 @@ public class DistributionDataForwardLayer {
             Map<String, List<String>> headers = Utils.buildHeaders();
             headers.put("Content-Type", Collections.singletonList("application/json"));
             OriginalHttpRequest request = new OriginalHttpRequest(
-                "http://localhost:9090/api/threat_detection/save_api_distribution_data",
+                Utils.getThreatProtectionBackendUrl() + "/api/threat_detection/save_api_distribution_data",
                 "",
                 "POST",
                 jsonPayload,
