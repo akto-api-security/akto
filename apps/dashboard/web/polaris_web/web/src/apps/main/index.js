@@ -34,7 +34,7 @@ if(func.isTempAccount() && window.PLAN_TYPE && ALLOWED_PLANS.includes(window.PLA
 }else if(!window.PLAN_TYPE && func.isTempAccount()) {
   free = false;
 }else{
-  free = func.isTempAccount();
+  free &= func.isTempAccount();
 }
 
 if (expired) {
