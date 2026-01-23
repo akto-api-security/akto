@@ -2351,7 +2351,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     })
   },
 
-   isWhiteListedOrganization(orgId){
+   isWhiteListedOrganization(){
       return window.USER_NAME?.toLowerCase().includes("akto");
     },
 
