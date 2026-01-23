@@ -2359,7 +2359,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       if (!window?.USER_NAME) return false;
       
       const userName = window.USER_NAME.toLowerCase();
-      const tempAccountOrganizations = ['chargebee', 'miq', 'whatfix', 'blinkrx' , 'blinkhealth'];
+      const tempAccountOrganizations = ['chargebee', 'miq', 'whatfix', 'blinkrx' , 'blinkhealth', 'agoda', 'mongo', 'guild', 'expedia'];
       
       return tempAccountOrganizations.some(org => userName.includes(org));
     },
