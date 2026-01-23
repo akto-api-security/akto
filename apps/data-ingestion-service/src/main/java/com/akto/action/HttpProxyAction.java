@@ -24,7 +24,7 @@ public class HttpProxyAction extends ActionSupport {
     private String guardrails;
     private String akto_connector;
 
-    private Map<String, Object> result;
+    private Map<String, Object> data;
     private boolean success;
     private String message;
 
@@ -38,8 +38,8 @@ public class HttpProxyAction extends ActionSupport {
                 loggerMaker.warn("Missing required field: url");
                 success = false;
                 message = "Missing required field: url";
-                result = new HashMap<>();
-                result.put("error", "URL is required");
+                data = new HashMap<>();
+                data.put("error", "URL is required");
                 return Action.ERROR.toUpperCase();
             }
 
@@ -47,8 +47,8 @@ public class HttpProxyAction extends ActionSupport {
                 loggerMaker.warn("Missing required field: path");
                 success = false;
                 message = "Missing required field: path";
-                result = new HashMap<>();
-                result.put("error", "Path is required");
+                data = new HashMap<>();
+                data.put("error", "Path is required");
                 return Action.ERROR.toUpperCase();
             }
 
@@ -56,8 +56,8 @@ public class HttpProxyAction extends ActionSupport {
                 loggerMaker.warn("Missing required field: request");
                 success = false;
                 message = "Missing required field: request";
-                result = new HashMap<>();
-                result.put("error", "Request object is required");
+                data = new HashMap<>();
+                data.put("error", "Request object is required");
                 return Action.ERROR.toUpperCase();
             }
 
@@ -80,9 +80,9 @@ public class HttpProxyAction extends ActionSupport {
             }
             proxyData.put("urlQueryParams", urlQueryParams);
 
-            result = gateway.processHttpProxy(proxyData);
+            data = gateway.processHttpProxy(proxyData);
             
-            success = result != null;
+            success = data != null;
             if (success) {
                 message = "Request processed successfully";
             } else {
@@ -98,8 +98,8 @@ public class HttpProxyAction extends ActionSupport {
 
             success = false;
             message = "Unexpected error: " + e.getMessage();
-            result = new HashMap<>();
-            result.put("error", e.getMessage());
+            data = new HashMap<>();
+            data.put("error", e.getMessage());
 
             return Action.ERROR.toUpperCase();
         }
