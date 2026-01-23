@@ -1001,29 +1001,6 @@ const dataDogConnectorObj = {
     component: <DataDogConnector />
 }
 
-const dataDogConnectorObj = {
-    icon: '/public/datadog-1.svg',
-    label: "DataDog Connector",
-    text: "Connect your Datadog account to Akto to visualize your traces in the dashboard.",
-    key: "DATA_DOG_CONNECTOR",
-    component: <DataDogConnector />
-}
-
-const litellmImportObj = {
-    icon: '/public/litellm.svg',
-    label: "LiteLLM",
-    text: "Use our LiteLLM feature to capture traffic from your LiteLLM proxy and instantly send it to your dashboard for real-time insights.",
-    docsUrl: 'https://docs.akto.io/litellm-import',
-    key: "LITELLM_IMPORT",
-    component: <AIAgentConnectorImport
-        connectorType={CONNECTOR_TYPE_LITELLM}
-        connectorName={CONNECTOR_NAME_LITELLM}
-        description={DESCRIPTION_LITELLM}
-        fields={LITELLM_FIELDS}
-        docsUrl={DOCS_URL_LITELLM}
-        recurringIntervalSeconds={INTERVAL_LITELLM}
-    />
-}
 
 const quick_start_policy_lines = [
     `{`,
@@ -1784,7 +1761,7 @@ const quickStartFunc = {
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj,
                 awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
-                n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj,
+                n8nImportObj, langchainImportObj, copilotStudioImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj,
                 apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj
             ])
         }
