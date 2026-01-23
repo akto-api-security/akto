@@ -2456,8 +2456,8 @@ public class InitializerListener implements ServletContextListener {
             e.printStackTrace();
         }
 
-        final int runJobs = JobUtils.getRunJobFunctions();
-        final boolean runJobsAnyway = JobUtils.getRunJobFunctionsAnyway();
+        int runJobs = JobUtils.getRunJobFunctions();
+        boolean runJobsAnyway = JobUtils.getRunJobFunctionsAnyway();
 
         executorService.schedule(new Runnable() {
             public void run() {
