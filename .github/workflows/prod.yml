@@ -114,7 +114,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "Releasing Akto Open Source v${{ github.event.inputs.release_version }}, after skipping unit tests"
+              "text": "⚠️ Releasing Akto Open Source v${{ github.event.inputs.release_version }}, after skipping unit tests"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -192,7 +192,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "Akto Open Source v${{ github.event.inputs.release_version }} released!"
+              "text": "🚀 Akto Open Source v${{ github.event.inputs.release_version }} released!"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -274,7 +274,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "Agent Traffic Analyzer v${{ github.event.inputs.release_version }} released!"
+              "text": "🔍 Agent Traffic Analyzer v${{ github.event.inputs.release_version }} released!"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -342,7 +342,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "Guardrails Service v${{ github.event.inputs.release_version }} released!"
+              "text": "🛡️ Guardrails Service v${{ github.event.inputs.release_version }} released!"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -449,7 +449,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "Akto Open Source Threat v${{ github.event.inputs.release_version_threat }} released!"
+              "text": "🔒 Akto Open Source Threat v${{ github.event.inputs.release_version_threat }} released!"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
