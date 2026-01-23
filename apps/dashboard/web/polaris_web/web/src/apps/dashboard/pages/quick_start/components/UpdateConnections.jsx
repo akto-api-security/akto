@@ -9,18 +9,19 @@ import FlyLayout from '../../../components/layouts/FlyLayout';
 import { useSearchParams } from 'react-router-dom';
 import func from "@/util/func"
 import EndpointShieldCard from './EndpointShieldCard';
-import { isEndpointSecurityCategory } from '@/apps/main/labelHelper';
+import { isEndpointSecurityCategory, getDashboardCategory } from '@/apps/main/labelHelper';
 
 function UpdateConnections(props) {
 
     const [searchParams, setSearchParams] = useSearchParams();
 
-    const { myConnections } = props; 
+    const { myConnections } = props;
     const obj = quickStartFunc.getConnectorsListCategorized()
     const [newCol, setNewCol] = useState(0)
 
     const currentCardObj = QuickStartStore(state => state.currentConnector)
     const setCurrentCardObj = QuickStartStore(state => state.setCurrentConnector)
+    const dashboardCategory = getDashboardCategory()
 
     const closeAction = () => {
         func.updateQueryParams(searchParams, setSearchParams, "connector","")
@@ -49,12 +50,14 @@ function UpdateConnections(props) {
         setCurrentCardObj(null)
     },[searchParams])
 
+    const resolvedDocsUrl = currentCardObj ? quickStartFunc.getDocsUrl(currentCardObj, dashboardCategory) : null;
+
     const components = [
         currentCardObj ? <HorizontalStack gap="1">
             <Text variant="headingMd" as="h6">{currentCardObj.label} </Text>
             {currentCardObj.badge ? <Badge size='small' status='info'>{currentCardObj.badge}</Badge> : null}
         </HorizontalStack> : null,
-        currentCardObj ? currentCardObj.component : null
+        currentCardObj ? (typeof currentCardObj.component === 'function' ? currentCardObj.component(resolvedDocsUrl) : currentCardObj.component) : null
     ]
 
     const handleInstallEndpointShield = () => {
@@ -108,10 +111,10 @@ function UpdateConnections(props) {
                 {currentCardObj ?<FlyLayout
                     width={"27vw"}
                     titleComp={
-                        <TitleWithInfo 
-                                tooltipContent={"Automate traffic to Akto"} 
-                                titleText={"Set up guide"}  
-                                docsUrl={currentCardObj.docsUrl}
+                        <TitleWithInfo
+                                tooltipContent={"Automate traffic to Akto"}
+                                titleText={"Set up guide"}
+                                docsUrl={quickStartFunc.getDocsUrl(currentCardObj, dashboardCategory)}
                             />
                         }
                     show={currentCardObj !== null}
