@@ -28,13 +28,17 @@ const signupPages = ['/check-inbox', '/business-email', '/signup', '/sso-login',
 const currentPath = window.location.pathname;
 const isSignupPage = signupPages.some(page => currentPath.startsWith(page));
 const isWhitelisted = func.isWhiteListedOrganization();
-let free = !(isWhitelisted || isSignupPage);
+
+let free = false
+if(window.IS_SAAS == 'false'){
+  free = !(isWhitelisted || isSignupPage);
 if(func.isTempAccount() && window.PLAN_TYPE && ALLOWED_PLANS.includes(window.PLAN_TYPE.toLowerCase())) {
   free = false;
 }else if(!window.PLAN_TYPE && func.isTempAccount()) {
   free = false;
 }else{
   free &= func.isTempAccount();
+}
 }
 
 if (expired) {
