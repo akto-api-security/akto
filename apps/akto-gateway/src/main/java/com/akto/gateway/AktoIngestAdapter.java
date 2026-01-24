@@ -148,6 +148,9 @@ public class AktoIngestAdapter {
             // Set source (always constant value)
             batch.setSource(AKTO_SOURCE);
 
+            // Set is_pending to false
+            batch.setIs_pending("false");
+
             logger.info("Successfully converted to IngestDataBatch - path: {}, method: {}", path, batch.getMethod());
             return batch;
 
