@@ -150,20 +150,13 @@ public class Gateway {
         Map<String, Object> result = new HashMap<>();
 
         result.put("success", true);
-        result.put("url", url);
-        result.put("path", path);
-        result.put("method", method);
-        result.put("guardrailsApplied", guardrailsResult.applied);
-        result.put("adapterUsed", guardrailsResult.adapterUsed);
-        result.put("blocked", guardrailsResult.blocked);
 
         if (guardrailsResult.guardrailsResponse != null) {
             result.put("guardrailsResult", guardrailsResult.guardrailsResponse);
         }
 
-        result.put("ingestData", ingestionResult.shouldIngest);
         if (ingestionResult.shouldIngest) {
-            result.put("ingested", ingestionResult.ingested);
+            result.put("ingestionResult", ingestionResult.ingested);
             if (ingestionResult.error != null) {
                 result.put("ingestError", ingestionResult.error);
             }
