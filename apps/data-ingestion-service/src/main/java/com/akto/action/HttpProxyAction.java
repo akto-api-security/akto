@@ -2,6 +2,7 @@ package com.akto.action;
 
 import com.akto.gateway.Gateway;
 import com.akto.log.LoggerMaker;
+import com.akto.publisher.KafkaDataPublisher;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 
@@ -16,13 +17,21 @@ public class HttpProxyAction extends ActionSupport {
     private static final LoggerMaker loggerMaker = new LoggerMaker(HttpProxyAction.class, LoggerMaker.LogDb.DATA_INGESTION);
     private static final Gateway gateway = Gateway.getInstance();
 
+    // Initialize Gateway with KafkaDataPublisher
+    static {
+        gateway.setDataPublisher(new KafkaDataPublisher());
+        loggerMaker.info("Gateway configured with KafkaDataPublisher");
+    }
+
     private String url;
     private String path;
     private Map<String, Object> request;
     private Map<String, Object> response;
 
+    // Query parameters (from URL query string)
     private String guardrails;
     private String akto_connector;
+    private String ingest_data;
 
     private Map<String, Object> data;
     private boolean success;
@@ -68,8 +77,12 @@ public class HttpProxyAction extends ActionSupport {
             if (akto_connector != null && !akto_connector.isEmpty()) {
                 urlQueryParams.put("akto_connector", akto_connector);
             }
+            if (ingest_data != null && !ingest_data.isEmpty()) {
+                urlQueryParams.put("ingest_data", ingest_data);
+            }
 
-            loggerMaker.info("URL Query Params - guardrails: " + guardrails + ", akto_connector: " + akto_connector);
+            loggerMaker.info("URL Query Params - guardrails: " + guardrails +
+                ", akto_connector: " + akto_connector + ", ingest_data: " + ingest_data);
 
             Map<String, Object> proxyData = new HashMap<>();
             proxyData.put("url", url);
@@ -81,7 +94,7 @@ public class HttpProxyAction extends ActionSupport {
             proxyData.put("urlQueryParams", urlQueryParams);
 
             data = gateway.processHttpProxy(proxyData);
-            
+
             success = data != null;
             if (success) {
                 message = "Request processed successfully";

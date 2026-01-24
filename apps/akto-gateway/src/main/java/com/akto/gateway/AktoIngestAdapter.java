@@ -1,5 +1,6 @@
 package com.akto.gateway;
 
+import com.akto.dto.IngestDataBatch;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -186,6 +187,124 @@ public class AktoIngestAdapter {
         } catch (Exception e) {
             logger.error("Error converting to Akto ingest format: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to convert to Akto ingest format: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Converts http-proxy format to IngestDataBatch object for Kafka ingestion
+     *
+     * @param proxyData The proxy data in http-proxy format
+     * @return IngestDataBatch object ready for Kafka publishing
+     */
+    @SuppressWarnings("unchecked")
+    public IngestDataBatch convertToIngestDataBatch(Map<String, Object> proxyData) {
+        logger.info("Converting proxy data to IngestDataBatch format");
+
+        try {
+            IngestDataBatch batch = new IngestDataBatch();
+
+            // Extract core fields
+            String url = (String) proxyData.get("url");
+            String path = (String) proxyData.get("path");
+            Map<String, Object> request = (Map<String, Object>) proxyData.get("request");
+            Map<String, Object> response = (Map<String, Object>) proxyData.get("response");
+
+            // Set path
+            batch.setPath(path);
+
+            // Set method
+            if (request != null) {
+                String method = (String) request.get("method");
+                batch.setMethod(method != null ? method : "");
+
+                // Convert request headers to JSON string
+                Map<String, Object> requestHeaders = (Map<String, Object>) request.get("headers");
+                if (requestHeaders != null) {
+                    batch.setRequestHeaders(objectMapper.writeValueAsString(requestHeaders));
+                    // Extract IP from headers
+                    batch.setIp(extractIpFromHeaders(requestHeaders));
+                } else {
+                    batch.setRequestHeaders("{}");
+                    batch.setIp("0.0.0.0");
+                }
+
+                // Set request payload (body)
+                Object requestBody = request.get("body");
+                if (requestBody != null) {
+                    if (requestBody instanceof String) {
+                        batch.setRequestPayload((String) requestBody);
+                    } else {
+                        batch.setRequestPayload(objectMapper.writeValueAsString(requestBody));
+                    }
+                } else {
+                    batch.setRequestPayload("");
+                }
+            } else {
+                batch.setMethod("");
+                batch.setRequestHeaders("{}");
+                batch.setRequestPayload("");
+                batch.setIp("0.0.0.0");
+            }
+
+            // Response fields
+            if (response != null) {
+                // Convert response headers to JSON string
+                Map<String, Object> responseHeaders = (Map<String, Object>) response.get("headers");
+                if (responseHeaders != null) {
+                    batch.setResponseHeaders(objectMapper.writeValueAsString(responseHeaders));
+                } else {
+                    batch.setResponseHeaders("{}");
+                }
+
+                // Set response payload (body)
+                Object responseBody = response.get("body");
+                if (responseBody != null) {
+                    if (responseBody instanceof String) {
+                        batch.setResponsePayload((String) responseBody);
+                    } else {
+                        batch.setResponsePayload(objectMapper.writeValueAsString(responseBody));
+                    }
+                } else {
+                    batch.setResponsePayload("");
+                }
+
+                // Set status code
+                Object statusCode = response.get("statusCode");
+                batch.setStatusCode(statusCode != null ? String.valueOf(statusCode) : "200");
+
+                // Set status
+                Object status = response.get("status");
+                batch.setStatus(status != null ? String.valueOf(status) : "SUCCESS");
+            } else {
+                batch.setResponseHeaders("{}");
+                batch.setResponsePayload("");
+                batch.setStatusCode("200");
+                batch.setStatus("SUCCESS");
+            }
+
+            // Set timestamp (in seconds)
+            batch.setTime(String.valueOf(System.currentTimeMillis() / 1000));
+
+            // Set account and vxlan IDs
+            batch.setAkto_account_id(aktoAccountId);
+            batch.setAkto_vxlan_id(aktoVxlanId);
+
+            // Set source
+            batch.setSource(source);
+
+            // Set type (HTTP or HTTPS based on URL)
+            if (url != null && url.toLowerCase().startsWith("https")) {
+                batch.setType("HTTPS");
+            } else {
+                batch.setType("HTTP");
+            }
+
+            logger.info("Successfully converted to IngestDataBatch - path: {}, method: {}", path, batch.getMethod());
+            return batch;
+
+        } catch (Exception e) {
+            logger.error("Error converting to IngestDataBatch: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to convert to IngestDataBatch: " + e.getMessage(), e);
         }
     }
 

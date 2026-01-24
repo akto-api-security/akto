@@ -49,6 +49,13 @@
             <version>2.15.2</version>
         </dependency>
 
+        <!-- DAO module for IngestDataBatch -->
+        <dependency>
+            <groupId>com.akto.libs.dao</groupId>
+            <artifactId>dao</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- JUnit for testing -->
         <dependency>
             <groupId>junit</groupId>
