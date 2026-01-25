@@ -185,31 +185,25 @@ public class Gateway {
     }
 
     /**
-     * Add x-blocked-by to response payload and set blocked status
+     * Add x-blocked-by to response payload and set blocked status (only if body is null)
      */
     @SuppressWarnings("unchecked")
     private void addBlockedByHeader(Map<String, Object> response) {
         Object body = response.get("body");
 
-        // If body is a Map, add x-blocked-by field to it
-        if (body instanceof Map) {
-            Map<String, Object> bodyMap = (Map<String, Object>) body;
-            bodyMap.put("x-blocked-by", "Akto Proxy");
-        } else {
-            // If body is not a Map, create a new Map with x-blocked-by field
+        // Only modify if body is null
+        if (body == null) {
+            // Create a new Map with x-blocked-by field
             Map<String, Object> newBody = new HashMap<>();
             newBody.put("x-blocked-by", "Akto Proxy");
-            if (body != null) {
-                newBody.put("original_body", body);
-            }
             response.put("body", newBody);
+
+            // Set statusCode to 403 and status to "forbidden" for blocked requests
+            response.put("statusCode", 403);
+            response.put("status", "forbidden");
+
+            logger.info("Added x-blocked-by to response payload and set status to 403 forbidden due to guardrails blocking");
         }
-
-        // Set statusCode to 403 and status to "forbidden" for blocked requests
-        response.put("statusCode", 403);
-        response.put("status", "forbidden");
-
-        logger.info("Added x-blocked-by to response payload and set status to 403 forbidden due to guardrails blocking");
     }
 
     /**
