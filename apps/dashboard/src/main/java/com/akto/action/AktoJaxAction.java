@@ -135,7 +135,7 @@ public class AktoJaxAction extends UserAction {
 
             String crawlId = UUID.randomUUID().toString();
 
-            Object cookies = null;
+            String cookies = null;
             if(!StringUtils.isEmpty(username) && !StringUtils.isEmpty(password)) {
             } else if(testRoleHaxId != null && !testRoleHaxId.isEmpty()) {
                 TestRoles testRole = TestRolesDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(testRoleHaxId)));
@@ -155,7 +155,7 @@ public class AktoJaxAction extends UserAction {
                         if (parseToken != null) {
                             loggerMaker.infoAndAddToDb("Got the cookies from test role for crawler");
                             BasicDBList allCookies = (BasicDBList) parseToken.get("all_cookies");
-                            cookies = allCookies;
+                            cookies = allCookies.toString();
                         }
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb("Error while fetching cookies/token from test role using jsonRecording. Error: " + e.getMessage());
