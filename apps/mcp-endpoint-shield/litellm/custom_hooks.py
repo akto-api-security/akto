@@ -14,7 +14,6 @@ DATA_INGESTION_URL = os.getenv("DATA_INGESTION_URL")
 SYNC_MODE = os.getenv("SYNC_MODE", "true").lower() == "true"
 TIMEOUT = float(os.getenv("TIMEOUT", "5"))
 LITELLM_URL = os.getenv("LITELLM_URL")
-LITELLM_PATH = os.getenv("LITELLM_PATH")
 
 
 class GuardrailsHandler(CustomLogger):
@@ -30,16 +29,36 @@ class GuardrailsHandler(CustomLogger):
     def get_client(self) -> httpx.AsyncClient:
         return self.client
 
+    def extract_request_path(self, kwargs: dict = None) -> str:
+        """Extract the request path from kwargs or fall back to env variable."""
+        fallback = "/v1/chat/completions"
+        try:
+            if kwargs:
+                litellm_params = kwargs.get("litellm_params", {})
+
+                # Method 1: Try to get the path from metadata.user_api_key_request_route (most direct)
+                metadata = litellm_params.get("metadata", {})
+                request_route = metadata.get("user_api_key_request_route")
+                if request_route:
+                    logger.info(f"Extracted path from metadata.user_api_key_request_route: {request_route}")
+                    return request_route
+
+            logger.info(f"Using fallback path: {fallback}")
+            return fallback
+        except Exception as e:
+            return fallback
+
     async def handle_validation_hook(
         self,
         data: dict,
         call_type: str,
         user_api_key_dict: Optional[UserAPIKeyAuth],
+        kwargs: dict = None,
     ) -> dict:
         if SYNC_MODE:
-            return await self.validate_and_block(data, call_type, user_api_key_dict)
-        
-        task = asyncio.create_task(self.validate_background(data, call_type, user_api_key_dict))
+            return await self.validate_and_block(data, call_type, user_api_key_dict, kwargs)
+
+        task = asyncio.create_task(self.validate_background(data, call_type, user_api_key_dict, kwargs))
         self.background_tasks.add(task)
         task.add_done_callback(self.background_tasks.discard)
         return data
@@ -51,7 +70,7 @@ class GuardrailsHandler(CustomLogger):
         call_type: Literal["completion", "text_completion", "embeddings", "image_generation", "moderation", "audio_transcription"],
         **kwargs,
     ) -> dict:
-        return await self.handle_validation_hook(data, call_type, user_api_key_dict)
+        return await self.handle_validation_hook(data, call_type, user_api_key_dict, kwargs)
 
     async def async_moderation_hook(
         self,
@@ -60,11 +79,11 @@ class GuardrailsHandler(CustomLogger):
         call_type: Literal["completion", "text_completion", "embeddings", "image_generation", "moderation", "audio_transcription"],
         **kwargs,
     ) -> dict:
-        return await self.handle_validation_hook(data, call_type, user_api_key_dict)
+        return await self.handle_validation_hook(data, call_type, user_api_key_dict, kwargs)
 
-    async def validate_background(self, data: dict, call_type: str, user_api_key_dict: Optional[UserAPIKeyAuth]) -> None:
+    async def validate_background(self, data: dict, call_type: str, user_api_key_dict: Optional[UserAPIKeyAuth], kwargs: dict = None) -> None:
         try:
-            allowed, reason = await self.call_guardrails_validation(data, call_type, user_api_key_dict)
+            allowed, reason = await self.call_guardrails_validation(data, call_type, user_api_key_dict, kwargs)
             if not allowed:
                 logger.info(f"Guardrails violation detected (async pre-call, logged only): {reason}")
         except Exception as e:
@@ -76,27 +95,27 @@ class GuardrailsHandler(CustomLogger):
             metadata = litellm_params.get("metadata", {})
             user_api_key_dict = metadata.get("user_api_key_dict")
             call_type = kwargs.get("call_type", "completion")
-            
+
             data = {
                 "model": kwargs.get("model", ""),
                 "messages": kwargs.get("messages", []),
                 "stream": kwargs.get("stream", False),
             }
-            
+
             response_dict = response_obj.model_dump() if response_obj else None
-            
+
             if SYNC_MODE:
-                await self.ingest_data(data, call_type, response_dict, user_api_key_dict)
+                await self.ingest_data(data, call_type, response_dict, user_api_key_dict, kwargs)
             else:
-                await self.async_validate_and_ingest(data, call_type, response_dict, user_api_key_dict)
+                await self.async_validate_and_ingest(data, call_type, response_dict, user_api_key_dict, kwargs)
         except Exception as e:
             logger.error(f"Guardrails post-call error: {e}")
 
-    async def validate_and_block(self, data: dict, call_type: str, user_api_key_dict: Optional[UserAPIKeyAuth] = None) -> dict:
+    async def validate_and_block(self, data: dict, call_type: str, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: dict = None) -> dict:
         try:
-            allowed, reason = await self.call_guardrails_validation(data, call_type, user_api_key_dict)
+            allowed, reason = await self.call_guardrails_validation(data, call_type, user_api_key_dict, kwargs)
             if not allowed:
-                await self.ingest_blocked_request(data, call_type, reason, user_api_key_dict)
+                await self.ingest_blocked_request(data, call_type, reason, user_api_key_dict, kwargs)
                 raise HTTPException(
                     status_code=403,
                     detail={"error": "Blocked by Akto Guardrails"},
@@ -108,17 +127,17 @@ class GuardrailsHandler(CustomLogger):
             logger.error(f"Guardrails validation error: {e}")
             raise HTTPException(status_code=503, detail={"error": "Guardrails unavailable"})
 
-    async def async_validate_and_ingest(self, data: dict, call_type: str, response_dict: dict, user_api_key_dict: Optional[UserAPIKeyAuth] = None) -> None:
+    async def async_validate_and_ingest(self, data: dict, call_type: str, response_dict: dict, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: dict = None) -> None:
         if not DATA_INGESTION_URL:
             return
-        
-        await self.ingest_data(data, call_type, response_dict, user_api_key_dict)
-        
+
+        await self.ingest_data(data, call_type, response_dict, user_api_key_dict, kwargs)
+
         try:
-            payload = self.build_payload(data, call_type, response_dict, user_api_key_dict)
+            payload = self.build_payload(data, call_type, response_dict, user_api_key_dict, wrap_response=True, kwargs=kwargs)
             url = f"{DATA_INGESTION_URL}/api/http-proxy"
             params = {"guardrails": "true", "akto_connector": "litellm"}
-            
+
             resp = await self.get_client().post(url, params=params, json=payload)
             if resp.status_code == 200:
                 result = resp.json()
@@ -129,56 +148,56 @@ class GuardrailsHandler(CustomLogger):
         except Exception as e:
             logger.error(f"Guardrails async validation error: {e}")
 
-    async def call_guardrails_validation(self, data: dict, call_type: str, user_api_key_dict: Optional[UserAPIKeyAuth] = None) -> Tuple[bool, str]:
+    async def call_guardrails_validation(self, data: dict, call_type: str, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: dict = None) -> Tuple[bool, str]:
         if not DATA_INGESTION_URL:
             return True, ""
-        
-        payload = self.build_payload(data, call_type, None, user_api_key_dict)
+
+        payload = self.build_payload(data, call_type, None, user_api_key_dict, wrap_response=True, kwargs=kwargs)
         url = f"{DATA_INGESTION_URL}/api/http-proxy"
         params = {"guardrails": "true", "akto_connector": "litellm"}
-        
+
         resp = await self.get_client().post(url, params=params, json=payload)
         if resp.status_code != 200:
             raise RuntimeError(f"Guardrails HTTP {resp.status_code}")
-        
+
         result = resp.json()
         guardrails_result = result.get("data", {}).get("guardrailsResult", {})
         return guardrails_result.get("Allowed", True), guardrails_result.get("Reason", "")
 
-    async def ingest_data(self, data: dict, call_type: str, response_dict: dict, user_api_key_dict: Optional[UserAPIKeyAuth] = None) -> None:
+    async def ingest_data(self, data: dict, call_type: str, response_dict: dict, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: dict = None) -> None:
         if not DATA_INGESTION_URL:
             return
-        
+
         response_payload = {
             "body": response_dict,
             "headers": {"content-type": "application/json"},
             "statusCode": 200,
             "status": "OK"
         }
-        
-        payload = self.build_payload(data, call_type, response_payload, user_api_key_dict, wrap_response=False)
+
+        payload = self.build_payload(data, call_type, response_payload, user_api_key_dict, wrap_response=False, kwargs=kwargs)
         url = f"{DATA_INGESTION_URL}/api/http-proxy"
         params = {"akto_connector": "litellm", "ingest_data": "true"}
-        
+
         resp = await self.get_client().post(url, params=params, json=payload)
         if resp.status_code != 200:
             logger.error(f"Ingestion failed: HTTP {resp.status_code}")
 
-    async def ingest_blocked_request(self, data: dict, call_type: str, reason: str, user_api_key_dict: Optional[UserAPIKeyAuth] = None) -> None:
+    async def ingest_blocked_request(self, data: dict, call_type: str, reason: str, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: dict = None) -> None:
         if not DATA_INGESTION_URL or not SYNC_MODE:
             return
-            
+
         blocked_response = {
             "body": {"x-blocked-by": "Akto Proxy"},
             "headers": {"content-type": "application/json"},
             "statusCode": 403,
             "status": "forbidden"
         }
-        
-        payload = self.build_payload(data, call_type, blocked_response, user_api_key_dict, wrap_response=False)
+
+        payload = self.build_payload(data, call_type, blocked_response, user_api_key_dict, wrap_response=False, kwargs=kwargs)
         url = f"{DATA_INGESTION_URL}/api/http-proxy"
         params = {"akto_connector": "litellm", "ingest_data": "true"}
-        
+
         try:
             await self.get_client().post(url, params=params, json=payload)
         except Exception as e:
@@ -219,13 +238,13 @@ class GuardrailsHandler(CustomLogger):
                 logger.error(f"Failed to enrich metadata: {e}")
         return request_metadata
 
-    def build_payload(self, data: dict, call_type: str, response_obj: Optional[dict], user_api_key_dict: Optional[UserAPIKeyAuth] = None, wrap_response: bool = True) -> dict:
+    def build_payload(self, data: dict, call_type: str, response_obj: Optional[dict], user_api_key_dict: Optional[UserAPIKeyAuth] = None, wrap_response: bool = True, kwargs: dict = None) -> dict:
         data_clean = {
             "model": data.get("model", ""),
             "messages": data.get("messages", []),
             "stream": data.get("stream", False)
         }
-        
+
         request_metadata = self.build_request_litellm_metadata(call_type, data, user_api_key_dict)
 
         if response_obj is None:
@@ -240,9 +259,12 @@ class GuardrailsHandler(CustomLogger):
         else:
             response_payload = response_obj
 
+        # Dynamically extract the request path from kwargs
+        request_path = self.extract_request_path(kwargs)
+
         return {
             "url": LITELLM_URL,
-            "path": LITELLM_PATH,
+            "path": request_path,
             "request": {
                 "method": "POST",
                 "headers": {"content-type": "application/json"},
