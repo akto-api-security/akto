@@ -680,8 +680,8 @@ public class HttpCallParser {
             //TODO("Parse JSON in one place for all the parser methods like Rest/GraphQL/JsonRpc")
             List<HttpResponseParams> responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
             if (responseParamsList.isEmpty()) {
-                // Check for persisted GraphQL payload structure (only for account 1767847021 or 1726615470)
-                if (Context.accountId.get() == 1767847021 || Context.accountId.get() == 1726615470) {
+                // Check for persisted GraphQL payload structure (only for account 1767847021 or 1726615470 or 1667235738)
+                if (Context.accountId.get() == 1767847021 || Context.accountId.get() == 1726615470 || Context.accountId.get() == 1667235738) {
                     List<HttpResponseParams> persistedGraphQLResponseParams =
                             PersistedGraphQLUtils.getUtils().parsePersistedGraphQLResponseParam(httpResponseParam);
                     if (!persistedGraphQLResponseParams.isEmpty()) {
