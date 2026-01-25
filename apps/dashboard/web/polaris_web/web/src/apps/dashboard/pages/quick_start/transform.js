@@ -44,13 +44,7 @@ import {
     DESCRIPTION_COPILOT_STUDIO,
     DOCS_URL_COPILOT_STUDIO,
     INTERVAL_COPILOT_STUDIO,
-    COPILOT_STUDIO_FIELDS,
-    CONNECTOR_TYPE_LITELLM,
-    CONNECTOR_NAME_LITELLM,
-    DESCRIPTION_LITELLM,
-    DOCS_URL_LITELLM,
-    INTERVAL_LITELLM,
-    LITELLM_FIELDS
+    COPILOT_STUDIO_FIELDS
 } from "./constants/aiAgentConnectorConstants"
 import DataDogConnector from "./components/DataDogConnector"
 
@@ -996,16 +990,12 @@ const copilotStudioImportObj = {
 const litellmImportObj = {
     icon: '/public/litellm.svg',
     label: "LiteLLM",
-    text: "Use our LiteLLM feature to capture traffic from your LiteLLM proxy and instantly send it to your dashboard for real-time insights.",
-    docsUrl: 'https://docs.akto.io/litellm-import',
-    key: "LITELLM_IMPORT",
-    component: <AIAgentConnectorImport
-        connectorType={CONNECTOR_TYPE_LITELLM}
-        connectorName={CONNECTOR_NAME_LITELLM}
-        description={DESCRIPTION_LITELLM}
-        fields={LITELLM_FIELDS}
-        docsUrl={DOCS_URL_LITELLM}
-        recurringIntervalSeconds={INTERVAL_LITELLM}
+    text: "Import your LiteLLM proxy traffic, seamlessly into AKTO.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/workflow-automation/litellm',
+    key: "LITELLM",
+    component: <BannerComponent
+        content="Import your LiteLLM proxy traffic, seamlessly in AKTO."
+        docsUrl='https://docs.akto.io/traffic-connector/workflow-automation/litellm'
     />
 }
 

@@ -47,10 +47,6 @@ public class AIAgentConnectorImportAction extends UserAction {
     private String dataverseClientId;
     private String dataverseClientSecret;
 
-    // LiteLLM-specific parameters
-    private String litellmUrl;
-    private String litellmApiKey;
-
     /**
      * Unified method to initiate import for any AI Agent Connector.
      * The connector type is determined by the connectorType parameter.
@@ -149,16 +145,6 @@ public class AIAgentConnectorImportAction extends UserAction {
                 config.put(CONFIG_DATAVERSE_TENANT_ID, dataverseTenantId);
                 config.put(CONFIG_DATAVERSE_CLIENT_ID, dataverseClientId);
                 config.put(CONFIG_DATAVERSE_CLIENT_SECRET, dataverseClientSecret);
-                break;
-
-            case CONNECTOR_TYPE_LITELLM:
-                if (litellmUrl == null || litellmUrl.isEmpty() || litellmApiKey == null
-                        || litellmApiKey.isEmpty()) {
-                    loggerMaker.error("Missing required LiteLLM configuration", LogDb.DASHBOARD);
-                    return null;
-                }
-                config.put(CONFIG_LITELLM_BASE_URL, litellmUrl);
-                config.put(CONFIG_LITELLM_API_KEY, litellmApiKey);
                 break;
 
             default:

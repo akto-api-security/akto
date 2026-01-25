@@ -21,7 +21,6 @@ public final class AIAgentConnectorUtils {
     public static boolean isValidConnectorType(String connectorType) {
         return CONNECTOR_TYPE_N8N.equals(connectorType) ||
                 CONNECTOR_TYPE_LANGCHAIN.equals(connectorType) ||
-                CONNECTOR_TYPE_COPILOT_STUDIO.equals(connectorType) ||
-                CONNECTOR_TYPE_LITELLM.equals(connectorType);
+                CONNECTOR_TYPE_COPILOT_STUDIO.equals(connectorType);
     }
 }
