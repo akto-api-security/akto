@@ -63,12 +63,7 @@ public class Gateway {
             if (guardrailsResult.guardrailsResponse != null) {
                 Object allowed = guardrailsResult.guardrailsResponse.get("Allowed");
                 if (allowed != null && !Boolean.TRUE.equals(allowed) && !"true".equalsIgnoreCase(String.valueOf(allowed))) {
-                    // Create response if it doesn't exist
-                    if (response == null) {
-                        response = new HashMap<>();
-                        proxyData.put("response", response);
-                    }
-                    addBlockedByHeader(response);
+                    addBlockedByHeader(proxyData, response);
                 }
             }
 
@@ -185,15 +180,15 @@ public class Gateway {
     }
 
     /**
-     * Add x-blocked-by to response payload and set blocked status (only if body is null)
+     * Add x-blocked-by to response payload and set blocked status (only if response is null)
      */
-    @SuppressWarnings("unchecked")
-    private void addBlockedByHeader(Map<String, Object> response) {
-        Object body = response.get("body");
+    private void addBlockedByHeader(Map<String, Object> proxyData, Map<String, Object> response) {
+        // Only modify if response is null (no backend response)
+        if (response == null) {
+            // Create a new response with blocked status
+            response = new HashMap<>();
 
-        // Only modify if body is null
-        if (body == null) {
-            // Create a new Map with x-blocked-by field
+            // Create body with x-blocked-by field
             Map<String, Object> newBody = new HashMap<>();
             newBody.put("x-blocked-by", "Akto Proxy");
             response.put("body", newBody);
@@ -201,6 +196,9 @@ public class Gateway {
             // Set statusCode to 403 and status to "forbidden" for blocked requests
             response.put("statusCode", 403);
             response.put("status", "forbidden");
+
+            // Add response to proxyData
+            proxyData.put("response", response);
 
             logger.info("Added x-blocked-by to response payload and set status to 403 forbidden due to guardrails blocking");
         }
