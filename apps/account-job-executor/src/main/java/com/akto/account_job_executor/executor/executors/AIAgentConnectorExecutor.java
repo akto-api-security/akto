@@ -69,6 +69,10 @@ public class AIAgentConnectorExecutor extends AccountJobExecutor {
                 executeCopilotStudioConnector(job, config);
                 break;
 
+            case "LITELLM":
+                executeLiteLLMConnector(job, config);
+                break;
+
             default:
                 logger.warn("Unknown AI Agent Connector subType: {}. Skipping job execution.", subType);
                 throw new IllegalArgumentException("Unsupported AI Agent Connector subType: " + subType);
@@ -114,6 +118,20 @@ public class AIAgentConnectorExecutor extends AccountJobExecutor {
         executeBinaryConnector(job, config, BINARY_NAME_COPILOT_STUDIO);
 
         logger.info("Copilot Studio connector execution completed: jobId={}", job.getId());
+    }
+
+    /**
+     * Execute LiteLLM connector logic.
+     * Downloads the LiteLLM shield binary from Azure Storage and executes it with
+     * config as env vars.
+     */
+    private void executeLiteLLMConnector(AccountJob job, Map<String, Object> config) throws Exception {
+        logger.info("Executing LiteLLM connector: jobId={}", job.getId());
+
+        // Execute connector binary with config
+        executeBinaryConnector(job, config, BINARY_NAME_LITELLM);
+
+        logger.info("LiteLLM connector execution completed: jobId={}", job.getId());
     }
 
     /**

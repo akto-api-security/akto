@@ -7,21 +7,25 @@
 export const CONNECTOR_TYPE_N8N = 'N8N';
 export const CONNECTOR_TYPE_LANGCHAIN = 'LANGCHAIN';
 export const CONNECTOR_TYPE_COPILOT_STUDIO = 'COPILOT_STUDIO';
+export const CONNECTOR_TYPE_LITELLM = 'LITELLM';
 
 // Connector Names (Display)
 export const CONNECTOR_NAME_N8N = 'N8N';
 export const CONNECTOR_NAME_LANGCHAIN = 'Langchain';
 export const CONNECTOR_NAME_COPILOT_STUDIO = 'Copilot Studio';
+export const CONNECTOR_NAME_LITELLM = 'LiteLLM';
 
 // Documentation URLs
 export const DOCS_URL_N8N = 'https://docs.akto.io/traffic-connector/workflow-automation/n8n';
 export const DOCS_URL_LANGCHAIN = 'https://docs.akto.io/traffic-connector/workflow-automation/langchain';
 export const DOCS_URL_COPILOT_STUDIO = 'https://docs.akto.io/traffic-connector/workflow-automation/copilot-studio';
+export const DOCS_URL_LITELLM = 'https://docs.akto.io/traffic-connector/workflow-automation/litellm';
 
 // Recurring Interval Seconds (in seconds)
 export const INTERVAL_N8N = 300; // 5 minutes
 export const INTERVAL_LANGCHAIN = 300; // 5 minutes
 export const INTERVAL_COPILOT_STUDIO = 300; // 5 minutes
+export const INTERVAL_LITELLM = 300; // 5 minutes
 
 // Field Names
 export const FIELD_N8N_URL = 'n8nUrl';
@@ -32,6 +36,8 @@ export const FIELD_DATAVERSE_ENVIRONMENT_URL = 'dataverseEnvironmentUrl';
 export const FIELD_DATAVERSE_TENANT_ID = 'dataverseTenantId';
 export const FIELD_DATAVERSE_CLIENT_ID = 'dataverseClientId';
 export const FIELD_DATAVERSE_CLIENT_SECRET = 'dataverseClientSecret';
+export const FIELD_LITELLM_URL = 'litellmUrl';
+export const FIELD_LITELLM_API_KEY = 'litellmApiKey';
 export const FIELD_DATA_INGESTION_URL = 'dataIngestionUrl';
 
 // Field Types
@@ -43,6 +49,7 @@ export const FIELD_TYPE_PASSWORD = 'password';
 export const DESCRIPTION_N8N = 'Use our N8N feature to capture traffic and instantly send it to your dashboard for real-time insights.';
 export const DESCRIPTION_LANGCHAIN = 'Use our Langchain feature to capture traffic from LangSmith and instantly send it to your dashboard for real-time insights.';
 export const DESCRIPTION_COPILOT_STUDIO = 'Use our Copilot Studio feature to capture conversation data from Azure Dataverse API and instantly send it to your dashboard for real-time insights.';
+export const DESCRIPTION_LITELLM = 'Use our LiteLLM feature to capture traffic from your LiteLLM proxy and instantly send it to your dashboard for real-time insights.';
 
 // N8N Field Configuration
 export const N8N_FIELDS = [
@@ -129,3 +136,28 @@ export const COPILOT_STUDIO_FIELDS = [
         placeholder: 'https://ingestion.example.com'
     }
 ];
+
+// LiteLLM Field Configuration
+export const LITELLM_FIELDS = [
+    {
+        name: FIELD_LITELLM_URL,
+        label: 'LiteLLM Proxy URL',
+        type: FIELD_TYPE_URL,
+        placeholder: 'http://localhost:4000',
+        configKey: FIELD_LITELLM_URL
+    },
+    {
+        name: FIELD_LITELLM_API_KEY,
+        label: 'LiteLLM API Key',
+        type: FIELD_TYPE_PASSWORD,
+        placeholder: '*******',
+        configKey: FIELD_LITELLM_API_KEY
+    },
+    {
+        name: FIELD_DATA_INGESTION_URL,
+        label: 'URL for Data Ingestion Service',
+        type: FIELD_TYPE_URL,
+        placeholder: 'https://ingestion.example.com'
+    }
+];
+
