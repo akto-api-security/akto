@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { EmptySearchResult, VerticalStack, Button, Badge, Text } from '@shopify/polaris';
 import { CancelMinor, ViewMinor, ChecklistMajor } from '@shopify/polaris-icons';
 import CreateGuardrailModal from "./components/CreateGuardrailModal";
+import CreateGuardrailPage from "./components/CreateGuardrailPage";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func";
 import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
@@ -509,7 +510,23 @@ function GuardrailPolicies() {
     };
 
 
-      const components = [
+    // If showing create/edit page, render the full page component
+    if (showCreateModal) {
+        return (
+            <CreateGuardrailPage
+                onClose={() => {
+                    setShowCreateModal(false);
+                    setEditingPolicy(null);
+                    setIsEditMode(false);
+                }}
+                onSave={handleCreateGuardrail}
+                editingPolicy={editingPolicy}
+                isEditMode={isEditMode}
+            />
+        );
+    }
+
+    const components = [
         <GithubSimpleTable
             key={`policies-table-${policyData.length}`}
             resourceName={resourceName}
@@ -531,18 +548,6 @@ function GuardrailPolicies() {
             selectable={true}
             promotedBulkActions={promotedBulkActions}
 
-        />,   
-        <CreateGuardrailModal
-            key={2}
-            isOpen={showCreateModal}
-            onClose={() => {
-                setShowCreateModal(false);
-                setEditingPolicy(null);
-                setIsEditMode(false);
-            }}
-            onSave={handleCreateGuardrail}
-            editingPolicy={editingPolicy}
-            isEditMode={isEditMode}
         />
     ];
 

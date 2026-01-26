@@ -63,7 +63,6 @@ const CustomGuardrailsStep = ({
 
     return (
         <VerticalStack gap="4">
-            <Text variant="headingMd">Custom Guardrails</Text>
             <Text variant="bodyMd" tone="subdued">
                 Create custom guardrails using LLM prompts or external model endpoints.
             </Text>
