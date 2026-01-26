@@ -61,7 +61,7 @@ public class CrawlerRun {
     private String errorMessage;
 
     public static final String COOKIES = "cookies";
-    private Object cookies;
+    private String cookies;
 
     public static final String CRAWLING_TIME = "crawlingTime";
     private Integer crawlingTime;
