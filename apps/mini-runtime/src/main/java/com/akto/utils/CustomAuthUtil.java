@@ -37,22 +37,22 @@ public class CustomAuthUtil {
         );
     }
 
-    private static Set<ApiInfo.AuthType> customTypes = new HashSet<>(Collections.singletonList(ApiInfo.AuthType.CUSTOM));
-    private static Set<ApiInfo.AuthType> unauthenticatedTypes = new HashSet<>(Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED));
+    private static Set<String> unauthenticatedTypes = new HashSet<>(Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED));
 
-    private static Set<Set<ApiInfo.AuthType>> addCustomAuth(Set<Set<ApiInfo.AuthType>> authTypes) {
+    private static Set<Set<String>> addCustomAuth(Set<Set<String>> authTypes, String customAuthName) {
 
         // remove unauthenticated and add custom auth type
         authTypes.remove(unauthenticatedTypes);
         
-        if(!authTypes.contains(customTypes)){
-            authTypes.add(customTypes);
+        Set<String> customAuthSet = new HashSet<>(Collections.singletonList(customAuthName));
+        if(!authTypes.contains(customAuthSet)){
+            authTypes.add(customAuthSet);
         }
 
         return authTypes;
     }
 
-    private static Set<Set<ApiInfo.AuthType>> addUnauthenticatedIfNoAuth(Set<Set<ApiInfo.AuthType>> authTypes) {
+    private static Set<Set<String>> addUnauthenticatedIfNoAuth(Set<Set<String>> authTypes) {
 
         if(authTypes.isEmpty()){
             authTypes.add(unauthenticatedTypes);
@@ -81,7 +81,10 @@ public class CustomAuthUtil {
 
         for (ApiInfo apiInfo : apiInfos) {
 
-            Set<Set<ApiInfo.AuthType>> authTypes = apiInfo.getAllAuthTypesFound();
+            Set<Set<String>> authTypes = apiInfo.getAllAuthTypesFound();
+            if (authTypes == null) {
+                authTypes = new HashSet<>();
+            }
             authTypes.remove(new HashSet<>());
 
             boolean foundCustomAuthType = false;
@@ -103,13 +106,16 @@ public class CustomAuthUtil {
 
                 // checking headerAuthKeys in header and cookie in any unauthenticated API
                 if (!headerAndCookieKeys.isEmpty() && !customAuthType.getHeaderKeys().isEmpty() && headerAndCookieKeys.containsAll(customAuthType.getHeaderKeys())) {
-                    UpdateOneModel<ApiInfo> update = new UpdateOneModel<>(
-                            ApiInfoDao.getFilter(apiInfo.getId()),
-                            Updates.set(ALL_AUTH_TYPES_FOUND, addCustomAuth(authTypes)),
-                            new UpdateOptions().upsert(false)
-                    );
-                    apiInfosUpdates.add(update);
-                    foundCustomAuthType = true;
+                    String customAuthName = customAuthType.getName();
+                    if (customAuthName != null && !customAuthName.trim().isEmpty()) {
+                        UpdateOneModel<ApiInfo> update = new UpdateOneModel<>(
+                                ApiInfoDao.getFilter(apiInfo.getId()),
+                                Updates.set(ALL_AUTH_TYPES_FOUND, addCustomAuth(authTypes, customAuthName)),
+                                new UpdateOptions().upsert(false)
+                        );
+                        apiInfosUpdates.add(update);
+                        foundCustomAuthType = true;
+                    }
                     break;
                 }
 
@@ -120,14 +126,16 @@ public class CustomAuthUtil {
                 // checking if all payload keys occur in any unauthenticated API
                 List<SingleTypeInfo> payloadSTIs = SingleTypeInfoDao.instance.findAll(getFilters(apiInfo, false, customAuthType.getPayloadKeys()));
                 if (payloadSTIs!=null && payloadSTIs.size()==customAuthType.getPayloadKeys().size()) {
-
-                    UpdateOneModel<ApiInfo> update = new UpdateOneModel<>(
-                            ApiInfoDao.getFilter(apiInfo.getId()),
-                            Updates.set(ALL_AUTH_TYPES_FOUND, addCustomAuth(authTypes)),
-                            new UpdateOptions().upsert(false)
-                    );
-                    apiInfosUpdates.add(update);
-                    foundCustomAuthType = true;
+                    String customAuthName = customAuthType.getName();
+                    if (customAuthName != null && !customAuthName.trim().isEmpty()) {
+                        UpdateOneModel<ApiInfo> update = new UpdateOneModel<>(
+                                ApiInfoDao.getFilter(apiInfo.getId()),
+                                Updates.set(ALL_AUTH_TYPES_FOUND, addCustomAuth(authTypes, customAuthName)),
+                                new UpdateOptions().upsert(false)
+                        );
+                        apiInfosUpdates.add(update);
+                        foundCustomAuthType = true;
+                    }
                     break;
                 }
             }
@@ -158,12 +166,23 @@ public class CustomAuthUtil {
     public static void resetAllCustomAuthTypes() {
 
         /*
-         * 1. remove custom auth type from all entries. 
+         * 1. remove all non-standard auth types (custom auth types use their custom names)
          * 2. remove unauthenticated auth type from all entries since on reset,
          * auth type should be calculated again.
+         * Note: We remove everything except standard auth types (BASIC, BEARER, JWT, etc.)
          */
+        List<String> standardAuthTypes = new ArrayList<>();
+        standardAuthTypes.add(ApiInfo.AuthType.BASIC);
+        standardAuthTypes.add(ApiInfo.AuthType.BEARER);
+        standardAuthTypes.add(ApiInfo.AuthType.JWT);
+        standardAuthTypes.add(ApiInfo.AuthType.AUTHORIZATION_HEADER);
+        standardAuthTypes.add(ApiInfo.AuthType.API_TOKEN);
+        standardAuthTypes.add(ApiInfo.AuthType.API_KEY);
+        standardAuthTypes.add(ApiInfo.AuthType.MTLS);
+        standardAuthTypes.add(ApiInfo.AuthType.SESSION_TOKEN);
+        
+        // Remove all auth types that are NOT in the standard list
         ApiInfoDao.instance.updateMany(new BasicDBObject(),
-                Updates.pull(ALL_AUTH_TYPES_FOUND + ".$[]", new BasicDBObject().append("$in",
-                        new String[] { ApiInfo.AuthType.CUSTOM.name(), ApiInfo.AuthType.UNAUTHENTICATED.name() })));
+                Updates.pull(ALL_AUTH_TYPES_FOUND + ".$[]", new BasicDBObject().append("$nin", standardAuthTypes)));
     }
 }
