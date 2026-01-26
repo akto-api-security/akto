@@ -268,7 +268,7 @@ public class ProfileAction extends UserAction {
             userDetails.append("protectionTrialMsg", organization.getprotectionTrialMsg());
             userDetails.append("agentTrialMsg", organization.getagentTrialMsg());
 
-            if(!DashboardMode.isSaasDeployment()) {
+
                 // Check if plan type is null, empty, or not in allowed list
                 String planType = organization.getplanType();
                 boolean isInvalidPlanType = planType == null || planType.isEmpty() ||
@@ -296,7 +296,7 @@ public class ProfileAction extends UserAction {
                     } else {
                         logger.infoAndAddToDb("Skipped Slack alert for whitelisted organization user: " + user.getLogin());
                     }
-                }
+
             }
         }
 
