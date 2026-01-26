@@ -49,11 +49,10 @@
 }
 
 .guardrail-nav-item {
-    padding: 10px 16px;
+    padding: 8px 16px;
     position: relative;
     transition: background-color 0.2s ease;
     cursor: pointer;
-    min-height: 52px;
     display: flex;
     align-items: center;
 }
@@ -62,19 +61,35 @@
     background-color: #F3F4F6;
 }
 
-.guardrail-nav-item:not(:last-child)::after {
+.guardrail-nav-item:not(:last-child)::before {
     content: '';
     position: absolute;
-    left: 26px;
-    top: 32px;
+    left: 25px;
+    top: 0;
+    bottom: 0;
     width: 2px;
-    height: calc(100% - 32px);
     background-color: #E1E3E5;
     z-index: 0;
 }
 
-.guardrail-nav-item[data-completed="true"]:not(:last-child)::after {
+.guardrail-nav-item:first-child::before {
+    top: 50%;
+}
+
+.guardrail-nav-item:last-child::before {
+    display: none;
+}
+
+.guardrail-nav-item[data-completed="true"] + .guardrail-nav-item::before {
     background-color: #6D3BEF;
+}
+
+.guardrail-nav-item:first-child[data-completed="true"]::before {
+    background-color: #6D3BEF;
+}
+
+.guardrail-nav-item.active::before {
+    display: none;
 }
 
 .step-indicator {
@@ -89,26 +104,26 @@
     flex-shrink: 0;
     position: relative;
     z-index: 1;
-    margin-top: 2px;
     margin-right: 12px;
     transition: all 0.2s ease;
+    background-color: white;
 }
 
 .step-indicator.current {
-    background-color: #6D3BEF;
+    background-color: #6D3BEF !important;
     color: white;
     border: none;
     box-shadow: 0 0 0 3px rgba(109, 59, 239, 0.12);
 }
 
 .step-indicator.completed {
-    background-color: #6D3BEF;
+    background-color: #6D3BEF !important;
     color: white;
     border: none;
 }
 
 .step-indicator.error {
-    background-color: #EF4444;
+    background-color: #EF4444 !important;
     color: white;
     border: none;
 }

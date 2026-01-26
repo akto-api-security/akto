@@ -12,7 +12,7 @@ import {
 } from "@shopify/polaris";
 import {
     SendMajor,
-    CancelSmallMinor,
+    CancelMajor,
     SettingsMajor
 } from "@shopify/polaris-icons";
 import PersistStore from '../../../../main/PersistStore';
@@ -776,9 +776,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         Create Guardrail Policy
                     </Text>
                 </HorizontalStack>
-                <Button plain onClick={handleClose}>
-                    <Icon source={CancelSmallMinor} />
-                </Button>
+                <button className="Polaris-Modal-CloseButton" onClick={handleClose}>
+                    <Box><Icon source={CancelMajor} /></Box>
+                </button>
             </div>
 
             <div className="guardrail-page-container">
