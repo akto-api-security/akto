@@ -5,9 +5,9 @@ import sys
 import urllib.request
 
 GUARDRAILS_URL = os.getenv("AKTO_GUARDRAILS_URL", "http://localhost:80")
-AUTH_TOKEN = os.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN", "")
 TIMEOUT = float(os.getenv("AKTO_GUARDRAILS_TIMEOUT", "5"))
 CLAUDE_API_URL = os.getenv("CLAUDE_API_URL", "https://api.anthropic.com")
+AKTO_CONNECTOR = "lightllm"
 
 
 def build_validation_request(query: str) -> dict:
@@ -42,11 +42,9 @@ def call_guardrails(query: str) -> tuple:
         request_body = build_validation_request(query)
 
         headers = {"Content-Type": "application/json"}
-        if AUTH_TOKEN:
-            headers["authorization"] = AUTH_TOKEN
 
         req = urllib.request.Request(
-            f"{GUARDRAILS_URL}/api/validate/request",
+            f"{GUARDRAILS_URL}/api/http-proxy?guardrails=true&akto_connector={AKTO_CONNECTOR}",
             data=json.dumps(request_body).encode("utf-8"),
             headers=headers,
             method="POST",
@@ -54,11 +52,16 @@ def call_guardrails(query: str) -> tuple:
 
         with urllib.request.urlopen(req, timeout=TIMEOUT) as response:
             result = json.loads(response.read().decode("utf-8"))
-            return result.get("Allowed", result.get("allowed", True)), result.get("Reason", result.get("reason", ""))
+            data = result.get("data", {})
+            guardrails_result = data.get("guardrailsResult", {})
+            allowed = guardrails_result.get("Allowed", True)
+            reason = guardrails_result.get("Reason", "")
+
+            return allowed, reason
 
     except Exception as e:
         print(f"Guardrails error: {e}", file=sys.stderr)
-        return True
+        return True, ""
 
 
 def main():
