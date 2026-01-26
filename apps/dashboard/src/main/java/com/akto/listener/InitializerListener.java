@@ -2526,7 +2526,6 @@ public class InitializerListener implements ServletContextListener {
                         }
                         syncCronInfo.setUpUpdateCronScheduler();
                         setUpTestEditorTemplatesScheduler();
-                        JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
                     }
                     if (runJobFunctions == 2) {
                         logger.warn("Starting CATEGORY 2 job schedulers", LogDb.DASHBOARD);
@@ -2535,6 +2534,7 @@ public class InitializerListener implements ServletContextListener {
                         agentBasePromptDetectionCron.setUpAgentBasePromptDetectionScheduler();
                         setupAutomatedApiGroupsScheduler();
                     }
+                    JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
                     updateApiGroupsForAccounts();
                     if(runJobFunctionsAnyway) {
                         crons.trafficAlertsScheduler();

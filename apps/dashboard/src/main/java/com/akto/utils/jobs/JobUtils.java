@@ -30,9 +30,11 @@ public class JobUtils {
     private static final Bson sort = Sorts.ascending(ApiInfo.ID_API_COLLECTION_ID, ApiInfo.ID_URL, ApiInfo.ID_METHOD);
 
     public static int getRunJobFunctions() {
+        String envValue = System.getenv().getOrDefault("AKTO_RUN_JOB", "0");
         try {
-            return Integer.parseInt(System.getenv().getOrDefault("AKTO_RUN_JOB", "0"));
+            return Integer.parseInt(envValue);
         } catch (Exception e) {
+            logger.error("Failed to parse AKTO_RUN_JOB environment variable. Invalid value: '" + envValue + "'. Defaulting to 0 (disabled). Valid values are: 0 (disabled), 1 (category 1 jobs), 2 (category 2 jobs)", e);
             return 0;
         }
     }
