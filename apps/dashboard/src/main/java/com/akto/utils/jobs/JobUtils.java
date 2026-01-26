@@ -34,7 +34,7 @@ public class JobUtils {
         try {
             return Integer.parseInt(envValue);
         } catch (Exception e) {
-            logger.error("Failed to parse AKTO_RUN_JOB environment variable. Invalid value: '" + envValue + "'. Defaulting to 0 (disabled). Valid values are: 0 (disabled), 1 (category 1 jobs), 2 (category 2 jobs)", e);
+            logger.error("Failed to parse AKTO_RUN_JOB environment variable. Invalid value: '" + envValue + "'. Defaulting to 0", e);
             return 0;
         }
     }
