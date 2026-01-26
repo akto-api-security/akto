@@ -2518,8 +2518,11 @@ public class InitializerListener implements ServletContextListener {
 
                     if (runJobFunctions == 1) {
                         logger.warn("Starting CATEGORY 1 job schedulers", LogDb.DASHBOARD);
+                        logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
                         setUpWebhookScheduler();
+                        logger.warn("Started traffic alert schedulers", LogDb.DASHBOARD);
                         setUpTrafficAlertScheduler();
+                        logger.warn("Started daily schedulers", LogDb.DASHBOARD);
                         setUpDailyScheduler();
                         if (DashboardMode.isMetered()) {
                             setupUsageScheduler();
