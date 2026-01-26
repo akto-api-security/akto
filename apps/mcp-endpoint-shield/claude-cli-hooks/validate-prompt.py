@@ -8,13 +8,14 @@ GUARDRAILS_URL = os.getenv("AKTO_GUARDRAILS_URL", "http://localhost:80")
 TIMEOUT = float(os.getenv("AKTO_GUARDRAILS_TIMEOUT", "5"))
 CLAUDE_API_URL = os.getenv("CLAUDE_API_URL", "https://api.anthropic.com")
 AKTO_CONNECTOR = "lightllm"
+API_PATH_FOR_CLAUDE = "/v1/messages"
 
 
 def build_validation_request(query: str) -> dict:
     """Build the request body for guardrails validation."""
     return {
         "url": CLAUDE_API_URL,
-        "path": "/v1/messages",
+        "path": API_PATH_FOR_CLAUDE,
         "request": {
             "method": "POST",
             "headers": {
