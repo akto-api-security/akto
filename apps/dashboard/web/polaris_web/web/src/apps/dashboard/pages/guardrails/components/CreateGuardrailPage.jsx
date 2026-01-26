@@ -785,7 +785,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 {/* Left Sidebar - Categories */}
                 <div className="guardrail-sidebar">
                     <Box padding="5" paddingBlockEnd="4">
-                        <Text variant="headingSm" as="h3" fontWeight="bold">Guardrail Categories</Text>
+                        <Text variant="headingMd" as="h3" fontWeight="semibold">Guardrail Categories</Text>
                     </Box>
                     <Box paddingInline="2">
                         <VerticalStack gap="0">
@@ -822,7 +822,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     <div className="guardrail-content-inner">
                         <Box padding="5">
                             <VerticalStack gap="4">
-                                <Text variant="headingLg" as="h2">
+                                <Text variant="headingMd" as="h2" fontWeight="semibold">
                                     {steps.find(s => s.number === currentStep)?.title}
                                 </Text>
                                 <Box paddingBlockEnd="4">
