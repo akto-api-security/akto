@@ -300,7 +300,7 @@ public class AktoJaxAction extends UserAction {
 
     private void initiateInternalCrawl(String crawlId, String hostname, String username,
                                      String password, String apiKey, String dashboardUrl,
-                                     int collectionId, Object cookies, int crawlingTime,
+                                     int collectionId, String cookies, int crawlingTime,
                                      String outscopeUrls, boolean runTestAfterCrawling,
                                      String urlTemplatePatterns, String applicationPages) throws Exception {
         String url = System.getenv("AKTOJAX_SERVICE_URL") + "/triggerCrawler";
