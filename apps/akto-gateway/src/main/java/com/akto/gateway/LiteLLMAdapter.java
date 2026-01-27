@@ -8,31 +8,31 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * LightLLM guardrails adapter that extracts the request body directly
- * Used when akto_connector=lightllm in query parameters
+ * LiteLLM guardrails adapter that extracts the request body directly
+ * Used when akto_connector=litellm in query parameters
  *
  * This adapter's sole responsibility is format conversion - extracting the body
  * and preparing the API request payload for /validate/request endpoint
  */
-public class LightLLMAdapter implements GuardrailsAdapter {
+public class LiteLLMAdapter implements GuardrailsAdapter {
 
-    private static final Logger logger = LogManager.getLogger(LightLLMAdapter.class);
+    private static final Logger logger = LogManager.getLogger(LiteLLMAdapter.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
-    public LightLLMAdapter(GuardrailsClient guardrailsClient) {
-        logger.info("LightLLMAdapter initialized");
+    public LiteLLMAdapter(GuardrailsClient guardrailsClient) {
+        logger.info("LiteLLMAdapter initialized");
     }
 
     @Override
     public Map<String, Object> formatRequest(String url, String path,
                                               Map<String, Object> request,
                                               Map<String, Object> response) {
-        logger.info("LightLLM adapter: extracting body and formatting API request");
+        logger.info("LiteLLM adapter: extracting body and formatting API request");
 
         // Extract body from request (format conversion only)
         String payload = extractBody(request);
 
-        logger.debug("Extracted LightLLM payload (length: {})",
+        logger.debug("Extracted LiteLLM payload (length: {})",
                 payload != null ? payload.length() : 0);
 
         // Format the API request for /validate/request endpoint
@@ -46,7 +46,7 @@ public class LightLLMAdapter implements GuardrailsAdapter {
 
     @Override
     public String getAdapterName() {
-        return "lightllm";
+        return "litellm";
     }
 
     /**
