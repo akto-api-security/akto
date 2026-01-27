@@ -1,75 +1,13 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import ReactFlow, {
-  Background,
-  MarkerType,
-  getBezierPath,
-  Handle,
-  Position
-} from 'react-flow-renderer';
-import 'react-flow-renderer/dist/style.css';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api';
-import { Card, Text, VerticalStack, Box, HorizontalStack } from '@shopify/polaris';
-import GetPrettifyEndpoint from '../GetPrettifyEndpoint';
+import FlowGraphLayout from './FlowGraphLayout';
+import { createCustomEdge, createCustomNode } from './FlowGraphComponents';
 
 const initialNodes = [];
 const initialEdges = [];
 
-// Custom edge component with arrows
-const SequencesEdge = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, data }) => {
-  const edgePath = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
-  const { label } = data;
-
-  return (
-    <g>
-      <svg>
-        <defs>
-          <marker id="arrow" markerWidth="14" markerHeight="14" refX="9" refY="7" orient="auto" markerUnits="strokeWidth">
-            <path d="M0,0 L9,7 L0,14" fill='none' stroke='grey' />
-          </marker>
-        </defs>
-      </svg>
-      <path 
-        id={id} 
-        style={{ ...style }} 
-        className="react-flow__edge-path" 
-        d={edgePath} 
-        markerEnd="url(#arrow)" 
-      />
-      {label && (
-        <text>
-          <textPath href={`#${id}`} style={{ fontSize: '12px', fill: '#666' }} startOffset="50%" textAnchor="middle">
-            {label}
-          </textPath>
-        </text>
-      )}
-    </g>
-  );
-};
-
-// Custom node component with colored method names
-const SequencesNode = ({ data }) => {
-  const { method, url } = data;
-  return (
-    <div style={{ 
-      background: '#ffffff', 
-      border: '1px solid #ccc', 
-      borderRadius: '4px', 
-      padding: '10px',
-      minWidth: '200px',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-    }}>
-      <Handle type="target" position={Position.Top} id="t" style={{ background: '#555' }} />
-      <GetPrettifyEndpoint
-        method={method}
-        url={url}
-        isNew={false}
-        maxWidth="180px"
-        methodBoxWidth="54px"
-      />
-      <Handle type="source" position={Position.Bottom} id="b" style={{ background: '#555' }} />
-    </div>
-  );
-};
+const SequencesEdge = createCustomEdge('arrow', 'grey');
+const SequencesNode = createCustomNode('#ccc', '1px', '#555', '0 1px 3px rgba(0,0,0,0.1)');
 
 const nodeTypes = { sequencesNode: SequencesNode };
 const edgeTypes = { sequencesEdge: SequencesEdge };
@@ -80,36 +18,7 @@ function SequencesFlow({ apiCollectionId }) {
   const [loading, setLoading] = useState(true);
   const [apiSequences, setApiSequences] = useState([]);
 
-  useEffect(() => {
-    if (apiCollectionId) {
-      fetchApiSequences();
-    } else {
-      setNodes([]);
-      setEdges([]);
-      setLoading(false);
-    }
-  }, [apiCollectionId]);
-
-  const fetchApiSequences = async () => {
-    try {
-      setLoading(true);
-      const response = await api.getApiSequences(apiCollectionId);
-      if (response && Array.isArray(response.apiSequences) && response.apiSequences.length > 0) {
-        setApiSequences(response.apiSequences);
-        renderSequencesGraph(response.apiSequences);
-      } else {
-        setApiSequences([]);
-        setNodes([]);
-        setEdges([]);
-      }
-    } catch (error) {
-      console.error('Error fetching API sequences:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const renderSequencesGraph = (sequences) => {
+  const renderSequencesGraph = useCallback((sequences) => {
     const newNodes = [];
     const newEdges = [];
     const nodeMap = new Map();
@@ -158,77 +67,63 @@ function SequencesFlow({ apiCollectionId }) {
       }
     });
 
-    console.log('Final nodes:', newNodes);
-    console.log('Final edges:', newEdges);
-
     setNodes(newNodes);
     setEdges(newEdges);
-  };
+  }, []);
 
-  const SequencesBanner = () => {
-    const totalSequences = apiSequences.length;
-    const totalTransitions = apiSequences.reduce((sum, seq) => sum + seq.transitionCount, 0);
-    const avgProbability = totalSequences > 0 ? (apiSequences.reduce((sum, seq) => sum + seq.probability, 0) / totalSequences * 100).toFixed(1) : 0;
+  const fetchApiSequences = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await api.getApiSequences(apiCollectionId);
+      if (response && Array.isArray(response.apiSequences) && response.apiSequences.length > 0) {
+        setApiSequences(response.apiSequences);
+        renderSequencesGraph(response.apiSequences);
+      } else {
+        setApiSequences([]);
+        setNodes([]);
+        setEdges([]);
+      }
+    } catch (error) {
+      console.error('Error fetching API sequences:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [apiCollectionId, renderSequencesGraph]);
 
-    return (
-      <Card padding="6">
-        <VerticalStack gap="4">
-          <HorizontalStack align="space-between">
-            <Text variant="headingMd" fontWeight="semibold">API Sequences Overview</Text>
-          </HorizontalStack>
-          <HorizontalStack gap="24">
-            <Box>
-              <Text variant="bodyMd" color="subdued">Total Sequences</Text>
-              <Text variant="headingLg" fontWeight="bold">{totalSequences}</Text>
-            </Box>
-            <Box>
-              <Text variant="bodyMd" color="subdued">Total Transitions</Text>
-              <Text variant="headingLg" fontWeight="bold">{totalTransitions}</Text>
-            </Box>
-            <Box>
-              <Text variant="bodyMd" color="subdued">Avg Probability</Text>
-              <Text variant="headingLg" fontWeight="bold">{avgProbability}%</Text>
-            </Box>
-          </HorizontalStack>
-        </VerticalStack>
-      </Card>
-    );
-  };
+  useEffect(() => {
+    if (apiCollectionId) {
+      fetchApiSequences();
+    } else {
+      setNodes([]);
+      setEdges([]);
+      setLoading(false);
+    }
+  }, [apiCollectionId, fetchApiSequences]);
 
-  if (loading) {
-    return (
-      <div style={{ padding: '20px', textAlign: 'center' }}>
-        <p>Loading API sequences...</p>
-      </div>
-    );
-  }
+  const totalSequences = apiSequences.length;
+  const totalTransitions = apiSequences.reduce((sum, seq) => sum + seq.transitionCount, 0);
+  const avgProbability = totalSequences > 0 ? (apiSequences.reduce((sum, seq) => sum + seq.probability, 0) / totalSequences * 100).toFixed(1) : 0;
+
+  const bannerStats = [
+    { label: 'Total Sequences', value: totalSequences },
+    { label: 'Total Transitions', value: totalTransitions },
+    { label: 'Avg Probability', value: `${avgProbability}%` }
+  ];
 
   return (
-    <div style={{ padding: '20px' }}>
-      <SequencesBanner />
-      
-      {apiSequences.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          <p>No API sequences found for this collection</p>
-        </div>
-      ) : (
-        <div style={{ height: "600px", marginTop: '20px' }}>
-          <ReactFlow 
-            nodes={nodes} 
-            edges={edges}
-            fitView
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-            defaultEdgeOptions={{
-              type: 'sequencesEdge',
-              animated: false,
-            }}
-          >
-            <Background color="#aaa" gap={6} />
-          </ReactFlow>
-        </div>
-      )}
-    </div>
+    <FlowGraphLayout
+      loading={loading}
+      loadingMessage="Loading API sequences..."
+      nodes={nodes}
+      edges={edges}
+      nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
+      defaultEdgeType="sequencesEdge"
+      emptyMessage="No API sequences found for this collection"
+      bannerTitle="API Sequences Overview"
+      bannerStats={bannerStats}
+      showData={apiSequences.length > 0}
+    />
   );
 }
 

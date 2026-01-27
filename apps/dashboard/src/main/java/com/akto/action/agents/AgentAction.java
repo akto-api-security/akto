@@ -22,11 +22,17 @@ import com.akto.dto.HttpResponseParams.Source;
 import com.akto.dto.agents.*;
 import com.akto.har.HAR;
 import com.akto.util.Constants;
+import com.akto.util.JSONUtils;
 import com.akto.utils.Utils;
 import com.amazonaws.util.StringUtils;
+import com.akto.dao.ApiDependenciesFromSwaggerDao;
+import com.akto.dto.ApiDependenciesFromSwagger;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.UpdateManyModel;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 
@@ -705,6 +711,69 @@ public class AgentAction extends UserAction {
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
+                break;
+
+            case "api_dependencies": {
+                @SuppressWarnings("unchecked")
+                List<Object> apiDependenciesRaw = (List<Object>) this.data.get("dependencies");
+                
+                if (apiDependenciesRaw != null && !apiDependenciesRaw.isEmpty()) {
+                    DiscoveryAgentRun agentRun = DiscoveryAgentRunDao.instance.findOne(Filters.eq(AgentRun.PROCESS_ID, this.processId));
+                    if (agentRun != null) {
+                        int collectionId = agentRun.getApiCollectionId();
+                        int lastSeen = Context.now();
+                        
+                        List<UpdateManyModel<ApiDependenciesFromSwagger>> bulkUpdates = new ArrayList<>();
+                        for (Object dependencyObj : apiDependenciesRaw) {
+                            try {
+                                // JSONUtils.fromJson can handle Map, HashMap, BasicDBObject, etc.
+                                ApiDependenciesFromSwagger dependency = JSONUtils.fromJson(dependencyObj, ApiDependenciesFromSwagger.class);
+                                if (dependency != null && dependency.getApiIdentifier() != null) {
+                                    dependency.setApiCollectionId(collectionId);
+                                    dependency.setLastSeen(lastSeen);
+                                    
+                                    String url = dependency.getApiIdentifier().getUrl();
+                                    String method = dependency.getApiIdentifier().getMethod();
+                                    
+                                    Bson dependencyFilter = Filters.and(
+                                        Filters.eq("apiIdentifier.url", url),
+                                        Filters.eq("apiIdentifier.method", method),
+                                        Filters.eq("apiCollectionId", collectionId)
+                                    );
+                                    
+                                    Bson dependencyUpdate = Updates.combine(
+                                        Updates.set("dependencies", dependency.getDependencies()),
+                                        Updates.set("lastSeen", lastSeen),
+                                        Updates.setOnInsert("apiCollectionId", collectionId),
+                                        Updates.setOnInsert("apiIdentifier", dependency.getApiIdentifier())
+                                    );
+                                    
+                                    bulkUpdates.add(new UpdateManyModel<>(
+                                        dependencyFilter,
+                                        dependencyUpdate,
+                                        new UpdateOptions().upsert(true)
+                                    ));
+                                }
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }
+                        
+                        
+                        if (!bulkUpdates.isEmpty()) {
+                            try {
+                                ApiDependenciesFromSwaggerDao.instance.getMCollection().bulkWrite(
+                                    bulkUpdates,
+                                    new BulkWriteOptions().ordered(false)
+                                );
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                }
+                break;
+            }
                 
             default:
                 break;
