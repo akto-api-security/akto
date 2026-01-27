@@ -991,11 +991,11 @@ const claudeCodeCliImportObj = {
     icon: '/public/claudeCodeCli.svg',
     label: "Claude Code CLI",
     text: "Import your Claude Code CLI proxy traffic, seamlessly into AKTO.",
-    docsUrl: 'https://docs.akto.io/traffic-connector/workflow-automation/claude-code-cli',
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/claude-code-cli',
     key: "CLAUDECODECLI",
     component: <BannerComponent
         content="Import your Claude Code CLI proxy traffic, seamlessly in AKTO."
-        docsUrl='https://docs.akto.io/traffic-connector/workflow-automation/claude-code-cli'
+        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/claude-code-cli'
     />
 }
 
