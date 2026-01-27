@@ -590,6 +590,7 @@ public class Executor {
         for (String payloadAuthKey: authBodyParams) {
             if (unchangedBodyKeys.contains(payloadAuthKey)) {
                 removed = Operations.deleteBodyParam(testRawApi, payloadAuthKey).getErrMsg().isEmpty() || removed;
+                removed = Operations.deleteQueryParam(testRawApi, authMechanismHeaderKey).getErrMsg().isEmpty() || removed;
             }
         }
 
@@ -607,7 +608,9 @@ public class Executor {
             List<String> customAuthTypePayloadKeys = customAuthType.getPayloadKeys();
             for (String payloadAuthKey: customAuthTypePayloadKeys) {
                 removed = Operations.deleteBodyParam(rawApi, payloadAuthKey).getErrMsg().isEmpty() || removed;
+                removed = Operations.deleteQueryParam(rawApi, payloadAuthKey).getErrMsg().isEmpty() || removed;
             }
+
         }
         return removed;
     }
