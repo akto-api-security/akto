@@ -59,7 +59,7 @@ public class InitializerListener implements ServletContextListener {
 
         // Initialize GuardrailsConfig and TopicPublisher
         GuardrailsConfig guardrailsConfig = GuardrailsConfig.getInstance();
-        logger.error("Guardrails configuration: " + guardrailsConfig,
+        logger.info("Guardrails configuration: " + guardrailsConfig,
             LoggerMaker.LogDb.DATA_INGESTION);
 
         // Store publisher for use in KafkaUtils
