@@ -7,15 +7,14 @@ import {
     Box,
     Icon,
     Scrollable,
-    Button,
-    TextField
+    Button
 } from "@shopify/polaris";
 import {
-    SendMajor,
     CancelMajor,
     SettingsMajor
 } from "@shopify/polaris-icons";
 import PersistStore from '../../../../main/PersistStore';
+import AgenticSearchInput from '../../agentic/components/AgenticSearchInput';
 import {
     PolicyDetailsStep,
     PolicyDetailsConfig,
@@ -825,7 +824,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                 <Text variant="headingMd" as="h2" fontWeight="semibold">
                                     {steps.find(s => s.number === currentStep)?.title}
                                 </Text>
-                                <Box paddingBlockEnd="4">
+                                <Box>
                                     {renderStepContent(currentStep)}
                                 </Box>
                             </VerticalStack>
@@ -870,33 +869,15 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                             </Box>
                         </VerticalStack>
                     </Box>
-                    <Box padding="4" paddingBlockEnd="5">
-                        <TextField
-                            placeholder="Ask a follow up..."
+                    <div className="playground-input-wrapper">
+                        <AgenticSearchInput
                             value={playgroundInput}
                             onChange={setPlaygroundInput}
-                            autoComplete="off"
-                            suffix={
-                                <div
-                                    style={{
-                                        background: playgroundInput.trim() ? "#0070F3" : "#E4E5E7",
-                                        padding: "6px",
-                                        borderRadius: "50%",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center"
-                                    }}
-                                >
-                                    <Button
-                                        plain
-                                        disabled={!playgroundInput.trim() || playgroundLoading}
-                                        onClick={handlePlaygroundTest}
-                                        icon={SendMajor}
-                                    />
-                                </div>
-                            }
+                            onSubmit={handlePlaygroundTest}
+                            placeholder="How can I help you today?"
+                            isStreaming={playgroundLoading}
                         />
-                    </Box>
+                    </div>
                 </div>
             </div>
         </div>

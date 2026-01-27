@@ -166,9 +166,16 @@
 
 .guardrail-content-footer {
     border-top: 1px solid #E1E3E5;
-    padding: 20px 24px;
+    padding: 24px 20px;
     background: white;
     box-shadow: 0 -1px 0 0 rgba(0, 0, 0, 0.05);
+    display: flex;
+    align-items: center;
+}
+
+.guardrail-content-footer > * {
+    flex: 1;
+    width: 100%;
 }
 
 /* Right Sidebar - Playground */
@@ -181,18 +188,10 @@
     justify-content: space-between;
 }
 
-.guardrail-playground .Polaris-TextField__Backdrop {
-    border-radius: 20px !important;
-    border: 1px solid #C9CCCF !important;
+.playground-input-wrapper {
+    padding: 20px 20px 24px 20px;
 }
 
-.guardrail-playground .Polaris-TextField {
-    font-size: 14px !important;
-}
-
-.guardrail-playground .Polaris-TextField__Input {
-    border-radius: 20px !important;
-}
 
 
 /* Responsive adjustments */
