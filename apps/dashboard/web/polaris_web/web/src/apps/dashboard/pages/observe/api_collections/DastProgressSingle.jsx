@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react"
-import { useParams, useNavigate } from "react-router-dom"
+import { useEffect, useState, useCallback } from "react"
+import { useParams } from "react-router-dom"
 import { Box, IndexFiltersMode, Text, HorizontalStack, Badge, Card, VerticalStack, Divider } from "@shopify/polaris"
-import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable"
+import GithubServerTable from "@/apps/dashboard/components/tables/GithubServerTable"
 import func from "@/util/func"
 import api from "./api"
-import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered"
 import TooltipText from "@/apps/dashboard/components/shared/TooltipText"
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 
@@ -45,6 +44,7 @@ const headers = [
         title: "Discovered At",
         text: "Discovered At",
         value: "discoveredAt",
+        sortKey: "timestamp"
     }
 ]
 
@@ -58,104 +58,113 @@ const resourceName = {
     plural: 'URLs',
 }
 
+const statusFilterChoices = [
+    { label: 'Non-terminal', value: 'Non-terminal' },
+    { label: 'Terminal', value: 'Terminal' }
+]
+
 function DastProgressSingle() {
     const { "crawlId": crawlId } = useParams()
-    const navigate = useNavigate()
     const [loading, setLoading] = useState(false)
-    const [data, setData] = useState([])
     const [crawlDetails, setCrawlDetails] = useState(null)
 
-    const fetchDastScan = async () => {
-        try {
-            setLoading(true)
-            const resp = await api.fetchDastScan(crawlId)
+    const formatCrawlerUrls = (crawlerUrls) => {
+        return crawlerUrls.map((urlItem, index) => {
+            const status = urlItem.accepted ? "Non-terminal" : "Terminal"
+            const statusColor = urlItem.accepted ? "success" : "warning"
 
-            const crawlerUrls = resp || []
-            const formattedData = crawlerUrls.map((urlItem, index) => {
-                const status = urlItem.accepted ? "Non-terminal" : "Terminal"
-                const statusColor = urlItem.accepted ? "success" : "warning"
-
-                return {
-                    id: `${urlItem.crawlId}-${index}`,
-                    url: urlItem.url,
-                    urlComp: (
-                        <Box maxWidth="50vw">
-                            <TooltipText
-                                tooltip={urlItem.url}
-                                text={urlItem.url}
-                                textProps={{ fontWeight: 'medium' }}
-                            />
-                        </Box>
-                    ),
-                    sourceUrl: urlItem.sourceUrl || '-',
-                    sourceUrlComp: (
-                        <Box maxWidth="30vw">
-                            <TooltipText
-                                tooltip={urlItem.sourceUrl || 'N/A'}
-                                text={urlItem.sourceUrl || '-'}
-                                textProps={{ fontWeight: 'regular' }}
-                            />
-                        </Box>
-                    ),
-                    sourceXpath: urlItem.sourceXpath || '-',
-                    sourceXpathComp: (
-                        <Box maxWidth="30vw">
-                            <TooltipText
-                                tooltip={urlItem.sourceXpath || 'N/A'}
-                                text={urlItem.sourceXpath || '-'}
-                                textProps={{ fontWeight: 'regular' }}
-                            />
-                        </Box>
-                    ),
-                    buttonText: urlItem.buttonText || '-',
-                    buttonTextComp: (
-                        <Box maxWidth="20vw">
-                            <TooltipText
-                                tooltip={urlItem.buttonText || 'N/A'}
-                                text={urlItem.buttonText || '-'}
-                                textProps={{ fontWeight: 'regular' }}
-                            />
-                        </Box>
-                    ),
-                    accepted: urlItem.accepted,
-                    status: status,
-                    statusComp: (
-                        <Badge status={statusColor}>{status}</Badge>
-                    ),
-                    discoveredAt: func.prettifyEpoch(urlItem.timestamp),
-                    timestamp: urlItem.timestamp,
-                    crawlId: urlItem.crawlId
-                }
-            })
-
-            setData(formattedData)
-
-            // Set crawl details for the header
-            if (crawlerUrls.length > 0) {
-                setCrawlDetails({
-                    crawlId: crawlId,
-                    totalUrls: crawlerUrls.length,
-                    acceptedUrls: crawlerUrls.filter(u => u.accepted).length,
-                    rejectedUrls: crawlerUrls.filter(u => !u.accepted).length
-                })
+            return {
+                id: `${urlItem.crawlId}-${urlItem.timestamp}-${index}`,
+                url: urlItem.url,
+                urlComp: (
+                    <Box maxWidth="50vw">
+                        <TooltipText
+                            tooltip={urlItem.url}
+                            text={urlItem.url}
+                            textProps={{ fontWeight: 'medium' }}
+                        />
+                    </Box>
+                ),
+                sourceUrl: urlItem.sourceUrl || '-',
+                sourceUrlComp: (
+                    <Box maxWidth="30vw">
+                        <TooltipText
+                            tooltip={urlItem.sourceUrl || 'N/A'}
+                            text={urlItem.sourceUrl || '-'}
+                            textProps={{ fontWeight: 'regular' }}
+                        />
+                    </Box>
+                ),
+                buttonText: urlItem.buttonText || '-',
+                buttonTextComp: (
+                    <Box maxWidth="20vw">
+                        <TooltipText
+                            tooltip={urlItem.buttonText || 'N/A'}
+                            text={urlItem.buttonText || '-'}
+                            textProps={{ fontWeight: 'regular' }}
+                        />
+                    </Box>
+                ),
+                accepted: urlItem.accepted,
+                status: status,
+                statusComp: (
+                    <Badge status={statusColor}>{status}</Badge>
+                ),
+                discoveredAt: func.prettifyEpoch(urlItem.timestamp),
+                timestamp: urlItem.timestamp,
+                crawlId: urlItem.crawlId
             }
+        })
+    }
+
+    const fetchTableData = useCallback(async (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => {
+        setLoading(true)
+        try {
+            const resp = await api.fetchDastScan(crawlId, skip, limit, filters, queryValue, sortKey, sortOrder)
+            const crawlerUrls = resp?.crawlerUrls || []
+            const totalCount = resp?.totalCount || 0
+
+            const formattedData = formatCrawlerUrls(crawlerUrls)
 
             setLoading(false)
+            return { value: formattedData, total: totalCount }
         } catch (error) {
             func.setToast(true, true, "Failed to fetch DAST scan details")
             setLoading(false)
+            return { value: [], total: 0 }
         }
-    }
+    }, [crawlId, crawlDetails])
 
     useEffect(() => {
+        setCrawlDetails(null)
+        const fetchCounts = async () => {
+            try {
+                const resp = await api.fetchDastScanCounts(crawlId)
+                if (resp) {
+                    setCrawlDetails({
+                        crawlId: crawlId,
+                        totalUrls: resp.totalCount || 0,
+                        acceptedUrls: resp.acceptedCount || 0,
+                        rejectedUrls: resp.rejectedCount || 0
+                    })
+                }
+            } catch (error) {
+                func.setToast(true, true, "Failed to fetch DAST scan counts")
+            }
+        }
         if (crawlId) {
-            fetchDastScan()
+            fetchCounts()
         }
     }, [crawlId])
 
-    if (loading) {
-        return <SpinnerCentered />
-    }
+    const filters = [
+        {
+            key: 'status',
+            label: 'Status',
+            title: 'Status',
+            choices: statusFilterChoices
+        }
+    ]
 
     return (
         <PageWithMultipleCards
@@ -164,7 +173,7 @@ function DastProgressSingle() {
             }
             components={[
                 crawlDetails && (
-                    <Box paddingBlockEnd="4">
+                    <Box paddingBlockEnd="4" key="crawl-details">
                         <Card>
                             <VerticalStack gap="4">
                                 <HorizontalStack gap="8" wrap={false}>
@@ -192,17 +201,20 @@ function DastProgressSingle() {
                         </Card>
                     </Box>
                 ),
-                <GithubSimpleTable
-                    data={data}
+                <GithubServerTable
+                    key={crawlId}
+                    pageLimit={50}
+                    fetchData={fetchTableData}
                     sortOptions={sortOptions}
                     resourceName={resourceName}
                     headers={headers}
                     headings={headers}
                     loading={loading}
+                    filters={filters}
                     mode={IndexFiltersMode.Default}
                     useNewRow={true}
                     condensedHeight={true}
-                    disambiguateLabel={(_, value) => func.convertToDisambiguateLabelObj(value, null, 2)}
+                    disambiguateLabel={(key, value) => func.convertToDisambiguateLabelObj(value, null, 2)}
                 />
             ]}
         />

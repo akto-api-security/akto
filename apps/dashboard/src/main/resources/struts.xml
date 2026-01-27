@@ -2898,7 +2898,38 @@
                 <param name="featureLabel">AKTO_DAST</param>
             </interceptor-ref>
             <result name="SUCCESS"  type="json">
-                <param name="root">crawlerUrls</param>
+                <param name="root">response</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchDastScanCounts" class="com.akto.action.DastAction" method="fetchDastScanCounts">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+                <param name="actionDescription">fetched DAST scan counts</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AKTO_DAST</param>
+            </interceptor-ref>
+            <result name="SUCCESS"  type="json">
+                <param name="root">response</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
