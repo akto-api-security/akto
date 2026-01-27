@@ -9,6 +9,9 @@ public class AdapterFactory {
 
     private static final Logger logger = LogManager.getLogger(AdapterFactory.class);
 
+    private static final String CONNECTOR_LIGHTLLM = "lightllm";
+    private static final String CONNECTOR_CLAUDE_CODE_CLI = "claude_code_cli";
+
     private final StandardGuardrailsAdapter standardAdapter;
     private final LightLLMAdapter lightLLMAdapter;
 
@@ -29,7 +32,7 @@ public class AdapterFactory {
         if (connectorValue != null) {
             String connector = connectorValue.toString();
 
-            if ("lightllm".equalsIgnoreCase(connector)) {
+            if (CONNECTOR_LIGHTLLM.equalsIgnoreCase(connector) || CONNECTOR_CLAUDE_CODE_CLI.equalsIgnoreCase(connector)) {
                 logger.info("Selecting LightLLM adapter based on akto_connector=lightllm");
                 return lightLLMAdapter;
             }
