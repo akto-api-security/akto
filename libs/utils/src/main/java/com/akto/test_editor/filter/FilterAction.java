@@ -1,6 +1,5 @@
 package com.akto.test_editor.filter;
 
-import com.akto.dao.test_editor.TestEditorEnums.DataOperands;
 import com.akto.util.HttpRequestResponseUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -13,9 +12,7 @@ import com.akto.dao.testing.AccessMatrixUrlToRolesDao;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
 
-import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.ApiCollectionsDao;
