@@ -20,29 +20,52 @@ public class KafkaUtils {
     // Only reconnection blocks everything (write lock)
     private static final ReadWriteLock producerLock = new ReentrantReadWriteLock();
 
-    // Configuration for reconnection
-    private static String brokerUrl;
-    private static int batchSize;
-    private static int lingerMS;
+    // Configuration initialized once from environment variables
+    private static final String topicName;
+    private static final String brokerUrl;
+    private static final int batchSize;
+    private static final int lingerMS;
 
-    public synchronized void initKafkaProducer() {
+    // Static initializer - reads and validates configuration once when class loads
+    static {
         try {
-            // Validate environment variables
+            // Read environment variables
+            topicName = System.getenv().getOrDefault("AKTO_KAFKA_TOPIC_NAME", "akto.api.logs");
+            if (topicName == null || topicName.trim().isEmpty()) {
+                throw new IllegalArgumentException("AKTO_KAFKA_TOPIC_NAME cannot be empty");
+            }
+
             brokerUrl = System.getenv().getOrDefault("AKTO_KAFKA_BROKER_URL", "localhost:29092");
             if (brokerUrl == null || brokerUrl.trim().isEmpty()) {
                 throw new IllegalArgumentException("AKTO_KAFKA_BROKER_URL cannot be empty");
             }
 
-            batchSize = Integer.parseInt(System.getenv().getOrDefault("AKTO_KAFKA_PRODUCER_BATCH_SIZE", "100"));
-            lingerMS = Integer.parseInt(System.getenv().getOrDefault("AKTO_KAFKA_PRODUCER_LINGER_MS", "10"));
-
+            String batchSizeStr = System.getenv().getOrDefault("AKTO_KAFKA_PRODUCER_BATCH_SIZE", "100");
+            batchSize = Integer.parseInt(batchSizeStr);
             if (batchSize <= 0) {
-                throw new IllegalArgumentException("AKTO_KAFKA_PRODUCER_BATCH_SIZE must be positive");
-            }
-            if (lingerMS < 0) {
-                throw new IllegalArgumentException("AKTO_KAFKA_PRODUCER_LINGER_MS cannot be negative");
+                throw new IllegalArgumentException("AKTO_KAFKA_PRODUCER_BATCH_SIZE must be positive, got: " + batchSize);
             }
 
+            String lingerMSStr = System.getenv().getOrDefault("AKTO_KAFKA_PRODUCER_LINGER_MS", "10");
+            lingerMS = Integer.parseInt(lingerMSStr);
+            if (lingerMS < 0) {
+                throw new IllegalArgumentException("AKTO_KAFKA_PRODUCER_LINGER_MS cannot be negative, got: " + lingerMS);
+            }
+
+            logger.info("Kafka configuration loaded - Topic: {}, Broker: {}, BatchSize: {}, LingerMS: {}",
+                topicName, brokerUrl, batchSize, lingerMS);
+
+        } catch (NumberFormatException e) {
+            logger.error("Invalid Kafka configuration number format: {}", e.getMessage());
+            throw new ExceptionInInitializerError("Invalid Kafka configuration: " + e.getMessage());
+        } catch (Exception e) {
+            logger.error("Failed to load Kafka configuration: {}", e.getMessage());
+            throw new ExceptionInInitializerError("Failed to load Kafka configuration: " + e.getMessage());
+        }
+    }
+
+    public synchronized void initKafkaProducer() {
+        try {
             logger.info("Initializing Kafka Producer at {}", Context.now());
             logger.info("Broker URL: {}", brokerUrl);
             logger.info("Batch Size: {}, Linger MS: {}", batchSize, lingerMS);
@@ -55,9 +78,6 @@ public class KafkaUtils {
                 logger.error("✗ Kafka Producer initialization failed - producer not ready");
                 throw new RuntimeException("Failed to initialize Kafka producer");
             }
-        } catch (NumberFormatException e) {
-            logger.error("Invalid configuration value: {}", e.getMessage());
-            throw new RuntimeException("Invalid Kafka configuration", e);
         } catch (Exception e) {
             logger.error("Unexpected error during Kafka initialization: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to initialize Kafka producer", e);
@@ -211,89 +231,29 @@ public class KafkaUtils {
     }
 
     /**
-     * Inserts data to Kafka using READ lock.
-     * Multiple threads can publish simultaneously for high throughput.
-     * Only blocks if reconnection (write lock) is in progress.
-     */
-    /**
      * Inserts data to Kafka using READ lock for high throughput.
-     * Production-ready with validation, error handling, and graceful degradation.
+     * Multiple threads can publish simultaneously.
+     * Only blocks if reconnection (write lock) is in progress.
      *
      * @param payload The data batch to publish
-     * @throws IllegalArgumentException if payload is null or invalid
-     * @throws RuntimeException if publishing fails critically
      */
     public static void insertData(IngestDataBatch payload) {
-        // Validation
-        if (payload == null) {
-            logger.error("Cannot publish null payload");
-            throw new IllegalArgumentException("Payload cannot be null");
-        }
+        logger.debug("Publishing message - Path: {}, Method: {}, StatusCode: {}",
+            payload.getPath(), payload.getMethod(), payload.getStatusCode());
 
-        String topicName = "akto.api.logs";
-        boolean lockAcquired = false;
+        BasicDBObject obj = buildMessageObject(payload);
+        String message = obj.toString();
 
+        // Acquire READ lock - multiple threads can publish simultaneously
+        producerLock.readLock().lock();
         try {
-            logger.debug("Building message object for payload - Path: {}, Method: {}",
-                payload.getPath(), payload.getMethod());
-
-            // Build message object with error handling
-            BasicDBObject obj = buildMessageObject(payload);
-            if (obj == null) {
-                logger.error("Failed to build message object for payload");
-                throw new RuntimeException("Message object is null");
-            }
-
-            String message = obj.toString();
-            if (message == null || message.isEmpty()) {
-                logger.error("Serialized message is null or empty");
-                throw new RuntimeException("Failed to serialize message");
-            }
-
-            logger.debug("Publishing message to Kafka topic: {} | Path: {} | Method: {} | StatusCode: {}",
-                topicName, payload.getPath(), payload.getMethod(), payload.getStatusCode());
-
-            // Acquire READ lock - multiple threads can publish simultaneously
-            producerLock.readLock().lock();
-            lockAcquired = true;
-
-            // Check if producer is available
-            if (kafkaProducer == null) {
-                logger.error("Kafka producer is null - cannot publish message");
-                throw new RuntimeException("Kafka producer not initialized");
-            }
-
-            if (!kafkaProducer.producerReady) {
-                logger.warn("Kafka producer not ready - attempting to publish anyway");
-            }
-
-            if (topicPublisher == null) {
-                logger.error("Topic publisher is null - cannot publish message");
-                throw new RuntimeException("Topic publisher not initialized");
-            }
-
-            // Publish message
             topicPublisher.publish(message, topicName);
-
             logger.debug("Message published successfully");
-
-        } catch (IllegalArgumentException e) {
-            logger.error("Invalid payload: {}", e.getMessage());
-            throw e;
         } catch (Exception e) {
             logger.error("Error publishing message to Kafka: {}", e.getMessage(), e);
-            logger.error("Payload details - Path: {}, Method: {}, StatusCode: {}",
-                payload.getPath(), payload.getMethod(), payload.getStatusCode());
             throw new RuntimeException("Failed to publish message to Kafka", e);
         } finally {
-            // Always release read lock if acquired
-            if (lockAcquired) {
-                try {
-                    producerLock.readLock().unlock();
-                } catch (Exception e) {
-                    logger.error("Error releasing read lock: {}", e.getMessage());
-                }
-            }
+            producerLock.readLock().unlock();
         }
     }
 

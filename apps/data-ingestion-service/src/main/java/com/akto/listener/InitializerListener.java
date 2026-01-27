@@ -21,6 +21,36 @@ public class InitializerListener implements ServletContextListener {
     private static final LoggerMaker logger = new LoggerMaker(InitializerListener.class, LoggerMaker.LogDb.DATA_INGESTION);
     private ScheduledExecutorService kafkaReconnectScheduler;
 
+    // Reconnection interval loaded once from environment
+    private static final int reconnectIntervalSeconds;
+
+    static {
+        int interval;
+        try {
+            interval = Integer.parseInt(
+                System.getenv().getOrDefault("AKTO_KAFKA_RECONNECT_INTERVAL_SECONDS", "60")
+            );
+        } catch (NumberFormatException e) {
+            logger.error("Invalid AKTO_KAFKA_RECONNECT_INTERVAL_SECONDS value, using default 60");
+            interval = 60;
+        }
+
+        // Validate reasonable range (10 seconds to 1 hour)
+        if (interval < 0) {
+            logger.info("Kafka reconnection disabled (interval < 0)");
+            interval = 0;
+        } else if (interval > 0 && interval < 10) {
+            logger.warn("Reconnection interval {} too short, setting to minimum 10 seconds", interval);
+            interval = 10;
+        } else if (interval > 3600) {
+            logger.warn("Reconnection interval {} too long, setting to maximum 3600 seconds", interval);
+            interval = 3600;
+        }
+
+        reconnectIntervalSeconds = interval;
+        logger.info("Kafka reconnection interval configured: {} seconds", reconnectIntervalSeconds);
+    }
+
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
         // Initialize Kafka
@@ -52,37 +82,14 @@ public class InitializerListener implements ServletContextListener {
      */
     /**
      * Starts a scheduled task to reconnect Kafka producer periodically.
-     * Production-ready with validation and error handling.
+     * Uses configuration loaded at class initialization.
      */
     private void startKafkaReconnectionScheduler() {
         try {
-            int reconnectIntervalSeconds;
-
-            try {
-                reconnectIntervalSeconds = Integer.parseInt(
-                    System.getenv().getOrDefault("AKTO_KAFKA_RECONNECT_INTERVAL_SECONDS", "60")
-                );
-            } catch (NumberFormatException e) {
-                logger.error("Invalid AKTO_KAFKA_RECONNECT_INTERVAL_SECONDS value, using default 60");
-                reconnectIntervalSeconds = 60;
-            }
-
             if (reconnectIntervalSeconds <= 0) {
-                logger.info("Kafka reconnection disabled (interval <= 0)");
+                logger.info("Kafka reconnection disabled");
                 return;
             }
-
-            // Validate reasonable range (10 seconds to 1 hour)
-            if (reconnectIntervalSeconds < 10) {
-                logger.warn("Reconnection interval {} too short, setting to minimum 10 seconds", reconnectIntervalSeconds);
-                reconnectIntervalSeconds = 10;
-            }
-            if (reconnectIntervalSeconds > 3600) {
-                logger.warn("Reconnection interval {} too long, setting to maximum 3600 seconds", reconnectIntervalSeconds);
-                reconnectIntervalSeconds = 3600;
-            }
-
-            final int finalInterval = reconnectIntervalSeconds;
 
             kafkaReconnectScheduler = Executors.newScheduledThreadPool(1, r -> {
                 Thread t = new Thread(r, "kafka-reconnection-scheduler");
@@ -107,14 +114,14 @@ public class InitializerListener implements ServletContextListener {
                         }
                     }
                 },
-                finalInterval, // Initial delay
-                finalInterval, // Period
+                reconnectIntervalSeconds, // Initial delay
+                reconnectIntervalSeconds, // Period
                 TimeUnit.SECONDS
             );
 
             logger.info("✓ Kafka reconnection scheduler started successfully");
-            logger.info("Reconnection interval: {} second(s)", finalInterval);
-            logger.info("Next reconnection scheduled in {} seconds", finalInterval);
+            logger.info("Reconnection interval: {} second(s)", reconnectIntervalSeconds);
+            logger.info("Next reconnection scheduled in {} seconds", reconnectIntervalSeconds);
 
         } catch (Exception e) {
             logger.error("Failed to start Kafka reconnection scheduler: {}", e.getMessage(), e);
