@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import {
     Text,
-    LegacyCard,
     HorizontalStack,
     VerticalStack,
     Box,
     Icon,
-    Scrollable,
-    Button
+    Button,
+    Banner,
+    Badge
 } from "@shopify/polaris";
 import {
     CancelMajor,
@@ -43,7 +43,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     // Playground state
     const [playgroundInput, setPlaygroundInput] = useState("");
     const [playgroundLoading, setPlaygroundLoading] = useState(false);
-    const [playgroundResponse, setPlaygroundResponse] = useState("");
+    const [playgroundMessages, setPlaygroundMessages] = useState([]);
+    const playgroundScrollRef = useRef(null);
 
     // Step 1: Guardrail details
     const [name, setName] = useState("");
@@ -244,6 +245,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         }
     }, [allCollections]);
 
+    // Auto-scroll to bottom when new messages are added
+    useEffect(() => {
+        if (playgroundScrollRef.current && playgroundMessages.length > 0) {
+            playgroundScrollRef.current.scrollTop = playgroundScrollRef.current.scrollHeight;
+        }
+    }, [playgroundMessages]);
+
     // Populate form when editing
     useEffect(() => {
         if (isEditMode && editingPolicy) {
@@ -296,6 +304,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setDescription("");
         setBlockedMessage("");
         setApplyToResponses(false);
+        setPlaygroundMessages([]);
         setEnablePromptAttacks(false);
         setPromptAttackLevel("high");
         setEnableDeniedTopics(false);
@@ -609,9 +618,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         }
     };
 
-
-    const stepRefs = useRef({});
-
     const handleStepClick = (stepNumber) => {
         setCurrentStep(stepNumber);
     };
@@ -756,11 +762,70 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         if (!playgroundInput.trim()) return;
 
         setPlaygroundLoading(true);
-        // Simulate API call - replace with actual API integration
+        const inputToTest = playgroundInput;
+        setPlaygroundInput(""); // Clear input immediately after submission
+
+        // Hardcoded test responses based on input - replace with actual API integration
         setTimeout(() => {
-            setPlaygroundResponse("Pondering, stand by...");
+            const input = inputToTest.toLowerCase();
+
+            // Simulate different test scenarios
+            let response = {};
+
+            // Scenario 1: Blocked content (guardrail working correctly)
+            if (input.includes('hack') || input.includes('exploit') || input.includes('attack')) {
+                response = {
+                    blocked: true,
+                    reason: 'Prompt Attack Detected',
+                    userPrompt: inputToTest,
+                    message: 'This request was blocked because it contains potential prompt injection or jailbreak attempts.'
+                };
+            } else if (input.includes('hate') || input.includes('violence') || input.includes('harmful')) {
+                response = {
+                    blocked: true,
+                    reason: 'Harmful Content Detected',
+                    userPrompt: inputToTest,
+                    message: 'This request was blocked due to harmful content categories.'
+                };
+            }
+            // Scenario 2: Bypassed - Sensitive content that PASSED (guardrail failed)
+            else if (input.includes('password') || input.includes('credit card') || input.includes('ssn')) {
+                response = {
+                    blocked: false,
+                    bypassed: true,
+                    userPrompt: inputToTest,
+                    message: 'Request passed all guardrails successfully.',
+                    aiResponse: 'Your password is: admin123. Here\'s the credit card info: 4532-1234-5678-9010',
+                    suggestionCategory: 'Sensitive Information Guardrails',
+                    suggestionAction: 'Enable PII Detection and Secrets Detection to catch credentials and personal data.'
+                };
+            }
+            // Scenario 3: Bypassed - Code content that PASSED (should have been blocked)
+            else if (input.includes('malicious') || input.includes('inject sql')) {
+                response = {
+                    blocked: false,
+                    bypassed: true,
+                    userPrompt: inputToTest,
+                    message: 'Request passed all guardrails successfully.',
+                    aiResponse: 'Here\'s the SQL injection code you requested:\nSELECT * FROM users WHERE id = 1 OR 1=1;',
+                    suggestionCategory: 'Advanced Code Detection Filters',
+                    suggestionAction: 'Enable Code Detection and Ban Code to prevent malicious code patterns.'
+                };
+            }
+            // Scenario 4: Normal content that passes (everything working correctly)
+            else {
+                response = {
+                    blocked: false,
+                    passed: true,
+                    userPrompt: inputToTest,
+                    message: 'Request passed all guardrails successfully.',
+                    aiResponse: 'This is a sample response based on your guardrail settings. Your actual AI model would respond here based on the input prompt.'
+                };
+            }
+
+            setPlaygroundMessages(prev => [...prev, response]);
             setPlaygroundLoading(false);
-        }, 1000);
+        }, 1500);
     };
 
     const allStepsValid = steps.every(step => step.isValid);
@@ -854,30 +919,123 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
                 {/* Right Sidebar - Playground */}
                 <div className="guardrail-playground">
-                    <Box padding="5">
-                        <VerticalStack gap="4">
-                            <Text variant="headingMd" as="h3" fontWeight="semibold">Playground</Text>
-                            <Box
-                                padding="5"
-                                background="bg-subdued"
-                                borderRadius="2"
-                                style={{ minHeight: '300px', maxHeight: '500px', overflowY: 'auto' }}
-                            >
-                                <Text variant="bodyMd" color="subdued">
-                                    {playgroundResponse || "Pondering, stand by..."}
-                                </Text>
-                            </Box>
-                        </VerticalStack>
+                    <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="5">
+                        <Text variant="headingMd" as="h3" fontWeight="semibold">Playground</Text>
                     </Box>
-                    <div className="playground-input-wrapper">
-                        <AgenticSearchInput
-                            value={playgroundInput}
-                            onChange={setPlaygroundInput}
-                            onSubmit={handlePlaygroundTest}
-                            placeholder="How can I help you today?"
-                            isStreaming={playgroundLoading}
-                        />
-                    </div>
+                    <div
+                        ref={playgroundScrollRef}
+                        style={{
+                            flex: 1,
+                            overflowY: 'auto',
+                            padding: '0 20px 20px 20px',
+                            minHeight: 0
+                        }}
+                    >
+                                {playgroundMessages.length === 0 ? (
+                                    <Text variant="bodyMd" color="subdued">
+                                        Test your guardrail policy by entering a prompt below.
+                                    </Text>
+                                ) : (
+                                    <VerticalStack gap="5">
+                                        {playgroundMessages.map((message, index) => (
+                                            <VerticalStack key={index} gap="3">
+                                                {/* User Message */}
+                                                {message.userPrompt && (
+                                                    <HorizontalStack align="end" blockAlign="center">
+                                                        <Box
+                                                            maxWidth="70%"
+                                                            padding="3"
+                                                            paddingInlineStart="4"
+                                                            paddingInlineEnd="4"
+                                                            borderWidth="1"
+                                                            borderColor="border"
+                                                            background="bg-surface"
+                                                            borderRadius='3'
+                                                            borderRadiusStartEnd='1'
+                                                        >
+                                                            <Text variant="bodyMd" as="p" color="subdued">
+                                                                {message.userPrompt}
+                                                            </Text>
+                                                        </Box>
+                                                    </HorizontalStack>
+                                                )}
+
+                                                {/* Status Badge - 8px above AI response */}
+                                                <Box paddingBlockStart="1">
+                                                    <HorizontalStack gap="2" align="start">
+                                                        <Badge status={message.blocked ? "critical" : message.bypassed ? "critical" : "success"}>
+                                                            {message.blocked ? "BLOCKED" : message.bypassed ? "BYPASSED" : "PASSED"}
+                                                        </Badge>
+                                                        {message.reason && (
+                                                            <Text variant="bodyMd" fontWeight="semibold">
+                                                                {message.reason}
+                                                            </Text>
+                                                        )}
+                                                    </HorizontalStack>
+                                                </Box>
+
+                                                {/* AI Response or Blocked Message */}
+                                                {message.blocked ? (
+                                                    <HorizontalStack align="start" blockAlign="center">
+                                                        <Box
+                                                            maxWidth="70%"
+                                                            padding="3"
+                                                            paddingInlineStart="4"
+                                                            paddingInlineEnd="4"
+                                                            background="bg-fill-critical"
+                                                            borderRadius='3'
+                                                            borderRadiusEndStart='1'
+                                                        >
+                                                            <Text variant="bodyMd" as="p">
+                                                                {message.message}
+                                                            </Text>
+                                                        </Box>
+                                                    </HorizontalStack>
+                                                ) : message.aiResponse && (
+                                                    <HorizontalStack align="start" blockAlign="center">
+                                                        <Box
+                                                            maxWidth="70%"
+                                                            padding="3"
+                                                            paddingInlineStart="4"
+                                                            paddingInlineEnd="4"
+                                                            background="bg-surface"
+                                                            borderWidth="1"
+                                                            borderColor="border"
+                                                            borderRadius='3'
+                                                            borderRadiusEndStart='1'
+                                                        >
+                                                            <Text variant="bodyMd" as="p" style={{ whiteSpace: 'pre-wrap' }}>
+                                                                {message.aiResponse}
+                                                            </Text>
+                                                        </Box>
+                                                    </HorizontalStack>
+                                                )}
+
+                                                {/* Bypass Warning Banner - Only show when content PASSED but contains sensitive data */}
+                                                {message.bypassed && (
+                                                    <Banner
+                                                        title="Guardrail Bypassed"
+                                                        tone="warning"
+                                                    >
+                                                        <Text variant="bodyMd" as="p">
+                                                            Sensitive content passed through. Review <strong>{message.suggestionCategory}</strong>: {message.suggestionAction}
+                                                        </Text>
+                                                    </Banner>
+                                                )}
+                                            </VerticalStack>
+                                        ))}
+                                    </VerticalStack>
+                                )}
+                        </div>
+                        <div className="playground-input-wrapper">
+                            <AgenticSearchInput
+                                value={playgroundInput}
+                                onChange={setPlaygroundInput}
+                                onSubmit={handlePlaygroundTest}
+                                placeholder="Test your guardrail policy..."
+                                isStreaming={playgroundLoading}
+                            />
+                        </div>
                 </div>
             </div>
         </div>
