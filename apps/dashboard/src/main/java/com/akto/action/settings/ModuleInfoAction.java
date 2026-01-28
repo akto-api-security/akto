@@ -5,6 +5,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.monitoring.ModuleInfo.ModuleType;
+import com.akto.dto.monitoring.ModuleInfoConstants;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
@@ -43,31 +44,6 @@ public class ModuleInfoAction extends UserAction {
     private static final int heartbeatThresholdSeconds = 5 * 60; // 5 minutes
     private static final int rebootThresholdSeconds = 2 * 60; // 2 minutes
     private static final String _DEFAULT_PREFIX_REGEX_STRING = "^Default_";
-
-    // Whitelist of environment variables that are safe to expose to frontend
-    private static final Map<String, String> ALLOWED_ENV_KEYS_MAP = new HashMap<String, String>() {{
-        put("AKTO_KAFKA_BROKER_MAL", "Kafka Broker MAL");
-        put("AKTO_KAFKA_BROKER_URL", "Kafka Broker URL");
-        put("AKTO_TRAFFIC_BATCH_SIZE", "Traffic Batch Size");
-        put("AKTO_TRAFFIC_BATCH_TIME_SECS", "Traffic Batch Time (Seconds)");
-        put("AKTO_LOG_LEVEL", "Log Level"); 
-        put("DEBUG_URLS", "Debug URLs (url1,url2,url3)");
-        put("AKTO_K8_METADATA_CAPTURE", "K8 Metadata Capture");
-        put("AKTO_THREAT_ENABLED", "Threat Enabled");
-        put("AKTO_IGNORE_ENVOY_PROXY_CALLS", "Ignore Envoy Proxy Calls");
-        put("AKTO_IGNORE_IP_TRAFFIC", "Ignore IP Traffic");
-        // Threat Detection environment variables
-        put("AKTO_TRAFFIC_KAFKA_BOOTSTRAP_SERVER", "Traffic Kafka Bootstrap Server");
-        put("AKTO_INTERNAL_KAFKA_BOOTSTRAP_SERVER", "Internal Kafka Bootstrap Server");
-        put("AKTO_THREAT_DETECTION_LOCAL_REDIS_URI", "Local Redis URI");
-        put("AGGREGATION_RULES_ENABLED", "Aggregation Rules Enabled");
-        put("API_DISTRIBUTION_ENABLED", "API Distribution Enabled");
-        put("AKTO_THREAT_PROTECTION_BACKEND_URL", "Threat Protection Backend URL");
-        put("AKTO_MONGO_CONN", "MongoDB Connection String");
-        put("RUNTIME_MODE", "Runtime Mode");
-        put("AKTO_THREAT_PROTECTION_BACKEND_TOKEN", "Threat Protection Backend Token");
-        put("DATABASE_ABSTRACTOR_TOKEN", "Database Abstractor Token");
-    }};
 
     private List<Map<String, String>> allowedEnvFields;
 
@@ -121,7 +97,7 @@ public class ModuleInfoAction extends UserAction {
 
         // Prepare allowed env fields list
         allowedEnvFields = new ArrayList<>();
-        for (Map.Entry<String, String> entry : ALLOWED_ENV_KEYS_MAP.entrySet()) {
+        for (Map.Entry<String, String> entry : ModuleInfoConstants.ALLOWED_ENV_KEYS_MAP.entrySet()) {
             Map<String, String> field = new HashMap<>();
             field.put("key", entry.getKey());
             field.put("label", entry.getValue());
@@ -170,7 +146,7 @@ public class ModuleInfoAction extends UserAction {
 
             // Create filtered env map with only allowed keys
             Map<String, Object> filteredEnv = new HashMap<>();
-            for (String key : ALLOWED_ENV_KEYS_MAP.keySet()) {
+            for (String key : ModuleInfoConstants.ALLOWED_ENV_KEYS_MAP.keySet()) {
                 if (env.containsKey(key)) {
                     filteredEnv.put(key, env.get(key));
                 }
@@ -273,7 +249,7 @@ public class ModuleInfoAction extends UserAction {
             // Update each environment variable individually to preserve other env vars
             // Only allow whitelisted keys for security
             for (Map.Entry<String, String> entry : envData.entrySet()) {
-                if (ALLOWED_ENV_KEYS_MAP.containsKey(entry.getKey())) {
+                if (ModuleInfoConstants.ALLOWED_ENV_KEYS_MAP.containsKey(entry.getKey())) {
                     updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + ".env." + entry.getKey(), entry.getValue()));
                 }
             }

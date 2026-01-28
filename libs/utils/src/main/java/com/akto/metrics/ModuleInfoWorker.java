@@ -3,6 +3,7 @@ package com.akto.metrics;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.dto.monitoring.ModuleInfoConstants;
 import com.akto.log.LoggerMaker;
 import com.akto.util.VersionUtil;
 
@@ -35,22 +36,15 @@ public class ModuleInfoWorker {
     private Map<String, Object> collectEnvironmentVariables(ModuleInfo.ModuleType moduleType) {
         Map<String, Object> envMap = new HashMap<>();
         
-        // Collect relevant environment variables based on module type
-        // Dashboard will filter to only whitelisted keys via ModuleInfoAction
-        if (moduleType == ModuleInfo.ModuleType.THREAT_DETECTION) {
-            // Collect all AKTO_* and relevant threat-detection env variables
-            Map<String, String> systemEnv = System.getenv();
-            for (Map.Entry<String, String> entry : systemEnv.entrySet()) {
-                String key = entry.getKey();
-                // Include AKTO_* prefixed vars and specific threat-detection config vars
-                if (key.startsWith("AKTO_") || 
-                    key.equals("AGGREGATION_RULES_ENABLED") || 
-                    key.equals("API_DISTRIBUTION_ENABLED")) {
-                    envMap.put(key, entry.getValue());
-                }
+        // Collect only whitelisted environment variables from ModuleInfoConstants
+        // Single source of truth for allowed environment variables
+        Map<String, String> systemEnv = System.getenv();
+        for (String key : ModuleInfoConstants.ALLOWED_ENV_KEYS_MAP.keySet()) {
+            String value = systemEnv.get(key);
+            if (value != null) {
+                envMap.put(key, value);
             }
         }
-        // Add more module types here as needed
         
         return envMap;
     }

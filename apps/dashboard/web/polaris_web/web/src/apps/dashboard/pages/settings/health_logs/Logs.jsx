@@ -163,10 +163,10 @@ const Logs = () => {
     const moduleInfoRows = sortedModuleInfos.map(module => {
         const isEligible = canRebootModule(module);
         const isSelected = selectedModules.includes(module.id);
-        const isTrafficCollector = module.moduleType === 'TRAFFIC_COLLECTOR';
+        const hasEnvConfig = module?.additionalData?.env && Object.keys(module.additionalData.env).length > 0;
 
         return [
-            isTrafficCollector ? (
+            hasEnvConfig ? (
                 <Link onClick={() => handleModuleTypeClick(module)} removeUnderline>{module.moduleType || '-'}</Link>
             ) : (
                 module.moduleType || '-'
