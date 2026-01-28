@@ -1314,7 +1314,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                         userDomain = userEmail.split("@")[1].toLowerCase();
                         logger.info("[createUserAndRedirect] User domain extracted: " + userDomain);
                     }
-                    Pair<String, String> matchedOrgInfo = null;
+                    com.akto.util.Triple<String, String, String> matchedOrgInfo = null;
 
                     if (userDomain != null) {
                         logger.info("[createUserAndRedirect] Searching for existing organizations with matching domain using cache");
@@ -1324,7 +1324,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     }
 
                     if (matchedOrgInfo != null) {
-                        logger.infoAndAddToDb("[createUserAndRedirect] Adding user to existing organization: " + matchedOrgInfo.getFirst());
+                        logger.infoAndAddToDb("[createUserAndRedirect] Adding user to existing organization: " + matchedOrgInfo.getFirst() + " with planType: " + matchedOrgInfo.getThird());
 
                         // Fetch organization with projection to get only ACCOUNTS field for performance
                         Organization matchedOrganization = OrganizationsDao.instance.findOne(
@@ -1374,7 +1374,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                             logger.infoAndAddToDb(String.format("[createUserAndRedirect] Created organization %s for new user %s", organizationUUID, userEmail));
 
                             String adminEmailDomain = userEmail.split("@")[1].toLowerCase();
-                            Pair<String, String> orgInfo = new Pair<>(organization.getId(), userEmail);
+                            com.akto.util.Triple<String, String, String> orgInfo = new com.akto.util.Triple<>(organization.getId(), userEmail, null);
                             OrganizationCache.domainToOrgInfoCache.put(adminEmailDomain, orgInfo);
 
                             Boolean attemptSyncWithAktoSuccess = OrganizationUtils.syncOrganizationWithAkto(organization);
