@@ -5,9 +5,7 @@ import {
     VerticalStack,
     Box,
     Icon,
-    Button,
-    Banner,
-    Badge
+    Button
 } from "@shopify/polaris";
 import {
     CancelMajor,
@@ -775,50 +773,44 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             // Scenario 1: Blocked content (guardrail working correctly)
             if (input.includes('hack') || input.includes('exploit') || input.includes('attack')) {
                 response = {
-                    blocked: true,
+                    action: 'Blocked',
                     reason: 'Prompt Attack Detected',
                     userPrompt: inputToTest,
                     message: 'This request was blocked because it contains potential prompt injection or jailbreak attempts.'
                 };
             } else if (input.includes('hate') || input.includes('violence') || input.includes('harmful')) {
                 response = {
-                    blocked: true,
+                    action: 'Blocked',
                     reason: 'Harmful Content Detected',
                     userPrompt: inputToTest,
                     message: 'This request was blocked due to harmful content categories.'
                 };
             }
-            // Scenario 2: Bypassed - Sensitive content that PASSED (guardrail failed)
+            // Scenario 2: Redacted - Sensitive content that was redacted
             else if (input.includes('password') || input.includes('credit card') || input.includes('ssn')) {
                 response = {
-                    blocked: false,
-                    bypassed: true,
+                    action: 'Redacted',
+                    reason: 'Sensitive Information Detected',
                     userPrompt: inputToTest,
-                    message: 'Request passed all guardrails successfully.',
-                    aiResponse: 'Your password is: admin123. Here\'s the credit card info: 4532-1234-5678-9010',
-                    suggestionCategory: 'Sensitive Information Guardrails',
-                    suggestionAction: 'Enable PII Detection and Secrets Detection to catch credentials and personal data.'
+                    message: 'Sensitive information was detected and redacted from the request.',
+                    aiResponse: 'Your password is: [REDACTED]. Here\'s the credit card info: [REDACTED]'
                 };
             }
-            // Scenario 3: Bypassed - Code content that PASSED (should have been blocked)
-            else if (input.includes('malicious') || input.includes('inject sql')) {
+            // Scenario 3: Redacted - Email or phone that was redacted
+            else if (input.includes('email') || input.includes('phone')) {
                 response = {
-                    blocked: false,
-                    bypassed: true,
+                    action: 'Redacted',
+                    reason: 'PII Detected',
                     userPrompt: inputToTest,
-                    message: 'Request passed all guardrails successfully.',
-                    aiResponse: 'Here\'s the SQL injection code you requested:\nSELECT * FROM users WHERE id = 1 OR 1=1;',
-                    suggestionCategory: 'Advanced Code Detection Filters',
-                    suggestionAction: 'Enable Code Detection and Ban Code to prevent malicious code patterns.'
+                    message: 'Personal information was detected and redacted.',
+                    aiResponse: 'Contact information: [REDACTED]'
                 };
             }
             // Scenario 4: Normal content that passes (everything working correctly)
             else {
                 response = {
-                    blocked: false,
-                    passed: true,
+                    action: 'Passed',
                     userPrompt: inputToTest,
-                    message: 'Request passed all guardrails successfully.',
                     aiResponse: 'This is a sample response based on your guardrail settings. Your actual AI model would respond here based on the input prompt.'
                 };
             }
@@ -919,7 +911,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
                 {/* Right Sidebar - Playground */}
                 <div className="guardrail-playground">
-                    <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="5">
+                    <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="5" paddingBlockEnd="5">
                         <Text variant="headingMd" as="h3" fontWeight="semibold">Playground</Text>
                     </Box>
                     <div
@@ -960,28 +952,22 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                                     </HorizontalStack>
                                                 )}
 
-                                                {/* Status Badge - 8px above AI response */}
+                                                {/* Guardrail Action - 8px above AI response */}
                                                 <Box paddingBlockStart="1">
-                                                    <HorizontalStack gap="2" align="start">
-                                                        <Badge status={message.blocked ? "critical" : message.bypassed ? "critical" : "success"}>
-                                                            {message.blocked ? "BLOCKED" : message.bypassed ? "BYPASSED" : "PASSED"}
-                                                        </Badge>
-                                                        {message.reason && (
-                                                            <Text variant="bodyMd" fontWeight="semibold">
-                                                                {message.reason}
-                                                            </Text>
-                                                        )}
-                                                    </HorizontalStack>
+                                                    <Text
+                                                        variant="bodyMd"
+                                                        color={message.action === 'Blocked' ? 'success' : 'subdued'}
+                                                    >
+                                                        {message.action}
+                                                        {message.reason && ` - ${message.reason}`}
+                                                    </Text>
                                                 </Box>
 
                                                 {/* AI Response or Blocked Message */}
-                                                {message.blocked ? (
+                                                {message.action === 'Blocked' ? (
                                                     <HorizontalStack align="start" blockAlign="center">
                                                         <Box
                                                             maxWidth="70%"
-                                                            padding="3"
-                                                            paddingInlineStart="4"
-                                                            paddingInlineEnd="4"
                                                             background="bg-fill-critical"
                                                             borderRadius='3'
                                                             borderRadiusEndStart='1'
@@ -1009,18 +995,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                                             </Text>
                                                         </Box>
                                                     </HorizontalStack>
-                                                )}
-
-                                                {/* Bypass Warning Banner - Only show when content PASSED but contains sensitive data */}
-                                                {message.bypassed && (
-                                                    <Banner
-                                                        title="Guardrail Bypassed"
-                                                        tone="warning"
-                                                    >
-                                                        <Text variant="bodyMd" as="p">
-                                                            Sensitive content passed through. Review <strong>{message.suggestionCategory}</strong>: {message.suggestionAction}
-                                                        </Text>
-                                                    </Banner>
                                                 )}
                                             </VerticalStack>
                                         ))}
