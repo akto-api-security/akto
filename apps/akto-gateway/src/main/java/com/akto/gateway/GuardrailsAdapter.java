@@ -25,7 +25,7 @@ public interface GuardrailsAdapter {
 
     /**
      * Get the name/type of this adapter
-     * @return Adapter name (e.g., "standard", "lightllm")
+     * @return Adapter name (e.g., "standard", "litellm")
      */
     String getAdapterName();
 }
