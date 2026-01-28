@@ -95,14 +95,17 @@ public class ModuleInfoAction extends UserAction {
         // Filter environment variables to only expose whitelisted keys
         filterEnvironmentVariables(moduleInfos);
 
-        // Prepare allowed env fields list
+        // Prepare allowed env fields list by combining all module-specific fields
         allowedEnvFields = new ArrayList<>();
-        for (Map.Entry<String, String> entry : ModuleInfoConstants.ALLOWED_ENV_KEYS_MAP.entrySet()) {
-            Map<String, String> field = new HashMap<>();
-            field.put("key", entry.getKey());
-            field.put("label", entry.getValue());
-            field.put("type", getFieldType(entry.getKey()));
-            allowedEnvFields.add(field);
+        for (Map.Entry<ModuleInfoConstants.ModuleCategory, Map<String, String>> moduleEntry : ModuleInfoConstants.ALLOWED_ENV_KEYS_BY_MODULE.entrySet()) {
+            for (Map.Entry<String, String> entry : moduleEntry.getValue().entrySet()) {
+                Map<String, String> field = new HashMap<>();
+                field.put("key", entry.getKey());
+                field.put("label", entry.getValue());
+                field.put("type", getFieldType(entry.getKey()));
+                field.put("moduleCategory", moduleEntry.getKey().name());
+                allowedEnvFields.add(field);
+            }
         }
 
         return SUCCESS.toUpperCase();
