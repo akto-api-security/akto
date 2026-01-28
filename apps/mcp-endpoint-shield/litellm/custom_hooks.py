@@ -128,7 +128,7 @@ class GuardrailsHandler(CustomLogger):
                     detail={"error": "Blocked by Akto Guardrails"},
                 )
             return data
-        except HTTPException:
+        except HTTPException as e:
             logger.info(f"Guardrails validation failed: {e}")
             raise
         except Exception as e:
@@ -169,39 +169,66 @@ class GuardrailsHandler(CustomLogger):
             logger.error(f"Guardrails validation error (fail-open): {e}")
             return True, ""
 
-    async def ingest_data(self, data: dict, call_type: str, response_dict: dict, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: Optional[dict] = None) -> None:
+    async def ingest_response(
+        self,
+        data: dict,
+        call_type: str,
+        response_body: Any,
+        status_code: int,
+        user_api_key_dict: Optional[UserAPIKeyAuth] = None,
+        kwargs: Optional[dict] = None,
+        *,
+        log_http_error: bool = False,
+    ) -> None:
         if not DATA_INGESTION_URL:
             return
 
         response_payload = {
-            "body": response_dict,
+            "body": response_body,
             "headers": {"content-type": "application/json"},
-            "statusCode": 200,
-            "status": "OK"
+            "statusCode": status_code,
+            "status": "OK" if status_code == 200 else "forbidden",
         }
 
-        http_proxy_payload = self.build_payload(data, call_type, response_payload, user_api_key_dict, wrap_response=False, kwargs=kwargs)
-        response = await self.post_http_proxy(guardrails=False, ingest_data=True, http_proxy_payload=http_proxy_payload)
-        if response.status_code != 200:
-            logger.error(f"Ingestion failed: HTTP {response.status_code}")
+        http_proxy_payload = self.build_payload(
+            data,
+            call_type,
+            response_payload,
+            user_api_key_dict,
+            wrap_response=False,
+            kwargs=kwargs,
+        )
+
+        try:
+            response = await self.post_http_proxy(guardrails=False, ingest_data=True, http_proxy_payload=http_proxy_payload)
+            if log_http_error and response.status_code != 200:
+                logger.error(f"Ingestion failed: HTTP {response.status_code}")
+        except Exception as e:
+            logger.error(f"Ingestion failed: {e}")
+
+    async def ingest_data(self, data: dict, call_type: str, response_dict: dict, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: Optional[dict] = None) -> None:
+        await self.ingest_response(
+            data,
+            call_type,
+            response_dict,
+            200,
+            user_api_key_dict,
+            kwargs,
+            log_http_error=True,
+        )
 
     async def ingest_blocked_request(self, data: dict, call_type: str, reason: str, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: Optional[dict] = None) -> None:
         if not DATA_INGESTION_URL or not SYNC_MODE:
             return
 
-        blocked_response = {
-            "body": {"x-blocked-by": "Akto Proxy"},
-            "headers": {"content-type": "application/json"},
-            "statusCode": 403,
-            "status": "forbidden"
-        }
-
-        http_proxy_payload = self.build_payload(data, call_type, blocked_response, user_api_key_dict, wrap_response=False, kwargs=kwargs)
-
-        try:
-            await self.post_http_proxy(guardrails=False, ingest_data=True, http_proxy_payload=http_proxy_payload)
-        except Exception as e:
-            logger.error(f"Failed to ingest blocked request: {e}")
+        await self.ingest_response(
+            data,
+            call_type,
+            {"x-blocked-by": "Akto Proxy"},
+            403,
+            user_api_key_dict,
+            kwargs,
+        )
 
     def build_request_litellm_metadata(self, call_type: str, data: dict, user_api_key_dict: Optional[UserAPIKeyAuth] = None) -> dict:
         request_metadata = {
