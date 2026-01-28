@@ -7,21 +7,25 @@
 export const CONNECTOR_TYPE_N8N = 'N8N';
 export const CONNECTOR_TYPE_LANGCHAIN = 'LANGCHAIN';
 export const CONNECTOR_TYPE_COPILOT_STUDIO = 'COPILOT_STUDIO';
+export const CONNECTOR_TYPE_SNOWFLAKE = 'SNOWFLAKE';
 
 // Connector Names (Display)
 export const CONNECTOR_NAME_N8N = 'N8N';
 export const CONNECTOR_NAME_LANGCHAIN = 'Langchain';
 export const CONNECTOR_NAME_COPILOT_STUDIO = 'Copilot Studio';
+export const CONNECTOR_NAME_SNOWFLAKE = 'Snowflake';
 
 // Documentation URLs
 export const DOCS_URL_N8N = 'https://docs.akto.io/traffic-connector/workflow-automation/n8n';
 export const DOCS_URL_LANGCHAIN = 'https://docs.akto.io/traffic-connector/workflow-automation/langchain';
 export const DOCS_URL_COPILOT_STUDIO = 'https://docs.akto.io/traffic-connector/workflow-automation/copilot-studio';
+export const DOCS_URL_SNOWFLAKE = 'https://docs.akto.io/snowflake-connector';
 
 // Recurring Interval Seconds (in seconds)
 export const INTERVAL_N8N = 300; // 5 minutes
 export const INTERVAL_LANGCHAIN = 300; // 5 minutes
 export const INTERVAL_COPILOT_STUDIO = 300; // 5 minutes
+export const INTERVAL_SNOWFLAKE = 300; // 5 minutes
 
 // Field Names
 export const FIELD_N8N_URL = 'n8nUrl';
@@ -32,17 +36,35 @@ export const FIELD_DATAVERSE_ENVIRONMENT_URL = 'dataverseEnvironmentUrl';
 export const FIELD_DATAVERSE_TENANT_ID = 'dataverseTenantId';
 export const FIELD_DATAVERSE_CLIENT_ID = 'dataverseClientId';
 export const FIELD_DATAVERSE_CLIENT_SECRET = 'dataverseClientSecret';
+export const FIELD_SNOWFLAKE_ACCOUNT_URL = 'snowflakeAccountUrl';
+export const FIELD_SNOWFLAKE_AUTH_TYPE = 'snowflakeAuthType';
+export const FIELD_SNOWFLAKE_USERNAME = 'snowflakeUsername';
+export const FIELD_SNOWFLAKE_PASSWORD = 'snowflakePassword';
+export const FIELD_SNOWFLAKE_TOKEN = 'snowflakeToken';
+export const FIELD_SNOWFLAKE_PRIVATE_KEY = 'snowflakePrivateKey';
+export const FIELD_SNOWFLAKE_PRIVATE_KEY_PASSPHRASE = 'snowflakePrivateKeyPassphrase';
+export const FIELD_SNOWFLAKE_WAREHOUSE = 'snowflakeWarehouse';
+export const FIELD_SNOWFLAKE_DATABASE = 'snowflakeDatabase';
+export const FIELD_SNOWFLAKE_SCHEMA = 'snowflakeSchema';
 export const FIELD_DATA_INGESTION_URL = 'dataIngestionUrl';
 
 // Field Types
 export const FIELD_TYPE_TEXT = 'text';
 export const FIELD_TYPE_URL = 'url';
 export const FIELD_TYPE_PASSWORD = 'password';
+export const FIELD_TYPE_SELECT = 'select';
+export const FIELD_TYPE_TEXTAREA = 'textarea';
+
+// Auth Types (for Snowflake)
+export const AUTH_TYPE_PASSWORD = 'PASSWORD';
+export const AUTH_TYPE_TOKEN = 'TOKEN';
+export const AUTH_TYPE_KEY_PAIR = 'KEY_PAIR';
 
 // Descriptions
 export const DESCRIPTION_N8N = 'Use our N8N feature to capture traffic and instantly send it to your dashboard for real-time insights.';
 export const DESCRIPTION_LANGCHAIN = 'Use our Langchain feature to capture traffic from LangSmith and instantly send it to your dashboard for real-time insights.';
 export const DESCRIPTION_COPILOT_STUDIO = 'Use our Copilot Studio feature to capture conversation data from Azure Dataverse API and instantly send it to your dashboard for real-time insights.';
+export const DESCRIPTION_SNOWFLAKE = 'Connect to your Snowflake account to discover agents using Cortex and automatically fetch data for all Snowflake agents.';
 
 // N8N Field Configuration
 export const N8N_FIELDS = [
@@ -65,6 +87,120 @@ export const N8N_FIELDS = [
         label: 'URL for Data Ingestion Service',
         type: FIELD_TYPE_URL,
         placeholder: 'https://ingestion.example.com'
+    }
+];
+
+// Snowflake Field Configuration
+export const SNOWFLAKE_FIELDS = [
+    {
+        name: FIELD_SNOWFLAKE_ACCOUNT_URL,
+        label: 'Snowflake Account URL',
+        type: FIELD_TYPE_URL,
+        placeholder: 'https://your-account.snowflakecomputing.com',
+        configKey: FIELD_SNOWFLAKE_ACCOUNT_URL,
+        helpText: 'Your Snowflake account URL (e.g., https://xyz12345.us-east-1.snowflakecomputing.com)',
+        required: true
+    },
+    {
+        name: FIELD_SNOWFLAKE_AUTH_TYPE,
+        label: 'Authentication Method',
+        type: FIELD_TYPE_SELECT,
+        configKey: FIELD_SNOWFLAKE_AUTH_TYPE,
+        options: [
+            { label: 'Username & Password', value: AUTH_TYPE_PASSWORD },
+            { label: 'OAuth Token', value: AUTH_TYPE_TOKEN },
+            { label: 'Key Pair (RSA)', value: AUTH_TYPE_KEY_PAIR }
+        ],
+        defaultValue: AUTH_TYPE_PASSWORD,
+        helpText: 'Select the authentication method for your Snowflake account',
+        required: true
+    },
+    {
+        name: FIELD_SNOWFLAKE_USERNAME,
+        label: 'Username',
+        type: FIELD_TYPE_TEXT,
+        placeholder: 'snowflake_user',
+        configKey: FIELD_SNOWFLAKE_USERNAME,
+        helpText: 'Snowflake username (required for Password and Key Pair authentication)',
+        // Runtime component uses this function; keep signature (authType) => boolean
+        showWhen: (authType) => authType === AUTH_TYPE_PASSWORD || authType === AUTH_TYPE_KEY_PAIR,
+        required: true
+    },
+    {
+        name: FIELD_SNOWFLAKE_PASSWORD,
+        label: 'Password',
+        type: FIELD_TYPE_PASSWORD,
+        placeholder: '*******',
+        configKey: FIELD_SNOWFLAKE_PASSWORD,
+        helpText: 'Snowflake password (required for Password authentication)',
+        showWhen: (authType) => authType === AUTH_TYPE_PASSWORD,
+        required: true
+    },
+    {
+        name: FIELD_SNOWFLAKE_TOKEN,
+        label: 'OAuth Token',
+        type: FIELD_TYPE_PASSWORD,
+        placeholder: 'eyJhbGciOiJSUzI1NiIs...',
+        configKey: FIELD_SNOWFLAKE_TOKEN,
+        helpText: 'OAuth access token for Snowflake (required for Token authentication)',
+        showWhen: (authType) => authType === AUTH_TYPE_TOKEN,
+        required: true
+    },
+    {
+        name: FIELD_SNOWFLAKE_PRIVATE_KEY,
+        label: 'Private Key (RSA)',
+        type: FIELD_TYPE_TEXTAREA,
+        placeholder: '-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC...\n-----END PRIVATE KEY-----',
+        configKey: FIELD_SNOWFLAKE_PRIVATE_KEY,
+        helpText: 'Paste your RSA private key in PEM format. The corresponding public key must be registered in Snowflake.',
+        showWhen: (authType) => authType === AUTH_TYPE_KEY_PAIR,
+        multiline: 6,
+        required: true
+    },
+    {
+        name: FIELD_SNOWFLAKE_PRIVATE_KEY_PASSPHRASE,
+        label: 'Private Key Passphrase (Optional)',
+        type: FIELD_TYPE_PASSWORD,
+        placeholder: 'Leave empty if key is not encrypted',
+        configKey: FIELD_SNOWFLAKE_PRIVATE_KEY_PASSPHRASE,
+        helpText: 'Only required if your private key is encrypted with a passphrase',
+        showWhen: (authType) => authType === AUTH_TYPE_KEY_PAIR,
+        required: false
+    },
+    {
+        name: FIELD_SNOWFLAKE_WAREHOUSE,
+        label: 'Warehouse (Optional)',
+        type: FIELD_TYPE_TEXT,
+        placeholder: 'COMPUTE_WH',
+        configKey: FIELD_SNOWFLAKE_WAREHOUSE,
+        helpText: 'Optional: Specify a warehouse to use for queries',
+        required: false
+    },
+    {
+        name: FIELD_SNOWFLAKE_DATABASE,
+        label: 'Database (Optional)',
+        type: FIELD_TYPE_TEXT,
+        placeholder: 'SNOWFLAKE',
+        configKey: FIELD_SNOWFLAKE_DATABASE,
+        helpText: 'Optional: Specify a database to query',
+        required: false
+    },
+    {
+        name: FIELD_SNOWFLAKE_SCHEMA,
+        label: 'Schema (Optional)',
+        type: FIELD_TYPE_TEXT,
+        placeholder: 'PUBLIC',
+        configKey: FIELD_SNOWFLAKE_SCHEMA,
+        helpText: 'Optional: Specify a schema to query',
+        required: false
+    },
+    {
+        name: FIELD_DATA_INGESTION_URL,
+        label: 'URL for Data Ingestion Service',
+        type: FIELD_TYPE_URL,
+        placeholder: 'https://ingestion.example.com',
+        helpText: 'URL of your Akto data ingestion service',
+        required: true
     }
 ];
 

@@ -194,6 +194,19 @@ const api = {
         })
     },
 
+    initiateAIAgentConnectorImport(connectorType, connectorConfig, dataIngestionUrl, recurringIntervalSeconds) {
+        return request({
+            url: '/api/initiateAIAgentConnectorImport',
+            method: 'post',
+            data: {
+                connectorType,
+                dataIngestionUrl,
+                recurringIntervalSeconds,
+                ...connectorConfig
+            }
+        })
+    },
+
     importFromUrl(url, testRoleId, requestBody) {
         return request({
             url: '/api/importFromUrl',
