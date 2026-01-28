@@ -68,7 +68,7 @@ jobs:
         env:
           ECR_REGISTRY: aktosecurity
           ECR_REPOSITORY: akto-api-security
-          IMAGE_TAG_DATA_INGESTION: data_ingestoin_retry
+          IMAGE_TAG_DATA_INGESTION: data_ingestoin_retry_v2
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub
