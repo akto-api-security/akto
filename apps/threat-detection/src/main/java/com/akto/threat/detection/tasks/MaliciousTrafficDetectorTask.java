@@ -452,11 +452,6 @@ public class MaliciousTrafficDetectorTask implements Task {
     rawApi.setRawApiMetdata(metadata);
 
     int apiCollectionId = httpCallParser.createApiCollectionId(responseParam);
-    if (apiCollectionId == 0) {
-      logger.info("Default apiCollectionId found for url " + responseParam.getRequestParams().getURL() + " account "
-          + responseParam.getAccountId());
-      return;
-    }
     responseParam.requestParams.setApiCollectionId(apiCollectionId);
 
     String url = responseParam.getRequestParams().getURL();
@@ -476,10 +471,10 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
 
-    // Increment API count using template URL for proper aggregation
+    // Increment API count using template URL for proper aggregation (skip for default collection)
     String apiHitCountKey = Utils.buildApiHitCountKey(apiCollectionId, urlForAggregation, method.toString());
-    if (this.apiCountWindowBasedThresholdNotifier != null) {
-        this.apiCountWindowBasedThresholdNotifier.incrementApiHitcount(apiHitCountKey, responseParam.getTime(), RedisKeyInfo.API_COUNTER_SORTED_SET);
+    if (apiCollectionId != 0 && this.apiCountWindowBasedThresholdNotifier != null) {
+      this.apiCountWindowBasedThresholdNotifier.incrementApiHitcount(apiHitCountKey, responseParam.getTime(), RedisKeyInfo.API_COUNTER_SORTED_SET);
     }
 
     List<SchemaConformanceError> errors = null;
