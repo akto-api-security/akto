@@ -4,6 +4,10 @@ import com.akto.log.LoggerMaker;
 import com.akto.dao.context.Context;
 import com.akto.dto.IngestDataBatch;
 import com.akto.kafka.Kafka;
+import com.akto.kafka.KafkaConfig;
+import com.akto.kafka.Serializer;
+import com.akto.kafka.KafkaProtoProducer;
+import com.akto.kafka.KafkaProducerConfig;
 import com.mongodb.BasicDBObject;
 
 import java.util.concurrent.locks.ReadWriteLock;
@@ -13,6 +17,7 @@ public class KafkaUtils {
 
     private static final LoggerMaker logger = new LoggerMaker(KafkaUtils.class, LoggerMaker.LogDb.DATA_INGESTION);
     private static volatile Kafka kafkaProducer;
+    private static volatile KafkaProtoProducer kafkaProtoProducer;
     private static TopicPublisher topicPublisher;
 
     // ReadWriteLock for high-throughput thread safety
@@ -71,6 +76,18 @@ public class KafkaUtils {
             logger.info("Batch Size: {}, Linger MS: {}", batchSize, lingerMS);
 
             kafkaProducer = new Kafka(brokerUrl, lingerMS, batchSize, LoggerMaker.LogDb.DATA_INGESTION);
+
+            // Initialize protobuf kafka producer
+            KafkaConfig protoKafkaConfig = KafkaConfig.newBuilder()
+                .setBootstrapServers(brokerUrl)
+                .setKeySerializer(Serializer.STRING)
+                .setValueSerializer(Serializer.BYTE_ARRAY)
+                .setProducerConfig(KafkaProducerConfig.newBuilder()
+                    .setLingerMs(lingerMS)
+                    .setBatchSize(batchSize)
+                    .build())
+                .build();
+            kafkaProtoProducer = new KafkaProtoProducer(protoKafkaConfig);
 
             if (kafkaProducer != null && kafkaProducer.producerReady) {
                 logger.info("✓ Kafka Producer initialized successfully");
@@ -186,6 +203,32 @@ public class KafkaUtils {
                 logger.debug("Switching to new producer...");
                 kafkaProducer = newProducer;
 
+                // Also reconnect protobuf producer
+                try {
+                    logger.debug("Reconnecting protobuf producer...");
+                    KafkaProtoProducer oldProtoProducer = kafkaProtoProducer;
+
+                    KafkaConfig protoKafkaConfig = KafkaConfig.newBuilder()
+                        .setBootstrapServers(brokerUrl)
+                        .setKeySerializer(Serializer.STRING)
+                        .setValueSerializer(Serializer.BYTE_ARRAY)
+                        .setProducerConfig(KafkaProducerConfig.newBuilder()
+                            .setLingerMs(lingerMS)
+                            .setBatchSize(batchSize)
+                            .build())
+                        .build();
+                    KafkaProtoProducer newProtoProducer = new KafkaProtoProducer(protoKafkaConfig);
+
+                    if (oldProtoProducer != null) {
+                        oldProtoProducer.close();
+                    }
+
+                    kafkaProtoProducer = newProtoProducer;
+                    logger.debug("✓ Proto producer reconnected successfully");
+                } catch (Exception e) {
+                    logger.error("Error reconnecting proto producer (non-fatal): {}", e.getMessage());
+                }
+
                 long totalTime = System.currentTimeMillis() - startTime;
                 logger.info("✓ Kafka reconnection successful in {}ms", totalTime);
             } else {
@@ -247,7 +290,7 @@ public class KafkaUtils {
         // Acquire READ lock - multiple threads can publish simultaneously
         producerLock.readLock().lock();
         try {
-            topicPublisher.publish(message, topicName);
+            topicPublisher.publish(message, topicName, payload);
             logger.debug("Message published successfully");
         } catch (Exception e) {
             logger.error("Error publishing message to Kafka: {}", e.getMessage(), e);
@@ -293,6 +336,10 @@ public class KafkaUtils {
     // Getters and setters for dependency injection
     public static Kafka getKafkaProducer() {
         return kafkaProducer;
+    }
+
+    public static KafkaProtoProducer getKafkaProtoProducer() {
+        return kafkaProtoProducer;
     }
 
     public static void setTopicPublisher(TopicPublisher publisher) {
