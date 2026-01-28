@@ -147,11 +147,18 @@ public class ModuleInfoAction extends UserAction {
             @SuppressWarnings("unchecked")
             Map<String, Object> env = (Map<String, Object>) envObj;
 
-            // Create filtered env map with only allowed keys
+            // Create filtered env map with only allowed keys for the module's type
             Map<String, Object> filteredEnv = new HashMap<>();
-            for (String key : ModuleInfoConstants.ALLOWED_ENV_KEYS_MAP.keySet()) {
-                if (env.containsKey(key)) {
-                    filteredEnv.put(key, env.get(key));
+            String moduleType = module.getModuleType().toString();
+
+            for (Map.Entry<ModuleInfoConstants.ModuleCategory, Map<String, String>> moduleEntry : ModuleInfoConstants.ALLOWED_ENV_KEYS_BY_MODULE.entrySet()) {
+                if (moduleEntry.getKey().name().equals(moduleType)) {
+                    for (String key : moduleEntry.getValue().keySet()) {
+                        if (env.containsKey(key)) {
+                            filteredEnv.put(key, env.get(key));
+                        }
+                    }
+                    break;
                 }
             }
 
@@ -252,7 +259,14 @@ public class ModuleInfoAction extends UserAction {
             // Update each environment variable individually to preserve other env vars
             // Only allow whitelisted keys for security
             for (Map.Entry<String, String> entry : envData.entrySet()) {
-                if (ModuleInfoConstants.ALLOWED_ENV_KEYS_MAP.containsKey(entry.getKey())) {
+                boolean isAllowedKey = false;
+                for (Map<String, String> moduleEnvMap : ModuleInfoConstants.ALLOWED_ENV_KEYS_BY_MODULE.values()) {
+                    if (moduleEnvMap.containsKey(entry.getKey())) {
+                        isAllowedKey = true;
+                        break;
+                    }
+                }
+                if (isAllowedKey) {
                     updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + ".env." + entry.getKey(), entry.getValue()));
                 }
             }

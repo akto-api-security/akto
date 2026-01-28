@@ -27,6 +27,7 @@ public class ModuleInfoWorker {
     private static final String nodeName = System.getenv().getOrDefault("NODE_NAME", "");
     private static final String hostname = System.getenv().getOrDefault("HOSTNAME", "");
     private static final String threatDetectionName = System.getenv().getOrDefault("THREAT_DETECTION_NAME", "");
+    private static String generatedModuleName = null;
 
     private ModuleInfoWorker(ModuleInfo.ModuleType moduleType, String version, DataActor dataActor, String moduleName) {
         this.moduleType = moduleType;
@@ -82,7 +83,7 @@ public class ModuleInfoWorker {
         } else if (!podName.isEmpty() && !nodeName.isEmpty()) {
             return "akto-threat:" + podName + ":" + nodeName;
         } else {
-            return UUID.randomUUID().toString();
+            return "Default_" + UUID.randomUUID().toString();
         }
     }
 

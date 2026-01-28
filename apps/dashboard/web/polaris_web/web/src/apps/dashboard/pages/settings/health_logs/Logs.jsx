@@ -160,13 +160,15 @@ const Logs = () => {
     // Sort moduleInfos by lastHeartbeatReceived in descending order
     const sortedModuleInfos = [...moduleInfos].sort((a, b) => (b.lastHeartbeatReceived || 0) - (a.lastHeartbeatReceived || 0));
 
+    const CONFIGURABLE_MODULE_TYPES = ['TRAFFIC_COLLECTOR', 'THREAT_DETECTION'];
+
     const moduleInfoRows = sortedModuleInfos.map(module => {
         const isEligible = canRebootModule(module);
         const isSelected = selectedModules.includes(module.id);
-        const hasEnvConfig = module?.additionalData?.env && Object.keys(module.additionalData.env).length > 0;
+        const isConfigurable = CONFIGURABLE_MODULE_TYPES.includes(module.moduleType);
 
         return [
-            hasEnvConfig ? (
+            isConfigurable ? (
                 <Link onClick={() => handleModuleTypeClick(module)} removeUnderline>{module.moduleType || '-'}</Link>
             ) : (
                 module.moduleType || '-'
