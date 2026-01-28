@@ -1,9 +1,6 @@
 .guardrail-page-wrapper {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0;
     background: white;
     z-index: 1000;
     overflow: hidden;
@@ -15,7 +12,6 @@
     justify-content: space-between;
     padding: 20px 24px;
     border-bottom: 1px solid #E1E3E5;
-    background: white;
     min-height: 65px;
 }
 
@@ -27,7 +23,6 @@
 .guardrail-page-container {
     display: flex;
     height: calc(100vh - 65px);
-    background: white;
     overflow: hidden;
 }
 
@@ -43,10 +38,10 @@
 .guardrail-nav-item {
     padding: 8px 16px;
     position: relative;
-    transition: background-color 0.2s ease;
     cursor: pointer;
     display: flex;
     align-items: center;
+    transition: background-color 0.2s;
 }
 
 .guardrail-nav-item:hover {
@@ -61,22 +56,14 @@
     bottom: 0;
     width: 2px;
     background-color: #E1E3E5;
-    z-index: 0;
 }
 
 .guardrail-nav-item:first-child::before {
     top: 50%;
 }
 
-.guardrail-nav-item:last-child::before {
-    display: none;
-}
-
+.guardrail-nav-item[data-completed="true"]::before,
 .guardrail-nav-item[data-completed="true"] + .guardrail-nav-item::before {
-    background-color: #6D3BEF;
-}
-
-.guardrail-nav-item:first-child[data-completed="true"]::before {
     background-color: #6D3BEF;
 }
 
@@ -97,42 +84,37 @@
     position: relative;
     z-index: 1;
     margin-right: 12px;
-    transition: all 0.2s ease;
+    transition: all 0.2s;
     background-color: white;
 }
 
 .step-indicator.current {
-    background-color: #6D3BEF !important;
+    background: #6D3BEF;
     color: white;
-    border: none;
     box-shadow: 0 0 0 3px rgba(109, 59, 239, 0.12);
 }
 
 .step-indicator.completed {
-    background-color: #6D3BEF !important;
+    background: #6D3BEF;
     color: white;
-    border: none;
 }
 
 .step-indicator.error {
-    background-color: #EF4444 !important;
+    background: #EF4444;
     color: white;
-    border: none;
 }
 
 .step-indicator.pending {
-    background-color: white;
     border: 2px solid #E1E3E5;
     color: #8C9196;
 }
 
-.guardrail-nav-item.active .step-indicator.pending {
-    border-color: #6D3BEF;
-    background-color: white;
-}
-
 .guardrail-nav-item.active {
     background-color: transparent;
+}
+
+.guardrail-nav-item.active .step-indicator.pending {
+    border-color: #6D3BEF;
 }
 
 .guardrail-nav-item.active .Polaris-Text {
@@ -167,21 +149,16 @@
 .guardrail-content-footer {
     border-top: 1px solid #E1E3E5;
     padding: 24px 20px;
-    background: white;
     box-shadow: 0 -1px 0 0 rgba(0, 0, 0, 0.05);
-    display: flex;
-    align-items: center;
 }
 
 .guardrail-content-footer > * {
-    flex: 1;
     width: 100%;
 }
 
 /* Right Sidebar - Playground */
 .guardrail-playground {
     width: 550px;
-    background: white;
     border-left: 1px solid #E1E3E5;
     display: flex;
     flex-direction: column;
@@ -190,12 +167,9 @@
 }
 
 .playground-input-wrapper {
-    padding: 20px 20px 24px 20px;
+    padding: 20px 20px 24px;
     flex-shrink: 0;
-    background: white;
 }
-
-
 
 /* Responsive adjustments */
 @media (max-width: 1400px) {

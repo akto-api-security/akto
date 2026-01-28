@@ -423,43 +423,21 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setEnableRegexPatterns(hasRegexPatterns);
 
         // LLM prompt
-        if (policy.llmRule) {
-            setEnableLlmPrompt(policy.llmRule.enabled || !!policy.llmRule.userPrompt);
-            setLlmPrompt(policy.llmRule.userPrompt || "");
-            setLlmConfidenceScore(policy.llmRule.confidenceScore !== undefined ? policy.llmRule.confidenceScore : 0.5);
-        } else {
-            setEnableLlmPrompt(false);
-            setLlmPrompt("");
-            setLlmConfidenceScore(0.5);
-        }
+        setEnableLlmPrompt(policy.llmRule?.enabled || !!policy.llmRule?.userPrompt);
+        setLlmPrompt(policy.llmRule?.userPrompt || "");
+        setLlmConfidenceScore(policy.llmRule?.confidenceScore ?? 0.5);
 
         // Base Prompt Based Validation (AI Agents)
-        if (policy.basePromptRule) {
-            setEnableBasePromptRule(policy.basePromptRule.enabled || false);
-            setBasePromptConfidenceScore(policy.basePromptRule.confidenceScore !== undefined ? policy.basePromptRule.confidenceScore : 0.5);
-        } else {
-            setEnableBasePromptRule(false);
-            setBasePromptConfidenceScore(0.5);
-        }
+        setEnableBasePromptRule(policy.basePromptRule?.enabled || false);
+        setBasePromptConfidenceScore(policy.basePromptRule?.confidenceScore ?? 0.5);
 
         // Gibberish Detection
-        if (policy.gibberishDetection) {
-            setEnableGibberishDetection(policy.gibberishDetection.enabled || false);
-            setGibberishConfidenceScore(policy.gibberishDetection.confidenceScore !== undefined ? policy.gibberishDetection.confidenceScore : 0.7);
-        } else {
-            setEnableGibberishDetection(false);
-            setGibberishConfidenceScore(0.7);
-        }
+        setEnableGibberishDetection(policy.gibberishDetection?.enabled || false);
+        setGibberishConfidenceScore(policy.gibberishDetection?.confidenceScore ?? 0.7);
 
-        // Helper function for scanner state
         const setScannerState = (detection, setEnabled, setConfidence) => {
-            if (detection) {
-                setEnabled(detection.enabled || false);
-                setConfidence(detection.confidenceScore !== undefined ? detection.confidenceScore : 0.7);
-            } else {
-                setEnabled(false);
-                setConfidence(0.7);
-            }
+            setEnabled(detection?.enabled || false);
+            setConfidence(detection?.confidenceScore ?? 0.7);
         };
 
         setScannerState(policy.anonymizeDetection, setEnableAnonymize, setAnonymizeConfidenceScore);
@@ -469,28 +447,25 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setScannerState(policy.tokenLimitDetection, setEnableTokenLimit, setTokenLimitConfidenceScore);
 
         // External model based evaluation
-        const hasExternalModel = !!policy.url;
-        setEnableExternalModel(hasExternalModel);
+        setEnableExternalModel(!!policy.url);
         setUrl(policy.url || "");
         const existingScore = policy.confidenceScore || policy.riskScore || 25;
-        const checkpoints = [25, 50, 75, 100];
-        const nearestCheckpoint = checkpoints.reduce((prev, curr) =>
+        const nearestCheckpoint = [25, 50, 75, 100].reduce((prev, curr) =>
             Math.abs(curr - existingScore) < Math.abs(prev - existingScore) ? curr : prev
         );
         setConfidenceScore(nearestCheckpoint);
 
         // Server settings
-        if (policy.selectedMcpServersV2 && policy.selectedMcpServersV2.length > 0) {
-            setSelectedMcpServers(policy.selectedMcpServersV2.map(server => server.id));
-        } else {
-            setSelectedMcpServers(policy.selectedMcpServers || []);
-        }
-
-        if (policy.selectedAgentServersV2 && policy.selectedAgentServersV2.length > 0) {
-            setSelectedAgentServers(policy.selectedAgentServersV2.map(server => server.id));
-        } else {
-            setSelectedAgentServers(policy.selectedAgentServers || []);
-        }
+        setSelectedMcpServers(
+            policy.selectedMcpServersV2?.length > 0
+                ? policy.selectedMcpServersV2.map(server => server.id)
+                : policy.selectedMcpServers || []
+        );
+        setSelectedAgentServers(
+            policy.selectedAgentServersV2?.length > 0
+                ? policy.selectedAgentServersV2.map(server => server.id)
+                : policy.selectedAgentServers || []
+        );
         setApplyOnResponse(policy.applyOnResponse || false);
         setApplyOnRequest(policy.applyOnRequest || false);
     };
@@ -761,56 +736,46 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
         setPlaygroundLoading(true);
         const inputToTest = playgroundInput;
-        setPlaygroundInput(""); // Clear input immediately after submission
+        setPlaygroundInput("");
 
-        // Hardcoded test responses based on input - replace with actual API integration
         setTimeout(() => {
             const input = inputToTest.toLowerCase();
+            let response = { userPrompt: inputToTest };
 
-            // Simulate different test scenarios
-            let response = {};
-
-            // Scenario 1: Blocked content (guardrail working correctly)
             if (input.includes('hack') || input.includes('exploit') || input.includes('attack')) {
                 response = {
+                    ...response,
                     action: 'Blocked',
                     reason: 'Prompt Attack Detected',
-                    userPrompt: inputToTest,
                     message: 'This request was blocked because it contains potential prompt injection or jailbreak attempts.'
                 };
             } else if (input.includes('hate') || input.includes('violence') || input.includes('harmful')) {
                 response = {
+                    ...response,
                     action: 'Blocked',
                     reason: 'Harmful Content Detected',
-                    userPrompt: inputToTest,
                     message: 'This request was blocked due to harmful content categories.'
                 };
-            }
-            // Scenario 2: Redacted - Sensitive content that was redacted
-            else if (input.includes('password') || input.includes('credit card') || input.includes('ssn')) {
+            } else if (input.includes('password') || input.includes('credit card') || input.includes('ssn')) {
                 response = {
+                    ...response,
                     action: 'Redacted',
                     reason: 'Sensitive Information Detected',
-                    userPrompt: inputToTest,
                     message: 'Sensitive information was detected and redacted from the request.',
                     aiResponse: 'Your password is: [REDACTED]. Here\'s the credit card info: [REDACTED]'
                 };
-            }
-            // Scenario 3: Redacted - Email or phone that was redacted
-            else if (input.includes('email') || input.includes('phone')) {
+            } else if (input.includes('email') || input.includes('phone')) {
                 response = {
+                    ...response,
                     action: 'Redacted',
                     reason: 'PII Detected',
-                    userPrompt: inputToTest,
                     message: 'Personal information was detected and redacted.',
                     aiResponse: 'Contact information: [REDACTED]'
                 };
-            }
-            // Scenario 4: Normal content that passes (everything working correctly)
-            else {
+            } else {
                 response = {
+                    ...response,
                     action: 'Passed',
-                    userPrompt: inputToTest,
                     aiResponse: 'This is a sample response based on your guardrail settings. Your actual AI model would respond here based on the input prompt.'
                 };
             }
@@ -824,7 +789,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
     return (
         <div className="guardrail-page-wrapper">
-            {/* Custom Header */}
             <div className="guardrail-page-header">
                 <HorizontalStack gap="3" align="center">
                     <Icon source={SettingsMajor} />
@@ -833,12 +797,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     </Text>
                 </HorizontalStack>
                 <button className="Polaris-Modal-CloseButton" onClick={handleClose}>
-                    <Box><Icon source={CancelMajor} /></Box>
+                    <Icon source={CancelMajor} />
                 </button>
             </div>
 
             <div className="guardrail-page-container">
-                {/* Left Sidebar - Categories */}
                 <div className="guardrail-sidebar">
                     <Box padding="5" paddingBlockEnd="4">
                         <Text variant="headingMd" as="h3" fontWeight="semibold">Guardrail Categories</Text>
@@ -852,28 +815,24 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                     onClick={() => handleStepClick(step.number)}
                                     data-completed={step.number < currentStep}
                                 >
-                                    <HorizontalStack gap="3" blockAlign="start">
-                                        <div className={`step-indicator ${
-                                            step.number === currentStep ? 'current' :
-                                            step.number < currentStep ? (step.isValid ? 'completed' : 'error') : 'pending'
-                                        }`}>
-                                        </div>
-                                        <div style={{ flex: 1, paddingTop: '4px' }}>
-                                            <Text
-                                                variant="bodyMd"
-                                                fontWeight={step.number === currentStep ? "semibold" : "regular"}
-                                            >
-                                                {step.title}
-                                            </Text>
-                                        </div>
-                                    </HorizontalStack>
+                                    <div className={`step-indicator ${
+                                        step.number === currentStep ? 'current' :
+                                        step.number < currentStep ? (step.isValid ? 'completed' : 'error') : 'pending'
+                                    }`} />
+                                    <div style={{ flex: 1, paddingTop: '4px' }}>
+                                        <Text
+                                            variant="bodyMd"
+                                            fontWeight={step.number === currentStep ? "semibold" : "regular"}
+                                        >
+                                            {step.title}
+                                        </Text>
+                                    </div>
                                 </div>
                             ))}
                         </VerticalStack>
                     </Box>
                 </div>
 
-                {/* Center Content - Form */}
                 <div className="guardrail-content">
                     <div className="guardrail-content-inner">
                         <Box padding="5">
@@ -909,9 +868,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     </div>
                 </div>
 
-                {/* Right Sidebar - Playground */}
                 <div className="guardrail-playground">
-                    <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="5" paddingBlockEnd="5">
+                    <Box padding="5">
                         <Text variant="headingMd" as="h3" fontWeight="semibold">Playground</Text>
                     </Box>
                     <div
@@ -919,7 +877,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         style={{
                             flex: 1,
                             overflowY: 'auto',
-                            padding: '0 20px 20px 20px',
+                            padding: '0 20px 20px',
                             minHeight: 0
                         }}
                     >
@@ -931,28 +889,23 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                     <VerticalStack gap="5">
                                         {playgroundMessages.map((message, index) => (
                                             <VerticalStack key={index} gap="3">
-                                                {/* User Message */}
-                                                {message.userPrompt && (
-                                                    <HorizontalStack align="end" blockAlign="center">
-                                                        <Box
-                                                            maxWidth="70%"
-                                                            padding="3"
-                                                            paddingInlineStart="4"
-                                                            paddingInlineEnd="4"
-                                                            borderWidth="1"
-                                                            borderColor="border"
-                                                            background="bg-surface"
-                                                            borderRadius='3'
-                                                            borderRadiusStartEnd='1'
-                                                        >
-                                                            <Text variant="bodyMd" as="p" color="subdued">
-                                                                {message.userPrompt}
-                                                            </Text>
-                                                        </Box>
-                                                    </HorizontalStack>
-                                                )}
+                                                <HorizontalStack align="end">
+                                                    <Box
+                                                        maxWidth="70%"
+                                                        padding="3"
+                                                        paddingInline="4"
+                                                        borderWidth="1"
+                                                        borderColor="border"
+                                                        background="bg-surface"
+                                                        borderRadius='3'
+                                                        borderRadiusStartEnd='1'
+                                                    >
+                                                        <Text variant="bodyMd" color="subdued">
+                                                            {message.userPrompt}
+                                                        </Text>
+                                                    </Box>
+                                                </HorizontalStack>
 
-                                                {/* Guardrail Action - 8px above AI response */}
                                                 <Box paddingBlockStart="1">
                                                     <Text
                                                         variant="bodyMd"
@@ -963,34 +916,32 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                                     </Text>
                                                 </Box>
 
-                                                {/* AI Response or Blocked Message */}
                                                 {message.action === 'Blocked' ? (
-                                                    <HorizontalStack align="start" blockAlign="center">
+                                                    <HorizontalStack align="start">
                                                         <Box
                                                             maxWidth="70%"
                                                             background="bg-fill-critical"
                                                             borderRadius='3'
                                                             borderRadiusEndStart='1'
                                                         >
-                                                            <Text variant="bodyMd" as="p">
+                                                            <Text variant="bodyMd">
                                                                 {message.message}
                                                             </Text>
                                                         </Box>
                                                     </HorizontalStack>
                                                 ) : message.aiResponse && (
-                                                    <HorizontalStack align="start" blockAlign="center">
+                                                    <HorizontalStack align="start">
                                                         <Box
                                                             maxWidth="70%"
                                                             padding="3"
-                                                            paddingInlineStart="4"
-                                                            paddingInlineEnd="4"
+                                                            paddingInline="4"
                                                             background="bg-surface"
                                                             borderWidth="1"
                                                             borderColor="border"
                                                             borderRadius='3'
                                                             borderRadiusEndStart='1'
                                                         >
-                                                            <Text variant="bodyMd" as="p" style={{ whiteSpace: 'pre-wrap' }}>
+                                                            <Text variant="bodyMd" style={{ whiteSpace: 'pre-wrap' }}>
                                                                 {message.aiResponse}
                                                             </Text>
                                                         </Box>
