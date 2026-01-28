@@ -34,16 +34,40 @@ function AttackWorldMap({ attackRequests, style }) {
     // Function to get color based on attack type
     const getColorForAttackType = useCallback((attackType) => {
         const colorMap = {
-            "SQL Injection": "#dc2626",
-            "XSS Attack": "#ea580c",
-            "DDoS Attack": "#ca8a04",
-            "Brute Force": "#16a34a",
+            "SQL_INJECTION": "#dc2626",
+            "SSRF": "#ea580c",
+            "BOLA": "#ca8a04",
+            "Broken Authentication": "#16a34a",
             "Path Traversal": "#2563eb",
             "Command Injection": "#9333ea",
-            "SSRF Attack": "#c026d3",
-            "XXE Attack": "#e11d48"
+            "Data Exposure": "#c026d3",
+            "PII Data": "#e11d48"
         };
         return colorMap[attackType] || "#6b7280";
+    }, []);
+
+    // Helper function to extract country center and name from topology
+    const getCountryCenter = useCallback((topology, countryCode) => {
+        if (!topology || !countryCode) return null;
+
+        // Find the country feature from topology
+        const feature = topology.objects?.default?.geometries?.find(
+            geo => geo.properties?.['iso-a2'] === countryCode.toUpperCase() ||
+                   geo.properties?.['hc-a2'] === countryCode.toUpperCase()
+        );
+
+        if (!feature) return null;
+
+        // Get coordinates and name from properties
+        const properties = feature.properties;
+        if (properties?.['hc-middle-lon'] && properties?.['hc-middle-lat']) {
+            return {
+                coords: [properties['hc-middle-lon'], properties['hc-middle-lat']],
+                name: properties?.['name'] || countryCode
+            };
+        }
+
+        return null;
     }, []);
 
     const fetchMapData = useCallback(async () => {
@@ -52,41 +76,59 @@ function AttackWorldMap({ attackRequests, style }) {
                 "https://code.highcharts.com/mapdata/custom/world.topo.json"
             ).then((response) => response.json());
 
+            // Extract coordinates from topology for each attack flow
+            const flowsWithCoords = attackRequests.map(attack => {
+                const sourceData = getCountryCenter(topology, attack.sourceCountry);
+                const destData = getCountryCenter(topology, attack.destinationCountry);
+
+                if (!sourceData || !destData) return null;
+
+                return {
+                    ...attack,
+                    sourceCoords: sourceData.coords,
+                    destCoords: destData.coords,
+                    sourceName: sourceData.name,
+                    destinationName: destData.name
+                };
+            }).filter(f => f !== null);
+
             // Prepare marker data for source and destination points
-            const sourceMarkers = attackRequests.map(attack => ({
-                name: attack.source.name,
+            const sourceMarkers = flowsWithCoords.map(attack => ({
+                name: attack.sourceName,
                 geometry: {
                     type: 'Point',
-                    coordinates: [attack.source.lon, attack.source.lat]
+                    coordinates: attack.sourceCoords
                 },
                 custom: {
-                    attackType: attack.attackType
+                    attackType: attack.attackType,
+                    count: attack.count
                 }
             }));
 
-            const destinationMarkers = attackRequests.map(attack => ({
-                name: attack.destination.name,
+            const destinationMarkers = flowsWithCoords.map(attack => ({
+                name: attack.destinationName,
                 geometry: {
                     type: 'Point',
-                    coordinates: [attack.destination.lon, attack.destination.lat]
+                    coordinates: attack.destCoords
                 }
             }));
 
             // Create line series data using mapline type
-            const lineSeriesData = attackRequests.map((attack) => ({
+            const lineSeriesData = flowsWithCoords.map((attack) => ({
                 geometry: {
                     type: 'LineString',
                     coordinates: [
-                        [attack.source.lon, attack.source.lat],
-                        [attack.destination.lon, attack.destination.lat]
+                        attack.sourceCoords,
+                        attack.destCoords
                     ]
                 },
                 color: getColorForAttackType(attack.attackType),
                 className: 'animated-attack-line',
                 custom: {
                     attackType: attack.attackType,
-                    source: attack.source.name,
-                    destination: attack.destination.name
+                    source: attack.sourceName,
+                    destination: attack.destinationName,
+                    count: attack.count
                 }
             }));
 

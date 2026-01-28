@@ -10898,6 +10898,28 @@
             </result>
         </action>
 
+        <action name="api/fetchAttackFlows" class="com.akto.action.AgenticDashboardAction" method="fetchAttackFlows">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="SUCCESS" type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/deleteExtraApiInfo" class="com.akto.action.CleanAction" method="deleteExtraApiInfo">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

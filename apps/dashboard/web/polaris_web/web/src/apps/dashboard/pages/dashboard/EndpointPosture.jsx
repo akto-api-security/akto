@@ -1,9 +1,8 @@
-import React from 'react'
+import { useState, useEffect } from 'react'
 import PageWithMultipleCards from '../../components/layouts/PageWithMultipleCards'
-import { HorizontalGrid, HorizontalStack, Box, Text } from '@shopify/polaris'
+import { HorizontalGrid, HorizontalStack, Box, Text, Spinner } from '@shopify/polaris'
 import TitleWithInfo from '../../components/shared/TitleWithInfo'
 import SummaryCard from './new_components/SummaryCard'
-import { commonMcpServers, summaryInfoData, commonLlmsInBrowsers, commonAiAgents, attackRequests, complianceData, dataProtectionTrendsData, dataProtectionTrendsLabels, guardrailPoliciesData } from './atlusPosture/dummyData'
 import InfoCard from './new_components/InfoCard'
 import ServersLayout from './atlusPosture/ServersLayout'
 import AttackWorldMap from './atlusPosture/AttackWorldMap'
@@ -11,8 +10,245 @@ import ComplianceAtRisksCard from './new_components/ComplianceAtRisksCard'
 import ThreatCategoryStackedChartWrapper from './atlusPosture/ThreatCategoryStackedChartWrapper'
 import CustomLineChart from './new_components/CustomLineChart'
 import ChartypeComponent from '../testing/TestRunsPage/ChartypeComponent'
+import dashboardApi from './api'
+import api from '../observe/api'
+import { getTypeFromTags, CLIENT_TYPES, getDomainForFavicon } from '../observe/agentic/mcpClientHelper'
+import { extractEndpointId } from '../observe/agentic/constants'
+import { attackRequests as dummyAttackRequests } from './atlusPosture/dummyData'
+
+// Helper function to process collections and group by type
+const processAgenticCollections = (collections, topN = 4) => {
+    const typeGroups = {
+        [CLIENT_TYPES.MCP_SERVER]: {},
+        [CLIENT_TYPES.LLM]: {},
+        [CLIENT_TYPES.AI_AGENT]: {}
+    }
+
+    const uniqueEndpointIds = new Set()
+
+    collections.forEach(c => {
+        if (c.deactivated) return
+
+        const clientType = getTypeFromTags(c.envType)
+        const displayName = c.displayName || c.name
+        const hostName = c.hostName || displayName
+        const endpointId = extractEndpointId(hostName)
+
+        // Track unique endpoints
+        if (endpointId) {
+            uniqueEndpointIds.add(endpointId)
+        }
+
+        // Group by collection name and type
+        if (!typeGroups[clientType][displayName]) {
+            typeGroups[clientType][displayName] = {
+                name: displayName,
+                count: 0,
+                endpoints: new Set()
+            }
+        }
+
+        typeGroups[clientType][displayName].count++
+        if (endpointId) {
+            typeGroups[clientType][displayName].endpoints.add(endpointId)
+        }
+    })
+
+    // Convert to arrays and sort by count, take top N
+    const processGroup = (type) =>
+        Object.values(typeGroups[type])
+            .map(g => {
+                const domain = getDomainForFavicon(g.name)
+                const icon = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=32` : undefined
+                return { name: g.name, value: g.endpoints.size || g.count, icon }
+            })
+            .sort((a, b) => b.value - a.value)
+            .slice(0, topN)
+
+    return {
+        mcpServers: processGroup(CLIENT_TYPES.MCP_SERVER),
+        llms: processGroup(CLIENT_TYPES.LLM),
+        aiAgents: processGroup(CLIENT_TYPES.AI_AGENT),
+        totalEndpoints: uniqueEndpointIds.size
+    }
+}
 
 function EndpointPosture() {
+    const [summaryInfoData, setSummaryInfoData] = useState([])
+    const [commonMcpServers, setCommonMcpServers] = useState([])
+    const [commonLlmsInBrowsers, setCommonLlmsInBrowsers] = useState([])
+    const [commonAiAgents, setCommonAiAgents] = useState([])
+    const [dataProtectionTrendsData, setDataProtectionTrendsData] = useState([])
+    const [guardrailPoliciesData, setGuardrailPoliciesData] = useState({})
+    const [complianceData, setComplianceData] = useState([])
+    const [attackRequests, setAttackRequests] = useState([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+
+        const fetchSummaryData = async () => {
+            try {
+                const endTimestamp = Math.floor(Date.now() / 1000)
+                const startTimestamp = endTimestamp - (30 * 24 * 60 * 60) // Last 30 days
+
+                // Fetch data from existing APIs in parallel
+                const [
+                    issuesResponse,
+                    threatResponse,
+                    collectionsResponse,
+                    // attackFlowsResponse // TODO: Uncomment when backend is ready
+                ] = await Promise.all([
+                    dashboardApi.fetchIssuesData(startTimestamp, endTimestamp),
+                    dashboardApi.fetchThreatData(startTimestamp, endTimestamp),
+                    api.getAllCollectionsBasic(),
+                    // dashboardApi.fetchAttackFlows(startTimestamp, endTimestamp) // TODO: Uncomment when backend is ready
+                ])
+
+                // Process collections to get component data (like Endpoints.jsx does)
+                const collections = collectionsResponse?.apiCollections || []
+                const { mcpServers, llms, aiAgents, totalEndpoints } = processAgenticCollections(collections, 4)
+
+                // Extract values from threat response (now consolidated there)
+                const sensitiveCount = threatResponse?.sensitiveCount || 0
+                const successfulExploits = threatResponse?.successfulExploits || 0
+                const avgGuardrailScore = threatResponse?.avgThreatScore || 0.0
+
+                const summaryData = [
+                    {
+
+                        title: "Total Endpoint Components",
+                        data: totalEndpoints.toString(),
+                        variant: 'heading2xl',
+                    },
+                    {
+                        title: 'Total Successful exploits',
+                        data: successfulExploits.toString(),
+                        variant: 'heading2xl',
+                        color: successfulExploits > 0 ? "warning" : undefined,
+                    },
+                    {
+                        title: 'Total Sensitive Data Events',
+                        data: sensitiveCount.toString(),
+                        variant: 'heading2xl',
+                    },
+                    {
+                        title: 'AI Average Guardrail Score',
+                        data: avgGuardrailScore.toFixed(1),
+                        variant: 'heading2xl',
+                        color: avgGuardrailScore > 3 ? "critical" : undefined,
+                    }
+                ]
+                setSummaryInfoData(summaryData)
+
+                setCommonMcpServers(mcpServers)
+                setCommonLlmsInBrowsers(llms)
+                setCommonAiAgents(aiAgents)
+
+                // Set attack flows for map - using dummy data for now
+                // TODO: Uncomment below when backend is ready
+                // const attackFlows = attackFlowsResponse?.attackFlows || []
+                // Convert dummy data format to match expected format
+                const attackFlows = dummyAttackRequests.map(req => ({
+                    sourceCountry: req.source.country,
+                    destinationCountry: req.destination.country,
+                    attackType: req.attackType,
+                    count: 1
+                }))
+                setAttackRequests(attackFlows)
+
+                // Process Data Protection Trends - dynamic categories
+                const dataProtectionTrends = threatResponse?.dataProtectionTrends || {}
+
+                // Define colors for top 3 categories
+                const categoryColors = ['#3b82f6', '#ef4444', '#10b981']
+
+                // Helper function to format category names
+                const formatCategoryName = (category) => {
+                    if (!category) return 'Unknown'
+                    return category
+                        .replace(/_/g, ' ')
+                        .toLowerCase()
+                        .replace(/\b\w/g, l => l.toUpperCase())
+                }
+
+                // Convert dynamic category keys to chart data
+                const trendsChartData = Object.keys(dataProtectionTrends).map((category, index) => ({
+                    name: formatCategoryName(category),
+                    color: categoryColors[index] || '#9ca3af', // Use gray as fallback
+                    data: dataProtectionTrends[category] || []
+                }))
+
+                setDataProtectionTrendsData(trendsChartData)
+
+                // Process Guardrail Policies Data
+                const topGuardrailPolicies = threatResponse?.topGuardrailPolicies || []
+                const guardrailPoliciesObject = {}
+                const guardrailColors = ['#ef4444', '#f59e0b', '#3b82f6', '#10b981'] // red, amber, blue, green
+                topGuardrailPolicies.forEach((policy, index) => {
+                    guardrailPoliciesObject[policy.name] = {
+                        text: policy.count,
+                        color: guardrailColors[index % guardrailColors.length]
+                    }
+                })
+                setGuardrailPoliciesData(guardrailPoliciesObject)
+
+                // Process Compliance At Risks Data
+                const complianceAtRisks = issuesResponse?.complianceAtRisks || []
+
+                // Icon mapping for compliance standards
+                const complianceIconMap = {
+                    'OWASP': '/public/owasp.svg',
+                    'PCI': '/public/pci.svg',
+                    'PCI DSS': '/public/pci.svg',
+                    'GDPR': '/public/gdpr.svg',
+                    'HIPAA': '/public/hipaa.svg',
+                    'SOC 2': '/public/soc2.svg',
+                    'ISO 27001': '/public/iso27001.svg'
+                }
+
+                // Color palette for compliance cards
+                const complianceColors = ['#dc2626', '#ea580c', '#ca8a04', '#16a34a']
+
+                const complianceDataMapped = complianceAtRisks.map((compliance, index) => {
+                    // Try to find matching icon based on compliance name
+                    let icon = '/public/compliance-default.svg' // Default fallback
+                    for (const [key, iconPath] of Object.entries(complianceIconMap)) {
+                        if (compliance.name.toUpperCase().includes(key)) {
+                            icon = iconPath
+                            break
+                        }
+                    }
+
+                    return {
+                        name: compliance.name,
+                        percentage: Math.round(compliance.percentage),
+                        color: complianceColors[index] || '#6b7280', // Use gray as fallback
+                        icon: icon
+                    }
+                })
+
+                setComplianceData(complianceDataMapped)
+
+                setLoading(false)
+            } catch (error) {
+                console.error('Error fetching summary info:', error)
+                setLoading(false)
+            }
+        }
+
+        fetchSummaryData()
+    }, [])
+
+    if (loading) {
+        return (
+            <Box padding="8">
+                <HorizontalStack align="center" blockAlign="center">
+                    <Spinner size="large" />
+                    <Text variant="bodyMd">Loading dashboard data...</Text>
+                </HorizontalStack>
+            </Box>
+        )
+    }
 
     const summaryHeader = (
         <SummaryCard 
@@ -62,6 +298,11 @@ function EndpointPosture() {
     )
 
     const hasGuardrailData = guardrailPoliciesData && typeof guardrailPoliciesData === 'object' && Object.keys(guardrailPoliciesData).length > 0 && Object.values(guardrailPoliciesData).some(item => item?.text > 0);
+
+    const dataProtectionTrendsLabels = dataProtectionTrendsData.map(item => ({
+        label: item.name,
+        color: item.color
+    }))
 
     const chartsComponent = (
         <HorizontalGrid columns={2} gap={4}>

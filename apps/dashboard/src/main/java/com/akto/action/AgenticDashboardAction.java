@@ -196,11 +196,31 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             // Fetch open and resolved threats
             BasicDBObject openResolvedThreats = fetchOpenResolvedThreatsInternal(startTimestamp, endTimestamp, daysBetween, allThreats);
 
+            // Fetch top guardrail policies
+            List<BasicDBObject> topGuardrailPolicies = fetchTopGuardrailPoliciesInternal(allThreats);
+
+            // Fetch data protection trends
+            BasicDBObject dataProtectionTrends = fetchDataProtectionTrendsInternal(allThreats, startTimestamp, endTimestamp, daysBetween);
+
+            // Fetch average threat score (guardrail score) from already-fetched threats
+            double avgThreatScore = fetchAverageThreatScoreInternal(allThreats);
+
+            // Fetch sensitive data events count from already-fetched threats
+            long sensitiveCount = fetchSensitiveDataEventsCountInternal(startTimestamp, endTimestamp, allThreats);
+
+            // Fetch successful exploits count from already-fetched threats
+            long successfulExploitsCount = fetchSuccessfulExploitsCountInternal(startTimestamp, endTimestamp, allThreats);
+
             response.put("threatsBySeverity", threatsBySeverity);
             response.put("topThreatsByCategory", topThreatsByCategory);
             response.put("topAttackHosts", topAttackHosts);
             response.put("topBadActors", topBadActors);
             response.put("openResolvedThreats", openResolvedThreats);
+            response.put("topGuardrailPolicies", topGuardrailPolicies);
+            response.put("dataProtectionTrends", dataProtectionTrends);
+            response.put("avgThreatScore", avgThreatScore);
+            response.put("sensitiveCount", sensitiveCount);
+            response.put("successfulExploits", successfulExploitsCount);
 
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
@@ -210,6 +230,93 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
         }
     }
 
+    /**
+     * API: Fetch attack flows for map visualization
+     * Returns source and destination country codes with attack types
+     * Collection: MaliciousEventDao
+     */
+    public String fetchAttackFlows() {
+        try {
+            if (endTimestamp == 0) {
+                endTimestamp = Context.now();
+            }
+            Set<Integer> demoCollections = getDemoCollections();
+
+            // Fetch all guardrail events (attacks) within the time range
+            List<DashboardMaliciousEvent> allThreats = fetchAllMaliciousEvents(startTimestamp, endTimestamp, demoCollections);
+
+            // Filter for guardrail events only (actual attacks that were blocked/detected)
+            List<DashboardMaliciousEvent> guardrailEvents = allThreats.stream()
+                .filter(event -> "GUARDRAIL".equalsIgnoreCase(event.getLabel()))
+                .collect(Collectors.toList());
+
+            // Group by source country and attack type
+            Map<String, Map<String, Long>> countryAttackCounts = new HashMap<>();
+            for (DashboardMaliciousEvent event : guardrailEvents) {
+                String sourceCountry = event.getCountry();
+                if (sourceCountry == null || sourceCountry.isEmpty()) {
+                    continue;
+                }
+
+                // Use subCategory as attack type, fallback to category
+                String attackType = event.getSubCategory();
+                if (attackType == null || attackType.isEmpty()) {
+                    attackType = event.getCategory();
+                }
+                if (attackType == null || attackType.isEmpty()) {
+                    attackType = "Unknown";
+                }
+
+                countryAttackCounts.putIfAbsent(sourceCountry, new HashMap<>());
+                Map<String, Long> attackCounts = countryAttackCounts.get(sourceCountry);
+                attackCounts.put(attackType, attackCounts.getOrDefault(attackType, 0L) + 1);
+            }
+
+            // Convert to result format: array of {sourceCountry, destinationCountry, attackType, count}
+            List<BasicDBObject> attackFlows = new ArrayList<>();
+            // Default destination country - can be made configurable later
+            String destinationCountry = "US"; // TODO: Make this configurable or detect from deployment
+
+            for (Map.Entry<String, Map<String, Long>> countryEntry : countryAttackCounts.entrySet()) {
+                String sourceCountry = countryEntry.getKey();
+                Map<String, Long> attackCounts = countryEntry.getValue();
+
+                // Get the top attack type for this country
+                Map.Entry<String, Long> topAttack = attackCounts.entrySet().stream()
+                    .max(Map.Entry.comparingByValue())
+                    .orElse(null);
+
+                if (topAttack != null) {
+                    BasicDBObject flow = new BasicDBObject();
+                    flow.put("sourceCountry", sourceCountry);
+                    flow.put("destinationCountry", destinationCountry);
+                    flow.put("attackType", topAttack.getKey());
+                    flow.put("count", topAttack.getValue());
+                    attackFlows.add(flow);
+                }
+            }
+
+            // Sort by count descending and limit to top 20 to avoid overcrowding the map
+            attackFlows.sort((a, b) -> {
+                long countA = a.getLong("count", 0L);
+                long countB = b.getLong("count", 0L);
+                return Long.compare(countB, countA);
+            });
+
+            // Limit to top 20
+            if (attackFlows.size() > 20) {
+                attackFlows = attackFlows.subList(0, 20);
+            }
+
+            response.put("attackFlows", attackFlows);
+
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching attack flows: " + e.getMessage());
+            addActionError("Error fetching attack flows: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+    }
 
 
     private List<BasicDBObject> fetchIssuesOverTime(int startTimestamp, int endTimestamp, long daysBetween, List<TestingRunIssues> allIssues) {
@@ -299,6 +406,55 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             result.put("llm", 0L);
         }
         return result;
+    }
+
+    /**
+     * Internal method: Fetch sensitive data events count from malicious events
+     * Collection: MaliciousEventDao
+     * @param startTimestamp Start time filter
+     * @param endTimestamp End time filter
+     * @param demoCollections Demo collections to exclude
+     * @return Count of PII-related malicious events
+     */
+    private long fetchSensitiveDataEventsCountInternal(int startTimestamp, int endTimestamp, List<DashboardMaliciousEvent> allThreats) {
+        try {
+            return allThreats.stream()
+                .filter(event -> {
+                    String filterId = event.getFilterId();
+                    String subCategory = event.getSubCategory();
+
+                    boolean isPIIFilter = com.akto.util.ThreatDetectionConstants.PII_DATA_LEAK_FILTER_ID.equals(filterId);
+
+                    boolean isPIISubCategory = subCategory != null &&
+                        com.akto.util.ThreatDetectionConstants.PII_SUBCATEGORIES.contains(subCategory);
+
+                    return isPIIFilter || isPIISubCategory;
+                })
+                .count();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching sensitive data events count: " + e.getMessage());
+            return 0L;
+        }
+    }
+
+    /**
+     * Internal method: Fetch successful exploits count from malicious events
+     * Collection: MaliciousEventDao
+     * @param startTimestamp Start time filter
+     * @param endTimestamp End time filter
+     * @param demoCollections Demo collections to exclude
+     * @return Count of malicious events with successfulExploit == true
+     */
+    private long fetchSuccessfulExploitsCountInternal(int startTimestamp, int endTimestamp, List<DashboardMaliciousEvent> allThreats) {
+        try {
+
+            return allThreats.stream()
+                .filter(DashboardMaliciousEvent::getSuccessfulExploit)
+                .count();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching successful exploits count: " + e.getMessage());
+            return 0L;
+        }
     }
 
     /**
@@ -989,6 +1145,215 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
     }
 
     /**
+     * Internal method: Fetch top triggered guardrail policies
+     * Collection: MaliciousEventDao (filtered by label=GUARDRAIL)
+     */
+    private List<BasicDBObject> fetchTopGuardrailPoliciesInternal(List<DashboardMaliciousEvent> allThreats) {
+        List<BasicDBObject> result = new ArrayList<>();
+        try {
+            List<DashboardMaliciousEvent> guardrailEvents = allThreats.stream()
+                .filter(event -> "GUARDRAIL".equalsIgnoreCase(event.getLabel()))
+                .collect(Collectors.toList());
+
+            // Group by filterId (policy) in Java
+            Map<String, Long> policyCounts = new HashMap<>();
+            for (DashboardMaliciousEvent event : guardrailEvents) {
+                String filterId = event.getFilterId();
+                if (filterId != null && !filterId.isEmpty()) {
+                    policyCounts.put(filterId, policyCounts.getOrDefault(filterId, 0L) + 1);
+                }
+            }
+
+            // Fetch guardrail filter names from FilterYamlTemplate
+            Map<String, String> filterIdToNameMap = new HashMap<>();
+            try {
+                Map<String, FilterConfig> filterConfigs = FilterYamlTemplateDao.instance.fetchFilterConfig(false, false);
+
+                for (Map.Entry<String, FilterConfig> entry : filterConfigs.entrySet()) {
+                    String filterId = entry.getKey();
+                    FilterConfig filterConfig = entry.getValue();
+
+                    if (filterConfig != null && filterConfig.getInfo() != null) {
+                        Info info = filterConfig.getInfo();
+
+                        // Try to get display name from category, fallback to name, then to filterId
+                        if (info.getCategory() != null) {
+                            Category category = info.getCategory();
+                            String displayName = category.getDisplayName();
+                            String categoryName = category.getName();
+
+                            if (displayName != null && !displayName.isEmpty()) {
+                                filterIdToNameMap.put(filterId, displayName);
+                            } else if (categoryName != null && !categoryName.isEmpty()) {
+                                filterIdToNameMap.put(filterId, categoryName);
+                            }
+                        }
+                        // If no category, try to get name from info
+                        if (!filterIdToNameMap.containsKey(filterId) && info.getName() != null && !info.getName().isEmpty()) {
+                            filterIdToNameMap.put(filterId, info.getName());
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error fetching guardrail filter names: " + e.getMessage());
+            }
+
+            // Sort by count descending and take top 4
+            List<Map.Entry<String, Long>> sortedPolicies = policyCounts.entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .limit(4)
+                .collect(Collectors.toList());
+
+            for (Map.Entry<String, Long> entry : sortedPolicies) {
+                BasicDBObject doc = new BasicDBObject();
+                String filterId = entry.getKey();
+
+                // Use display name from FilterYamlTemplate if available
+                String displayName = filterIdToNameMap.get(filterId);
+
+                // Use displayName if available, otherwise fallback to filterId
+                doc.put("name", (displayName != null && !displayName.isEmpty()) ? displayName : filterId);
+                doc.put("count", entry.getValue());
+                result.add(doc);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching top guardrail policies: " + e.getMessage());
+        }
+        return result;
+    }
+
+    /**
+     * Internal method: Fetch data protection trends over time
+     * Collection: MaliciousEventDao (filtered by label=GUARDRAIL)
+     * Returns time-series data for top 3 guardrail categories by count
+     */
+    private BasicDBObject fetchDataProtectionTrendsInternal(List<DashboardMaliciousEvent> allThreats, int startTimestamp, int endTimestamp, long daysBetween) {
+        BasicDBObject result = new BasicDBObject();
+        try {
+            // Filter for guardrail events only
+            List<DashboardMaliciousEvent> guardrailEvents = allThreats.stream()
+                .filter(event -> "GUARDRAIL".equalsIgnoreCase(event.getLabel()))
+                .collect(Collectors.toList());
+
+            // Group events by subCategory and count occurrences
+            Map<String, Long> categoryCounts = new HashMap<>();
+            Map<String, List<Integer>> categoryTimestamps = new HashMap<>();
+
+            for (DashboardMaliciousEvent event : guardrailEvents) {
+                long timestamp = event.getTimestamp();
+                if (timestamp <= 0 || timestamp < startTimestamp || timestamp > endTimestamp) {
+                    continue;
+                }
+
+                // Use subCategory as the primary category identifier
+                String category = event.getSubCategory();
+                if (category == null || category.isEmpty()) {
+                    // Fallback to filterId if subCategory is not available
+                    category = event.getFilterId();
+                }
+                if (category == null || category.isEmpty()) {
+                    category = "Unknown";
+                }
+
+                // Count occurrences
+                categoryCounts.put(category, categoryCounts.getOrDefault(category, 0L) + 1);
+
+                // Store timestamps for each category
+                categoryTimestamps.computeIfAbsent(category, k -> new ArrayList<>()).add((int) timestamp);
+            }
+
+            // Sort categories by count and take top 3
+            List<String> topCategories = categoryCounts.entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .limit(3)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
+
+            // Create time-series data for each top category
+            for (String category : topCategories) {
+                List<Integer> timestamps = categoryTimestamps.get(category);
+                if (timestamps != null && !timestamps.isEmpty()) {
+                    Map<String, Long> timePeriodMap = groupByTimePeriod(timestamps, daysBetween);
+                    List<List<Object>> timeSeriesData = convertTimePeriodMapToTimeSeriesData(timePeriodMap, daysBetween);
+                    result.put(category, timeSeriesData);
+                }
+            }
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching data protection trends: " + e.getMessage());
+        }
+        return result;
+    }
+
+    /**
+     * Helper method: Convert time period map to time-series data format
+     * Returns array of [timestamp_in_milliseconds, count] arrays
+     */
+    private List<List<Object>> convertTimePeriodMapToTimeSeriesData(Map<String, Long> timePeriodMap, long daysBetween) {
+        List<List<Object>> result = new ArrayList<>();
+
+        // Convert to list and sort by actual timestamp value instead of string key
+        List<Map.Entry<String, Long>> sortedEntries = timePeriodMap.entrySet().stream()
+            .sorted((e1, e2) -> {
+                long ts1 = convertTimePeriodKeyToTimestamp(e1.getKey(), daysBetween);
+                long ts2 = convertTimePeriodKeyToTimestamp(e2.getKey(), daysBetween);
+                return Long.compare(ts1, ts2);
+            })
+            .collect(Collectors.toList());
+
+        for (Map.Entry<String, Long> entry : sortedEntries) {
+            String timePeriodKey = entry.getKey();
+            Long count = entry.getValue();
+
+            // Convert time period key back to timestamp
+            long timestamp = convertTimePeriodKeyToTimestamp(timePeriodKey, daysBetween);
+
+            // Return [timestamp_in_milliseconds, count]
+            List<Object> dataPoint = new ArrayList<>();
+            dataPoint.add(timestamp * 1000L); // Convert to milliseconds
+            dataPoint.add(count);
+            result.add(dataPoint);
+        }
+
+        return result;
+    }
+
+    /**
+     * Helper method: Convert time period key back to approximate timestamp
+     * For charting purposes, returns the start of the period
+     */
+    private long convertTimePeriodKeyToTimestamp(String timePeriodKey, long daysBetween) {
+        try {
+            if (timePeriodKey.startsWith("D_")) {
+                // Day format: "D_YYYY-MM-DD"
+                String dateStr = timePeriodKey.substring(2);
+                LocalDate date = LocalDate.parse(dateStr, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                return date.atStartOfDay(ZoneId.systemDefault()).toEpochSecond();
+            } else if (timePeriodKey.startsWith("W_")) {
+                // Week format: "W_YYYY_W"
+                String[] parts = timePeriodKey.substring(2).split("_");
+                int year = Integer.parseInt(parts[0]);
+                int week = Integer.parseInt(parts[1]);
+                WeekFields weekFields = WeekFields.of(Locale.getDefault());
+                LocalDate date = LocalDate.of(year, 1, 1)
+                    .with(weekFields.weekBasedYear(), year)
+                    .with(weekFields.weekOfWeekBasedYear(), week);
+                return date.atStartOfDay(ZoneId.systemDefault()).toEpochSecond();
+            } else if (timePeriodKey.startsWith("M_")) {
+                // Month format: "M_YYYY_M"
+                String[] parts = timePeriodKey.substring(2).split("_");
+                int year = Integer.parseInt(parts[0]);
+                int month = Integer.parseInt(parts[1]);
+                LocalDate date = LocalDate.of(year, month, 1);
+                return date.atStartOfDay(ZoneId.systemDefault()).toEpochSecond();
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error converting time period key to timestamp: " + e.getMessage());
+        }
+        return 0;
+    }
+
+    /**
      * Internal method: Fetch top 5 attacked hosts by threats
      * Collection: MaliciousEventDao
      */
@@ -1186,7 +1551,81 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
         return result;
     }
 
+    /**
+     * Internal method: Calculate average threat score from malicious events
+     * Converts severity of each event to numeric score and calculates average
+     * @param allThreats List of malicious events already fetched
+     * @return Average threat score (0.0-1.0 scale, or 0 if no threats)
+     */
+    private double fetchAverageThreatScoreInternal(List<DashboardMaliciousEvent> allThreats) {
+        double avgScore = 0.0;
+        try {
+            if (allThreats == null || allThreats.isEmpty()) {
+                return 0.0;
+            }
 
+            // Calculate average from severities
+            double totalScore = 0.0;
+            int count = 0;
+
+            for (DashboardMaliciousEvent event : allThreats) {
+                String severityStr = event.getSeverity();
+                if (severityStr != null && !severityStr.isEmpty()) {
+                    float score = getSeverityScore(severityStr);
+                    if (score > 0) {
+                        totalScore += score;
+                        count++;
+                    }
+                }
+            }
+
+            if (count > 0) {
+                avgScore = totalScore / count;
+                // Round to 1 decimal place
+                avgScore = Math.round(avgScore * 10.0) / 10.0;
+            }
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error calculating average threat score: " + e.getMessage());
+        }
+        return avgScore;
+    }
+
+    /**
+     * Convert severity string to numeric score
+     * Uses same mapping as MaliciousEventDao.getThreatScore()
+     * @param severityStr Severity string (CRITICAL, HIGH, MEDIUM, LOW)
+     * @return Numeric score (1.0, 0.75, 0.5, 0.25, or 0.0)
+     */
+    private float getSeverityScore(String severityStr) {
+        try {
+            GlobalEnums.Severity severity = GlobalEnums.Severity.valueOf(severityStr.toUpperCase());
+            switch (severity) {
+                case CRITICAL:
+                    return 1.0f;
+                case HIGH:
+                    return 0.75f;
+                case MEDIUM:
+                    return 0.5f;
+                case LOW:
+                    return 0.25f;
+                default:
+                    return 0.0f;
+            }
+        } catch (Exception e) {
+            return 0.0f;
+        }
+    }
+
+    /**
+     * Internal method: Fetch common agentic components grouped by collection
+     * Groups API endpoints by collection, counts them, and returns top N sorted by count
+     *
+     * @param startTimestamp Start time filter
+     * @param endTimestamp End time filter
+     * @param componentType Type of component: MCP_SERVERS, LLMS, AI_AGENTS
+     * @return List of {name, count} objects sorted by count descending
+     */
     // ========== Helper Methods ==========
 
     private Set<Integer> getDeactivatedCollections() {

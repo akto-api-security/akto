@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import InfoCard from "../new_components/InfoCard";
 import { Spinner, Text, SkeletonBodyText, SkeletonDisplayText } from "@shopify/polaris";
 import StackedAreaChart from "../../../components/charts/StackedAreaChart";
-import mockThreatApi from "./mockThreatApi";
+import threatDetectionApi from "../../threat_detection/api";
 import dayjs from "dayjs";
 
 // ============================================================================
@@ -249,7 +249,7 @@ function ThreatCategoryChart({ startTimestamp, endTimestamp }) {
       setError(null);
 
       try {
-        const resp = await mockThreatApi.getThreatActivityTimeline(
+        const resp = await threatDetectionApi.getThreatActivityTimeline(
           startTimestamp,
           endTimestamp
         );
