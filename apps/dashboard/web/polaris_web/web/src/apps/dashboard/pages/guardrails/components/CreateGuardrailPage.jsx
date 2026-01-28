@@ -756,22 +756,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     reason: 'Harmful Content Detected',
                     message: 'This request was blocked due to harmful content categories.'
                 };
-            } else if (input.includes('password') || input.includes('credit card') || input.includes('ssn')) {
-                response = {
-                    ...response,
-                    action: 'Redacted',
-                    reason: 'Sensitive Information Detected',
-                    message: 'Sensitive information was detected and redacted from the request.',
-                    aiResponse: 'Your password is: [REDACTED]. Here\'s the credit card info: [REDACTED]'
-                };
-            } else if (input.includes('email') || input.includes('phone')) {
-                response = {
-                    ...response,
-                    action: 'Redacted',
-                    reason: 'PII Detected',
-                    message: 'Personal information was detected and redacted.',
-                    aiResponse: 'Contact information: [REDACTED]'
-                };
             } else {
                 response = {
                     ...response,
