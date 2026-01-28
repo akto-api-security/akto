@@ -32,7 +32,6 @@ public class ModuleInfoConstants {
             put("AKTO_INTERNAL_KAFKA_BOOTSTRAP_SERVER", "Internal Kafka Bootstrap Server");
             put("AKTO_THREAT_DETECTION_LOCAL_REDIS_URI", "Local Redis URI");
             put("AGGREGATION_RULES_ENABLED", "Aggregation Rules Enabled");
-            put("API_DISTRIBUTION_ENABLED", "API Distribution Enabled");
             put("AKTO_THREAT_PROTECTION_BACKEND_URL", "Threat Protection Backend URL");
             put("AKTO_MONGO_CONN", "MongoDB Connection String");
             put("RUNTIME_MODE", "Runtime Mode");

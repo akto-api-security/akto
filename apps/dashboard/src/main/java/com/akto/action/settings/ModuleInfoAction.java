@@ -120,8 +120,7 @@ public class ModuleInfoAction extends UserAction {
             key.equals("AKTO_IGNORE_IP_TRAFFIC") ||
             key.equals("AKTO_K8_METADATA_CAPTURE") ||
             key.equals("AKTO_THREAT_ENABLED") ||
-            key.equals("AGGREGATION_RULES_ENABLED") ||
-            key.equals("API_DISTRIBUTION_ENABLED")) {
+            key.equals("AGGREGATION_RULES_ENABLED")) {
             return "boolean";
         }
         return "text";
