@@ -2,5 +2,15 @@ package com.akto.dto.audit_logs;
 
 public enum Resource {
     NOT_SPECIFIED,
-    API_COLLECTION
+    AI_AGENTS,
+    API_COLLECTION,
+    AZURE_BOARDS_INTEGRATION,
+    API_TOKEN,
+    CONFIGS,
+    DEVREV_INTEGRATION_SERVICE,
+    JIRA_INTEGRATION,
+    TEST_EDITOR,
+    TEST_RESULTS,
+    TEST_ROLE,
+    TESTING_RUN,
 }

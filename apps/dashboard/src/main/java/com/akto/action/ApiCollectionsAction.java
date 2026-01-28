@@ -303,7 +303,7 @@ public class ApiCollectionsAction extends UserAction {
         return true;
     }
 
-    @Audit(description = "User created a new API collection", resource = Resource.API_COLLECTION, operation = Operation.CREATE, metadataGenerators = {"amgCollectionName"})
+    @Audit(description = "User created a new API collection", resource = Resource.API_COLLECTION, operation = Operation.CREATE, metadataGenerators = {"gCollectionName"})
     public String createCollection() {
 
         if(!isValidApiCollectionName()){
@@ -351,7 +351,7 @@ public class ApiCollectionsAction extends UserAction {
         return this.deleteMultipleCollections();
     }
 
-    @Audit(description = "User deleted multiple API collections", resource = Resource.API_COLLECTION, operation = Operation.DELETE, metadataGenerators = {"amgApiCollectionIds"})
+    @Audit(description = "User deleted multiple API collections", resource = Resource.API_COLLECTION, operation = Operation.DELETE, metadataGenerators = {"gApiCollectionIds"})
     public String deleteMultipleCollections() {
         List<Integer> apiCollectionIds = new ArrayList<>();
         for(ApiCollection apiCollection: this.apiCollections) {
@@ -703,6 +703,7 @@ public class ApiCollectionsAction extends UserAction {
         loggerMaker.debugAndAddToDb(String.format("Fixed sample data for %d api collections", apiCollections.size()), LoggerMaker.LogDb.DASHBOARD);
     }
 
+    @Audit(description = "User redacted a collection", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"getApiCollectionId", "isRedacted"})
     public String redactCollection() {
         List<Bson> updates = Arrays.asList(
                 Updates.set(ApiCollection.REDACT, redacted),
@@ -843,7 +844,7 @@ public class ApiCollectionsAction extends UserAction {
                 deactivatedFilter));
     }
 
-    @Audit(description = "User deactivated collections from inventory", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"amgApiCollectionIds"})
+    @Audit(description = "User deactivated collections from inventory", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"gApiCollectionIds"})
     public String deactivateCollections() {
         this.apiCollections = filterCollections(this.apiCollections, false);
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections,Filters.empty());
@@ -855,7 +856,7 @@ public class ApiCollectionsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    @Audit(description = "User activated collections in inventory", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"amgApiCollectionIds"})
+    @Audit(description = "User activated collections in inventory", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"gApiCollectionIds"})
     public String activateCollections() {
         this.apiCollections = filterCollections(this.apiCollections, true);
         if (this.apiCollections.isEmpty()) {
@@ -939,7 +940,7 @@ public class ApiCollectionsAction extends UserAction {
     private List<CollectionTags> envType;
     private boolean resetEnvTypes;
     
-    @Audit(description = "User updated environment type", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"amgApiCollectionIds"})
+    @Audit(description = "User updated environment type", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"gApiCollectionIds"})
     public String updateEnvType(){
         if(!resetEnvTypes && (envType == null || envType.isEmpty())) {
             addActionError("Please enter a valid ENV type.");
@@ -1547,11 +1548,11 @@ public class ApiCollectionsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String amgCollectionName() {
+    public String gCollectionName() {
         return this.collectionName;
     }
 
-    public List<Integer> amgApiCollectionIds() {
+    public List<Integer> gApiCollectionIds() {
         List<Integer> apiCollectionIds = new ArrayList<>();
 
         if (this.apiCollectionIds != null) {
