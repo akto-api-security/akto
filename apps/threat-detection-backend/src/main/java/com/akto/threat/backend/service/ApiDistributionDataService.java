@@ -132,8 +132,8 @@ public class ApiDistributionDataService {
             Filters.eq("url", fetchApiDistributionDataRequest.getUrl()),
             Filters.eq("method", fetchApiDistributionDataRequest.getMethod()),
             Filters.eq("windowSize", 5),
-            Filters.gte("windowStart", 1726461999 / 60),
-            Filters.lte("windowStart", 1757997999 / 60)
+            Filters.gte("windowStart", fetchApiDistributionDataRequest.getStartWindow()),
+            Filters.lte("windowStart", fetchApiDistributionDataRequest.getEndWindow())
         );
         
         FetchApiDistributionDataResponse.Builder responseBuilder = FetchApiDistributionDataResponse.newBuilder();

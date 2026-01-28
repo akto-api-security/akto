@@ -457,22 +457,27 @@ public class MaliciousTrafficDetectorTask implements Task {
     String url = responseParam.getRequestParams().getURL();
     URLMethods.Method method =
         URLMethods.Method.fromString(responseParam.getRequestParams().getMethod());
-    ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
-
-    String apiHitCountKey = Utils.buildApiHitCountKey(apiCollectionId, url, method.toString());
-    if (this.apiCountWindowBasedThresholdNotifier != null) {
-        this.apiCountWindowBasedThresholdNotifier.incrementApiHitcount(apiHitCountKey, responseParam.getTime(), RedisKeyInfo.API_COUNTER_SORTED_SET);
-    }
-
-    List<SchemaConformanceError> errors = null; 
-
 
     // Convert static URL to template URL once for reuse
-    // This is used for: 1) Redis/CMS aggregation, 2) ParamEnumeration filter
+    // This is used for: 1) API count increment, 2) Redis/CMS aggregation, 3) ParamEnumeration filter
     URLTemplate matchedTemplate = null;
     if (apiDistributionEnabled && apiCollectionId != 0) {
       matchedTemplate = threatDetector.findMatchingUrlTemplate(responseParam);
     }
+
+    // Use template URL if available, otherwise fall back to static URL
+    // This ensures API counts aggregate on template URLs (e.g., /api/users/INTEGER instead of /api/users/123)
+    String urlForAggregation = matchedTemplate != null ? matchedTemplate.getTemplateString() : url;
+
+    ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
+
+    // Increment API count using template URL for proper aggregation
+    String apiHitCountKey = Utils.buildApiHitCountKey(apiCollectionId, urlForAggregation, method.toString());
+    if (this.apiCountWindowBasedThresholdNotifier != null) {
+        this.apiCountWindowBasedThresholdNotifier.incrementApiHitcount(apiHitCountKey, responseParam.getTime(), RedisKeyInfo.API_COUNTER_SORTED_SET);
+    }
+
+    List<SchemaConformanceError> errors = null;
 
     // Check SuccessfulExploit category filters
     boolean successfulExploit = false; 
@@ -487,19 +492,17 @@ public class MaliciousTrafficDetectorTask implements Task {
     if (apiDistributionEnabled && apiCollectionId != 0) {
       String apiCollectionIdStr = Integer.toString(apiCollectionId);
 
-      // Use pre-matched template for Redis storage
+      // Use pre-matched template URL for Redis storage
       // This aggregates requests like /api/users/1, /api/users/2 under /api/users/INTEGER
-      String templateUrl = matchedTemplate != null ? matchedTemplate.getTemplateString() : url;
-
-      String distributionKey = Utils.buildApiDistributionKey(apiCollectionIdStr, templateUrl, method.toString());
-      String ipApiCmsKey = Utils.buildIpApiCmsDataKey(actor, apiCollectionIdStr, templateUrl, method.toString());
+      String distributionKey = Utils.buildApiDistributionKey(apiCollectionIdStr, urlForAggregation, method.toString());
+      String ipApiCmsKey = Utils.buildIpApiCmsDataKey(actor, apiCollectionIdStr, urlForAggregation, method.toString());
       long curEpochMin = responseParam.getTime() / 60;
       this.distributionCalculator.updateFrequencyBuckets(distributionKey, curEpochMin, ipApiCmsKey);
 
       // Check and raise alert for RateLimits
       RatelimitConfigItem ratelimitConfig = this.threatConfigEvaluator.getDefaultRateLimitConfig();
 
-      ApiInfo.ApiInfoKey templateApiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, templateUrl, method);
+      ApiInfo.ApiInfoKey templateApiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, urlForAggregation, method);
       long ratelimit = this.threatConfigEvaluator.getRatelimit(templateApiInfoKey);
 
       long count = this.distributionCalculator.getSlidingWindowCount(ipApiCmsKey, curEpochMin,

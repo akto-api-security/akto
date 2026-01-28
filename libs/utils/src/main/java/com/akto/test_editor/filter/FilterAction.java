@@ -1,5 +1,6 @@
 package com.akto.test_editor.filter;
 
+import com.akto.util.HttpRequestResponseUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -11,7 +12,6 @@ import com.akto.dao.testing.AccessMatrixUrlToRolesDao;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
 
-import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import org.bson.conversions.Bson;
 
@@ -401,11 +401,13 @@ public final class FilterAction {
         String reqBody = response.getBody();
         ApiInfo.ApiInfoKey apiInfoKey = filterActionRequest.getApiInfoKey();
         if(TestingUtilsSingleton.getInstance().isMcpRequest(apiInfoKey, rawApi)) {
-            String contentType = response.getHeaders().get("content-type").get(0);
+
+            String contentType = HttpRequestResponseUtils.getHeaderValue(response.getHeaders(), "content-type");
             String tempReqBody = McpRequestResponseUtils.parseResponse(contentType, reqBody);
            
             if(tempReqBody.contains("error") && filterActionRequest.isValidationContext()) {
                 // check if error comes out in parsing, call to LLM when context is not filter
+
                 MagicValidateFilter magicValidateFilter = new MagicValidateFilter();
                 DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(reqBody, filterActionRequest.getQuerySet(), "magic_validate");
                 ValidationResult validationResult = magicValidateFilter.isValid(dataOperandFilterRequest);

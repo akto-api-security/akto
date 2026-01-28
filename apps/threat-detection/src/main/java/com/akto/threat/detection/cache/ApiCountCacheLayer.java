@@ -93,7 +93,8 @@ public class ApiCountCacheLayer implements CounterCache {
 
         for (String key : keys) {
             long cv = this.localCache.asMap().getOrDefault(key, 0L);
-            this.redis.async().setex(key, 1 * 60 * 60, cv);
+            // Set TTL to 8 hours to handle Kafka lag and ensure relay cron can process keys
+            this.redis.async().setex(key, 8 * 60 * 60, cv);
         }
 
         this.pendingOps.clear();

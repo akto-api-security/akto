@@ -226,6 +226,8 @@ public class AktoJaxAction extends UserAction {
                 crawlerRun.setCookies(cookies);
                 crawlerRun.setCrawlingTime(crawlingTime);
                 crawlerRun.setCustomHeaders(customHeaders);
+                crawlerRun.setUrlTemplatePatterns(urlTemplatePatterns);
+                crawlerRun.setApplicationPages(applicationPages);
 
                 if(runTestAfterCrawling && selectedMiniTestingService != null && !selectedMiniTestingService.isEmpty()) {
                     crawlerRun.setSelectedMiniTestingService(selectedMiniTestingService);
