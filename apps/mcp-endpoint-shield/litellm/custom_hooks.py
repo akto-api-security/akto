@@ -129,6 +129,7 @@ class GuardrailsHandler(CustomLogger):
                 )
             return data
         except HTTPException:
+            logger.info(f"Guardrails validation failed: {e}")
             raise
         except Exception as e:
             logger.error(f"Guardrails validation error (fail-open): {e}")
