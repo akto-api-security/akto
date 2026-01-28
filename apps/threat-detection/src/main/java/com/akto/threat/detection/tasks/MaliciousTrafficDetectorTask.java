@@ -452,6 +452,11 @@ public class MaliciousTrafficDetectorTask implements Task {
     rawApi.setRawApiMetdata(metadata);
 
     int apiCollectionId = httpCallParser.createApiCollectionId(responseParam);
+    if (apiCollectionId == 0) {
+      logger.info("Default apiCollectionId found for url " + responseParam.getRequestParams().getURL() + " account "
+          + responseParam.getAccountId());
+      return;
+    }
     responseParam.requestParams.setApiCollectionId(apiCollectionId);
 
     String url = responseParam.getRequestParams().getURL();
