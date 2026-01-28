@@ -57,9 +57,16 @@ export default {
             data: {}
         })
     },
-    fetchDastScan(crawlId){
+    fetchDastScan(crawlId, skip, limit, filters, searchString, sortKey, sortOrder){
         return request({
             url: '/api/fetchDastScan',
+            method: 'post',
+            data: { crawlId, skip, limit, filters, searchString, sortKey, sortOrder }
+        })
+    },
+    fetchDastScanCounts(crawlId){
+        return request({
+            url: '/api/fetchDastScanCounts',
             method: 'post',
             data: { crawlId }
         })
