@@ -28,14 +28,14 @@ def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
 
 def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str]:
     headers = {"Content-Type": "application/json"}
-    req = urllib.request.Request(
+    request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
         headers=headers,
         method="POST",
     )
 
-    with urllib.request.urlopen(req, timeout=AKTO_TIMEOUT) as response:
+    with urllib.request.urlopen(request, timeout=AKTO_TIMEOUT) as response:
         raw = response.read().decode("utf-8")
         try:
             return json.loads(raw)

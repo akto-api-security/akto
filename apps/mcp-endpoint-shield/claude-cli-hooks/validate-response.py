@@ -26,16 +26,16 @@ def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
     return f"{AKTO_DATA_INGESTION_URL}/api/http-proxy?{'&'.join(params)}"
 
 
-def post_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str]:
+def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str]:
     headers = {"Content-Type": "application/json"}
-    req = urllib.request.Request(
+    request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
         headers=headers,
         method="POST",
     )
 
-    with urllib.request.urlopen(req, timeout=AKTO_TIMEOUT) as response:
+    with urllib.request.urlopen(request, timeout=AKTO_TIMEOUT) as response:
         raw = response.read().decode("utf-8")
         try:
             return json.loads(raw)
@@ -92,7 +92,7 @@ def get_last_interaction(transcript_path: str) -> tuple[str, str]:
                     
                     content = entry.get('message', {}).get('content', '')
                     text = content if isinstance(content, str) else "".join(
-                        b.get('text', '') for b in content if b.get('type') == 'text'
+                        block.get('text', '') for block in content if block.get('type') == 'text'
                     )
                     
                     if entry_type == 'user':
@@ -115,7 +115,7 @@ def send_ingestion_data(user_prompt: str, response_text: str):
 
     try:
         request_body = build_ingestion_payload(user_prompt, response_text)
-        post_json(
+        post_payload_json(
             build_http_proxy_url(
                 guardrails=not AKTO_SYNC_MODE,
                 ingest_data=True,
