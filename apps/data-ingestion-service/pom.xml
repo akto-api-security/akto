@@ -43,6 +43,11 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
+            <groupId>com.akto.libs.protobuf</groupId>
+            <artifactId>protobuf</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>com.akto.apps.gateway</groupId>
             <artifactId>akto-gateway</artifactId>
             <version>${project.version}</version>
