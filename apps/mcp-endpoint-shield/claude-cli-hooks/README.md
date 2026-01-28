@@ -9,19 +9,22 @@ Validate your prompts against Akto AI Guardrails before they're sent to Claude.
 ```bash
 mkdir -p ~/.claude/hooks
 cd ~/.claude/hooks
-# Download validate-prompt.py and .env.example here
 ```
 
 ### 2. Configure environment
 
+Add the following environment variables to your shell configuration file (e.g. `~/.bashrc`, `~/.zshrc`, or `~/.profile`):
+
 ```bash
-cp .env.example .env
+# Add these to ~/.zshrc
+export DATA_INGESTION_URL="ingestion-service-url"
+export SYNC_MODE="true" # Set to false if you want to allow prompts if guardrails blocks them but still send them to Claude
 ```
 
-Edit `.env` with your values:
+Then reload your shell configuration (or open a new terminal) before running Claude Code:
+
 ```bash
-AKTO_GUARDRAILS_URL=http://localhost:80
-DATABASE_ABSTRACTOR_SERVICE_TOKEN=your-token-here
+source ~/.zshrc
 ```
 
 ### 3. Add hook to Claude CLI
@@ -41,6 +44,17 @@ Edit `~/.claude/settings.json`:
                     }
                 ]
             }
+        ],
+        "Stop": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "python3 ~/.claude/hooks/validate-response.py",
+                        "timeout": 10
+                    }
+                ]
+            }
         ]
     }
 }
@@ -51,12 +65,3 @@ Edit `~/.claude/settings.json`:
 ```bash
 claude
 ```
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AKTO_GUARDRAILS_URL` | `http://localhost:80` | Guardrails service URL |
-| `DATABASE_ABSTRACTOR_SERVICE_TOKEN` | - | Auth token for hosted guardrails |
-| `AKTO_GUARDRAILS_TIMEOUT` | `5` | Request timeout (seconds) |
-| `AKTO_GUARDRAILS_FAIL_OPEN` | `true` | Allow prompts if guardrails unavailable |
