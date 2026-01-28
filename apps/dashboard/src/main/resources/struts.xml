@@ -3184,7 +3184,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User started a web crawler</param>
             </interceptor-ref>
@@ -3559,7 +3559,7 @@
                 <param name="featureLabel">AKTO_EXTERNAL_API CI_CD_INTEGRATION</param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="featureLabel">API_TOKENS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User added an API token</param>
             </interceptor-ref>
@@ -3584,7 +3584,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="featureLabel">API_TOKENS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User deleted an API token</param>
             </interceptor-ref>
@@ -3606,7 +3606,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="featureLabel">API_TOKENS</param>
                 <param name="accessType">READ</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
