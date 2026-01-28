@@ -17,8 +17,8 @@ Add the following environment variables to your shell configuration file (e.g. `
 
 ```bash
 # Add these to ~/.zshrc
-export DATA_INGESTION_URL="ingestion-service-url"
-export SYNC_MODE="true" # Set to false if you want to allow prompts if guardrails blocks them but still send them to Claude
+export AKTO_DATA_INGESTION_URL="ingestion-service-url"
+export AKTO_SYNC_MODE="true" # Set to false if you want to allow prompts if guardrails blocks them but still send them to Claude
 ```
 
 Then reload your shell configuration (or open a new terminal) before running Claude Code:
