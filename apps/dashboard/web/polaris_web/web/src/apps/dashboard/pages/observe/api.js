@@ -1,5 +1,15 @@
 import request from "../../../../util/request"
+import func from "@/util/func"
 
+const STANDARD_HTTP_METHODS = ["GET","POST","PUT","DELETE","HEAD","OPTIONS","TRACE","PATCH","TRACK","CONNECT"]
+
+function hasInvalidHttpMethod(apiInfoKeyList) {
+    if (!Array.isArray(apiInfoKeyList)) return false
+    return apiInfoKeyList.some(key => {
+        const method = (key?.method || "").toUpperCase()
+        return !STANDARD_HTTP_METHODS.includes(method)
+    })
+}
 
 export default {
     async fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, startTimestamp, endTimestamp, sensitive, isRequest, queryValue) {
@@ -589,6 +599,7 @@ export default {
         })
     },
     scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceName, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed) {
+        
         return request({
             url: '/api/startTest',
             method: 'post',
@@ -598,6 +609,11 @@ export default {
         })
     },
     scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceName, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed) {
+        if (hasInvalidHttpMethod(apiInfoKeyList)) {
+            func.setToast(true, true, "Invalid HTTP method for one or more selected APIs")
+            return Promise.reject(new Error("Invalid HTTP method for one or more selected APIs"))
+        }
+
         return request({
             url: '/api/startTest',
             method: 'post',
