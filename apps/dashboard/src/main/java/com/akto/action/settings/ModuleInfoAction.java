@@ -103,6 +103,7 @@ public class ModuleInfoAction extends UserAction {
                 field.put("key", entry.getKey());
                 field.put("label", entry.getValue());
                 field.put("type", getFieldType(entry.getKey()));
+                field.put("moduleCategory", moduleEntry.getKey().toString());
                 allowedEnvFields.add(field);
             }
         }
