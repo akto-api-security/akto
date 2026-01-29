@@ -494,7 +494,7 @@ public class SaveTestEditorAction extends UserAction {
         }
     }
 
-    @Audit(description = "User set a test inactive in test editor", resource = Resource.TEST_EDITOR, operation = Operation.DELETE, metadataGenerators = {"getOriginalTestId", "getInactive"})
+    @Audit(description = "User set a test inactive in test editor", resource = Resource.TEST_EDITOR, operation = Operation.UPDATE, metadataGenerators = {"getOriginalTestId", "getInactive"})
     public String setTestInactive() {
 
         if (originalTestId == null) {
