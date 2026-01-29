@@ -279,6 +279,17 @@ const api = {
                 endTimestamp
             }
         })
+    },
+
+    fetchAttackFlows: async (startTimestamp, endTimestamp) => {
+        return await request({
+            url: '/api/fetchAttackFlows',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
     }
 }
 
