@@ -33,6 +33,19 @@ const headers = [
         showFilter: true
     },
     {
+        title: "Module Name",
+        text: "Module Name",
+        value: "moduleName",
+        filterKey: "moduleName",
+        showFilter: true
+    },
+    {
+        title: "Application Pages",
+        text: "Application Pages",
+        value: "applicationPagesComp",
+        textValue: "applicationPages"
+    },
+    {
         title: "Start Time",
         text: "Start Time",
         value: "startTime",
@@ -52,6 +65,12 @@ const headers = [
     //     text: "Duration",
     //     value: "duration"
     // },
+    {
+        title: "URL Template Patterns",
+        text: "URL Template Patterns",
+        value: "urlTemplatePatternsComp",
+        textValue: "urlTemplatePatterns"
+    },
     {
         title: "Out of Scope URLs",
         text: "Out of Scope URLs",
@@ -105,11 +124,28 @@ function DastProgress() {
                         </Box>
                     ),
                     startedBy: run.startedBy || "-",
+                    moduleName: run.moduleName || "Internal DAST (Akto)",
+                    applicationPages: run.applicationPages || "-",
+                    applicationPagesComp: (
+                        <Box maxWidth="20vw">
+                            <Text truncate>{run.applicationPages || "-"}</Text>
+                        </Box>
+                    ),
                     startTime: func.prettifyEpoch(run.startTimestamp),
                     startTimestamp: run.startTimestamp,
                     endTime: run.endTimestamp > 0 ? func.prettifyEpoch(run.endTimestamp) : "In Progress",
                     endTimestamp: run.endTimestamp,
                     duration: duration,
+                    urlTemplatePatterns: run.urlTemplatePatterns || "-",
+                    urlTemplatePatternsComp: (
+                        <Box maxWidth="30vw">
+                            <TooltipText
+                                tooltip={run.urlTemplatePatterns || "-"}
+                                text={run.urlTemplatePatterns || "-"}
+                                textProps={{ truncate: true }}
+                            />
+                        </Box>
+                    ),
                     outScopeUrls: run.outScopeUrls || "-",
                     nextUrl: `/dashboard/observe/dast-progress/${run.crawlId}`
                 }
