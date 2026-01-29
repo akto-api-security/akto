@@ -991,11 +991,11 @@ const litellmImportObj = {
     icon: '/public/litellm.svg',
     label: "LiteLLM",
     text: "Import your LiteLLM proxy traffic, seamlessly into AKTO.",
-    docsUrl: 'https://docs.akto.io/traffic-connector/workflow-automation/litellm',
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/litellm',
     key: "LITELLM",
     component: <BannerComponent
         content="Import your LiteLLM proxy traffic, seamlessly in AKTO."
-        docsUrl='https://docs.akto.io/traffic-connector/workflow-automation/litellm'
+        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/litellm'
     />
 }
 
