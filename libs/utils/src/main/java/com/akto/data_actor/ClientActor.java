@@ -32,6 +32,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
@@ -53,7 +54,7 @@ public class ClientActor extends DataActor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ClientActor.class);
     private static final int maxConcurrentBatchWrites = 150;
     private static final Gson gson = new Gson();
-    public static final String CYBORG_URL = "https://cyborg.akto.io";
+    public static final String CYBORG_URL = "http://localhost:5678";
     private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
     private static ExecutorService logThreadPool = Executors.newFixedThreadPool(50);
     private static AccountSettings accSettings;
@@ -1436,6 +1437,40 @@ public class ClientActor extends DataActor {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error updating heartbeat for :" + moduleInfo.getModuleType().name(), LoggerMaker.LogDb.RUNTIME);
         }
+    }
+
+    @Override
+    public List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String moduleName) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("moduleType", moduleType != null ? moduleType.name() : null);
+        obj.put("moduleName", moduleName);
+
+        String requestPayload = gson.toJson(obj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchAndUpdateModuleForReboot", "", "POST", requestPayload, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchAndUpdateModuleForReboot: " + response.getStatusCode(), LoggerMaker.LogDb.RUNTIME);
+                return new ArrayList<>();
+            }
+
+            try {
+                ModuleInfo[] moduleInfoArray = objectMapper.readValue(responsePayload, ModuleInfo[].class);
+                if (moduleInfoArray == null) {
+                    return new ArrayList<>();
+                }
+                return Arrays.asList(moduleInfoArray);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "error parsing module info list from cyborg response", LoggerMaker.LogDb.RUNTIME);
+                return new ArrayList<>();
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error fetching and updating module for reboot", LoggerMaker.LogDb.RUNTIME);
+        }
+        return new ArrayList<>();
     }
 
     public String fetchOpenApiSchema(int apiCollectionId) {

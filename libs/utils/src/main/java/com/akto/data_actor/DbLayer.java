@@ -16,6 +16,7 @@ import com.akto.dao.upload.FileUploadsDao;
 import com.akto.dto.files.File;
 import com.akto.dto.upload.SwaggerFileUpload;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
+import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.threat_detection.ApiHitCountInfoDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.APIConfig;
@@ -31,6 +32,7 @@ import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.Setup;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -488,5 +490,47 @@ public class DbLayer {
 
     public static void insertDataIngestionLog(Log log) {
         DataIngestionLogsDao.instance.insertOne(log);
+    }
+
+    public static List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String moduleName) {
+        List<Bson> filters = new ArrayList<>();
+        
+        // Build filter based on provided parameters
+        if (moduleType != null) {
+            filters.add(Filters.eq(ModuleInfo.MODULE_TYPE, moduleType.toString()));
+        }
+        if (moduleName != null && !moduleName.isEmpty()) {
+            filters.add(Filters.eq(ModuleInfo.NAME, moduleName));
+        }
+        
+        // Only fetch modules with reboot flag set
+        filters.add(Filters.eq(ModuleInfo._REBOOT, true));
+        
+        // Combine all filters
+        Bson finalFilter = filters.size() == 1 ? filters.get(0) : Filters.and(filters);
+        
+        // Fetch matching modules
+        List<ModuleInfo> moduleInfos = ModuleInfoDao.instance.findAll(finalFilter);
+        
+        if (moduleInfos == null || moduleInfos.isEmpty()) {
+            return new ArrayList<>();
+        }
+        
+        // Clear reboot flag for fetched modules
+        List<String> moduleIds = new ArrayList<>();
+        for (ModuleInfo module : moduleInfos) {
+            if (module.getId() != null) {
+                moduleIds.add(module.getId());
+            }
+        }
+        
+        if (!moduleIds.isEmpty()) {
+            ModuleInfoDao.instance.updateMany(
+                Filters.in(ModuleInfoDao.ID, moduleIds),
+                Updates.set(ModuleInfo._REBOOT, false)
+            );
+        }
+        
+        return moduleInfos;
     }
 }

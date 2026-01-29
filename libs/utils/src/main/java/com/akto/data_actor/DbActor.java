@@ -251,5 +251,9 @@ public class DbActor extends DataActor {
         return DbLayer.fetchAllApiCollections();
     }
 
+    public List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String moduleName) {
+        return DbLayer.fetchAndUpdateModuleForReboot(moduleType, moduleName);
+    }
+
 
 }

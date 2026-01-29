@@ -23,6 +23,7 @@ import com.akto.kafka.KafkaProducerConfig;
 import com.akto.kafka.Serializer;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.ConfigUpdatePoller;
 import com.akto.metrics.ModuleInfoWorker;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.crons.ApiCountInfoRelayCron;
@@ -81,6 +82,11 @@ public class Main {
 
     logger.warnAndAddToDb("aggregation rules enabled " + aggregationRulesEnabled);
     ModuleInfoWorker.init(ModuleInfo.ModuleType.THREAT_DETECTION, dataActor);
+    
+    // Initialize config update poller for dynamic environment variable updates
+    String moduleName = ModuleInfoWorker.getModuleName(ModuleInfo.ModuleType.THREAT_DETECTION);
+    ConfigUpdatePoller.init(ModuleInfo.ModuleType.THREAT_DETECTION, moduleName);
+    
     if (!isHybridDeployment) {
         DaoInit.init(new ConnectionString(System.getenv("AKTO_MONGO_CONN")));
     }
