@@ -6,7 +6,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Pair;
-import com.akto.util.Triple;
+import com.akto.util.OrganizationInfo;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Projections;
 
@@ -23,8 +23,8 @@ public class OrganizationCache {
     private static final LoggerMaker logger = new LoggerMaker(OrganizationCache.class, LogDb.DASHBOARD);
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     
-    // Cache for admin email domain -> Triple(orgId, adminEmail, planType) mapping
-    public static final Map<String, Triple<String, String, String>> domainToOrgInfoCache = Collections.synchronizedMap(new HashMap<>());
+    // Cache for admin email domain -> OrganizationInfo mapping
+    public static final Map<String, OrganizationInfo> domainToOrgInfoCache = Collections.synchronizedMap(new HashMap<>());
     
     // Cache refresh interval: 10 minutes
     private static final int CACHE_REFRESH_INTERVAL_MINUTES = 10;
@@ -102,7 +102,7 @@ public class OrganizationCache {
                     planType = null;
                 }
                 
-                Triple<String, String, String> orgInfo = new Triple<>(orgId, adminEmail, planType);
+                OrganizationInfo orgInfo = new OrganizationInfo(orgId, adminEmail, planType);
                 domainToOrgInfoCache.put(domain, orgInfo);
                 
                 logger.debug("Cached organization: " + orgId + " with domain: " + domain + 
@@ -116,13 +116,13 @@ public class OrganizationCache {
      * Get organization info (orgId, adminEmail, planType) by admin email domain for signup matching
      * Handles bidirectional domain mapping using InviteUserAction.commonOrganisationsMap
      */
-    public static Triple<String, String, String> getOrganizationInfoByDomain(String emailDomain) {
+    public static OrganizationInfo getOrganizationInfoByDomain(String emailDomain) {
         if (emailDomain == null) {
             return null;
         }
         
         // First, try direct lookup
-        Triple<String, String, String> orgInfo = domainToOrgInfoCache.get(emailDomain);
+        OrganizationInfo orgInfo = domainToOrgInfoCache.get(emailDomain);
         if (orgInfo != null) {
             return orgInfo;
         }
@@ -147,9 +147,9 @@ public class OrganizationCache {
      */
     @Deprecated
     public static Pair<String, String> getOrganizationInfoByDomainLegacy(String emailDomain) {
-        Triple<String, String, String> orgInfo = getOrganizationInfoByDomain(emailDomain);
+        OrganizationInfo orgInfo = getOrganizationInfoByDomain(emailDomain);
         if (orgInfo != null) {
-            return new Pair<>(orgInfo.getFirst(), orgInfo.getSecond());
+            return new Pair<>(orgInfo.getOrganizationId(), orgInfo.getAdminEmail());
         }
         return null;
     }

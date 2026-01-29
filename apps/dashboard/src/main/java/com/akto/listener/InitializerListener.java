@@ -127,7 +127,7 @@ import com.akto.util.enums.GlobalEnums.TemplatePlan;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.util.filter.DictionaryFilter;
-import com.akto.util.Triple;
+import com.akto.util.OrganizationInfo;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.util.tasks.OrganizationTask;
 import com.akto.utils.Auth0;
@@ -2940,9 +2940,9 @@ public class InitializerListener implements ServletContextListener {
 
             if(planType== null || planType.isEmpty()){
                 String userDomain = organization.getAdminEmail().split("@")[1].toLowerCase();
-                Triple<String, String, String> orgInfo = domainToOrgInfoCache.get(userDomain);
+                OrganizationInfo orgInfo = domainToOrgInfoCache.get(userDomain);
                 if(orgInfo != null){
-                    planType = orgInfo.getThird();
+                    planType = orgInfo.getPlanType();
                     if(planType== null || planType.isEmpty()){
                         // Fetch all organizations with matching admin email domain
                         try {
@@ -2984,7 +2984,7 @@ public class InitializerListener implements ServletContextListener {
                                 planType = validPlanType;
                                 
                                 // Update the organization cache with the new planType for this domain
-                                Triple<String, String, String> updatedOrgInfo = new Triple<>(organization.getId(), organization.getAdminEmail(), planType);
+                                OrganizationInfo updatedOrgInfo = new OrganizationInfo(organization.getId(), organization.getAdminEmail(), planType);
                                 OrganizationCache.domainToOrgInfoCache.put(userDomain, updatedOrgInfo);
                                 
                                 logger.debugAndAddToDb("Set planType to: " + planType + " for original organization: " + organization.getId() + 

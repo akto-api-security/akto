@@ -1314,7 +1314,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                         userDomain = userEmail.split("@")[1].toLowerCase();
                         logger.info("[createUserAndRedirect] User domain extracted: " + userDomain);
                     }
-                    com.akto.util.Triple<String, String, String> matchedOrgInfo = null;
+                    com.akto.util.OrganizationInfo matchedOrgInfo = null;
 
                     if (userDomain != null) {
                         logger.info("[createUserAndRedirect] Searching for existing organizations with matching domain using cache");
@@ -1324,11 +1324,11 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     }
 
                     if (matchedOrgInfo != null) {
-                        logger.infoAndAddToDb("[createUserAndRedirect] Adding user to existing organization: " + matchedOrgInfo.getFirst() + " with planType: " + matchedOrgInfo.getThird());
+                        logger.infoAndAddToDb("[createUserAndRedirect] Adding user to existing organization: " + matchedOrgInfo.getOrganizationId() + " with planType: " + matchedOrgInfo.getPlanType());
 
                         // Fetch organization with projection to get only ACCOUNTS field for performance
                         Organization matchedOrganization = OrganizationsDao.instance.findOne(
-                            Filters.eq(Organization.ID, matchedOrgInfo.getFirst()),
+                            Filters.eq(Organization.ID, matchedOrgInfo.getOrganizationId()),
                             Projections.include(Organization.ID, Organization.ACCOUNTS)
                         );
                         Set<Integer> orgAccounts = matchedOrganization.getAccounts();
@@ -1342,7 +1342,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                             // Multiple accounts organization - link user to admin's first account
                             logger.info("[createUserAndRedirect] Multiple account organization found, finding admin user");
                             
-                            String orgAdminEmail = matchedOrgInfo.getSecond(); // Get admin email from cache
+                            String orgAdminEmail = matchedOrgInfo.getAdminEmail(); // Get admin email from cache
                             
                             // Find the admin user in users collection
                             User adminUser = UsersDao.instance.findOne(eq(User.LOGIN, orgAdminEmail));
@@ -1374,7 +1374,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                             logger.infoAndAddToDb(String.format("[createUserAndRedirect] Created organization %s for new user %s", organizationUUID, userEmail));
 
                             String adminEmailDomain = userEmail.split("@")[1].toLowerCase();
-                            com.akto.util.Triple<String, String, String> orgInfo = new com.akto.util.Triple<>(organization.getId(), userEmail, null);
+                            com.akto.util.OrganizationInfo orgInfo = new com.akto.util.OrganizationInfo(organization.getId(), userEmail, null);
                             OrganizationCache.domainToOrgInfoCache.put(adminEmailDomain, orgInfo);
 
                             Boolean attemptSyncWithAktoSuccess = OrganizationUtils.syncOrganizationWithAkto(organization);
