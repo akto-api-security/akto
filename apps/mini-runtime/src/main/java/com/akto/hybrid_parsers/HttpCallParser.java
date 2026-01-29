@@ -270,7 +270,8 @@ public class HttpCallParser {
             String source = tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
             if (source == null || (!source.equals(Constants.AI_AGENT_SOURCE_N8N)
                     && !source.equals(Constants.AI_AGENT_SOURCE_LANGCHAIN)
-                    && !source.equals(Constants.AI_AGENT_SOURCE_COPILOT_STUDIO))) {
+                    && !source.equals(Constants.AI_AGENT_SOURCE_COPILOT_STUDIO)
+                    && !source.equals(Constants.AI_AGENT_SOURCE_DATABRICS))) {
                 // Not AI agent traffic, return base hostname
                 return baseHostname;
             }
