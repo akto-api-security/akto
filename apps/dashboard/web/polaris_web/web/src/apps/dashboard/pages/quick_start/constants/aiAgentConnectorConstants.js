@@ -16,10 +16,10 @@ export const CONNECTOR_NAME_COPILOT_STUDIO = 'Copilot Studio';
 export const CONNECTOR_NAME_SNOWFLAKE = 'Snowflake';
 
 // Documentation URLs
-export const DOCS_URL_N8N = 'https://docs.akto.io/traffic-connector/workflow-automation/n8n';
-export const DOCS_URL_LANGCHAIN = 'https://docs.akto.io/traffic-connector/workflow-automation/langchain';
-export const DOCS_URL_COPILOT_STUDIO = 'https://docs.akto.io/traffic-connector/workflow-automation/copilot-studio';
-export const DOCS_URL_SNOWFLAKE = 'https://docs.akto.io/snowflake-connector';
+export const DOCS_URL_N8N = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/n8n';
+export const DOCS_URL_LANGCHAIN = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/langchain';
+export const DOCS_URL_COPILOT_STUDIO = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/microsoft-copilot-studio';
+export const DOCS_URL_SNOWFLAKE = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/snowflake';
 
 // Recurring Interval Seconds (in seconds)
 export const INTERVAL_N8N = 300; // 5 minutes
