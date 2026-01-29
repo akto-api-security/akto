@@ -13,6 +13,9 @@ public class LastCronRunInfo {
     public static final String LAST_INFO_RESETTED = "lastInfoResetted";
     private int lastInfoResetted ;
 
+    public static final String LAST_THREAT_SCORE_SYNC = "lastThreatScoreSync";
+    private int lastThreatScoreSync;
+
     public LastCronRunInfo() {
     }
 
@@ -53,5 +56,13 @@ public class LastCronRunInfo {
 
     public void setLastInfoResetted(int lastInfoResetted) {
         this.lastInfoResetted = lastInfoResetted;
+    }
+
+    public int getLastThreatScoreSync() {
+        return lastThreatScoreSync;
+    }
+
+    public void setLastThreatScoreSync(int lastThreatScoreSync) {
+        this.lastThreatScoreSync = lastThreatScoreSync;
     }
 }

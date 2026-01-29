@@ -5,7 +5,8 @@ import transform from '../transform'
 import SampleDataList from '../../../components/shared/SampleDataList'
 import SampleData from '../../../components/shared/SampleData'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
-import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link} from '@shopify/polaris'
+import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link, ActionList } from '@shopify/polaris'
+import { EditMinor } from '@shopify/polaris-icons'
 import CompulsoryDescriptionModal from "../../issues/components/CompulsoryDescriptionModal.jsx"
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
@@ -26,18 +27,19 @@ import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper.js'
 import ApiGroups from '../../../components/shared/ApiGroups'
 import ForbiddenRole from '../../../components/shared/ForbiddenRole'
 import LegendLabel from './LegendLabel.jsx'
+import TestRunResultChat from './TestRunResultChat.jsx'
 
 function TestRunResultFlyout(props) {
 
 
-    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, showForbidden} = props
+    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, validationFailed, showForbidden } = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
     const [apiInfo, setApiInfo] = useState({})
     const [popoverActive, setPopoverActive] = useState(false)
     const [modalActive, setModalActive] = useState(false)
-    const [jiraProjectMaps,setJiraProjectMap] = useState({})
+    const [jiraProjectMaps, setJiraProjectMap] = useState({})
     const [issueType, setIssueType] = useState('');
     const [projId, setProjId] = useState('')
 
@@ -59,10 +61,13 @@ function TestRunResultFlyout(props) {
     const [editDescription, setEditDescription] = useState("")
     const [isEditingDescription, setIsEditingDescription] = useState(false)
 
+    const [severityPopoverActive, setSeverityPopoverActive] = useState(false)
+    const [isHoveringSeverity, setIsHoveringSeverity] = useState(false)
+
     const [vulnerabilityAnalysisError, setVulnerabilityAnalysisError] = useState(null)
     const [refreshFlag, setRefreshFlag] = useState(Date.now().toString())
     const [labelsText, setLabelsText] = useState("")
-    
+
     // Compulsory description modal states
     const [compulsoryDescriptionModal, setCompulsoryDescriptionModal] = useState(false)
     const [pendingIgnoreAction, setPendingIgnoreAction] = useState(null)
@@ -73,8 +78,8 @@ function TestRunResultFlyout(props) {
         noTimeToFix: false,
         acceptableFix: false
     })
-    
-    const fetchRemediationInfo = useCallback (async (testId) => {
+
+    const fetchRemediationInfo = useCallback(async (testId) => {
         if (testId && testId.length > 0) {
             await testingApi.fetchRemediationInfo(testId).then((resp) => {
                 setRemediationText(resp)
@@ -84,45 +89,45 @@ function TestRunResultFlyout(props) {
         }
     })
 
-    const fetchApiInfo = useCallback( async(apiInfoKey) => {
+    const fetchApiInfo = useCallback(async (apiInfoKey) => {
         let apiInfoData = {}
-        if(apiInfoKey !== null){
+        if (apiInfoKey !== null) {
             await api.fetchEndpoint(apiInfoKey).then((res) => {
                 apiInfoData = JSON.parse(JSON.stringify(res))
                 setApiInfo(apiInfoData)
             })
             let sensitiveParam = ""
             const sensitiveParamsSet = new Set();
-            await api.loadSensitiveParameters(apiInfoKey.apiCollectionId,apiInfoKey.url, apiInfoKey.method).then((resp) => {
+            await api.loadSensitiveParameters(apiInfoKey.apiCollectionId, apiInfoKey.url, apiInfoKey.method).then((resp) => {
                 resp?.data?.endpoints.forEach((x, index) => {
                     sensitiveParamsSet.add(x.subTypeString.toUpperCase())
                 })
                 const unique = sensitiveParamsSet.size
                 let index = 0;
-                sensitiveParamsSet.forEach((x) =>{
+                sensitiveParamsSet.forEach((x) => {
                     sensitiveParam += x;
-                    if(index !== unique - 1){
+                    if (index !== unique - 1) {
                         sensitiveParam += ", "
                     }
                     index++
                 })
             })
 
-            setRowItems(transform.getRowInfo(issueDetails.severity,apiInfoData,issueDetails.jiraIssueUrl,sensitiveParam,issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl, issueDetails.servicenowIssueUrl, issueDetails.ticketId, issueDetails.devrevWorkUrl))
+            setRowItems(transform.getRowInfo(issueDetails.severity, apiInfoData, issueDetails.jiraIssueUrl, sensitiveParam, issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl, issueDetails.servicenowIssueUrl, issueDetails.ticketId, issueDetails.devrevWorkUrl))
         }
-    },[issueDetails])
+    }, [issueDetails])
 
     const navigate = useNavigate()
 
     useEffect(() => {
-       if(issueDetails && Object.keys(issueDetails).length > 0){       
+        if (issueDetails && Object.keys(issueDetails).length > 0) {
             fetchApiInfo(issueDetails.id.apiInfoKey)
-       }
-       setTimeout(() => {
+        }
+        setTimeout(() => {
             setDescription(issueDetails?.description || "")
             setEditDescription(issueDetails?.description || "")
-       }, [100])
-    },[issueDetails?.id?.apiInfoKey])
+        }, [100])
+    }, [issueDetails?.id?.apiInfoKey])
 
     const handleSaveDescription = async () => {
         setIsEditingDescription(false);
@@ -142,6 +147,31 @@ function TestRunResultFlyout(props) {
         }
     }
 
+    const handleSeverityUpdate = async (newSeverity) => {
+        setSeverityPopoverActive(false);
+        try {
+            await issuesApi.bulkUpdateIssueSeverity([issueDetails.id], newSeverity);
+            func.setToast(true, false, `Severity updated to ${newSeverity}`);
+
+            // Update issueDetails object
+            issueDetails.severity = newSeverity;
+
+            // Trigger re-render using existing refreshFlag state
+            setRefreshFlag(Date.now().toString());
+
+            // Update local state
+            if (typeof props.setIssueDetails === 'function') {
+                props.setIssueDetails({ ...issueDetails, severity: newSeverity });
+            }
+            // Trigger refresh if needed
+            if (typeof props.refreshIssueDetails === 'function') {
+                props.refreshIssueDetails();
+            }
+        } catch (err) {
+            func.setToast(true, true, "Failed to update severity");
+        }
+    }
+
     useEffect(() => {
         if (remediationSrc) {
             // Priority 1: Use remediation from backend/subCategoryMap
@@ -151,7 +181,7 @@ function TestRunResultFlyout(props) {
             setRemediationText(conversationRemediationText)
         } else {
             // Priority 3: Fall back to fetching from file
-            fetchRemediationInfo("tests-library-master/remediation/"+selectedTestRunResult.testCategoryId+".md")
+            fetchRemediationInfo("tests-library-master/remediation/" + selectedTestRunResult.testCategoryId + ".md")
         }
     }, [selectedTestRunResult.testCategoryId, remediationSrc, conversationRemediationText, fetchRemediationInfo])
 
@@ -159,13 +189,13 @@ function TestRunResultFlyout(props) {
     useEffect(() => {
         const fetchCompulsorySettings = async () => {
             try {
-                const {resp} = await settingFunctions.fetchAdminInfo();
-                
+                const { resp } = await settingFunctions.fetchAdminInfo();
+
                 if (resp?.compulsoryDescription) {
                     setCompulsorySettings(resp.compulsoryDescription);
                 }
             } catch (error) {
-                
+
             }
         };
         fetchCompulsorySettings();
@@ -210,8 +240,8 @@ function TestRunResultFlyout(props) {
     const performIgnoreAction = (ignoreReason, description = "") => {
         const severity = (selectedTestRunResult && selectedTestRunResult.vulnerable) ? issueDetails.severity : "";
         let obj = {}
-        if(issueDetails?.testRunIssueStatus !== "IGNORED"){
-            obj = {[selectedTestRunResult.id]: severity.toUpperCase()}
+        if (issueDetails?.testRunIssueStatus !== "IGNORED") {
+            obj = { [selectedTestRunResult.id]: severity.toUpperCase() }
         }
         issuesApi.bulkUpdateIssueStatus([issueDetails.id], "IGNORED", ignoreReason, { description }).then((res) => {
             func.setToast(true, false, `Issue ignored${description ? " with description" : ""}`)
@@ -219,7 +249,7 @@ function TestRunResultFlyout(props) {
     }
 
 
-    function ignoreAction(ignoreReason){
+    function ignoreAction(ignoreReason) {
         const reasonKey = getIgnoreReasonKey(ignoreReason);
         if (requiresDescription(reasonKey)) {
             setPendingIgnoreAction({ ignoreReason });
@@ -229,21 +259,21 @@ function TestRunResultFlyout(props) {
         performIgnoreAction(ignoreReason);
     }
 
-    function reopenAction(){
-        issuesApi.bulkUpdateIssueStatus([issueDetails.id], "OPEN", "" ).then((res) => {
+    function reopenAction() {
+        issuesApi.bulkUpdateIssueStatus([issueDetails.id], "OPEN", "").then((res) => {
             func.setToast(true, false, "Issue re-opened")
         })
     }
 
-    const handleJiraClick = async() => {
-        if(!modalActive){
+    const handleJiraClick = async () => {
+        if (!modalActive) {
             const jirIntegration = await settingFunctions.fetchJiraIntegration()
-            if(jirIntegration.projectIdsMap !== null && Object.keys(jirIntegration.projectIdsMap).length > 0){
+            if (jirIntegration.projectIdsMap !== null && Object.keys(jirIntegration.projectIdsMap).length > 0) {
                 setJiraProjectMap(jirIntegration.projectIdsMap)
-                if(Object.keys(jirIntegration.projectIdsMap).length > 0){
+                if (Object.keys(jirIntegration.projectIdsMap).length > 0) {
                     setProjId(Object.keys(jirIntegration.projectIdsMap)[0])
                 }
-            }else{
+            } else {
                 setProjId(jirIntegration.projId)
                 setIssueType(jirIntegration.issueType)
             }
@@ -252,26 +282,26 @@ function TestRunResultFlyout(props) {
     }
 
     const handleSaveAction = (id, labels) => {
-        if(projId.length > 0 && issueType.length > 0){
+        if (projId.length > 0 && issueType.length > 0) {
             // Use labels parameter if provided, otherwise fall back to state
             const labelsToUse = labels !== undefined ? labels : labelsText;
             createJiraTicket(id, projId, issueType, labelsToUse)
             setModalActive(false)
-        }else{
+        } else {
             func.setToast(true, true, "Invalid project id or issue type")
         }
     }
 
-    const handleAzureBoardClick = async() => {
-        if(!boardsModalActive){
+    const handleAzureBoardClick = async () => {
+        if (!boardsModalActive) {
             const azureBoardsIntegration = await settingFunctions.fetchAzureBoardsIntegration()
-            if(azureBoardsIntegration.projectToWorkItemsMap != null && Object.keys(azureBoardsIntegration.projectToWorkItemsMap).length > 0){
+            if (azureBoardsIntegration.projectToWorkItemsMap != null && Object.keys(azureBoardsIntegration.projectToWorkItemsMap).length > 0) {
                 setProjectToWorkItemsMap(azureBoardsIntegration.projectToWorkItemsMap)
-                if(Object.keys(azureBoardsIntegration.projectToWorkItemsMap).length > 0){
+                if (Object.keys(azureBoardsIntegration.projectToWorkItemsMap).length > 0) {
                     setProjectId(Object.keys(azureBoardsIntegration.projectToWorkItemsMap)[0])
                     setWorkItemType(Object.values(azureBoardsIntegration.projectToWorkItemsMap)[0]?.[0])
                 }
-            }else{
+            } else {
                 setProjectId(azureBoardsIntegration?.projectId)
                 setWorkItemType(azureBoardsIntegration?.workItemType)
             }
@@ -279,8 +309,8 @@ function TestRunResultFlyout(props) {
         setBoardsModalActive(!boardsModalActive)
     }
 
-    const handleAzureBoardWorkitemCreation = async(id) => {
-        if(projectId.length > 0 && workItemType.length > 0){
+    const handleAzureBoardWorkitemCreation = async (id) => {
+        if (projectId.length > 0 && workItemType.length > 0) {
             let customABWorkItemFieldsPayload = [];
             try {
                 customABWorkItemFieldsPayload = issuesFunctions.prepareCustomABWorkItemFieldsPayload(projectId, workItemType);
@@ -288,22 +318,22 @@ function TestRunResultFlyout(props) {
                 func.setToast(true, true, "Please fill all required fields before creating a Azure boards work item.");
                 return;
             }
-            
+
             await issuesApi.createAzureBoardsWorkItem(issueDetails.id, projectId, workItemType, window.location.origin, customABWorkItemFieldsPayload).then((res) => {
                 func.setToast(true, false, "Work item created")
             }).catch((err) => {
                 func.setToast(true, true, err?.response?.data?.errorMessage || "Error creating work item")
             })
-        }else{
+        } else {
             func.setToast(true, true, "Invalid project id or work item type")
         }
         setBoardsModalActive(false)
     }
 
-    const handleServiceNowClick = async() => {
-        if(!serviceNowModalActive){
+    const handleServiceNowClick = async () => {
+        if (!serviceNowModalActive) {
             const serviceNowIntegration = await settingFunctions.fetchServiceNowIntegration()
-            if(serviceNowIntegration.tableNames && serviceNowIntegration.tableNames.length > 0){
+            if (serviceNowIntegration.tableNames && serviceNowIntegration.tableNames.length > 0) {
                 setServiceNowTables(serviceNowIntegration.tableNames)
                 setServiceNowTable(serviceNowIntegration.tableNames[0])
             }
@@ -311,11 +341,11 @@ function TestRunResultFlyout(props) {
         setServiceNowModalActive(!serviceNowModalActive)
     }
 
-    const handleServiceNowTicketCreation = async(id) => {
-        if(serviceNowTable && serviceNowTable.length > 0){
+    const handleServiceNowTicketCreation = async (id) => {
+        if (serviceNowTable && serviceNowTable.length > 0) {
             func.setToast(true, false, "Please wait while we create your ServiceNow ticket.")
             await issuesApi.createServiceNowTicket(issueDetails.id, serviceNowTable).then((res) => {
-                if(res?.errorMessage) {
+                if (res?.errorMessage) {
                     func.setToast(true, false, res?.errorMessage)
                 } else {
                     func.setToast(true, false, "ServiceNow ticket created successfully")
@@ -323,18 +353,18 @@ function TestRunResultFlyout(props) {
             }).catch((err) => {
                 func.setToast(true, true, err?.response?.data?.errorMessage || "Error creating ServiceNow ticket")
             })
-        }else{
+        } else {
             func.setToast(true, true, "Invalid ServiceNow table")
         }
         setServiceNowModalActive(false)
     }
 
-    const handleDevRevClick = async() => {
-        if(!devrevModalActive){
+    const handleDevRevClick = async () => {
+        if (!devrevModalActive) {
             const devrevIntegration = await settingFunctions.fetchDevRevIntegration()
             const partsMap = devrevIntegration.partsMap || {}
-            const partsArray = Object.entries(partsMap).map(([id, name]) => ({id, name}))
-            if(partsArray.length > 0){
+            const partsArray = Object.entries(partsMap).map(([id, name]) => ({ id, name }))
+            if (partsArray.length > 0) {
                 setDevRevParts(partsArray)
                 setDevRevPartId(partsArray[0].id)
             }
@@ -342,8 +372,8 @@ function TestRunResultFlyout(props) {
         setDevRevModalActive(!devrevModalActive)
     }
 
-    const handleDevRevTicketCreation = async(issueId, labels) => {
-        if(devrevPartId && devrevPartId.length > 0){
+    const handleDevRevTicketCreation = async (issueId, labels) => {
+        if (devrevPartId && devrevPartId.length > 0) {
             await createDevRevTicket(issueDetails.id, devrevPartId, devrevWorkItemType)
             setDevRevModalActive(false)
         } else {
@@ -364,14 +394,14 @@ function TestRunResultFlyout(props) {
         onAction: () => { ignoreAction("No time to fix") }
     }]
 
-    const  reopen =  [{
+    const reopen = [{
         content: 'Reopen',
         onAction: () => { reopenAction() }
     }]
 
     const handleClose = () => {
         const navigateUrl = window.location.pathname.split("result")[0]
-        navigate(navigateUrl) 
+        navigate(navigateUrl)
     }
 
     const openTest = () => {
@@ -383,53 +413,101 @@ function TestRunResultFlyout(props) {
     const owaspMapping = owaspData.label || "";
     const owaspUrl = owaspData.url || "";
 
-    function ActionsComp (){
+    function ActionsComp() {
         const issuesActions = issueDetails?.testRunIssueStatus === "IGNORED" ? [...issues, ...reopen] : issues
-        return(
+        return (
             issueDetails?.id &&
-        <Popover
-            activator={<Button disclosure onClick={() => setPopoverActive(!popoverActive)}>Triage</Button>}
-            active={popoverActive}
-            onClose={() => setPopoverActive(false)}
-            autofocusTarget="first-node"
-            preferredPosition="below"
-            preferredAlignment="left"
-        >
-            <Popover.Pane fixed>
-                <Popover.Section>
-                    <VerticalStack gap={"4"}>
-                        {issuesActions.map((issue, index) => {
-                            return(
-                                <div style={{cursor: 'pointer'}} onClick={() => {issue.onAction(); setPopoverActive(false)}} key={index}>
-                                    {issue.content}
-                                </div>
-                            )
-                        })}
-                    </VerticalStack>
-                </Popover.Section>
-            </Popover.Pane>
-        </Popover>
-    )}
+            <Popover
+                activator={<Button disclosure onClick={() => setPopoverActive(!popoverActive)}>Triage</Button>}
+                active={popoverActive}
+                onClose={() => setPopoverActive(false)}
+                autofocusTarget="first-node"
+                preferredPosition="below"
+                preferredAlignment="left"
+            >
+                <Popover.Pane fixed>
+                    <Popover.Section>
+                        <VerticalStack gap={"4"}>
+                            {issuesActions.map((issue, index) => {
+                                return (
+                                    <div style={{ cursor: 'pointer' }} onClick={() => { issue.onAction(); setPopoverActive(false) }} key={index}>
+                                        {issue.content}
+                                    </div>
+                                )
+                            })}
+                        </VerticalStack>
+                    </Popover.Section>
+                </Popover.Pane>
+            </Popover>
+        )
+    }
     function TitleComponent() {
         const severity = (selectedTestRunResult && selectedTestRunResult.vulnerable) ? issueDetails.severity : ""
-        return(
-            <div style={{display: 'flex', justifyContent: "space-between", alignItems: "flex-start", gap:"24px", padding: "16px", paddingTop: '0px'}}>
+        return (
+            <div style={{ display: 'flex', justifyContent: "space-between", alignItems: "flex-start", gap: "24px", padding: "16px", paddingTop: '0px' }}>
                 <VerticalStack gap={"2"}>
                     <Box width="100%">
-                        <div style={{display: 'flex', gap: '4px', marginBottom: '4px'}} className='test-title'>
-                        <VerticalStack gap={1}>
-                            <HorizontalStack gap={1}>
-                                <Button removeUnderline plain monochrome onClick={() => openTest()}>
-                                    <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
-                                </Button>
-                                {(severity && severity?.length > 0) ? (issueDetails?.testRunIssueStatus === 'IGNORED' ? <Badge size='small'>Ignored</Badge> : <Box className={`badge-wrapper-${severity.toUpperCase()}`}><Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge></Box>) : null}
-                            </HorizontalStack>      
+                        <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }} className='test-title'>
+                            <VerticalStack gap={1}>
+                                <HorizontalStack gap={1}>
+                                    <Button removeUnderline plain monochrome onClick={() => openTest()}>
+                                        <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
+                                    </Button>
+                                    {(severity && severity?.length > 0) ? (
+                                        issueDetails?.testRunIssueStatus === 'IGNORED' ?
+                                            <Badge size='small'>Ignored</Badge> :
+                                            <Popover
+                                                active={severityPopoverActive}
+                                                activator={
+                                                    <Button
+                                                        plain
+                                                        removeUnderline
+                                                        onClick={() => setSeverityPopoverActive(!severityPopoverActive)}
+                                                        onMouseEnter={() => setIsHoveringSeverity(true)}
+                                                        onMouseLeave={() => setIsHoveringSeverity(false)}
+                                                    >
+                                                        <HorizontalStack gap="1" align="center">
+                                                            <Box className={`badge-wrapper-${severity.toUpperCase()}`}>
+                                                                <Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge>
+                                                            </Box>
+                                                            {isHoveringSeverity && (
+                                                                <Icon source={EditMinor} tone="base" />
+                                                            )}
+                                                        </HorizontalStack>
+                                                    </Button>
+                                                }
+                                                onClose={() => setSeverityPopoverActive(false)}
+                                                autofocusTarget="first-node"
+                                            >
+                                                <ActionList
+                                                    items={[
+                                                        {
+                                                            content: 'Critical',
+                                                            onAction: () => handleSeverityUpdate('CRITICAL')
+                                                        },
+                                                        {
+                                                            content: 'High',
+                                                            onAction: () => handleSeverityUpdate('HIGH')
+                                                        },
+                                                        {
+                                                            content: 'Medium',
+                                                            onAction: () => handleSeverityUpdate('MEDIUM')
+                                                        },
+                                                        {
+                                                            content: 'Low',
+                                                            onAction: () => handleSeverityUpdate('LOW')
+                                                        }
+                                                    ]}
+                                                />
+                                            </Popover>
+                                    ) : null}
+                                </HorizontalStack>
                                 {owaspMapping.length > 0 ? (
                                     <Link onClick={() => owaspUrl && window.open(owaspUrl, '_blank')}>
                                         <Badge size="small">OWASP Top 10 | {owaspMapping}</Badge>
                                     </Link>
-                                ): null}  
-                        </VerticalStack> 
+                                ) : null}
+                            </VerticalStack>
                         </div>
                         {
                             isEditingDescription ? (
@@ -452,16 +530,16 @@ function TestRunResultFlyout(props) {
                                             {description}
                                         </Text>
                                     </Button>
-                                    )
+                                )
                             )
                         }
                     </Box>
                     <HorizontalStack gap={"2"}>
                         <Text color="subdued" variant="bodySm">{transform.getTestingRunResultUrl(selectedTestRunResult)}</Text>
-                        <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
+                        <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px' />
                         <Text color="subdued" variant="bodySm">{selectedTestRunResult?.testCategory}</Text>
                     </HorizontalStack>
-                        
+
                     <ApiGroups collectionIds={apiInfo?.collectionIds} />
                 </VerticalStack>
                 <HorizontalStack gap={2} wrap={false}>
@@ -503,7 +581,7 @@ function TestRunResultFlyout(props) {
                                 handleSaveAction={handleServiceNowTicketCreation}
                                 jiraProjectMaps={serviceNowTables}
                                 setProjId={setServiceNowTable}
-                                setIssueType={() => {}}
+                                setIssueType={() => { }}
                                 projId={serviceNowTable}
                                 issueType=""
                                 issueId={issueDetails.id}
@@ -532,7 +610,7 @@ function TestRunResultFlyout(props) {
     const dataExpiredComponent = <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
         <Text>
             Sample data might not be available for non-vulnerable tests more than 2 months ago.
-            <br/>
+            <br />
             Please contact <Link url="mailto:support@akto.io">support@akto.io</Link> for more information.
         </Text>
     </Box>
@@ -543,10 +621,10 @@ function TestRunResultFlyout(props) {
     // Move state outside to prevent reset on component recreation
     const hasAnalyzedRef = useRef(false);
     const [vulnerabilityHighlights, setVulnerabilityHighlights] = useState({});
-    
+
     // Component that handles vulnerability analysis only when mounted
     const ValuesTabContent = React.memo(() => {
-        
+
         useEffect(() => {
             // Check if vulnerability highlighting is enabled (use existing GPT feature flag)
             //const isVulnerabilityHighlightingEnabled = window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"] && 
@@ -597,7 +675,7 @@ function TestRunResultFlyout(props) {
                                         body: messageObj.response?.body || ''
                                     }
                                 };
-                            
+
                                 const response = await testingApi.analyzeVulnerability(
                                     JSON.stringify(testResultData),
                                     'redteaming'
@@ -634,7 +712,7 @@ function TestRunResultFlyout(props) {
                         }
                         return null;
                     });
-                
+
                     Promise.allSettled(analysisPromises).finally(() => {
                     });
                 }, 60);
@@ -642,21 +720,21 @@ function TestRunResultFlyout(props) {
                 return () => clearTimeout(timeoutId);
             }
         }, [selectedTestRunResult?.id,]);
-        
+
         if (dataExpired && !selectedTestRunResult?.vulnerable) {
             return dataExpiredComponent;
         }
-        
+
         if (!selectedTestRunResult?.testResults) {
             return null;
         }
-        
-        
+
+
         return (
             <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
                 <VerticalStack gap="3">
                     <Box padding="3" background="bg-surface-secondary" borderRadius="2">
-                        <LegendLabel/>
+                        <LegendLabel />
                     </Box>
                     <SampleDataList
                         key="Sample values"
@@ -691,13 +769,30 @@ function TestRunResultFlyout(props) {
 
     const conversationTab = useMemo(() => {
         if (typeof selectedTestRunResult !== "object") return null;
+
+        // TODO: Replace with real AI analysis from backend
+        // Mock analysis for UI development - replace when backend endpoint is ready
+        const analysis = "Your AI Agent exposed its system instructions after a follow up request framed as internal debugging. The disclosure occurred while interacting with getAutomationTestCommandLogs, indicating a multi part prompt injection vulnerability.";
+
+        // TODO: Implement real message sending handler
+        // Replace with actual API call when chat endpoint is available
+        const handleSendMessage = (msg) => {
+            console.log("TODO: Send message to backend:", msg);
+            // Future: Call testingApi.sendChatMessage(issueDetails.id, msg)
+        };
+
         return {
             id: 'evidence',
             content: "Evidence",
-            component: <ChatInterface conversations={conversations} sort={false}/>
+            component: <TestRunResultChat
+                analysis={analysis}
+                conversations={conversations}
+                onSendMessage={handleSendMessage}
+                isStreaming={false}
+            />
         }
     }, [selectedTestRunResult, conversations])
-    
+
     const ValuesTab = useMemo(() => {
         if (typeof selectedTestRunResult !== "object") return null;
         return {
@@ -709,19 +804,19 @@ function TestRunResultFlyout(props) {
 
     const finalResultTab = conversations?.length > 0 ? conversationTab : ValuesTab
 
-    function RowComp ({cardObj}){
-        const {title, value, tooltipContent} = cardObj
-        return(
+    function RowComp({ cardObj }) {
+        const { title, value, tooltipContent } = cardObj
+        return (
             value ? <Box width="224px">
                 <VerticalStack gap={"2"}>
                     <TitleWithInfo
-                        textProps={{variant:"bodyMd", fontWeight:"semibold"}}
+                        textProps={{ variant: "bodyMd", fontWeight: "semibold" }}
                         titleText={title}
                         tooltipContent={tooltipContent}
                     />
                     {value}
                 </VerticalStack>
-            </Box>: null
+            </Box> : null
         )
     }
 
@@ -729,14 +824,14 @@ function TestRunResultFlyout(props) {
         <GridRows columns={3} items={rowItems} CardComponent={RowComp} />
     )
 
-    function MoreInformationComp({ infoState }){
+    function MoreInformationComp({ infoState }) {
         infoState = infoState.filter((item) => item.title !== 'Jira')
 
-        return(
+        return (
             <VerticalStack gap={"2"}>
                 {
                     infoState.map((item, index) => {
-                        const {title, content, tooltipContent, icon} = item
+                        const { title, content, tooltipContent, icon } = item
 
                         if (content === null || content === undefined || content === "") return null
 
@@ -766,19 +861,19 @@ function TestRunResultFlyout(props) {
             <VerticalStack gap={"5"}>
                 <VerticalStack gap={"2"}>
                     <TitleWithInfo
-                        textProps={{variant:"bodyMd", fontWeight:"semibold", color:"subdued"}}
+                        textProps={{ variant: "bodyMd", fontWeight: "semibold", color: "subdued" }}
                         titleText={"Description"}
                         tooltipContent={"A brief description about the test from test library"}
                     />
                     <Box as="span">
                         {
-                            getDescriptionText(fullDescription) 
+                            getDescriptionText(fullDescription)
                         }
                         <Button plain onClick={() => setFullDescription(!fullDescription)}> {fullDescription ? "Less" : "More"} information</Button>
                     </Box>
                 </VerticalStack>
                 <Divider />
-                {testResultDetailsComp}  
+                {testResultDetailsComp}
                 {infoState && typeof infoState === 'object' && infoState.length > 0 ? (
                     <>
                         <Divider />
@@ -841,19 +936,19 @@ function TestRunResultFlyout(props) {
     const errorTab = {
         id: "error",
         content: "Attempt",
-        component:  (selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) && <Box padding={"4"}>
+        component: (selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0) && <Box padding={"4"}>
             {
-            selectedTestRunResult?.errors?.map((error, i) => {
-                if (error) {
-                    let data = {
-                        original : error
+                selectedTestRunResult?.errors?.map((error, i) => {
+                    if (error) {
+                        let data = {
+                            original: error
+                        }
+                        return (
+                            <SampleData key={i} data={data} language="yaml" minHeight="450px" wordWrap={false} />
+                        )
                     }
-                    return (
-                        <SampleData key={i} data={data} language="yaml" minHeight="450px" wordWrap={false}/>
-                      )
-                }
-            })
-          }
+                })
+            }
         </Box>
     }
 
@@ -862,39 +957,39 @@ function TestRunResultFlyout(props) {
     const tabsComponent = (
         <LayoutWithTabs
             key={issueDetails?.id}
-            tabs={issueDetails?.id ? [overviewTab,timelineTab,finalResultTab, remediationTab].filter(Boolean): [attemptTab]}
-            currTab = {() => {}}
+            tabs={issueDetails?.id ? [overviewTab, timelineTab, finalResultTab, remediationTab].filter(Boolean) : [attemptTab]}
+            currTab={() => { }}
         />
     )
 
-    const currentComponents = showForbidden 
+    const currentComponents = showForbidden
         ? [<Box padding="4"><ForbiddenRole /></Box>]
-        : [<TitleComponent/>, tabsComponent]
+        : [<TitleComponent />, tabsComponent]
 
     const title = isIssuePage ? "Issue details" : mapLabel('Test result', getDashboardCategory())
 
     return (
         <>
-        <FlyLayout
-            title={title}
-            show={showDetails}
-            setShow={setShowDetails}
-            components={currentComponents}
-            loading={loading}
-            showDivider={true}
-            newComp={true}
-            handleClose={handleClose}
-            isHandleClose={true}
-        />
-        <CompulsoryDescriptionModal
-            open={compulsoryDescriptionModal}
-            onClose={() => setCompulsoryDescriptionModal(false)}
-            onConfirm={handleIgnoreWithDescription}
-            reasonLabel={pendingIgnoreAction?.ignoreReason}
-            description={mandatoryDescription}
-            onChangeDescription={setMandatoryDescription}
-            loading={modalLoading}
-        />
+            <FlyLayout
+                title={title}
+                show={showDetails}
+                setShow={setShowDetails}
+                components={currentComponents}
+                loading={loading}
+                showDivider={true}
+                newComp={true}
+                handleClose={handleClose}
+                isHandleClose={true}
+            />
+            <CompulsoryDescriptionModal
+                open={compulsoryDescriptionModal}
+                onClose={() => setCompulsoryDescriptionModal(false)}
+                onConfirm={handleIgnoreWithDescription}
+                reasonLabel={pendingIgnoreAction?.ignoreReason}
+                description={mandatoryDescription}
+                onChangeDescription={setMandatoryDescription}
+                loading={modalLoading}
+            />
         </>
     )
 }

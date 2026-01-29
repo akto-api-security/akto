@@ -22,6 +22,7 @@ public final class AIAgentConnectorUtils {
         return CONNECTOR_TYPE_N8N.equals(connectorType) ||
                CONNECTOR_TYPE_LANGCHAIN.equals(connectorType) ||
                CONNECTOR_TYPE_COPILOT_STUDIO.equals(connectorType) ||
-               CONNECTOR_TYPE_DATABRICKS.equals(connectorType);
+               CONNECTOR_TYPE_DATABRICKS.equals(connectorType) ||
+               CONNECTOR_TYPE_SNOWFLAKE.equals(connectorType);
     }
 }

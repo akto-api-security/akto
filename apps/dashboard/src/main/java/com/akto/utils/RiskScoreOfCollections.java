@@ -40,6 +40,7 @@ import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
 
 import static com.akto.utils.Utils.calculateRiskValueForSeverity;
+import static com.akto.jobs.utils.Utils.getRiskScoreValueFromSeverityScore;
 public class RiskScoreOfCollections {
     private static final LoggerMaker loggerMaker = new LoggerMaker(RiskScoreOfCollections.class, LogDb.DASHBOARD);;
 
@@ -153,7 +154,7 @@ public class RiskScoreOfCollections {
                 Bson filter = ApiInfoDao.getFilter(apiInfoKey);
                 ApiInfo apiInfo = ApiInfoDao.instance.findOne(filter);
                 boolean isSensitive = apiInfo != null ? apiInfo.getIsSensitive() : false;
-                float riskScore = ApiInfoDao.getRiskScore(apiInfo, isSensitive, Utils.getRiskScoreValueFromSeverityScore(severityScore));
+                float riskScore = ApiInfoDao.getRiskScore(apiInfo, isSensitive, getRiskScoreValueFromSeverityScore(severityScore));
 
                 if (apiInfo != null) {
                     if (apiInfo.getRiskScore() != riskScore) {
@@ -205,7 +206,7 @@ public class RiskScoreOfCollections {
                 if(apiInfo == null){
                     continue;
                 }
-                float riskScore = ApiInfoDao.getRiskScore(apiInfo, isSensitive, Utils.getRiskScoreValueFromSeverityScore(apiInfo.getSeverityScore()));
+                float riskScore = ApiInfoDao.getRiskScore(apiInfo, isSensitive, getRiskScoreValueFromSeverityScore(apiInfo.getSeverityScore()));
                 Bson update = Updates.combine(
                     Updates.set(ApiInfo.IS_SENSITIVE, isSensitive),
                     Updates.set(ApiInfo.RISK_SCORE, riskScore)
@@ -279,7 +280,7 @@ public class RiskScoreOfCollections {
         while(count < 100){
             List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(filter,0, limit, Sorts.descending(ApiInfo.LAST_CALCULATED_TIME), projection);
             for(ApiInfo apiInfo: apiInfos){
-                float riskScore = ApiInfoDao.getRiskScore(apiInfo, apiInfo.getIsSensitive(), Utils.getRiskScoreValueFromSeverityScore(initialSeverityScoreMap.getOrDefault(apiInfo.getId(), (float) 0)));
+                float riskScore = ApiInfoDao.getRiskScore(apiInfo, apiInfo.getIsSensitive(), getRiskScoreValueFromSeverityScore(initialSeverityScoreMap.getOrDefault(apiInfo.getId(), (float) 0)));
                 Bson update = Updates.combine(
                     Updates.set(ApiInfo.RISK_SCORE, riskScore),
                     Updates.set(ApiInfo.LAST_CALCULATED_TIME, Context.now())

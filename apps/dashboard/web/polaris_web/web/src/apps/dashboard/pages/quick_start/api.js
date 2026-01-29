@@ -170,11 +170,19 @@ const api = {
         })
     },
 
-    initiateCrawler(hostname, username, password, apiKey, dashboardUrl, testRoleHaxId, outscopeUrls) {
+    initiateCrawler(hostname, username, password, apiKey, dashboardUrl, testRoleHaxId, outscopeUrls, crawlingTime, selectedModuleName, customHeaders, runTestAfterCrawling, selectedMiniTestingService, urlTemplatePatterns, applicationPages) {
         return request({
             url: '/api/initiateCrawler',
             method: 'post',
-            data: {hostname, username, password, apiKey, dashboardUrl, testRoleHaxId, outscopeUrls}
+            data: {hostname, username, password, apiKey, dashboardUrl, testRoleHaxId, outscopeUrls, crawlingTime, selectedModuleName, customHeaders, runTestAfterCrawling, selectedMiniTestingService, urlTemplatePatterns, applicationPages}
+        })
+    },
+
+    fetchAvailableDastModules() {
+        return request({
+            url: '/api/fetchAvailableDastModules',
+            method: 'post',
+            data: {}
         })
     },
 
@@ -183,6 +191,19 @@ const api = {
             url: '/api/initiateMCPScan',
             method: 'post',
             data: {serverUrl, authKey, authValue, dashboardUrl}
+        })
+    },
+
+    initiateAIAgentConnectorImport(connectorType, connectorConfig, dataIngestionUrl, recurringIntervalSeconds) {
+        return request({
+            url: '/api/initiateAIAgentConnectorImport',
+            method: 'post',
+            data: {
+                connectorType,
+                dataIngestionUrl,
+                recurringIntervalSeconds,
+                ...connectorConfig
+            }
         })
     },
 
@@ -236,6 +257,14 @@ const api = {
                 recurringIntervalSeconds,
                 ...connectorConfig
             }
+        })
+    },
+
+    saveDataDogConnector(datadogApiKey, datadogAppKey, datadogSite, serviceNames) {
+        return request({
+            url: '/api/saveDataDogConfigs',
+            method: 'post',
+            data: {datadogApiKey, datadogAppKey, datadogSite, serviceNames}
         })
     },
 

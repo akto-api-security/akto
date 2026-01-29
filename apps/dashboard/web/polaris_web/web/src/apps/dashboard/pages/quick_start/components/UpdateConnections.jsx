@@ -8,17 +8,20 @@ import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo';
 import FlyLayout from '../../../components/layouts/FlyLayout';
 import { useSearchParams } from 'react-router-dom';
 import func from "@/util/func"
+import EndpointShieldCard from './EndpointShieldCard';
+import { isEndpointSecurityCategory, getDashboardCategory } from '@/apps/main/labelHelper';
 
 function UpdateConnections(props) {
 
     const [searchParams, setSearchParams] = useSearchParams();
 
-    const { myConnections } = props; 
+    const { myConnections } = props;
     const obj = quickStartFunc.getConnectorsListCategorized()
     const [newCol, setNewCol] = useState(0)
 
     const currentCardObj = QuickStartStore(state => state.currentConnector)
     const setCurrentCardObj = QuickStartStore(state => state.setCurrentConnector)
+    const dashboardCategory = getDashboardCategory()
 
     const closeAction = () => {
         func.updateQueryParams(searchParams, setSearchParams, "connector","")
@@ -47,13 +50,25 @@ function UpdateConnections(props) {
         setCurrentCardObj(null)
     },[searchParams])
 
+    const resolvedDocsUrl = currentCardObj ? quickStartFunc.getDocsUrl(currentCardObj, dashboardCategory) : null;
+
     const components = [
         currentCardObj ? <HorizontalStack gap="1">
             <Text variant="headingMd" as="h6">{currentCardObj.label} </Text>
             {currentCardObj.badge ? <Badge size='small' status='info'>{currentCardObj.badge}</Badge> : null}
         </HorizontalStack> : null,
-        currentCardObj ? currentCardObj.component : null
+        currentCardObj ? (typeof currentCardObj.component === 'function' ? currentCardObj.component(resolvedDocsUrl) : currentCardObj.component) : null
     ]
+
+    const handleInstallEndpointShield = () => {
+        func.updateQueryParams(searchParams, setSearchParams, "connector", encodeURIComponent("mcp_endpoint_shield"))
+    };
+
+    const handleSeeDocsEndpointShield = () => {
+        window.open('https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/mcp-endpoint-shield', '_blank');
+    };
+
+    const showRecommendedSetup = !func.checkLocal() && isEndpointSecurityCategory();
 
     return (
         <Page 
@@ -66,7 +81,17 @@ function UpdateConnections(props) {
         >
             <div>
                 <VerticalStack gap="8">
-                    {Object.keys(obj).map((key, index) => {
+                    {showRecommendedSetup && (
+                        <VerticalStack gap="4">
+                            <Text variant="headingMd" as="h6">Recommended setup</Text>
+                            <Divider />
+                            <EndpointShieldCard
+                                onInstall={handleInstallEndpointShield}
+                                onSeeDocs={handleSeeDocsEndpointShield}
+                            />
+                        </VerticalStack>
+                    )}
+                    {Object.keys(obj).filter(key => key !== "").map((key, index) => {
                         return (
                             <VerticalStack gap="4" key={key}>
                             <HorizontalStack gap={"3"}>
@@ -74,9 +99,9 @@ function UpdateConnections(props) {
                                 <Tag>{obj[key].length.toString()}</Tag>
                             </HorizontalStack>
                             <Divider/>
-                            <GridRows CardComponent={RowCard} columns="3" 
-                            items={obj[key]} buttonText="Connect" onButtonClick={onButtonClick}     
-                            changedColumns={newCol} 
+                            <GridRows CardComponent={RowCard} columns="3"
+                            items={obj[key]} buttonText="Connect" onButtonClick={onButtonClick}
+                            changedColumns={newCol}
                             />
                             </VerticalStack>
                         )
@@ -86,10 +111,10 @@ function UpdateConnections(props) {
                 {currentCardObj ?<FlyLayout
                     width={"27vw"}
                     titleComp={
-                        <TitleWithInfo 
-                                tooltipContent={"Automate traffic to Akto"} 
-                                titleText={"Set up guide"}  
-                                docsUrl={currentCardObj.docsUrl}
+                        <TitleWithInfo
+                                tooltipContent={"Automate traffic to Akto"}
+                                titleText={"Set up guide"}
+                                docsUrl={quickStartFunc.getDocsUrl(currentCardObj, dashboardCategory)}
                             />
                         }
                     show={currentCardObj !== null}

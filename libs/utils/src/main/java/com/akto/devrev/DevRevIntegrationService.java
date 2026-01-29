@@ -26,10 +26,12 @@ import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -92,38 +94,85 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
         return updatedIntegration;
     }
 
-    private Map<String, String> fetchAllPartsFromDevRev(String token) {
+    private Map<String, String> fetchAllPartsFromDevRev(String token, List<String> partTypes, String partNameFilter) {
         Map<String, String> partsIdToNameMap = new HashMap<>();
-
         String url = DevRevIntegration.API_BASE_URL + "/parts.list";
 
         Map<String, List<String>> headers = new HashMap<>();
         headers.put("Authorization", Collections.singletonList("Bearer " + token));
         headers.put("Content-Type", Collections.singletonList("application/json"));
 
-        OriginalHttpRequest request = new OriginalHttpRequest(url, "", Method.GET.name(), null, headers, "");
+        String cursor = null;
+        String lastCursor = null;
+        int maxIterations = 20; // Safety limit
+        int iteration = 0;
 
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-            logger.infoAndAddToDb("Status from DevRev parts.list API: " + response.getStatusCode(), LoggerMaker.LogDb.DASHBOARD);
-
-            if (response.getStatusCode() > 201) {
-                logger.errorAndAddToDb("Failed to fetch parts from DevRev: " + response.getBody(), LoggerMaker.LogDb.DASHBOARD);
-                return partsIdToNameMap;
-            }
-
-            String responsePayload = response.getBody();
-            BasicDBObject respPayloadObj = BasicDBObject.parse(responsePayload);
-            BasicDBList partsListObj = (BasicDBList) respPayloadObj.get("parts");
-
-            if (partsListObj != null) {
-                for (Object partObj : partsListObj) {
-                    BasicDBObject part = (BasicDBObject) partObj;
-                    String partId = part.getString("id");
-                    String partName = part.getString("name");
-                    partsIdToNameMap.put(partId, partName);
+            do {
+                // Build request body with cursor and limit
+                BasicDBObject requestBody = new BasicDBObject("limit", 100);
+                if (cursor != null) {
+                    requestBody.put("cursor", cursor);
                 }
-            }
+
+                if (partTypes != null && !partTypes.isEmpty()) {
+                    requestBody.put("type", partTypes);
+                }
+                if (partNameFilter != null && !partNameFilter.trim().isEmpty()) {
+                    List<String> nameList = Arrays.stream(partNameFilter.split(","))
+                        .map(String::trim)
+                        .filter(name -> !name.isEmpty())
+                        .collect(Collectors.toList());
+                    if (!nameList.isEmpty()) {
+                        requestBody.put("name", nameList);
+                    }
+                }
+
+                OriginalHttpRequest request = new OriginalHttpRequest(
+                    url, "", Method.POST.name(),
+                    requestBody.toJson(),
+                    headers, ""
+                );
+
+                OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+
+                if (response.getStatusCode() > 201) {
+                    logger.errorAndAddToDb("Failed to fetch parts from DevRev: " + response.getBody(), LoggerMaker.LogDb.DASHBOARD);
+                    break;
+                }
+
+                BasicDBObject respPayloadObj = BasicDBObject.parse(response.getBody());
+                BasicDBList partsListObj = (BasicDBList) respPayloadObj.get("parts");
+
+                if (partsListObj != null) {
+                    for (Object partObj : partsListObj) {
+                        BasicDBObject part = (BasicDBObject) partObj;
+                        String partId = part.getString("id");
+                        String partName = part.getString("name");
+                        partsIdToNameMap.put(partId, partName);
+                    }
+                }
+
+                // Get next cursor
+                cursor = respPayloadObj.getString("next_cursor");
+
+                // Infinite loop protection
+                if (cursor != null && cursor.equals(lastCursor)) {
+                    logger.errorAndAddToDb("Detected same cursor, stopping pagination", LoggerMaker.LogDb.DASHBOARD);
+                    break;
+                }
+
+                lastCursor = cursor;
+                iteration++;
+
+                if (iteration >= maxIterations) {
+                    logger.errorAndAddToDb("Max iterations reached, stopping pagination", LoggerMaker.LogDb.DASHBOARD);
+                    break;
+                }
+
+            } while (cursor != null);
+
+            logger.infoAndAddToDb("Fetched " + partsIdToNameMap.size() + " parts from DevRev in " + iteration + " iterations", LoggerMaker.LogDb.DASHBOARD);
 
         } catch (Exception e) {
             logger.errorAndAddToDb("Error fetching parts from DevRev: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
@@ -140,16 +189,10 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
         return integration;
     }
 
-    public Map<String, String> fetchDevrevProjects() throws Exception {
+    public Map<String, String> fetchDevrevProjects(List<String> partTypes, String partName) throws Exception {
         String actualToken = getPersonalAccessToken(personalAccessToken);
 
-        Map<String, String> partsIdToNameMap = fetchAllPartsFromDevRev(actualToken);
-
-        if (partsIdToNameMap.isEmpty()) {
-            throw new Exception("Failed to fetch projects from DevRev. Please verify your personal access token and try again.");
-        }
-
-        return partsIdToNameMap;
+        return fetchAllPartsFromDevRev(actualToken, partTypes, partName);
     }
 
     public void removeIntegration() throws Exception {
@@ -267,11 +310,14 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
         String hostname = endpointDetails.getFirst();
         String endpointPath = endpointDetails.getSecond();
 
-        String truncatedEndpoint = endpointPath.length() > 50 ?
-            endpointPath.substring(0, 25) + "..." + endpointPath.substring(endpointPath.length() - 25) : endpointPath;
-
         String title = String.format("Security Issue: %s (%s - %s)",
-            testInfo.getName(), method, truncatedEndpoint);
+            testInfo.getName(), method, endpointPath);
+
+        // Max length for title (as per deverv docs)
+        if (title.length() > 256) {
+            title = title.substring(0, 253) + "...";
+        }
+
         payload.put("title", title);
 
         StringBuilder body = new StringBuilder();
@@ -300,7 +346,13 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
             }
         }
 
-        payload.put("body", body.toString());
+        String bodyString = body.toString();
+        // Max length for body (as per deverv docs)
+        if (bodyString.length() > 65536) {
+            bodyString = bodyString.substring(0, 65500) + "...";
+        }
+
+        payload.put("body", bodyString);
         payload.put("applies_to_part", partId);
         return payload;
     }
@@ -331,8 +383,12 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
 
             if (StringUtils.isNotBlank(originalMessage)) {
                 origCurl = CurlUtils.getCurl(originalMessage);
-                HttpResponseParams origObj = com.akto.runtime.utils.Utils.parseKafkaMessage(originalMessage);
-                origResponse = origObj.getPayload();
+                try {
+                    HttpResponseParams origObj = com.akto.runtime.utils.Utils.parseKafkaMessage(originalMessage);
+                    origResponse = origObj.getPayload();
+                } catch (Exception e) {
+                    logger.errorAndAddToDb(e, "Error in building http response params for DevRev");
+                }
             }
 
             if (StringUtils.isNotBlank(message)) {
@@ -344,16 +400,6 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
 
             StringBuilder data = new StringBuilder();
 
-            if (StringUtils.isNotBlank(origCurl)) {
-                data.append("### Original Curl\n\n");
-                data.append("```\n").append(origCurl).append("\n```\n\n");
-            }
-
-            if (StringUtils.isNotBlank(origResponse)) {
-                data.append("### Original API Response\n\n");
-                data.append("```\n").append(origResponse).append("\n```\n\n");
-            }
-
             if (StringUtils.isNotBlank(testCurl)) {
                 data.append("### Test Curl\n\n");
                 data.append("```\n").append(testCurl).append("\n```\n\n");
@@ -364,10 +410,20 @@ public class DevRevIntegrationService extends ATicketIntegrationService<DevRevIn
                 data.append("```\n").append(testResponse).append("\n```\n\n");
             }
 
+            if (StringUtils.isNotBlank(origCurl)) {
+                data.append("### Original Curl\n\n");
+                data.append("```\n").append(origCurl).append("\n```\n\n");
+            }
+
+            if (StringUtils.isNotBlank(origResponse)) {
+                data.append("### Original API Response\n\n");
+                data.append("```\n").append(origResponse).append("\n```\n\n");
+            }
+
             return data.toString();
 
         } catch (Exception e) {
-            logger.errorAndAddToDb("Error building request/response data: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            logger.errorAndAddToDb(e,"Error building request/response data: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             return "";
         }
     }

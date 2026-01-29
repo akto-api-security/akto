@@ -2,9 +2,7 @@ package com.akto.dao.jobs;
 
 import com.akto.dao.CommonContextDao;
 import com.akto.dao.MCollection;
-import com.akto.dao.context.Context;
 import com.akto.dto.jobs.Job;
-import com.akto.dto.testing.TestingRun;
 import com.mongodb.client.model.CreateCollectionOptions;
 
 public class JobsDao extends CommonContextDao<Job> {

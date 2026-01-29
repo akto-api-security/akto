@@ -20,20 +20,17 @@ import com.akto.threat.backend.constants.KafkaTopic;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.utils.KafkaUtils;
-import com.akto.threat.backend.utils.ThreatUtils;
 import com.akto.util.ThreatDetectionConstants;
-import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.DistinctIterable;
 import com.mongodb.client.MongoCursor;
 import org.bson.conversions.Bson;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
-import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.Document;
-import org.bson.conversions.Bson;
 
 public class MaliciousEventService {
 
@@ -42,6 +39,7 @@ public class MaliciousEventService {
   private static final LoggerMaker logger = new LoggerMaker(MaliciousEventService.class);
 
   private static final HashMap<String, Boolean> shouldNotCreateIndexes = new HashMap<>();
+  private static final List<String> IGNORED_POLICIES_FOR_ACCOUNT = Arrays.asList("WeakOrMissingAuth", "PIIDataLeak");
 
   public MaliciousEventService(
       KafkaConfig kafkaConfig, MaliciousEventDao maliciousEventDao) {
@@ -112,6 +110,29 @@ public class MaliciousEventService {
     String actor = evt.getActor();
     String filterId = evt.getFilterId();
 
+    MaliciousEventDto.Builder builder = MaliciousEventDto.newBuilder();
+    String severity = evt.getSeverity();
+    // Skip recording for specific policies on specific account
+    if("1763355072".equals(accountId)){
+      if (IGNORED_POLICIES_FOR_ACCOUNT.contains(filterId)) {
+        return;
+      }
+
+      if ("OSCommandInjection".equals(filterId) && evt.getLatestApiEndpoint().contains("api-transactions")) {
+        return;
+      }
+
+      if (("WeakAuthentication").equals(filterId)) {
+        String host = evt.getHost() != null ? evt.getHost() : "";
+        String hostWithoutPort = host.replaceAll(":\\d+$", "");
+        boolean isInternalHost = host.contains(".svc") ||
+            !hostWithoutPort.matches(".*\\.[a-zA-Z]{2,}$");
+        if (isInternalHost) {
+          severity = "LOW";
+        }
+      }
+    }
+
     String refId = UUID.randomUUID().toString();
     logger.debug("received malicious event " + evt.getLatestApiEndpoint() + " filterId " + evt.getFilterId() + " eventType " + evt.getEventType().toString());
 
@@ -133,27 +154,26 @@ public class MaliciousEventService {
         contextSource = evt.getContextSource();
     }
 
-    MaliciousEventDto.Builder builder = MaliciousEventDto.newBuilder()
-            .setDetectedAt(evt.getDetectedAt())
-            .setActor(actor)
-            .setFilterId(filterId)
-            .setLatestApiEndpoint(evt.getLatestApiEndpoint())
-            .setLatestApiMethod(URLMethods.Method.fromString(evt.getLatestApiMethod()))
-            .setLatestApiOrig(evt.getLatestApiPayload())
-            .setLatestApiCollectionId(evt.getLatestApiCollectionId())
-            .setEventType(maliciousEventType)
-            .setLatestApiIp(evt.getLatestApiIp())
-            .setCountry(evt.getMetadata().getCountryCode())
-            .setCategory(evt.getCategory())
-            .setSubCategory(evt.getSubCategory())
-            .setRefId(refId)
-            .setSeverity(evt.getSeverity())
-            .setType(evt.getType())
-            .setMetadata(evt.getMetadata().toString())
-            .setSuccessfulExploit(evt.getSuccessfulExploit())
-            .setStatus(MaliciousEventDto.Status.valueOf(status.toUpperCase()))
-            .setLabel(label)
-            .setHost(evt.getHost() != null ? evt.getHost() : "");
+    builder.setDetectedAt(evt.getDetectedAt())
+        .setActor(actor)
+        .setFilterId(filterId)
+        .setLatestApiEndpoint(evt.getLatestApiEndpoint())
+        .setLatestApiMethod(URLMethods.Method.fromString(evt.getLatestApiMethod()))
+        .setLatestApiOrig(evt.getLatestApiPayload())
+        .setLatestApiCollectionId(evt.getLatestApiCollectionId())
+        .setEventType(maliciousEventType)
+        .setLatestApiIp(evt.getLatestApiIp())
+        .setCountry(evt.getMetadata().getCountryCode())
+        .setCategory(evt.getCategory())
+        .setSubCategory(evt.getSubCategory())
+        .setRefId(refId)
+        .setSeverity(severity)
+        .setType(evt.getType())
+        .setMetadata(evt.getMetadata().toString())
+        .setSuccessfulExploit(evt.getSuccessfulExploit())
+        .setStatus(MaliciousEventDto.Status.valueOf(status.toUpperCase()))
+        .setLabel(label)
+        .setHost(evt.getHost() != null ? evt.getHost() : "");
 
     // Set contextSource if available
     if (contextSource != null && !contextSource.isEmpty()) {
@@ -174,7 +194,10 @@ public class MaliciousEventService {
     Set<T> result = new HashSet<>();
     MongoCursor<T> cursor = r.cursor();
     while (cursor.hasNext()) {
-      result.add(cursor.next());
+      T value = cursor.next();
+      if (value != null) {
+        result.add(value);
+      }
     }
     return result;
   }
@@ -231,6 +254,21 @@ public class MaliciousEventService {
 
     if (!filter.getUrlsList().isEmpty()) {
       query.append("latestApiEndpoint", new Document("$in", filter.getUrlsList()));
+    }
+
+    if (!filter.getApiCollectionIdList().isEmpty()) {
+      query.append("latestApiCollectionId", new Document("$in", filter.getApiCollectionIdList()));
+    }
+
+    if (!filter.getMethodList().isEmpty()) {
+      // Convert string methods to uppercase to match enum names stored in MongoDB
+      List<String> methodStrings = filter.getMethodList().stream()
+          .map(m -> m != null ? m.toUpperCase() : null)
+          .filter(m -> m != null)
+          .collect(Collectors.toList());
+      if (!methodStrings.isEmpty()) {
+        query.append("latestApiMethod", new Document("$in", methodStrings));
+      }
     }
 
     if (!filter.getIpsList().isEmpty()) {
@@ -299,18 +337,47 @@ public class MaliciousEventService {
       query.putAll(contextFilter);
     }
 
+    // Check if sortBySeverity flag is set
+    boolean sortBySeverity = filter.hasSortBySeverity() && filter.getSortBySeverity();
+
     long total = maliciousEventDao.countDocuments(accountId, query);
-    try (MongoCursor<MaliciousEventDto> cursor =
-        maliciousEventDao.getCollection(accountId)
-            .find(query)
-            .sort(new Document("detectedAt", sort.getOrDefault("detectedAt", -1)))
-            .skip(skip)
-            .limit(limit)
-            .cursor()) {
+
+    MongoCursor<MaliciousEventDto> cursor;
+    if (sortBySeverity) {
+      // Use aggregation pipeline for custom severity sorting
+      cursor = maliciousEventDao.getCollection(accountId)
+          .aggregate(Arrays.asList(
+              new Document("$match", query),
+              new Document("$addFields", new Document("severityRank",
+                  new Document("$switch", new Document()
+                      .append("branches", Arrays.asList(
+                          new Document("case", new Document("$eq", Arrays.asList("$severity", "CRITICAL"))).append("then", 1),
+                          new Document("case", new Document("$eq", Arrays.asList("$severity", "HIGH"))).append("then", 2),
+                          new Document("case", new Document("$eq", Arrays.asList("$severity", "MEDIUM"))).append("then", 3),
+                          new Document("case", new Document("$eq", Arrays.asList("$severity", "LOW"))).append("then", 4)
+                      ))
+                      .append("default", 5)
+                  )
+              )),
+              new Document("$sort", new Document("severityRank", 1)),
+              new Document("$skip", skip),
+              new Document("$limit", limit)
+          ))
+          .cursor();
+    } else {
+      cursor = maliciousEventDao.getCollection(accountId)
+          .find(query)
+          .sort(new Document("detectedAt", sort.getOrDefault("detectedAt", -1)))
+          .skip(skip)
+          .limit(limit)
+          .cursor();
+    }
+
+    try {
       List<ListMaliciousRequestsResponse.MaliciousEvent> maliciousEvents = new ArrayList<>();
       while (cursor.hasNext()) {
         MaliciousEventDto evt = cursor.next();
-        String metadata = evt.getMetadata() != null ? evt.getMetadata() : "";
+        String metadata = ThreatUtils.fetchMetadataString(evt.getMetadata() != null ? evt.getMetadata() : "");
 
         maliciousEvents.add(
             ListMaliciousRequestsResponse.MaliciousEvent.newBuilder()
@@ -336,12 +403,17 @@ public class MaliciousEventService {
                 .setLabel(convertModelLabelToString(evt.getLabel()))
                 .setHost(evt.getHost() != null ? evt.getHost() : "")
                 .setJiraTicketUrl(evt.getJiraTicketUrl() != null ? evt.getJiraTicketUrl() : "")
+                .setSeverity(evt.getSeverity() != null ? evt.getSeverity() : "HIGH")
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()
           .setTotal(total)
           .addAllMaliciousEvents(maliciousEvents)
           .build();
+    } finally {
+      if (cursor != null) {
+        cursor.close();
+      }
     }
   }
 
@@ -432,6 +504,8 @@ public class MaliciousEventService {
       query.append("status", ThreatDetectionConstants.UNDER_REVIEW);
     } else if (ThreatDetectionConstants.IGNORED.equals(statusFilter)) {
       query.append("status", ThreatDetectionConstants.IGNORED);
+    } else if (ThreatDetectionConstants.TRAINING.equals(statusFilter)) {
+      query.append("status", ThreatDetectionConstants.TRAINING);
     } else if (ThreatDetectionConstants.ACTIVE.equals(statusFilter) || ThreatDetectionConstants.EVENTS_FILTER.equals(statusFilter)) {
       // For Events tab: show null, empty, or ACTIVE status
       List<Document> orConditions = Arrays.asList(
@@ -457,6 +531,25 @@ public class MaliciousEventService {
     List<String> urls = (List<String>) filter.get("urls");
     if (urls != null && !urls.isEmpty()) {
       query.append("latestApiEndpoint", new Document("$in", urls));
+    }
+
+    // Handle apiCollectionId filter
+    List<Integer> apiCollectionIds = (List<Integer>) filter.get("apiCollectionId");
+    if (apiCollectionIds != null && !apiCollectionIds.isEmpty()) {
+      query.append("latestApiCollectionId", new Document("$in", apiCollectionIds));
+    }
+
+    // Handle method filter
+    List<String> methods = (List<String>) filter.get("method");
+    if (methods != null && !methods.isEmpty()) {
+      // Convert string methods to uppercase to match enum names stored in MongoDB
+      List<String> normalizedMethods = methods.stream()
+          .map(m -> m != null ? m.toUpperCase() : null)
+          .filter(m -> m != null)
+          .collect(Collectors.toList());
+      if (!normalizedMethods.isEmpty()) {
+        query.append("latestApiMethod", new Document("$in", normalizedMethods));
+      }
     }
 
     // Handle types filter

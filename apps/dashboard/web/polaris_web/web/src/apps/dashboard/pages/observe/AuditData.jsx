@@ -24,9 +24,9 @@ const headings = [
         text: 'Type',
     },
     {
-        text: "MCP component name",
+        text: "Agentic Component name",
         value: "resourceName",
-        title: "MCP component name"
+        title: "Agentic Component name"
     },
     {
         text: "Collection name",
@@ -313,7 +313,6 @@ function AuditData() {
                 total = res.total || 0;
             }
         } catch (error) {
-            console.error("Error fetching audit data:", error)
         }
         
         setLoading(false);
@@ -354,7 +353,7 @@ function AuditData() {
                 Audit Data
               </Text>
             }
-            backUrl="/dashboard/observe"
+            isFirstPage={true}
             primaryAction={primaryActions}
             components = {[
                 <GithubServerTable

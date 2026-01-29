@@ -58,6 +58,8 @@ import com.akto.threat.detection.cache.RedisBackedCounterCache;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.constants.RedisKeyInfo;
 import com.akto.threat.detection.ip_api_counter.DistributionCalculator;
+import com.akto.threat.detection.ip_api_counter.ParamEnumerationDetector;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ParamEnumerationConfig;
 import com.akto.threat.detection.kafka.KafkaProtoProducer;
 import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedThresholdNotifier;
 import com.akto.threat.detection.utils.ThreatDetector;
@@ -90,7 +92,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
   private Map<String, FilterConfig> apiFilters;
   private int filterLastUpdatedAt = 0;
-  private int filterUpdateIntervalSec = 900;
+  private int filterUpdateIntervalSec = 300;
 
   private final KafkaProtoProducer internalKafka;
 
@@ -156,6 +158,11 @@ public class MaliciousTrafficDetectorTask implements Task {
     }
 
     this.threatConfigEvaluator = new ThreatConfigurationEvaluator(null, dataActor, apiCacheCountLayer);
+
+    // Initialize ParamEnumerationDetector with config values (or defaults)
+    ParamEnumerationConfig paramEnumConfig = this.threatConfigEvaluator.getParamEnumerationConfig();
+    ParamEnumerationDetector.initialize(redisClient, paramEnumConfig.getUniqueParamThreshold(), paramEnumConfig.getWindowSizeMinutes());
+
     this.internalKafka = new KafkaProtoProducer(internalConfig);
     this.rawApiFactory = new RawApiMetadataFactory(new IPLookupClient());
     this.distributionCalculator = distributionCalculator;
@@ -370,15 +377,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     URLMethods.Method method = apiInfoKey.getMethod();
 
     // Normalize URL: remove query parameters, fragments, and trailing slashes
-    if (url.contains("?")) {
-      url = url.substring(0, url.indexOf("?"));
-    }
-    if (url.contains("#")) {
-      url = url.substring(0, url.indexOf("#"));
-    }
-    if (url.endsWith("/")) {
-      url = url.substring(0, url.length() - 1);
-    }
+    url = ApiInfo.getNormalizedUrl(url);
 
     // Check if exact URL + method combination exists
     String urlKey = apiCollectionId + ":" + url;
@@ -458,15 +457,27 @@ public class MaliciousTrafficDetectorTask implements Task {
     String url = responseParam.getRequestParams().getURL();
     URLMethods.Method method =
         URLMethods.Method.fromString(responseParam.getRequestParams().getMethod());
-    ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
 
-    String apiHitCountKey = Utils.buildApiHitCountKey(apiCollectionId, url, method.toString());
-    if (this.apiCountWindowBasedThresholdNotifier != null) {
-        this.apiCountWindowBasedThresholdNotifier.incrementApiHitcount(apiHitCountKey, responseParam.getTime(), RedisKeyInfo.API_COUNTER_SORTED_SET);
+    // Convert static URL to template URL once for reuse
+    // This is used for: 1) API count increment, 2) Redis/CMS aggregation, 3) ParamEnumeration filter
+    URLTemplate matchedTemplate = null;
+    if (apiDistributionEnabled && apiCollectionId != 0) {
+      matchedTemplate = threatDetector.findMatchingUrlTemplate(responseParam);
     }
 
-    List<SchemaConformanceError> errors = null; 
+    // Use template URL if available, otherwise fall back to static URL
+    // This ensures API counts aggregate on template URLs (e.g., /api/users/INTEGER instead of /api/users/123)
+    String urlForAggregation = matchedTemplate != null ? matchedTemplate.getTemplateString() : url;
 
+    ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
+
+    // Increment API count using template URL for proper aggregation (skip for default collection)
+    String apiHitCountKey = Utils.buildApiHitCountKey(apiCollectionId, urlForAggregation, method.toString());
+    if (apiCollectionId != 0 && this.apiCountWindowBasedThresholdNotifier != null) {
+      this.apiCountWindowBasedThresholdNotifier.incrementApiHitcount(apiHitCountKey, responseParam.getTime(), RedisKeyInfo.API_COUNTER_SORTED_SET);
+    }
+
+    List<SchemaConformanceError> errors = null;
 
     // Check SuccessfulExploit category filters
     boolean successfulExploit = false; 
@@ -480,14 +491,19 @@ public class MaliciousTrafficDetectorTask implements Task {
     }
     if (apiDistributionEnabled && apiCollectionId != 0) {
       String apiCollectionIdStr = Integer.toString(apiCollectionId);
-      String distributionKey = Utils.buildApiDistributionKey(apiCollectionIdStr, url, method.toString());
-      String ipApiCmsKey = Utils.buildIpApiCmsDataKey(actor, apiCollectionIdStr, url, method.toString());
+
+      // Use pre-matched template URL for Redis storage
+      // This aggregates requests like /api/users/1, /api/users/2 under /api/users/INTEGER
+      String distributionKey = Utils.buildApiDistributionKey(apiCollectionIdStr, urlForAggregation, method.toString());
+      String ipApiCmsKey = Utils.buildIpApiCmsDataKey(actor, apiCollectionIdStr, urlForAggregation, method.toString());
       long curEpochMin = responseParam.getTime() / 60;
       this.distributionCalculator.updateFrequencyBuckets(distributionKey, curEpochMin, ipApiCmsKey);
 
       // Check and raise alert for RateLimits
       RatelimitConfigItem ratelimitConfig = this.threatConfigEvaluator.getDefaultRateLimitConfig();
-      long ratelimit = this.threatConfigEvaluator.getRatelimit(apiInfoKey);
+
+      ApiInfo.ApiInfoKey templateApiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, urlForAggregation, method);
+      long ratelimit = this.threatConfigEvaluator.getRatelimit(templateApiInfoKey);
 
       long count = this.distributionCalculator.getSlidingWindowCount(ipApiCmsKey, curEpochMin,
           ratelimitConfig.getPeriod());
@@ -541,7 +557,9 @@ public class MaliciousTrafficDetectorTask implements Task {
         hasPassedFilter = vulnerable != null && !vulnerable.isEmpty();
 
       }else {
-        hasPassedFilter = threatDetector.applyFilter(apiFilter, responseParam, rawApi, apiInfoKey);
+        // Pass pre-matched template to avoid duplicate findMatchingUrlTemplate calls
+        // (especially important for ParamEnumeration filter)
+        hasPassedFilter = threatDetector.applyFilter(apiFilter, responseParam, rawApi, apiInfoKey, matchedTemplate);
 
         if (applyFilterLogCount.get() < MAX_APPLY_FILTER_LOGS || isDebugRequest(responseParam)) {
           logger.warnAndAddToDb("applyFilter - apiInfoKey: " + apiInfoKey.toString() +

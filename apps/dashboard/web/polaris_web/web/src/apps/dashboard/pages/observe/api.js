@@ -751,14 +751,6 @@ export default {
         })
     },
 
-    async getSensitiveInfoForCollections(){
-        return await request({
-            url: '/api/getSensitiveInfoForCollections',
-            method: 'post',
-            data:{},
-        })
-    },
-
     async getCoverageInfoForCollections(){
         return await request({
             url: '/api/getCoverageInfoForCollections',
@@ -986,6 +978,24 @@ export default {
             }
         })
         return resp
+    },
+
+    async getSwaggerDependencies(apiCollectionId) {
+        const resp = await request({
+            url: '/api/getSwaggerDependencies',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId
+            }
+        })
+        return resp
+    },
+
+    getAllIconsCache(){
+        return request({
+            url: '/api/getAllIconsCache',
+            method: 'get'
+        })
     }
 
 }

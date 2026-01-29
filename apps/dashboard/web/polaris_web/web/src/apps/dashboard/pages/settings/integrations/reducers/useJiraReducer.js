@@ -6,22 +6,28 @@ export const initialEmptyMapping = aktoStatusForJira.reduce((acc, status) => {
   return acc;
 }, {});
 
+export const aktoSeverities = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
+
 const initialState = {
   credentials: {
     baseUrl: '',
     apiToken: '',
     userEmail: ''
   },
+  jiraType: 'CLOUD', // 'CLOUD' or 'DATA_CENTER'
   projects: [],
   existingProjectIds: [],
   isAlreadyIntegrated: false,
   isSaving: false,
   initialFormData: null,
-  loadingProjectIndex: null
+  loadingProjectIndex: null,
+  loadingFieldsProjectIndex: null,
+  loadingFieldValuesProjectIndex: null
 };
 
 const ACTION_TYPES = {
   SET_CREDENTIALS: 'SET_CREDENTIALS',
+  SET_JIRA_TYPE: 'SET_JIRA_TYPE',
   SET_PROJECTS: 'SET_PROJECTS',
   ADD_PROJECT: 'ADD_PROJECT',
   REMOVE_PROJECT: 'REMOVE_PROJECT',
@@ -31,7 +37,9 @@ const ACTION_TYPES = {
   SET_IS_SAVING: 'SET_IS_SAVING',
   SET_INITIAL_FORM_DATA: 'SET_INITIAL_FORM_DATA',
   CLEAR_PROJECTS: 'CLEAR_PROJECTS',
-  SET_LOADING_PROJECT_INDEX: 'SET_LOADING_PROJECT_INDEX'
+  SET_LOADING_PROJECT_INDEX: 'SET_LOADING_PROJECT_INDEX',
+  SET_LOADING_FIELDS_PROJECT_INDEX: 'SET_LOADING_FIELDS_PROJECT_INDEX',
+  SET_LOADING_FIELD_VALUES_PROJECT_INDEX: 'SET_LOADING_FIELD_VALUES_PROJECT_INDEX'
 };
 
 function jiraReducer(state, action) {
@@ -43,6 +51,12 @@ function jiraReducer(state, action) {
           ...state.credentials,
           ...action.payload
         }
+      };
+
+    case ACTION_TYPES.SET_JIRA_TYPE:
+      return {
+        ...state,
+        jiraType: action.payload
       };
 
     case ACTION_TYPES.SET_PROJECTS:
@@ -61,7 +75,18 @@ function jiraReducer(state, action) {
             enableBiDirIntegration: false,
             aktoToJiraStatusMap: JSON.parse(JSON.stringify(initialEmptyMapping)),
             statuses: [],
-            jiraStatusLabel: []
+            jiraStatusLabel: [],
+            priorityFieldMapping: {
+              fieldId: "priority",
+              fieldName: "Priority",
+              fieldType: "priority",
+              severityToValueMap: {},
+              severityToDisplayNameMap: {}
+            },
+            availableFields: [],
+            availableFieldValues: [],
+            enablePriorityMapping: false,
+            hasSavedMapping: false
           }
         ]
       };
@@ -131,6 +156,18 @@ function jiraReducer(state, action) {
       return {
         ...state,
         loadingProjectIndex: action.payload
+      };
+
+    case ACTION_TYPES.SET_LOADING_FIELDS_PROJECT_INDEX:
+      return {
+        ...state,
+        loadingFieldsProjectIndex: action.payload
+      };
+
+    case ACTION_TYPES.SET_LOADING_FIELD_VALUES_PROJECT_INDEX:
+      return {
+        ...state,
+        loadingFieldValuesProjectIndex: action.payload
       };
 
     default:
@@ -210,6 +247,27 @@ export function useJiraReducer() {
       dispatch({
         type: ACTION_TYPES.SET_LOADING_PROJECT_INDEX,
         payload: index
+      });
+    },
+
+    setLoadingFieldsProjectIndex: (index) => {
+      dispatch({
+        type: ACTION_TYPES.SET_LOADING_FIELDS_PROJECT_INDEX,
+        payload: index
+      });
+    },
+
+    setLoadingFieldValuesProjectIndex: (index) => {
+      dispatch({
+        type: ACTION_TYPES.SET_LOADING_FIELD_VALUES_PROJECT_INDEX,
+        payload: index
+      });
+    },
+
+    setJiraType: (value) => {
+      dispatch({
+        type: ACTION_TYPES.SET_JIRA_TYPE,
+        payload: value
       });
     }
   };

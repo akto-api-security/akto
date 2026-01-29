@@ -15,9 +15,6 @@ import RunTest from "./RunTest"
 import ObserveStore from "../observeStore"
 import WorkflowTests from "./WorkflowTests"
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
-import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout"
-import dashboardFunc from "../../transform"
-import settingsRequests from "../../settings/api"
 import PersistStore from "../../../../main/PersistStore"
 import transform from "../transform"
 import { CellType } from "../../../components/tables/rows/GithubRow"
@@ -34,9 +31,11 @@ import { SelectSource } from "./SelectSource"
 import InlineEditableText from "../../../components/shared/InlineEditableText"
 import IssuesApi from "../../issues/api"
 import SequencesFlow from "./SequencesFlow"
-import { CATEGORY_API_SECURITY, getDashboardCategory, isCategory, mapLabel } from "../../../../main/labelHelper"
+import SwaggerDependenciesFlow from "./SwaggerDependenciesFlow"
+import { CATEGORY_API_SECURITY, getDashboardCategory, isCategory, mapLabel, isEndpointSecurityCategory } from "../../../../main/labelHelper"
 import AgentDiscoverGraph from "./AgentDiscoverGraph"
 import McpToolsGraph from "./McpToolsGraph"
+import { findTypeTag, TYPE_TAG_KEYS } from "../agentic/mcpClientHelper"
 
 const headings = [
     {
@@ -48,7 +47,7 @@ const headings = [
     },
     {
         text: "Risk score",
-        title: <HeadingWithTooltip 
+        title: <HeadingWithTooltip
             title={"Risk score"}
             content={"Risk score is calculated based on the amount of sensitive information the API shares and its current status regarding security issues."}
         />,
@@ -57,14 +56,16 @@ const headings = [
         sortActive: true,
         filterKey: 'riskScore',
         showFilter:true
-    },{
+    },
+    // Conditionally include Issues column (skip for Endpoint Security)
+    ...(!isEndpointSecurityCategory() ? [{
         text:"Issues",
         title: "Issues",
         value: "issuesComp",
         textValue: "issues",
         showFilter:true,
         filterKey:"severity"
-    },
+    }] : []),
     {
         text: "Hostname",
         value: 'hostName',
@@ -110,7 +111,7 @@ const headings = [
     },
     {
         text: 'Discovered At',
-        title: <HeadingWithTooltip 
+        title: <HeadingWithTooltip
                 title={"Discovered At"}
                 content={"Time when API was first discovered in traffic."}
             />,
@@ -119,9 +120,10 @@ const headings = [
         type: CellType.TEXT,
         sortActive: true,
     },
-    {
+    // Conditionally include Last Tested column (skip for Endpoint Security)
+    ...(!isEndpointSecurityCategory() ? [{
         text: 'Last ' + mapLabel('Tested', getDashboardCategory()),
-        title: <HeadingWithTooltip 
+        title: <HeadingWithTooltip
                 title={"Last " + mapLabel('Tested', getDashboardCategory())}
                 content={"Time when API was last tested successfully."}
             />,
@@ -129,7 +131,7 @@ const headings = [
         sortActive: true,
         sortKey: 'lastTested',
         textValue: 'lastTested',
-    },
+    }] : []),
     {
         text: "Source location",
         value: "sourceLocationComp",
@@ -188,17 +190,20 @@ headers.push({
 })
 
 
+// Offset for hidden Issues column in Endpoint Security mode
+const columnOffset = isEndpointSecurityCategory() ? -1 : 0;
+
 const sortOptions = [
     { label: 'Risk Score', value: 'riskScore asc', directionLabel: 'Highest', sortKey: 'riskScore', columnIndex: 2},
     { label: 'Risk Score', value: 'riskScore desc', directionLabel: 'Lowest', sortKey: 'riskScore', columnIndex: 2},
     { label: 'Endpoint', value: 'endpoint asc', directionLabel: 'A-Z', sortKey: 'endpoint', columnIndex: 1 },
     { label: 'Endpoint', value: 'endpoint desc', directionLabel: 'Z-A', sortKey: 'endpoint', columnIndex: 1 },
-    { label: 'Last seen', value: 'lastSeenTs asc', directionLabel: 'Newest', sortKey: 'lastSeenTs', columnIndex: 8 },
-    { label: 'Last seen', value: 'lastSeenTs desc', directionLabel: 'Oldest', sortKey: 'lastSeenTs', columnIndex: 8 },
-    { label: 'Discovered at', value: 'detectedTs asc', directionLabel: 'Newest', sortKey: 'detectedTs', columnIndex: 9 },
-    { label: 'Discovered at', value: 'detectedTs desc', directionLabel: 'Oldest', sortKey: 'detectedTs', columnIndex: 9 },
-    { label: 'Last tested', value: 'lastTested asc', directionLabel: 'Newest', sortKey: 'lastTested', columnIndex: 10 },
-    { label: 'Last tested', value: 'lastTested desc', directionLabel: 'Oldest', sortKey: 'lastTested', columnIndex: 10 },
+    { label: 'Last seen', value: 'lastSeenTs asc', directionLabel: 'Newest', sortKey: 'lastSeenTs', columnIndex: 8 + columnOffset },
+    { label: 'Last seen', value: 'lastSeenTs desc', directionLabel: 'Oldest', sortKey: 'lastSeenTs', columnIndex: 8 + columnOffset },
+    { label: 'Discovered at', value: 'detectedTs asc', directionLabel: 'Newest', sortKey: 'detectedTs', columnIndex: 9 + columnOffset },
+    { label: 'Discovered at', value: 'detectedTs desc', directionLabel: 'Oldest', sortKey: 'detectedTs', columnIndex: 9 + columnOffset },
+    { label: 'Last tested', value: 'lastTested asc', directionLabel: 'Newest', sortKey: 'lastTested', columnIndex: 10 + columnOffset },
+    { label: 'Last tested', value: 'lastTested desc', directionLabel: 'Oldest', sortKey: 'lastTested', columnIndex: 10 + columnOffset },
 ];
 
 
@@ -237,14 +242,15 @@ function ApiEndpoints(props) {
     const [apiDetail, setApiDetail] = useState({})
     const [exportOpen, setExportOpen] = useState(false)
     const [showSequencesFlow, setShowSequencesFlow] = useState(false)
+    const [showSwaggerDependenciesFlow, setShowSwaggerDependenciesFlow] = useState(false)
 
     const filteredEndpoints = ObserveStore(state => state.filteredItems)
     const setFilteredEndpoints = ObserveStore(state => state.setFilteredItems)
     const coverageInfo = PersistStore(state => state.coverageMap)
 
-    const [prompts, setPrompts] = useState([])
-    const [isGptScreenActive, setIsGptScreenActive] = useState(false)
-    const [isGptActive, setIsGptActive] = useState(false)
+    // const [prompts, setPrompts] = useState([])
+    // const [isGptScreenActive, setIsGptScreenActive] = useState(false)
+    // const [isGptActive, setIsGptActive] = useState(false)
     const [redacted, setIsRedacted] = useState(false)
     const [showRedactModal, setShowRedactModal] = useState(false)
     const [tableLoading, setTableLoading] = useState(false)
@@ -275,6 +281,7 @@ function ApiEndpoints(props) {
         let sensitiveParamsResp;
         let sourceCodeData = {};
         let apiInfoSeverityMap ;
+        let issuesDataResp;
         if (isQueryPage) {
             let apiCollectionData = endpointListFromConditions
             if (Object.keys(endpointListFromConditions).length === 0) {
@@ -304,17 +311,28 @@ function ApiEndpoints(props) {
                 api.fetchApisFromStis(apiCollectionId),
                 api.fetchApiInfosForCollection(apiCollectionId),
                 api.fetchAPIsFromSourceCode(apiCollectionId),
-                api.getSeveritiesCountPerCollection(apiCollectionId),
-                IssuesApi.fetchIssues(0, 1000, ["OPEN"], [apiCollectionId], null, null, null, null, null, null, true, null)
             ];
-            
+
+            // Conditionally add testing-related APIs (skip for Endpoint Security)
+            if (!isEndpointSecurityCategory()) {
+                apiPromises.push(api.getSeveritiesCountPerCollection(apiCollectionId));
+                apiPromises.push(IssuesApi.fetchIssues(0, 1000, ["OPEN"], [apiCollectionId], null, null, null, null, null, null, true, null));
+            }
+
             let results = await Promise.allSettled(apiPromises);
-            let stisEndpoints =  results[0].status === 'fulfilled' ? results[0].value : {};
+            let stisEndpoints = results[0].status === 'fulfilled' ? results[0].value : {};
             let apiInfosData = results[1].status === 'fulfilled' ? results[1].value : {};
             sourceCodeData = results[2].status === 'fulfilled' ? results[2].value : {};
-            apiInfoSeverityMap = results[3].status === 'fulfilled' ? results[3].value : {};
-            let issuesDataResp = results[4].status === 'fulfilled' ? results[4].value : {};
-            
+
+            // Conditionally extract testing-related results (skip for Endpoint Security)
+            if (!isEndpointSecurityCategory()) {
+                apiInfoSeverityMap = results[3].status === 'fulfilled' ? results[3].value : {};
+                issuesDataResp = results[4].status === 'fulfilled' ? results[4].value : {};
+            } else {
+                apiInfoSeverityMap = {};
+                issuesDataResp = {};
+            }
+
             // Initialize with empty sensitive params for fast UI loading
             sensitiveParamsResp = { data: { endpoints: [] } };
             setShowEmptyScreen(stisEndpoints?.list !== undefined && stisEndpoints?.list?.length === 0)
@@ -698,18 +716,18 @@ function ApiEndpoints(props) {
 
     }, [selectedUrl, selectedMethod, endpointData])
 
-    const checkGptActive = async() => {
-        await settingsRequests.fetchAktoGptConfig(apiCollectionId).then((resp) => {
-            if(resp.currentState[0].state === "ENABLED"){
-                setIsGptActive(true)
-            }
-        })
-    }
+    // const checkGptActive = async() => {
+    //     await settingsRequests.fetchAktoGptConfig(apiCollectionId).then((resp) => {
+    //         if(resp.currentState[0].state === "ENABLED"){
+    //             setIsGptActive(true)
+    //         }
+    //     })
+    // }
 
     useEffect(() => {
-        if (!isQueryPage) {
-            checkGptActive()
-        }
+        // if (!isQueryPage) {
+        //     checkGptActive()
+        // }
         fetchData()
     }, [apiCollectionId, endpointListFromConditions])
 
@@ -1049,13 +1067,13 @@ function ApiEndpoints(props) {
         }
     }
 
-    function displayGPT(){
-        setIsGptScreenActive(true)
-        let requestObj = {key: "COLLECTION",filteredItems: filteredEndpoints,apiCollectionId: Number(apiCollectionId)}
-        const activePrompts = dashboardFunc.getPrompts(requestObj)
-        setPrompts(activePrompts)
-        
-    }
+    // function displayGPT(){
+    //     setIsGptScreenActive(true)
+    //     let requestObj = {key: "COLLECTION",filteredItems: filteredEndpoints,apiCollectionId: Number(apiCollectionId)}
+    //     const activePrompts = dashboardFunc.getPrompts(requestObj)
+    //     setPrompts(activePrompts)
+    //
+    // }
 
     function getTagsCompactComponent(envTypeList) {
         const list = envTypeList || []
@@ -1068,6 +1086,30 @@ function ApiEndpoints(props) {
         const envTypeList = envType?.map(func.formatCollectionType) || []
 
         return getTagsCompactComponent(envTypeList)
+    }
+
+    function getEmptyScreenText(collectionsObj) {
+        const typeTag = findTypeTag(collectionsObj?.envType);
+        if (typeTag?.keyName === TYPE_TAG_KEYS.MCP_SERVER) {
+            return {
+                headingText: "Discover MCP tools to get started",
+                description: "Your MCP server collection is currently empty."
+            };
+        } else if (typeTag?.keyName === TYPE_TAG_KEYS.GEN_AI) {
+            return {
+                headingText: "Discover AI endpoints to get started",
+                description: "Your AI agent collection is currently empty."
+            };
+        } else if (typeTag?.keyName === TYPE_TAG_KEYS.BROWSER_LLM) {
+            return {
+                headingText: "Discover LLM endpoints to get started",
+                description: "Your LLM collection is currently empty."
+            };
+        }
+        return {
+            headingText: "Discover APIs to get started",
+            description: "Your API collection is currently empty. Import APIs from other collections now."
+        };
     }
 
     const collectionsObj = (allCollections && allCollections.length > 0) ? allCollections.filter(x => Number(x.id) === Number(apiCollectionId))[0] : {}
@@ -1099,14 +1141,23 @@ function ApiEndpoints(props) {
                                     content: showSequencesFlow ? "Display table view" : "Display graph view",
                                     onAction: () => { 
                                         setShowSequencesFlow(!showSequencesFlow); 
+                                        setShowSwaggerDependenciesFlow(false);
                                         setExportOpen(false); 
                                     },
                                     prefix: <Box width="24px"> <Icon source={showSequencesFlow ? HideMinor: ViewMinor} /></Box>
                                 },
-                               
-                            ]
+                                !isApiGroup && (!isHostnameCollection && hasAccessToDiscoveryAgent) && {
+                                    content: showSwaggerDependenciesFlow ? "Display table view" : "Display dependencies graph",
+                                    onAction: () => { 
+                                        setShowSwaggerDependenciesFlow(!showSwaggerDependenciesFlow); 
+                                        setShowSequencesFlow(false);
+                                        setExportOpen(false); 
+                                    },
+                                    prefix: <Box width="24px"> <Icon source={showSwaggerDependenciesFlow ? HideMinor: ViewMinor} /></Box>
+                                }
+                            ].filter(Boolean)
                         },
-                        ...(showSequencesFlow ? [] : [
+                        ...(showSequencesFlow || showSwaggerDependenciesFlow ? [] : [
                             {
                                 title:'Re-Compute',
                                 items: [
@@ -1229,18 +1280,21 @@ function ApiEndpoints(props) {
 
             {isApiGroup &&collectionsObj?.automated !== true ? <Button onClick={() => navigate("/dashboard/observe/query_mode?collectionId=" + apiCollectionId)}>Edit conditions</Button> : null}
 
-            {isGptActive ? <Button onClick={displayGPT} disabled={showEmptyScreen}>Ask AktoGPT</Button>: null}
-                    
-            <RunTest
-                apiCollectionId={apiCollectionId}
-                endpoints={filteredEndpoints}
-                filtered={loading ? false : filteredEndpoints.length !== endpointData["all"].length}
-                runTestFromOutside={runTests}
-                closeRunTest={() => setRunTests(false)}
-                disabled={showEmptyScreen || window.USER_ROLE === "GUEST" || (collectionsObj?.isOutOfTestingScope || false)}
-                selectedResourcesForPrimaryAction={selectedResourcesForPrimaryAction}
-                preActivator={false}
-            />
+            {/* {isGptActive ? <Button onClick={displayGPT} disabled={showEmptyScreen}>Ask AktoGPT</Button>: null} */}
+
+            {/* Hide Run Test button for Endpoint Security */}
+            {!isEndpointSecurityCategory() && (
+                <RunTest
+                    apiCollectionId={apiCollectionId}
+                    endpoints={filteredEndpoints}
+                    filtered={loading ? false : filteredEndpoints.length !== endpointData["all"].length}
+                    runTestFromOutside={runTests}
+                    closeRunTest={() => setRunTests(false)}
+                    disabled={showEmptyScreen || window.USER_ROLE === "GUEST" || (collectionsObj?.isOutOfTestingScope || false)}
+                    selectedResourcesForPrimaryAction={selectedResourcesForPrimaryAction}
+                    preActivator={false}
+                />
+            )}
             <SelectSource
                 show={showSourceDialog}
                 setShow={(val) => setShowSourceDialog(val)}
@@ -1473,7 +1527,7 @@ function ApiEndpoints(props) {
         setShowDetails={setShowDetails}
         apiDetail={apiDetail}
         headers={transform.getDetailsHeaders()}
-        isGptActive={isGptActive}
+        // isGptActive={isGptActive}
         collectionIssuesData={collectionIssuesData}
     />,
     ]
@@ -1487,28 +1541,31 @@ function ApiEndpoints(props) {
                     apiCollectionId={apiCollectionId}
                     endpointsList={loading ? [] : endpointData["all"]}
                 />
-            ] : showEmptyScreen ? [
+            ] : showEmptyScreen && !(showSequencesFlow || showSwaggerDependenciesFlow) ? [
                 <EmptyScreensLayout key={"emptyScreen"}
                     iconSrc={"/public/file_plus.svg"}
-                    headingText={"Discover APIs to get started"}
-                    description={"Your API collection is currently empty. Import APIs from other collections now."}
+                    headingText={getEmptyScreenText(collectionsObj).headingText}
+                    description={getEmptyScreenText(collectionsObj).description}
                     buttonText={"Import from other collections"}
                     redirectUrl={"/dashboard/observe/inventory"}
                     learnText={"inventory"}
                     docsUrl={ENDPOINTS_PAGE_DOCS_URL}
                 />] : showSequencesFlow ? [
                 <SequencesFlow key="sequences-flow" apiCollectionId={apiCollectionId}  />
+            ] : showSwaggerDependenciesFlow ? [
+                <SwaggerDependenciesFlow key="swagger-dependencies-flow" apiCollectionId={apiCollectionId}  />
             ] : [
                 func.isDemoAccount() ? <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : null,
                 (!isCategory(CATEGORY_API_SECURITY)) ? <McpToolsGraph key="mcp-tools-graph" apiCollectionId={apiCollectionId} /> : null,
-                (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId))) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null,
+                // Hide "Test your Endpoints" banner for Endpoint Security
+                (!isEndpointSecurityCategory() && (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)))) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null,
                 <div className="apiEndpointsTable" key="table">
                     {apiEndpointTable}
-                      <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
+                      {/* <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
                           <Modal.Section flush>
                               <AktoGptLayout prompts={prompts} closeModal={() => setIsGptScreenActive(false)} />
                           </Modal.Section>
-                      </Modal>
+                      </Modal> */}
                   </div>,
                   <ApiGroupModal
                       key="api-group-modal"

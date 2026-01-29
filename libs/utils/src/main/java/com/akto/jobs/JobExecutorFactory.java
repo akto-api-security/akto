@@ -2,6 +2,7 @@ package com.akto.jobs;
 
 import com.akto.dto.jobs.JobParams;
 import com.akto.dto.jobs.JobType;
+import com.akto.jobs.executors.DatadogTrafficCollectorJobExecutor;
 import com.akto.jobs.executors.JiraTicketJobExecutor;
 import com.akto.jobs.executors.PendingTestsAlertsJobExecutor;
 import com.akto.jobs.executors.TicketSyncJobExecutor;
@@ -17,6 +18,7 @@ public class JobExecutorFactory {
         map.put(JobType.JIRA_AUTO_CREATE_TICKETS, JiraTicketJobExecutor.INSTANCE);
         map.put(JobType.TICKET_SYNC, TicketSyncJobExecutor.INSTANCE);
         map.put(JobType.PENDING_TESTS_ALERTS, PendingTestsAlertsJobExecutor.INSTANCE);
+        map.put(JobType.DATADOG_TRAFFIC_COLLECTOR, DatadogTrafficCollectorJobExecutor.INSTANCE);
 
         registry = Collections.unmodifiableMap(map);
     }

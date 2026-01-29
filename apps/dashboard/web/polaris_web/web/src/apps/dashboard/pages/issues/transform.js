@@ -86,6 +86,31 @@ const transform = {
         </tr>
         )
     },
+    getThreatCollapsibleRow(urls, handleThreatClick) {
+        return(
+        <tr style={{background: "#FAFBFB", padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
+            <td colSpan={'100%'} style={{padding: '0px !important'}}>
+                {urls.map((urlObj, index) => {
+                    const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth: 1} : {};
+                    return (
+                        <Box key={index} padding={"2"} paddingInlineEnd={"4"} paddingInlineStart={"3"} borderColor="border-subdued" {...borderStyle}>
+                            <HorizontalStack gap={24} wrap={false}>
+                                <Box paddingInlineStart={10}>
+                                    <IssuesCheckbox id={JSON.stringify({ eventId: urlObj.threatData?.eventId || "" })} />
+                                </Box>
+                                <HorizontalStack gap={"4"}>
+                                    <Link monochrome onClick={() => handleThreatClick(urlObj.threatData)} removeUnderline>
+                                        <Text>{urlObj.method} {urlObj.url}</Text>
+                                    </Link>
+                                </HorizontalStack>
+                            </HorizontalStack>
+                        </Box>
+                    );
+                })}
+            </td>
+        </tr>
+        )
+    },
     convertToIssueTableData: async (rawData, subCategoryMap, isCompliancePage = false) => {
         const processedData = await Promise.all(
             await Promise.all(rawData.map(async (issue, idx) => {
@@ -100,7 +125,7 @@ const transform = {
                                 <Badge size="small" key={idx}>{issue.severity}</Badge>
                             </div>,
                     issueName: subCategoryMap[issue.issueName]?.testName,
-                    category: subCategoryMap[issue.issueName]?.superCategory?.shortName,
+                    category: subCategoryMap[issue.issueName]?.superCategory?.displayName,
                     numberOfEndpoints: issue.numberOfEndpoints,
                     compliance: <HorizontalStack wrap={false} gap={1}>{issue.compliance.slice(0, maxShowCompliance).map(x => <Avatar source={func.getComplianceIcon(x)} shape="square"  size="extraSmall"/>)}<Box>{badge}</Box></HorizontalStack>,
                     creationTime: func.prettifyEpoch(issue.creationTime),

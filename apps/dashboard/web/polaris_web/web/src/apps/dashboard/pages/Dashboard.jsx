@@ -217,8 +217,10 @@ function Dashboard() {
 
     const shouldShowWelcomeBackModal = window.IS_SAAS === "true" && window?.USER_NAME?.length > 0 && (window?.USER_FULL_NAME?.length === 0 || (window?.USER_ROLE === 'ADMIN' && window?.ORGANIZATION_NAME?.length === 0))
 
+    const isAskAiRoute = location.pathname.includes('/ask-ai')
+
     return (
-        <div className="dashboard">
+        <div className={`dashboard ${isAskAiRoute ? 'ask-ai-route' : ''}`}>
         <Frame>
             <Outlet />
             {shouldShowWelcomeBackModal && <WelcomeBackDetailsModal isAdmin={window.USER_ROLE === 'ADMIN'} />}
@@ -239,7 +241,7 @@ function Dashboard() {
                         })}
                     </VerticalStack>
             </div> : null}
-            {func.checkLocal() && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || location.pathname.includes("onboarding") || location.pathname.includes("summary")) ?<div className="call-banner" style={{marginBottom: "1rem"}}>
+            {func.checkLocal() && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || location.pathname.includes("onboarding") || location.pathname.includes("summary") || location.pathname.includes("report")) ?<div className="call-banner" style={{marginBottom: "1rem"}}>
                 <Banner hideIcon={true}>
                     <Text variant="headingMd">Need a 1:1 experience?</Text>
                     <Button plain monochrome onClick={() => {

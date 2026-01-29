@@ -43,6 +43,7 @@ public class RbacEnums {
         TEST_SUITE(AccessGroups.TEST_LIBRARY),
         EXTERNAL_TEST_LIBRARY(AccessGroups.TEST_LIBRARY),
         INTEGRATIONS(AccessGroups.SETTINGS),
+        API_TOKENS(AccessGroups.SETTINGS),
         METRICS(AccessGroups.DEBUG_INFO),
         LOGS(AccessGroups.DEBUG_INFO),
         BILLING(AccessGroups.SETTINGS),

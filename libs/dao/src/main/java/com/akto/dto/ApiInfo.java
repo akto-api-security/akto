@@ -76,6 +76,9 @@ public class ApiInfo {
     public static final String DETECTED_BASE_PROMPT = "detectedBasePrompt";
     private String detectedBasePrompt;
 
+    private float threatScore;
+    public static final String THREAT_SCORE = "threatScore";
+
     public enum ApiType {
         REST, GRAPHQL, GRPC, SOAP
     }
@@ -261,6 +264,7 @@ public class ApiInfo {
         this.isSensitive = that.isSensitive || this.isSensitive;
         this.severityScore = this.severityScore + that.severityScore;
         this.riskScore = Math.max(this.riskScore, that.riskScore);
+        this.threatScore = Math.max(this.threatScore, that.threatScore);
 
         if (that.lastCalculatedTime > this.lastCalculatedTime) {
             this.lastCalculatedTime = that.lastCalculatedTime;
@@ -402,6 +406,30 @@ public class ApiInfo {
         id == null ? null : (Integer) id.getApiCollectionId(),
         this.id == null ? null : (Integer) this.id.getApiCollectionId());
         this.id = id;
+    }
+
+    public static String getNormalizedUrl(String url) {
+        if (url == null) {
+            return "";
+        }
+        if (url.contains("?")) {
+            url = url.substring(0, url.indexOf("?"));
+        }
+        if (url.contains("#")) {
+            url = url.substring(0, url.indexOf("#"));
+        }
+        if (url.endsWith("/")) {
+            url = url.substring(0, url.length() - 1);
+        }
+        return url;
+    }
+
+    public static String getForwardNormalizedUrl(String url){
+        url = getNormalizedUrl(url);
+        if (url.startsWith("/")) {
+            url = url.substring(1);
+        }
+        return url;
     }
 
     public Set<Set<AuthType>> getAllAuthTypesFound() {
@@ -553,5 +581,13 @@ public class ApiInfo {
 
     public void setDetectedBasePrompt(String detectedBasePrompt) {
         this.detectedBasePrompt = detectedBasePrompt;
+    }
+
+    public void setThreatScore(float threatScore) {
+        this.threatScore = threatScore;
+    }
+
+    public float getThreatScore() {
+        return threatScore;
     }
 }

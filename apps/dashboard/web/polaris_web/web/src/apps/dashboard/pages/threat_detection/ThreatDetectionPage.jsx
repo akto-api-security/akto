@@ -23,6 +23,7 @@ import { getDashboardCategory, isApiSecurityCategory, isDastCategory, mapLabel }
 import LineChart from "../../components/charts/LineChart";
 import P95LatencyGraph from "../../components/charts/P95LatencyGraph";
 import { LABELS } from "./constants";
+import useThreatReportDownload from "../../hooks/useThreatReportDownload";
 
 const convertToGraphData = (severityMap) => {
     let dataArr = []
@@ -255,6 +256,12 @@ function ThreatDetectionPage() {
     const startTimestamp = parseInt(currDateRange.period.since.getTime()/1000)
     const endTimestamp = parseInt(currDateRange.period.until.getTime()/1000)
 
+    const { downloadThreatReport } = useThreatReportDownload({
+        startTimestamp,
+        endTimestamp,
+        onComplete: () => setMoreActions(false)
+    })
+
     const isDemoMode = func.isDemoAccount();
 
     /**
@@ -367,7 +374,8 @@ function ThreatDetectionPage() {
             templateId: data.filterId,
             status: data.status || '',
             eventId: data.id || '',
-            jiraTicketUrl: data.jiraTicketUrl || ''
+            jiraTicketUrl: data.jiraTicketUrl || '',
+            severity: data.severity || ''
         });
 
         setShowDetails(true);
@@ -381,6 +389,7 @@ function ThreatDetectionPage() {
                 method: data.method || '',
                 apiCollectionId: data.apiCollectionId,
                 templateId: data.filterId,
+                severity: data.severity || '',
             },
             currentEventId: data.id || '',
             currentEventStatus: data.status || '',
@@ -478,6 +487,7 @@ function ThreatDetectionPage() {
               method: rowContext?.method || '',
               apiCollectionId: rowContext?.apiCollectionId,
               templateId: queryParams.filterId,
+              severity: rowContext?.severity || '',
             },
             currentEventId: rowContext?.eventId || '',
             currentEventStatus: queryParams.status || rowContext?.status || '',
@@ -702,6 +712,11 @@ function ThreatDetectionPage() {
                                 {
                                     title: 'Export',
                                     items: [
+                                        {
+                                            content: 'Download Threat Report',
+                                            onAction: () => downloadThreatReport(),
+                                            prefix: <Box><Icon source={FileMinor} /></Box>
+                                        },
                                         {
                                             content: 'Export',
                                             onAction: () => exportJson(),

@@ -50,8 +50,9 @@ export default function Header() {
         if (window.beamer_config) {
             const isOnPrem = window.DASHBOARD_MODE === 'ON_PREM';
             const isAgentic = dashboardCategory === 'Agentic Security';
+            const isEndpoint = dashboardCategory === 'Endpoint Security';
 
-            const productId = isAgentic
+            const productId = (isAgentic || isEndpoint)
                 ? (isOnPrem ? 'shUignSe80215' : 'ijUqfdSQ80078')
                 : (isOnPrem ? 'rggteHBr72897' : 'cJtNevEq80216');
 
@@ -60,6 +61,21 @@ export default function Header() {
             if (window.beamer_config.product_id !== productId || window.beamer_config.filter !== filterTag) {
                 window.beamer_config.product_id = productId;
                 window.beamer_config.filter = filterTag;
+                window.beamer_config.selector = '#beamer-btn';
+                window.beamer_config.onOpen = function () {
+                    var closeButton = document.createElement('div');
+                    closeButton.id = 'beamer-custom-close';
+                    closeButton.innerHTML = '&times;';
+                    closeButton.style.cssText = 'position: fixed; top: 7px; right: 5px; z-index: 2147483650; width: 40px; height: 40px; cursor: pointer; color: black; font-size: 30px; display: flex; align-items: center; justify-content: center; opacity: 0;';
+                    closeButton.onclick = function () {
+                        window.Beamer.hide();
+                    };
+                    document.body.appendChild(closeButton);
+                };
+                window.beamer_config.onClose = function () {
+                    var closeButton = document.getElementById('beamer-custom-close');
+                    if (closeButton) closeButton.remove();
+                };
                 if (window.Beamer) {
                     window.Beamer.destroy();
                     window.Beamer.init();
@@ -68,14 +84,21 @@ export default function Header() {
         }
     }, [dashboardCategory]);
 
+    const handleBeamerClick = useCallback(() => {
+        if (window.Beamer) {
+            window.Beamer.show();
+        }
+    }, []);
 
-    const logoSrc = dashboardCategory === "Agentic Security" ? "/public/akto-christmas-agentic.svg" : "/public/akto-christmas.svg";
+
+    const logoSrc = dashboardCategory === "Agentic Security" ? "/public/white_logo.svg" : "/public/akto_name_with_logo.svg";
     const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {};
     const agenticSecurityGranted =
         stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || true
     const mcpSecurityGranted =
         stiggFeatures?.MCP_SECURITY?.isGranted || true;
     const dastGranted = func.checkForFeatureSaas("AKTO_DAST")
+    const endpointSecurityGranted = stiggFeatures?.ENDPOINT_SECURITY?.isGranted || true
 
     const disabledDashboardCategories = useMemo(() => {
         const disabled = [];
@@ -88,8 +111,11 @@ export default function Header() {
         if (dastGranted === false) {
             disabled.push("DAST")
         }
+        if (endpointSecurityGranted === false) {
+            disabled.push("Endpoint Security")
+        }
         return disabled;
-    }, [mcpSecurityGranted, agenticSecurityGranted]);
+    }, [mcpSecurityGranted, agenticSecurityGranted, dastGranted, endpointSecurityGranted]);
 
     const dropdownInitial = disabledDashboardCategories.includes(dashboardCategory)
         ? "API Security"
@@ -183,8 +209,12 @@ export default function Header() {
         LocalStore.getState().setCategoryMap({});
         LocalStore.getState().setSubCategoryMap({});
         SessionStore.getState().setThreatFiltersMap({});
+        PersistStore.getState().setFiltersMap({});
         setDashboardCategory(value);
-        navigate("/dashboard/observe/inventory");
+        const targetPath = value === "Endpoint Security"
+            ? "/dashboard/observe/agentic-assets"
+            : "/dashboard/observe/inventory";
+        navigate(targetPath);
         navigate(0);
     }
 
@@ -273,20 +303,17 @@ export default function Header() {
                 </HorizontalStack> : null}
 
             {/* 2025 Wrapped Button */}
-            <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => setShowWrapped(true)}>
+            {/* <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => setShowWrapped(true)}>
                 <div style={{ background: 'linear-gradient(to right, #ff416c, #ff4b2b)', borderRadius: '4px', padding: '4px 8px', color: 'white', fontWeight: 'bold', fontSize: '12px' }}>
                     2025 Wrapped <span style={{marginInlineStart: '2px'}}>🎁</span>
                 </div>
-            </div>
+            </div> */}
 
-            <TopBar.Menu
-                activatorContent={
-                    <span id="beamer-btn" className={getColorForIcon()}>
-                        <Icon source={NotificationMajor} />
-                    </span>
-                }
-                actions={[]}
-            />
+            <Button id="beamer-btn" plain monochrome onClick={handleBeamerClick}>
+                <span className={getColorForIcon()}>
+                    <Icon source={NotificationMajor} />
+                </span>
+            </Button>
             <TopBar.Menu
                 activatorContent={
                     <span style={{ cursor: 'pointer' }} onClick={() => navigate("/dashboard/settings/about")}>
@@ -307,14 +334,25 @@ export default function Header() {
                     <Box paddingInlineStart={3} paddingInlineEnd={3}>
                         <HorizontalStack gap={4} wrap={false}>
                             <div style={{ cursor: 'pointer' }} onClick={() => window.location.href = "/dashboard/observe/inventory"} className='logo'>
-                                <img src={logoSrc} alt="Akto Logo" style={{ maxWidth: '90px' }} />
+                                <img src={logoSrc} alt="Akto Logo" style={{ maxWidth: '78px' }} />
                             </div>
 
                             <Box minWidth='170px'>
                                 <Dropdown
                                     menuItems={[
                                         { value: "API Security", label: "API Security", id: "api-security" },
-                                        { value: "Agentic Security", label: "Agentic Security", id: "agentic-security" },
+                                        {
+                                            value: "Agentic Security",
+                                            label: "Akto ARGUS",
+                                            id: "agentic-security",
+                                            helpText: "Agentic AI Security for Homegrown AI"
+                                        },
+                                        {
+                                            value: "Endpoint Security",
+                                            label: "Akto ATLAS",
+                                            id: "endpoint-security",
+                                            helpText: "Agentic AI Security for Employee Endpoints"
+                                        },
                                         { value: "DAST", label: "DAST", id: "dast" },
                                     ]}
                                     initial={dropdownInitial}

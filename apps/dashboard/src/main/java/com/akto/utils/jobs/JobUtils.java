@@ -29,11 +29,13 @@ public class JobUtils {
     private static final int limit = 500;
     private static final Bson sort = Sorts.ascending(ApiInfo.ID_API_COLLECTION_ID, ApiInfo.ID_URL, ApiInfo.ID_METHOD);
 
-    public static boolean getRunJobFunctions() {
+    public static int getRunJobFunctions() {
+        String envValue = System.getenv().getOrDefault("AKTO_RUN_JOB", "0");
         try {
-            return Boolean.parseBoolean(System.getenv().getOrDefault("AKTO_RUN_JOB", "false"));
+            return Integer.parseInt(envValue);
         } catch (Exception e) {
-            return true;
+            logger.error("Failed to parse AKTO_RUN_JOB environment variable. Invalid value: '" + envValue + "'. Defaulting to 0", e);
+            return 0;
         }
     }
 

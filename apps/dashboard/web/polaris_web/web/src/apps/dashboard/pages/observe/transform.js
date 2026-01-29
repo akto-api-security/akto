@@ -8,7 +8,7 @@ import { SearchMinor, InfoMinor, LockMinor, ClockMinor, PasskeyMinor, LinkMinor,
 import api from "./api";
 import GetPrettifyEndpoint from "./GetPrettifyEndpoint";
 import ShowListInBadge from "../../components/shared/ShowListInBadge";
-import { getDashboardCategory } from "../../../main/labelHelper";
+import { CATEGORY_ENDPOINT_SECURITY, getDashboardCategory } from "../../../main/labelHelper";
 
 const standardHeaders = [
     'accept', 'accept-ch', 'accept-ch-lifetime', 'accept-charset', 'accept-encoding', 'accept-language', 'accept-patch', 'accept-post', 'accept-ranges', 'access-control-allow-credentials', 'access-control-allow-headers', 'access-control-allow-methods', 'access-control-allow-origin', 'access-control-expose-headers', 'access-control-max-age', 'access-control-request-headers', 'access-control-request-method', 'age', 'allow', 'alt-svc', 'alt-used', 'authorization',
@@ -517,7 +517,10 @@ const transform = {
         )
     },
 
-    prettifyCollectionsData(newData, isLoading, selectedTab){
+    prettifyCollectionsData(newData, isLoading, selectedTab, filterType){
+        const category = getDashboardCategory();
+        const isEndpointSecurity = category === CATEGORY_ENDPOINT_SECURITY;
+
         const prettifyData = newData.map((c)=>{
             // Check if we're in the untracked tab
             const isUntrackedTab = selectedTab === 'untracked';
@@ -540,10 +543,35 @@ const transform = {
 
             const loadingComp = <Text color="subdued" variant="bodyMd">...</Text>
 
-            // Create displayNameComp if it doesn't exist (for lazy-loaded items)
-            const displayNameComp = c.displayNameComp || (
+            // Split collection name for Endpoint Security category
+            let splitApiCollectionName = c.displayName;
+            let endpointId = '';
+            let sourceId = '';
+            let serviceName = '';
+            if (isEndpointSecurity) {
+                const splitResult = this.splitCollectionNameForEndpointSecurity(c.displayName);
+                splitApiCollectionName = splitResult.apiCollectionName;
+                endpointId = splitResult.endpointId;
+                sourceId = splitResult.sourceId;
+                serviceName = splitResult.serviceName;
+            }
+
+            // Determine display text based on filter type
+            // - browser-llm: show sourceId (<2>)
+            // - ai-agent: show serviceName (<3>)
+            // - mcp-server: show sourceId (<2>)
+            // - default: show splitApiCollectionName (<2>.<3>)
+            let displayText = isEndpointSecurity ? splitApiCollectionName : c.displayName;
+            if (filterType === 'browser-llm' || filterType === 'mcp-server') {
+                displayText = sourceId || c.sourceId || splitApiCollectionName;
+            } else if (filterType === 'ai-agent') {
+                displayText = serviceName || c.serviceName || splitApiCollectionName;
+            }
+
+            // Create displayNameComp - always create new one when filterType is provided to show correct text
+            const displayNameComp = (filterType ? null : c.displayNameComp) || (
                 <HorizontalStack gap="2" align="start">
-                    <Box maxWidth="30vw"><Text truncate fontWeight="medium">{c.displayName}</Text></Box>
+                    <Box maxWidth="30vw"><Text truncate fontWeight="medium">{displayText}</Text></Box>
                     {c.registryStatus === "available" && <Badge>Registry</Badge>}
                 </HorizontalStack>
             );
@@ -564,6 +592,10 @@ const transform = {
                 id: c.id,
                 nextUrl: '/dashboard/observe/inventory/' + c.id,
                 displayName: c.displayName,
+                splitApiCollectionName: splitApiCollectionName,
+                endpointId: endpointId,
+                sourceId: sourceId || c.sourceId,
+                serviceName: serviceName || c.serviceName,
                 displayNameComp: displayNameComp,
                 descriptionComp: descriptionComp,
                 outOfTestingScopeComp: outOfTestingScopeComp,
@@ -662,7 +694,7 @@ const transform = {
         } catch (error) {
             
         }
-        if(category.includes("MCP") || category.includes("Agentic")){
+        if(category.includes("MCP") || category.includes("Agentic") || category === CATEGORY_ENDPOINT_SECURITY){
             try {
                 const [path, tail = ""] = pathUrl.split(/(?=[?#])/); // keep ? or # in tail
                 const newPath = path
@@ -882,9 +914,9 @@ const transform = {
                             >
                                 <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
                                     <HorizontalStack gap="2" align="start" blockAlign="center">
-                                        <GetPrettifyEndpoint 
-                                            method={api.method} 
-                                            url={api.url} 
+                                        <GetPrettifyEndpoint
+                                            method={api.method}
+                                            url={api.url}
                                             isNew={false}
                                         />
                                     </HorizontalStack>
@@ -900,6 +932,19 @@ const transform = {
                 </td>
             </tr>
         )
+    },
+
+    splitCollectionNameForEndpointSecurity: (collectionName) => {
+        if (!collectionName || !collectionName.includes('.')) {
+            return { apiCollectionName: collectionName || '', endpointId: '', sourceId: '', serviceName: collectionName || '' };
+        }
+        const parts = collectionName.split('.');
+        return {
+            endpointId: parts[0],                    // <1>
+            sourceId: parts[1] || '',                // <2>
+            serviceName: parts.slice(2).join('.'),   // <3> (can contain dots)
+            apiCollectionName: parts.slice(1).join('.') // <2>.<3> for backward compatibility
+        };
     }
 }
 

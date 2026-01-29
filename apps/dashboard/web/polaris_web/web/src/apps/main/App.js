@@ -23,18 +23,20 @@ import Roles from "../dashboard/pages/settings/roles/Roles";
 import Postman from "../dashboard/pages/settings/integrations/Postman";
 import Jira from "../dashboard/pages/settings/integrations/Jira";
 import ApiTokens from "../dashboard/pages/settings/integrations/ApiTokens";
-import AktoGPT from "../dashboard/pages/settings/integrations/AktoGPT";
+// import AktoGPT from "../dashboard/pages/settings/integrations/AktoGPT";
 import GithubSso from "../dashboard/pages/settings/integrations/GithubSso";
 import GithubAppIntegration from "../dashboard/pages/settings/integrations/GithubAppIntegration";
 import HealthLogs from "../dashboard/pages/settings/health_logs/HealthLogs";
 import About from "../dashboard/pages/settings/about/About";
 import ThreatConfiguration from "../dashboard/pages/settings/threat_configuration/ThreatConfiguration";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
+import TrafficCollectorsMetrics from "../dashboard/pages/settings/metrics/TrafficCollectorsMetrics";
 import TestEditor from "../dashboard/pages/test_editor/TestEditor";
 import PromptHardening from "../dashboard/pages/prompt_hardening/PromptHardening";
 import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
 import IssuesPage from "../dashboard/pages/issues/IssuesPage/IssuesPage";
 import CompliancePage from "../dashboard/pages/issues/IssuesPage/CompliancePage";
+import ThreatCompliancePage from "../dashboard/pages/issues/IssuesPage/ThreatCompliancePage";
 import QuickStart from "../dashboard/pages/quick_start/QuickStart";
 import AgentTeam from "../dashboard/pages/agent_team/AgentTeam";
 import Webhooks from "../dashboard/pages/settings/integrations/webhooks/Webhooks";
@@ -45,10 +47,8 @@ import UserConfig from "../dashboard/pages/testing/user_config/UserConfig";
 import AuthTypes from "../dashboard/pages/settings/auth_types/AuthTypes";
 import DefaultPayloads from "../dashboard/pages/settings/default_payloads/DefaultPayloads";
 import AuthTypeDetails from "../dashboard/pages/settings/auth_types/AuthTypeDetails";
-import Tags from "../dashboard/pages/settings/tags/Tags";
 import Billing from "../dashboard/pages/settings/billing/Billing";
 import SelfHosted from "../dashboard/pages/settings/billing/SelfHosted";
-import TagDetails from "../dashboard/pages/settings/tags/TagDetails";
 import Onboarding from "../dashboard/pages/onboarding/Onboarding";
 import Dashboard from "../dashboard/pages/Dashboard";
 import Slack from "../dashboard/pages/settings/integrations/Slack";
@@ -75,6 +75,7 @@ import TokenValidator from "./TokenValidator"
 import {TableContextProvider} from "@/apps/dashboard/components/tables/TableContext";
 import VulnerabilityReport from "../dashboard/pages/testing/vulnerability_report/VulnerabilityReport";
 import ThreatDetectionPage from "../dashboard/pages/threat_detection/ThreatDetectionPage";
+import ThreatReport from "../dashboard/pages/threat_detection/threat_report/ThreatReport";
 
 import {PollingProvider} from "./PollingProvider";
 import Help from "../dashboard/pages/settings/help_and_support/Help";
@@ -115,6 +116,10 @@ import ThreatDashboardPage from "../dashboard/pages/threat_detection/ThreatDashb
 import OpenApiAgentTester from "../dashboard/pages/observe/OpenApiAgentTester";
 import DastProgress from "../dashboard/pages/observe/api_collections/DastProgress.jsx";
 import DastProgressSingle from "../dashboard/pages/observe/api_collections/DastProgressSingle.jsx";
+import AgenticMainPage from "../dashboard/pages/agentic/AgenticMainPage.jsx";
+import Endpoints from "../dashboard/pages/observe/agentic/Endpoints.jsx";
+import AgenticDashboard from "../dashboard/pages/dashboard/AgenticDashboard.jsx";
+import EndpointDashboard from "../dashboard/pages/dashboard/EndpointDashboard.jsx";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -130,6 +135,18 @@ const router = createBrowserRouter([
                     {
                         path: "home",
                         element: <HomeDashboard/>,
+                    },
+                    {
+                        path: "agentic-dashboard",
+                        element: <AgenticDashboard/>,
+                    },
+                    {
+                        path: "endpoint-dashboard",
+                        element: <EndpointDashboard/>,
+                    },
+                    {
+                        path: "view",
+                        element: <AgenticDashboard/>,
                     },
                     {
                         path: "testing",
@@ -182,6 +199,10 @@ const router = createBrowserRouter([
                             {
                                 path: "inventory",
                                 element: <ApiCollections/>
+                            },
+                            {
+                                path: "agentic-assets",
+                                element: <Endpoints/>
                             },
                             {
                                 path: "query_mode",
@@ -251,6 +272,10 @@ const router = createBrowserRouter([
                             {
                                 path: "compliance",
                                 element: <CompliancePage/>
+                            },
+                            {
+                                path: "threat",
+                                element: <ThreatCompliancePage/>
                             }
                         ]
                     },
@@ -288,6 +313,10 @@ const router = createBrowserRouter([
                                 element: <ConfigureIgnoredEventsPage/>
                             }
                         ]
+                    },
+                    {
+                        path: "ask-ai",
+                        element: <AgenticMainPage/>,
                     },
                     {
                         path: "quick-start",
@@ -354,6 +383,10 @@ const router = createBrowserRouter([
                         element: <Metrics/>,
                     },
                     {
+                        path: "traffic-collectors-metrics",
+                        element: <TrafficCollectorsMetrics/>,
+                    },
+                    {
                         path: "integrations/burp",
                         element: <BurpSuite/>,
                     },
@@ -409,10 +442,10 @@ const router = createBrowserRouter([
                         path: "integrations/akto_apis",
                         element: <ApiTokens/>,
                     },
-                    {
-                        path: "integrations/akto_gpt",
-                        element: <AktoGPT/>,
-                    },
+                    // {
+                    //     path: "integrations/akto_gpt",
+                    //     element: <AktoGPT/>,
+                    // },
                     {
                         path: "integrations/mcp_registry",
                         element: <McpRegistry/>,
@@ -546,6 +579,10 @@ const router = createBrowserRouter([
             {
                 path: "issues/summary/:reportId",
                 element: <VulnerabilityReport/>
+            },
+            {
+                path: "threat-detection/report/:reportId",
+                element: <ThreatReport/>
             }
         ],
         errorElement: <ErrorComponent/>
