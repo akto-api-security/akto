@@ -55,6 +55,7 @@ public class Constants {
     public static final String AI_AGENT_SOURCE_N8N = "N8N";
     public static final String AI_AGENT_SOURCE_LANGCHAIN = "LANGCHAIN";
     public static final String AI_AGENT_SOURCE_COPILOT_STUDIO = "COPILOT_STUDIO";
+    public static final String AI_AGENT_SOURCE_DATABRICS = "DATABRICKS";
     public static final String AI_AGENT_TAG_BOT_NAME = "bot-name";
     public static final String AI_AGENT_TAG_SOURCE = "source";
 
