@@ -3,7 +3,6 @@ package com.akto.metrics;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.dto.monitoring.ModuleInfo;
-import com.akto.dto.monitoring.ModuleInfoConstants;
 import com.akto.log.LoggerMaker;
 import com.akto.util.VersionUtil;
 
@@ -44,31 +43,28 @@ public class ModuleInfoWorker {
     private Map<String, Object> collectEnvironmentVariables(ModuleInfo.ModuleType moduleType) {
         Map<String, Object> envMap = new HashMap<>();
 
-        // Collect only whitelisted environment variables from ModuleInfoConstants
-        // Single source of truth for allowed environment variables
+        // Collect all environment variables to see any extra variables
         Map<String, String> systemEnv = System.getenv();
 
-        Map<String, String> allowedKeys = ModuleInfoConstants.ALLOWED_ENV_KEYS_BY_MODULE.get(moduleType);
-
-        if (allowedKeys != null) {
-            for (String key : allowedKeys.keySet()) {
-                String value = systemEnv.get(key);
-                if (value != null) {
-                    envMap.put(key, value);
-                }
-            }
+        for (Map.Entry<String, String> entry : systemEnv.entrySet()) {
+            envMap.put(entry.getKey(), entry.getValue());
         }
 
         return envMap;
     }
 
-    public static String getModuleName() {
-        if (!hostname.isEmpty()) {
-            return "akto-threat:" + hostname;
-        } else if (!podName.isEmpty() && !nodeName.isEmpty()) {
-            return "akto-threat:" + podName + ":" + nodeName;
-        } else {
-            return "akto-threat:" + UUID.randomUUID().toString();
+    public static String getModuleName(ModuleInfo.ModuleType moduleType) {
+        switch (moduleType) {
+            case THREAT_DETECTION:
+                if (!hostname.isEmpty()) {
+                    return "akto-threat:" + hostname;
+                } else if (!podName.isEmpty() && !nodeName.isEmpty()) {
+                    return "akto-threat:" + podName + ":" + nodeName;
+                } else {
+                    return "akto-threat:" + UUID.randomUUID().toString();
+                }
+            default:
+                return "Default_" + UUID.randomUUID().toString();
         }
     }
 
@@ -109,7 +105,7 @@ public class ModuleInfoWorker {
             loggerMaker.error("Error getting local version, skipping heartbeat check");
             return;
         }
-        String moduleName = getModuleName();
+        String moduleName = getModuleName(moduleType);
         loggerMaker.infoAndAddToDb("Starting heartbeat update for module:" + moduleType.name() + " with name:" + moduleName);
         ModuleInfoWorker infoWorker = new ModuleInfoWorker(moduleType, version, dataActor, moduleName);
         infoWorker.scheduleHeartBeatUpdate();
