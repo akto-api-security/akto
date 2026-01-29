@@ -304,24 +304,27 @@ export const DATABRICKS_FIELDS = [
     },
     {
         name: FIELD_DATABRICKS_CATALOG,
-        label: 'Unity Catalog Name (Optional)',
+        label: 'Unity Catalog Name',
         type: FIELD_TYPE_TEXT,
-        placeholder: 'main',
-        configKey: FIELD_DATABRICKS_CATALOG
+        placeholder: 'workspace',
+        configKey: FIELD_DATABRICKS_CATALOG,
+        defaultValue: "workspace"
     },
     {
         name: FIELD_DATABRICKS_SCHEMA,
-        label: 'Unity Catalog Schema (Optional)',
+        label: 'Unity Catalog Schema',
         type: FIELD_TYPE_TEXT,
         placeholder: 'default',
-        configKey: FIELD_DATABRICKS_SCHEMA
+        configKey: FIELD_DATABRICKS_SCHEMA,
+        defaultValue: 'default'
     },
     {
         name: FIELD_DATABRICKS_PREFIX,
         label: 'Table Prefix (Optional)',
         type: FIELD_TYPE_TEXT,
         placeholder: '',
-        configKey: FIELD_DATABRICKS_PREFIX
+        configKey: FIELD_DATABRICKS_PREFIX,
+        required: false
     },
     {
         name: FIELD_DATA_INGESTION_URL,
