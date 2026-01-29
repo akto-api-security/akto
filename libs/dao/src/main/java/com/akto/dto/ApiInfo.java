@@ -418,6 +418,10 @@ public class ApiInfo {
         if (url.contains("#")) {
             url = url.substring(0, url.indexOf("#"));
         }
+
+        if(url.startsWith("/")){
+            url = url.substring(1);
+        }
         if (url.endsWith("/")) {
             url = url.substring(0, url.length() - 1);
         }
