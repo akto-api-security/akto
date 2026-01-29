@@ -33,7 +33,6 @@ const PolicyDetailsStep = ({
 }) => {
     return (
         <VerticalStack gap="4">
-            <Text variant="headingMd">Guardrail policy details</Text>
             <FormLayout>
                 <TextField
                     label="Name"

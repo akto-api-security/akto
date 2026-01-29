@@ -25,7 +25,6 @@ const UsageGuardrailsStep = ({
 }) => {
     return (
         <VerticalStack gap="4">
-            <Text variant="headingMd">Usage based Guardrails</Text>
             <Text variant="bodyMd" tone="subdued">
                 Configure usage-based guardrails to control token limits and prevent abuse.
             </Text>

@@ -246,7 +246,6 @@ const ContentPolicyStep = ({
 
     return (
         <VerticalStack gap="4">
-            <Text variant="headingMd">Content & Policy Guardrails</Text>
             <Text variant="bodyMd" tone="subdued">
                 Configure content filtering and policy guardrails to protect against harmful content and policy violations.
             </Text>
