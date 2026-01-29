@@ -1,6 +1,9 @@
 package com.akto.action;
 
+import com.akto.audit_logs_util.Audit;
 import com.akto.devrev.DevRevIntegrationService;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
 import com.akto.dto.devrev_integration.DevRevIntegration;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.log.LoggerMaker;
@@ -65,6 +68,7 @@ public class DevRevIntegrationAction extends UserAction {
         }
     }
 
+    @Audit(description = "User removed DevRev integration", resource = Resource.DEVREV_INTEGRATION_SERVICE, operation = Operation.DELETE)
     public String removeDevRevIntegration() {
         try {
             DevRevIntegrationService devRevService = new DevRevIntegrationService();

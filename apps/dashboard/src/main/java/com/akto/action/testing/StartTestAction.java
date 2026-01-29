@@ -1,6 +1,7 @@
 package com.akto.action.testing;
 
 import com.akto.action.UserAction;
+import com.akto.audit_logs_util.Audit;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
@@ -13,6 +14,8 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
 import com.akto.dto.User;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.monitoring.ModuleInfo;
@@ -1119,6 +1122,7 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    @Audit(description = "User stopped a test", resource = Resource.TESTING_RUN, operation = Operation.UPDATE, metadataGenerators = {"getTestingRunHexId"})
     public String stopTest() {
         Bson filter = Filters.or(
                 Filters.eq(TestingRun.STATE, State.SCHEDULED),
@@ -1263,6 +1267,7 @@ public class StartTestAction extends UserAction {
         executorService.submit(r);
     }
 
+    @Audit(description = "User deleted test runs", resource = Resource.TEST_RESULTS, operation = Operation.DELETE, metadataGenerators = {"getTestRunIds"})
     public String deleteTestRunsAction() {
         try {
             List<ObjectId> testRunIdsCopy = new ArrayList<>();
@@ -1283,6 +1288,7 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    @Audit(description = "User deleted test runs from summaries", resource = Resource.TESTING_RUN, operation = Operation.DELETE, metadataGenerators = {"getLatestSummaryIds"})
     public String deleteTestDataFromSummaryId(){
         try {
             List<ObjectId> summaryIdsCopy = new ArrayList<>();

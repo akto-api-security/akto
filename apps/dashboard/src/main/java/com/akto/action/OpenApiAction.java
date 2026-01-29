@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import com.akto.audit_logs_util.Audit;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SampleDataDao;
@@ -17,6 +18,8 @@ import com.akto.dto.agents.Agent;
 import com.akto.dto.agents.DiscoveryAgentRun;
 import com.akto.dto.agents.Model;
 import com.akto.dto.agents.State;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
 import com.akto.dto.files.File;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
@@ -156,6 +159,7 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
     @Setter
     private boolean triggeredWithAIAgent;
 
+    @Audit(description = "User imported an OpenAPI specification", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"gApiCollectionId"})
     public String importDataFromOpenApiSpec(){
 
         int accountId = Context.accountId.get();
@@ -460,6 +464,10 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
 
 
         return SUCCESS.toUpperCase();
+    }
+
+    public int gApiCollectionId() {
+        return this.apiCollectionId;
     }
 
     public void setApiCollectionId(int apiCollectionId) {

@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import com.akto.audit_logs_util.Audit;
 import com.akto.dao.AzureBoardsIntegrationDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterConfigYamlParser;
@@ -11,6 +12,8 @@ import com.akto.dto.azure_boards_integration.AzureBoardsIntegration;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
@@ -374,6 +377,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    @Audit(description = "User removed Azure Boards integration", resource = Resource.AZURE_BOARDS_INTEGRATION, operation = Operation.DELETE)
     public String removeAzureBoardsIntegration() {
         AzureBoardsIntegrationDao.instance.deleteAll(new BasicDBObject());
         return Action.SUCCESS.toUpperCase();
