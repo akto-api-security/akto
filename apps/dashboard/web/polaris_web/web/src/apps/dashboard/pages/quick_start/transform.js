@@ -392,11 +392,11 @@ const huggingFaceObj = {
     icon: '/public/huggingFace.svg',
     label: "Hugging Face",
     text: "Import your Hugging Face models seamlessly into AKTO.",
-    docsUrl: 'https://akto.gitbook.io/agentic-security/~/revisions/G503LKq1u4sLMB1qUIRB/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-with-huggingface',
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-with-huggingface',
     key: "HUGGING_FACE",
     component : <BannerComponent
             content="Import your Hugging Face models, seamlessly in AKTO."
-            docsUrl='https://akto.gitbook.io/agentic-security/~/revisions/G503LKq1u4sLMB1qUIRB/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-with-huggingface'
+            docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-with-huggingface'
     />
 }
 
