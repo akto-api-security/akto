@@ -59,7 +59,7 @@ public class ModuleInfoWorker {
             return;
         }
         loggerMaker.infoAndAddToDb("Starting heartbeat update for module:" + moduleType.name());
-        ModuleInfoWorker infoWorker = new ModuleInfoWorker(moduleType, version, dataActor);
+        ModuleInfoWorker infoWorker = new ModuleInfoWorker(moduleType, "1.1.7-DIS-1.1.7", dataActor);
         infoWorker.scheduleHeartBeatUpdate();
     }
 }
