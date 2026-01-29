@@ -43,7 +43,7 @@ public class ModuleInfoAction extends UserAction {
 
     private static final int heartbeatThresholdSeconds = 5 * 60; // 5 minutes
     private static final int rebootThresholdSeconds = 2 * 60; // 2 minutes
-    private static final String _DEFAULT_PREFIX_REGEX_STRING = "^Default_";
+    private static final String _DEFAULT_PREFIX_REGEX_STRING = "^(Default_|akto-mr)";
 
     private List<Map<String, String>> allowedEnvFields;
 
@@ -191,7 +191,8 @@ public class ModuleInfoAction extends UserAction {
                 Filters.gte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, deltaTimeForReboot),
                 Filters.or(
                     Filters.regex(ModuleInfo.NAME, _DEFAULT_PREFIX_REGEX_STRING),
-                    Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.TRAFFIC_COLLECTOR.toString())
+                    Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.TRAFFIC_COLLECTOR.toString()),
+                    Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.THREAT_DETECTION.toString())
                 )
             );
 
