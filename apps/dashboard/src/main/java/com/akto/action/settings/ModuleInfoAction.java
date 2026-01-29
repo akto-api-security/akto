@@ -97,13 +97,12 @@ public class ModuleInfoAction extends UserAction {
 
         // Prepare allowed env fields list by combining all module-specific fields
         allowedEnvFields = new ArrayList<>();
-        for (Map.Entry<ModuleInfoConstants.ModuleCategory, Map<String, String>> moduleEntry : ModuleInfoConstants.ALLOWED_ENV_KEYS_BY_MODULE.entrySet()) {
+        for (Map.Entry<ModuleType, Map<String, String>> moduleEntry : ModuleInfoConstants.ALLOWED_ENV_KEYS_BY_MODULE.entrySet()) {
             for (Map.Entry<String, String> entry : moduleEntry.getValue().entrySet()) {
                 Map<String, String> field = new HashMap<>();
                 field.put("key", entry.getKey());
                 field.put("label", entry.getValue());
                 field.put("type", getFieldType(entry.getKey()));
-                field.put("moduleCategory", moduleEntry.getKey().name());
                 allowedEnvFields.add(field);
             }
         }
@@ -148,16 +147,14 @@ public class ModuleInfoAction extends UserAction {
 
             // Create filtered env map with only allowed keys for the module's type
             Map<String, Object> filteredEnv = new HashMap<>();
-            String moduleType = module.getModuleType().toString();
+            ModuleType moduleType = module.getModuleType();
 
-            for (Map.Entry<ModuleInfoConstants.ModuleCategory, Map<String, String>> moduleEntry : ModuleInfoConstants.ALLOWED_ENV_KEYS_BY_MODULE.entrySet()) {
-                if (moduleEntry.getKey().name().equals(moduleType)) {
-                    for (String key : moduleEntry.getValue().keySet()) {
-                        if (env.containsKey(key)) {
-                            filteredEnv.put(key, env.get(key));
-                        }
+            Map<String, String> allowedKeys = ModuleInfoConstants.ALLOWED_ENV_KEYS_BY_MODULE.get(moduleType);
+            if (allowedKeys != null) {
+                for (String key : allowedKeys.keySet()) {
+                    if (env.containsKey(key)) {
+                        filteredEnv.put(key, env.get(key));
                     }
-                    break;
                 }
             }
 
@@ -258,13 +255,9 @@ public class ModuleInfoAction extends UserAction {
             // Update each environment variable individually to preserve other env vars
             // Only allow whitelisted keys for security
             for (Map.Entry<String, String> entry : envData.entrySet()) {
-                boolean isAllowedKey = false;
-                for (Map<String, String> moduleEnvMap : ModuleInfoConstants.ALLOWED_ENV_KEYS_BY_MODULE.values()) {
-                    if (moduleEnvMap.containsKey(entry.getKey())) {
-                        isAllowedKey = true;
-                        break;
-                    }
-                }
+                boolean isAllowedKey = ModuleInfoConstants.ALLOWED_ENV_KEYS_BY_MODULE.values().stream()
+                    .anyMatch(moduleEnvMap -> moduleEnvMap.containsKey(entry.getKey()));
+
                 if (isAllowedKey) {
                     updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + ".env." + entry.getKey(), entry.getValue()));
                 }

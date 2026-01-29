@@ -48,9 +48,7 @@ public class ModuleInfoWorker {
         // Single source of truth for allowed environment variables
         Map<String, String> systemEnv = System.getenv();
 
-        // Determine which module category to use based on moduleType
-        ModuleInfoConstants.ModuleCategory category = getModuleCategoryForType(moduleType);
-        Map<String, String> allowedKeys = ModuleInfoConstants.ALLOWED_ENV_KEYS_BY_MODULE.get(category);
+        Map<String, String> allowedKeys = ModuleInfoConstants.ALLOWED_ENV_KEYS_BY_MODULE.get(moduleType);
 
         if (allowedKeys != null) {
             for (String key : allowedKeys.keySet()) {
@@ -62,17 +60,6 @@ public class ModuleInfoWorker {
         }
 
         return envMap;
-    }
-
-    private ModuleInfoConstants.ModuleCategory getModuleCategoryForType(ModuleInfo.ModuleType moduleType) {
-        switch (moduleType) {
-            case TRAFFIC_COLLECTOR:
-                return ModuleInfoConstants.ModuleCategory.TRAFFIC_COLLECTOR;
-            case THREAT_DETECTION:
-                return ModuleInfoConstants.ModuleCategory.THREAT_DETECTION;
-            default:
-                throw new IllegalArgumentException("Unsupported module type: " + moduleType);
-        }
     }
 
     public static String getModuleName() {

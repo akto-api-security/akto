@@ -5,16 +5,11 @@ import java.util.Map;
 
 public class ModuleInfoConstants {
 
-    public enum ModuleCategory {
-        TRAFFIC_COLLECTOR,
-        THREAT_DETECTION
-    }
-
     // Whitelist of environment variables that are safe to expose/collect
     // This is the single source of truth for allowed environment variables
     // Organized by module type
-    public static final Map<ModuleCategory, Map<String, String>> ALLOWED_ENV_KEYS_BY_MODULE = new HashMap<ModuleCategory, Map<String, String>>() {{
-        put(ModuleCategory.TRAFFIC_COLLECTOR, new HashMap<String, String>() {{
+    public static final Map<ModuleInfo.ModuleType, Map<String, String>> ALLOWED_ENV_KEYS_BY_MODULE = new HashMap<ModuleInfo.ModuleType, Map<String, String>>() {{
+        put(ModuleInfo.ModuleType.TRAFFIC_COLLECTOR, new HashMap<String, String>() {{
             put("AKTO_KAFKA_BROKER_MAL", "Kafka Broker MAL");
             put("AKTO_KAFKA_BROKER_URL", "Kafka Broker URL");
             put("AKTO_TRAFFIC_BATCH_SIZE", "Traffic Batch Size");
@@ -27,7 +22,7 @@ public class ModuleInfoConstants {
             put("AKTO_IGNORE_IP_TRAFFIC", "Ignore IP Traffic");
         }});
 
-        put(ModuleCategory.THREAT_DETECTION, new HashMap<String, String>() {{
+        put(ModuleInfo.ModuleType.THREAT_DETECTION, new HashMap<String, String>() {{
             put("AKTO_TRAFFIC_KAFKA_BOOTSTRAP_SERVER", "Traffic Kafka Bootstrap Server");
             put("AKTO_INTERNAL_KAFKA_BOOTSTRAP_SERVER", "Internal Kafka Bootstrap Server");
             put("AKTO_THREAT_DETECTION_LOCAL_REDIS_URI", "Local Redis URI");
