@@ -25,6 +25,9 @@ public class MemberRoleStrategy implements RoleStrategy{
                 accessMap.put(feature, access);
             }
         }
+
+        accessMap.put(Feature.API_TOKENS, ReadWriteAccess.READ_WRITE);
+
         RbacEnums.mergeUserFeaturesAccess(accessMap);
         return accessMap;
     }
