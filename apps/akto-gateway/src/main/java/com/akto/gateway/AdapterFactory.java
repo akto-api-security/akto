@@ -9,13 +9,16 @@ public class AdapterFactory {
 
     private static final Logger logger = LogManager.getLogger(AdapterFactory.class);
 
+    private static final String CONNECTOR_LITELLM = "litellm";
+    private static final String CONNECTOR_CLAUDE_CODE_CLI = "claude_code_cli";
+
     private final StandardGuardrailsAdapter standardAdapter;
-    private final LightLLMAdapter lightLLMAdapter;
+    private final LiteLLMAdapter liteLLMAdapter;
 
     public AdapterFactory(GuardrailsClient guardrailsClient) {
         this.standardAdapter = new StandardGuardrailsAdapter(guardrailsClient);
-        this.lightLLMAdapter = new LightLLMAdapter(guardrailsClient);
-        logger.info("AdapterFactory initialized with standard and lightllm adapters");
+        this.liteLLMAdapter = new LiteLLMAdapter(guardrailsClient);
+        logger.info("AdapterFactory initialized with standard and litellm adapters");
     }
 
     public GuardrailsAdapter selectAdapter(Map<String, Object> queryParams) {
@@ -29,9 +32,9 @@ public class AdapterFactory {
         if (connectorValue != null) {
             String connector = connectorValue.toString();
 
-            if ("lightllm".equalsIgnoreCase(connector)) {
-                logger.info("Selecting LightLLM adapter based on akto_connector=lightllm");
-                return lightLLMAdapter;
+            if (CONNECTOR_LITELLM.equalsIgnoreCase(connector) || CONNECTOR_CLAUDE_CODE_CLI.equalsIgnoreCase(connector)) {
+                logger.info("Selecting LiteLLM adapter based on akto_connector=litellm");
+                return liteLLMAdapter;
             }
         }
 
@@ -56,7 +59,7 @@ public class AdapterFactory {
         return standardAdapter;
     }
 
-    public LightLLMAdapter getLightLLMAdapter() {
-        return lightLLMAdapter;
+    public LiteLLMAdapter getLiteLLMAdapter() {
+        return liteLLMAdapter;
     }
 }
