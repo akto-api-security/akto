@@ -16,6 +16,7 @@ import GithubSource from "./components/GithubSource"
 import AktoJax from "./components/AktoJax"  
 import McpScan from "./components/McpScan" 
 import AiAgentScan from "./components/AiAgentScan"
+import AIAgentConnectorImport from "./components/AIAgentConnectorImport"
 import { isGenAISecurityCategory, isMCPSecurityCategory, isAgenticSecurityCategory, isDastCategory, isApiSecurityCategory, isEndpointSecurityCategory } from "../../../main/labelHelper"
 import McpRecon from "./components/McpRecon"
 import McpProxy from "./components/McpProxy"
@@ -24,7 +25,6 @@ import McpGateway from "./McpGateway"
 import AIAgentsGateway from "./AIAgentsGateway"
 import ImpervaImport from "./components/ImpervaImport"
 import BrowserExtension from "./components/BrowserExtension"
-import AIAgentConnectorImport from "./components/AIAgentConnectorImport"
 import CursorHook from "./components/CursorHook"
 import {
     CONNECTOR_TYPE_N8N,
@@ -44,7 +44,13 @@ import {
     DESCRIPTION_COPILOT_STUDIO,
     DOCS_URL_COPILOT_STUDIO,
     INTERVAL_COPILOT_STUDIO,
-    COPILOT_STUDIO_FIELDS
+    COPILOT_STUDIO_FIELDS,
+    CONNECTOR_TYPE_SNOWFLAKE,
+    CONNECTOR_NAME_SNOWFLAKE,
+    DESCRIPTION_SNOWFLAKE,
+    DOCS_URL_SNOWFLAKE,
+    INTERVAL_SNOWFLAKE,
+    SNOWFLAKE_FIELDS
 } from "./constants/aiAgentConnectorConstants"
 import DataDogConnector from "./components/DataDogConnector"
 
@@ -553,6 +559,22 @@ const mcpGateway = {
     docsUrl: 'https://ai-security-docs.akto.io/agentic-guardrails/overview/akto-mcp-proxy',
     key: "MCP_GATEWAY",
     component : <McpGateway/>
+}
+
+const snowflakeObj = {
+    icon: '/public/snowflake.svg',
+    label: "Snowflake",
+    text: "Connect to your Snowflake account to discover agents using Cortex and automatically fetch data for all Snowflake agents.",
+    docsUrl: DOCS_URL_SNOWFLAKE,
+    key: "SNOWFLAKE_IMPORT",
+    component: <AIAgentConnectorImport
+        connectorType={CONNECTOR_TYPE_SNOWFLAKE}
+        connectorName={CONNECTOR_NAME_SNOWFLAKE}
+        description={DESCRIPTION_SNOWFLAKE}
+        fields={SNOWFLAKE_FIELDS}
+        docsUrl={DOCS_URL_SNOWFLAKE}
+        recurringIntervalSeconds={INTERVAL_SNOWFLAKE}
+    />
 }
 
 const dockerObj = {
@@ -1673,7 +1695,7 @@ const quickStartFunc = {
 
         const aiAgentConnectors = [
             awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
-            n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj
+            n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj, snowflakeObj
         ]
 
         // MCP Scan
@@ -1772,7 +1794,7 @@ const quickStartFunc = {
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,
-            cloudflareWarpObj, zscalerObj
+            cloudflareWarpObj, zscalerObj, snowflakeObj
         ]
 
         if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
