@@ -6,6 +6,7 @@ const ModuleEnvConfigComponent = ({ title, description, module, allowedEnvFields
     const [envData, setEnvData] = useState({});
     const [initialEnvData, setInitialEnvData] = useState({});
     const [isSaveDisabled, setIsSaveDisabled] = useState(true);
+    const [filteredEnvFields, setFilteredEnvFields] = useState([]);
 
     useEffect(() => {
         if (module?.additionalData?.env) {
@@ -14,6 +15,15 @@ const ModuleEnvConfigComponent = ({ title, description, module, allowedEnvFields
             setInitialEnvData(initialData);
         }
     }, [module]);
+
+    useEffect(() => {
+        if (allowedEnvFields && module?.moduleType) {
+            const filtered = allowedEnvFields.filter(
+                field => field.moduleCategory === module.moduleType
+            );
+            setFilteredEnvFields(filtered);
+        }
+    }, [allowedEnvFields, module?.moduleType]);
 
     useEffect(() => {
         const hasChanges = JSON.stringify(envData) !== JSON.stringify(initialEnvData);
@@ -60,7 +70,7 @@ const ModuleEnvConfigComponent = ({ title, description, module, allowedEnvFields
             <Divider />
             <LegacyCard.Section>
                 <VerticalStack gap="4">
-                    {allowedEnvFields && allowedEnvFields.map((field) => {
+                    {filteredEnvFields && filteredEnvFields.map((field) => {
                         const fieldValue = envData[field.key] || "";
                         const isBoolean = field.type === "boolean";
 
