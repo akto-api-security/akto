@@ -1,5 +1,5 @@
 
-name: Data Ingestion Deployment 
+name: Data Ingestion Staging Deployment 
 
 # Controls when the workflow will run
 on:
