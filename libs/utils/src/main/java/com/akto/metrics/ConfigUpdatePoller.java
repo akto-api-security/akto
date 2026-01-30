@@ -52,7 +52,9 @@ public class ConfigUpdatePoller {
         }
 
         try {
-            List<ModuleInfo> moduleInfos = dataActor.fetchAndUpdateModuleForReboot(moduleType, moduleName);
+            // Pass null for THREAT_DETECTION, actual moduleName for mini-runtime
+            String miniRuntimeName = (moduleType == ModuleInfo.ModuleType.THREAT_DETECTION) ? null : moduleName;
+            List<ModuleInfo> moduleInfos = dataActor.fetchAndUpdateModuleForReboot(moduleType, miniRuntimeName);
             if (moduleInfos == null || moduleInfos.isEmpty()) {
                 return;
             }

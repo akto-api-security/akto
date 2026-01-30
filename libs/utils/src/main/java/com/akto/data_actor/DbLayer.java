@@ -492,16 +492,19 @@ public class DbLayer {
         DataIngestionLogsDao.instance.insertOne(log);
     }
 
-    public static List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String moduleName) {
+    public static List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName) {
+        // Require miniRuntimeName for targeted reboots - each instance checks its own flag
+        if (miniRuntimeName == null || miniRuntimeName.isEmpty()) {
+            return new ArrayList<>();
+        }
+        
         List<Bson> filters = new ArrayList<>();
         
         // Build filter based on provided parameters
         if (moduleType != null) {
             filters.add(Filters.eq(ModuleInfo.MODULE_TYPE, moduleType.toString()));
         }
-        if (moduleName != null && !moduleName.isEmpty()) {
-            filters.add(Filters.eq(ModuleInfo.NAME, moduleName));
-        }
+        filters.add(Filters.eq(ModuleInfo.MINI_RUNTIME_NAME, miniRuntimeName));
         
         // Only fetch modules with reboot flag set
         filters.add(Filters.eq(ModuleInfo._REBOOT, true));
