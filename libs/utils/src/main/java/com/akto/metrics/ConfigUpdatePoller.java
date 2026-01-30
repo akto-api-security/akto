@@ -1,5 +1,6 @@
 package com.akto.metrics;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -8,103 +9,120 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.google.gson.Gson;
 
 public class ConfigUpdatePoller {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ConfigUpdatePoller.class, LogDb.RUNTIME);
-    private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private static final Gson gson = new Gson();
+    private static final long POLL_INTERVAL_SECONDS = 20;
     private static final Random random = new Random();
     
-    private final ModuleInfo.ModuleType moduleType;
+    private final DataActor dataActor;
     private final String moduleName;
-    private Map<String, String> envVars = new HashMap<>();
+    private final Kafka kafkaProducer;
+    private final String configUpdateTopicName;
+    private final ScheduledExecutorService scheduler;
+    private final ModuleInfo.ModuleType moduleType;
 
-    private ConfigUpdatePoller(ModuleInfo.ModuleType moduleType, String moduleName) {
-        this.moduleType = moduleType;
+    public ConfigUpdatePoller(String moduleName, Kafka kafkaProducer, String configUpdateTopicName, ModuleInfo.ModuleType moduleType) {
+        this.dataActor = DataActorFactory.fetchInstance();
         this.moduleName = moduleName;
+        this.kafkaProducer = kafkaProducer;
+        this.configUpdateTopicName = configUpdateTopicName;
+        this.moduleType = moduleType;
+        this.scheduler = Executors.newSingleThreadScheduledExecutor();
+        loggerMaker.infoAndAddToDb("ConfigUpdatePoller: Initialized with kafka producer for topic: " + configUpdateTopicName);
     }
 
-    private void startPolling() {
-        // Add jitter to avoid thundering herd
-        int jitterSeconds = random.nextInt(10);
-        
+    public void start() {
+        loggerMaker.infoAndAddToDb("Starting config update poller for module: " + moduleName + " type: " + moduleType);
+
         scheduler.scheduleWithFixedDelay(() -> {
             try {
-                checkForConfigUpdates();
+                long jitter = random.nextInt(6);
+                if (jitter > 0) {
+                    Thread.sleep(jitter * 1000);
+                }
+
+                pollAndPublishConfigUpdates();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                loggerMaker.errorAndAddToDb(e, "Config update poller interrupted");
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error checking for config updates: " + e.getMessage(), LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e, "Error in config update poller");
             }
-        }, jitterSeconds, 20, TimeUnit.SECONDS);
-        
-        loggerMaker.infoAndAddToDb("Started config update poller for module: " + moduleType.name() + 
-                                   " with name: " + moduleName + " (initial delay: " + jitterSeconds + "s)");
+        }, 0, POLL_INTERVAL_SECONDS, TimeUnit.SECONDS);
     }
 
-    private void checkForConfigUpdates() {
-        DataActor dataActor = DataActorFactory.fetchInstance();
-        if (dataActor == null) {
-            loggerMaker.errorAndAddToDb("DataActor instance is null", LogDb.RUNTIME);
-            return;
-        }
-
+    private void pollAndPublishConfigUpdates() {
         try {
-            // Pass null for THREAT_DETECTION, actual moduleName for mini-runtime
+            // For THREAT_DETECTION pass null for miniRuntimeName, for TRAFFIC_COLLECTOR pass actual name
             String miniRuntimeName = (moduleType == ModuleInfo.ModuleType.THREAT_DETECTION) ? null : moduleName;
-            List<ModuleInfo> moduleInfos = dataActor.fetchAndUpdateModuleForReboot(moduleType, miniRuntimeName);
-            if (moduleInfos == null || moduleInfos.isEmpty()) {
-                return;
-            }
-
-            // Process the first matching module (should typically be only one)
-            ModuleInfo moduleInfo = moduleInfos.get(0);
             
-            if (!moduleInfo.isReboot()) {
+            List<ModuleInfo> moduleInfoList = dataActor.fetchAndUpdateModuleForReboot(
+                    moduleType,
+                    miniRuntimeName
+            );
+
+            if (moduleInfoList == null || moduleInfoList.isEmpty()) {
                 return;
             }
 
-            loggerMaker.infoAndAddToDb("Reboot flag detected for module: " + moduleName);
+            loggerMaker.infoAndAddToDb("Found " + moduleInfoList.size() + " module(s) with config updates for module: " + moduleName);
 
-            // Extract updated environment variables from additionalData
-            if (moduleInfo.getAdditionalData() != null && moduleInfo.getAdditionalData().containsKey("env")) {
-                Object envObj = moduleInfo.getAdditionalData().get("env");
+            // Collect all module names (for mini-runtime, these are daemon names)
+            List<String> moduleNames = new ArrayList<>();
+            for (ModuleInfo moduleInfo : moduleInfoList) {
+                moduleNames.add(moduleInfo.getName());
+            }
+
+            // Extract envVars from additionalData.env of the first module
+            Map<String, String> envVars = new HashMap<>();
+            if (!moduleInfoList.isEmpty() && moduleInfoList.get(0).getAdditionalData() != null) {
+                Map<String, Object> additionalData = moduleInfoList.get(0).getAdditionalData();
+                Object envObj = additionalData.get("env");
                 if (envObj instanceof Map) {
                     @SuppressWarnings("unchecked")
-                    Map<String, String> newEnvVars = (Map<String, String>) envObj;
-                    envVars = newEnvVars;
-                    
-                    loggerMaker.infoAndAddToDb("Received " + envVars.size() + " environment variable updates for module: " + moduleName);
-                    
-                    // Apply environment variables
-                    for (Map.Entry<String, String> entry : envVars.entrySet()) {
-                        String key = entry.getKey();
-                        String value = entry.getValue();
-                        System.setProperty(key, value);
-                        loggerMaker.infoAndAddToDb("Applied env var: " + key + " = " + value);
-                    }
+                    Map<String, String> env = (Map<String, String>) envObj;
+                    envVars = env;
                 }
             }
 
-            // Trigger shutdown to allow orchestrator (K8s/Docker) to restart
-            loggerMaker.infoAndAddToDb("Initiating shutdown for module: " + moduleName);
-            System.exit(0);
+            publishConfigUpdate(moduleNames, envVars);
 
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error in checkForConfigUpdates: " + e.getMessage(), LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb(e, "Error polling and publishing config updates");
         }
     }
 
-    public static void init(ModuleInfo.ModuleType moduleType, String moduleName) {
+    private void publishConfigUpdate(List<String> moduleNames, Map<String, String> envVars) {
         try {
-            loggerMaker.infoAndAddToDb("Initializing ConfigUpdatePoller for module: " + moduleType.name() + 
-                                       " with name: " + moduleName);
-            ConfigUpdatePoller poller = new ConfigUpdatePoller(moduleType, moduleName);
-            poller.startPolling();
+            if (kafkaProducer == null || !kafkaProducer.producerReady) {
+                loggerMaker.infoAndAddToDb("Kafka producer not ready, will retry in next poll cycle");
+                return;
+            }
+
+            Map<String, Object> configUpdate = new HashMap<>();
+            configUpdate.put("messageType", "ENV_RELOAD");
+            configUpdate.put("moduleType", moduleType.name());
+            configUpdate.put("moduleNames", moduleNames);
+            configUpdate.put("env", envVars);
+            configUpdate.put("timestamp", System.currentTimeMillis());
+
+            String message = gson.toJson(configUpdate);
+            kafkaProducer.send(message, configUpdateTopicName);
+
+            loggerMaker.infoAndAddToDb("Published config update for " + moduleNames.size() + " module(s) to topic: " + configUpdateTopicName);
+
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Failed to initialize ConfigUpdatePoller: " + e.getMessage(), LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb(e, "Error publishing config update");
         }
     }
 }

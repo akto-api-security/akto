@@ -47,7 +47,13 @@ public class ModuleInfoWorker {
         Map<String, String> systemEnv = System.getenv();
 
         for (Map.Entry<String, String> entry : systemEnv.entrySet()) {
-            envMap.put(entry.getKey(), entry.getValue());
+            String key = entry.getKey();
+            // Check System.getProperty() first (updated by ConfigUpdateConsumerTask), fallback to System.getenv()
+            String value = System.getProperty(key);
+            if (value == null) {
+                value = entry.getValue();
+            }
+            envMap.put(key, value);
         }
 
         return envMap;
@@ -77,15 +83,15 @@ public class ModuleInfoWorker {
         moduleInfo.setId(moduleInfo.getId());//Setting new uuid for id
         moduleInfo.setName(this.moduleName);
 
-        //Collect environment variables once at initialization
-        Map<String, Object> envVariables = collectEnvironmentVariables(this.moduleType);
-        Map<String, Object> additionalData = new HashMap<>();
-        if (!envVariables.isEmpty()) {
-            additionalData.put("env", envVariables);
-        }
-        moduleInfo.setAdditionalData(additionalData);
-
         scheduler.scheduleWithFixedDelay(() -> {
+            // Collect environment variables FRESH on each heartbeat to pick up ConfigUpdateConsumerTask changes
+            Map<String, Object> envVariables = _this.collectEnvironmentVariables(_this.moduleType);
+            Map<String, Object> additionalData = new HashMap<>();
+            if (!envVariables.isEmpty()) {
+                additionalData.put("env", envVariables);
+            }
+            moduleInfo.setAdditionalData(additionalData);
+            
             moduleInfo.setLastHeartbeatReceived(Context.now());
             assert _this.dataActor != null;
             _this.dataActor.updateModuleInfo(moduleInfo);
