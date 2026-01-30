@@ -2941,9 +2941,8 @@ public class InitializerListener implements ServletContextListener {
             if(planType== null || planType.isEmpty()){
                 String userDomain = organization.getAdminEmail().split("@")[1].toLowerCase();
                 OrganizationInfo orgInfo = domainToOrgInfoCache.get(userDomain);
-                if(orgInfo != null){
-                    planType = orgInfo.getPlanType();
-                    if(planType== null || planType.isEmpty()){
+                if(orgInfo == null){
+                       logger.debugAndAddToDb("Domain " +userDomain + "not found in cache",LogDb.DASHBOARD);
                         // Fetch all organizations with matching admin email domain
                         try {
                             List<Organization> orgsWithSameDomain = OrganizationsDao.instance.findAll(
@@ -2990,12 +2989,14 @@ public class InitializerListener implements ServletContextListener {
                                 logger.debugAndAddToDb("Set planType to: " + planType + " for original organization: " + organization.getId() + 
                                     " based on domain match with organization having valid planType (other metadata fields preserved from original org). Updated cache for domain: " + userDomain, LogDb.DASHBOARD);
                             } else {
-                                logger.debugAndAddToDb("No organization found with valid planType for domain: " + userDomain, LogDb.DASHBOARD);
+                                // Update the organization cache with current planType
+                                OrganizationInfo updatedOrgInfo = new OrganizationInfo(organization.getId(), organization.getAdminEmail(), planType);
+                                OrganizationCache.domainToOrgInfoCache.put(userDomain, updatedOrgInfo);
+                                logger.debugAndAddToDb("No organization found with valid planType for domain so adding data in cache with original planType: " + userDomain, LogDb.DASHBOARD);
                             }
                         } catch (Exception e) {
                             logger.errorAndAddToDb(e, "Error while fetching organizations by domain: " + userDomain);
                         }
-                    }
                 }
             }
             trialMsg = OrganizationUtils.fetchtrialMsg(metaData);
