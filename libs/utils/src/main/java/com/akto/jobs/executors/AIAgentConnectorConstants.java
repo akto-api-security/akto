@@ -14,12 +14,14 @@ public final class AIAgentConnectorConstants {
     public static final String CONNECTOR_TYPE_N8N = "N8N";
     public static final String CONNECTOR_TYPE_LANGCHAIN = "LANGCHAIN";
     public static final String CONNECTOR_TYPE_COPILOT_STUDIO = "COPILOT_STUDIO";
+    public static final String CONNECTOR_TYPE_DATABRICKS = "DATABRICKS";
     public static final String CONNECTOR_TYPE_SNOWFLAKE = "SNOWFLAKE";
 
     // Binary Names
     public static final String BINARY_NAME_N8N = "n8n-shield";
     public static final String BINARY_NAME_LANGCHAIN = "langchain-shield";
     public static final String BINARY_NAME_COPILOT_STUDIO = "copilot-shield";
+    public static final String BINARY_NAME_DATABRICKS = "databricks-shield";
     public static final String BINARY_NAME_SNOWFLAKE = "snowflake-shield";
 
     // Configuration Keys - N8N
@@ -52,6 +54,14 @@ public final class AIAgentConnectorConstants {
     public static final String SNOWFLAKE_AUTH_TYPE_PASSWORD = "PASSWORD";
     public static final String SNOWFLAKE_AUTH_TYPE_TOKEN = "TOKEN";
     public static final String SNOWFLAKE_AUTH_TYPE_KEY_PAIR = "KEY_PAIR";
+
+    // Configuration Keys - Databricks
+    public static final String CONFIG_DATABRICKS_HOST = "DATABRICKS_HOST";
+    public static final String CONFIG_DATABRICKS_CLIENT_ID = "DATABRICKS_CLIENT_ID";
+    public static final String CONFIG_DATABRICKS_CLIENT_SECRET = "DATABRICKS_CLIENT_SECRET";
+    public static final String CONFIG_DATABRICKS_CATALOG = "DATABRICKS_CATALOG";
+    public static final String CONFIG_DATABRICKS_SCHEMA = "DATABRICKS_SCHEMA";
+    public static final String CONFIG_DATABRICKS_PREFIX = "DATABRICKS_PREFIX";
 
     // Common Configuration Keys
     public static final String CONFIG_DATA_INGESTION_SERVICE_URL = "DATA_INGESTION_SERVICE_URL";
