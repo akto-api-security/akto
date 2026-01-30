@@ -1,5 +1,5 @@
 
-name: Data Ingestion Deployment 
+name: Data Ingestion Staging Deployment 
 
 # Controls when the workflow will run
 on:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       release_version_data_ingestion:
-        description: 'Release version for the Data Ingestion deployment'
+        description: 'Release version for the Data Ingestion staging deployment'
         required: false
       skipTests:
         description: 'Do you want to skip unit tests?'
