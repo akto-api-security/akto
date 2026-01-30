@@ -1,6 +1,7 @@
 package com.akto.action.testing;
 
 import com.akto.action.UserAction;
+import com.akto.audit_logs_util.Audit;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
@@ -10,6 +11,8 @@ import com.akto.dao.testing.config.TestCollectionPropertiesDao;
 import com.akto.dto.RBAC;
 import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.User;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
@@ -190,6 +193,7 @@ public class TestRolesAction extends UserAction {
         return role;
     }
 
+    @Audit(description = "User deleted a test role", resource = Resource.TEST_ROLE, operation = Operation.DELETE, metadataGenerators = {"getRoleName"})
     public String deleteTestRole() {
         loggerMaker.debugAndAddToDb("Started deleting role: " + roleName, LoggerMaker.LogDb.DASHBOARD);
         TestRoles role = getRole();
@@ -339,6 +343,8 @@ public class TestRolesAction extends UserAction {
     }
 
     private int index;
+
+    @Audit(description = "User deleted an auth mechanism from a test role", resource = Resource.TEST_ROLE, operation = Operation.DELETE, metadataGenerators = {"getRoleName"})
     public String deleteAuthFromRole() {
         TestRoles role = getRole();
         if (role == null) {

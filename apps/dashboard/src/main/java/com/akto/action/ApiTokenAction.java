@@ -1,10 +1,13 @@
 package com.akto.action;
 
+import com.akto.audit_logs_util.Audit;
 import com.akto.dao.ApiTokensDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dto.ApiToken;
 import com.akto.dto.ApiToken.Utility;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
 import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.SingleTypeInfo;
@@ -30,6 +33,7 @@ public class ApiTokenAction extends UserAction implements ServletRequestAware {
     private static final RandomString randomString = new RandomString(keyLength);
     private ApiToken.Utility tokenUtility;
 
+    @Audit(description = "User added an API token", resource = Resource.API_TOKEN, operation = Operation.CREATE, metadataGenerators = {"getTokenUtility"})
     public String addApiToken() {
         String username = getSUser().getLogin();
         String apiKey = randomString.nextString();
@@ -54,6 +58,8 @@ public class ApiTokenAction extends UserAction implements ServletRequestAware {
 
     private int apiTokenId;
     private boolean apiTokenDeleted;
+
+    @Audit(description = "User deleted an API token", resource = Resource.API_TOKEN, operation = Operation.DELETE)
     public String deleteApiToken() {
         String username = getSUser().getLogin();
         DeleteResult deleteResult = ApiTokensDao.instance.getMCollection().deleteOne(

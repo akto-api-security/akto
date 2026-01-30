@@ -4,9 +4,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.akto.action.UserAction;
+import com.akto.audit_logs_util.Audit;
 import com.akto.dao.agents.AgentModelDao;
 import com.akto.dto.agents.Model;
 import com.akto.dto.agents.ModelType;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
 import com.opensymphony.xwork2.Action;
 
 public class ModelAction extends UserAction {
@@ -72,6 +75,7 @@ public class ModelAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    @Audit(description = "User deleted an agent model", resource = Resource.AI_AGENTS, operation = Operation.DELETE, metadataGenerators = {"getName"})
     public String deleteAgentModel() {
         if (name == null || name.isEmpty()) {
             addActionError("Please add a model name");
