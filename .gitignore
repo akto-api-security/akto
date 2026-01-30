@@ -31,3 +31,4 @@ run-threat-consumer.sh
 run-account-jobs.sh
 run-data-ingestion.sh
 CLAUDE.md
+run-account-job-executor.sh
