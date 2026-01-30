@@ -54,7 +54,7 @@ public class ClientActor extends DataActor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ClientActor.class);
     private static final int maxConcurrentBatchWrites = 150;
     private static final Gson gson = new Gson();
-    public static final String CYBORG_URL = "http://localhost:5678";
+    public static final String CYBORG_URL = "https://cyborg.akto.io";
     private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
     private static ExecutorService logThreadPool = Executors.newFixedThreadPool(50);
     private static AccountSettings accSettings;
