@@ -388,6 +388,18 @@ const customAIObj = {
     />
 }
 
+const huggingFaceObj = {
+    icon: '/public/huggingFace.svg',
+    label: "Hugging Face",
+    text: "Import your Hugging Face models seamlessly into AKTO.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-with-huggingface',
+    key: "HUGGING_FACE",
+    component : <BannerComponent
+            content="Import your Hugging Face models, seamlessly in AKTO."
+            docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-with-huggingface'
+    />
+}
+
 // AI Agent Platform Objects
 const awsBedrockObj = {
     icon: '/public/aws_bedrock.svg',
@@ -1685,7 +1697,7 @@ const quickStartFunc = {
         ];
 
         const aiScanConnectors = [
-            geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj
+            geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj, huggingFaceObj
         ]
 
         const agenticProxies = [
@@ -1799,7 +1811,7 @@ const quickStartFunc = {
 
         if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
             connectorsList = connectorsList.concat([
-                geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj,
+                geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj, huggingFaceObj,
                 awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
                 n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj,kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj,
                 apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj
