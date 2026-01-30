@@ -1,9 +1,12 @@
 package com.akto.action;
 
 
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.KafkaHealthMetricsDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.billing.OrganizationsDao;
+import com.akto.dao.context.Context;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.KafkaHealthMetric;
 import com.akto.dto.billing.Organization;
 import com.akto.listener.InfraMetricsListener;
@@ -52,6 +55,17 @@ public class InfraMetricsAction implements Action,ServletResponseAware, ServletR
         if(organization != null){
             orgId = redact(organization.getId());
         }
+
+        Context.accountId.set(1_000_000);
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        if (accountSettings != null && accountSettings.getDashboardVersion() != null) {
+            out.append("Dashboard version: ").append(accountSettings.getDashboardVersion()).append("\n");
+        }
+
+        if (accountSettings != null && accountSettings.getApiRuntimeVersion() != null) {
+            out.append("Runtime version: ").append(accountSettings.getApiRuntimeVersion()).append("\n");
+        }
+
         out.append("orgId: ").append(orgId).append("\n");
         boolean telemetryConnectivity = telemetryConnectivityFuture.get();
         boolean usageConnectivity = usageConnectivityFuture.get();
