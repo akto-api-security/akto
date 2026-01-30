@@ -15,6 +15,7 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.testing.ComplianceMapping;
+import com.akto.dto.threat_detection.ThreatComplianceInfo;
 import com.akto.action.threat_detection.AbstractThreatDetectionAction;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.listener.RuntimeListener;
@@ -22,6 +23,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
+import com.akto.util.TimePeriodUtils;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
@@ -33,12 +35,6 @@ import lombok.Setter;
 
 import java.util.*;
 import java.util.stream.Collectors;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.time.temporal.WeekFields;
-import java.util.Locale;
 
 public class AgenticDashboardAction extends AbstractThreatDetectionAction {
 
@@ -210,6 +206,122 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
         }
     }
 
+    /**
+     * Fetch guardrail/posture dashboard specific metrics
+     */
+    public String fetchGuardrailData() {
+        try {
+            if (endTimestamp == 0) {
+                endTimestamp = Context.now();
+            }
+            long daysBetween = (endTimestamp - startTimestamp) / Constants.ONE_DAY_TIMESTAMP;
+            Set<Integer> demoCollections = getDemoCollections();
+
+            // Fetch all malicious events once within the time range
+            List<DashboardMaliciousEvent> allThreats = fetchAllMaliciousEvents(startTimestamp, endTimestamp, demoCollections);
+
+            // Fetch threat compliance data
+            Map<String, ThreatComplianceInfo> threatComplianceMap =
+                    com.akto.util.GuardrailMetricsProcessor.fetchThreatComplianceMap();
+
+            // Process all guardrail metrics in a single optimized pass
+            com.akto.util.GuardrailMetricsProcessor.GuardrailMetrics metrics =
+                    com.akto.util.GuardrailMetricsProcessor.processGuardrailMetrics(
+                            allThreats, startTimestamp, endTimestamp, daysBetween, threatComplianceMap);
+
+            response.put("topGuardrailPolicies", metrics.topGuardrailPolicies);
+            response.put("dataProtectionTrends", metrics.dataProtectionTrends);
+            response.put("avgThreatScore", metrics.avgThreatScore);
+            response.put("sensitiveCount", metrics.sensitiveCount);
+            response.put("successfulExploits", metrics.successfulExploits);
+            response.put("complianceAtRisks", metrics.complianceAtRisks);
+
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching guardrail data: " + e.getMessage());
+            addActionError("Error fetching guardrail data: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * API: Fetch attack flows for map visualization
+     * Returns source and destination country codes with attack types
+     * Collection: MaliciousEventDao
+     */
+    public String fetchAttackFlows() {
+        try {
+            if (endTimestamp == 0) {
+                endTimestamp = Context.now();
+            }
+            Set<Integer> demoCollections = getDemoCollections();
+
+            List<DashboardMaliciousEvent> allThreats = fetchAllMaliciousEvents(startTimestamp, endTimestamp, demoCollections);
+
+            List<DashboardMaliciousEvent> guardrailEvents = allThreats.stream()
+                .filter(event -> "GUARDRAIL".equalsIgnoreCase(event.getLabel()))
+                .collect(Collectors.toList());
+
+            Map<String, Map<String, Long>> countryAttackCounts = new HashMap<>();
+            for (DashboardMaliciousEvent event : guardrailEvents) {
+                String sourceCountry = event.getCountry();
+                if (sourceCountry == null || sourceCountry.isEmpty()) {
+                    continue;
+                }
+
+                String attackType = event.getSubCategory();
+                if (attackType == null || attackType.isEmpty()) {
+                    attackType = event.getCategory();
+                }
+                if (attackType == null || attackType.isEmpty()) {
+                    attackType = "Unknown";
+                }
+
+                countryAttackCounts.putIfAbsent(sourceCountry, new HashMap<>());
+                Map<String, Long> attackCounts = countryAttackCounts.get(sourceCountry);
+                attackCounts.put(attackType, attackCounts.getOrDefault(attackType, 0L) + 1);
+            }
+
+            List<BasicDBObject> attackFlows = new ArrayList<>();
+            String destinationCountry = "US"; // TODO: Make this configurable or detect from deployment
+
+            for (Map.Entry<String, Map<String, Long>> countryEntry : countryAttackCounts.entrySet()) {
+                String sourceCountry = countryEntry.getKey();
+                Map<String, Long> attackCounts = countryEntry.getValue();
+
+                Map.Entry<String, Long> topAttack = attackCounts.entrySet().stream()
+                    .max(Map.Entry.comparingByValue())
+                    .orElse(null);
+
+                if (topAttack != null) {
+                    BasicDBObject flow = new BasicDBObject();
+                    flow.put("sourceCountry", sourceCountry);
+                    flow.put("destinationCountry", destinationCountry);
+                    flow.put("attackType", topAttack.getKey());
+                    flow.put("count", topAttack.getValue());
+                    attackFlows.add(flow);
+                }
+            }
+
+            attackFlows.sort((a, b) -> {
+                long countA = a.getLong("count", 0L);
+                long countB = b.getLong("count", 0L);
+                return Long.compare(countB, countA);
+            });
+
+            if (attackFlows.size() > 20) {
+                attackFlows = attackFlows.subList(0, 20);
+            }
+
+            response.put("attackFlows", attackFlows);
+
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching attack flows: " + e.getMessage());
+            addActionError("Error fetching attack flows: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+    }
 
 
     private List<BasicDBObject> fetchIssuesOverTime(int startTimestamp, int endTimestamp, long daysBetween, List<TestingRunIssues> allIssues) {
@@ -224,7 +336,7 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                 .collect(Collectors.toList());
             
             // Group by time period in Java
-            Map<String, Long> timePeriodMap = groupByTimePeriod(creationTimestamps, daysBetween);
+            Map<String, Long> timePeriodMap = TimePeriodUtils.groupByTimePeriod(creationTimestamps, daysBetween);
             
             // Convert to result format
             result = convertTimePeriodMapToResult(timePeriodMap, daysBetween);
@@ -451,8 +563,8 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             }
             
             // Group by time period in Java
-            Map<String, Long> testedTimePeriodMap = groupByTimePeriod(testedTimestamps, daysBetween);
-            Map<String, Long> nonTestedTimePeriodMap = groupByTimePeriod(nonTestedTimestamps, daysBetween);
+            Map<String, Long> testedTimePeriodMap = TimePeriodUtils.groupByTimePeriod(testedTimestamps, daysBetween);
+            Map<String, Long> nonTestedTimePeriodMap = TimePeriodUtils.groupByTimePeriod(nonTestedTimestamps, daysBetween);
             
             // Convert to result format
             List<BasicDBObject> testedData = convertTimePeriodMapToResult(testedTimePeriodMap, daysBetween);
@@ -595,8 +707,8 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             }
             
             // Group by time period in Java
-            Map<String, Long> openTimePeriodMap = groupByTimePeriod(openTimestamps, daysBetween);
-            Map<String, Long> resolvedTimePeriodMap = groupByTimePeriod(resolvedTimestamps, daysBetween);
+            Map<String, Long> openTimePeriodMap = TimePeriodUtils.groupByTimePeriod(openTimestamps, daysBetween);
+            Map<String, Long> resolvedTimePeriodMap = TimePeriodUtils.groupByTimePeriod(resolvedTimestamps, daysBetween);
             
             // Convert to result format
             List<BasicDBObject> openData = convertTimePeriodMapToResult(openTimePeriodMap, daysBetween);
@@ -1168,8 +1280,8 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             }
             
             // Group by time period in Java
-            Map<String, Long> openTimePeriodMap = groupByTimePeriod(openTimestamps, daysBetween);
-            Map<String, Long> resolvedTimePeriodMap = groupByTimePeriod(resolvedTimestamps, daysBetween);
+            Map<String, Long> openTimePeriodMap = TimePeriodUtils.groupByTimePeriod(openTimestamps, daysBetween);
+            Map<String, Long> resolvedTimePeriodMap = TimePeriodUtils.groupByTimePeriod(resolvedTimestamps, daysBetween);
             
             // Convert to result format
             List<BasicDBObject> openData = convertTimePeriodMapToResult(openTimePeriodMap, daysBetween);
@@ -1186,6 +1298,15 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
     }
 
 
+    /**
+     * Internal method: Fetch common agentic components grouped by collection
+     * Groups API endpoints by collection, counts them, and returns top N sorted by count
+     *
+     * @param startTimestamp Start time filter
+     * @param endTimestamp End time filter
+     * @param componentType Type of component: MCP_SERVERS, LLMS, AI_AGENTS
+     * @return List of {name, count} objects sorted by count descending
+     */
     // ========== Helper Methods ==========
 
     private Set<Integer> getDeactivatedCollections() {
@@ -1311,43 +1432,6 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
     }
 
     // ========== Java-based Time Grouping Utilities ==========
-
-    /**
-     * Get time period key for grouping (day/week/month based on daysBetween)
-     */
-    private String getTimePeriodKey(int timestamp, long daysBetween) {
-        LocalDate date = Instant.ofEpochSecond(timestamp).atZone(ZoneId.systemDefault()).toLocalDate();
-        
-        if (daysBetween <= 15) {
-            // Day grouping: return "D_YYYY-MM-DD" to explicitly indicate day type
-            return "D_" + date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-        } else if (daysBetween <= 105) {
-            // Week grouping: return "W_YYYY_W" to explicitly indicate week type
-            WeekFields weekFields = WeekFields.of(Locale.getDefault());
-            int week = date.get(weekFields.weekOfWeekBasedYear());
-            int year = date.get(weekFields.weekBasedYear());
-            return "W_" + year + "_" + week;
-        } else {
-            // Month grouping: return "M_YYYY_M" to explicitly indicate month type
-            int year = date.getYear();
-            int month = date.getMonthValue();
-            return "M_" + year + "_" + month;
-        }
-    }
-
-    /**
-     * Group data by time period in Java
-     */
-    private Map<String, Long> groupByTimePeriod(List<Integer> timestamps, long daysBetween) {
-        Map<String, Long> result = new HashMap<>();
-        for (Integer timestamp : timestamps) {
-            if (timestamp != null && timestamp > 0) {
-                String key = getTimePeriodKey(timestamp, daysBetween);
-                result.put(key, result.getOrDefault(key, 0L) + 1);
-            }
-        }
-        return result;
-    }
 
     /**
      * Convert time period map to BasicDBObject list format
