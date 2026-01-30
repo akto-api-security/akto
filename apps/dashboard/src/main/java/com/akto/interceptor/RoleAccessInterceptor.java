@@ -185,7 +185,7 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
 
                                 String formattedMetadataKey = metadataGenerator;
 
-                                String[] prefixes = { "get", "is", "g" };
+                                String[] prefixes = { "get", "is" };
                                 for (String prefix : prefixes) {
                                     if (metadataGenerator.startsWith(prefix) && metadataGenerator.length() > prefix.length()) {
                                         String withoutPrefix = metadataGenerator.substring(prefix.length());

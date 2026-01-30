@@ -53,7 +53,7 @@ public class HarAction extends UserAction {
     }
 
     @Override
-    @Audit(description = "User uploaded a HAR file", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"gApiCollectionId"})
+    @Audit(description = "User uploaded a HAR file", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"getApiCollectionId"})
     public String execute() throws IOException {
         if (DashboardMode.isKubernetes()) {
             skipKafka = true;
@@ -165,7 +165,7 @@ public class HarAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public int gApiCollectionId() {
+    public int getApiCollectionId() {
         return this.apiCollectionId;
     }
 

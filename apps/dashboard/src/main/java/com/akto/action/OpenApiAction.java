@@ -159,7 +159,7 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
     @Setter
     private boolean triggeredWithAIAgent;
 
-    @Audit(description = "User imported an OpenAPI specification", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"gApiCollectionId"})
+    @Audit(description = "User imported an OpenAPI specification", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"getApiCollectionId"})
     public String importDataFromOpenApiSpec(){
 
         int accountId = Context.accountId.get();
@@ -466,7 +466,7 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
         return SUCCESS.toUpperCase();
     }
 
-    public int gApiCollectionId() {
+    public int getApiCollectionId() {
         return this.apiCollectionId;
     }
 
