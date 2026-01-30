@@ -45,6 +45,12 @@ import {
     DOCS_URL_COPILOT_STUDIO,
     INTERVAL_COPILOT_STUDIO,
     COPILOT_STUDIO_FIELDS,
+    CONNECTOR_TYPE_DATABRICKS,
+    CONNECTOR_NAME_DATABRICKS,
+    DESCRIPTION_DATABRICKS,
+    DOCS_URL_DATABRICKS,
+    INTERVAL_DATABRICKS,
+    DATABRICKS_FIELDS,
     CONNECTOR_TYPE_SNOWFLAKE,
     CONNECTOR_NAME_SNOWFLAKE,
     DESCRIPTION_SNOWFLAKE,
@@ -1021,6 +1027,22 @@ const copilotStudioImportObj = {
     />
 }
 
+const databricksImportObj = {
+    icon: '/public/databricks.svg',
+    label: "Databricks",
+    text: "Use our Databricks feature to capture traffic from serving endpoint inference tables and instantly send it to your dashboard for real-time insights.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/databrics',
+    key: "DATABRICKS_IMPORT",
+    component: <AIAgentConnectorImport
+        connectorType={CONNECTOR_TYPE_DATABRICKS}
+        connectorName={CONNECTOR_NAME_DATABRICKS}
+        description={DESCRIPTION_DATABRICKS}
+        fields={DATABRICKS_FIELDS}
+        docsUrl={DOCS_URL_DATABRICKS}
+        recurringIntervalSeconds={INTERVAL_DATABRICKS}
+    />
+}
+
 const litellmImportObj = {
     icon: '/public/litellm.svg',
     label: "LiteLLM",
@@ -1707,7 +1729,7 @@ const quickStartFunc = {
 
         const aiAgentConnectors = [
             awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
-            n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj, snowflakeObj
+            n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj, snowflakeObj, databricksImportObj
         ]
 
         // MCP Scan
@@ -1796,13 +1818,13 @@ const quickStartFunc = {
     getConnectorsList: function () {
 
         if(func.checkLocal() || func.isLimitedAccount()){
-            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj]
+            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj, databricksImportObj]
         }
 
         // Combine all categories into connectorsList
         let connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj,
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj, databricksImportObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,
@@ -1813,7 +1835,7 @@ const quickStartFunc = {
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj, huggingFaceObj,
                 awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
-                n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj,kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj,
+                n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj, databricksImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj,
                 apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj
             ])
         }

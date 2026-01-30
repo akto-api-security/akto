@@ -59,6 +59,14 @@ public class AIAgentConnectorImportAction extends UserAction {
     private String snowflakeDatabase;
     private String snowflakeSchema;
 
+    // Databricks-specific parameters
+    private String databricksHost;
+    private String databricksClientId;
+    private String databricksClientSecret;
+    private String databricksCatalog;
+    private String databricksSchema;
+    private String databricksPrefix;
+
     /**
      * Unified method to initiate import for any AI Agent Connector.
      * The connector type is determined by the connectorType parameter.
@@ -213,6 +221,21 @@ public class AIAgentConnectorImportAction extends UserAction {
                 if (snowflakeSchema != null && !snowflakeSchema.isEmpty()) {
                     config.put(CONFIG_SNOWFLAKE_SCHEMA, snowflakeSchema);
                 }
+                break;
+
+            case CONNECTOR_TYPE_DATABRICKS:
+                if (databricksHost == null || databricksHost.isEmpty() ||
+                    databricksClientId == null || databricksClientId.isEmpty() ||
+                    databricksClientSecret == null || databricksClientSecret.isEmpty()) {
+                    loggerMaker.error("Missing required Databricks configuration", LogDb.DASHBOARD);
+                    return null;
+                }
+                config.put(CONFIG_DATABRICKS_HOST, databricksHost);
+                config.put(CONFIG_DATABRICKS_CLIENT_ID, databricksClientId);
+                config.put(CONFIG_DATABRICKS_CLIENT_SECRET, databricksClientSecret);
+                config.put(CONFIG_DATABRICKS_CATALOG, databricksCatalog != null ? databricksCatalog : "main");
+                config.put(CONFIG_DATABRICKS_SCHEMA, databricksSchema != null ? databricksSchema : "default");
+                config.put(CONFIG_DATABRICKS_PREFIX, databricksPrefix != null ? databricksPrefix : "");
                 break;
 
             default:
