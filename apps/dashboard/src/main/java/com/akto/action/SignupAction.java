@@ -316,6 +316,19 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     String email;
     String invitationCode;
 
+    public static int findUsersLimit(String email) {
+        HashMap<String, Integer> domainsToBaselineUsersMap = new HashMap<>();
+        domainsToBaselineUsersMap.put("loom.com", 50);
+        domainsToBaselineUsersMap.put("atlassian.com", 50);
+
+        String[] emailSplit = email.split("@");
+        if (emailSplit.length < 2) return 0;
+        String domain = emailSplit[1];
+        domain = domain.toLowerCase();
+        loggerMaker.infoAndAddToDb("Email Domain: " + domain, LogDb.DASHBOARD);
+        return domainsToBaselineUsersMap.getOrDefault(domain, 0);
+    }
+
     public String registerViaEmail() {
         code = "";
         if (password != null ) {
@@ -358,9 +371,14 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         } else {
             if (!InitializerListener.isSaas) {
                 long countUsers = UsersDao.instance.getMCollection().countDocuments();
-                if (countUsers > 0) {
+                int limitUsers = findUsersLimit(email);
+                loggerMaker.infoAndAddToDb("Users limit: " + limitUsers, LogDb.DASHBOARD);
+                if (countUsers > limitUsers) {
                     code = "Ask admin to invite you";
                     return ERROR.toUpperCase();
+                } else {
+                    RBAC adminRBAC = RBACDao.instance.findOne(new BasicDBObject());
+                    if (adminRBAC != null) invitedToAccountId = adminRBAC.getAccountId();
                 }
             }
         }
