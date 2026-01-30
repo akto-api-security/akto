@@ -5,6 +5,7 @@ import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
 import static com.akto.task.Cluster.callDibs;
 import static com.akto.utils.Utils.deleteApis;
 import static com.akto.utils.billing.OrganizationUtils.syncOrganizationWithAkto;
+import static com.akto.utils.crons.OrganizationCache.domainToOrgInfoCache;
 import static com.mongodb.client.model.Filters.eq;
 
 import java.io.*;
@@ -16,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.attribute.FileTime;
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.regex.Pattern;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -125,6 +127,7 @@ import com.akto.util.enums.GlobalEnums.TemplatePlan;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.util.filter.DictionaryFilter;
+import com.akto.util.OrganizationInfo;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.util.tasks.OrganizationTask;
 import com.akto.utils.Auth0;
@@ -2943,6 +2946,67 @@ public class InitializerListener implements ServletContextListener {
             gracePeriod = OrganizationUtils.fetchOrgGracePeriodFromMetaData(metaData);
             hotjarSiteId = OrganizationUtils.fetchHotjarSiteId(metaData);
             planType = OrganizationUtils.fetchplanType(metaData);
+
+            if(planType== null || planType.isEmpty()){
+                String userDomain = organization.getAdminEmail().split("@")[1].toLowerCase();
+                OrganizationInfo orgInfo = domainToOrgInfoCache.get(userDomain);
+                if(orgInfo != null){
+                    planType = orgInfo.getPlanType();
+                    if(planType== null || planType.isEmpty()){
+                        // Fetch all organizations with matching admin email domain
+                        try {
+                            List<Organization> orgsWithSameDomain = OrganizationsDao.instance.findAll(
+                                Filters.regex(Organization.ADMIN_EMAIL, ".*@" + Pattern.quote(userDomain) + "$", "i"),
+                                Projections.include(Organization.ID, Organization.ADMIN_EMAIL, Organization.PLAN_TYPE)
+                            );
+                            
+                            // Find the first organization with non-empty, non-null planType by hitting billing API
+                            String validPlanType = null;
+                            for (Organization org : orgsWithSameDomain) {
+                                try {
+                                    // Hit the billing API to fetch organization metadata ONLY for planType extraction
+                                    // This is separate from original organization's metadata and used only for planType lookup
+                                    BasicDBObject domainOrgMetaData = OrganizationUtils.fetchOrgMetaData(org.getId(), org.getAdminEmail());
+                                    if (domainOrgMetaData != null) {
+                                        // Extract planType ONLY from this domain-based organization metadata
+                                        String domainOrgPlanType = OrganizationUtils.fetchplanType(domainOrgMetaData);
+                                        if (domainOrgPlanType != null && !domainOrgPlanType.isEmpty() && !"planType".equals(domainOrgPlanType)) {
+                                            validPlanType = domainOrgPlanType;
+                                            logger.debugAndAddToDb("Found valid planType: " + validPlanType + " from domain organization: " + org.getId() + 
+                                                " for domain: " + userDomain + " via billing API (used only for planType, not other fields)", LogDb.DASHBOARD);
+                                            break;
+                                        } else {
+                                            logger.debugAndAddToDb("Domain organization: " + org.getId() + " has invalid/empty planType: " + domainOrgPlanType + 
+                                                " from billing API", LogDb.DASHBOARD);
+                                        }
+                                    } else {
+                                        logger.debugAndAddToDb("Failed to fetch metadata from billing API for domain organization: " + org.getId(), LogDb.DASHBOARD);
+                                    }
+                                } catch (Exception apiException) {
+                                    logger.errorAndAddToDb(apiException, "Error while fetching metadata from billing API for organization: " + org.getId());
+                                }
+                            }
+                            
+                            if (validPlanType != null) {
+                                // Apply the planType found from domain-based search to the original organization
+                                // This ONLY sets planType - all other metadata fields remain from original organization
+                                planType = validPlanType;
+                                
+                                // Update the organization cache with the new planType for this domain
+                                OrganizationInfo updatedOrgInfo = new OrganizationInfo(organization.getId(), organization.getAdminEmail(), planType);
+                                OrganizationCache.domainToOrgInfoCache.put(userDomain, updatedOrgInfo);
+                                
+                                logger.debugAndAddToDb("Set planType to: " + planType + " for original organization: " + organization.getId() + 
+                                    " based on domain match with organization having valid planType (other metadata fields preserved from original org). Updated cache for domain: " + userDomain, LogDb.DASHBOARD);
+                            } else {
+                                logger.debugAndAddToDb("No organization found with valid planType for domain: " + userDomain, LogDb.DASHBOARD);
+                            }
+                        } catch (Exception e) {
+                            logger.errorAndAddToDb(e, "Error while fetching organizations by domain: " + userDomain);
+                        }
+                    }
+                }
+            }
             trialMsg = OrganizationUtils.fetchtrialMsg(metaData);
             protectionTrialMsg = OrganizationUtils.fetchprotectionTrialMsg(metaData);
             agentTrialMsg = OrganizationUtils.fetchagentTrialMsg(metaData);

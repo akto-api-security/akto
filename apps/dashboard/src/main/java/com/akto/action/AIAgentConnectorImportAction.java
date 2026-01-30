@@ -47,6 +47,18 @@ public class AIAgentConnectorImportAction extends UserAction {
     private String dataverseClientId;
     private String dataverseClientSecret;
 
+    // Snowflake-specific parameters
+    private String snowflakeAccountUrl;
+    private String snowflakeAuthType;
+    private String snowflakeUsername;
+    private String snowflakePassword;
+    private String snowflakeToken;
+    private String snowflakePrivateKey;
+    private String snowflakePrivateKeyPassphrase;
+    private String snowflakeWarehouse;
+    private String snowflakeDatabase;
+    private String snowflakeSchema;
+
     /**
      * Unified method to initiate import for any AI Agent Connector.
      * The connector type is determined by the connectorType parameter.
@@ -145,6 +157,62 @@ public class AIAgentConnectorImportAction extends UserAction {
                 config.put(CONFIG_DATAVERSE_TENANT_ID, dataverseTenantId);
                 config.put(CONFIG_DATAVERSE_CLIENT_ID, dataverseClientId);
                 config.put(CONFIG_DATAVERSE_CLIENT_SECRET, dataverseClientSecret);
+                break;
+
+            case CONNECTOR_TYPE_SNOWFLAKE:
+                if (snowflakeAccountUrl == null || snowflakeAccountUrl.isEmpty()) {
+                    loggerMaker.error("Missing required Snowflake account URL", LogDb.DASHBOARD);
+                    return null;
+                }
+                config.put(CONFIG_SNOWFLAKE_ACCOUNT_URL, snowflakeAccountUrl);
+
+                // Determine auth type (default to PASSWORD for backward compatibility)
+                String authType = (snowflakeAuthType != null && !snowflakeAuthType.isEmpty())
+                    ? snowflakeAuthType
+                    : SNOWFLAKE_AUTH_TYPE_PASSWORD;
+                config.put(CONFIG_SNOWFLAKE_AUTH_TYPE, authType);
+
+                // Validate and add auth-specific fields
+                if (SNOWFLAKE_AUTH_TYPE_PASSWORD.equals(authType)) {
+                    if (snowflakeUsername == null || snowflakeUsername.isEmpty() ||
+                        snowflakePassword == null || snowflakePassword.isEmpty()) {
+                        loggerMaker.error("Missing required Snowflake username/password for password authentication", LogDb.DASHBOARD);
+                        return null;
+                    }
+                    config.put(CONFIG_SNOWFLAKE_USERNAME, snowflakeUsername);
+                    config.put(CONFIG_SNOWFLAKE_PASSWORD, snowflakePassword);
+                } else if (SNOWFLAKE_AUTH_TYPE_TOKEN.equals(authType)) {
+                    if (snowflakeToken == null || snowflakeToken.isEmpty()) {
+                        loggerMaker.error("Missing required Snowflake OAuth token", LogDb.DASHBOARD);
+                        return null;
+                    }
+                    config.put(CONFIG_SNOWFLAKE_TOKEN, snowflakeToken);
+                } else if (SNOWFLAKE_AUTH_TYPE_KEY_PAIR.equals(authType)) {
+                    if (snowflakeUsername == null || snowflakeUsername.isEmpty() ||
+                        snowflakePrivateKey == null || snowflakePrivateKey.isEmpty()) {
+                        loggerMaker.error("Missing required Snowflake username/private key for key pair authentication", LogDb.DASHBOARD);
+                        return null;
+                    }
+                    config.put(CONFIG_SNOWFLAKE_USERNAME, snowflakeUsername);
+                    config.put(CONFIG_SNOWFLAKE_PRIVATE_KEY, snowflakePrivateKey);
+                    if (snowflakePrivateKeyPassphrase != null && !snowflakePrivateKeyPassphrase.isEmpty()) {
+                        config.put(CONFIG_SNOWFLAKE_PRIVATE_KEY_PASSPHRASE, snowflakePrivateKeyPassphrase);
+                    }
+                } else {
+                    loggerMaker.error("Unsupported Snowflake authentication type: " + authType, LogDb.DASHBOARD);
+                    return null;
+                }
+
+                // Optional fields
+                if (snowflakeWarehouse != null && !snowflakeWarehouse.isEmpty()) {
+                    config.put(CONFIG_SNOWFLAKE_WAREHOUSE, snowflakeWarehouse);
+                }
+                if (snowflakeDatabase != null && !snowflakeDatabase.isEmpty()) {
+                    config.put(CONFIG_SNOWFLAKE_DATABASE, snowflakeDatabase);
+                }
+                if (snowflakeSchema != null && !snowflakeSchema.isEmpty()) {
+                    config.put(CONFIG_SNOWFLAKE_SCHEMA, snowflakeSchema);
+                }
                 break;
 
             default:
