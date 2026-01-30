@@ -239,15 +239,24 @@ public class DbLayer {
 
 
     public static List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName) {
-        if (moduleType == null || miniRuntimeName == null || miniRuntimeName.isEmpty()) {
+        if (moduleType == null) {
             return new ArrayList<>();
         }
 
-        Bson filter = Filters.and(
-            Filters.eq(ModuleInfo._REBOOT, true),
-            Filters.eq(ModuleInfo.MODULE_TYPE, moduleType.name()),
-            Filters.eq(ModuleInfo.MINI_RUNTIME_NAME, miniRuntimeName)
-        );
+        if (moduleType != ModuleInfo.ModuleType.THREAT_DETECTION && (miniRuntimeName == null || miniRuntimeName.isEmpty())) {
+            return new ArrayList<>();
+        }
+
+        List<Bson> filterConditions = new ArrayList<>();
+        filterConditions.add(Filters.eq(ModuleInfo._REBOOT, true));
+        filterConditions.add(Filters.eq(ModuleInfo.MODULE_TYPE, moduleType.name()));
+        
+        // Only add miniRuntimeName filter if it's not null
+        if (miniRuntimeName != null && !miniRuntimeName.isEmpty()) {
+            filterConditions.add(Filters.eq(ModuleInfo.MINI_RUNTIME_NAME, miniRuntimeName));
+        }
+
+        Bson filter = Filters.and(filterConditions);
 
         List<ModuleInfo> moduleInfoList = ModuleInfoDao.instance.findAll(filter);
 
