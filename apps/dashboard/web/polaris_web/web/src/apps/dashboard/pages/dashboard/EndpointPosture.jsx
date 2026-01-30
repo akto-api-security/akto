@@ -12,11 +12,38 @@ import CustomLineChart from './new_components/CustomLineChart'
 import ChartypeComponent from '../testing/TestRunsPage/ChartypeComponent'
 import dashboardApi from './api'
 import api from '../observe/api'
+import func from '@/util/func'
 import { getTypeFromTags, CLIENT_TYPES, getDomainForFavicon } from '../observe/agentic/mcpClientHelper'
 import { extractEndpointId } from '../observe/agentic/constants'
 import { attackRequests as dummyAttackRequests } from './atlusPosture/dummyData'
 
-// Helper function to process collections and group by type
+const cleanHostname = (hostname) => {
+    if (!hostname) return hostname
+
+    const parts = hostname.split('.')
+
+    // Need at least 2 parts to have a prefix (id.domain)
+    if (parts.length >= 2) {
+        const firstPart = parts[0]
+
+        // Check if first part looks like an ID:
+        // - At least 12 characters long (UUIDs, hashes, session IDs are typically 12+)
+        // - Contains only alphanumeric characters (no hyphens or special chars)
+        // - Doesn't look like a common subdomain (www, api, app, etc.)
+        const isLikelyId = firstPart.length >= 12 &&
+                          /^[a-zA-Z0-9]+$/.test(firstPart) &&
+                          !/^(www|api|app|dev|staging|prod|test)$/i.test(firstPart)
+
+        if (isLikelyId) {
+            // Remove the first part and return the rest
+            return parts.slice(1).join('.')
+        }
+    }
+
+    // Return original if no ID pattern found
+    return hostname
+}
+
 const processAgenticCollections = (collections, topN = 4) => {
     const typeGroups = {
         [CLIENT_TYPES.MCP_SERVER]: {},
@@ -30,8 +57,9 @@ const processAgenticCollections = (collections, topN = 4) => {
         if (c.deactivated) return
 
         const clientType = getTypeFromTags(c.envType)
-        const displayName = c.displayName || c.name
-        const hostName = c.hostName || displayName
+        const rawDisplayName = c.displayName || c.name
+        const hostName = c.hostName || rawDisplayName
+        const displayName = cleanHostname(rawDisplayName)
         const endpointId = extractEndpointId(hostName)
 
         // Track unique endpoints
@@ -93,13 +121,11 @@ function EndpointPosture() {
 
                 // Fetch data from existing APIs in parallel
                 const [
-                    issuesResponse,
-                    threatResponse,
+                    guardrailResponse,
                     collectionsResponse,
                     // attackFlowsResponse // TODO: Uncomment when backend is ready
                 ] = await Promise.all([
-                    dashboardApi.fetchIssuesData(startTimestamp, endTimestamp),
-                    dashboardApi.fetchThreatData(startTimestamp, endTimestamp),
+                    dashboardApi.fetchGuardrailData(startTimestamp, endTimestamp),
                     api.getAllCollectionsBasic(),
                     // dashboardApi.fetchAttackFlows(startTimestamp, endTimestamp) // TODO: Uncomment when backend is ready
                 ])
@@ -108,10 +134,10 @@ function EndpointPosture() {
                 const collections = collectionsResponse?.apiCollections || []
                 const { mcpServers, llms, aiAgents, totalEndpoints } = processAgenticCollections(collections, 4)
 
-                // Extract values from threat response (now consolidated there)
-                const sensitiveCount = threatResponse?.sensitiveCount || 0
-                const successfulExploits = threatResponse?.successfulExploits || 0
-                const avgGuardrailScore = threatResponse?.avgThreatScore || 0.0
+                // Extract values from guardrail response
+                const sensitiveCount = guardrailResponse?.sensitiveCount || 0
+                const successfulExploits = guardrailResponse?.successfulExploits || 0
+                const avgGuardrailScore = guardrailResponse?.avgThreatScore || 0.0
 
                 const summaryData = [
                     {
@@ -157,7 +183,7 @@ function EndpointPosture() {
                 setAttackRequests(attackFlows)
 
                 // Process Data Protection Trends - dynamic categories
-                const dataProtectionTrends = threatResponse?.dataProtectionTrends || {}
+                const dataProtectionTrends = guardrailResponse?.dataProtectionTrends || {}
 
                 // Define colors for top 3 categories
                 const categoryColors = ['#3b82f6', '#ef4444', '#10b981']
@@ -181,7 +207,7 @@ function EndpointPosture() {
                 setDataProtectionTrendsData(trendsChartData)
 
                 // Process Guardrail Policies Data
-                const topGuardrailPolicies = threatResponse?.topGuardrailPolicies || []
+                const topGuardrailPolicies = guardrailResponse?.topGuardrailPolicies || []
                 const guardrailPoliciesObject = {}
                 const guardrailColors = ['#ef4444', '#f59e0b', '#3b82f6', '#10b981'] // red, amber, blue, green
                 topGuardrailPolicies.forEach((policy, index) => {
@@ -192,38 +218,18 @@ function EndpointPosture() {
                 })
                 setGuardrailPoliciesData(guardrailPoliciesObject)
 
-                // Process Compliance At Risks Data
-                const complianceAtRisks = issuesResponse?.complianceAtRisks || []
-
-                // Icon mapping for compliance standards
-                const complianceIconMap = {
-                    'OWASP': '/public/owasp.svg',
-                    'PCI': '/public/pci.svg',
-                    'PCI DSS': '/public/pci.svg',
-                    'GDPR': '/public/gdpr.svg',
-                    'HIPAA': '/public/hipaa.svg',
-                    'SOC 2': '/public/soc2.svg',
-                    'ISO 27001': '/public/iso27001.svg'
-                }
+                // Process Compliance At Risks Data (from guardrail data, not issues)
+                const complianceAtRisks = guardrailResponse?.complianceAtRisks || []
 
                 // Color palette for compliance cards
                 const complianceColors = ['#dc2626', '#ea580c', '#ca8a04', '#16a34a']
 
                 const complianceDataMapped = complianceAtRisks.map((compliance, index) => {
-                    // Try to find matching icon based on compliance name
-                    let icon = '/public/compliance-default.svg' // Default fallback
-                    for (const [key, iconPath] of Object.entries(complianceIconMap)) {
-                        if (compliance.name.toUpperCase().includes(key)) {
-                            icon = iconPath
-                            break
-                        }
-                    }
-
                     return {
                         name: compliance.name,
-                        percentage: Math.round(compliance.percentage),
+                        percentage: Math.round(compliance.percentage || 0),
                         color: complianceColors[index] || '#6b7280', // Use gray as fallback
-                        icon: icon
+                        icon: func.getComplianceIcon(compliance.name)
                     }
                 })
 

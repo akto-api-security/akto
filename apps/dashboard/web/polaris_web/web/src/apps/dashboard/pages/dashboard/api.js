@@ -281,6 +281,17 @@ const api = {
         })
     },
 
+    fetchGuardrailData: async (startTimestamp, endTimestamp) => {
+        return await request({
+            url: '/api/fetchGuardrailData',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
+    },
+
     fetchAttackFlows: async (startTimestamp, endTimestamp) => {
         return await request({
             url: '/api/fetchAttackFlows',

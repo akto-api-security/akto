@@ -27,31 +27,18 @@ public class ThreatDetectionConstants {
     public static final String PII_DATA_LEAK_FILTER_ID = "PIIDataLeak";
 
     // PII-related subcategories for sensitive data event detection
-    // These represent security misconfigurations that expose credentials, secrets, and sensitive data
+    // These correspond to SingleTypeInfo.SubType values that represent sensitive data types
     public static final List<String> PII_SUBCATEGORIES = Arrays.asList(
-        "SENSITIVE_DATA_EXPOSURE_PASSWORD",
-        "LARAVEL_ENV",
-        "PARAMETERS_CONFIG",
-        "FIREBASE_CONFIG_EXPOSURE",
-        "GIT_CREDENTIALS_DISCLOSURE",
-        "GIT_CONFIG",
-        "GITHUB_WORKFLOW_DISCLOSURE",
-        "AIRFLOW_CONFIGURATION_EXPOSURE",
-        "WPCONFIG_AWS_KEY",
-        "SPRING_BOOT_ENV_ACTUATOR_EXPOSED",
-        "ORACLE_EBS_CREDENTIALS",
-        "ROBOMONGO_CREDENTIAL",
-        "SSH_AUTHORIZED_KEYS",
-        "SSH_KNOWN_HOSTS",
-        "SERVER_PRIVATE_KEYS",
-        "FTP_CREDENTIALS_EXPOSURE",
-        "SFTP_CONFIG_EXPOSURE",
-        "MSMTP_CONFIG",
-        "ESMTPRC_CONFIG",
-        "DOCKERFILE_HIDDEN_DISCLOSURE",
-        "DOCKER_COMPOSE_CONFIG",
-        "AMAZON_DOCKER_CONFIG",
-        "MISCONFIGURED_DOCKER"
+        "EMAIL",
+        "URL",
+        "ADDRESS",
+        "SSN",
+        "CREDIT_CARD",
+        "VIN",
+        "PHONE_NUMBER",
+        "UUID",
+        "JWT",
+        "IP_ADDRESS"
     );
 
     private ThreatDetectionConstants() {
