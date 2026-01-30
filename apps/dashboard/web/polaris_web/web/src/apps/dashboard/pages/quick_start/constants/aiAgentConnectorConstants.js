@@ -76,7 +76,7 @@ export const AUTH_TYPE_KEY_PAIR = 'KEY_PAIR';
 export const DESCRIPTION_N8N = 'Use our N8N feature to capture traffic and instantly send it to your dashboard for real-time insights.';
 export const DESCRIPTION_LANGCHAIN = 'Use our Langchain feature to capture traffic from LangSmith and instantly send it to your dashboard for real-time insights.';
 export const DESCRIPTION_COPILOT_STUDIO = 'Use our Copilot Studio feature to capture traffic from Azure Application Insights and instantly send it to your dashboard for real-time insights.';
-export const DESCRIPTION_DATABRICKS = 'Use our Databricks feature to capture traffic from serving endpoint inference tables and instantly send it to your dashboard for real-time insights.';
+export const DESCRIPTION_DATABRICKS = 'Import Databricks agents seamlessly into AKTO.';
 export const DESCRIPTION_SNOWFLAKE = 'Connect to your Snowflake account to discover agents using Cortex and automatically fetch data for all Snowflake agents.';
 
 // N8N Field Configuration

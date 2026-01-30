@@ -1014,7 +1014,7 @@ const copilotStudioImportObj = {
 const databricksImportObj = {
     icon: '/public/databricks.svg',
     label: "Databricks",
-    text: "Use our Databricks feature to capture traffic from serving endpoint inference tables and instantly send it to your dashboard for real-time insights.",
+    text: "Import Databricks agents seamlessly into AKTO.",
     docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/databrics',
     key: "DATABRICKS_IMPORT",
     component: <AIAgentConnectorImport
