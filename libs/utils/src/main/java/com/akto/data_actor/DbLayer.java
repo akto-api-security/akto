@@ -514,14 +514,13 @@ public class DbLayer {
     }
 
     public static List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName) {
-        if (miniRuntimeName == null || miniRuntimeName.isEmpty()) {
-            return new ArrayList<>();
-        }
         List<Bson> filters = new ArrayList<>();
         if (moduleType != null) {
             filters.add(Filters.eq(ModuleInfo.MODULE_TYPE, moduleType.toString()));
         }
-        filters.add(Filters.eq(ModuleInfo.MINI_RUNTIME_NAME, miniRuntimeName));
+        if (miniRuntimeName != null && !miniRuntimeName.isEmpty()) {
+            filters.add(Filters.eq(ModuleInfo.MINI_RUNTIME_NAME, miniRuntimeName));
+        }
         filters.add(Filters.eq(ModuleInfo._REBOOT, true));
         Bson finalFilter = filters.size() == 1 ? filters.get(0) : Filters.and(filters);
         List<ModuleInfo> moduleInfos = ModuleInfoDao.instance.findAll(finalFilter);
