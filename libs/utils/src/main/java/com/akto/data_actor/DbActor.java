@@ -253,6 +253,7 @@ public class DbActor extends DataActor {
         return DbLayer.fetchAllApiCollections();
     }
 
+    @Override
     public List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName) {
         return DbLayer.fetchAndUpdateModuleForReboot(moduleType, miniRuntimeName);
     }
