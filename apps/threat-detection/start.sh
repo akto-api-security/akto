@@ -33,7 +33,7 @@ run_java() {
     java \
         -XX:+ExitOnOutOfMemoryError \
         -Xmx${XMX_MEM}m \
-        -jar /app/api-threat-detection-1.0-SNAPSHOT-jar-with-dependencies.jar
+        -jar /app/threat-detection-1.0-SNAPSHOT-jar-with-dependencies.jar
 }
 
 while true; do

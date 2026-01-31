@@ -12,11 +12,11 @@ import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.kafka.KafkaConfig;
+import com.akto.metrics.ModuleInfoWorker;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.metrics.ModuleInfoWorker;
-import com.akto.dto.monitoring.ModuleInfo;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
@@ -27,9 +27,10 @@ public class ThreatClientTelemetry implements Runnable {
     private static final String CONFIG_UPDATE_TOPIC = "akto.config.updates";
     private static final String MESSAGE_TYPE_RESTART = "RESTART";
     private static final String MESSAGE_TYPE_ENV_RELOAD = "ENV_RELOAD";
+    private static final ModuleInfo.ModuleType MODULE_TYPE = ModuleInfo.ModuleType.THREAT_DETECTION;
 
     private final Consumer<String, String> kafkaConsumer;
-    private final String daemonName;
+    private final String moduleName;
 
     public ThreatClientTelemetry(KafkaConfig kafkaConfig) {
         Properties properties = new Properties();
@@ -43,9 +44,9 @@ public class ThreatClientTelemetry implements Runnable {
 
         this.kafkaConsumer = new KafkaConsumer<>(properties);
         this.kafkaConsumer.subscribe(Collections.singletonList(CONFIG_UPDATE_TOPIC));
-        this.daemonName = ModuleInfoWorker.getModuleName(ModuleInfo.ModuleType.THREAT_DETECTION);
+        this.moduleName = ModuleInfoWorker.getModuleName(MODULE_TYPE);
 
-        logger.infoAndAddToDb("ThreatClientTelemetry initialized listening on topic: " + CONFIG_UPDATE_TOPIC);
+        logger.infoAndAddToDb("ThreatClientTelemetry initialized for module " + moduleName + ", topic: " + CONFIG_UPDATE_TOPIC);
     } 
 
     @Override
@@ -82,7 +83,7 @@ public class ThreatClientTelemetry implements Runnable {
                 return;
             }
 
-            if (!isMessageForThisDaemon(command)) {
+            if (!isMessageForThreatDetection(command)) {
                 return;
             }
 
@@ -121,20 +122,9 @@ public class ThreatClientTelemetry implements Runnable {
         }
     }
 
-    private boolean isMessageForThisDaemon(Map<String, Object> command) {
-        @SuppressWarnings("unchecked")
-        List<String> daemonNames = (List<String>) command.get("daemonNames");
-        if (daemonNames != null && !daemonNames.isEmpty()) {
-            if (daemonNames.contains("ALL")) {
-                return true;
-            }
-            if (daemonNames.contains(daemonName)) {
-                return true;
-            }
-            return false;
-        }
+    private boolean isMessageForThreatDetection(Map<String, Object> command) {
         String moduleType = (String) command.get("moduleType");
-        return "THREAT_DETECTION".equals(moduleType);
+        return MODULE_TYPE.name().equals(moduleType);
     }
 
     private void restartSelf(Map<String, String> envOverrides) {
