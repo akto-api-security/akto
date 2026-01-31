@@ -45,7 +45,7 @@ public class AuthPolicy {
         return SESSION_TOKEN_PATTERN.matcher(cookieName).find();
     }
 
-    private static List<ApiInfo.AuthType> findBearerBasicAuth(String header, String value){
+    private static List<String> findBearerBasicAuth(String header, String value){
         value = value.trim();
         boolean twoFields = value.split(" ").length == 2;
         if (twoFields && value.substring(0, Math.min(6, value.length())).equalsIgnoreCase("bearer")) {
@@ -79,7 +79,7 @@ public class AuthPolicy {
     }
 
     public static boolean findAuthType(HttpResponseParams httpResponseParams, ApiInfo apiInfo, RuntimeFilter filter, List<CustomAuthType> customAuthTypes) {
-        Set<Set<ApiInfo.AuthType>> allAuthTypesFound = apiInfo.getAllAuthTypesFound();
+        Set<Set<String>> allAuthTypesFound = apiInfo.getAllAuthTypesFound();
         if (allAuthTypesFound == null) allAuthTypesFound = new HashSet<>();
 
         // TODO: from custom api-token
@@ -90,7 +90,7 @@ public class AuthPolicy {
         Map<String, List<String>> headers = httpResponseParams.getRequestParams().getHeaders();
         List<String> cookieList = headers.getOrDefault(COOKIE_NAME, new ArrayList<>());
         Map<String,String> cookieMap = parseCookie(cookieList);
-        Set<ApiInfo.AuthType> authTypes = new HashSet<>();
+        Set<String> authTypes = new HashSet<>();
 
         BasicDBObject flattenedPayload = null;
         try{
@@ -107,7 +107,11 @@ public class AuthPolicy {
             // Find custom auth type in header and cookie
             List<String> customAuthTypeHeaderKeys = customAuthType.getHeaderKeys();
             if (!headerAndCookieKeys.isEmpty() && !customAuthTypeHeaderKeys.isEmpty() && headerAndCookieKeys.containsAll(customAuthTypeHeaderKeys)) {
-                authTypes.add(ApiInfo.AuthType.CUSTOM);
+                // CRITICAL: Use the custom auth type's NAME directly instead of "CUSTOM"
+                String customAuthName = customAuthType.getName();
+                if (customAuthName != null && !customAuthName.trim().isEmpty()) {
+                    authTypes.add(customAuthName);
+                }
                 break;
             }
 
