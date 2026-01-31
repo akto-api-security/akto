@@ -514,33 +514,34 @@ public class DbLayer {
     }
 
     public static List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName) {
-        List<Bson> filters = new ArrayList<>();
-        if (moduleType != null) {
-            filters.add(Filters.eq(ModuleInfo.MODULE_TYPE, moduleType.toString()));
-        }
-        if (miniRuntimeName != null && !miniRuntimeName.isEmpty()) {
-            filters.add(Filters.eq(ModuleInfo.MINI_RUNTIME_NAME, miniRuntimeName));
-        }
-        filters.add(Filters.eq(ModuleInfo._REBOOT, true));
-        Bson finalFilter = filters.size() == 1 ? filters.get(0) : Filters.and(filters);
-        List<ModuleInfo> moduleInfos = ModuleInfoDao.instance.findAll(finalFilter);
-        if (moduleInfos == null || moduleInfos.isEmpty()) {
+        if (moduleType == null) {
             return new ArrayList<>();
         }
-        List<String> moduleIds = new ArrayList<>();
-        for (ModuleInfo module : moduleInfos) {
-            if (module.getId() != null) {
-                moduleIds.add(module.getId());
+
+        if (moduleType != ModuleInfo.ModuleType.THREAT_DETECTION && (miniRuntimeName == null || miniRuntimeName.isEmpty())) {
+            return new ArrayList<>();
+        }
+
+        List<Bson> filterConditions = new ArrayList<>();
+        filterConditions.add(Filters.eq(ModuleInfo._REBOOT, true));
+        filterConditions.add(Filters.eq(ModuleInfo.MODULE_TYPE, moduleType.name()));
+        if (miniRuntimeName != null && !miniRuntimeName.isEmpty()) {
+            filterConditions.add(Filters.eq(ModuleInfo.MINI_RUNTIME_NAME, miniRuntimeName));
+        }
+
+        Bson filter = Filters.and(filterConditions);
+        List<ModuleInfo> moduleInfoList = ModuleInfoDao.instance.findAll(filter);
+
+        if (moduleInfoList != null && !moduleInfoList.isEmpty()) {
+            List<String> ids = new ArrayList<>();
+            for (ModuleInfo moduleInfo : moduleInfoList) {
+                ids.add(moduleInfo.getId());
             }
+            Bson updateFilter = Filters.in(ModuleInfoDao.ID, ids);
+            Bson updates = Updates.set(ModuleInfo._REBOOT, false);
+            ModuleInfoDao.instance.updateMany(updateFilter, updates);
         }
-        
-        if (!moduleIds.isEmpty()) {
-            ModuleInfoDao.instance.updateMany(
-                Filters.in(ModuleInfoDao.ID, moduleIds),
-                Updates.set(ModuleInfo._REBOOT, false)
-            );
-        }
-        
-        return moduleInfos;
+
+        return moduleInfoList != null ? moduleInfoList : new ArrayList<>();
     }
 }
