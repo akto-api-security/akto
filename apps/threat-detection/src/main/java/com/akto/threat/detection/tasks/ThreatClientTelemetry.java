@@ -1,0 +1,177 @@
+package com.akto.threat.detection.tasks;
+
+import java.lang.management.ManagementFactory;
+import java.lang.management.RuntimeMXBean;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.serialization.StringDeserializer;
+
+import com.akto.kafka.KafkaConfig;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.ModuleInfoWorker;
+import com.akto.dto.monitoring.ModuleInfo;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+
+public class ThreatClientTelemetry implements Runnable {
+
+    private static final LoggerMaker logger = new LoggerMaker(ThreatClientTelemetry.class, LogDb.THREAT_DETECTION);
+    private static final Gson gson = new Gson();
+    private static final String CONFIG_UPDATE_TOPIC = "akto.config.updates";
+    private static final String MESSAGE_TYPE_RESTART = "RESTART";
+    private static final String MESSAGE_TYPE_ENV_RELOAD = "ENV_RELOAD";
+    private static final String MAIN_CLASS = "com.akto.threat.detection.Main";
+
+    private final Consumer<String, String> kafkaConsumer;
+    private final String daemonName;
+
+    public ThreatClientTelemetry(KafkaConfig kafkaConfig) {
+        Properties properties = new Properties();
+        properties.put("bootstrap.servers", kafkaConfig.getBootstrapServers());
+        properties.put("group.id", kafkaConfig.getGroupId() + ".config.updates");
+        properties.put("key.deserializer", StringDeserializer.class.getName());
+        properties.put("value.deserializer", StringDeserializer.class.getName());
+        properties.put("enable.auto.commit", "true");
+        properties.put("auto.commit.interval.ms", "1000");
+        properties.put("auto.offset.reset", "latest");
+
+        this.kafkaConsumer = new KafkaConsumer<>(properties);
+        this.kafkaConsumer.subscribe(Collections.singletonList(CONFIG_UPDATE_TOPIC));
+        this.daemonName = ModuleInfoWorker.getModuleName(ModuleInfo.ModuleType.THREAT_DETECTION);
+
+        logger.infoAndAddToDb("ThreatClientTelemetry initialized listening on topic: " + CONFIG_UPDATE_TOPIC);
+    } 
+
+    @Override
+    public void run() {
+        logger.infoAndAddToDb("Starting threat client telemetry config consumer");
+
+        while (true) {
+            try {
+                ConsumerRecords<String, String> records = kafkaConsumer.poll(Duration.ofMillis(1000));
+
+                for (ConsumerRecord<String, String> record : records) {
+                    processCommandMessage(record.value());
+                }
+
+            } catch (Exception e) {
+                logger.errorAndAddToDb(e, "Error in threat client telemetry config consumer");
+                try {
+                    Thread.sleep(5000);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    logger.errorAndAddToDb(ie, "Threat client telemetry config consumer interrupted");
+                    break;
+                }
+            }
+        }
+    }
+
+    private void processCommandMessage(String message) {
+        try {
+            Map<String, Object> command = gson.fromJson(message, new TypeToken<Map<String, Object>>(){}.getType());
+
+            String messageType = (String) command.get("messageType");
+            if (messageType == null) {
+                return;
+            }
+
+            if (!isMessageForThisDaemon(command)) {
+                return;
+            }
+
+            logger.infoAndAddToDb("Processing command message messageType=" + messageType);
+
+            if (MESSAGE_TYPE_RESTART.equals(messageType)) {
+                logger.infoAndAddToDb("Restarting process...");
+                restartSelf(null);
+                return;
+            }
+
+            if (MESSAGE_TYPE_ENV_RELOAD.equals(messageType)) {
+                @SuppressWarnings("unchecked")
+                Map<String, String> envVars = (Map<String, String>) command.get("env");
+                if (envVars != null && !envVars.isEmpty()) {
+                    for (Map.Entry<String, String> entry : envVars.entrySet()) {
+                        String key = entry.getKey();
+                        String value = entry.getValue();
+                        String oldValue = System.getProperty(key);
+                        if (oldValue == null) {
+                            oldValue = System.getenv(key);
+                        }
+                        if (value != null && !value.equals(oldValue)) {
+                            logger.infoAndAddToDb("Updating env " + key);
+                            System.setProperty(key, value);
+                        }
+                    }
+                }
+                logger.infoAndAddToDb("Environment updated, restarting process...");
+                restartSelf(envVars);
+                return;
+            }
+
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error processing command message: " + message);
+        }
+    }
+
+    private boolean isMessageForThisDaemon(Map<String, Object> command) {
+        @SuppressWarnings("unchecked")
+        List<String> daemonNames = (List<String>) command.get("daemonNames");
+        if (daemonNames != null && !daemonNames.isEmpty()) {
+            if (daemonNames.contains("ALL")) {
+                return true;
+            }
+            if (daemonNames.contains(daemonName)) {
+                return true;
+            }
+            return false;
+        }
+        String moduleType = (String) command.get("moduleType");
+        return "THREAT_DETECTION".equals(moduleType);
+    }
+
+    /**
+     * Restart this JVM with optional env overrides (Golang syscall.Exec equivalent).
+     * Spawns a new process with the same main class and merged environment, then exits.
+     */
+    private void restartSelf(Map<String, String> envOverrides) {
+        try {
+            String javaBin = System.getProperty("java.home") + "/bin/java";
+            RuntimeMXBean runtimeMXBean = ManagementFactory.getRuntimeMXBean();
+            String classPath = System.getProperty("java.class.path");
+
+            List<String> cmd = new ArrayList<>();
+            cmd.add(javaBin);
+            cmd.addAll(runtimeMXBean.getInputArguments());
+            cmd.add("-cp");
+            cmd.add(classPath);
+            cmd.add(MAIN_CLASS);
+
+            ProcessBuilder pb = new ProcessBuilder(cmd);
+            Map<String, String> env = pb.environment();
+            env.clear();
+            env.putAll(System.getenv());
+            if (envOverrides != null) {
+                env.putAll(envOverrides);
+            }
+
+            logger.infoAndAddToDb("Restarting process with new environment...");
+            pb.inheritIO();
+            pb.start();
+            System.exit(0);
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Failed to restart process");
+        }
+    }
+}

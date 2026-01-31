@@ -492,34 +492,42 @@ public class DbLayer {
         DataIngestionLogsDao.instance.insertOne(log);
     }
 
+    public static void updateModuleInfo(ModuleInfo moduleInfo) {
+        if (moduleInfo == null || moduleInfo.getId() == null) {
+            return;
+        }
+        Bson filter = Filters.and(
+            Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
+            Filters.eq(ModuleInfo._REBOOT, false),
+            Filters.eq(ModuleInfo.DELETE_TOPIC_AND_REBOOT, false)
+        );
+        Bson updates = Updates.combine(
+            Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
+            Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType() != null ? moduleInfo.getModuleType().name() : null),
+            Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
+            Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
+            Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()),
+            Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
+            Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived())
+        );
+        ModuleInfoDao.instance.updateOne(filter, updates);
+    }
+
     public static List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName) {
-        // Require miniRuntimeName for targeted reboots - each instance checks its own flag
         if (miniRuntimeName == null || miniRuntimeName.isEmpty()) {
             return new ArrayList<>();
         }
-        
         List<Bson> filters = new ArrayList<>();
-        
-        // Build filter based on provided parameters
         if (moduleType != null) {
             filters.add(Filters.eq(ModuleInfo.MODULE_TYPE, moduleType.toString()));
         }
         filters.add(Filters.eq(ModuleInfo.MINI_RUNTIME_NAME, miniRuntimeName));
-        
-        // Only fetch modules with reboot flag set
         filters.add(Filters.eq(ModuleInfo._REBOOT, true));
-        
-        // Combine all filters
         Bson finalFilter = filters.size() == 1 ? filters.get(0) : Filters.and(filters);
-        
-        // Fetch matching modules
         List<ModuleInfo> moduleInfos = ModuleInfoDao.instance.findAll(finalFilter);
-        
         if (moduleInfos == null || moduleInfos.isEmpty()) {
             return new ArrayList<>();
         }
-        
-        // Clear reboot flag for fetched modules
         List<String> moduleIds = new ArrayList<>();
         for (ModuleInfo module : moduleInfos) {
             if (module.getId() != null) {

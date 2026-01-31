@@ -48,7 +48,7 @@ public class ModuleInfoWorker {
 
         for (Map.Entry<String, String> entry : systemEnv.entrySet()) {
             String key = entry.getKey();
-            // Check System.getProperty() first (updated by ConfigUpdateConsumerTask), fallback to System.getenv()
+            // Check System.getProperty() first (updated by ThreatClientTelemetry before restart), fallback to System.getenv()
             String value = System.getProperty(key);
             if (value == null) {
                 value = entry.getValue();
@@ -84,7 +84,7 @@ public class ModuleInfoWorker {
         moduleInfo.setName(this.moduleName);
 
         scheduler.scheduleWithFixedDelay(() -> {
-            // Collect environment variables FRESH on each heartbeat to pick up ConfigUpdateConsumerTask changes
+            // Collect environment variables FRESH on each heartbeat to pick up ThreatClientTelemetry changes
             Map<String, Object> envVariables = _this.collectEnvironmentVariables(_this.moduleType);
             Map<String, Object> additionalData = new HashMap<>();
             if (!envVariables.isEmpty()) {

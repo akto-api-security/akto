@@ -30,7 +30,7 @@ import com.akto.threat.detection.crons.ApiCountInfoRelayCron;
 import com.akto.threat.detection.ip_api_counter.CmsCounterLayer;
 import com.akto.threat.detection.ip_api_counter.DistributionCalculator;
 import com.akto.threat.detection.ip_api_counter.DistributionDataForwardLayer;
-import com.akto.threat.detection.tasks.ConfigUpdateConsumerTask;
+import com.akto.threat.detection.tasks.ThreatClientTelemetry;
 import com.akto.threat.detection.tasks.MaliciousTrafficDetectorTask;
 import com.akto.threat.detection.tasks.SendMaliciousEventsToBackend;
 import com.akto.threat.detection.utils.Utils;
@@ -151,19 +151,16 @@ public class Main {
         logger.errorAndAddToDb("Config update kafka producer not ready, skipping ConfigUpdatePoller");
     }
     
-    // Start config update consumer (receives from Kafka and applies env vars)
-    logger.infoAndAddToDb("[DEBUG] About to start ConfigUpdateConsumerTask thread");
+    // Start config update consumer (receives from Kafka, applies env and restarts process when needed)
     new Thread(() -> {
         try {
-            logger.infoAndAddToDb("[DEBUG] ConfigUpdateConsumerTask thread started, creating consumer");
-            ConfigUpdateConsumerTask consumerTask = new ConfigUpdateConsumerTask(internalKafka);
-            logger.infoAndAddToDb("[DEBUG] ConfigUpdateConsumerTask created successfully, starting run()");
-            consumerTask.run();
+            ThreatClientTelemetry telemetry = new ThreatClientTelemetry(internalKafka);
+            telemetry.run();
         } catch (Exception e) {
-            logger.errorAndAddToDb(e, "Error in ConfigUpdateConsumerTask");
+            logger.errorAndAddToDb(e, "Error in ThreatClientTelemetry");
         }
     }).start();
-    logger.infoAndAddToDb("Started ConfigUpdateConsumerTask for threat-detection");
+    logger.infoAndAddToDb("Started ThreatClientTelemetry for threat-detection");
 
     initCustomDataTypeScheduler();
     CmsCounterLayer.initialize(localRedis);
