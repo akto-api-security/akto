@@ -29,9 +29,22 @@ echo "Detected container memory limit: ${MEM_LIMIT_MB} MB"
 XMX_MEM=$((MEM_LIMIT_MB * 80 / 100))
 echo "Calculated -Xmx value: ${XMX_MEM} MB"
 
-# 5. Run Java with the dynamically calculated -Xmx
-exec java \
-  -XX:+ExitOnOutOfMemoryError \
-  -Xmx${XMX_MEM}m \
-  -jar /app/api-threat-detection-1.0-SNAPSHOT-jar-with-dependencies.jar
+run_java() {
+    java \
+        -XX:+ExitOnOutOfMemoryError \
+        -Xmx${XMX_MEM}m \
+        -jar /app/api-threat-detection-1.0-SNAPSHOT-jar-with-dependencies.jar
+}
 
+while true; do
+    run_java &
+    JAVA_PID=$!
+    trap "kill -TERM $JAVA_PID 2>/dev/null; wait $JAVA_PID 2>/dev/null; exit 143" SIGTERM SIGINT
+    wait $JAVA_PID
+    EXIT_CODE=$?
+    trap - SIGTERM SIGINT
+    if [ $EXIT_CODE -eq 0 ]; then
+        continue
+    fi
+    sleep 5
+done

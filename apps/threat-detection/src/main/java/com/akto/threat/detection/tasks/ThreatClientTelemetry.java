@@ -1,9 +1,6 @@
 package com.akto.threat.detection.tasks;
 
-import java.lang.management.ManagementFactory;
-import java.lang.management.RuntimeMXBean;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +27,6 @@ public class ThreatClientTelemetry implements Runnable {
     private static final String CONFIG_UPDATE_TOPIC = "akto.config.updates";
     private static final String MESSAGE_TYPE_RESTART = "RESTART";
     private static final String MESSAGE_TYPE_ENV_RELOAD = "ENV_RELOAD";
-    private static final String MAIN_CLASS = "com.akto.threat.detection.Main";
 
     private final Consumer<String, String> kafkaConsumer;
     private final String daemonName;
@@ -141,37 +137,8 @@ public class ThreatClientTelemetry implements Runnable {
         return "THREAT_DETECTION".equals(moduleType);
     }
 
-    /**
-     * Restart this JVM with optional env overrides (Golang syscall.Exec equivalent).
-     * Spawns a new process with the same main class and merged environment, then exits.
-     */
     private void restartSelf(Map<String, String> envOverrides) {
-        try {
-            String javaBin = System.getProperty("java.home") + "/bin/java";
-            RuntimeMXBean runtimeMXBean = ManagementFactory.getRuntimeMXBean();
-            String classPath = System.getProperty("java.class.path");
-
-            List<String> cmd = new ArrayList<>();
-            cmd.add(javaBin);
-            cmd.addAll(runtimeMXBean.getInputArguments());
-            cmd.add("-cp");
-            cmd.add(classPath);
-            cmd.add(MAIN_CLASS);
-
-            ProcessBuilder pb = new ProcessBuilder(cmd);
-            Map<String, String> env = pb.environment();
-            env.clear();
-            env.putAll(System.getenv());
-            if (envOverrides != null) {
-                env.putAll(envOverrides);
-            }
-
-            logger.infoAndAddToDb("Restarting process with new environment...");
-            pb.inheritIO();
-            pb.start();
-            System.exit(0);
-        } catch (Exception e) {
-            logger.errorAndAddToDb(e, "Failed to restart process");
-        }
+        logger.infoAndAddToDb("Exiting for restart (handled by entrypoint script)");
+        System.exit(0);
     }
 }
