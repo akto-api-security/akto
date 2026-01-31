@@ -16,6 +16,7 @@ import com.akto.dao.upload.FileUploadsDao;
 import com.akto.dto.files.File;
 import com.akto.dto.upload.SwaggerFileUpload;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
+import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.threat_detection.ApiHitCountInfoDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.APIConfig;
@@ -31,6 +32,7 @@ import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.Setup;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -488,5 +490,58 @@ public class DbLayer {
 
     public static void insertDataIngestionLog(Log log) {
         DataIngestionLogsDao.instance.insertOne(log);
+    }
+
+    public static void updateModuleInfo(ModuleInfo moduleInfo) {
+        if (moduleInfo == null || moduleInfo.getId() == null) {
+            return;
+        }
+        Bson filter = Filters.and(
+            Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
+            Filters.eq(ModuleInfo._REBOOT, false),
+            Filters.eq(ModuleInfo.DELETE_TOPIC_AND_REBOOT, false)
+        );
+        Bson updates = Updates.combine(
+            Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
+            Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType() != null ? moduleInfo.getModuleType().name() : null),
+            Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
+            Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
+            Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()),
+            Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
+            Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived())
+        );
+        ModuleInfoDao.instance.updateOne(filter, updates);
+    }
+
+    public static List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName) {
+        if (moduleType == null) {
+            return new ArrayList<>();
+        }
+
+        if (moduleType != ModuleInfo.ModuleType.THREAT_DETECTION && (miniRuntimeName == null || miniRuntimeName.isEmpty())) {
+            return new ArrayList<>();
+        }
+
+        List<Bson> filterConditions = new ArrayList<>();
+        filterConditions.add(Filters.eq(ModuleInfo._REBOOT, true));
+        filterConditions.add(Filters.eq(ModuleInfo.MODULE_TYPE, moduleType.name()));
+        if (miniRuntimeName != null && !miniRuntimeName.isEmpty()) {
+            filterConditions.add(Filters.eq(ModuleInfo.MINI_RUNTIME_NAME, miniRuntimeName));
+        }
+
+        Bson filter = Filters.and(filterConditions);
+        List<ModuleInfo> moduleInfoList = ModuleInfoDao.instance.findAll(filter);
+
+        if (moduleInfoList != null && !moduleInfoList.isEmpty()) {
+            List<String> ids = new ArrayList<>();
+            for (ModuleInfo moduleInfo : moduleInfoList) {
+                ids.add(moduleInfo.getId());
+            }
+            Bson updateFilter = Filters.in(ModuleInfoDao.ID, ids);
+            Bson updates = Updates.set(ModuleInfo._REBOOT, false);
+            ModuleInfoDao.instance.updateMany(updateFilter, updates);
+        }
+
+        return moduleInfoList != null ? moduleInfoList : new ArrayList<>();
     }
 }

@@ -23,15 +23,18 @@ import com.akto.kafka.KafkaProducerConfig;
 import com.akto.kafka.Serializer;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.ConfigUpdatePoller;
 import com.akto.metrics.ModuleInfoWorker;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.crons.ApiCountInfoRelayCron;
 import com.akto.threat.detection.ip_api_counter.CmsCounterLayer;
 import com.akto.threat.detection.ip_api_counter.DistributionCalculator;
 import com.akto.threat.detection.ip_api_counter.DistributionDataForwardLayer;
+import com.akto.threat.detection.tasks.ThreatClientTelemetry;
 import com.akto.threat.detection.tasks.MaliciousTrafficDetectorTask;
 import com.akto.threat.detection.tasks.SendMaliciousEventsToBackend;
 import com.akto.threat.detection.utils.Utils;
+import com.akto.kafka.Kafka;
 import com.mongodb.ConnectionString;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
@@ -81,6 +84,7 @@ public class Main {
 
     logger.warnAndAddToDb("aggregation rules enabled " + aggregationRulesEnabled);
     ModuleInfoWorker.init(ModuleInfo.ModuleType.THREAT_DETECTION, dataActor);
+    
     if (!isHybridDeployment) {
         DaoInit.init(new ConnectionString(System.getenv("AKTO_MONGO_CONN")));
     }
@@ -121,6 +125,42 @@ public class Main {
             .setKeySerializer(Serializer.STRING)
             .setValueSerializer(Serializer.BYTE_ARRAY)
             .build();
+
+    // Initialize Kafka producer for config updates
+    String internalKafkaUrl = System.getenv("AKTO_INTERNAL_KAFKA_BOOTSTRAP_SERVER");
+    Kafka configUpdateKafkaProducer = null;
+    try {
+        configUpdateKafkaProducer = new Kafka(internalKafkaUrl, 10000, 100);
+        logger.infoAndAddToDb("Connected to config update kafka producer @ " + Context.now() + ", producerReady=" + configUpdateKafkaProducer.producerReady);
+    } catch (Exception e) {
+        logger.errorAndAddToDb(e, "Error building config update kafka producer: " + e.getMessage());
+    }
+    
+    // Start config update poller (publishes to Kafka)
+    String moduleName = ModuleInfoWorker.getModuleName(ModuleInfo.ModuleType.THREAT_DETECTION);
+    if (configUpdateKafkaProducer != null && configUpdateKafkaProducer.producerReady) {
+        ConfigUpdatePoller configUpdatePoller = new ConfigUpdatePoller(
+            moduleName, 
+            configUpdateKafkaProducer, 
+            "akto.config.updates",
+            ModuleInfo.ModuleType.THREAT_DETECTION
+        );
+        configUpdatePoller.start();
+        logger.infoAndAddToDb("Started ConfigUpdatePoller for threat-detection");
+    } else {
+        logger.errorAndAddToDb("Config update kafka producer not ready, skipping ConfigUpdatePoller");
+    }
+    
+    // Start config update consumer (receives from Kafka, applies env and restarts process when needed)
+    new Thread(() -> {
+        try {
+            ThreatClientTelemetry telemetry = new ThreatClientTelemetry(internalKafka);
+            telemetry.run();
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error in ThreatClientTelemetry");
+        }
+    }).start();
+    logger.infoAndAddToDb("Started ThreatClientTelemetry for threat-detection");
 
     initCustomDataTypeScheduler();
     CmsCounterLayer.initialize(localRedis);
