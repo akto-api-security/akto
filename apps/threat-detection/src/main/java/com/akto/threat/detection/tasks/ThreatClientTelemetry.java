@@ -2,6 +2,7 @@ package com.akto.threat.detection.tasks;
 
 import java.time.Duration;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -83,7 +84,7 @@ public class ThreatClientTelemetry implements Runnable {
                 return;
             }
 
-            if (!isMessageForThreatDetection(command)) {
+            if (!isMessageForThisInstance(command)) {
                 return;
             }
 
@@ -96,8 +97,7 @@ public class ThreatClientTelemetry implements Runnable {
             }
 
             if (MESSAGE_TYPE_ENV_RELOAD.equals(messageType)) {
-                @SuppressWarnings("unchecked")
-                Map<String, String> envVars = (Map<String, String>) command.get("env");
+                Map<String, String> envVars = parseEnvFromCommand(command);
                 if (envVars != null && !envVars.isEmpty()) {
                     for (Map.Entry<String, String> entry : envVars.entrySet()) {
                         String key = entry.getKey();
@@ -122,13 +122,58 @@ public class ThreatClientTelemetry implements Runnable {
         }
     }
 
-    private boolean isMessageForThreatDetection(Map<String, Object> command) {
-        String moduleType = (String) command.get("moduleType");
-        return MODULE_TYPE.name().equals(moduleType);
+    /** Matches ebpf: message is for this instance if moduleType matches and moduleNames contains this name or "ALL". */
+    private boolean isMessageForThisInstance(Map<String, Object> command) {
+        String cmdModuleType = (String) command.get("moduleType");
+        if (!MODULE_TYPE.name().equals(cmdModuleType)) {
+            return false;
+        }
+        Object namesObj = command.get("moduleNames");
+        if (namesObj == null) {
+            return true;
+        }
+        List<String> moduleNames = gson.fromJson(gson.toJson(namesObj), new TypeToken<List<String>>(){}.getType());
+        if (moduleNames == null || moduleNames.isEmpty()) {
+            return true;
+        }
+        return moduleNames.contains(moduleName) || moduleNames.contains("ALL");
+    }
+
+    /** Parse env map from command; values may be String or Number from JSON. */
+    private Map<String, String> parseEnvFromCommand(Map<String, Object> command) {
+        Object envObj = command.get("env");
+        if (envObj == null || !(envObj instanceof Map)) {
+            return Collections.emptyMap();
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> raw = (Map<String, Object>) envObj;
+        Map<String, String> out = new HashMap<>();
+        for (Map.Entry<String, Object> e : raw.entrySet()) {
+            out.put(e.getKey(), e.getValue() != null ? e.getValue().toString() : "");
+        }
+        return out;
     }
 
     private void restartSelf(Map<String, String> envOverrides) {
+        if (envOverrides != null && !envOverrides.isEmpty()) {
+            writeEnvFile(envOverrides);
+        }
         logger.infoAndAddToDb("Exiting for restart (handled by entrypoint script)");
         System.exit(0);
+    }
+
+    /** Write env overrides so start.sh can source them before the next java run (Java cannot exec). */
+    private void writeEnvFile(Map<String, String> envVars) {
+        try {
+            java.io.File envFile = new java.io.File("/app/.env.override");
+            try (java.io.FileWriter writer = new java.io.FileWriter(envFile)) {
+                for (Map.Entry<String, String> entry : envVars.entrySet()) {
+                    writer.write("export " + entry.getKey() + "=\"" + entry.getValue().replace("\"", "\\\"") + "\"\n");
+                }
+            }
+            logger.infoAndAddToDb("Environment overrides written to " + envFile.getAbsolutePath() + " with " + envVars.size() + " variables");
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Failed to write environment file");
+        }
     }
 }
