@@ -89,7 +89,7 @@ public class CrawlerRun {
     }
 
     public enum CrawlerRunStatus {
-        PENDING, RUNNING, COMPLETED, FAILED
+        PENDING, RUNNING, COMPLETED, FAILED, STOP_REQUESTED, STOPPED
     }
 
     @Override

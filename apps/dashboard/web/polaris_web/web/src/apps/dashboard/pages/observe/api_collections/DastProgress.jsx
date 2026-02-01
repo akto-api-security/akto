@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react"
 import { Box, IndexFiltersMode, Text } from "@shopify/polaris"
+import { CircleCancelMajor } from "@shopify/polaris-icons"
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable"
+import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow"
 import api from "./api"
 import func from "@/util/func"
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered"
@@ -40,17 +42,17 @@ const headers = [
         showFilter: true
     },
     {
-        title: "Application Pages",
-        text: "Application Pages",
-        value: "applicationPagesComp",
-        textValue: "applicationPages"
-    },
-    {
         title: "Start Time",
         text: "Start Time",
         value: "startTime",
         sortActive: true,
         sortKey: "startTimestamp"
+    },
+    {
+        title: "Application Pages",
+        text: "Application Pages",
+        value: "applicationPagesComp",
+        textValue: "applicationPages"
     },
     // TODO: to be added later.
     // {
@@ -74,7 +76,12 @@ const headers = [
     {
         title: "Out of Scope URLs",
         text: "Out of Scope URLs",
-        value: "outScopeUrls"
+        value: "outScopeUrlsComp",
+        textValue: "outScopeUrls"
+    },
+    {
+        title: "",
+        type: CellType.ACTION
     }
 ]
 
@@ -88,6 +95,32 @@ const sortOptions = [
 const resourceName = {
     singular: 'DAST scan',
     plural: 'DAST scans',
+}
+
+function getActions(item, fetchAllDastScans) {
+    const isStopped = item.status === "STOPPED"
+    return [
+        {
+            title: "Actions",
+            items: [
+                {
+                    content: "Stop scan",
+                    icon: CircleCancelMajor,
+                    destructive: true,
+                    disabled: isStopped,
+                    onAction: async () => {
+                        try {
+                            await api.stopCrawler(item.crawlId)
+                            func.setToast(true, false, "Crawler stop requested")
+                            fetchAllDastScans()
+                        } catch {
+                            func.setToast(true, true, "Failed to stop crawler")
+                        }
+                    }
+                }
+            ]
+        }
+    ]
 }
 
 function DastProgress() {
@@ -147,7 +180,17 @@ function DastProgress() {
                         </Box>
                     ),
                     outScopeUrls: run.outScopeUrls || "-",
-                    nextUrl: `/dashboard/observe/dast-progress/${run.crawlId}`
+                    outScopeUrlsComp: (
+                        <Box maxWidth="30vw">
+                            <TooltipText
+                                tooltip={run.outScopeUrls || "-"}
+                                text={run.outScopeUrls || "-"}
+                                textProps={{ truncate: true }}
+                            />
+                        </Box>
+                    ),
+                    nextUrl: `/dashboard/observe/dast-progress/${run.crawlId}`,
+                    status: run.status || null
                 }
             })
 
@@ -189,6 +232,10 @@ function DastProgress() {
                     useNewRow={true}
                     condensedHeight={true}
                     disambiguateLabel={(_, value) => func.convertToDisambiguateLabelObj(value, null, 2)}
+                    getActions={(item) => getActions(item, fetchAllDastScans)}
+                    hasRowActions={true}
+                    lastColumnSticky={true}
+                    preventRowClickOnActions={true}
                 />
             ]}
         />
