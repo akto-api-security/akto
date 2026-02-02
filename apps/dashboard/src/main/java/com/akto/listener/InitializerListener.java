@@ -2860,8 +2860,20 @@ public class InitializerListener implements ServletContextListener {
     public static Organization fetchAndSaveFeatureWiseAllowed(Organization organization) {
 
         int lastFeatureMapUpdate = organization.getLastFeatureMapUpdate();
-        if((lastFeatureMapUpdate + REFRESH_INTERVAL) >= Context.now()){
+        
+        // Check if planType is missing or invalid - if so, force refresh regardless of time interval
+        String currentPlanType = organization.getplanType();
+        boolean planTypeMissing = currentPlanType == null || currentPlanType.isEmpty() || "planType".equals(currentPlanType);
+        
+        if((lastFeatureMapUpdate + REFRESH_INTERVAL) >= Context.now() && !planTypeMissing){
+            logger.debugAndAddToDb("Skipping refresh for organization " + organization.getId() + 
+                " - recent update and planType exists: " + currentPlanType, LogDb.DASHBOARD);
             return organization;
+        }
+        
+        if (planTypeMissing) {
+            logger.debugAndAddToDb("Forcing refresh for organization " + organization.getId() + 
+                " - planType missing/invalid: " + currentPlanType, LogDb.DASHBOARD);
         }
         HashMap<String, FeatureAccess> featureWiseAllowed = new HashMap<>();
 

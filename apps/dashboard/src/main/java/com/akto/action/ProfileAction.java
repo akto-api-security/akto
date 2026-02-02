@@ -22,6 +22,8 @@ import com.akto.utils.Intercom;
 import com.akto.utils.AlertUtils;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.cloud.Utils;
+import com.akto.utils.crons.OrganizationCache;
+import com.akto.util.OrganizationInfo;
 import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.UserBlockedNoPlanAlert;
 import com.akto.notifications.slack.SlackSender;
@@ -263,6 +265,7 @@ public class ProfileAction extends UserAction {
             userDetails.append("stiggClientKey", OrganizationUtils.fetchClientKey(organizationId, organization.getAdminEmail()));
             userDetails.append("expired", organization.checkExpirationWithAktoSync());
             userDetails.append("hotjarSiteId", organization.getHotjarSiteId());
+            // Note: planType will be resolved later in the method with fallback logic
             userDetails.append("planType", organization.getplanType());
             userDetails.append("trialMsg", organization.gettrialMsg());
             userDetails.append("protectionTrialMsg", organization.getprotectionTrialMsg());
@@ -271,6 +274,28 @@ public class ProfileAction extends UserAction {
 
                 // Check if plan type is null, empty, or not in allowed list
                 String planType = organization.getplanType();
+                
+                // Enhanced fallback logic with caching to handle background thread race conditions
+                if (planType == null || planType.isEmpty() || "planType".equals(planType)) {
+                    logger.debugAndAddToDb("PlanType not found in organization, attempting fallback resolution for org: " + organization.getId());
+                    
+                    String userDomain = null;
+                    if (organization.getAdminEmail() != null && organization.getAdminEmail().contains("@")) {
+                        userDomain = organization.getAdminEmail().split("@")[1].toLowerCase();
+                        
+                        // Try cache again to avoid missing check in background thread
+                        OrganizationInfo cachedOrgInfo = OrganizationCache.getOrganizationInfoByDomain(userDomain);
+                        if (cachedOrgInfo != null && cachedOrgInfo.getPlanType() != null && 
+                            !cachedOrgInfo.getPlanType().isEmpty() && !"planType".equals(cachedOrgInfo.getPlanType())) {
+                            planType = cachedOrgInfo.getPlanType();
+                            logger.infoAndAddToDb("Retrieved planType from cache recheck: " + planType + " for domain: " + userDomain);
+                        }
+                    }
+                }
+                
+                // Update userDetails with resolved planType (may be different from organization.getplanType())
+                userDetails.replace("planType", planType);
+                
                 boolean isInvalidPlanType = planType == null || planType.isEmpty() ||
                         !AlertUtils.isValidPlanType(planType);
 
