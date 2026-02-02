@@ -223,24 +223,6 @@ const threatDetectionRequests = {
             data: {}
         })
     },
-    exportThreatActivityToWebhook(startTimestamp, endTimestamp) {
-        return request({
-            url: '/api/exportGuardrailActivityToWebhook',
-            method: 'post',
-            data: {
-                startTimestamp: startTimestamp,
-                endTimestamp: endTimestamp,
-                label: 'THREAT'
-            }
-        })
-    },
-    getWebhookExportStatus() {
-        return request({
-            url: '/api/getWebhookExportStatus',
-            method: 'post',
-            data: {}
-        })
-    },
     fetchThreatActivityWebhookIntegration() {
         return request({
             url: '/api/fetchThreatActivityWebhookIntegration',

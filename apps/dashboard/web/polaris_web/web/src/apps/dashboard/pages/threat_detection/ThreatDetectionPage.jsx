@@ -252,7 +252,6 @@ function ThreatDetectionPage() {
     const [latencyData, setLatencyData] = useState([]);
     const [detailsLoading, setDetailsLoading] = useState(false);
     const pollingIntervalRef = useRef(null);
-    const webhookPollingIntervalRef = useRef(null);
     const [pendingRowContext, setPendingRowContext] = useState(null);
 
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
@@ -410,9 +409,14 @@ function ThreatDetectionPage() {
         setTriggerTableRefresh(prev => prev + 1)
     }
 
-      // Cleanup polling intervals on unmount
+      // Cleanup polling interval on unmount
       useEffect(() => {
-        return () => clearAllExportPolling();
+        return () => {
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+        };
       }, []);
 
       useEffect(() => {
@@ -620,91 +624,48 @@ function ThreatDetectionPage() {
         func.setToast(true, false, "JSON exported successfully");
     }
 
-    const clearAllExportPolling = () => {
+    const exportToAdx = async () => {
         if (pollingIntervalRef.current) {
             clearInterval(pollingIntervalRef.current);
             pollingIntervalRef.current = null;
         }
-        if (webhookPollingIntervalRef.current) {
-            clearInterval(webhookPollingIntervalRef.current);
-            webhookPollingIntervalRef.current = null;
-        }
-    };
-
-    const runExportWithStatusPolling = async ({
-        exportApi,
-        getStatusApi,
-        noExportInProgressMessage,
-        pollingRef,
-        failureToastMessage,
-        errorExportToastPrefix,
-        errorStatusToastPrefix
-    }) => {
-        clearAllExportPolling();
         try {
-            const resp = await exportApi();
+            const resp = await api.exportThreatActivityToAdx(startTimestamp, endTimestamp);
             func.setToast(true, false, resp.exportMessage || "Export under processing");
-
-            const POLL_INTERVAL_MS = 2000;
-            pollingRef.current = setInterval(async () => {
+            pollingIntervalRef.current = setInterval(async () => {
                 try {
-                    const statusResp = await getStatusApi();
-                    if (statusResp.exportMessage === noExportInProgressMessage) {
-                        if (pollingRef.current) {
-                            clearInterval(pollingRef.current);
-                            pollingRef.current = null;
+                    const statusResp = await api.getAdxExportStatus();
+                    if (statusResp.exportMessage === "No export in progress.") {
+                        if (pollingIntervalRef.current) {
+                            clearInterval(pollingIntervalRef.current);
+                            pollingIntervalRef.current = null;
                         }
                         return;
                     }
                     const message = statusResp.exportMessage || "";
                     const isProcessing = message.includes("Export under processing");
                     if (isProcessing) return;
-
-                    if (pollingRef.current) {
-                        clearInterval(pollingRef.current);
-                        pollingRef.current = null;
+                    if (pollingIntervalRef.current) {
+                        clearInterval(pollingIntervalRef.current);
+                        pollingIntervalRef.current = null;
                     }
                     if (statusResp.exportSuccess) {
                         func.setToast(true, false, message || "Exported successfully");
                     } else {
-                        func.setToast(true, true, message || failureToastMessage);
+                        func.setToast(true, true, message || "Failed to export threat activity to ADX");
                     }
                 } catch (error) {
-                    if (pollingRef.current) {
-                        clearInterval(pollingRef.current);
-                        pollingRef.current = null;
+                    if (pollingIntervalRef.current) {
+                        clearInterval(pollingIntervalRef.current);
+                        pollingIntervalRef.current = null;
                     }
-                    func.setToast(true, true, errorStatusToastPrefix + (error.message || "Unknown error"));
+                    func.setToast(true, true, "Error checking export status: " + (error.message || "Unknown error"));
                 }
-            }, POLL_INTERVAL_MS);
+            }, 2000);
         } catch (error) {
-            func.setToast(true, true, errorExportToastPrefix + (error.message || "Unknown error"));
+            func.setToast(true, true, "Error exporting to ADX: " + (error.message || "Unknown error"));
         }
         setMoreActions(false);
-    };
-
-    const exportToAdx = () => {
-        runExportWithStatusPolling({
-            exportApi: () => api.exportThreatActivityToAdx(startTimestamp, endTimestamp),
-            getStatusApi: api.getAdxExportStatus,
-            noExportInProgressMessage: "No export in progress.",
-            pollingRef: pollingIntervalRef,
-            failureToastMessage: "Failed to export threat activity to ADX",
-            errorExportToastPrefix: "Error exporting to ADX: ",
-            errorStatusToastPrefix: "Error checking export status: "
-        });
-    };
-
-    const exportToWebhook = () => {
-        runExportWithStatusPolling({
-            exportApi: () => api.exportThreatActivityToWebhook(startTimestamp, endTimestamp),
-            getStatusApi: api.getWebhookExportStatus,
-            noExportInProgressMessage: "No webhook export in progress.",
-            pollingRef: webhookPollingIntervalRef,
-            failureToastMessage: "Failed to export threat activity to webhook",
-            errorExportToastPrefix: "Error exporting to webhook: ",
-            errorStatusToastPrefix: "Error checking webhook export status: "
-        });
     };
 
     const secondaryActionsComp = (

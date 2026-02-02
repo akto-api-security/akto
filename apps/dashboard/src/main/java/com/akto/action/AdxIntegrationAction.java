@@ -54,14 +54,12 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
     private static final LoggerMaker logger = new LoggerMaker(AdxIntegrationAction.class, LogDb.DASHBOARD);
     private static final int MAX_EXPORT_LIMIT = 10000;
     private static final int WEBHOOK_EXPORT_BATCH_SIZE = 5000;
-    private static final String WEBHOOK_EXPORT_ENDPOINT = "https://webhook.example.com/akto/guardrail-export";
     /** First-time sync: send threat data of past 3 days */
     private static final int FIRST_TIME_SYNC_WINDOW_SECONDS = 3 * 24 * 60 * 60;
     private static final ObjectMapper objectMapper = new ObjectMapper();
     
-    // Status tracking for async exports (keyed by account ID)
+    // Status tracking for async ADX exports (keyed by account ID)
     private static final Map<Integer, ExportStatus> exportStatusMap = new ConcurrentHashMap<>();
-    private static final Map<Integer, ExportStatus> webhookExportStatusMap = new ConcurrentHashMap<>();
     private static final ExecutorService exportExecutor = Executors.newCachedThreadPool();
     
     /**
@@ -550,169 +548,6 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
     }
 
     /**
-     * Export guardrail activity data to webhook endpoint.
-     * Starts export in background thread and returns immediately.
-     * Data is sent in batches of 5000 with gzip content-encoding.
-     */
-    public String exportGuardrailActivityToWebhook() {
-        Integer accountId = Context.accountId.get();
-        if (accountId == null || accountId == 0) {
-            addActionError("Account ID not found in context.");
-            exportSuccess = false;
-            exportMessage = "Account ID not found.";
-            exportedCount = 0;
-            return Action.ERROR.toUpperCase();
-        }
-
-        webhookExportStatusMap.put(accountId, new ExportStatus("PROCESSING", "Export under processing", 0));
-
-        final Integer finalAccountId = accountId;
-        final List<String> finalIps = this.ips;
-        final List<Integer> finalApiCollectionIds = this.apiCollectionIds;
-        final List<String> finalUrls = this.urls;
-        final List<String> finalTypes = this.types;
-        final List<String> finalLatestAttack = this.latestAttack;
-        final Boolean finalSuccessfulExploit = this.successfulExploit;
-        final String finalLabel = this.label;
-        final List<String> finalHosts = this.hosts;
-        final String finalLatestApiOrigRegex = this.latestApiOrigRegex;
-        final String finalStatusFilter = this.statusFilter;
-        final int finalStartTimestamp = this.startTimestamp;
-        final int finalEndTimestamp = this.endTimestamp;
-        final CONTEXT_SOURCE finalContextSource = Context.contextSource.get();
-
-        exportExecutor.submit(() -> {
-            try {
-                executeWebhookExportInBackground(
-                    finalAccountId,
-                    finalIps,
-                    finalApiCollectionIds,
-                    finalUrls,
-                    finalTypes,
-                    finalLatestAttack,
-                    finalSuccessfulExploit,
-                    finalLabel,
-                    finalHosts,
-                    finalLatestApiOrigRegex,
-                    finalStatusFilter,
-                    finalStartTimestamp,
-                    finalEndTimestamp,
-                    finalContextSource
-                );
-            } catch (Exception e) {
-                logger.errorAndAddToDb("Error in background webhook export thread: " + e.getMessage(), LogDb.DASHBOARD);
-                ExportStatus status = webhookExportStatusMap.get(finalAccountId);
-                if (status != null) {
-                    status.setStatus("FAILED");
-                    status.setMessage("Error exporting data to webhook: " + e.getMessage());
-                    status.setExportedCount(0);
-                }
-            }
-        });
-
-        exportSuccess = true;
-        exportMessage = "Export under processing";
-        exportedCount = 0;
-        return Action.SUCCESS.toUpperCase();
-    }
-
-    /**
-     * Execute webhook export in background: fetch events, transform, batch (5000), gzip, POST.
-     */
-    private void executeWebhookExportInBackground(
-            Integer accountId,
-            List<String> ips,
-            List<Integer> apiCollectionIds,
-            List<String> urls,
-            List<String> types,
-            List<String> latestAttack,
-            Boolean successfulExploit,
-            String label,
-            List<String> hosts,
-            String latestApiOrigRegex,
-            String statusFilter,
-            int startTimestamp,
-            int endTimestamp,
-            CONTEXT_SOURCE contextSource) {
-        try {
-            Context.accountId.set(accountId);
-            Context.contextSource.set(contextSource);
-
-            AdxIntegrationAction tempAction = new AdxIntegrationAction();
-            tempAction.setIps(ips);
-            tempAction.setApiCollectionIds(apiCollectionIds);
-            tempAction.setUrls(urls);
-            tempAction.setTypes(types);
-            tempAction.setLatestAttack(latestAttack);
-            tempAction.setSuccessfulExploit(successfulExploit);
-            tempAction.setLabel(label);
-            tempAction.setHosts(hosts);
-            tempAction.setLatestApiOrigRegex(latestApiOrigRegex);
-            tempAction.setStatusFilter(statusFilter);
-            tempAction.setStartTimestamp(startTimestamp);
-            tempAction.setEndTimestamp(endTimestamp);
-
-            List<DashboardMaliciousEvent> events = tempAction.fetchMaliciousEventsForExport();
-
-            if (events == null || events.isEmpty()) {
-                ExportStatus status = webhookExportStatusMap.get(accountId);
-                if (status != null) {
-                    status.setStatus("SUCCESS");
-                    status.setMessage("No guardrail activity data found to export.");
-                    status.setExportedCount(0);
-                }
-                logger.infoAndAddToDb("No guardrail activity data found for export to webhook", LogDb.DASHBOARD);
-                return;
-            }
-
-            List<Map<String, Object>> records = tempAction.transformEventsToAdxFormat(events);
-            int totalExported = 0;
-
-            for (int i = 0; i < records.size(); i += WEBHOOK_EXPORT_BATCH_SIZE) {
-                int end = Math.min(i + WEBHOOK_EXPORT_BATCH_SIZE, records.size());
-                List<Map<String, Object>> batch = records.subList(i, end);
-                String json = objectMapper.writeValueAsString(batch);
-                byte[] gzipBytes = gzipBytes(json.getBytes(StandardCharsets.UTF_8));
-
-                RequestBody body = RequestBody.create(gzipBytes, MediaType.parse("application/json"));
-                Request request = new Request.Builder()
-                    .url(WEBHOOK_EXPORT_ENDPOINT)
-                    .post(body)
-                    .addHeader("Content-Type", "application/json")
-                    .addHeader("Content-Encoding", "gzip")
-                    .build();
-
-                try (Response resp = httpClient.newCall(request).execute()) {
-                    if (!resp.isSuccessful()) {
-                        String msg = resp.body() != null ? resp.body().string() : "";
-                        throw new IOException("Webhook returned " + resp.code() + ": " + msg);
-                    }
-                }
-                totalExported += batch.size();
-            }
-
-            ExportStatus status = webhookExportStatusMap.get(accountId);
-            if (status != null) {
-                status.setStatus("SUCCESS");
-                status.setMessage("Exported successfully");
-                status.setExportedCount(totalExported);
-            }
-            logger.infoAndAddToDb(
-                String.format("Successfully exported %d guardrail activity records to webhook", totalExported),
-                LogDb.DASHBOARD
-            );
-        } catch (Exception e) {
-            logger.errorAndAddToDb("Error exporting guardrail activity to webhook: " + e.getMessage(), LogDb.DASHBOARD);
-            ExportStatus status = webhookExportStatusMap.get(accountId);
-            if (status != null) {
-                status.setStatus("FAILED");
-                status.setMessage("Error exporting data to webhook: " + e.getMessage());
-                status.setExportedCount(0);
-            }
-        }
-    }
-
-    /**
      * Gzip compress bytes.
      */
     private static byte[] gzipBytes(byte[] input) throws IOException {
@@ -721,38 +556,6 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
             gzipOut.write(input);
         }
         return baos.toByteArray();
-    }
-
-    /**
-     * Fetch webhook export status for polling.
-     */
-    public String fetchWebhookExportStatus() {
-        Integer accountId = Context.accountId.get();
-        if (accountId == null || accountId == 0) {
-            addActionError("Account ID not found in context.");
-            exportSuccess = false;
-            exportMessage = "Account ID not found.";
-            exportedCount = 0;
-            return Action.ERROR.toUpperCase();
-        }
-
-        ExportStatus status = webhookExportStatusMap.get(accountId);
-        if (status == null) {
-            exportSuccess = false;
-            exportMessage = "No webhook export in progress.";
-            exportedCount = 0;
-            return Action.SUCCESS.toUpperCase();
-        }
-
-        exportSuccess = "SUCCESS".equals(status.getStatus()) || "PROCESSING".equals(status.getStatus());
-        exportMessage = status.getMessage();
-        exportedCount = status.getExportedCount();
-
-        if ("SUCCESS".equals(status.getStatus()) || "FAILED".equals(status.getStatus())) {
-            webhookExportStatusMap.remove(accountId);
-        }
-
-        return Action.SUCCESS.toUpperCase();
     }
 
     /**
