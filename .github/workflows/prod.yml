@@ -360,6 +360,22 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - uses: actions/setup-java@v2
+        with:
+          distribution: "adopt"
+          java-version: "8"
+          architecture: x64
+
+      - name: Setup Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "29.2"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - uses: bufbuild/buf-action@v1
+        with:
+          setup_only: true
+
       - name: Run mvn package
         if: ${{github.event.inputs.skipTests == 'False' }}
         run: mvn package -Dakto-image-tag=${{ github.event.inputs.release_version}} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{github.event.inputs.release_version}}
