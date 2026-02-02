@@ -17,6 +17,39 @@ public class N8nTraceParser implements TraceParser {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String SOURCE_TYPE = "n8n";
 
+    // Helper classes for optimized data collection
+    private static class WorkflowMetadata {
+        final Map<String, String> nodeTypeMap;
+        final String agentName;
+        final String workflowName;
+
+        WorkflowMetadata(Map<String, String> nodeTypeMap, String agentName, String workflowName) {
+            this.nodeTypeMap = nodeTypeMap;
+            this.agentName = agentName;
+            this.workflowName = workflowName;
+        }
+    }
+
+    private static class ExecutionData {
+        final List<Span> spans;
+        final Map<String, String> nodeToSpanIdMap;
+        final Map<String, JsonNode> nodeToExecutionMap;
+        final String rootSpanId;
+        final JsonNode firstExecution;
+        final JsonNode lastExecution;
+
+        ExecutionData(List<Span> spans, Map<String, String> nodeToSpanIdMap,
+                     Map<String, JsonNode> nodeToExecutionMap, String rootSpanId,
+                     JsonNode firstExecution, JsonNode lastExecution) {
+            this.spans = spans;
+            this.nodeToSpanIdMap = nodeToSpanIdMap;
+            this.nodeToExecutionMap = nodeToExecutionMap;
+            this.rootSpanId = rootSpanId;
+            this.firstExecution = firstExecution;
+            this.lastExecution = lastExecution;
+        }
+    }
+
     // N8N field names
     private static final String FIELD_ID = "id";
     private static final String FIELD_WORKFLOW_ID = "workflowId";
@@ -79,86 +112,62 @@ public class N8nTraceParser implements TraceParser {
             long startTimeMillis = parseTimestamp(root.path(FIELD_STARTED_AT).asText());
             long endTimeMillis = parseTimestamp(root.path(FIELD_STOPPED_AT).asText());
 
-            // Build node type map from workflowData
-            Map<String, String> nodeTypeMap = buildNodeTypeMap(root.path(FIELD_WORKFLOW_DATA));
+            // Single pass over workflowData to build node type map AND extract agent name
+            WorkflowMetadata workflowMetadata = extractWorkflowMetadata(root.path(FIELD_WORKFLOW_DATA));
 
-            // Parse runData into spans
+            // Parse runData into spans - Single pass to collect all necessary data
             JsonNode runData = root.path(FIELD_DATA).path(FIELD_RESULT_DATA).path(FIELD_RUN_DATA);
-            List<Span> spans = new ArrayList<>();
-            Map<String, String> nodeToSpanIdMap = new HashMap<>();
-            String rootSpanId = null;
+            String lastNodeName = root.path(FIELD_DATA).path(FIELD_RESULT_DATA).path("lastNodeExecuted").asText();
 
-            // First pass: create all spans
-            Iterator<Map.Entry<String, JsonNode>> nodeIterator = runData.fields();
-            while (nodeIterator.hasNext()) {
-                Map.Entry<String, JsonNode> entry = nodeIterator.next();
-                String nodeName = entry.getKey();
-                JsonNode executions = entry.getValue();
+            // Parse all execution data in a single comprehensive pass
+            ExecutionData executionData = parseExecutionData(runData, workflowMetadata.nodeTypeMap, lastNodeName, executionId);
 
-                if (executions.isArray() && executions.size() > 0) {
-                    JsonNode execution = executions.get(0); // Take first execution
-
-                    String spanId = UUID.randomUUID().toString();
-                    nodeToSpanIdMap.put(nodeName, spanId);
-
-                    Span span = buildSpan(
-                        spanId,
-                        executionId,
-                        nodeName,
-                        nodeTypeMap.get(nodeName),
-                        execution,
-                        null // parentSpanId set in second pass
-                    );
-
-                    spans.add(span);
-
-                    // Identify root span (node with no source/previousNode)
-                    if (!execution.has(FIELD_SOURCE) || execution.get(FIELD_SOURCE).size() == 0) {
-                        rootSpanId = spanId;
-                    }
-                }
-            }
-
-            // Second pass: set parent relationships
-            for (Span span : spans) {
+            // Set parent relationships using cached execution data
+            for (Span span : executionData.spans) {
                 String nodeName = span.getName();
-                JsonNode nodeExecution = findNodeExecution(runData, nodeName);
+                JsonNode nodeExecution = executionData.nodeToExecutionMap.get(nodeName);
 
                 if (nodeExecution != null && nodeExecution.has(FIELD_SOURCE)) {
                     JsonNode sources = nodeExecution.get(FIELD_SOURCE);
                     if (sources.isArray() && sources.size() > 0) {
                         String previousNodeName = sources.get(0).get(FIELD_PREVIOUS_NODE).asText();
-                        String parentSpanId = nodeToSpanIdMap.get(previousNodeName);
+                        String parentSpanId = executionData.nodeToSpanIdMap.get(previousNodeName);
                         span.setParentSpanId(parentSpanId);
                     }
                 }
             }
 
             // Calculate depths
-            calculateSpanDepths(spans, rootSpanId, nodeToSpanIdMap);
+            calculateSpanDepths(executionData.spans, executionData.rootSpanId, executionData.nodeToSpanIdMap);
+
+            // Extract root input and output using cached data
+            Map<String, Object> rootInput = extractRootInputFromExecution(executionData.firstExecution);
+            Map<String, Object> rootOutput = extractRootOutputFromExecution(executionData.lastExecution);
 
             // Build Trace object
-            List<String> spanIds = spans.stream().map(Span::getTraceId).collect(Collectors.toList());
+            List<String> spanIds = executionData.spans.stream().map(Span::getTraceId).collect(Collectors.toList());
 
             Trace trace = Trace.builder()
                 .id(executionId)
-                .rootSpanId(rootSpanId)
-                .aiAgentName(workflowId)
-                .name("N8N Workflow Execution")
+                .rootSpanId(executionData.rootSpanId)
+                .aiAgentName(workflowMetadata.agentName)
+                .name(workflowMetadata.workflowName)
                 .startTimeMillis(startTimeMillis)
                 .endTimeMillis(endTimeMillis)
                 .status(mapStatus(status))
-                .totalSpans(spans.size())
+                .totalSpans(executionData.spans.size())
                 .totalTokens(0)
                 .totalInputTokens(0)
                 .totalOutputTokens(0)
+                .rootInput(rootInput)
+                .rootOutput(rootOutput)
                 .spanIds(spanIds)
                 .metadata(buildTraceMetadata(root))
                 .build();
 
             return TraceParseResult.builder()
                 .trace(trace)
-                .spans(spans)
+                .spans(executionData.spans)
                 .workflowId(workflowId)
                 .sourceIdentifier(executionId)
                 .metadata(Collections.singletonMap("executionId", executionId))
@@ -169,6 +178,105 @@ public class N8nTraceParser implements TraceParser {
         }
     }
 
+    /**
+     * Extracts workflow metadata (node types, agent name, and workflow name) in a single pass.
+     * Optimized to avoid multiple iterations over workflowData.
+     */
+    private WorkflowMetadata extractWorkflowMetadata(JsonNode workflowData) {
+        Map<String, String> nodeTypeMap = new HashMap<>();
+        String agentName = null;
+        String workflowName = workflowData.path(FIELD_NAME).asText("N8N Workflow");
+        JsonNode nodes = workflowData.path(FIELD_NODES);
+
+        if (nodes.isArray()) {
+            for (JsonNode node : nodes) {
+                if (node.has(FIELD_NAME) && node.has(FIELD_TYPE)) {
+                    String name = node.get(FIELD_NAME).asText();
+                    String type = node.get(FIELD_TYPE).asText();
+
+                    // Store node type (stripped of common prefixes)
+                    String strippedType = stripN8nPrefixes(type);
+                    nodeTypeMap.put(name, strippedType);
+
+                    // Check if this is the agent node
+                    if (agentName == null && type.contains(".agent")) {
+                        agentName = name;
+                    }
+                }
+            }
+        }
+
+        // Fallback: if no agent found, look in nodeTypeMap
+        if (agentName == null) {
+            for (Map.Entry<String, String> entry : nodeTypeMap.entrySet()) {
+                if (entry.getValue() != null && entry.getValue().toLowerCase().contains("agent")) {
+                    agentName = entry.getKey();
+                    break;
+                }
+            }
+        }
+
+        // Final fallback: use workflow name
+        if (agentName == null) {
+            agentName = workflowName;
+        }
+
+        return new WorkflowMetadata(nodeTypeMap, agentName, workflowName);
+    }
+
+    /**
+     * Parses execution data in a single optimized pass.
+     * Collects spans, mappings, and root/last execution data together.
+     */
+    private ExecutionData parseExecutionData(JsonNode runData, Map<String, String> nodeTypeMap, String lastNodeName, String executionId) {
+        List<Span> spans = new ArrayList<>();
+        Map<String, String> nodeToSpanIdMap = new HashMap<>();
+        Map<String, JsonNode> nodeToExecutionMap = new HashMap<>();
+        String rootSpanId = null;
+        JsonNode firstExecution = null;
+        JsonNode lastExecution = null;
+
+        Iterator<Map.Entry<String, JsonNode>> nodeIterator = runData.fields();
+        while (nodeIterator.hasNext()) {
+            Map.Entry<String, JsonNode> entry = nodeIterator.next();
+            String nodeName = entry.getKey();
+            JsonNode executions = entry.getValue();
+
+            if (executions.isArray() && executions.size() > 0) {
+                JsonNode execution = executions.get(0);
+                nodeToExecutionMap.put(nodeName, execution);
+
+                String spanId = UUID.randomUUID().toString();
+                nodeToSpanIdMap.put(nodeName, spanId);
+
+                Span span = buildSpan(
+                    spanId,
+                    executionId,
+                    nodeName,
+                    nodeTypeMap.get(nodeName),
+                    execution,
+                    null
+                );
+
+                spans.add(span);
+
+                // Check if this is the root node
+                boolean isRootNode = !execution.has(FIELD_SOURCE) || execution.get(FIELD_SOURCE).size() == 0;
+                if (isRootNode) {
+                    rootSpanId = spanId;
+                    firstExecution = execution;
+                }
+
+                // Check if this is the last node
+                if (nodeName.equals(lastNodeName)) {
+                    lastExecution = execution;
+                }
+            }
+        }
+
+        return new ExecutionData(spans, nodeToSpanIdMap, nodeToExecutionMap, rootSpanId, firstExecution, lastExecution);
+    }
+
     @Override
     public Map<String, ServiceGraphEdgeInfo> extractServiceGraph(Object input) throws Exception {
         try {
@@ -177,18 +285,17 @@ public class N8nTraceParser implements TraceParser {
 
             Map<String, ServiceGraphEdgeInfo> edges = new HashMap<>();
 
-            // Build node type map
-            Map<String, String> nodeTypeMap = buildNodeTypeMap(root.path(FIELD_WORKFLOW_DATA));
+            // Single pass to get workflow metadata
+            WorkflowMetadata workflowMetadata = extractWorkflowMetadata(root.path(FIELD_WORKFLOW_DATA));
 
-            // Extract edges from runData
+            // Extract edges from runData - reusing nodeTypeMap
             JsonNode runData = root.path(FIELD_DATA).path(FIELD_RESULT_DATA).path(FIELD_RUN_DATA);
-            int currentTime = (int) (System.currentTimeMillis() / 1000); // Convert to seconds
 
             Iterator<Map.Entry<String, JsonNode>> nodeIterator = runData.fields();
             while (nodeIterator.hasNext()) {
                 Map.Entry<String, JsonNode> entry = nodeIterator.next();
                 String nodeName = entry.getKey();
-                String nodeType = nodeTypeMap.get(nodeName);
+                String nodeType = workflowMetadata.nodeTypeMap.get(nodeName);
                 JsonNode executions = entry.getValue();
 
                 if (executions.isArray() && executions.size() > 0) {
@@ -198,7 +305,7 @@ public class N8nTraceParser implements TraceParser {
                         JsonNode sources = execution.get(FIELD_SOURCE);
                         if (sources.isArray() && sources.size() > 0) {
                             String previousNodeName = sources.get(0).get(FIELD_PREVIOUS_NODE).asText();
-                            String previousNodeType = nodeTypeMap.get(previousNodeName);
+                            String previousNodeType = workflowMetadata.nodeTypeMap.get(previousNodeName);
 
                             // Determine if source is agent node
                             boolean isAgentSource = previousNodeName.endsWith(AGENT_SUFFIX) ||
@@ -207,22 +314,11 @@ public class N8nTraceParser implements TraceParser {
                             if (isAgentSource) {
                                 // Create edge: agent -> target service
                                 String edgeKey = nodeName;
-                                Map<String, Object> metadata = buildEdgeMetadata(execution, nodeType, previousNodeName, currentTime);
+                                Map<String, Object> metadata = new HashMap<>();
+                                metadata.put("type", nodeType != null ? nodeType : "unknown");
 
                                 ServiceGraphEdgeInfo edge = new ServiceGraphEdgeInfo(previousNodeName, nodeName, metadata);
-
-                                // Merge if edge already exists
-                                edges.merge(edgeKey, edge, (existing, newEdge) -> {
-                                    Map<String, Object> existingMeta = existing.getMetadata();
-                                    if (existingMeta == null) {
-                                        existingMeta = new HashMap<>();
-                                    }
-                                    int currentCount = (int) existingMeta.getOrDefault("requestCount", 0);
-                                    existingMeta.put("requestCount", currentCount + 1);
-                                    existingMeta.put("lastSeenTimestamp", currentTime);
-                                    existing.setMetadata(existingMeta);
-                                    return existing;
-                                });
+                                edges.put(edgeKey, edge);
                             }
                         }
                     }
@@ -239,27 +335,6 @@ public class N8nTraceParser implements TraceParser {
     @Override
     public String getSourceType() {
         return SOURCE_TYPE;
-    }
-
-    private Map<String, String> buildNodeTypeMap(JsonNode workflowData) {
-        Map<String, String> nodeTypeMap = new HashMap<>();
-        JsonNode nodes = workflowData.path(FIELD_NODES);
-
-        if (nodes.isArray()) {
-            for (JsonNode node : nodes) {
-                if (node.has(FIELD_NAME) && node.has(FIELD_TYPE)) {
-                    String name = node.get(FIELD_NAME).asText();
-                    String type = node.get(FIELD_TYPE).asText();
-
-                    // Strip common N8N prefixes
-                    type = stripN8nPrefixes(type);
-
-                    nodeTypeMap.put(name, type);
-                }
-            }
-        }
-
-        return nodeTypeMap;
     }
 
     private String stripN8nPrefixes(String type) {
@@ -322,16 +397,6 @@ public class N8nTraceParser implements TraceParser {
         return TracingConstants.SpanKind.TASK;
     }
 
-    private String determineEdgeType(String nodeType) {
-        if (nodeType == null) return "unknown";
-        String lowerType = nodeType.toLowerCase();
-        if (lowerType.contains("agent")) return "agent";
-        if (lowerType.contains("llm")) return "llm";
-        if (lowerType.contains("tool")) return "tool";
-        if (lowerType.contains("mcp")) return "mcp_server";
-        return "service";
-    }
-
     private void calculateSpanDepths(List<Span> spans, String rootSpanId, Map<String, String> nodeToSpanIdMap) {
         Map<String, Span> spanMap = new HashMap<>();
         for (Span span : spans) {
@@ -358,14 +423,6 @@ public class N8nTraceParser implements TraceParser {
                 }
             }
         }
-    }
-
-    private JsonNode findNodeExecution(JsonNode runData, String nodeName) {
-        JsonNode executions = runData.path(nodeName);
-        if (executions.isArray() && executions.size() > 0) {
-            return executions.get(0);
-        }
-        return null;
     }
 
     private long parseTimestamp(String timestamp) {
@@ -435,14 +492,69 @@ public class N8nTraceParser implements TraceParser {
         return metadata;
     }
 
-    private Map<String, Object> buildEdgeMetadata(JsonNode execution, String nodeType, String sourceService, int currentTime) {
-        Map<String, Object> metadata = new HashMap<>();
-        metadata.put("sourceService", sourceService);
-        metadata.put("nodeType", nodeType != null ? nodeType : "unknown");
-        metadata.put("edgeType", determineEdgeType(nodeType));
-        metadata.put("executionTime", execution.path(FIELD_EXECUTION_TIME).asLong(0));
-        metadata.put("requestCount", 1);
-        metadata.put("lastSeenTimestamp", currentTime);
-        return metadata;
+    /**
+     * Extracts input from the first node's execution data.
+     * Optimized version that works directly with cached execution data.
+     */
+    private Map<String, Object> extractRootInputFromExecution(JsonNode execution) {
+        Map<String, Object> rootInput = new HashMap<>();
+
+        if (execution == null) {
+            return rootInput;
+        }
+
+        try {
+            // Extract input from the first node's data
+            if (execution.has("data")) {
+                JsonNode dataNode = execution.get("data");
+                if (dataNode.has("main") && dataNode.get("main").isArray() && dataNode.get("main").size() > 0) {
+                    JsonNode mainArray = dataNode.get("main").get(0);
+                    if (mainArray.isArray() && mainArray.size() > 0) {
+                        JsonNode firstItem = mainArray.get(0);
+                        if (firstItem.has("json")) {
+                            rootInput.put("data", OBJECT_MAPPER.writeValueAsString(firstItem.get("json")));
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // If extraction fails, return empty map
+            rootInput.put("error", "Failed to extract root input: " + e.getMessage());
+        }
+
+        return rootInput;
+    }
+
+    /**
+     * Extracts output from the last node's execution data.
+     * Optimized version that works directly with cached execution data.
+     */
+    private Map<String, Object> extractRootOutputFromExecution(JsonNode execution) {
+        Map<String, Object> rootOutput = new HashMap<>();
+
+        if (execution == null) {
+            return rootOutput;
+        }
+
+        try {
+            // Extract output from the last node's data
+            if (execution.has("data")) {
+                JsonNode dataNode = execution.get("data");
+                if (dataNode.has("main") && dataNode.get("main").isArray() && dataNode.get("main").size() > 0) {
+                    JsonNode mainArray = dataNode.get("main").get(0);
+                    if (mainArray.isArray() && mainArray.size() > 0) {
+                        JsonNode firstItem = mainArray.get(0);
+                        if (firstItem.has("json")) {
+                            rootOutput.put("output", OBJECT_MAPPER.writeValueAsString(firstItem.get("json")));
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // If extraction fails, return empty map
+            rootOutput.put("error", "Failed to extract root output: " + e.getMessage());
+        }
+
+        return rootOutput;
     }
 }

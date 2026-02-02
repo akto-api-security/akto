@@ -16,6 +16,7 @@ public class ServiceGraphBuilder {
 
     private static final Logger logger = LoggerFactory.getLogger(ServiceGraphBuilder.class);
     private static final ServiceGraphBuilder INSTANCE = new ServiceGraphBuilder();
+    private Map<String, Integer> workflowIdToApiCollectionIdMap = new HashMap<>();
 
     public static ServiceGraphBuilder getInstance() {
         return INSTANCE;
@@ -70,17 +71,36 @@ public class ServiceGraphBuilder {
     }
 
     public int getApiCollectionIdFromWorkflowId(String workflowId) {
+        // Check cache first
+        if (workflowIdToApiCollectionIdMap.containsKey(workflowId)) {
+            int apiCollectionId = workflowIdToApiCollectionIdMap.get(workflowId);
+            logger.debug("Found cached collection {} for workflowId: {}", apiCollectionId, workflowId);
+            return apiCollectionId;
+        }
+
+        // Query database if not in cache
         ApiCollection collection = ApiCollectionsDao.instance.findOne(
             Filters.eq(ApiCollection.NAME, workflowId)
         );
 
         if (collection != null) {
-            logger.info("Found collection {} for workflowId: {}", collection.getId(), workflowId);
-            return collection.getId();
+            int apiCollectionId = collection.getId();
+            // Cache the result
+            workflowIdToApiCollectionIdMap.put(workflowId, apiCollectionId);
+            logger.info("Found collection {} for workflowId: {} and cached it", apiCollectionId, workflowId);
+            return apiCollectionId;
         } else {
             logger.info("No collection found for workflowId: {}", workflowId);
             return -1;
         }
-        
+
+    }
+
+    public Map<String, Integer> getWorkflowIdToApiCollectionIdMap() {
+        return workflowIdToApiCollectionIdMap;
+    }
+
+    public void setWorkflowIdToApiCollectionIdMap(Map<String, Integer> workflowIdToApiCollectionIdMap) {
+        this.workflowIdToApiCollectionIdMap = workflowIdToApiCollectionIdMap;
     }
 }
