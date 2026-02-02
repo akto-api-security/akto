@@ -381,8 +381,7 @@ jobs:
             cd ../account-job-executor
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-account-job-executor:$IMAGE_VERSION -t $ECR_REGISTRY/akto-account-job-executor:$IMAGE_VERSION_LATEST . --push
           fi
-          
-
+      
       - name: Configure AWS Credentials for ECR
         uses: aws-actions/configure-aws-credentials@v1
         with:
