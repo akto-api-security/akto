@@ -372,10 +372,11 @@ jobs:
         env:
           ECR_REGISTRY: aktosecurity
           IMAGE_VERSION: ${{ github.event.inputs.release_version }}
+          IMAGE_VERSION_LATEST: latest
         run: |
           docker buildx create --use
           cd apps/account-job-executor
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-account-job-executor:$IMAGE_VERSION . --push
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-account-job-executor:$IMAGE_VERSION -t $ECR_REGISTRY/akto-account-job-executor:$IMAGE_VERSION_LATEST . --push
           echo "::set-output name=image::$ECR_REGISTRY/akto-account-job-executor:$IMAGE_VERSION"
           
 
