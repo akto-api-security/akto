@@ -24,6 +24,7 @@ import LineChart from "../../components/charts/LineChart";
 import P95LatencyGraph from "../../components/charts/P95LatencyGraph";
 import { LABELS } from "./constants";
 import useThreatReportDownload from "../../hooks/useThreatReportDownload";
+import WebhookIntegrationModal from "./components/WebhookIntegrationModal";
 
 const convertToGraphData = (severityMap) => {
     let dataArr = []
@@ -246,6 +247,8 @@ function ThreatDetectionPage() {
     const [subCategoryCount, setSubCategoryCount] = useState([]);
     const [severityCountMap, setSeverityCountMap] = useState([]);
     const [moreActions, setMoreActions] = useState(false);
+    const [webhookIntegrationModalOpen, setWebhookIntegrationModalOpen] = useState(false);
+    const [webhookIntegrationData, setWebhookIntegrationData] = useState(null);
     const [latencyData, setLatencyData] = useState([]);
     const [detailsLoading, setDetailsLoading] = useState(false);
     const pollingIntervalRef = useRef(null);
@@ -740,8 +743,30 @@ function ThreatDetectionPage() {
                                             prefix: <Box><Icon source={FileMinor} /></Box>
                                         },
                                         {
-                                            content: 'Export via Webhook',
-                                            onAction: exportToWebhook,
+                                            content: 'Export via webhook integration',
+                                            onAction: async () => {
+                                                setMoreActions(false);
+                                                try {
+                                                    const resp = await api.fetchThreatActivityWebhookIntegration();
+                                                    const integ = resp?.webhookIntegration;
+                                                    if (integ) {
+                                                        const headers = integ.customHeaders && typeof integ.customHeaders === 'object'
+                                                            ? Object.entries(integ.customHeaders).map(([key, value]) => ({ key, value: value || '' }))
+                                                            : [{ key: '', value: '' }];
+                                                        setWebhookIntegrationData({
+                                                            url: integ.url || '',
+                                                            customHeaders: headers.length > 0 ? headers : [{ key: '', value: '' }],
+                                                            contextSources: Array.isArray(integ.contextSources) ? integ.contextSources : ['API'],
+                                                            lastSyncTime: integ.lastSyncTime || 0
+                                                        });
+                                                    } else {
+                                                        setWebhookIntegrationData(null);
+                                                    }
+                                                } catch (_) {
+                                                    setWebhookIntegrationData(null);
+                                                }
+                                                setWebhookIntegrationModalOpen(true);
+                                            },
                                             prefix: <Box><Icon source={FileMinor} /></Box>
                                         },
                                         {
@@ -763,18 +788,39 @@ function ThreatDetectionPage() {
             </Popover>
         </HorizontalStack>
     )
-    return <PageWithMultipleCards
-        title={
-            <TitleWithInfo
-                titleText={mapLabel("API Threat Activity", getDashboardCategory())}
-                tooltipContent={`Identify malicious requests with Akto's powerful ${mapLabel("Threat", getDashboardCategory())} detection capabilities`}
+    return (
+        <>
+            <WebhookIntegrationModal
+                open={webhookIntegrationModalOpen}
+                onClose={() => setWebhookIntegrationModalOpen(false)}
+                initialEndpoint={webhookIntegrationData?.url ?? ''}
+                initialHeaders={webhookIntegrationData?.customHeaders ?? [{ key: '', value: '' }]}
+                initialContextSources={webhookIntegrationData?.contextSources ?? ['API']}
+                lastSyncTime={webhookIntegrationData?.lastSyncTime ?? 0}
+                onSave={async (config) => {
+                    try {
+                        await api.addThreatActivityWebhookIntegration(config.webhookEndpoint, config.customHeaders, config.contextSources);
+                        func.setToast(true, false, 'Webhook integration saved');
+                        setWebhookIntegrationModalOpen(false);
+                    } catch (e) {
+                        func.setToast(true, true, e?.message || 'Failed to save webhook integration');
+                    }
+                }}
             />
-        }
-        isFirstPage={true}
-        primaryAction={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
-        components={components}
-        secondaryActions={secondaryActionsComp}
-    />
+            <PageWithMultipleCards
+                title={
+                    <TitleWithInfo
+                        titleText={mapLabel("API Threat Activity", getDashboardCategory())}
+                        tooltipContent={`Identify malicious requests with Akto's powerful ${mapLabel("Threat", getDashboardCategory())} detection capabilities`}
+                    />
+                }
+                isFirstPage={true}
+                primaryAction={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
+                components={components}
+                secondaryActions={secondaryActionsComp}
+            />
+        </>
+    );
 }
 
 export default ThreatDetectionPage;

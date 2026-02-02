@@ -241,6 +241,24 @@ const threatDetectionRequests = {
             data: {}
         })
     },
+    fetchThreatActivityWebhookIntegration() {
+        return request({
+            url: '/api/fetchThreatActivityWebhookIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addThreatActivityWebhookIntegration(webhookUrl, customHeaders, contextSources) {
+        return request({
+            url: '/api/addThreatActivityWebhookIntegration',
+            method: 'post',
+            data: {
+                webhookUrl: webhookUrl,
+                customHeaders: customHeaders || [],
+                ...(contextSources && contextSources.length > 0 ? { contextSources } : {})
+            }
+        })
+    },
     generateThreatReport(filtersForReport, threatIdsForReport) {
         return request({
             url: '/api/generateThreatReport',
