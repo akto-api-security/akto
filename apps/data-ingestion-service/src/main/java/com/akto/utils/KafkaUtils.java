@@ -18,10 +18,6 @@ public class KafkaUtils {
         int kafkaLingerMS = Integer.parseInt(System.getenv().getOrDefault("AKTO_KAFKA_PRODUCER_LINGER_MS", "10"));
         String kafkaUsername = System.getenv("AKTO_KAFKA_USERNAME");
         String kafkaPassword = System.getenv("AKTO_KAFKA_PASSWORD");
-
-        logger.infoAndAddToDb("Initializing Kafka producer with broker: " + kafkaBrokerUrl, LoggerMaker.LogDb.DATA_INGESTION);
-        logger.infoAndAddToDb("Kafka authentication: " + (kafkaUsername != null ? "enabled (user: " + kafkaUsername + ")" : "disabled"), LoggerMaker.LogDb.DATA_INGESTION);
-
         kafkaProducer = new Kafka(kafkaBrokerUrl, kafkaLingerMS, batchSize, kafkaUsername, kafkaPassword, LoggerMaker.LogDb.DATA_INGESTION);
         logger.infoAndAddToDb("Kafka Producer Init " + Context.now(), LoggerMaker.LogDb.DATA_INGESTION);
     }

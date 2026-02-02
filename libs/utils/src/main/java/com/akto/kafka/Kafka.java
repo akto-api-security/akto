@@ -168,20 +168,13 @@ public class Kafka {
 
     // Add SASL authentication if username and password are provided
     if (username != null && !username.isEmpty() && password != null && !password.isEmpty()) {
-      logger.info("Enabling Kafka SASL authentication for user: " + username);
-      logger.info("DEBUG - Kafka credentials - Username: [" + username + "], Password: [" + password + "]");
       KafkaConfig.addAuthenticationProperties(kafkaProps, username, password);
-    } else {
-      logger.info("Kafka SASL authentication not enabled (username or password not provided)");
-      logger.info("DEBUG - Username: [" + username + "], Password: [" + password + "]");
     }
 
     try {
-      logger.info("Creating Kafka producer with broker: " + brokerIP);
       producer = new KafkaProducer<String, String>(kafkaProps);
     } catch (Exception e) {
       logger.errorAndAddToDb("Error while creating kafka producer: " + e.getMessage());
-      e.printStackTrace();
       return;
     }
 
@@ -190,14 +183,10 @@ public class Kafka {
     // if any error then close the connection
     ProducerRecord<String, String> record = new ProducerRecord<>("akto.misc", "ping");
     try {
-      logger.info("Testing Kafka connection by sending ping message to akto.misc topic...");
       producer.send(record).get();
       producerReady = true;
-      logger.info("Kafka producer connection test successful - producer is ready");
-    } catch (Exception e) {
-      logger.errorAndAddToDb("Producer connection test failed: " + e.getClass().getName() + " - " + e.getMessage());
-      logger.error("Full error details: " + e.toString());
-      e.printStackTrace();
+    } catch (Exception ignored) {
+      logger.error("Producer not ready. Cannot send message.");
       close();
     }
   }
