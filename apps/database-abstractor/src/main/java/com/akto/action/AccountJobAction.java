@@ -58,25 +58,29 @@ public class AccountJobAction extends ActionSupport {
      */
     public String fetchAndClaimAccountJob() {
         try {
+            // Convert long to int for proper type handling
+            int nowInt = (int) now;
+            int heartbeatThresholdInt = (int) (now - heartbeatThreshold);
+
             // Build filter: scheduled jobs or stale running jobs
             Bson scheduledFilter = Filters.and(
                 Filters.eq(AccountJob.JOB_STATUS, JobStatus.SCHEDULED.name()),
-                Filters.lt(AccountJob.SCHEDULED_AT, now)
+                Filters.lt(AccountJob.SCHEDULED_AT, nowInt)
             );
 
             Bson staleRunningFilter = Filters.and(
                 Filters.eq(AccountJob.JOB_STATUS, JobStatus.RUNNING.name()),
-                Filters.lt(AccountJob.HEARTBEAT_AT, now - heartbeatThreshold)
+                Filters.lt(AccountJob.HEARTBEAT_AT, heartbeatThresholdInt)
             );
 
             Bson filter = Filters.or(scheduledFilter, staleRunningFilter);
 
-            // Update to RUNNING with heartbeat
+            // Update to RUNNING with heartbeat (use int values for consistency)
             Bson update = Updates.combine(
                 Updates.set(AccountJob.JOB_STATUS, JobStatus.RUNNING.name()),
-                Updates.set(AccountJob.STARTED_AT, now),
-                Updates.set(AccountJob.HEARTBEAT_AT, now),
-                Updates.set(AccountJob.LAST_UPDATED_AT, now)
+                Updates.set(AccountJob.STARTED_AT, nowInt),
+                Updates.set(AccountJob.HEARTBEAT_AT, nowInt),
+                Updates.set(AccountJob.LAST_UPDATED_AT, nowInt)
             );
 
             // Atomic findOneAndUpdate
@@ -90,6 +94,10 @@ public class AccountJobAction extends ActionSupport {
 
             if (claimedJob != null) {
                 this.accountJob = mapper.convertValue(claimedJob, Map.class);
+                // Convert ObjectId to string for consistent serialization
+                if (claimedJob.getId() != null) {
+                    this.accountJob.put("_id", claimedJob.getId().toHexString());
+                }
                 loggerMaker.debug("Claimed job: {}", claimedJob.getId());
             } else {
                 this.accountJob = null;
@@ -180,9 +188,32 @@ public class AccountJobAction extends ActionSupport {
 
             Bson filter = Filters.eq(AccountJob.ID, id);
 
-            // Build update from map
+            // Build update from map with proper type conversion
+            java.util.Set<String> integerFields = new java.util.HashSet<>(java.util.Arrays.asList(
+                AccountJob.SCHEDULED_AT,
+                AccountJob.STARTED_AT,
+                AccountJob.FINISHED_AT,
+                AccountJob.HEARTBEAT_AT,
+                AccountJob.LAST_UPDATED_AT,
+                AccountJob.CREATED_AT,
+                AccountJob.RECURRING_INTERVAL_SECONDS
+            ));
+
             Bson[] updateOperations = updates.entrySet().stream()
-                .map(entry -> Updates.set(entry.getKey(), entry.getValue()))
+                .map(entry -> {
+                    String key = entry.getKey();
+                    Object value = entry.getValue();
+
+                    if (integerFields.contains(key) && value != null) {
+                        if (value instanceof Long) {
+                            value = ((Long) value).intValue();
+                        } else if (value instanceof Double) {
+                            value = ((Double) value).intValue();
+                        }
+                    }
+
+                    return Updates.set(key, value);
+                })
                 .toArray(Bson[]::new);
 
             Bson update = Updates.combine(updateOperations);
@@ -208,6 +239,10 @@ public class AccountJobAction extends ActionSupport {
 
             if (job != null) {
                 this.accountJob = mapper.convertValue(job, Map.class);
+                // Convert ObjectId to string for consistent serialization
+                if (job.getId() != null) {
+                    this.accountJob.put("_id", job.getId().toHexString());
+                }
                 loggerMaker.debug("Fetched job: jobId={}", jobId);
             } else {
                 this.accountJob = null;
