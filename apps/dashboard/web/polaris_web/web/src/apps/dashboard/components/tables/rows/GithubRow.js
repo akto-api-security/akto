@@ -29,7 +29,7 @@ const CellType = {
 
 function GithubRow(props) {
 
-    const {dataObj, getNextUrl, selectedResources, index, headers, hasRowActions, getActions, onRowClick, getStatus, headings, popoverActive, setPopoverActive } = props;
+    const {dataObj, getNextUrl, selectedResources, index, headers, hasRowActions, getActions, onRowClick, getStatus, headings, popoverActive, setPopoverActive, preventRowClickOnActions } = props;
     const navigate = useNavigate();
     const [data, setData] = useState(dataObj);
     const [collapsibleActive, setCollapsibleActive] = useState("none")
@@ -173,23 +173,24 @@ function GithubRow(props) {
     }
 
     function ActionCell(customKey) {
+        const actionsContent = (
+            <HorizontalStack align='end'>
+                <Popover
+                    active={popoverActive === data.id}
+                    activator={<Button onClick={(e) => togglePopoverActive(e,data.id)} plain icon={HorizontalDotsMinor} />}
+                    autofocusTarget="first-node"
+                    onClose={(e) => togglePopoverActive(e,popoverActive)}
+                >
+                    <ActionList
+                        actionRole="menuitem"
+                        sections={getActions(data)}
+                    />
+                </Popover>
+            </HorizontalStack>
+        );
         return (
             <IndexTable.Cell key={customKey || "actions"}>
-                <HorizontalStack align='end'>
-                    {
-                        <Popover
-                            active={popoverActive === data.id}
-                            activator={<Button onClick={(e) => togglePopoverActive(e,data.id)} plain icon={HorizontalDotsMinor} />}
-                            autofocusTarget="first-node"
-                            onClose={(e) => togglePopoverActive(e,popoverActive)}
-                        >
-                            <ActionList
-                                actionRole="menuitem"
-                                sections={getActions(data)}
-                            />
-                        </Popover>
-                    }
-                </HorizontalStack>
+                {preventRowClickOnActions ? <div onClick={(e) => e.stopPropagation()}>{actionsContent}</div> : actionsContent}
             </IndexTable.Cell>
         )
     }
