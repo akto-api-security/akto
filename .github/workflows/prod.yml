@@ -360,6 +360,14 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: Run mvn package
+        if: ${{github.event.inputs.skipTests == 'False' }}
+        run: mvn package -Dakto-image-tag=${{ github.event.inputs.release_version}} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{github.event.inputs.release_version}}
+
+      - name: Run mvn package dangerously
+        if: ${{github.event.inputs.skipTests== 'True' }}
+        run: mvn package -Dakto-image-tag=${{ github.event.inputs.release_version }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{github.event.inputs.release_version}} -DskipTests
+
       - name: DockerHub login
         env:
           DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
