@@ -377,10 +377,8 @@ jobs:
           docker buildx create --use
           # Build a docker container and push it to DockerHub
           cd apps/dashboard
-          if [[ "${{ github.event.inputs.threat_detection}}" == "true" ]]; then
-            cd ../account-job-executor
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-account-job-executor:$IMAGE_VERSION -t $ECR_REGISTRY/akto-account-job-executor:$IMAGE_VERSION_LATEST . --push
-          fi
+          cd ../account-job-executor
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-account-job-executor:$IMAGE_VERSION -t $ECR_REGISTRY/akto-account-job-executor:$IMAGE_VERSION_LATEST . --push
       
       - name: Configure AWS Credentials for ECR
         uses: aws-actions/configure-aws-credentials@v1
