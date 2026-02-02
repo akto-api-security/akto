@@ -371,7 +371,7 @@ jobs:
         with:
           version: "29.2"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          
+
       - uses: bufbuild/buf-action@v1
         with:
           setup_only: true
@@ -423,7 +423,7 @@ jobs:
         uses: mathieudutour/github-tag-action@v6.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          custom_tag: guardrails-service-${{ github.event.inputs.release_version }}
+          custom_tag: account-jobs-executor-service-${{ github.event.inputs.release_version }}
 
       - name: Create a GitHub release
         uses: ncipollo/release-action@v1.12.0
