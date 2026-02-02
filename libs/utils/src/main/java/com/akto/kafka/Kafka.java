@@ -84,7 +84,7 @@ public class Kafka {
     producerReady = false;
     try {
       logger = new LoggerMaker(Kafka.class, logDb);
-      setProducer(brokerIP, lingerMS, batchSize, Serializer.STRING, Serializer.STRING, 30000, 0, username, password);
+      setProducer(brokerIP, lingerMS, batchSize, Serializer.STRING, Serializer.STRING, 5000, 0, username, password);
     } catch (Exception e) {
       logger.errorAndAddToDb("Error while creating producer: " + e.getMessage());
       e.printStackTrace();
