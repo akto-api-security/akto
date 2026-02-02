@@ -101,7 +101,7 @@ public class OrganizationCache {
                     OrganizationInfo orgInfo = new OrganizationInfo(orgId, adminEmail, planType);
                     domainToOrgInfoCache.put(domain, orgInfo);
 
-                    logger.infoAndAddToDb("Cached organization: " + orgId + " with domain: " + domain +
+                    logger.debug("Cached organization: " + orgId + " with domain: " + domain +
                             ", email: " + adminEmail + ", planType: " + planType +
                             " (selected from " + orgsForDomain.size() + " organizations)");
                 }
