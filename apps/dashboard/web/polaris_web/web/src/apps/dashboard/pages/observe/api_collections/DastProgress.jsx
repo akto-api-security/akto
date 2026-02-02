@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react"
 import { Box, IndexFiltersMode, Text } from "@shopify/polaris"
-import { CircleCancelMajor } from "@shopify/polaris-icons"
+import { CircleCancelMajor, ReplayMinor } from "@shopify/polaris-icons"
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable"
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow"
 import api from "./api"
+import quickStartApi from "../../quick_start/api"
 import func from "@/util/func"
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered"
 import TooltipText from "@/apps/dashboard/components/shared/TooltipText"
@@ -98,16 +99,48 @@ const resourceName = {
 }
 
 function getActions(item, fetchAllDastScans) {
-    const isStopped = item.status === "STOPPED"
+    const isStopDisabled = item.status === "STOPPED" || item.status === "STOP_REQUESTED"
+    const run = item.runData
+    const canDuplicate = run && !(run.cookies && !run.testRoleHexId)
     return [
         {
             title: "Actions",
             items: [
                 {
+                    content: "Duplicate scan",
+                    icon: ReplayMinor,
+                    disabled: !canDuplicate,
+                    onAction: async () => {
+                        if (!run) return
+                        try {
+                            await quickStartApi.initiateCrawler(
+                                run.hostname,
+                                run.username ?? '',
+                                run.password ?? '',
+                                run.apiKey ?? '',
+                                run.dashboardUrl ?? window.location.origin,
+                                run.testRoleHexId ?? '',
+                                run.outScopeUrls ?? '',
+                                run.crawlingTime ?? 600,
+                                (run.moduleName && run.moduleName !== "Internal DAST (Akto)") ? run.moduleName : '',
+                                run.customHeaders ?? {},
+                                run.runTestAfterCrawling ?? false,
+                                run.selectedMiniTestingService ?? '',
+                                run.urlTemplatePatterns ?? '',
+                                run.applicationPages ?? ''
+                            )
+                            func.setToast(true, false, "Duplicate scan started")
+                            fetchAllDastScans()
+                        } catch {
+                            func.setToast(true, true, "Failed to duplicate scan")
+                        }
+                    }
+                },
+                {
                     content: "Stop scan",
                     icon: CircleCancelMajor,
                     destructive: true,
-                    disabled: isStopped,
+                    disabled: isStopDisabled,
                     onAction: async () => {
                         try {
                             await api.stopCrawler(item.crawlId)
@@ -190,7 +223,8 @@ function DastProgress() {
                         </Box>
                     ),
                     nextUrl: `/dashboard/observe/dast-progress/${run.crawlId}`,
-                    status: run.status || null
+                    status: run.status || null,
+                    runData: run
                 }
             })
 
