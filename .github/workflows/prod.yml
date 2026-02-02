@@ -375,9 +375,12 @@ jobs:
           IMAGE_VERSION_LATEST: latest
         run: |
           docker buildx create --use
-          cd apps/account-job-executor
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-account-job-executor:$IMAGE_VERSION -t $ECR_REGISTRY/akto-account-job-executor:$IMAGE_VERSION_LATEST . --push
-          echo "::set-output name=image::$ECR_REGISTRY/akto-account-job-executor:$IMAGE_VERSION"
+          # Build a docker container and push it to DockerHub
+          cd apps/dashboard
+          if [[ "${{ github.event.inputs.threat_detection}}" == "true" ]]; then
+            cd ../account-job-executor
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-account-job-executor:$IMAGE_VERSION -t $ECR_REGISTRY/akto-account-job-executor:$IMAGE_VERSION_LATEST . --push
+          fi
           
 
       - name: Configure AWS Credentials for ECR
