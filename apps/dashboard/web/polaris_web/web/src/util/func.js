@@ -1889,7 +1889,7 @@ joinWordsWithUnderscores(input) {
     const segments = transformedString.split('/');
     for (let i = 0; i < segments.length; i++) {
         // Check if the segment is alphanumeric
-        if (/^[0-9a-fA-F]+$/.test(segments[i]) || /^[0-9]+$/.test(segments[i])) {
+        if (/^-?[0-9a-fA-F]+$/.test(segments[i]) || /^-?[0-9]+$/.test(segments[i])) {
         segments[i] = 'id';
         }
     }
