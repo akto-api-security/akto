@@ -24,6 +24,7 @@ import LineChart from "../../components/charts/LineChart";
 import P95LatencyGraph from "../../components/charts/P95LatencyGraph";
 import { LABELS } from "./constants";
 import useThreatReportDownload from "../../hooks/useThreatReportDownload";
+import WebhookIntegrationModal from "./components/WebhookIntegrationModal";
 
 const convertToGraphData = (severityMap) => {
     let dataArr = []
@@ -246,6 +247,8 @@ function ThreatDetectionPage() {
     const [subCategoryCount, setSubCategoryCount] = useState([]);
     const [severityCountMap, setSeverityCountMap] = useState([]);
     const [moreActions, setMoreActions] = useState(false);
+    const [webhookIntegrationModalOpen, setWebhookIntegrationModalOpen] = useState(false);
+    const [webhookIntegrationData, setWebhookIntegrationData] = useState(null);
     const [latencyData, setLatencyData] = useState([]);
     const [detailsLoading, setDetailsLoading] = useState(false);
     const pollingIntervalRef = useRef(null);
@@ -622,75 +625,48 @@ function ThreatDetectionPage() {
     }
 
     const exportToAdx = async () => {
-        // Clear any existing polling interval
         if (pollingIntervalRef.current) {
             clearInterval(pollingIntervalRef.current);
             pollingIntervalRef.current = null;
         }
-
         try {
             const resp = await api.exportThreatActivityToAdx(startTimestamp, endTimestamp);
-            
-            // Show initial processing message
             func.setToast(true, false, resp.exportMessage || "Export under processing");
-            
-            // Start polling for status every 2 seconds
             pollingIntervalRef.current = setInterval(async () => {
                 try {
                     const statusResp = await api.getAdxExportStatus();
-                    
                     if (statusResp.exportMessage === "No export in progress.") {
-                        // Export status was cleared (already completed)
                         if (pollingIntervalRef.current) {
                             clearInterval(pollingIntervalRef.current);
                             pollingIntervalRef.current = null;
                         }
                         return;
                     }
-                    
                     const message = statusResp.exportMessage || "";
-                    const exportSuccess = statusResp.exportSuccess;
-                    
-                    // Backend status logic:
-                    // - PROCESSING: exportSuccess = true, message = "Export under processing"
-                    // - SUCCESS: exportSuccess = true, message = "Exported successfully"
-                    // - FAILED: exportSuccess = false, message = error message
-                    
                     const isProcessing = message.includes("Export under processing");
-                    
-                    // If still processing, continue polling
-                    if (isProcessing) {
-                        return;
-                    }
-                    
-                    // Export completed - stop polling
+                    if (isProcessing) return;
                     if (pollingIntervalRef.current) {
                         clearInterval(pollingIntervalRef.current);
                         pollingIntervalRef.current = null;
                     }
-                    
-                    // Determine final state: exportSuccess is true for SUCCESS, false for FAILED
-                    if (exportSuccess) {
-                        // Status is SUCCESS
+                    if (statusResp.exportSuccess) {
                         func.setToast(true, false, message || "Exported successfully");
                     } else {
-                        // Status is FAILED
                         func.setToast(true, true, message || "Failed to export threat activity to ADX");
                     }
                 } catch (error) {
-                    // On error, stop polling
                     if (pollingIntervalRef.current) {
                         clearInterval(pollingIntervalRef.current);
                         pollingIntervalRef.current = null;
                     }
                     func.setToast(true, true, "Error checking export status: " + (error.message || "Unknown error"));
                 }
-            }, 2000); // Poll every 2 seconds
+            }, 2000);
         } catch (error) {
             func.setToast(true, true, "Error exporting to ADX: " + (error.message || "Unknown error"));
         }
         setMoreActions(false);
-    }
+    };
 
     const secondaryActionsComp = (
         <HorizontalStack gap={2}>
@@ -728,6 +704,33 @@ function ThreatDetectionPage() {
                                             prefix: <Box><Icon source={FileMinor} /></Box>
                                         },
                                         {
+                                            content: 'Export via webhook integration',
+                                            onAction: async () => {
+                                                setMoreActions(false);
+                                                try {
+                                                    const resp = await api.fetchThreatActivityWebhookIntegration();
+                                                    const integ = resp?.webhookIntegration;
+                                                    if (integ) {
+                                                        const headers = integ.customHeaders && typeof integ.customHeaders === 'object'
+                                                            ? Object.entries(integ.customHeaders).map(([key, value]) => ({ key, value: value || '' }))
+                                                            : [{ key: '', value: '' }];
+                                                        setWebhookIntegrationData({
+                                                            url: integ.url || '',
+                                                            customHeaders: headers.length > 0 ? headers : [{ key: '', value: '' }],
+                                                            contextSources: Array.isArray(integ.contextSources) ? integ.contextSources : ['API'],
+                                                            lastSyncTime: integ.lastSyncTime || 0
+                                                        });
+                                                    } else {
+                                                        setWebhookIntegrationData(null);
+                                                    }
+                                                } catch (_) {
+                                                    setWebhookIntegrationData(null);
+                                                }
+                                                setWebhookIntegrationModalOpen(true);
+                                            },
+                                            prefix: <Box><Icon source={FileMinor} /></Box>
+                                        },
+                                        {
                                             content: 'Configure Successful Exploits',
                                             onAction: () => navigate('/dashboard/protection/configure-exploits'),
                                             prefix: <Box><Icon source={FileMinor} /></Box>
@@ -746,18 +749,39 @@ function ThreatDetectionPage() {
             </Popover>
         </HorizontalStack>
     )
-    return <PageWithMultipleCards
-        title={
-            <TitleWithInfo
-                titleText={mapLabel("API Threat Activity", getDashboardCategory())}
-                tooltipContent={`Identify malicious requests with Akto's powerful ${mapLabel("Threat", getDashboardCategory())} detection capabilities`}
+    return (
+        <>
+            <WebhookIntegrationModal
+                open={webhookIntegrationModalOpen}
+                onClose={() => setWebhookIntegrationModalOpen(false)}
+                initialEndpoint={webhookIntegrationData?.url ?? ''}
+                initialHeaders={webhookIntegrationData?.customHeaders ?? [{ key: '', value: '' }]}
+                initialContextSources={webhookIntegrationData?.contextSources ?? ['API']}
+                lastSyncTime={webhookIntegrationData?.lastSyncTime ?? 0}
+                onSave={async (config) => {
+                    try {
+                        await api.addThreatActivityWebhookIntegration(config.webhookEndpoint, config.customHeaders, config.contextSources);
+                        func.setToast(true, false, 'Webhook integration saved');
+                        setWebhookIntegrationModalOpen(false);
+                    } catch (e) {
+                        func.setToast(true, true, e?.message || 'Failed to save webhook integration');
+                    }
+                }}
             />
-        }
-        isFirstPage={true}
-        primaryAction={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
-        components={components}
-        secondaryActions={secondaryActionsComp}
-    />
+            <PageWithMultipleCards
+                title={
+                    <TitleWithInfo
+                        titleText={mapLabel("API Threat Activity", getDashboardCategory())}
+                        tooltipContent={`Identify malicious requests with Akto's powerful ${mapLabel("Threat", getDashboardCategory())} detection capabilities`}
+                    />
+                }
+                isFirstPage={true}
+                primaryAction={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
+                components={components}
+                secondaryActions={secondaryActionsComp}
+            />
+        </>
+    );
 }
 
 export default ThreatDetectionPage;
