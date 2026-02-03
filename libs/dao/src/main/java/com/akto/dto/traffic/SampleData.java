@@ -12,6 +12,7 @@ public class SampleData {
     List<String> samples;
     public static final String SAMPLE_IDS = "sampleIds";
     List<String> sampleIds;
+    List<String> traces;
 
     List<Integer> collectionIds;
 
