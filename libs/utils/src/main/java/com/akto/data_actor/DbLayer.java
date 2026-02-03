@@ -70,6 +70,8 @@ import com.akto.dao.testing.config.TestScriptsDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.threat_detection.ApiHitCountInfoDao;
+import com.akto.dao.tracing.SpanDao;
+import com.akto.dao.tracing.TraceDao;
 import com.akto.dao.traffic_metrics.RuntimeMetricsDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dao.upload.FileUploadsDao;
@@ -101,6 +103,8 @@ import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.threat_detection.ApiHitCountInfo;
+import com.akto.dto.tracing.Span;
+import com.akto.dto.tracing.Trace;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.SuspectSampleData;
@@ -2519,5 +2523,13 @@ public class DbLayer {
         }
         
         AgentTrafficLogDao.instance.insertMany(agentTrafficLogs);
+    }
+
+    public static void storeTrace(Trace trace) {
+        TraceDao.instance.insertOne(trace);
+    }
+
+    public static void storeSpans(List<Span> spans) {
+        SpanDao.instance.insertMany(spans);
     }
 }

@@ -29,6 +29,8 @@ import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.threat_detection.ApiHitCountInfo;
+import com.akto.dto.tracing.Span;
+import com.akto.dto.tracing.Trace;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
@@ -38,7 +40,6 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -388,4 +389,8 @@ public abstract class DataActor {
     public abstract List<McpAuditInfo> fetchMcpAuditInfo(Integer updatedAfter, List<String> remarksList);
 
     public abstract void storeConversationResults(List<AgentConversationResult> conversationResults);
+
+    public abstract void storeTrace(Trace trace);
+
+    public abstract void storeSpans(List<Span> spans);
 }

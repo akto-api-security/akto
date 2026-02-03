@@ -41,6 +41,8 @@ import com.akto.dto.testing.*;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.threat_detection.ApiHitCountInfo;
+import com.akto.dto.tracing.Span;
+import com.akto.dto.tracing.Trace;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.SuspectSampleData;
@@ -3374,6 +3376,30 @@ public class DbAction extends ActionSupport {
         }
     }
 
+    private Trace trace;
+    private List<Span> spans;
+
+    public String storeTrace() {
+
+        try {
+            DbLayer.storeTrace(trace);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in storeTrace " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String storeSpans() {
+        try {
+            DbLayer.storeSpans(spans);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in storeSpans " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+    
     private TestingRun triggerTestsAfterCrawling(CrawlerRun crawlerRun) {
         // Validate input
         if (crawlerRun == null || !crawlerRun.isRunTestAfterCrawling()) {
@@ -5056,5 +5082,21 @@ public class DbAction extends ActionSupport {
         }
 
         return bulkWrites;
+    }
+
+    public Trace getTrace() {
+        return trace;
+    }
+
+    public void setTrace(Trace trace) {
+        this.trace = trace;
+    }
+
+    public List<Span> getSpans() {
+        return spans;
+    }
+
+    public void setSpans(List<Span> spans) {
+        this.spans = spans;
     }
 }

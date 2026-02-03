@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.collections.CollectionUtils;
@@ -60,18 +61,6 @@ public class ApiCollection {
     String sseCallbackUrl;
     public static final String SSE_CALLBACK_URL = "sseCallbackUrl";
 
-    private static final List<String> ENV_KEYWORDS_WITH_DOT = Arrays.asList(
-        "staging", "preprod", "qa", "demo", "dev", "test", "svc", 
-        "localhost", "local", "intranet", "lan", "example", "invalid", 
-        "home", "corp", "priv", "localdomain", "localnet", "network", 
-        "int", "private"
-    );
-
-    private static final List<String> ENV_KEYWORDS_WITHOUT_DOT = Arrays.asList(
-        "kubernetes", "internal"
-    );
-
-
     public enum Type {
         API_GROUP
     }
@@ -100,6 +89,20 @@ public class ApiCollection {
     String serviceTag;
     public static final String SERVICE_TAG = "serviceTag";
 
+    private static final List<String> ENV_KEYWORDS_WITH_DOT = Arrays.asList(
+            "staging", "preprod", "qa", "demo", "dev", "test", "svc",
+            "localhost", "local", "intranet", "lan", "example", "invalid",
+            "home", "corp", "priv", "localdomain", "localnet", "network",
+            "int", "private");
+    
+    private static final List<String> ENV_KEYWORDS_WITHOUT_DOT = Arrays.asList(
+        "kubernetes", "internal"
+    );
+
+    Map<String, ServiceGraphEdgeInfo> serviceGraphEdges;
+    public static final String SERVICE_GRAPH_EDGES = "serviceGraphEdges";
+
+
     public ApiCollection() {
     }
 
@@ -121,6 +124,47 @@ public class ApiCollection {
         this.type = Type.API_GROUP;
         this.startTs = Context.now();
     }
+
+    public static class ServiceGraphEdgeInfo {
+        private String sourceService;
+        private String targetService;
+        private Map<String, Object> metadata;   
+
+        public ServiceGraphEdgeInfo() {
+        }
+
+        public ServiceGraphEdgeInfo(String sourceService, String targetService, Map<String, Object> metadata) {
+            this.sourceService = sourceService;
+            this.targetService = targetService;
+            this.metadata = metadata;
+        }
+
+        public String getSourceService() {
+            return sourceService;
+        }
+
+        public void setSourceService(String sourceService) {
+            this.sourceService = sourceService;
+        }
+
+        public String getTargetService() {
+            return targetService;
+        }
+
+        public void setTargetService(String targetService) {
+            this.targetService = targetService;
+        }
+
+        public Map<String, Object> getMetadata() {
+            return metadata;
+        }
+
+        public void setMetadata(Map<String, Object> metadata) {
+            this.metadata = metadata;
+        }
+    }
+
+
 
     public static boolean useHost = true;
 
@@ -420,6 +464,14 @@ public class ApiCollection {
 
     public void setServiceTag(String serviceTag) {
         this.serviceTag = serviceTag;
+    }
+
+    public Map<String, ServiceGraphEdgeInfo> getServiceGraphEdges() {
+        return serviceGraphEdges;
+    }
+
+    public void setServiceGraphEdges(Map<String, ServiceGraphEdgeInfo> serviceGraphEdges) {
+        this.serviceGraphEdges = serviceGraphEdges;
     }
 
 }
