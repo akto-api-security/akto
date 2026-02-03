@@ -1222,15 +1222,7 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
     }
 
 
-    /**
-     * Internal method: Fetch common agentic components grouped by collection
-     * Groups API endpoints by collection, counts them, and returns top N sorted by count
-     *
-     * @param startTimestamp Start time filter
-     * @param endTimestamp End time filter
-     * @param componentType Type of component: MCP_SERVERS, LLMS, AI_AGENTS
-     * @return List of {name, count} objects sorted by count descending
-     */
+
     // ========== Helper Methods ==========
 
     private Set<Integer> getDeactivatedCollections() {
