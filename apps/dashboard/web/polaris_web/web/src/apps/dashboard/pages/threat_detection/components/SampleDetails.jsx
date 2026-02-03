@@ -38,7 +38,7 @@ function SampleDetails(props) {
         currentTemplateObj = moreInfoData?.templateId ? resolvedThreatFiltersMap[moreInfoData?.templateId] : undefined;
     }
 
-    let severity = currentTemplateObj?.severity || "HIGH"
+    let severity = moreInfoData?.severity || currentTemplateObj?.severity || "HIGH"
     const [remediationText, setRemediationText] = useState("")
     const [latestActivity, setLatestActivity] = useState([])
     const [showModal, setShowModal] = useState(false);  

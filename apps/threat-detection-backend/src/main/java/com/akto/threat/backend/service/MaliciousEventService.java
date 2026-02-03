@@ -111,6 +111,7 @@ public class MaliciousEventService {
     String filterId = evt.getFilterId();
 
     MaliciousEventDto.Builder builder = MaliciousEventDto.newBuilder();
+    String severity = evt.getSeverity();
     // Skip recording for specific policies on specific account
     if("1763355072".equals(accountId)){
       if (IGNORED_POLICIES_FOR_ACCOUNT.contains(filterId)) {
@@ -127,7 +128,7 @@ public class MaliciousEventService {
         boolean isInternalHost = host.contains(".svc") ||
             !hostWithoutPort.matches(".*\\.[a-zA-Z]{2,}$");
         if (isInternalHost) {
-          builder.setSeverity("LOW");
+          severity = "LOW";
         }
       }
     }
@@ -166,7 +167,7 @@ public class MaliciousEventService {
         .setCategory(evt.getCategory())
         .setSubCategory(evt.getSubCategory())
         .setRefId(refId)
-        .setSeverity(evt.getSeverity())
+        .setSeverity(severity)
         .setType(evt.getType())
         .setMetadata(evt.getMetadata().toString())
         .setSuccessfulExploit(evt.getSuccessfulExploit())

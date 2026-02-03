@@ -54,6 +54,8 @@ public class InviteUserAction extends UserAction{
         commonOrganisationsMap.put("blinkrx.com", "blinkhealth.com");
         commonOrganisationsMap.put("hollywoodbets.net ", "betsoftware.com ");
         commonOrganisationsMap.put("betsoftware.com ", "hollywoodbets.net ");
+        commonOrganisationsMap.put("lambdatest.com", "testmuai.com");
+        commonOrganisationsMap.put("testmuai.com", "lambdatest.com");
     }
 
     public static String validateEmail(String email, String adminLogin) {
@@ -87,7 +89,7 @@ public class InviteUserAction extends UserAction{
         return null;
     }
 
-    public static boolean isSameDomain(String inviteeDomain, String adminDomain) {
+    private static boolean isSameDomain(String inviteeDomain, String adminDomain) {
         if (inviteeDomain == null || adminDomain == null) return false;
         if (inviteeDomain.equalsIgnoreCase(adminDomain)) return true;
 

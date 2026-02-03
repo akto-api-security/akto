@@ -16,7 +16,9 @@ public class KafkaUtils {
         String kafkaBrokerUrl = System.getenv().getOrDefault("AKTO_KAFKA_BROKER_URL", "localhost:29092");
         int batchSize = Integer.parseInt(System.getenv().getOrDefault("AKTO_KAFKA_PRODUCER_BATCH_SIZE", "100"));
         int kafkaLingerMS = Integer.parseInt(System.getenv().getOrDefault("AKTO_KAFKA_PRODUCER_LINGER_MS", "10"));
-        kafkaProducer = new Kafka(kafkaBrokerUrl, kafkaLingerMS, batchSize, LoggerMaker.LogDb.DATA_INGESTION);
+        String kafkaUsername = System.getenv("AKTO_KAFKA_USERNAME");
+        String kafkaPassword = System.getenv("AKTO_KAFKA_PASSWORD");
+        kafkaProducer = new Kafka(kafkaBrokerUrl, kafkaLingerMS, batchSize, kafkaUsername, kafkaPassword, LoggerMaker.LogDb.DATA_INGESTION);
         logger.infoAndAddToDb("Kafka Producer Init " + Context.now(), LoggerMaker.LogDb.DATA_INGESTION);
     }
 

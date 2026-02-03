@@ -318,6 +318,10 @@ public class DaoInit {
         ClassModel<EndpointShieldLog> endpointShieldLogClassModel = ClassModel.builder(EndpointShieldLog.class).enableDiscriminator(true).build();
         ClassModel<GuardrailPolicies> guardrailPoliciesClassModel = ClassModel.builder(GuardrailPolicies.class).enableDiscriminator(true).build();
         ClassModel<IpReputationScore> ipReputationScoreClassModel = ClassModel.builder(IpReputationScore.class).enableDiscriminator(true).build();
+        ClassModel<ApiDependenciesFromSwagger.APIIdentifier> apiIdentifierClassModel = ClassModel.builder(ApiDependenciesFromSwagger.APIIdentifier.class)
+                .enableDiscriminator(true).build();
+        ClassModel<ApiDependenciesFromSwagger.Dependency> dependencyClassModel = ClassModel.builder(ApiDependenciesFromSwagger.Dependency.class)
+                .enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -360,7 +364,7 @@ public class DaoInit {
                 configSettingClassModel, configSettingsConditionTypeClassModel, roleClassModel, testingInstanceHeartBeat,
                 jobParams, autoTicketParams, agentModel, ModuleInfoClassModel, testingIssueTicketsModel, tlsAuthClassModel,
                 ticketSyncJobParamsClassModel, apiHitCountInfoClassModel, collectionTagsModel, apiSequencesClassModel,
-                endpointShieldLogClassModel, guardrailPoliciesClassModel, ipReputationScoreClassModel)
+                endpointShieldLogClassModel, guardrailPoliciesClassModel, ipReputationScoreClassModel, apiIdentifierClassModel, dependencyClassModel)
             .automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(

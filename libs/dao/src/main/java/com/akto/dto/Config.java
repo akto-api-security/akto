@@ -38,7 +38,7 @@ public abstract class Config {
 
     public enum ConfigType {
         SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, GOOGLE_SAML, AWS_WAF, SPLUNK_SIEM, AKTO_DASHBOARD_HOST_URL, CLOUDFLARE_WAF, RSA_KP, MCP_REGISTRY,
-        SLACK_ALERT_INTERNAL, ABUSEIPDB, DATA_DOG;
+        SLACK_ALERT_INTERNAL, ABUSEIPDB, DATA_DOG, BLOCK_ACCESS_WEBHOOK;
     }
 
     public ConfigType configType;
@@ -1118,5 +1118,29 @@ public abstract class Config {
             this.id = CONFIG_ID;
             this.apiKey = apiKey;
         }
+    }
+
+    @Getter
+    @Setter
+    @BsonDiscriminator
+    public static class BlockAccessWebhookConfig extends Config {
+
+        String webhook_url;
+        String slack_alert_type;
+        String slack_app_name;
+
+        public BlockAccessWebhookConfig() {
+            this.configType = ConfigType.BLOCK_ACCESS_WEBHOOK;
+            this.id = configType.name();
+        }
+
+        public BlockAccessWebhookConfig(String webhook_url, String slack_alert_type, String slack_app_name) {
+            this.configType = ConfigType.BLOCK_ACCESS_WEBHOOK;
+            this.id = configType.name();
+            this.webhook_url = webhook_url;
+            this.slack_alert_type = slack_alert_type;
+            this.slack_app_name = slack_app_name;
+        }
+
     }
 }

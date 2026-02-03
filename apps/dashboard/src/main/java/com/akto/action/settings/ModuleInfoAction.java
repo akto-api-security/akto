@@ -5,6 +5,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.monitoring.ModuleInfo.ModuleType;
+import com.akto.dto.monitoring.ModuleInfoConstants;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
@@ -42,21 +43,7 @@ public class ModuleInfoAction extends UserAction {
 
     private static final int heartbeatThresholdSeconds = 5 * 60; // 5 minutes
     private static final int rebootThresholdSeconds = 2 * 60; // 2 minutes
-    private static final String _DEFAULT_PREFIX_REGEX_STRING = "^Default_";
-
-    // Whitelist of environment variables that are safe to expose to frontend
-    private static final Map<String, String> ALLOWED_ENV_KEYS_MAP = new HashMap<String, String>() {{
-        put("AKTO_KAFKA_BROKER_MAL", "Kafka Broker MAL");
-        put("AKTO_KAFKA_BROKER_URL", "Kafka Broker URL");
-        put("AKTO_TRAFFIC_BATCH_SIZE", "Traffic Batch Size");
-        put("AKTO_TRAFFIC_BATCH_TIME_SECS", "Traffic Batch Time (Seconds)");
-        put("AKTO_LOG_LEVEL", "Log Level");
-        put("DEBUG_URLS", "Debug URLs (url1,url2,url3)");
-        put("AKTO_K8_METADATA_CAPTURE", "K8 Metadata Capture");
-        put("AKTO_THREAT_ENABLED", "Threat Enabled");
-        put("AKTO_IGNORE_ENVOY_PROXY_CALLS", "Ignore Envoy Proxy Calls");
-        put("AKTO_IGNORE_IP_TRAFFIC", "Ignore IP Traffic");
-    }};
+    private static final String _DEFAULT_PREFIX_REGEX_STRING = "^(Default_|akto-mr)";
 
     private List<Map<String, String>> allowedEnvFields;
 
@@ -64,6 +51,7 @@ public class ModuleInfoAction extends UserAction {
         List<Bson> filters = new ArrayList<>();
 
         boolean isEndpointShield = false;
+        boolean hasCustomHeartbeatFilter = false;
 
         // Apply filter if provided
         if (filter != null && !filter.isEmpty()) {
@@ -74,10 +62,29 @@ public class ModuleInfoAction extends UserAction {
                 }
                 filters.add(Filters.eq(ModuleInfo.MODULE_TYPE, moduleTypeStr));
             }
+
+            if (filter.containsKey(ModuleInfo.LAST_HEARTBEAT_RECEIVED)) {
+                Object heartbeatFilter = filter.get(ModuleInfo.LAST_HEARTBEAT_RECEIVED);
+                if (heartbeatFilter instanceof Map) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> heartbeatMap = (Map<String, Object>) heartbeatFilter;
+
+                    if (heartbeatMap.containsKey("$gte")) {
+                        int gte = ((Number) heartbeatMap.get("$gte")).intValue();
+                        filters.add(Filters.gte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, gte));
+                        hasCustomHeartbeatFilter = true;
+                    }
+                    if (heartbeatMap.containsKey("$lte")) {
+                        int lte = ((Number) heartbeatMap.get("$lte")).intValue();
+                        filters.add(Filters.lte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, lte));
+                        hasCustomHeartbeatFilter = true;
+                    }
+                }
+            }
             // Add more filter fields as needed
         }
 
-        if (!isEndpointShield) {
+        if (!isEndpointShield && !hasCustomHeartbeatFilter) {
             int deltaTime = Context.now() - heartbeatThresholdSeconds;
             filters.add(Filters.gte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, deltaTime));
         }
@@ -88,14 +95,17 @@ public class ModuleInfoAction extends UserAction {
         // Filter environment variables to only expose whitelisted keys
         filterEnvironmentVariables(moduleInfos);
 
-        // Prepare allowed env fields list
+        // Prepare allowed env fields list by combining all module-specific fields
         allowedEnvFields = new ArrayList<>();
-        for (Map.Entry<String, String> entry : ALLOWED_ENV_KEYS_MAP.entrySet()) {
-            Map<String, String> field = new HashMap<>();
-            field.put("key", entry.getKey());
-            field.put("label", entry.getValue());
-            field.put("type", getFieldType(entry.getKey()));
-            allowedEnvFields.add(field);
+        for (Map.Entry<ModuleType, Map<String, String>> moduleEntry : ModuleInfoConstants.ALLOWED_ENV_KEYS_BY_MODULE.entrySet()) {
+            for (Map.Entry<String, String> entry : moduleEntry.getValue().entrySet()) {
+                Map<String, String> field = new HashMap<>();
+                field.put("key", entry.getKey());
+                field.put("label", entry.getValue());
+                field.put("type", getFieldType(entry.getKey()));
+                field.put("moduleCategory", moduleEntry.getKey().toString());
+                allowedEnvFields.add(field);
+            }
         }
 
         return SUCCESS.toUpperCase();
@@ -109,7 +119,8 @@ public class ModuleInfoAction extends UserAction {
         if (key.equals("AKTO_IGNORE_ENVOY_PROXY_CALLS") ||
             key.equals("AKTO_IGNORE_IP_TRAFFIC") ||
             key.equals("AKTO_K8_METADATA_CAPTURE") ||
-            key.equals("AKTO_THREAT_ENABLED")) {
+            key.equals("AKTO_THREAT_ENABLED") ||
+            key.equals("AGGREGATION_RULES_ENABLED")) {
             return "boolean";
         }
         return "text";
@@ -135,11 +146,16 @@ public class ModuleInfoAction extends UserAction {
             @SuppressWarnings("unchecked")
             Map<String, Object> env = (Map<String, Object>) envObj;
 
-            // Create filtered env map with only allowed keys
+            // Create filtered env map with only allowed keys for the module's type
             Map<String, Object> filteredEnv = new HashMap<>();
-            for (String key : ALLOWED_ENV_KEYS_MAP.keySet()) {
-                if (env.containsKey(key)) {
-                    filteredEnv.put(key, env.get(key));
+            ModuleType moduleType = module.getModuleType();
+
+            Map<String, String> allowedKeys = ModuleInfoConstants.ALLOWED_ENV_KEYS_BY_MODULE.get(moduleType);
+            if (allowedKeys != null) {
+                for (String key : allowedKeys.keySet()) {
+                    if (env.containsKey(key)) {
+                        filteredEnv.put(key, env.get(key));
+                    }
                 }
             }
 
@@ -175,7 +191,8 @@ public class ModuleInfoAction extends UserAction {
                 Filters.gte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, deltaTimeForReboot),
                 Filters.or(
                     Filters.regex(ModuleInfo.NAME, _DEFAULT_PREFIX_REGEX_STRING),
-                    Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.TRAFFIC_COLLECTOR.toString())
+                    Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.TRAFFIC_COLLECTOR.toString()),
+                    Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.THREAT_DETECTION.toString())
                 )
             );
 
@@ -240,7 +257,10 @@ public class ModuleInfoAction extends UserAction {
             // Update each environment variable individually to preserve other env vars
             // Only allow whitelisted keys for security
             for (Map.Entry<String, String> entry : envData.entrySet()) {
-                if (ALLOWED_ENV_KEYS_MAP.containsKey(entry.getKey())) {
+                boolean isAllowedKey = ModuleInfoConstants.ALLOWED_ENV_KEYS_BY_MODULE.values().stream()
+                    .anyMatch(moduleEnvMap -> moduleEnvMap.containsKey(entry.getKey()));
+
+                if (isAllowedKey) {
                     updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + ".env." + entry.getKey(), entry.getValue()));
                 }
             }
