@@ -188,7 +188,14 @@ function DropdownSearch(props) {
                     </div>
                 ) 
             } : {})}
-            suffix={<Icon source={ChevronDownMinor} color="base" />}
+            suffix={
+                <span
+                    onClick={() => document.getElementById(id)?.focus()}
+                    style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                >
+                    <Icon source={ChevronDownMinor} color="base" />
+                </span>
+            }
             placeholder={placeholder}
             autoComplete="off"
             requiredIndicator={textfieldRequiredIndicator}
@@ -209,21 +216,24 @@ function DropdownSearch(props) {
     );
 
     return (
-            <Autocomplete
-                {...(allowMultiple ? {allowMultiple:true} : {} )}
-                options={options.slice(0,sliceMaxVal || 20)}
-                selected={selectedOptions}
-                onSelect={updateSelection}
-                emptyState={emptyState}
-                loading={loading}
-                textField={textField}
-                preferredPosition='below'
-                {...(showSelectAll ? {actionBefore:{
-                    content: checkboxLabel,
-                    onAction: () => selectAllFunc(),
-                }} : {})}
-            >
-            </Autocomplete>
+            <>
+                <style>{`#${id} { cursor: pointer; }`}</style>
+                <Autocomplete
+                    {...(allowMultiple ? {allowMultiple:true} : {} )}
+                    options={options.slice(0,sliceMaxVal || 20)}
+                    selected={selectedOptions}
+                    onSelect={updateSelection}
+                    emptyState={emptyState}
+                    loading={loading}
+                    textField={textField}
+                    preferredPosition='below'
+                    {...(showSelectAll ? {actionBefore:{
+                        content: checkboxLabel,
+                        onAction: () => selectAllFunc(),
+                    }} : {})}
+                >
+                </Autocomplete>
+            </>
     );
 }
 
