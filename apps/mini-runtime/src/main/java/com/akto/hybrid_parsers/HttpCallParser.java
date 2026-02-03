@@ -509,8 +509,14 @@ public class HttpCallParser {
             String n8nTraceJson = gson.toJson(n8nTraceMetadata);
 
             // Validate if this is parseable n8n trace data
-            if (!N8nTraceParser.getInstance().canParse(n8nTraceJson)) {
+            boolean canParse = N8nTraceParser.getInstance().canParse(n8nTraceJson);
+            loggerMaker.info("parseN8nTrace: N8nTraceParser.canParse() = " + canParse, LogDb.RUNTIME);
+
+            if (!canParse) {
                 loggerMaker.info("n8nTraceMetadata found but not valid n8n trace format", LogDb.RUNTIME);
+                // Log first 500 chars for debugging
+                String tracePreview = n8nTraceJson.length() > 500 ? n8nTraceJson.substring(0, 500) + "..." : n8nTraceJson;
+                loggerMaker.info("Invalid trace preview: " + tracePreview, LogDb.RUNTIME);
                 return;
             }
 
@@ -536,7 +542,7 @@ public class HttpCallParser {
             String hostname = getHostnameForCollection(httpResponseParam);
             int apiCollectionId = ServiceGraphBuilder.getInstance().getApiCollectionIdFromWorkflowId(workflowId, hostname);
 
-        
+
             if (apiCollectionId > 0) {
                 java.util.Map<String, ServiceGraphEdgeInfo> edges = N8nTraceParser.getInstance().extractServiceGraph(n8nTraceJson);
                 if (edges != null && !edges.isEmpty()) {
