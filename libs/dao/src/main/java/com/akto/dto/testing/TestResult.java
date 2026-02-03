@@ -26,9 +26,10 @@ public class TestResult extends GenericTestResult {
 
     private boolean requiresConfig;
 
-    
+
     private String conversationId;
     private boolean resultTypeAgentic;
+    private int externalApiTokens;
 
     /*
      * This field is being used as severity.
@@ -172,6 +173,14 @@ public class TestResult extends GenericTestResult {
 
     public void setResultTypeAgentic(boolean resultTypeAgentic) {
         this.resultTypeAgentic = resultTypeAgentic;
+    }
+
+    public int getExternalApiTokens() {
+        return externalApiTokens;
+    }
+
+    public void setExternalApiTokens(int externalApiTokens) {
+        this.externalApiTokens = externalApiTokens;
     }
 
     @Override

@@ -63,10 +63,19 @@ public class AgentClient {
 
         try {
             List<AgentConversationResult> conversationResults = processConversations(promptsList, conversationId, testMode);
-            
+
             boolean isVulnerable = conversationResults.get(conversationResults.size() - 1).isValidation();
             List<String> errors = new ArrayList<>();
-            
+
+            // Calculate total external API tokens across all conversations
+            int totalExternalApiTokens = 0;
+            for (AgentConversationResult result : conversationResults) {
+                int tokens = result.getExternalApiTokens();
+                loggerMaker.infoAndAddToDb("🔢 Adding tokens from conversation: " + tokens);
+                totalExternalApiTokens += tokens;
+            }
+            loggerMaker.infoAndAddToDb("TOTAL External API Tokens for test: " + totalExternalApiTokens);
+
             TestResult testResult = new TestResult();
             // TODO: Fill in message field
             testResult.setMessage(null);
@@ -76,10 +85,12 @@ public class AgentClient {
             testResult.setConfidence(TestResult.Confidence.HIGH);
             testResult.setErrors(errors);
             testResult.setPercentageMatch(isVulnerable ? 0.0 : 100.0);
-            
+            testResult.setExternalApiTokens(totalExternalApiTokens);
+            loggerMaker.infoAndAddToDb("TestResult.externalApiTokens set to: " + testResult.getExternalApiTokens());
+
             // Store conversation results in MongoDB
             storeConversationResults(conversationResults);
-            
+
             return testResult;
             
         } catch (Exception e) {
@@ -162,6 +173,7 @@ public class AgentClient {
     
     private AgentConversationResult parseResponse(String responseBody, String conversationId, String originalPrompt) throws Exception {
         try {
+            loggerMaker.infoAndAddToDb("🔍 RAW RESPONSE BODY: " + responseBody);
             JsonNode jsonNode = objectMapper.readTree(responseBody);
             
             String response = jsonNode.has("response") ? jsonNode.get("response").asText() : null;
@@ -189,8 +201,16 @@ public class AgentClient {
             if(jsonNode.has("finalSentPrompt")) {
                 finalSentPrompt = jsonNode.get("finalSentPrompt").asText();
             }
-            
-            return new AgentConversationResult(conversationId, originalPrompt, response, conversation, timestamp, validation, validationMessage, finalSentPrompt, remediationMessage);
+
+            int externalApiTokens = 0;
+            if(jsonNode.has("externalApiTokens")) {
+                externalApiTokens = jsonNode.get("externalApiTokens").intValue();
+                loggerMaker.infoAndAddToDb("EXTRACTED externalApiTokens: " + externalApiTokens);
+            } else {
+                loggerMaker.infoAndAddToDb("externalApiTokens field NOT FOUND in response");
+            }
+
+            return new AgentConversationResult(conversationId, originalPrompt, response, conversation, timestamp, validation, validationMessage, finalSentPrompt, remediationMessage, externalApiTokens);
             
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error parsing agent response: " + e.getMessage() + ", response body: " + responseBody);
@@ -300,7 +320,9 @@ public class AgentClient {
             if(storedTitle != null) {
                 title = storedTitle;
             }
-            return new GenericAgentConversation(title, conversationId, prompt, responseFromMcpServer, finalSentPrompt, timestamp, timestamp, tokensUsed, tokensLimit, conversationType);
+            // externalApiTokens is 0 for non-agentic conversations (e.g., ask_akto, docs_agent)
+            int externalApiTokens = 0;
+            return new GenericAgentConversation(title, conversationId, prompt, responseFromMcpServer, finalSentPrompt, timestamp, timestamp, tokensUsed, externalApiTokens, tokensLimit, conversationType);
         } catch (Exception e) {
             throw new Exception("Failed to get response from MCP server: " + e.getMessage());
         }

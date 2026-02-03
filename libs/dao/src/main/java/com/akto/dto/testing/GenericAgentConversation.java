@@ -27,6 +27,7 @@ public class GenericAgentConversation {
     private int createdAt;
     private int lastUpdatedAt;
     private int tokensUsed;
+    private int externalApiTokens;
     private int tokensLimit;
     private ConversationType conversationType;
 }

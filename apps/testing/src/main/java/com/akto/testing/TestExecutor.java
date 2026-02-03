@@ -841,12 +841,31 @@ public class TestExecutor {
                     VulnerableTestingRunResultDao.instance.insertMany(vulTestResults);
                 }
 
+                // Calculate total external API tokens from all test results
+                int totalExternalApiTokens = 0;
+                for (TestingRunResult runResult : testingRunResults) {
+                    if (runResult != null && runResult.getTestResults() != null) {
+                        for (GenericTestResult testResult : runResult.getTestResults()) {
+                            if (testResult instanceof TestResult) {
+                                int tokens = ((TestResult) testResult).getExternalApiTokens();
+                                loggerMaker.infoAndAddToDb("📊 TestExecutor reading tokens from TestResult: " + tokens, LogDb.TESTING);
+                                totalExternalApiTokens += tokens;
+                            }
+                        }
+                    }
+                }
+                loggerMaker.infoAndAddToDb("TestExecutor TOTAL tokens to add to summary: " + totalExternalApiTokens, LogDb.TESTING);
+
+                // Update summary with test count and cumulative external API tokens
                 TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
                     Filters.eq(Constants.ID, testRunResultSummaryId),
-                    Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, resultSize)
+                    Updates.combine(
+                        Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, resultSize),
+                        Updates.inc(TestingRunResultSummary.TOTAL_EXTERNAL_API_TOKENS, totalExternalApiTokens)
+                    )
                 );
 
-                loggerMaker.debugAndAddToDb("Updated count in summary", LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("Updated TestingRunResultSummary with " + totalExternalApiTokens + " tokens", LogDb.TESTING);
 
                 TestingIssuesHandler handler = new TestingIssuesHandler();
                 boolean triggeredByTestEditor = false;
