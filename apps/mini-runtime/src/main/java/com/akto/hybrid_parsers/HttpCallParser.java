@@ -450,6 +450,34 @@ public class HttpCallParser {
     }
 
     /**
+     * Checks if the HTTP response is N8N traffic by examining tags.
+     *
+     * @param httpResponseParam The HTTP response parameters
+     * @return true if this is N8N traffic, false otherwise
+     */
+    private boolean isN8nTraffic(HttpResponseParams httpResponseParam) {
+        try {
+            String tagsJson = httpResponseParam.getTags();
+            if (tagsJson == null || tagsJson.isEmpty()) {
+                return false;
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            if (tagsMap == null) {
+                return false;
+            }
+
+            String source = tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
+            return Constants.AI_AGENT_SOURCE_N8N.equals(source);
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error checking if traffic is N8N: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Parses N8N trace metadata from responsePayload and stores trace/span data.
      * The responsePayload structure is: {"output": {...}, "n8nTraceMetadata": {...}}
      * where n8nTraceMetadata contains the full n8n execution JSON needed by N8nTraceParser.
@@ -1115,8 +1143,12 @@ public class HttpCallParser {
             }
 
             int apiCollectionId = createApiCollectionId(httpResponseParam);
-
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
+
+            // Parse N8N trace metadata if this is N8N traffic
+            if (isN8nTraffic(httpResponseParam)) {
+                parseN8nTrace(httpResponseParam);
+            }
 
             //TODO("Parse JSON in one place for all the parser methods like Rest/GraphQL/JsonRpc")
             List<HttpResponseParams> responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
