@@ -48,24 +48,22 @@ const searchResultSections = {
 
 const categoryMapping = {
   "BOLA": { label: "API1:2023 Broken Object Level Authorization", url: "https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/" },
-  "Broken Authentication": { label: "API2:2023 Broken Authentication", url: "https://owasp.org/API-Security/editions/2023/en/0xa2-broken-authentication/" },
-  "Broken User Authentication": { label: "API2:2023 Broken Authentication", url: "https://owasp.org/API-Security/editions/2023/en/0xa2-broken-authentication/" },
+  "BUA": { label: "API2:2023 Broken Authentication", url: "https://owasp.org/API-Security/editions/2023/en/0xa2-broken-authentication/" },
+  "EDE": { label: "API3:2023 Broken Object Property Level Authorization", url: "https://owasp.org/API-Security/editions/2023/en/0xa3-broken-object-property-level-authorization/" },
+  "MA": { label: "API3:2023 Broken Object Property Level Authorization", url: "https://owasp.org/API-Security/editions/2023/en/0xa3-broken-object-property-level-authorization/" },
+  "RL": { label: "API4:2023 Unrestricted Resource Consumption", url: "https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/" },
   "BFLA": { label: "API5:2023 Broken Function Level Authorization", url: "https://owasp.org/API-Security/editions/2023/en/0xa5-broken-function-level-authorization/" },
+  "UASBF": { label: "API6:2023 Unrestricted Access to Sensitive Business Flows", url: "https://owasp.org/API-Security/editions/2023/en/0xa6-unrestricted-access-to-sensitive-business-flows/" },
+  "SSRF": { label: "API7:2023 Server Side Request Forgery", url: "https://owasp.org/API-Security/editions/2023/en/0xa7-server-side-request-forgery/" },
+  "SM": { label: "API8:2023 Security Misconfiguration", url: "https://owasp.org/API-Security/editions/2023/en/0xa8-security-misconfiguration/" },
   "IAM": { label: "API9:2023 Improper Inventory Management", url: "https://owasp.org/API-Security/editions/2023/en/0xa9-improper-inventory-management/" },
-  "EDE": { label: "API6:2023 Unrestricted Access to Sensitive Business Flows", url: "https://owasp.org/API-Security/editions/2023/en/0xa6-unrestricted-access-to-sensitive-business-flows/" },
-  "Lack of Resources & Rate Limiting": { label: "API4:2023 Unrestricted Resource Consumption", url: "https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/" },
-  "Mass Assignment": { label: "API3:2023 Broken Object Property Level Authorization", url: "https://owasp.org/API-Security/editions/2023/en/0xa3-broken-object-property-level-authorization/" },
-  "Injection": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
-  "Security Misconfiguration": { label: "API8:2023 Security Misconfiguration", url: "https://owasp.org/API-Security/editions/2023/en/0xa8-security-misconfiguration/" },
-  "Misconfiguration": { label: "API8:2023 Security Misconfiguration", url: "https://owasp.org/API-Security/editions/2023/en/0xa8-security-misconfiguration/" },
-  "Server Side Request Forgery": { label: "API7:2023 Server Side Request Forgery", url: "https://owasp.org/API-Security/editions/2023/en/0xa7-server-side-request-forgery/" },
-  "CORS Misconfiguration": { label: "API8:2023 Security Misconfiguration", url: "https://owasp.org/API-Security/editions/2023/en/0xa8-security-misconfiguration/" },
-  "Command Injection": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
-  "CRLF Injection": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
-  "Server Side Template Injection": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
-  "Local File Inclusion": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
-  "XXS": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
-  "Improper Inventory Management": { label: "API9:2023 Improper Inventory Management", url: "https://owasp.org/API-Security/editions/2023/en/0xa9-improper-inventory-management/" }
+  "IIM": { label: "API9:2023 Improper Inventory Management", url: "https://owasp.org/API-Security/editions/2023/en/0xa9-improper-inventory-management/" },
+  "INJ": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
+  "LFI": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
+  "XSS": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
+  "SSTI": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
+  "CRLF": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
+  "CI": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" }
 }
 
 const func = {
@@ -1889,7 +1887,7 @@ joinWordsWithUnderscores(input) {
     const segments = transformedString.split('/');
     for (let i = 0; i < segments.length; i++) {
         // Check if the segment is alphanumeric
-        if (/^[0-9a-fA-F]+$/.test(segments[i]) || /^[0-9]+$/.test(segments[i])) {
+        if (/^-?[0-9a-fA-F]+$/.test(segments[i]) || /^-?[0-9]+$/.test(segments[i])) {
         segments[i] = 'id';
         }
     }

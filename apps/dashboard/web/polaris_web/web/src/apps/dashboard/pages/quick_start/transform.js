@@ -45,6 +45,12 @@ import {
     DOCS_URL_COPILOT_STUDIO,
     INTERVAL_COPILOT_STUDIO,
     COPILOT_STUDIO_FIELDS,
+    CONNECTOR_TYPE_DATABRICKS,
+    CONNECTOR_NAME_DATABRICKS,
+    DESCRIPTION_DATABRICKS,
+    DOCS_URL_DATABRICKS,
+    INTERVAL_DATABRICKS,
+    DATABRICKS_FIELDS,
     CONNECTOR_TYPE_SNOWFLAKE,
     CONNECTOR_NAME_SNOWFLAKE,
     DESCRIPTION_SNOWFLAKE,
@@ -443,22 +449,6 @@ const azureAIFoundryObj = {
             "messages": [{"role": "user", "content": "Why is the sky blue?"}],
             "max_tokens": 100,
             "temperature": 0.7
-        }}
-        docsLink='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security'
-    />
-}
-
-const databricksObj = {
-    icon: '/public/databricks.svg',
-    label: "Databricks",
-    text: "Import Databricks AI agents seamlessly into AKTO.",
-    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security',
-    key: "DATABRICKS",
-    component : <AiAgentScan
-        description="Import your Databricks AI agents, seamlessly in AKTO."
-        defaultRequestBody={{
-            "prompt": "Why is the sky blue?",
-            "max_tokens": 100
         }}
         docsLink='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security'
     />
@@ -1018,6 +1008,22 @@ const copilotStudioImportObj = {
         fields={COPILOT_STUDIO_FIELDS}
         docsUrl={DOCS_URL_COPILOT_STUDIO}
         recurringIntervalSeconds={INTERVAL_COPILOT_STUDIO}
+    />
+}
+
+const databricksImportObj = {
+    icon: '/public/databricks.svg',
+    label: "Databricks",
+    text: "Import Databricks agents seamlessly into AKTO.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/databrics',
+    key: "DATABRICKS_IMPORT",
+    component: <AIAgentConnectorImport
+        connectorType={CONNECTOR_TYPE_DATABRICKS}
+        connectorName={CONNECTOR_NAME_DATABRICKS}
+        description={DESCRIPTION_DATABRICKS}
+        fields={DATABRICKS_FIELDS}
+        docsUrl={DOCS_URL_DATABRICKS}
+        recurringIntervalSeconds={INTERVAL_DATABRICKS}
     />
 }
 
@@ -1706,7 +1712,7 @@ const quickStartFunc = {
         ]
 
         const aiAgentConnectors = [
-            awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
+            awsBedrockObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
             n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj, snowflakeObj
         ]
 
@@ -1796,13 +1802,13 @@ const quickStartFunc = {
     getConnectorsList: function () {
 
         if(func.checkLocal() || func.isLimitedAccount()){
-            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj]
+            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj, databricksImportObj]
         }
 
         // Combine all categories into connectorsList
         let connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj,
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj, databricksImportObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,
@@ -1812,8 +1818,8 @@ const quickStartFunc = {
         if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj, huggingFaceObj,
-                awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
-                n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj,kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj,
+                awsBedrockObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
+                n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj,
                 apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj
             ])
         }

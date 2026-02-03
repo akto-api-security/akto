@@ -27,7 +27,7 @@ public class OrganizationCache {
     public static final Map<String, OrganizationInfo> domainToOrgInfoCache = Collections.synchronizedMap(new HashMap<>());
     
     // Cache refresh interval: 10 minutes
-    private static final int CACHE_REFRESH_INTERVAL_MINUTES = 10;
+    private static final int CACHE_REFRESH_INTERVAL_MINUTES = 60;
     
     public void setUpOrganizationCacheScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -60,7 +60,7 @@ public class OrganizationCache {
             try {
                 String orgId = org.getId();
                 String adminEmail = org.getAdminEmail();
-                
+
                 if (orgId != null && adminEmail != null && adminEmail.contains("@")) {
                     String adminEmailDomain = adminEmail.split("@")[1].toLowerCase();
                     domainToOrganizations.computeIfAbsent(adminEmailDomain, k -> new ArrayList<>()).add(org);
@@ -73,41 +73,40 @@ public class OrganizationCache {
         
         // For each domain, prioritize organizations with non-empty, non-null planType
         for (Map.Entry<String, List<Organization>> entry : domainToOrganizations.entrySet()) {
-            String domain = entry.getKey();
-            List<Organization> orgsForDomain = entry.getValue();
-            
-            Organization selectedOrg = null;
-            
-            // First, try to find an organization with non-empty, non-null planType
-            for (Organization org : orgsForDomain) {
-                String planType = org.getplanType();
-                if (planType != null && !planType.isEmpty() && !"planType".equals(planType)) {
-                    selectedOrg = org;
-                    break;
+            try {
+                String domain = entry.getKey();
+                List<Organization> orgsForDomain = entry.getValue();
+
+                Organization selectedOrg = null;
+
+                // First, try to find an organization with non-empty, non-null planType
+                for (Organization org : orgsForDomain) {
+                    String planType = org.getplanType();
+                    if (planType != null && !planType.isEmpty() && !"planType".equals(planType)) {
+                        selectedOrg = org;
+                        break;
+                    }
                 }
-            }
-            
-            // If no organization with valid planType found, use the first one
-            if (selectedOrg == null && !orgsForDomain.isEmpty()) {
-                selectedOrg = orgsForDomain.get(0);
-            }
-            
-            if (selectedOrg != null) {
-                String orgId = selectedOrg.getId();
-                String adminEmail = selectedOrg.getAdminEmail();
-                String planType = selectedOrg.getplanType();
-                
-                // Ensure planType is not the default value
-                if ("planType".equals(planType) || planType.isEmpty()) {
-                    planType = null;
+
+                // If no organization with valid planType found, use the first one
+                if (selectedOrg == null && !orgsForDomain.isEmpty()) {
+                    selectedOrg = orgsForDomain.get(0);
                 }
-                
-                OrganizationInfo orgInfo = new OrganizationInfo(orgId, adminEmail, planType);
-                domainToOrgInfoCache.put(domain, orgInfo);
-                
-                logger.debug("Cached organization: " + orgId + " with domain: " + domain + 
-                    ", email: " + adminEmail + ", planType: " + planType + 
-                    " (selected from " + orgsForDomain.size() + " organizations)");
+
+                if (selectedOrg != null) {
+                    String orgId = selectedOrg.getId();
+                    String adminEmail = selectedOrg.getAdminEmail();
+                    String planType = selectedOrg.getplanType();
+
+                    OrganizationInfo orgInfo = new OrganizationInfo(orgId, adminEmail, planType);
+                    domainToOrgInfoCache.put(domain, orgInfo);
+
+                    logger.debug("Cached organization: " + orgId + " with domain: " + domain +
+                            ", email: " + adminEmail + ", planType: " + planType +
+                            " (selected from " + orgsForDomain.size() + " organizations)");
+                }
+            } catch (Exception e){
+                logger.errorAndAddToDb(e, "Error while processing organization" );
             }
         }
     }

@@ -57,7 +57,9 @@ public class AktoJaxAction extends UserAction {
     private String password;
     private String apiKey;
     private String dashboardUrl;
-    private String testRoleHaxId;
+    @Getter
+    @Setter
+    private String testRoleHexId;
 
     private String outscopeUrls;
     @Getter
@@ -137,8 +139,8 @@ public class AktoJaxAction extends UserAction {
 
             String cookies = null;
             if(!StringUtils.isEmpty(username) && !StringUtils.isEmpty(password)) {
-            } else if(testRoleHaxId != null && !testRoleHaxId.isEmpty()) {
-                TestRoles testRole = TestRolesDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(testRoleHaxId)));
+            } else if(testRoleHexId != null && !testRoleHexId.isEmpty()) {
+                TestRoles testRole = TestRolesDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(testRoleHexId)));
                 AuthMechanism authMechanismForRole = testRole.findDefaultAuthMechanism();
                 if (testRole != null && !testRole.getAuthWithCondList().isEmpty() && testRole.getAuthWithCondList().get(0).getRecordedLoginFlowInput() != null) {
                     try {
@@ -232,13 +234,16 @@ public class AktoJaxAction extends UserAction {
                 if(runTestAfterCrawling && selectedMiniTestingService != null && !selectedMiniTestingService.isEmpty()) {
                     crawlerRun.setSelectedMiniTestingService(selectedMiniTestingService);
                 }
+                if (testRoleHexId != null && !testRoleHexId.isEmpty()) {
+                    crawlerRun.setTestRoleHexId(testRoleHexId);
+                }
 
                 CrawlerRunDao.instance.insertOne(crawlerRun);
             } else {
                 // Fallback to internal DAST API
                 initiateInternalCrawl(crawlId, hostname, username, password, apiKey,
                     dashboardUrl, collectionId, cookies, crawlingTime, outscopeUrls, runTestAfterCrawling,
-                    urlTemplatePatterns, applicationPages);
+                    urlTemplatePatterns, applicationPages, testRoleHexId);
             }
 
             // Send Slack alert for crawler initiation
@@ -300,11 +305,46 @@ public class AktoJaxAction extends UserAction {
         }
     }
 
+    public String stopCrawler() {
+        try {
+            if (StringUtils.isEmpty(crawlId)) {
+                addActionError("Crawl ID is required");
+                return ERROR.toUpperCase();
+            }
+            String url = System.getenv("AKTOJAX_SERVICE_URL") + "/stopCrawler";
+            loggerMaker.infoAndAddToDb("Stopping crawler: " + url);
+
+            JSONObject requestBody = new JSONObject();
+            requestBody.put("crawlId", crawlId);
+            String reqData = requestBody.toString();
+            JsonNode node = ApiRequest.postRequest(new HashMap<>(), url, reqData);
+            String status = node.get("status").textValue();
+
+            if (status.equalsIgnoreCase("success")) {
+                CrawlerRunDao.instance.updateOne(
+                        Filters.eq(CrawlerRun.CRAWL_ID, crawlId),
+                        Updates.set(CrawlerRun.STATUS, CrawlerRunStatus.STOP_REQUESTED.name())
+                );
+                loggerMaker.infoAndAddToDb("Crawler stopped successfully"); 
+                return Action.SUCCESS.toUpperCase();
+            } else {
+                loggerMaker.errorAndAddToDb("Failed to stop crawler. Status: " + status);
+                addActionError("Failed to stop crawler. Please try again later.");
+                return Action.ERROR.toUpperCase();
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error stopping crawler: " + e.getMessage());
+            addActionError("Error stopping crawler. Please try again later.");
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
     private void initiateInternalCrawl(String crawlId, String hostname, String username,
                                      String password, String apiKey, String dashboardUrl,
                                      int collectionId, String cookies, int crawlingTime,
                                      String outscopeUrls, boolean runTestAfterCrawling,
-                                     String urlTemplatePatterns, String applicationPages) throws Exception {
+                                     String urlTemplatePatterns, String applicationPages,
+                                     String testRoleHexId) throws Exception {
         String url = System.getenv("AKTOJAX_SERVICE_URL") + "/triggerCrawler";
         loggerMaker.infoAndAddToDb("Using internal DAST crawler service: " + url);
 
@@ -373,6 +413,9 @@ public class AktoJaxAction extends UserAction {
 
             if(runTestAfterCrawling && selectedMiniTestingService != null && !selectedMiniTestingService.isEmpty()) {
                 crawlerRun.setSelectedMiniTestingService(selectedMiniTestingService);
+            }
+            if (testRoleHexId != null && !testRoleHexId.isEmpty()) {
+                crawlerRun.setTestRoleHexId(testRoleHexId);
             }
 
             CrawlerRunDao.instance.insertOne(crawlerRun);
@@ -589,6 +632,11 @@ public class AktoJaxAction extends UserAction {
                         Updates.set(CrawlerRun.END_TIMESTAMP, Context.now()),
                         Updates.set(CrawlerRun.ERROR_MESSAGE, errorMessage)
                 );
+            } else if (status.equals(CrawlerRun.CrawlerRunStatus.STOPPED.name())) {
+                updates = Updates.combine(
+                        Updates.set(CrawlerRun.STATUS, status),
+                        Updates.set(CrawlerRun.END_TIMESTAMP, Context.now())
+                );
             }
 
             CrawlerRunDao.instance.updateOne(
@@ -665,14 +713,6 @@ public class AktoJaxAction extends UserAction {
 
     public void setDashboardUrl(String dashboardUrl) {
         this.dashboardUrl = dashboardUrl;
-    }
-
-    public String getTestRoleHaxId() {
-        return testRoleHaxId;
-    }
-
-    public void setTestRoleHaxId(String testRoleHaxId) {
-        this.testRoleHaxId = testRoleHaxId;
     }
 
     public String getOutscopeUrls() {

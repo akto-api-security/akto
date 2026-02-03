@@ -7,24 +7,28 @@
 export const CONNECTOR_TYPE_N8N = 'N8N';
 export const CONNECTOR_TYPE_LANGCHAIN = 'LANGCHAIN';
 export const CONNECTOR_TYPE_COPILOT_STUDIO = 'COPILOT_STUDIO';
+export const CONNECTOR_TYPE_DATABRICKS = 'DATABRICKS';
 export const CONNECTOR_TYPE_SNOWFLAKE = 'SNOWFLAKE';
 
 // Connector Names (Display)
 export const CONNECTOR_NAME_N8N = 'N8N';
 export const CONNECTOR_NAME_LANGCHAIN = 'Langchain';
 export const CONNECTOR_NAME_COPILOT_STUDIO = 'Copilot Studio';
+export const CONNECTOR_NAME_DATABRICKS = 'Databricks';
 export const CONNECTOR_NAME_SNOWFLAKE = 'Snowflake';
 
 // Documentation URLs
 export const DOCS_URL_N8N = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/n8n';
 export const DOCS_URL_LANGCHAIN = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/langchain';
 export const DOCS_URL_COPILOT_STUDIO = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/microsoft-copilot-studio';
+export const DOCS_URL_DATABRICKS = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/databrics';
 export const DOCS_URL_SNOWFLAKE = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/snowflake';
 
 // Recurring Interval Seconds (in seconds)
 export const INTERVAL_N8N = 300; // 5 minutes
 export const INTERVAL_LANGCHAIN = 300; // 5 minutes
 export const INTERVAL_COPILOT_STUDIO = 300; // 5 minutes
+export const INTERVAL_DATABRICKS = 300; // 5 minutes
 export const INTERVAL_SNOWFLAKE = 300; // 5 minutes
 
 // Field Names
@@ -32,6 +36,14 @@ export const FIELD_N8N_URL = 'n8nUrl';
 export const FIELD_N8N_API_KEY = 'n8nApiKey';
 export const FIELD_LANGSMITH_URL = 'langsmithUrl';
 export const FIELD_LANGSMITH_API_KEY = 'langsmithApiKey';
+export const FIELD_APPINSIGHTS_APP_ID = 'appInsightsAppId';
+export const FIELD_APPINSIGHTS_API_KEY = 'appInsightsApiKey';
+export const FIELD_DATABRICKS_HOST = 'databricksHost';
+export const FIELD_DATABRICKS_CLIENT_ID = 'databricksClientId';
+export const FIELD_DATABRICKS_CLIENT_SECRET = 'databricksClientSecret';
+export const FIELD_DATABRICKS_CATALOG = 'databricksCatalog';
+export const FIELD_DATABRICKS_SCHEMA = 'databricksSchema';
+export const FIELD_DATABRICKS_PREFIX = 'databricksPrefix';
 export const FIELD_DATAVERSE_ENVIRONMENT_URL = 'dataverseEnvironmentUrl';
 export const FIELD_DATAVERSE_TENANT_ID = 'dataverseTenantId';
 export const FIELD_DATAVERSE_CLIENT_ID = 'dataverseClientId';
@@ -63,7 +75,8 @@ export const AUTH_TYPE_KEY_PAIR = 'KEY_PAIR';
 // Descriptions
 export const DESCRIPTION_N8N = 'Use our N8N feature to capture traffic and instantly send it to your dashboard for real-time insights.';
 export const DESCRIPTION_LANGCHAIN = 'Use our Langchain feature to capture traffic from LangSmith and instantly send it to your dashboard for real-time insights.';
-export const DESCRIPTION_COPILOT_STUDIO = 'Use our Copilot Studio feature to capture conversation data from Azure Dataverse API and instantly send it to your dashboard for real-time insights.';
+export const DESCRIPTION_COPILOT_STUDIO = 'Use our Copilot Studio feature to capture traffic from Azure Application Insights and instantly send it to your dashboard for real-time insights.';
+export const DESCRIPTION_DATABRICKS = 'Import Databricks agents seamlessly into AKTO.';
 export const DESCRIPTION_SNOWFLAKE = 'Connect to your Snowflake account to discover agents using Cortex and automatically fetch data for all Snowflake agents.';
 
 // N8N Field Configuration
@@ -257,6 +270,61 @@ export const COPILOT_STUDIO_FIELDS = [
         type: FIELD_TYPE_PASSWORD,
         placeholder: '*******',
         configKey: FIELD_DATAVERSE_CLIENT_SECRET
+    },
+    {
+        name: FIELD_DATA_INGESTION_URL,
+        label: 'URL for Data Ingestion Service',
+        type: FIELD_TYPE_URL,
+        placeholder: 'https://ingestion.example.com'
+    }
+];
+
+// Databricks Field Configuration
+export const DATABRICKS_FIELDS = [
+    {
+        name: FIELD_DATABRICKS_HOST,
+        label: 'Databricks Host',
+        type: FIELD_TYPE_URL,
+        placeholder: 'https://your-workspace.cloud.databricks.com',
+        configKey: FIELD_DATABRICKS_HOST
+    },
+    {
+        name: FIELD_DATABRICKS_CLIENT_ID,
+        label: 'Databricks Client ID (Service Principal)',
+        type: FIELD_TYPE_TEXT,
+        placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+        configKey: FIELD_DATABRICKS_CLIENT_ID
+    },
+    {
+        name: FIELD_DATABRICKS_CLIENT_SECRET,
+        label: 'Databricks Client Secret',
+        type: FIELD_TYPE_PASSWORD,
+        placeholder: '*******',
+        configKey: FIELD_DATABRICKS_CLIENT_SECRET
+    },
+    {
+        name: FIELD_DATABRICKS_CATALOG,
+        label: 'Unity Catalog Name',
+        type: FIELD_TYPE_TEXT,
+        placeholder: 'workspace',
+        configKey: FIELD_DATABRICKS_CATALOG,
+        defaultValue: "workspace"
+    },
+    {
+        name: FIELD_DATABRICKS_SCHEMA,
+        label: 'Unity Catalog Schema',
+        type: FIELD_TYPE_TEXT,
+        placeholder: 'default',
+        configKey: FIELD_DATABRICKS_SCHEMA,
+        defaultValue: 'default'
+    },
+    {
+        name: FIELD_DATABRICKS_PREFIX,
+        label: 'Table Prefix (Optional)',
+        type: FIELD_TYPE_TEXT,
+        placeholder: '',
+        configKey: FIELD_DATABRICKS_PREFIX,
+        required: false
     },
     {
         name: FIELD_DATA_INGESTION_URL,
