@@ -31,6 +31,8 @@ import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
+import com.akto.dto.tracing.Span;
+import com.akto.dto.tracing.Trace;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
@@ -335,4 +337,8 @@ public abstract class DataActor {
     public abstract YamlTemplate fetchCommonWordList();
 
     public abstract List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName);
+    
+    public abstract void storeTrace(Trace trace);
+
+    public abstract void storeSpans(List<Span> spans);
 }
