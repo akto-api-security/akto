@@ -235,6 +235,7 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             response.put("sensitiveCount", metrics.sensitiveCount);
             response.put("successfulExploits", metrics.successfulExploits);
             response.put("complianceAtRisks", metrics.complianceAtRisks);
+            response.put("attackFlows", metrics.attackFlows);
 
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
@@ -244,84 +245,6 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
         }
     }
 
-    /**
-     * API: Fetch attack flows for map visualization
-     * Returns source and destination country codes with attack types
-     * Collection: MaliciousEventDao
-     */
-    public String fetchAttackFlows() {
-        try {
-            if (endTimestamp == 0) {
-                endTimestamp = Context.now();
-            }
-            Set<Integer> demoCollections = getDemoCollections();
-
-            List<DashboardMaliciousEvent> allThreats = fetchAllMaliciousEvents(startTimestamp, endTimestamp, demoCollections);
-
-            List<DashboardMaliciousEvent> guardrailEvents = allThreats.stream()
-                .filter(event -> "GUARDRAIL".equalsIgnoreCase(event.getLabel()))
-                .collect(Collectors.toList());
-
-            Map<String, Map<String, Long>> countryAttackCounts = new HashMap<>();
-            for (DashboardMaliciousEvent event : guardrailEvents) {
-                String sourceCountry = event.getCountry();
-                if (sourceCountry == null || sourceCountry.isEmpty()) {
-                    continue;
-                }
-
-                String attackType = event.getSubCategory();
-                if (attackType == null || attackType.isEmpty()) {
-                    attackType = event.getCategory();
-                }
-                if (attackType == null || attackType.isEmpty()) {
-                    attackType = "Unknown";
-                }
-
-                countryAttackCounts.putIfAbsent(sourceCountry, new HashMap<>());
-                Map<String, Long> attackCounts = countryAttackCounts.get(sourceCountry);
-                attackCounts.put(attackType, attackCounts.getOrDefault(attackType, 0L) + 1);
-            }
-
-            List<BasicDBObject> attackFlows = new ArrayList<>();
-            String destinationCountry = "US"; // TODO: Make this configurable or detect from deployment
-
-            for (Map.Entry<String, Map<String, Long>> countryEntry : countryAttackCounts.entrySet()) {
-                String sourceCountry = countryEntry.getKey();
-                Map<String, Long> attackCounts = countryEntry.getValue();
-
-                Map.Entry<String, Long> topAttack = attackCounts.entrySet().stream()
-                    .max(Map.Entry.comparingByValue())
-                    .orElse(null);
-
-                if (topAttack != null) {
-                    BasicDBObject flow = new BasicDBObject();
-                    flow.put("sourceCountry", sourceCountry);
-                    flow.put("destinationCountry", destinationCountry);
-                    flow.put("attackType", topAttack.getKey());
-                    flow.put("count", topAttack.getValue());
-                    attackFlows.add(flow);
-                }
-            }
-
-            attackFlows.sort((a, b) -> {
-                long countA = a.getLong("count", 0L);
-                long countB = b.getLong("count", 0L);
-                return Long.compare(countB, countA);
-            });
-
-            if (attackFlows.size() > 20) {
-                attackFlows = attackFlows.subList(0, 20);
-            }
-
-            response.put("attackFlows", attackFlows);
-
-            return SUCCESS.toUpperCase();
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error fetching attack flows: " + e.getMessage());
-            addActionError("Error fetching attack flows: " + e.getMessage());
-            return ERROR.toUpperCase();
-        }
-    }
 
 
     private List<BasicDBObject> fetchIssuesOverTime(int startTimestamp, int endTimestamp, long daysBetween, List<TestingRunIssues> allIssues) {

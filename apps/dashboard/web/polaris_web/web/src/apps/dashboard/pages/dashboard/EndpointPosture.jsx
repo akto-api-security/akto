@@ -15,7 +15,6 @@ import api from '../observe/api'
 import func from '@/util/func'
 import { getTypeFromTags, CLIENT_TYPES, getDomainForFavicon } from '../observe/agentic/mcpClientHelper'
 import { extractEndpointId } from '../observe/agentic/constants'
-import { attackRequests as dummyAttackRequests } from './atlusPosture/dummyData'
 
 const cleanHostname = (hostname) => {
     if (!hostname) return hostname
@@ -122,12 +121,10 @@ function EndpointPosture() {
                 // Fetch data from existing APIs in parallel
                 const [
                     guardrailResponse,
-                    collectionsResponse,
-                    // attackFlowsResponse // TODO: Uncomment when backend is ready
+                    collectionsResponse
                 ] = await Promise.all([
                     dashboardApi.fetchGuardrailData(startTimestamp, endTimestamp),
-                    api.getAllCollectionsBasic(),
-                    // dashboardApi.fetchAttackFlows(startTimestamp, endTimestamp) // TODO: Uncomment when backend is ready
+                    api.getAllCollectionsBasic()
                 ])
 
                 // Process collections to get component data (like Endpoints.jsx does)
@@ -170,16 +167,8 @@ function EndpointPosture() {
                 setCommonLlmsInBrowsers(llms)
                 setCommonAiAgents(aiAgents)
 
-                // Set attack flows for map - using dummy data for now
-                // TODO: Uncomment below when backend is ready
-                // const attackFlows = attackFlowsResponse?.attackFlows || []
-                // Convert dummy data format to match expected format
-                const attackFlows = dummyAttackRequests.map(req => ({
-                    sourceCountry: req.source.country,
-                    destinationCountry: req.destination.country,
-                    attackType: req.attackType,
-                    count: 1
-                }))
+                // Get attack flows from guardrail response (consolidated into single API call)
+                const attackFlows = guardrailResponse?.attackFlows || []
                 setAttackRequests(attackFlows)
 
                 // Process Data Protection Trends - dynamic categories

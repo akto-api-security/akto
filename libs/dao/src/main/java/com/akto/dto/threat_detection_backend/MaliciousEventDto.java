@@ -12,6 +12,7 @@ public class MaliciousEventDto {
   private String latestApiIp;
   private String latestApiEndpoint;
   private String country;
+  private String destCountry;
   private URLMethods.Method latestApiMethod;
   private String latestApiOrig;
   private long detectedAt;
@@ -55,6 +56,7 @@ public class MaliciousEventDto {
     this.actor = builder.actor;
     this.latestApiIp = builder.latestApiIp;
     this.country = builder.country;
+    this.destCountry = builder.destCountry;
     this.latestApiEndpoint = builder.latestApiEndpoint;
     this.latestApiMethod = builder.latestApiMethod;
     this.latestApiOrig = builder.latestApiOrig;
@@ -81,6 +83,7 @@ public class MaliciousEventDto {
     private String actor;
     private String latestApiIp;
     private String country;
+    private String destCountry;
     private String latestApiEndpoint;
     private URLMethods.Method latestApiMethod;
     private String latestApiOrig;
@@ -115,6 +118,11 @@ public class MaliciousEventDto {
 
     public Builder setCountry(String country) {
       this.country = country;
+      return this;
+    }
+
+    public Builder setDestCountry(String destCountry) {
+      this.destCountry = destCountry;
       return this;
     }
 
@@ -299,6 +307,14 @@ public class MaliciousEventDto {
 
   public void setCountry(String country) {
     this.country = country;
+  }
+
+  public String getDestCountry() {
+    return destCountry;
+  }
+
+  public void setDestCountry(String destCountry) {
+    this.destCountry = destCountry;
   }
 
   public void setLatestApiMethod(URLMethods.Method latestApiMethod) {

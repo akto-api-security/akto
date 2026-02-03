@@ -46,6 +46,7 @@ public class GuardrailMetricsProcessor {
         public long sensitiveCount;
         public long successfulExploits;
         public List<BasicDBObject> complianceAtRisks;
+        public List<BasicDBObject> attackFlows;
     }
 
     public static GuardrailMetrics processGuardrailMetrics(
@@ -67,6 +68,10 @@ public class GuardrailMetricsProcessor {
         int scoreCount = 0;
         long sensitiveEventCount = 0;
         long successfulExploitCount = 0;
+
+        // Track attack flows for world map: "sourceCountry|destCountry" -> attackType -> count
+        Map<String, Map<String, Long>> countryFlowAttackCounts = new HashMap<>();
+        Map<String, String> countryFlowMapping = new HashMap<>(); 
 
 
         for (DashboardMaliciousEvent event : allThreats) {
@@ -146,6 +151,32 @@ public class GuardrailMetricsProcessor {
                     }
                 }
             }
+
+            // 7. Collect attack flows for world map (guardrail events only)
+            if (isGuardrail) {
+                String sourceCountry = event.getCountry();
+                String destCountry = event.getDestCountry();
+
+                if (sourceCountry != null && !sourceCountry.isEmpty() &&
+                    destCountry != null && !destCountry.isEmpty()) {
+
+                    String flowKey = sourceCountry + "|" + destCountry;
+
+                    String attackType = event.getSubCategory();
+                    if (attackType == null || attackType.isEmpty()) {
+                        attackType = event.getCategory();
+                    }
+                    if (attackType == null || attackType.isEmpty()) {
+                        attackType = "Unknown";
+                    }
+
+                    countryFlowAttackCounts.putIfAbsent(flowKey, new HashMap<>());
+                    Map<String, Long> attackCounts = countryFlowAttackCounts.get(flowKey);
+                    attackCounts.put(attackType, attackCounts.getOrDefault(attackType, 0L) + 1);
+
+                    countryFlowMapping.put(flowKey, sourceCountry + "|" + destCountry);
+                }
+            }
         }
 
         // Process collected data
@@ -155,6 +186,7 @@ public class GuardrailMetricsProcessor {
         metrics.sensitiveCount = sensitiveEventCount;
         metrics.successfulExploits = successfulExploitCount;
         metrics.complianceAtRisks = buildComplianceAtRisks(complianceEndpoints, totalGuardrailEndpoints.size());
+        metrics.attackFlows = buildAttackFlows(countryFlowAttackCounts, countryFlowMapping);
 
         return metrics;
     }
@@ -296,5 +328,51 @@ public class GuardrailMetricsProcessor {
         } catch (Exception e) {
             return 0.0f;
         }
+    }
+
+
+    private static List<BasicDBObject> buildAttackFlows(
+            Map<String, Map<String, Long>> countryFlowAttackCounts,
+            Map<String, String> countryFlowMapping) {
+        List<BasicDBObject> attackFlows = new ArrayList<>();
+        try {
+            for (Map.Entry<String, Map<String, Long>> flowEntry : countryFlowAttackCounts.entrySet()) {
+                String flowKey = flowEntry.getKey(); 
+                Map<String, Long> attackCounts = flowEntry.getValue();
+
+                String[] countries = flowKey.split("\\|");
+                if (countries.length != 2) {
+                    continue; 
+                }
+                String sourceCountry = countries[0];
+                String destinationCountry = countries[1];
+
+                Map.Entry<String, Long> topAttack = attackCounts.entrySet().stream()
+                        .max(Map.Entry.comparingByValue())
+                        .orElse(null);
+
+                if (topAttack != null) {
+                    BasicDBObject flow = new BasicDBObject();
+                    flow.put("sourceCountry", sourceCountry);
+                    flow.put("destinationCountry", destinationCountry);
+                    flow.put("attackType", topAttack.getKey());
+                    flow.put("count", topAttack.getValue());
+                    attackFlows.add(flow);
+                }
+            }
+
+            attackFlows.sort((a, b) -> {
+                long countA = a.getLong("count", 0L);
+                long countB = b.getLong("count", 0L);
+                return Long.compare(countB, countA);
+            });
+
+            if (attackFlows.size() > 20) {
+                attackFlows = attackFlows.subList(0, 20);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error building attack flows: " + e.getMessage());
+        }
+        return attackFlows;
     }
 }
