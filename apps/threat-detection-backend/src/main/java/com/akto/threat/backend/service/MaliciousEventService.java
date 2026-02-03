@@ -388,6 +388,7 @@ public class MaliciousEventService {
                 .setId(evt.getId())
                 .setIp(evt.getLatestApiIp())
                 .setCountry(evt.getCountry())
+                .setDestCountry(evt.getDestCountry() != null ? evt.getDestCountry() : "")
                 .setPayload(evt.getLatestApiOrig())
                 .setEndpoint(evt.getLatestApiEndpoint())
                 .setMethod(evt.getLatestApiMethod().name())
