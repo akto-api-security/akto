@@ -130,6 +130,7 @@ public class Utils {
                     .setStatus(status);
 
             metadataBuilder.setCountryCode(metadata.getCountryCode());
+            metadataBuilder.setDestCountryCode(metadata.getDestCountryCode());
             maliciousReqBuilder.setMetadata(metadataBuilder.build());
             return maliciousReqBuilder.build();
         }
