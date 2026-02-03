@@ -1,5 +1,6 @@
 package com.akto.threat.detection.utils;
 
+import com.akto.config.DynamicConfig;
 import com.akto.enums.RedactionType;
 import com.akto.utils.RedactParser;
 
@@ -142,12 +143,12 @@ public class Utils {
     }
 
     public static String getThreatProtectionBackendUrl() {
-        return System.getenv("AKTO_THREAT_PROTECTION_BACKEND_URL");
+        return DynamicConfig.get("AKTO_THREAT_PROTECTION_BACKEND_URL");
     }
 
     public static Map<String, List<String>> buildHeaders() {
         Map<String, List<String>> headers = new HashMap<>();
-        headers.put("Authorization", Collections.singletonList("Bearer " + System.getenv("AKTO_THREAT_PROTECTION_BACKEND_TOKEN")));
+        headers.put("Authorization", Collections.singletonList("Bearer " + DynamicConfig.get("AKTO_THREAT_PROTECTION_BACKEND_TOKEN")));
         return headers;
     }
 

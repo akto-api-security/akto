@@ -1,5 +1,6 @@
 package com.akto.data_actor;
 
+import com.akto.config.DynamicConfig;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.testing.ApiExecutor;
 import com.auth0.jwt.JWT;
@@ -65,7 +66,7 @@ public class ClientActor extends DataActor {
     public static String buildDbAbstractorUrl() {
         String dbAbsHost = CYBORG_URL;
         if (checkAccount()) {
-            dbAbsHost = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
+            dbAbsHost = DynamicConfig.get("DATABASE_ABSTRACTOR_SERVICE_URL");
         }
         System.out.println("dbHost value " + dbAbsHost);
         if (dbAbsHost.endsWith("/")) {
@@ -1330,7 +1331,7 @@ public class ClientActor extends DataActor {
         if(System.getProperty("DATABASE_ABSTRACTOR_SERVICE_TOKEN") != null){
             headers.put("Authorization", Collections.singletonList(System.getProperty("DATABASE_ABSTRACTOR_SERVICE_TOKEN")));
         }else{
-            headers.put("Authorization", Collections.singletonList(System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN")));
+            headers.put("Authorization", Collections.singletonList(DynamicConfig.get("DATABASE_ABSTRACTOR_SERVICE_TOKEN")));
         }
         return headers;
     }

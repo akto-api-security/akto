@@ -9,6 +9,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import com.akto.config.DynamicConfig;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
@@ -65,7 +66,7 @@ public class ConfigUpdatePoller {
         try {
             // For THREAT_DETECTION pass null for miniRuntimeName, for TRAFFIC_COLLECTOR pass actual name
             String miniRuntimeName = (moduleType == ModuleInfo.ModuleType.THREAT_DETECTION) ? null : moduleName;
-            
+
             List<ModuleInfo> moduleInfoList = dataActor.fetchAndUpdateModuleForReboot(
                     moduleType,
                     miniRuntimeName
@@ -75,7 +76,7 @@ public class ConfigUpdatePoller {
                 return;
             }
 
-            loggerMaker.infoAndAddToDb("Found " + moduleInfoList.size() + " module(s) with config updates for module: " + moduleName);
+            loggerMaker.infoAndAddToDb("Found " + moduleInfoList.size() + " module(s) with reboot flag for module: " + moduleName);
 
             // Collect all module names (for mini-runtime, these are daemon names)
             List<String> moduleNames = new ArrayList<>();
@@ -95,7 +96,13 @@ public class ConfigUpdatePoller {
                 }
             }
 
-            publishConfigUpdate(moduleNames, envVars);
+            // Check if configuration has actually changed
+            if (DynamicConfig.hasChanges(envVars)) {
+                loggerMaker.infoAndAddToDb("Configuration changes detected, publishing update");
+                publishConfigUpdate(moduleNames, envVars);
+            } else {
+                loggerMaker.infoAndAddToDb("No configuration changes detected, skipping publish (heartbeat sent)");
+            }
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error polling and publishing config updates");

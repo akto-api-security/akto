@@ -32,6 +32,7 @@ public class ModuleInfoConstants {
             put("RUNTIME_MODE", "Runtime Mode");
             put("AKTO_THREAT_PROTECTION_BACKEND_TOKEN", "Threat Protection Backend Token");
             put("DATABASE_ABSTRACTOR_SERVICE_TOKEN", "Database Abstractor Token");
+            put("AKTO_LOG_LEVEL", "Log Level");
         }});
     }};
 

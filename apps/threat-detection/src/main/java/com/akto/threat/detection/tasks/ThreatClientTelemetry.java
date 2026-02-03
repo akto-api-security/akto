@@ -13,6 +13,7 @@ import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 
+import com.akto.config.DynamicConfig;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.kafka.KafkaConfig;
 import com.akto.metrics.ModuleInfoWorker;
@@ -91,29 +92,28 @@ public class ThreatClientTelemetry implements Runnable {
             logger.infoAndAddToDb("Processing command message messageType=" + messageType);
 
             if (MESSAGE_TYPE_RESTART.equals(messageType)) {
-                logger.infoAndAddToDb("Restarting process...");
-                restartSelf(null);
+                logger.infoAndAddToDb("Received RESTART message, but restarts are no longer supported with DynamicConfig");
+                // restartSelf(null); // Commented out: No longer restart, use DynamicConfig instead
                 return;
             }
 
             if (MESSAGE_TYPE_ENV_RELOAD.equals(messageType)) {
                 Map<String, String> envVars = parseEnvFromCommand(command);
                 if (envVars != null && !envVars.isEmpty()) {
-                    for (Map.Entry<String, String> entry : envVars.entrySet()) {
-                        String key = entry.getKey();
-                        String value = entry.getValue();
-                        String oldValue = System.getProperty(key);
-                        if (oldValue == null) {
-                            oldValue = System.getenv(key);
-                        }
-                        if (value != null && !value.equals(oldValue)) {
-                            logger.infoAndAddToDb("Updating env " + key);
-                            System.setProperty(key, value);
-                        }
+                    // Update DynamicConfig with new environment variables
+                    int changedCount = DynamicConfig.updateAll(envVars);
+
+                    if (changedCount > 0) {
+                        logger.infoAndAddToDb("Updated " + changedCount + " configuration values in DynamicConfig");
+
+                        // Update runtime environment and system properties
+                        updateRuntimeEnvironment(envVars);
+                    } else {
+                        logger.infoAndAddToDb("No configuration changes detected");
                     }
+                } else {
+                    logger.infoAndAddToDb("No environment variables to update");
                 }
-                logger.infoAndAddToDb("Environment updated, restarting process...");
-                restartSelf(envVars);
                 return;
             }
 
@@ -122,7 +122,6 @@ public class ThreatClientTelemetry implements Runnable {
         }
     }
 
-    /** Matches ebpf: message is for this instance if moduleType matches and moduleNames contains this name or "ALL". */
     private boolean isMessageForThisInstance(Map<String, Object> command) {
         String cmdModuleType = (String) command.get("moduleType");
         if (!MODULE_TYPE.name().equals(cmdModuleType)) {
@@ -154,26 +153,85 @@ public class ThreatClientTelemetry implements Runnable {
         return out;
     }
 
-    private void restartSelf(Map<String, String> envOverrides) {
-        if (envOverrides != null && !envOverrides.isEmpty()) {
-            writeEnvFile(envOverrides);
+    /**
+     * Updates runtime environment variables and system properties.
+     * This allows code that reads from System.getenv() or System.getProperty() to get updated values.
+     * Only updates whitelisted variables for THREAT_DETECTION module.
+     */
+    private void updateRuntimeEnvironment(Map<String, String> envVars) {
+        try {
+            // Filter to only whitelisted environment variables using ModuleInfoWorker
+            Map<String, Object> envVarsAsObject = new HashMap<>(envVars);
+            Map<String, Object> filteredEnvVarsObject = ModuleInfoWorker.filterWhitelistedEnvVariables(envVarsAsObject, MODULE_TYPE);
+
+            if (filteredEnvVarsObject.isEmpty()) {
+                logger.infoAndAddToDb("No whitelisted environment variables to update");
+                return;
+            }
+
+            // Convert back to Map<String, String> for processing
+            Map<String, String> filteredEnvVars = new HashMap<>();
+            for (Map.Entry<String, Object> entry : filteredEnvVarsObject.entrySet()) {
+                filteredEnvVars.put(entry.getKey(), entry.getValue() != null ? entry.getValue().toString() : "");
+            }
+
+            // Update System properties (accessible via System.getProperty())
+            for (Map.Entry<String, String> entry : filteredEnvVars.entrySet()) {
+                System.setProperty(entry.getKey(), entry.getValue());
+            }
+
+            // Update AKTO_LOG_LEVEL in SimpleLogger if it changed
+            if (filteredEnvVars.containsKey("AKTO_LOG_LEVEL")) {
+                String newLogLevel = filteredEnvVars.get("AKTO_LOG_LEVEL");
+                System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", newLogLevel);
+                updateSimpleLoggerInstances(newLogLevel);
+            }
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Failed to update runtime environment");
         }
-        logger.infoAndAddToDb("Exiting for restart (handled by entrypoint script)");
-        System.exit(0);
     }
 
-    /** Write env overrides so start.sh can source them before the next java run (Java cannot exec). */
-    private void writeEnvFile(Map<String, String> envVars) {
+    /**
+     * Updates existing SimpleLogger instances with new log level using reflection.
+     */
+    @SuppressWarnings("unchecked")
+    private void updateSimpleLoggerInstances(String newLogLevel) {
         try {
-            java.io.File envFile = new java.io.File("/app/.env.override");
-            try (java.io.FileWriter writer = new java.io.FileWriter(envFile)) {
-                for (Map.Entry<String, String> entry : envVars.entrySet()) {
-                    writer.write("export " + entry.getKey() + "=\"" + entry.getValue().replace("\"", "\\\"") + "\"\n");
+            // Get log level integer value
+            int logLevelValue = parseLogLevel(newLogLevel);
+
+            // Get SimpleLogger class
+            Class<?> simpleLoggerClass = Class.forName("org.slf4j.simple.SimpleLogger");
+            java.lang.reflect.Field currentLogLevelField = simpleLoggerClass.getDeclaredField("currentLogLevel");
+            currentLogLevelField.setAccessible(true);
+
+            // Get logger factory
+            org.slf4j.ILoggerFactory factory = org.slf4j.LoggerFactory.getILoggerFactory();
+            Class<?> factoryClass = factory.getClass();
+            java.lang.reflect.Field loggerMapField = factoryClass.getDeclaredField("loggerMap");
+            loggerMapField.setAccessible(true);
+            Map<String, org.slf4j.Logger> loggerMap = (Map<String, org.slf4j.Logger>) loggerMapField.get(factory);
+
+            // Update all existing loggers
+            for (org.slf4j.Logger loggerInstance : loggerMap.values()) {
+                if (simpleLoggerClass.isInstance(loggerInstance)) {
+                    currentLogLevelField.setInt(loggerInstance, logLevelValue);
                 }
             }
-            logger.infoAndAddToDb("Environment overrides written to " + envFile.getAbsolutePath() + " with " + envVars.size() + " variables");
         } catch (Exception e) {
-            logger.errorAndAddToDb(e, "Failed to write environment file");
+            logger.errorAndAddToDb(e, "Failed to update SimpleLogger instances");
+        }
+    }
+
+    private int parseLogLevel(String levelStr) {
+        if (levelStr == null) return 30; // WARN
+        switch (levelStr.toUpperCase()) {
+            case "TRACE": return 0;
+            case "DEBUG": return 10;
+            case "INFO": return 20;
+            case "WARN": return 30;
+            case "ERROR": return 40;
+            default: return 30; // WARN
         }
     }
 }

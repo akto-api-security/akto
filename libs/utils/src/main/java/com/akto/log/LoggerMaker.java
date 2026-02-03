@@ -1,5 +1,6 @@
 package com.akto.log;
 
+import com.akto.config.DynamicConfig;
 import com.akto.dao.AnalyserLogsDao;
 import com.akto.dao.BillingLogsDao;
 import com.akto.dao.ConfigsDao;
@@ -35,7 +36,18 @@ import org.slf4j.simple.SimpleLogger;
 public class LoggerMaker  {
 
     static {
-        System.setProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY, System.getenv().getOrDefault("AKTO_LOG_LEVEL", "WARN"));
+        // Try DynamicConfig first (for threat-detection), fallback to env (for other modules)
+        String logLevel;
+        try {
+            logLevel = DynamicConfig.get("AKTO_LOG_LEVEL");
+            if (logLevel == null || logLevel.isEmpty()) {
+                logLevel = System.getenv().getOrDefault("AKTO_LOG_LEVEL", "WARN");
+            }
+        } catch (Exception e) {
+            // DynamicConfig not available - fallback to env
+            logLevel = System.getenv().getOrDefault("AKTO_LOG_LEVEL", "WARN");
+        }
+        System.setProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY, logLevel);
         System.setProperty("org.slf4j.simpleLogger.log.org.apache.kafka", "ERROR");
         System.setProperty("org.slf4j.simpleLogger.log.io.lettuce", "ERROR");
         System.setProperty("org.slf4j.simpleLogger.log.org.mongodb", "ERROR");

@@ -29,16 +29,9 @@ echo "Detected container memory limit: ${MEM_LIMIT_MB} MB"
 XMX_MEM=$((MEM_LIMIT_MB * 80 / 100))
 echo "Calculated -Xmx value: ${XMX_MEM} MB"
 
-# 5. Run Java in a loop so exit(0) triggers restart (config-update flow).
-#    Source /app/.env.override before each run so ENV_RELOAD from ThreatClientTelemetry
-#    is applied to the next JVM (Java cannot exec() like Go's syscall.Exec).
-while true; do
-  [ -f /app/.env.override ] && . /app/.env.override
-  java \
-    -XX:+ExitOnOutOfMemoryError \
-    -Xmx${XMX_MEM}m \
-    -jar /app/threat-detection-1.0-SNAPSHOT-jar-with-dependencies.jar
-  EXIT_CODE=$?
-  echo "Java exited with code ${EXIT_CODE}; restarting..."
-done
+# 5. Run Java with the dynamically calculated -Xmx
+exec java \
+  -XX:+ExitOnOutOfMemoryError \
+  -Xmx${XMX_MEM}m \
+  -jar /app/api-threat-detection-1.0-SNAPSHOT-jar-with-dependencies.jar
 
