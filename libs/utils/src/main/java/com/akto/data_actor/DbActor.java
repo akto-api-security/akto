@@ -31,6 +31,8 @@ import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.threat_detection.ApiHitCountInfo;
+import com.akto.dto.tracing.Span;
+import com.akto.dto.tracing.Trace;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.billing.UningestedApiOverage;
@@ -716,5 +718,13 @@ public class DbActor extends DataActor {
     @Override
     public void storeConversationResults(List<AgentConversationResult> conversationResults) {
         DbLayer.storeConversationResults(conversationResults);
+    }
+
+    public void storeTrace(Trace trace) {
+        DbLayer.storeTrace(trace);
+    }
+
+    public void storeSpans(List<Span> spans) {
+        DbLayer.storeSpans(spans);
     }
 }
