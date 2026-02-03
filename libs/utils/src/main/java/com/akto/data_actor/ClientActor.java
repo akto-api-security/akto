@@ -4527,9 +4527,10 @@ public class ClientActor extends DataActor {
 
     public void storeTrace(Trace trace) {
         Map<String, List<String>> headers = buildHeaders();
-        BasicDBObject obj = new BasicDBObject();
-        obj.put("trace", trace);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeTrace", "", "POST", obj.toString(), headers, "");
+        // Use HashMap instead of BasicDBObject to avoid MongoDB codec issues with POJOs
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("trace", trace);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeTrace", "", "POST", gson.toJson(payload), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
@@ -4545,9 +4546,10 @@ public class ClientActor extends DataActor {
 
     public void storeSpans(List<Span> spans) {
         Map<String, List<String>> headers = buildHeaders();
-        BasicDBObject obj = new BasicDBObject();
-        obj.put("spans", spans);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeSpans", "", "POST", obj.toString(), headers, "");
+        // Use HashMap instead of BasicDBObject to avoid MongoDB codec issues with POJOs
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("spans", spans);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeSpans", "", "POST", gson.toJson(payload), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();

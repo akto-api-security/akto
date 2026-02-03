@@ -10,6 +10,7 @@ import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.*;
+import com.akto.dto.ApiCollection.ServiceGraphEdgeInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.SyncLimit;
@@ -36,6 +37,9 @@ import com.akto.runtime.utils.Utils;
 import com.akto.test_editor.execution.ParseAndExecute;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
+import com.akto.tracing.ServiceGraphBuilder;
+import com.akto.tracing.TraceParseResult;
+import com.akto.tracing.n8n.N8nTraceParser;
 import com.akto.usage.OrgUtils;
 import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.Main;
@@ -442,6 +446,116 @@ public class HttpCallParser {
 
             long endTime = System.currentTimeMillis();
             loggerMaker.infoAndAddToDb("Completed Syncing API catalog..." + numberOfSyncs + " " + (endTime - startTime) + " ms");
+        }
+    }
+
+    /**
+     * Checks if the HTTP response is N8N traffic by examining tags.
+     *
+     * @param httpResponseParam The HTTP response parameters
+     * @return true if this is N8N traffic, false otherwise
+     */
+    private boolean isN8nTraffic(HttpResponseParams httpResponseParam) {
+        try {
+            String tagsJson = httpResponseParam.getTags();
+            if (tagsJson == null || tagsJson.isEmpty()) {
+                return false;
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            if (tagsMap == null) {
+                return false;
+            }
+
+            String source = tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
+            return Constants.AI_AGENT_SOURCE_N8N.equals(source);
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error checking if traffic is N8N: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Parses N8N trace metadata from responsePayload and stores trace/span data.
+     * The responsePayload structure is: {"output": {...}, "n8nTraceMetadata": {...}}
+     * where n8nTraceMetadata contains the full n8n execution JSON needed by N8nTraceParser.
+     *
+     * @param httpResponseParam The HTTP response containing n8n trace data in responsePayload
+     */
+    private void parseN8nTrace(HttpResponseParams httpResponseParam) {
+        try {
+            String payload = httpResponseParam.getPayload();
+            if (payload == null || payload.isEmpty()) {
+                return;
+            }
+
+            // Parse the responsePayload JSON to extract n8nTraceMetadata
+            @SuppressWarnings("unchecked")
+            Map<String, Object> payloadMap = gson.fromJson(payload, Map.class);
+            if (payloadMap == null || !payloadMap.containsKey("n8nTraceMetadata")) {
+                // Not an n8n trace response, skip
+                return;
+            }
+
+            // Extract the n8nTraceMetadata field
+            Object n8nTraceMetadata = payloadMap.get("n8nTraceMetadata");
+            if (n8nTraceMetadata == null) {
+                return;
+            }
+
+            // Convert metadata back to JSON string for parser
+            String n8nTraceJson = gson.toJson(n8nTraceMetadata);
+
+            // Validate if this is parseable n8n trace data
+            boolean canParse = N8nTraceParser.getInstance().canParse(n8nTraceJson);
+            loggerMaker.info("parseN8nTrace: N8nTraceParser.canParse() = " + canParse, LogDb.RUNTIME);
+
+            if (!canParse) {
+                loggerMaker.info("n8nTraceMetadata found but not valid n8n trace format", LogDb.RUNTIME);
+                // Log first 500 chars for debugging
+                String tracePreview = n8nTraceJson.length() > 500 ? n8nTraceJson.substring(0, 500) + "..." : n8nTraceJson;
+                loggerMaker.info("Invalid trace preview: " + tracePreview, LogDb.RUNTIME);
+                return;
+            }
+
+            loggerMaker.info("Found valid N8N workflow execution trace", LogDb.RUNTIME);
+
+            // Parse trace using N8nTraceParser
+            TraceParseResult result = N8nTraceParser.getInstance().parse(n8nTraceJson);
+
+            // Store trace and spans using dataActor
+            dataActor.storeTrace(result.getTrace());
+            if (result.getSpans() != null && !result.getSpans().isEmpty()) {
+                dataActor.storeSpans(result.getSpans());
+                loggerMaker.info("Stored N8N trace with " + result.getSpans().size() + " spans", LogDb.RUNTIME);
+            }
+
+            // Extract workflowId and get/create API collection
+            String workflowId = result.getWorkflowId();
+            if (workflowId == null || workflowId.isEmpty()) {
+                loggerMaker.info("N8N trace missing workflowId, skipping service graph update", LogDb.RUNTIME);
+                return;
+            }
+
+            String hostname = getHostnameForCollection(httpResponseParam);
+            int apiCollectionId = ServiceGraphBuilder.getInstance().getApiCollectionIdFromWorkflowId(workflowId, hostname);
+
+
+            if (apiCollectionId > 0) {
+                java.util.Map<String, ServiceGraphEdgeInfo> edges = N8nTraceParser.getInstance().extractServiceGraph(n8nTraceJson);
+                if (edges != null && !edges.isEmpty()) {
+                    ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
+                    loggerMaker.info("Updated service graph for N8N workflow: " + workflowId
+                        + " (collection: " + apiCollectionId + ", hostname: " + hostname + ") with " + edges.size() + " edges", LogDb.RUNTIME);
+                }
+            } else {
+                loggerMaker.info("Invalid API collection ID for N8N workflowId: " + workflowId, LogDb.RUNTIME);
+            }
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error parsing N8N trace: " + e.getMessage());
         }
     }
 
@@ -1035,8 +1149,12 @@ public class HttpCallParser {
             }
 
             int apiCollectionId = createApiCollectionId(httpResponseParam);
-
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
+
+            // Parse N8N trace metadata if this is N8N traffic
+            if (isN8nTraffic(httpResponseParam)) {
+                parseN8nTrace(httpResponseParam);
+            }
 
             //TODO("Parse JSON in one place for all the parser methods like Rest/GraphQL/JsonRpc")
             List<HttpResponseParams> responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
