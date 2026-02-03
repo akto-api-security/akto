@@ -75,6 +75,9 @@ public class CrawlerRun {
     public static final String SELECTED_MINI_TESTING_SERVICE = "selectedMiniTestingService";
     private String selectedMiniTestingService;
 
+    public static final String TEST_ROLE_HEX_ID = "testRoleHexId";
+    private String testRoleHexId;
+
     public CrawlerRun() {
     }
 
@@ -89,7 +92,7 @@ public class CrawlerRun {
     }
 
     public enum CrawlerRunStatus {
-        PENDING, RUNNING, COMPLETED, FAILED
+        PENDING, RUNNING, COMPLETED, FAILED, STOP_REQUESTED, STOPPED
     }
 
     @Override

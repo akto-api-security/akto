@@ -170,11 +170,11 @@ const api = {
         })
     },
 
-    initiateCrawler(hostname, username, password, apiKey, dashboardUrl, testRoleHaxId, outscopeUrls, crawlingTime, selectedModuleName, customHeaders, runTestAfterCrawling, selectedMiniTestingService, urlTemplatePatterns, applicationPages) {
+    initiateCrawler(hostname, username, password, apiKey, dashboardUrl, testRoleHexId, outscopeUrls, crawlingTime, selectedModuleName, customHeaders, runTestAfterCrawling, selectedMiniTestingService, urlTemplatePatterns, applicationPages) {
         return request({
             url: '/api/initiateCrawler',
             method: 'post',
-            data: {hostname, username, password, apiKey, dashboardUrl, testRoleHaxId, outscopeUrls, crawlingTime, selectedModuleName, customHeaders, runTestAfterCrawling, selectedMiniTestingService, urlTemplatePatterns, applicationPages}
+            data: {hostname, username, password, apiKey, dashboardUrl, testRoleHexId, outscopeUrls, crawlingTime, selectedModuleName, customHeaders, runTestAfterCrawling, selectedMiniTestingService, urlTemplatePatterns, applicationPages}
         })
     },
 
