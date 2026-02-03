@@ -1,6 +1,8 @@
 package com.akto.tracing;
 
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiCollection.ServiceGraphEdgeInfo;
 import com.mongodb.client.model.Filters;
@@ -17,6 +19,7 @@ public class ServiceGraphBuilder {
     private static final Logger logger = LoggerFactory.getLogger(ServiceGraphBuilder.class);
     private static final ServiceGraphBuilder INSTANCE = new ServiceGraphBuilder();
     private Map<String, Integer> workflowIdToApiCollectionIdMap = new HashMap<>();
+    private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     public static ServiceGraphBuilder getInstance() {
         return INSTANCE;
@@ -70,7 +73,7 @@ public class ServiceGraphBuilder {
         }
     }
 
-    public int getApiCollectionIdFromWorkflowId(String workflowId) {
+    public int getApiCollectionIdFromWorkflowId(String workflowId, String hostName) {
         // Check cache first
         if (workflowIdToApiCollectionIdMap.containsKey(workflowId)) {
             int apiCollectionId = workflowIdToApiCollectionIdMap.get(workflowId);
@@ -79,9 +82,7 @@ public class ServiceGraphBuilder {
         }
 
         // Query database if not in cache
-        ApiCollection collection = ApiCollectionsDao.instance.findOne(
-            Filters.eq(ApiCollection.NAME, workflowId)
-        );
+        ApiCollection collection = dataActor.findApiCollectionByName(hostName);
 
         if (collection != null) {
             int apiCollectionId = collection.getId();
