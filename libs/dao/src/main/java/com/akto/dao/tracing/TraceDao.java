@@ -2,8 +2,6 @@ package com.akto.dao.tracing;
 
 import com.akto.dao.AccountsContextDao;
 import com.akto.dto.tracing.model.Trace;
-import com.mongodb.client.model.IndexOptions;
-import com.mongodb.client.model.Indexes;
 
 public class TraceDao extends AccountsContextDao<Trace> {
 
@@ -34,13 +32,5 @@ public class TraceDao extends AccountsContextDao<Trace> {
         String[] startTimeIndex = {"startTimeMillis"};
         createIndexIfAbsent(getDBName(), getCollName(), startTimeIndex, false);
 
-        // Compound index on status and startTime for dashboard queries
-        getMCollection().createIndex(
-            Indexes.compoundIndex(
-                Indexes.ascending("status"),
-                Indexes.descending("startTimeMillis")
-            ),
-            new IndexOptions().background(true).name("status_startTime")
-        );
     }
 }
