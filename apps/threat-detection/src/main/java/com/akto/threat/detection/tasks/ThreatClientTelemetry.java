@@ -180,58 +180,11 @@ public class ThreatClientTelemetry implements Runnable {
                 System.setProperty(entry.getKey(), entry.getValue());
             }
 
-            // Update AKTO_LOG_LEVEL in SimpleLogger if it changed
             if (filteredEnvVars.containsKey("AKTO_LOG_LEVEL")) {
-                String newLogLevel = filteredEnvVars.get("AKTO_LOG_LEVEL");
-                System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", newLogLevel);
-                updateSimpleLoggerInstances(newLogLevel);
+                LoggerMaker.setDefaultLogLevel(filteredEnvVars.get("AKTO_LOG_LEVEL"));
             }
         } catch (Exception e) {
             logger.errorAndAddToDb(e, "Failed to update runtime environment");
-        }
-    }
-
-    /**
-     * Updates existing SimpleLogger instances with new log level using reflection.
-     */
-    @SuppressWarnings("unchecked")
-    private void updateSimpleLoggerInstances(String newLogLevel) {
-        try {
-            // Get log level integer value
-            int logLevelValue = parseLogLevel(newLogLevel);
-
-            // Get SimpleLogger class
-            Class<?> simpleLoggerClass = Class.forName("org.slf4j.simple.SimpleLogger");
-            java.lang.reflect.Field currentLogLevelField = simpleLoggerClass.getDeclaredField("currentLogLevel");
-            currentLogLevelField.setAccessible(true);
-
-            // Get logger factory
-            org.slf4j.ILoggerFactory factory = org.slf4j.LoggerFactory.getILoggerFactory();
-            Class<?> factoryClass = factory.getClass();
-            java.lang.reflect.Field loggerMapField = factoryClass.getDeclaredField("loggerMap");
-            loggerMapField.setAccessible(true);
-            Map<String, org.slf4j.Logger> loggerMap = (Map<String, org.slf4j.Logger>) loggerMapField.get(factory);
-
-            // Update all existing loggers
-            for (org.slf4j.Logger loggerInstance : loggerMap.values()) {
-                if (simpleLoggerClass.isInstance(loggerInstance)) {
-                    currentLogLevelField.setInt(loggerInstance, logLevelValue);
-                }
-            }
-        } catch (Exception e) {
-            logger.errorAndAddToDb(e, "Failed to update SimpleLogger instances");
-        }
-    }
-
-    private int parseLogLevel(String levelStr) {
-        if (levelStr == null) return 30; // WARN
-        switch (levelStr.toUpperCase()) {
-            case "TRACE": return 0;
-            case "DEBUG": return 10;
-            case "INFO": return 20;
-            case "WARN": return 30;
-            case "ERROR": return 40;
-            default: return 30; // WARN
         }
     }
 }
