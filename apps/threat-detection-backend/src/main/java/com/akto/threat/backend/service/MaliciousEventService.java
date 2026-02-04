@@ -164,7 +164,7 @@ public class MaliciousEventService {
         .setEventType(maliciousEventType)
         .setLatestApiIp(evt.getLatestApiIp())
         .setCountry(evt.getMetadata().getCountryCode())
-        .setDestCountry(evt.getMetadata().getDestCountryCode())
+        .setDestCountry(evt.getMetadata() != null && evt.getMetadata().getDestCountryCode() != null ? evt.getMetadata().getDestCountryCode() : "")
         .setCategory(evt.getCategory())
         .setSubCategory(evt.getSubCategory())
         .setRefId(refId)
