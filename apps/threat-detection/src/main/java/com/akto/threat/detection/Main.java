@@ -37,7 +37,7 @@ public class Main {
 
   private static final String CONSUMER_GROUP_ID = "akto.threat_detection";
   private static final LoggerMaker logger = new LoggerMaker(Main.class, LogDb.THREAT_DETECTION);
-  private static boolean aggregationRulesEnabled = System.getenv().getOrDefault("AGGREGATION_RULES_ENABLED", "false").equals("true");
+  private static boolean aggregationRulesEnabled = System.getenv().getOrDefault("AGGREGATION_RULES_ENABLED", "true").equals("true");
 
   private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
