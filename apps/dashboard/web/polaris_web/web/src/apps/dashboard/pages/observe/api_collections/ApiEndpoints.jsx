@@ -36,6 +36,7 @@ import { CATEGORY_API_SECURITY, getDashboardCategory, isCategory, mapLabel, isEn
 import McpToolsGraph from "./McpToolsGraph"
 import { findTypeTag, TYPE_TAG_KEYS } from "../agentic/mcpClientHelper"
 import AgentDiscoverGraphWithDummyData from "./AgentDiscoveryGraphWithDummyData"
+import AgentDiscoverGraph from "./AgentDiscoverGraph"
 
 const headings = [
     {
