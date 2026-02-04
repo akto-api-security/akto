@@ -606,39 +606,6 @@ public class ApiCollectionsAction extends UserAction {
         return Action.ERROR.toUpperCase();
     }
 
-    private Map<String, ApiCollection.ServiceGraphEdgeInfo> serviceGraphEdges;
-
-    public String updateServiceGraphEdges() {
-        try {
-            if (apiCollectionId <= 0) {
-                loggerMaker.errorAndAddToDb("Invalid API collection ID: " + apiCollectionId, LogDb.DASHBOARD);
-                return Action.ERROR.toUpperCase();
-            }
-
-            if (serviceGraphEdges == null) {
-                loggerMaker.errorAndAddToDb("Service graph edges cannot be null", LogDb.DASHBOARD);
-                return Action.ERROR.toUpperCase();
-            }
-
-            Bson filter = Filters.eq(ApiCollection.ID, apiCollectionId);
-            Bson update = Updates.set(ApiCollection.SERVICE_GRAPH_EDGES, serviceGraphEdges);
-            UpdateResult result = ApiCollectionsDao.instance.getMCollection().updateOne(filter, update);
-
-            if (result.getMatchedCount() == 0) {
-                loggerMaker.errorAndAddToDb("API Collection not found: " + apiCollectionId, LogDb.DASHBOARD);
-                return Action.ERROR.toUpperCase();
-            }
-
-            loggerMaker.infoAndAddToDb("Updated service graph for collection " + apiCollectionId + " with " + serviceGraphEdges.size() + " edges", LogDb.DASHBOARD);
-            return SUCCESS.toUpperCase();
-
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Exception while updating service graph: " + e.getMessage(), LogDb.DASHBOARD);
-            e.printStackTrace();
-            return Action.ERROR.toUpperCase();
-        }
-    }
-
     public List<ApiCollection> getApiCollections() {
         return this.apiCollections;
     }
@@ -713,14 +680,6 @@ public class ApiCollectionsAction extends UserAction {
 
     public void setApiCount(int apiCount) {
         this.apiCount = apiCount;
-    }
-
-    public Map<String, ApiCollection.ServiceGraphEdgeInfo> getServiceGraphEdges() {
-        return serviceGraphEdges;
-    }
-
-    public void setServiceGraphEdges(Map<String, ApiCollection.ServiceGraphEdgeInfo> serviceGraphEdges) {
-        this.serviceGraphEdges = serviceGraphEdges;
     }
 
     public boolean getHasUsageEndpoints() {
