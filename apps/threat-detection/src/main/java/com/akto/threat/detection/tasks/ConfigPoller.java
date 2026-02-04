@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.metrics.ModuleInfoWorker;
@@ -19,6 +20,9 @@ public class ConfigPoller implements Runnable {
     private static final ModuleInfo.ModuleType MODULE_TYPE = ModuleInfo.ModuleType.THREAT_DETECTION;
     private static final long POLL_INTERVAL_MS = 20000; // 20 seconds
     private static final String ENV_FILE_PATH = "/app/.env";
+    private static final Random RANDOM = new Random();
+    private static final int JITTER_MIN_SECONDS = 1;
+    private static final int JITTER_MAX_SECONDS = 5;
 
     private final DataActor dataActor;
 
@@ -34,11 +38,8 @@ public class ConfigPoller implements Runnable {
         while (true) {
             try {
                 pollAndProcessConfig();
-                Thread.sleep(POLL_INTERVAL_MS);
-            } catch (InterruptedException ie) {
-                Thread.currentThread().interrupt();
-                logger.errorAndAddToDb(ie, "Config poller interrupted");
-                break;
+                long jitterMs = (RANDOM.nextInt(JITTER_MAX_SECONDS - JITTER_MIN_SECONDS + 1) + JITTER_MIN_SECONDS) * 1000L;
+                Thread.sleep(POLL_INTERVAL_MS + jitterMs);
             } catch (Exception e) {
                 logger.errorAndAddToDb(e, "Error in config poller");
             }
@@ -53,22 +54,11 @@ public class ConfigPoller implements Runnable {
                 return;
             }
 
-            // Reboot flag was set - either plain restart or env update + restart
             logger.infoAndAddToDb("Reboot flag detected, processing restart request");
 
             Map<String, String> envVars = extractEnvVars(moduleInfoList);
-
             if (!envVars.isEmpty()) {
-                // Write env vars to file (even if unchanged, to ensure .env file exists)
                 writeEnvFile(envVars);
-
-                if (hasEnvironmentChanged(envVars)) {
-                    logger.infoAndAddToDb("Configuration changes detected, restarting with new env vars");
-                } else {
-                    logger.infoAndAddToDb("No configuration changes, performing plain restart");
-                }
-            } else {
-                logger.infoAndAddToDb("No env vars found, performing plain restart");
             }
 
             restartSelf();
@@ -113,17 +103,6 @@ public class ConfigPoller implements Runnable {
             }
         }
         logger.infoAndAddToDb("Updated .env file with " + envVars.size() + " variables");
-    }
-
-    private boolean hasEnvironmentChanged(Map<String, String> envVars) {
-        for (Map.Entry<String, String> entry : envVars.entrySet()) {
-            String currentValue = System.getenv(entry.getKey());
-            String newValue = entry.getValue();
-            if (currentValue == null || !currentValue.equals(newValue)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private void restartSelf() {
