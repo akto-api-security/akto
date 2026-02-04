@@ -129,11 +129,13 @@ const Logs = () => {
         });
     }
 
+    const CONFIGURABLE_MODULE_TYPES = ['TRAFFIC_COLLECTOR', 'THREAT_DETECTION'];
+
     const canRebootModule = (module) => {
         const twoMinutesAgo = Math.floor(Date.now() / 1000) - 120;
         return module.lastHeartbeatReceived >= twoMinutesAgo &&
                module.name &&
-               (module.name.startsWith('Default_') || module.moduleType === 'TRAFFIC_COLLECTOR');
+               (module.name.startsWith('Default_') || module.name.startsWith('akto-mr')|| CONFIGURABLE_MODULE_TYPES.includes(module.moduleType));
     }
 
     const handleModuleTypeClick = (module) => {
@@ -159,8 +161,6 @@ const Logs = () => {
 
     // Sort moduleInfos by lastHeartbeatReceived in descending order
     const sortedModuleInfos = [...moduleInfos].sort((a, b) => (b.lastHeartbeatReceived || 0) - (a.lastHeartbeatReceived || 0));
-
-    const CONFIGURABLE_MODULE_TYPES = ['TRAFFIC_COLLECTOR', 'THREAT_DETECTION'];
 
     const moduleInfoRows = sortedModuleInfos.map(module => {
         const isEligible = canRebootModule(module);
