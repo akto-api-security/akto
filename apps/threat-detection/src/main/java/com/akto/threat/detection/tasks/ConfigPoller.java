@@ -6,7 +6,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.akto.config.DynamicConfig;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.metrics.ModuleInfoWorker;
 import com.akto.log.LoggerMaker;
@@ -69,7 +68,7 @@ public class ConfigPoller implements Runnable {
                 // Write env vars to file (even if unchanged, to ensure .env file exists)
                 writeEnvFile(envVars);
 
-                if (DynamicConfig.hasChanges(envVars)) {
+                if (hasEnvironmentChanged(envVars)) {
                     logger.infoAndAddToDb("Configuration changes detected, restarting with new env vars");
                 } else {
                     logger.infoAndAddToDb("No configuration changes, performing plain restart");
@@ -117,6 +116,17 @@ public class ConfigPoller implements Runnable {
             }
         }
         logger.infoAndAddToDb("Updated .env file with " + envVars.size() + " variables");
+    }
+
+    private boolean hasEnvironmentChanged(Map<String, String> envVars) {
+        for (Map.Entry<String, String> entry : envVars.entrySet()) {
+            String currentValue = System.getenv(entry.getKey());
+            String newValue = entry.getValue();
+            if (currentValue == null || !currentValue.equals(newValue)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void restartSelf() {

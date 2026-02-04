@@ -1,6 +1,5 @@
 package com.akto.metrics;
 
-import com.akto.config.DynamicConfig;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.dto.monitoring.ModuleInfo;
@@ -45,15 +44,7 @@ public class ModuleInfoWorker {
     private Map<String, Object> collectEnvironmentVariables(ModuleInfo.ModuleType moduleType) {
         Map<String, Object> envMap = new HashMap<>();
 
-        // Collect all environment variables from DynamicConfig (which has the latest updates)
-        Map<String, String> dynamicConfigEnv = DynamicConfig.getAll();
-
-        for (Map.Entry<String, String> entry : dynamicConfigEnv.entrySet()) {
-            String key = entry.getKey();
-            String value = entry.getValue();
-            envMap.put(key, value);
-        }
-
+        envMap.putAll(System.getenv());
 
         return envMap;
     }

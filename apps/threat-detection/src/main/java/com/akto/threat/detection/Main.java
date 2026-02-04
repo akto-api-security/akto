@@ -7,7 +7,6 @@ import java.util.concurrent.TimeUnit;
 
 import com.akto.DaoInit;
 import com.akto.RuntimeMode;
-import com.akto.config.DynamicConfig;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
@@ -38,7 +37,7 @@ public class Main {
 
   private static final String CONSUMER_GROUP_ID = "akto.threat_detection";
   private static final LoggerMaker logger = new LoggerMaker(Main.class, LogDb.THREAT_DETECTION);
-  private static boolean aggregationRulesEnabled = DynamicConfig.get("AGGREGATION_RULES_ENABLED", "true").equals("true");
+  private static boolean aggregationRulesEnabled = System.getenv("AGGREGATION_RULES_ENABLED").equals("true");
 
   private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
@@ -81,7 +80,7 @@ public class Main {
     ModuleInfoWorker.init(ModuleInfo.ModuleType.THREAT_DETECTION, dataActor);
     
     if (!isHybridDeployment) {
-        DaoInit.init(new ConnectionString(DynamicConfig.get("AKTO_MONGO_CONN")));
+        DaoInit.init(new ConnectionString(System.getenv("AKTO_MONGO_CONN")));
     }
 
     if (aggregationRulesEnabled) {
@@ -94,7 +93,7 @@ public class Main {
     KafkaConfig trafficKafka =
         KafkaConfig.newBuilder()
             .setGroupId(CONSUMER_GROUP_ID)
-            .setBootstrapServers(DynamicConfig.get("AKTO_TRAFFIC_KAFKA_BOOTSTRAP_SERVER"))
+            .setBootstrapServers(System.getenv("AKTO_TRAFFIC_KAFKA_BOOTSTRAP_SERVER"))
             .setConsumerConfig(
                 KafkaConsumerConfig.newBuilder()
                     .setMaxPollRecords(500)
@@ -109,7 +108,7 @@ public class Main {
     KafkaConfig internalKafka =
         KafkaConfig.newBuilder()
             .setGroupId(CONSUMER_GROUP_ID)
-            .setBootstrapServers(DynamicConfig.get("AKTO_INTERNAL_KAFKA_BOOTSTRAP_SERVER"))
+            .setBootstrapServers(System.getenv("AKTO_INTERNAL_KAFKA_BOOTSTRAP_SERVER"))
             .setConsumerConfig(
                 KafkaConsumerConfig.newBuilder()
                     .setMaxPollRecords(100)
@@ -137,7 +136,7 @@ public class Main {
     DistributionCalculator distributionCalculator = new DistributionCalculator();
     DistributionDataForwardLayer distributionDataForwardLayer = new DistributionDataForwardLayer(localRedis, distributionCalculator);
 
-    boolean apiDistributionEnabled = Utils.apiDistributionEnabled(localRedis != null, DynamicConfig.get("API_DISTRIBUTION_ENABLED", "true").equals("true"));
+    boolean apiDistributionEnabled = Utils.apiDistributionEnabled(localRedis != null, System.getenv().getOrDefault("API_DISTRIBUTION_ENABLED", "true").equals("true"));
 
     triggerDistributionDataForwardCron(apiDistributionEnabled, distributionDataForwardLayer);
 
@@ -172,7 +171,7 @@ public class Main {
   }
 
   public static RedisClient createLocalRedisClient() {
-    RedisClient redisClient = RedisClient.create(DynamicConfig.get("AKTO_THREAT_DETECTION_LOCAL_REDIS_URI"));
+    RedisClient redisClient = RedisClient.create(System.getenv("AKTO_THREAT_DETECTION_LOCAL_REDIS_URI"));
     try {
       logger.infoAndAddToDb("Connecting to local redis");
       StatefulRedisConnection<String, String> connection = redisClient.connect();
