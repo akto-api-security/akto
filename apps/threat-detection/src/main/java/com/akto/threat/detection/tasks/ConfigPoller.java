@@ -84,23 +84,26 @@ public class ConfigPoller implements Runnable {
     }
 
     private Map<String, String> extractEnvVars(List<ModuleInfo> moduleInfoList) {
-        Map<String, String> envVars = new HashMap<>();
-        if (!moduleInfoList.isEmpty() && moduleInfoList.get(0).getAdditionalData() != null) {
-            Map<String, Object> additionalData = moduleInfoList.get(0).getAdditionalData();
-            Object envObj = additionalData.get("env");
-            if (envObj instanceof Map) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> raw = (Map<String, Object>) envObj;
-                for (Map.Entry<String, Object> e : raw.entrySet()) {
-                    envVars.put(e.getKey(), e.getValue() != null ? e.getValue().toString() : "");
-                }
-            }
+        Map<String, String> filteredEnvVars = new HashMap<>();
+
+        if (moduleInfoList.isEmpty() || moduleInfoList.get(0).getAdditionalData() == null) {
+            return filteredEnvVars;
         }
 
-        Map<String, Object> envVarsAsObject = new HashMap<>(envVars);
-        Map<String, Object> filteredEnvVarsObject = ModuleInfoWorker.filterWhitelistedEnvVariables(envVarsAsObject, MODULE_TYPE);
+        Map<String, Object> additionalData = moduleInfoList.get(0).getAdditionalData();
+        Object envObj = additionalData.get("env");
 
-        Map<String, String> filteredEnvVars = new HashMap<>();
+        if (!(envObj instanceof Map)) {
+            return filteredEnvVars;
+        }
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> envVars = (Map<String, Object>) envObj;
+
+        // Filter whitelisted environment variables
+        Map<String, Object> filteredEnvVarsObject = ModuleInfoWorker.filterWhitelistedEnvVariables(envVars, MODULE_TYPE);
+
+        // Convert to String values
         for (Map.Entry<String, Object> entry : filteredEnvVarsObject.entrySet()) {
             filteredEnvVars.put(entry.getKey(), entry.getValue() != null ? entry.getValue().toString() : "");
         }
