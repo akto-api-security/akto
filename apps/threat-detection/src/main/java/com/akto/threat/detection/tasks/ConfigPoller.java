@@ -41,12 +41,6 @@ public class ConfigPoller implements Runnable {
                 break;
             } catch (Exception e) {
                 logger.errorAndAddToDb(e, "Error in config poller");
-                try {
-                    Thread.sleep(5000);
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
             }
         }
     }
