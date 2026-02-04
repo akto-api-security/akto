@@ -8,8 +8,29 @@ from typing import Any, Dict, Tuple, Union
 
 from machine_id import get_machine_id
 
-logging.basicConfig(level=logging.INFO)
+# Configure logging
+LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.claude/logs"))
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+LOG_PAYLOADS = os.getenv("LOG_PAYLOADS", "false").lower() == "true"
+
+# Create log directory if it doesn't exist
+os.makedirs(LOG_DIR, exist_ok=True)
+
+# Setup logging with both file and console handlers
 logger = logging.getLogger(__name__)
+logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+
+# File handler
+file_handler = logging.FileHandler(os.path.join(LOG_DIR, "validate-prompt.log"))
+file_handler.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(file_formatter)
+logger.addHandler(file_handler)
+
+# Console handler
+console_handler = logging.StreamHandler(sys.stderr)
+console_handler.setLevel(logging.ERROR)  # Only show errors in console
+logger.addHandler(console_handler)
 
 MODE = os.getenv("MODE", "argus").lower()
 AKTO_DATA_INGESTION_URL = os.getenv("AKTO_DATA_INGESTION_URL")
@@ -36,6 +57,12 @@ def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
 
 
 def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str]:
+    import time
+
+    logger.info(f"API CALL: POST {url}")
+    if LOG_PAYLOADS:
+        logger.debug(f"Request payload: {json.dumps(payload)[:1000]}...")
+
     headers = {"Content-Type": "application/json"}
     request = urllib.request.Request(
         url,
@@ -44,12 +71,26 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         method="POST",
     )
 
-    with urllib.request.urlopen(request, timeout=AKTO_TIMEOUT) as response:
-        raw = response.read().decode("utf-8")
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            return raw
+    start_time = time.time()
+    try:
+        with urllib.request.urlopen(request, timeout=AKTO_TIMEOUT) as response:
+            duration_ms = int((time.time() - start_time) * 1000)
+            status_code = response.getcode()
+            raw = response.read().decode("utf-8")
+
+            logger.info(f"API RESPONSE: Status {status_code}, Duration: {duration_ms}ms, Size: {len(raw)} bytes")
+
+            if LOG_PAYLOADS:
+                logger.debug(f"Response body: {raw[:1000]}...")
+
+            try:
+                return json.loads(raw)
+            except json.JSONDecodeError:
+                return raw
+    except Exception as e:
+        duration_ms = int((time.time() - start_time) * 1000)
+        logger.error(f"API CALL FAILED after {duration_ms}ms: {e}")
+        raise
 
 
 def build_validation_request(query: str) -> dict:
@@ -84,6 +125,12 @@ def call_guardrails(query: str) -> Tuple[bool, str]:
     if not query.strip():
         return True, ""
 
+    logger.info("Validating prompt against guardrails")
+    if LOG_PAYLOADS:
+        logger.debug(f"Prompt: {query[:200]}...")
+    else:
+        logger.info(f"Prompt preview: {query[:100]}...")
+
     try:
         request_body = build_validation_request(query)
         result = post_payload_json(
@@ -96,6 +143,11 @@ def call_guardrails(query: str) -> Tuple[bool, str]:
         allowed = guardrails_result.get("Allowed", True)
         reason = guardrails_result.get("Reason", "")
 
+        if allowed:
+            logger.info("Prompt ALLOWED by guardrails")
+        else:
+            logger.warning(f"Prompt DENIED by guardrails: {reason}")
+
         return allowed, reason
 
     except Exception as e:
@@ -107,6 +159,7 @@ def ingest_blocked_request(user_prompt: str):
     if not AKTO_DATA_INGESTION_URL or not AKTO_SYNC_MODE:
         return
 
+    logger.info("Ingesting blocked request data")
     try:
         blocked_response_payload = {
             "body": {"x-blocked-by": "Akto Proxy"},
@@ -121,12 +174,14 @@ def ingest_blocked_request(user_prompt: str):
             build_http_proxy_url(guardrails=False, ingest_data=True),
             request_body,
         )
-        logger.info("Data ingestion successful")
+        logger.info("Blocked request ingestion successful")
     except Exception as e:
         logger.error(f"Ingestion error: {e}")
 
 
 def main():
+    logger.info(f"=== Hook execution started - Mode: {MODE}, Sync: {AKTO_SYNC_MODE} ===")
+
     try:
         input_data = json.load(sys.stdin)
     except json.JSONDecodeError as e:
@@ -136,7 +191,10 @@ def main():
     prompt = input_data.get("prompt", "")
 
     if not prompt.strip():
+        logger.info("Empty prompt, allowing")
         sys.exit(0)
+
+    logger.info(f"Processing prompt (length: {len(prompt)} chars)")
 
     if AKTO_SYNC_MODE:
         allowed, reason = call_guardrails(prompt)
@@ -145,10 +203,12 @@ def main():
                 "decision": "block",
                 "reason": f"Blocked by Akto Guardrails"
             }
+            logger.warning(f"BLOCKING prompt - Reason: {reason}")
             print(json.dumps(output))
             ingest_blocked_request(prompt)
             sys.exit(1)
 
+    logger.info("Prompt allowed")
     sys.exit(0)
 
 

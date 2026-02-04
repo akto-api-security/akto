@@ -8,8 +8,29 @@ from typing import Any, Dict, Tuple, Union
 
 from machine_id import get_machine_id
 
-logging.basicConfig(level=logging.INFO)
+# Configure logging
+LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.claude/logs"))
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+LOG_PAYLOADS = os.getenv("LOG_PAYLOADS", "false").lower() == "true"
+
+# Create log directory if it doesn't exist
+os.makedirs(LOG_DIR, exist_ok=True)
+
+# Setup logging with both file and console handlers
 logger = logging.getLogger(__name__)
+logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+
+# File handler
+file_handler = logging.FileHandler(os.path.join(LOG_DIR, "validate-response.log"))
+file_handler.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(file_formatter)
+logger.addHandler(file_handler)
+
+# Console handler
+console_handler = logging.StreamHandler(sys.stderr)
+console_handler.setLevel(logging.ERROR)  # Only show errors in console
+logger.addHandler(console_handler)
 
 MODE = os.getenv("MODE", "argus").lower()
 AKTO_DATA_INGESTION_URL = os.getenv("AKTO_DATA_INGESTION_URL")
@@ -36,6 +57,12 @@ def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
 
 
 def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str]:
+    import time
+
+    logger.info(f"API CALL: POST {url}")
+    if LOG_PAYLOADS:
+        logger.debug(f"Request payload: {json.dumps(payload)[:1000]}...")
+
     headers = {"Content-Type": "application/json"}
     request = urllib.request.Request(
         url,
@@ -44,12 +71,26 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         method="POST",
     )
 
-    with urllib.request.urlopen(request, timeout=AKTO_TIMEOUT) as response:
-        raw = response.read().decode("utf-8")
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            return raw
+    start_time = time.time()
+    try:
+        with urllib.request.urlopen(request, timeout=AKTO_TIMEOUT) as response:
+            duration_ms = int((time.time() - start_time) * 1000)
+            status_code = response.getcode()
+            raw = response.read().decode("utf-8")
+
+            logger.info(f"API RESPONSE: Status {status_code}, Duration: {duration_ms}ms, Size: {len(raw)} bytes")
+
+            if LOG_PAYLOADS:
+                logger.debug(f"Response body: {raw[:1000]}...")
+
+            try:
+                return json.loads(raw)
+            except json.JSONDecodeError:
+                return raw
+    except Exception as e:
+        duration_ms = int((time.time() - start_time) * 1000)
+        logger.error(f"API CALL FAILED after {duration_ms}ms: {e}")
+        raise
 
 
 def build_ingestion_payload(user_prompt: str, response_text: str) -> Dict[str, Any]:
@@ -126,6 +167,14 @@ def send_ingestion_data(user_prompt: str, response_text: str):
     if not user_prompt.strip() or not response_text.strip():
         return
 
+    logger.info("Ingesting conversation data")
+    if LOG_PAYLOADS:
+        logger.debug(f"Prompt: {user_prompt[:200]}...")
+        logger.debug(f"Response: {response_text[:200]}...")
+    else:
+        logger.info(f"Prompt preview: {user_prompt[:100]}...")
+        logger.info(f"Response preview: {response_text[:100]}...")
+
     try:
         request_body = build_ingestion_payload(user_prompt, response_text)
         post_payload_json(
@@ -135,33 +184,40 @@ def send_ingestion_data(user_prompt: str, response_text: str):
             ),
             request_body,
         )
-        logger.info("Data ingestion successful")
+        logger.info("Conversation ingestion successful")
 
     except Exception as e:
         logger.error(f"Ingestion error: {e}")
 
 
 def main():
+    logger.info(f"=== Hook execution started - Mode: {MODE}, Sync: {AKTO_SYNC_MODE} ===")
+
     try:
         input_data = json.load(sys.stdin)
         transcript_path = input_data.get("transcript_path")
-        
+
         if not transcript_path:
+            logger.info("No transcript path provided")
             sys.exit(0)
 
         transcript_path = os.path.expanduser(transcript_path)
-        
+        logger.info(f"Reading transcript from: {transcript_path}")
+
         user_prompt, response_text = get_last_interaction(transcript_path)
-        
+
         if not user_prompt or not response_text:
+            logger.info("No complete interaction found in transcript")
             sys.exit(0)
 
+        logger.info(f"Extracted interaction - Prompt: {len(user_prompt)} chars, Response: {len(response_text)} chars")
         send_ingestion_data(user_prompt, response_text)
 
     except Exception as e:
         logger.error(f"Main error: {e}")
         sys.exit(0)
 
+    logger.info("Hook execution completed")
     sys.exit(0)
 
 

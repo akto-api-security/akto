@@ -26,6 +26,11 @@ export AKTO_DATA_INGESTION_URL="ingestion-service-url"
 export AKTO_SYNC_MODE="true" # Set to false if you want to allow prompts if guardrails blocks them but still send them to Cursor
 export MODE="argus" # Options: "argus" (default) or "atlas"
 export DEVICE_ID="" # Optional: Custom device ID for atlas mode (auto-generated if not provided)
+
+# Optional logging configuration
+export LOG_DIR="~/.cursor/mcp-logs" # Default: ~/.cursor/mcp-logs
+export LOG_LEVEL="INFO" # Options: DEBUG, INFO, WARNING, ERROR (default: INFO)
+export LOG_PAYLOADS="false" # Set to "true" to log request/response payloads (default: false)
 ```
 
 #### Mode Configuration
@@ -109,6 +114,9 @@ Close and reopen Cursor for the hooks to take effect.
 | `MODE` | `argus` | Operation mode: `argus` or `atlas` |
 | `DEVICE_ID` | (auto-generated) | Custom device ID for atlas mode |
 | `API_URL` | `https://api.anthropic.com` | API endpoint URL (argus mode only) |
+| `LOG_DIR` | `~/.cursor/mcp-logs` | Directory for log files |
+| `LOG_LEVEL` | `INFO` | Logging verbosity: DEBUG, INFO, WARNING, ERROR |
+| `LOG_PAYLOADS` | `false` | Log request/response payloads (privacy-sensitive) |
 
 ## Troubleshooting
 
@@ -127,7 +135,62 @@ If the Akto service is unavailable:
 
 ### Viewing logs
 
-Check Cursor's output logs for hook execution details and errors.
+Hook execution logs are written to persistent files:
+
+**Log File Locations** (default: `~/.cursor/mcp-logs/`):
+- `validate-request.log` - Before hook (request validation) logs
+- `validate-response.log` - After hook (response ingestion) logs
+
+**View logs in real-time:**
+```bash
+# Watch request validation logs
+tail -f ~/.cursor/mcp-logs/validate-request.log
+
+# Watch response ingestion logs
+tail -f ~/.cursor/mcp-logs/validate-response.log
+
+# View both logs together
+tail -f ~/.cursor/mcp-logs/*.log
+```
+
+**Log Format:**
+```
+2025-02-04 10:30:45,123 - INFO - === Hook execution started - Mode: atlas, Sync: True ===
+2025-02-04 10:30:45,124 - INFO - Processing request for MCP server: github
+2025-02-04 10:30:45,125 - INFO - Validating request for MCP server: github
+2025-02-04 10:30:45,126 - INFO - API CALL: POST https://data-ingestion.akto.io/api/http-proxy?guardrails=true&akto_connector=cursor_mcp
+2025-02-04 10:30:45,456 - INFO - API RESPONSE: Status 200, Duration: 330ms, Size: 245 bytes
+2025-02-04 10:30:45,457 - INFO - Request ALLOWED for github
+2025-02-04 10:30:45,458 - INFO - Request allowed
+```
+
+**What Gets Logged:**
+
+1. **Hook Execution Context**
+   - Mode (atlas/argus) and sync configuration
+   - MCP server name
+   - Hook start/end timestamps
+
+2. **API Calls** (detailed logging)
+   - Full URL with query parameters (`guardrails=true`, `akto_connector=cursor_mcp`, `ingest_data=true`)
+   - HTTP method (POST)
+   - Request/response timing (latency in ms)
+   - Response status codes
+   - Response sizes
+
+3. **Guardrails Decisions** (validate-mcp-request.py)
+   - ALLOWED/DENIED with reasons
+   - MCP tool input previews
+
+4. **Data Ingestion** (validate-mcp-response.py)
+   - Ingestion attempts and results
+   - Tool input/result previews
+
+5. **Errors**
+   - Full error messages with context
+   - API call failures with timing
+
+**Privacy Note:** By default, full request/response payloads are NOT logged for privacy. Set `LOG_PAYLOADS=true` to enable full payload logging for debugging (use with caution in production).
 
 ## Legacy Bash Hooks
 
