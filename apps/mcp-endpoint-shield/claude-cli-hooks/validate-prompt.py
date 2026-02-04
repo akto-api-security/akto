@@ -98,7 +98,7 @@ def build_validation_request(query: str) -> dict:
     # Build tags based on mode
     tags = {"gen-ai": "Gen AI"}
     if MODE == "atlas":
-        tags["ai-agent"] = "cursor"
+        tags["ai-agent"] = "claudecli"
         tags["source"] = "ENDPOINT"
 
     return {

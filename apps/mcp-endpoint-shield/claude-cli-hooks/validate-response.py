@@ -97,7 +97,7 @@ def build_ingestion_payload(user_prompt: str, response_text: str) -> Dict[str, A
     # Build tags based on mode
     tags = {"gen-ai": "Gen AI"}
     if MODE == "atlas":
-        tags["ai-agent"] = "cursor"
+        tags["ai-agent"] = "claudecli"
         tags["source"] = "ENDPOINT"
 
     return {
