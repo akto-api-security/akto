@@ -26,19 +26,23 @@ function AgenticHistoryCards({ historyItems = [], onHistoryClick, onViewAllClick
 
                 <HorizontalGrid columns={{ xs: 1, sm: 2, md: 3 }} gap="4">
                     {historyItems.map((item) => (
-                        <div key={item.id} onClick={() => onHistoryClick(item.id)} style={{ cursor: 'pointer' }}>
-                            <Card  background="bg-magic-subdued-active" padding="3">
-                                <VerticalStack gap="8">
-                                        <Text variant="bodySm" fontWeight="medium" as="p" breakWord>
-                                            {item.title}
-                                        </Text>
-                                    <Text variant="bodyXs" tone="subdued" as="span">
+                        <div
+                            key={item.id}
+                            onClick={() => onHistoryClick(item.id)}
+                            className="history-card-wrapper"
+                            style={{ cursor: 'pointer', height: '100%' }}
+                        >
+                            <Card background="bg-magic-subdued-active" padding="4">
+                                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100px' }}>
+                                    <Text variant="bodySm" fontWeight="medium" as="p" breakWord>
+                                        {item.title}
+                                    </Text>
+                                    <Text variant="bodySm" tone="subdued" as="span">
                                         {func.prettifyEpoch(item.lastUpdatedAt)}
                                     </Text>
-                                </VerticalStack>
+                                </div>
                             </Card>
                         </div>
-                        
                     ))}
                 </HorizontalGrid>
             </VerticalStack>

@@ -59,7 +59,7 @@ function AgenticHistoryModal({ isOpen, onClose, onHistoryClick, historyItems = [
                                 <HorizontalStack align='space-between' blockAlign="center" wrap={false}>
                                     <Box maxWidth="250px">
                                     <TooltipText
-                                        textProps={{ fontWeight: "bold", variant: "bodyMd" }} 
+                                        textProps={{ variant: "bodyMd" }}
                                         tooltip={item.title}
                                         text={item.title}
                                     />

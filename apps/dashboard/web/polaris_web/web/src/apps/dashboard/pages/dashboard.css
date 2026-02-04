@@ -266,3 +266,10 @@
     border-radius: 4px;
     background: var(--Background-Selected, #EDEEEF);
 }
+
+/* Disables both horizontal and vertical scrolling on the Ask Akto page */
+html.ask-ai-route,
+body.ask-ai-route {
+    overflow: hidden !important;
+    height: 100%;
+}

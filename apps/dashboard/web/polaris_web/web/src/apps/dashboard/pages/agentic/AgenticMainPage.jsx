@@ -25,6 +25,21 @@ function AgenticMainPage() {
     const [pendingConversationId, setPendingConversationId] = useState(null);
     const [conversationType, setConversationType] = useState('ASK_AKTO');
 
+    // Disable page scroll only on main page, not conversation
+    useEffect(() => {
+        if (!showConversation) {
+            document.documentElement.classList.add('ask-ai-route');
+            document.body.classList.add('ask-ai-route');
+        } else {
+            document.documentElement.classList.remove('ask-ai-route');
+            document.body.classList.remove('ask-ai-route');
+        }
+        return () => {
+            document.documentElement.classList.remove('ask-ai-route');
+            document.body.classList.remove('ask-ai-route');
+        };
+    }, [showConversation]);
+
     const handleSearchSubmit = useCallback((query) => {
         setCurrentQuery(query);
         setLoadConversationId(null); // Clear conversation ID for new search
@@ -119,14 +134,15 @@ function AgenticMainPage() {
 
     return (
         <Page id="agentic-main-page" fullWidth>
-            <div style={{display: 'flex', justifyContent: 'end'}}>
+            {/* <div style={{display: 'flex', justifyContent: 'end'}}>
                 <ButtonGroup segmented={true}>
                     <Button icon={MagicMinor} onClick={() => setConversationType('ASK_AKTO')} pressed={conversationType === 'ASK_AKTO'}>Know About Dashboard</Button>
                     <Button icon={InfoMinor} onClick={() => setConversationType('DOCS_AGENT')} pressed={conversationType === 'DOCS_AGENT'}>Learn about Akto</Button>
                 </ButtonGroup>
-            </div>
-            <div style={{height: '100vh', display: 'flex', justifyContent: 'center'}}>
+            </div> */}
+            <div style={{height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}}>
             <HorizontalStack align="center" blockAlign="center">
+                <div style={{ width: '550px', maxWidth: '100%' }}>
                 <VerticalStack gap="16" align="center">
                     <VerticalStack gap={"8"}>
                         <AgenticWelcomeHeader username={username} />
@@ -139,13 +155,14 @@ function AgenticMainPage() {
                             onSuggestionClick={handleSuggestionClick}
                             hide={searchValue.trim().length > 0}
                         />
-                    </VerticalStack>    
+                    </VerticalStack>
                     <AgenticHistoryCards
                         historyItems={historyItems.sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt).slice(0, 3)}
                         onHistoryClick={handleHistoryClick}
                         onViewAllClick={handleViewAllClick}
                     />
                 </VerticalStack>
+                </div>
             </HorizontalStack>
             {/* History Modal */}
             <AgenticHistoryModal
