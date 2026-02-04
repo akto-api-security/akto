@@ -1,6 +1,6 @@
 #!/bin/bash
 
-LOG_FILE="/var/log/app/runtime.log"
+LOG_FILE="/var/log/app/threat-detection.log"
 MAX_LOG_SIZE=${MAX_LOG_SIZE:-104857600}  # Default to 10 MB if not set (10 MB = 10 * 1024 * 1024 bytes)
 CHECK_INTERVAL=60                        # Check interval in seconds
 MEMORY_RESTART_THRESHOLD=${MEMORY_RESTART_THRESHOLD:-95}  # Restart if memory usage exceeds 95%
