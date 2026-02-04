@@ -22,12 +22,12 @@ AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_CONNECTOR = "cursor_mcp"
 
-# Configure CLAUDE_API_URL based on mode
+# Configure API_URL based on mode
 if MODE == "atlas":
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
-    CLAUDE_API_URL = f"https://{device_id}.claudecli.ai-agent" if device_id else "https://api.anthropic.com"
+    API_URL = f"https://{device_id}.cursor.ai-agent" if device_id else "https://api.anthropic.com"
 else:
-    CLAUDE_API_URL = os.getenv("CLAUDE_API_URL", "https://api.anthropic.com")
+    API_URL = os.getenv("API_URL", "https://api.anthropic.com")
 
 
 def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
@@ -84,7 +84,7 @@ def build_ingestion_payload(tool_input: str, result_json: str, mcp_server_name: 
         tags["source"] = "ENDPOINT"
 
     return {
-        "url": CLAUDE_API_URL,
+        "url": API_URL,
         "path": "/v1/messages",
         "request": {
             "method": "POST",

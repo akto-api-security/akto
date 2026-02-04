@@ -30,8 +30,8 @@ export DEVICE_ID="" # Optional: Custom device ID for atlas mode (auto-generated 
 
 #### Mode Configuration
 
-- **argus** (default): Standard mode using configured `CLAUDE_API_URL` or defaults to `https://api.anthropic.com`
-- **atlas**: Uses device-specific routing with format `https://{deviceId}.claudecli.ai-agent` and includes additional metadata tags:
+- **argus** (default): Standard mode using configured `API_URL` or defaults to `https://api.anthropic.com`
+- **atlas**: Uses device-specific routing with format `https://{deviceId}.cursor.ai-agent` and includes additional metadata tags:
   - `ai-agent=cursor`
   - `source=ENDPOINT`
 
@@ -108,7 +108,7 @@ Close and reopen Cursor for the hooks to take effect.
 | `AKTO_TIMEOUT` | `5` | Timeout in seconds for API calls |
 | `MODE` | `argus` | Operation mode: `argus` or `atlas` |
 | `DEVICE_ID` | (auto-generated) | Custom device ID for atlas mode |
-| `CLAUDE_API_URL` | `https://api.anthropic.com` | Claude API URL (argus mode only) |
+| `API_URL` | `https://api.anthropic.com` | API endpoint URL (argus mode only) |
 
 ## Troubleshooting
 
