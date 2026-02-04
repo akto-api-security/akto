@@ -1,13 +1,9 @@
 package com.akto.tracing;
 
-import com.akto.dao.ApiCollectionsDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiCollection.ServiceGraphEdgeInfo;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Updates;
-import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +29,7 @@ public class ServiceGraphBuilder {
 
         try {
             // Fetch current collection
-            ApiCollection collection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+            ApiCollection collection = dataActor.fetchApiCollectionMeta(apiCollectionId);
             if (collection == null) {
                 logger.error("API Collection not found: {}", apiCollectionId);
                 return false;
@@ -58,10 +54,11 @@ public class ServiceGraphBuilder {
                 existingEdges.put(targetService, edgeInfo);
             }
 
-            // Update in database
-            Bson filter = Filters.eq(ApiCollection.ID, apiCollectionId);
-            Bson update = Updates.set(ApiCollection.SERVICE_GRAPH_EDGES, existingEdges);
-            ApiCollectionsDao.instance.updateOne(filter, update);
+            boolean success = dataActor.updateServiceGraphEdges(apiCollectionId, existingEdges);
+            if (!success) {
+                logger.error("Failed to update service graph edges for collection: {}", apiCollectionId);
+                return false;
+            }
 
             logger.info("Updated service graph for collection {} with {} edges", apiCollectionId, edges.size());
 
