@@ -1,6 +1,5 @@
 package com.akto.log;
 
-import com.akto.config.DynamicConfig;
 import com.akto.dao.AnalyserLogsDao;
 import com.akto.dao.BillingLogsDao;
 import com.akto.dao.ConfigsDao;
@@ -23,10 +22,8 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.slack.api.Slack;
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -38,18 +35,7 @@ import org.slf4j.simple.SimpleLogger;
 public class LoggerMaker  {
 
     static {
-        // Try DynamicConfig first (for threat-detection), fallback to env (for other modules)
-        String logLevel;
-        try {
-            logLevel = DynamicConfig.get("AKTO_LOG_LEVEL");
-            if (logLevel == null || logLevel.isEmpty()) {
-                logLevel = System.getenv().getOrDefault("AKTO_LOG_LEVEL", "WARN");
-            }
-        } catch (Exception e) {
-            // DynamicConfig not available - fallback to env
-            logLevel = System.getenv().getOrDefault("AKTO_LOG_LEVEL", "WARN");
-        }
-        System.setProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY, logLevel);
+        System.setProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY, System.getenv().getOrDefault("AKTO_LOG_LEVEL", "WARN"));
         System.setProperty("org.slf4j.simpleLogger.log.org.apache.kafka", "ERROR");
         System.setProperty("org.slf4j.simpleLogger.log.io.lettuce", "ERROR");
         System.setProperty("org.slf4j.simpleLogger.log.org.mongodb", "ERROR");
@@ -215,7 +201,7 @@ public class LoggerMaker  {
                 err = String.format("Err msg: %s\nClass: %s\nFile: %s\nLine: %d", err, stackTraceElement.getClassName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber());
             } else {
                 err = String.format("Err msg: %s\nStackTrace not available", err);
-                if (e != null) e.printStackTrace();
+                e.printStackTrace();
             }
             errorAndAddToDb(err, db);
         } catch (Exception e1) {
@@ -388,46 +374,6 @@ public class LoggerMaker  {
             insert(debugMessage, "debug", db);
         } catch (Exception e){
 
-        }
-    }
-
-    /**
-     * Updates the default log level at runtime when using slf4j-simple.
-     * Sets the system property (for new loggers) and updates existing SimpleLogger instances via reflection,
-     * since they cache the level at construction and do not re-read the property.
-     */
-    @SuppressWarnings("unchecked")
-    public static void setDefaultLogLevel(String levelStr) {
-        if (levelStr == null || levelStr.isEmpty()) return;
-        System.setProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY, levelStr);
-        int levelValue = parseSimpleLoggerLevel(levelStr);
-        try {
-            Class<?> simpleLoggerClass = Class.forName("org.slf4j.simple.SimpleLogger");
-            Field currentLogLevelField = simpleLoggerClass.getDeclaredField("currentLogLevel");
-            currentLogLevelField.setAccessible(true);
-            org.slf4j.ILoggerFactory factory = LoggerFactory.getILoggerFactory();
-            Field loggerMapField = factory.getClass().getDeclaredField("loggerMap");
-            loggerMapField.setAccessible(true);
-            Map<String, org.slf4j.Logger> loggerMap = (Map<String, org.slf4j.Logger>) loggerMapField.get(factory);
-            for (org.slf4j.Logger log : loggerMap.values()) {
-                if (simpleLoggerClass.isInstance(log)) {
-                    currentLogLevelField.setInt(log, levelValue);
-                }
-            }
-        } catch (Exception e) {
-            internalLogger.warn("Failed to update SimpleLogger instances: {}", e != null ? e.getMessage() : "");
-        }
-    }
-
-    private static int parseSimpleLoggerLevel(String levelStr) {
-        if (levelStr == null) return 30;
-        switch (levelStr.toUpperCase()) {
-            case "TRACE": return 0;
-            case "DEBUG": return 10;
-            case "INFO": return 20;
-            case "WARN": return 30;
-            case "ERROR": return 40;
-            default: return 30;
         }
     }
 }
