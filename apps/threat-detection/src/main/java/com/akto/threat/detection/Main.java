@@ -1,6 +1,5 @@
 package com.akto.threat.detection;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -9,12 +8,9 @@ import java.util.concurrent.TimeUnit;
 import com.akto.DaoInit;
 import com.akto.RuntimeMode;
 import com.akto.dao.context.Context;
-import com.akto.data_actor.ClientActor;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
-import com.akto.dto.billing.FeatureAccess;
-import com.akto.dto.billing.Organization;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.kafka.KafkaConfig;
@@ -29,6 +25,7 @@ import com.akto.threat.detection.crons.ApiCountInfoRelayCron;
 import com.akto.threat.detection.ip_api_counter.CmsCounterLayer;
 import com.akto.threat.detection.ip_api_counter.DistributionCalculator;
 import com.akto.threat.detection.ip_api_counter.DistributionDataForwardLayer;
+import com.akto.threat.detection.tasks.ConfigPoller;
 import com.akto.threat.detection.tasks.MaliciousTrafficDetectorTask;
 import com.akto.threat.detection.tasks.SendMaliciousEventsToBackend;
 import com.akto.threat.detection.utils.Utils;
@@ -81,6 +78,7 @@ public class Main {
 
     logger.warnAndAddToDb("aggregation rules enabled " + aggregationRulesEnabled);
     ModuleInfoWorker.init(ModuleInfo.ModuleType.THREAT_DETECTION, dataActor);
+    
     if (!isHybridDeployment) {
         DaoInit.init(new ConnectionString(System.getenv("AKTO_MONGO_CONN")));
     }
@@ -121,6 +119,17 @@ public class Main {
             .setKeySerializer(Serializer.STRING)
             .setValueSerializer(Serializer.BYTE_ARRAY)
             .build();
+
+    // Start config poller (polls Cyborg for env updates and restarts on changes)
+    new Thread(() -> {
+        try {
+            ConfigPoller configPoller = new ConfigPoller();
+            configPoller.run();
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error in ConfigPoller");
+        }
+    }).start();
+    logger.infoAndAddToDb("Started ConfigPoller for threat-detection");
 
     initCustomDataTypeScheduler();
     CmsCounterLayer.initialize(localRedis);
