@@ -78,7 +78,7 @@ public class JiraApiClient {
         return isDataCenter(jira) ? POST_BULK_TRANSITIONS_ENDPOINT_V2 : POST_BULK_TRANSITIONS_ENDPOINT_V3;
     }
 
-    private static String getAuthorizationHeader(JiraIntegration jira) {
+    public static String getAuthorizationHeader(JiraIntegration jira) {
         if (isDataCenter(jira)) {
             return "Bearer " + jira.getApiToken();
         } else {

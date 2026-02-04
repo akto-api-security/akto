@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react"
 import { Box, IndexFiltersMode, Text } from "@shopify/polaris"
+import { CircleCancelMajor, ReplayMinor } from "@shopify/polaris-icons"
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable"
+import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow"
 import api from "./api"
+import quickStartApi from "../../quick_start/api"
 import func from "@/util/func"
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered"
 import TooltipText from "@/apps/dashboard/components/shared/TooltipText"
@@ -33,11 +36,24 @@ const headers = [
         showFilter: true
     },
     {
+        title: "Module Name",
+        text: "Module Name",
+        value: "moduleName",
+        filterKey: "moduleName",
+        showFilter: true
+    },
+    {
         title: "Start Time",
         text: "Start Time",
         value: "startTime",
         sortActive: true,
         sortKey: "startTimestamp"
+    },
+    {
+        title: "Application Pages",
+        text: "Application Pages",
+        value: "applicationPagesComp",
+        textValue: "applicationPages"
     },
     // TODO: to be added later.
     // {
@@ -53,9 +69,20 @@ const headers = [
     //     value: "duration"
     // },
     {
+        title: "URL Template Patterns",
+        text: "URL Template Patterns",
+        value: "urlTemplatePatternsComp",
+        textValue: "urlTemplatePatterns"
+    },
+    {
         title: "Out of Scope URLs",
         text: "Out of Scope URLs",
-        value: "outScopeUrls"
+        value: "outScopeUrlsComp",
+        textValue: "outScopeUrls"
+    },
+    {
+        title: "",
+        type: CellType.ACTION
     }
 ]
 
@@ -69,6 +96,64 @@ const sortOptions = [
 const resourceName = {
     singular: 'DAST scan',
     plural: 'DAST scans',
+}
+
+function getActions(item, fetchAllDastScans) {
+    const isStopDisabled = item.status === "STOPPED" || item.status === "STOP_REQUESTED"
+    const run = item.runData
+    const canDuplicate = run && !(run.cookies && !run.testRoleHexId)
+    return [
+        {
+            title: "Actions",
+            items: [
+                {
+                    content: "Duplicate scan",
+                    icon: ReplayMinor,
+                    disabled: !canDuplicate,
+                    onAction: async () => {
+                        if (!run) return
+                        try {
+                            await quickStartApi.initiateCrawler(
+                                run.hostname,
+                                run.username ?? '',
+                                run.password ?? '',
+                                run.apiKey ?? '',
+                                run.dashboardUrl ?? window.location.origin,
+                                run.testRoleHexId ?? '',
+                                run.outScopeUrls ?? '',
+                                run.crawlingTime ?? 600,
+                                (run.moduleName && run.moduleName !== "Internal DAST (Akto)") ? run.moduleName : '',
+                                run.customHeaders ?? {},
+                                run.runTestAfterCrawling ?? false,
+                                run.selectedMiniTestingService ?? '',
+                                run.urlTemplatePatterns ?? '',
+                                run.applicationPages ?? ''
+                            )
+                            func.setToast(true, false, "Duplicate scan started")
+                            fetchAllDastScans()
+                        } catch {
+                            func.setToast(true, true, "Failed to duplicate scan")
+                        }
+                    }
+                },
+                {
+                    content: "Stop scan",
+                    icon: CircleCancelMajor,
+                    destructive: true,
+                    disabled: isStopDisabled,
+                    onAction: async () => {
+                        try {
+                            await api.stopCrawler(item.crawlId)
+                            func.setToast(true, false, "Crawler stop requested")
+                            fetchAllDastScans()
+                        } catch {
+                            func.setToast(true, true, "Failed to stop crawler")
+                        }
+                    }
+                }
+            ]
+        }
+    ]
 }
 
 function DastProgress() {
@@ -105,13 +190,41 @@ function DastProgress() {
                         </Box>
                     ),
                     startedBy: run.startedBy || "-",
+                    moduleName: run.moduleName || "Internal DAST (Akto)",
+                    applicationPages: run.applicationPages || "-",
+                    applicationPagesComp: (
+                        <Box maxWidth="20vw">
+                            <Text truncate>{run.applicationPages || "-"}</Text>
+                        </Box>
+                    ),
                     startTime: func.prettifyEpoch(run.startTimestamp),
                     startTimestamp: run.startTimestamp,
                     endTime: run.endTimestamp > 0 ? func.prettifyEpoch(run.endTimestamp) : "In Progress",
                     endTimestamp: run.endTimestamp,
                     duration: duration,
+                    urlTemplatePatterns: run.urlTemplatePatterns || "-",
+                    urlTemplatePatternsComp: (
+                        <Box maxWidth="30vw">
+                            <TooltipText
+                                tooltip={run.urlTemplatePatterns || "-"}
+                                text={run.urlTemplatePatterns || "-"}
+                                textProps={{ truncate: true }}
+                            />
+                        </Box>
+                    ),
                     outScopeUrls: run.outScopeUrls || "-",
-                    nextUrl: `/dashboard/observe/dast-progress/${run.crawlId}`
+                    outScopeUrlsComp: (
+                        <Box maxWidth="30vw">
+                            <TooltipText
+                                tooltip={run.outScopeUrls || "-"}
+                                text={run.outScopeUrls || "-"}
+                                textProps={{ truncate: true }}
+                            />
+                        </Box>
+                    ),
+                    nextUrl: `/dashboard/observe/dast-progress/${run.crawlId}`,
+                    status: run.status || null,
+                    runData: run
                 }
             })
 
@@ -153,6 +266,10 @@ function DastProgress() {
                     useNewRow={true}
                     condensedHeight={true}
                     disambiguateLabel={(_, value) => func.convertToDisambiguateLabelObj(value, null, 2)}
+                    getActions={(item) => getActions(item, fetchAllDastScans)}
+                    hasRowActions={true}
+                    lastColumnSticky={true}
+                    preventRowClickOnActions={true}
                 />
             ]}
         />

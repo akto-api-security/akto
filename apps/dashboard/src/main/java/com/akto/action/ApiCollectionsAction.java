@@ -15,6 +15,7 @@ import lombok.Getter;
 import org.bson.conversions.Bson;
 
 import com.akto.action.observe.Utils;
+import com.akto.audit_logs_util.Audit;
 import com.akto.dao.*;
 import com.akto.dao.threat_detection.ApiHitCountInfoDao;
 import com.akto.billing.UsageMetricUtils;
@@ -31,6 +32,8 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.mongodb.MongoCommandException;
 import com.akto.dto.type.SingleTypeInfo;
@@ -300,6 +303,7 @@ public class ApiCollectionsAction extends UserAction {
         return true;
     }
 
+    @Audit(description = "User created a new API collection", resource = Resource.API_COLLECTION, operation = Operation.CREATE, metadataGenerators = {"getCollectionName"})
     public String createCollection() {
 
         if(!isValidApiCollectionName()){
@@ -347,6 +351,7 @@ public class ApiCollectionsAction extends UserAction {
         return this.deleteMultipleCollections();
     }
 
+    @Audit(description = "User deleted multiple API collections", resource = Resource.API_COLLECTION, operation = Operation.DELETE, metadataGenerators = {"getApiCollectionIdsList"})
     public String deleteMultipleCollections() {
         List<Integer> apiCollectionIds = new ArrayList<>();
         for(ApiCollection apiCollection: this.apiCollections) {
@@ -698,6 +703,7 @@ public class ApiCollectionsAction extends UserAction {
         loggerMaker.debugAndAddToDb(String.format("Fixed sample data for %d api collections", apiCollections.size()), LoggerMaker.LogDb.DASHBOARD);
     }
 
+    @Audit(description = "User redacted a collection", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"getApiCollectionId", "isRedacted"})
     public String redactCollection() {
         List<Bson> updates = Arrays.asList(
                 Updates.set(ApiCollection.REDACT, redacted),
@@ -838,6 +844,7 @@ public class ApiCollectionsAction extends UserAction {
                 deactivatedFilter));
     }
 
+    @Audit(description = "User deactivated collections from inventory", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"getApiCollectionIdsList"})
     public String deactivateCollections() {
         this.apiCollections = filterCollections(this.apiCollections, false);
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections,Filters.empty());
@@ -849,6 +856,7 @@ public class ApiCollectionsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    @Audit(description = "User activated collections in inventory", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"getApiCollectionIdsList"})
     public String activateCollections() {
         this.apiCollections = filterCollections(this.apiCollections, true);
         if (this.apiCollections.isEmpty()) {
@@ -931,7 +939,8 @@ public class ApiCollectionsAction extends UserAction {
 
     private List<CollectionTags> envType;
     private boolean resetEnvTypes;
-
+    
+    @Audit(description = "User updated environment type", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"getApiCollectionIdsList"})
     public String updateEnvType(){
         if(!resetEnvTypes && (envType == null || envType.isEmpty())) {
             addActionError("Please enter a valid ENV type.");
@@ -1539,7 +1548,17 @@ public class ApiCollectionsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public List<Integer> getApiCollectionIdsList() {
+        List<Integer> apiCollectionIds = new ArrayList<>();
 
+        if (this.apiCollectionIds != null) {
+            apiCollectionIds = this.apiCollectionIds;
+        } else if (this.apiCollections != null) {
+            apiCollectionIds = this.apiCollections.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList());
+        }
+        
+        return apiCollectionIds;
+    }
 
     public void setFilterType(String filterType) {
         this.filterType = filterType;
@@ -1552,6 +1571,10 @@ public class ApiCollectionsAction extends UserAction {
 
     public void setApiCollections(List<ApiCollection> apiCollections) {
         this.apiCollections = apiCollections;
+    }
+
+    public String getCollectionName() {
+        return this.collectionName;
     }
 
     public void setCollectionName(String collectionName) {

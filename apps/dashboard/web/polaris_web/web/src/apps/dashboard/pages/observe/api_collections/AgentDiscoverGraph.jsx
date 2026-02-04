@@ -1,14 +1,37 @@
 
-import { useState, useEffect } from 'react';
-import { Box, Text, VerticalStack, HorizontalStack, Card, Badge, Button, Icon, Avatar } from '@shopify/polaris';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { Box, Text, VerticalStack, HorizontalStack, Card, Badge, Icon, Avatar, Spinner } from '@shopify/polaris';
 import ReactFlow, { Background, Handle, Position, getBezierPath } from 'react-flow-renderer';
 import TooltipText from '../../../components/shared/TooltipText';
 import { CustomersMinor, AutomationMajor, MagicMajor } from "@shopify/polaris-icons";
-import agentDiscoveryData from './AgentDiscoveryDummyData';
-import MCPIcon from "@/assets/MCP_Icon.svg"
+import MCPIcon from "@/assets/MCP_Icon.svg";
+import api from './api';
 
-// Custom Node Component following ApiDependencyNode pattern
-function AgentNode({ data }) {
+// Map metadata type to node category and display info
+const getNodeCategoryFromType = (type) => {
+  const typeMap = {
+    // LLM/AI Model types
+    'lmChatAnthropic': { category: 'ai-model', type: 'LLM Call', description: 'Anthropic Chat Model' },
+    'lmChatOpenAI': { category: 'ai-model', type: 'LLM Call', description: 'OpenAI Chat Model' },
+    'lmChat': { category: 'ai-model', type: 'LLM Call', description: 'Language Model Call' },
+
+    // MCP types
+    'mcpClientTool': { category: 'mcp', type: 'MCP Server', description: 'MCP Client Tool' },
+    'mcpServer': { category: 'mcp', type: 'MCP Server', description: 'MCP Server' },
+
+    // Agent/Service types
+    'respondToWebhook': { category: 'external', type: 'Target Service', description: 'Webhook Response' },
+    'agenticComponent': { category: 'external', type: 'Agentic Component', description: 'Agentic Component Server' },
+
+    // Default
+    'default': { category: 'external', type: 'Target Service', description: 'External Service' }
+  };
+
+  return typeMap[type] || typeMap['default'];
+};
+
+// Custom Node Component following ApiDependencyNode pattern - memoized to prevent re-renders
+const AgentNode = memo(function AgentNode({ data }) {
   const { component, onNodeClick } = data;
 
   const getComponentColors = (category) => {
@@ -83,10 +106,10 @@ function AgentNode({ data }) {
       <Handle type="source" position={Position.Right} id="b" />
     </>
   );
-}
+});
 
-// Custom Edge Component following ApiDependencyEdge pattern
-function AgentEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, data }) {
+// Custom Edge Component following ApiDependencyEdge pattern - memoized to prevent re-renders
+const AgentEdge = memo(function AgentEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, data }) {
   const [show, setShow] = useState(false);
   const { connectionType, isExternal } = data || {};
 
@@ -159,28 +182,24 @@ function AgentEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, tar
       </g>
     </>
   );
-}
+});
 
 function AgentDiscoverGraph({ apiCollectionId }) {
-
-  // Simplified dummy data with only 3 components
-  const dummyData = agentDiscoveryData[apiCollectionId + ""] || {};
-
-  if (dummyData?.components == undefined ||
-    dummyData?.components.length === 0) {
-    return <></>
-  }
 
   const [selectedComponent, setSelectedComponent] = useState(null);
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [collectionData, setCollectionData] = useState(null);
+  const [serviceGraphEdges, setServiceGraphEdges] = useState({});
 
-  const nodeTypes = { agentNode: AgentNode };
-  const edgeTypes = { agentEdge: AgentEdge };
+  // Memoize node and edge types to prevent re-creation on each render
+  const nodeTypes = useMemo(() => ({ agentNode: AgentNode }), []);
+  const edgeTypes = useMemo(() => ({ agentEdge: AgentEdge }), []);
 
-  const handleNodeClick = (component) => {
-    setSelectedComponent(selectedComponent?.id === component.id ? null : component);
-  };
+  const handleNodeClick = useCallback((component) => {
+    setSelectedComponent(prev => prev?.id === component.id ? null : component);
+  }, []);
 
   const getStatusBadge = (status) => {
     const statusColors = {
@@ -191,85 +210,162 @@ function AgentDiscoverGraph({ apiCollectionId }) {
     return <Badge status={statusColors[status] || 'info'}>{status}</Badge>;
   };
 
-  const getCategoryStats = () => {
-    const stats = {};
-    dummyData.components.forEach(component => {
-      stats[component.type] = (stats[component.type] || 0) + 1;
-    });
-    return stats;
-  };
+  // Memoize category stats calculation
+  const categoryStats = useMemo(() => {
+    if (!serviceGraphEdges || Object.keys(serviceGraphEdges).length === 0) {
+      return {};
+    }
 
-  const formatNodesAndEdges = () => {
-    const formattedNodes = [];
-    const formattedEdges = [];
+    const stats = {
+      'AI Agents': 1, // Source service
+      'MCP Servers': 0,
+      'AI Models': 0,
+      'Agentic Components': 0
+    };
 
-    // Add all component nodes with fixed positions
-    dummyData.components.forEach(component => {
-      formattedNodes.push({
-        id: component.id,
-        type: 'agentNode',
-        data: { 
-          component: component, 
-          onNodeClick: handleNodeClick 
-        },
-        position: { x: component.x, y: component.y },
-        draggable: false // Make nodes non-draggable for fixed positioning
-      });
-    });
+    Object.values(serviceGraphEdges).forEach((edgeInfo) => {
+      const metadataType = edgeInfo?.metadata?.type || 'default';
+      const nodeInfo = getNodeCategoryFromType(metadataType);
 
-    // Create simple linear connections: User -> AI Agent -> LLM Call
-    formattedEdges.push({
-      id: 'user-to-ai',
-      source: 'user',
-      target: 'ai-agent',
-      type: 'agentEdge',
-      data: {
-        connectionType: 'User Request',
-        isExternal: false
+      if (nodeInfo.category === 'mcp') {
+        stats['MCP Servers']++;
+      } else if (nodeInfo.category === 'ai-model') {
+        stats['AI Models']++;
+      } else if (nodeInfo.category === 'external') {
+        stats['Agentic Components']++;
       }
     });
 
-    formattedEdges.push({
-      id: 'ai-to-llm',
-      source: 'ai-agent',
-      target: 'llm-call',
-      type: 'agentEdge',
-      data: {
-        connectionType: 'LLM Request',
-        isExternal: false
-      }
-    });
+    // Filter out zero counts
+    return Object.fromEntries(Object.entries(stats).filter(([_, count]) => count > 0));
+  }, [serviceGraphEdges]);
 
-    formattedEdges.push({
-      id: 'ai-to-mcp',
-      source: 'ai-agent',
-      target: 'mcp',
-      type: 'agentEdge',
-      data: {
-        connectionType: 'MCP',
-        isExternal: false
-      }
-    });
-
-    formattedEdges.push({
-      id: 'mcp-to-api',
-      source: 'mcp',
-      target: 'external',
-      type: 'agentEdge',
-      data: {
-        connectionType: 'MCP',
-        isExternal: false
-      }
-    });
-
-    return { nodes: formattedNodes, edges: formattedEdges };
-  };
-
+  // Fetch collection data
   useEffect(() => {
-    const { nodes: formattedNodes, edges: formattedEdges } = formatNodesAndEdges();
+    const fetchCollectionData = async () => {
+      setLoading(true);
+      try {
+        const response = await api.getCollection(apiCollectionId);
+        if (response && response.length > 0) {
+          const apiCollection = response[0];
+          setCollectionData(apiCollection);
+          setServiceGraphEdges(apiCollection.serviceGraphEdges || {});
+        }
+      } catch (error) {
+        console.error('Error fetching collection data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (apiCollectionId) {
+      fetchCollectionData();
+    }
+  }, [apiCollectionId]);
+
+  // Memoize nodes and edges transformation to prevent unnecessary re-renders
+  const { nodes: formattedNodes, edges: formattedEdges } = useMemo(() => {
+    const nodes = [];
+    const edges = [];
+
+    if (collectionData && serviceGraphEdges && Object.keys(serviceGraphEdges).length > 0) {
+      // Extract source service name from edges
+      const firstEdge = Object.values(serviceGraphEdges)[0];
+      const sourceServiceName = firstEdge?.sourceService || collectionData.name || collectionData.hostName || 'AI Agent';
+
+      // Add source node (AI Agent) - positioned in CENTER inside the boundary box
+      nodes.push({
+        id: 'source',
+        type: 'agentNode',
+        data: {
+          component: {
+            id: 'source',
+            label: sourceServiceName,
+            type: 'AI Agent',
+            category: 'agent',
+            description: 'Central AI agent processing requests',
+            status: 'active'
+          },
+          onNodeClick: handleNodeClick
+        },
+        position: { x: 100, y: 140 },
+        draggable: false
+      });
+
+      // Add target nodes in linear layout to the right of AI Agent
+      let yOffset = 50;
+      Object.entries(serviceGraphEdges).forEach(([targetService, edgeInfo], index) => {
+        const targetId = `target-${index}`;
+        const metadataType = edgeInfo?.metadata?.type || 'default';
+        const nodeInfo = getNodeCategoryFromType(metadataType);
+
+        // Shorten label if it's too long (for cleaner display)
+        const label = targetService.length > 30 ? targetService.substring(0, 27) + '...' : targetService;
+
+        // Add target service node with proper category from type
+        // MCP servers at x:500, others at x:800 (to the right of AI Agent)
+        nodes.push({
+          id: targetId,
+          type: 'agentNode',
+          data: {
+            component: {
+              id: targetId,
+              label: label,
+              type: nodeInfo.type,
+              category: nodeInfo.category,
+              description: nodeInfo.description,
+              status: 'connected',
+              requestCount: edgeInfo.requestCount,
+              lastSeen: edgeInfo.lastSeenTimestamp
+            },
+            onNodeClick: handleNodeClick
+          },
+          position: { x: 500 + (nodeInfo.category === 'mcp' ? 0 : 150), y: yOffset + (index * 120) },
+          draggable: false
+        });
+
+        // Add edge from source to target
+        edges.push({
+          id: `edge-${index}`,
+          source: 'source',
+          target: targetId,
+          type: 'agentEdge',
+          data: {
+            connectionType: metadataType,
+            isExternal: nodeInfo.category === 'external',
+            requestCount: edgeInfo.requestCount
+          }
+        });
+      });
+    }
+
+    return { nodes, edges };
+  }, [serviceGraphEdges, collectionData, handleNodeClick]);
+
+  // Update state only when memoized values change
+  useEffect(() => {
     setNodes(formattedNodes);
     setEdges(formattedEdges);
-  }, []);
+  }, [formattedNodes, formattedEdges]);
+
+  // Show loading spinner
+  if (loading) {
+    return (
+      <Card>
+        <Box padding="4">
+          <HorizontalStack align="center" blockAlign="center">
+            <Spinner size="large" />
+            <Text variant="bodyMd" color="subdued">Loading service graph...</Text>
+          </HorizontalStack>
+        </Box>
+      </Card>
+    );
+  }
+
+  // Don't render if no serviceGraphEdges data
+  if (!serviceGraphEdges || Object.keys(serviceGraphEdges).length === 0) {
+    return null;
+  }
 
   return (
     <Card>
@@ -278,9 +374,9 @@ function AgentDiscoverGraph({ apiCollectionId }) {
           <HorizontalStack align="space-between">
             <Text variant="headingMd">Architecture</Text>
             <HorizontalStack gap="2">
-              {Object.entries(getCategoryStats()).map(([category, count]) => (
+              {Object.entries(categoryStats).map(([category, count]) => (
                 <Badge key={category} status="info">
-                  {count} {category.replace('-', ' ')}
+                  {count} {category}
                 </Badge>
               ))}
             </HorizontalStack>
@@ -308,22 +404,24 @@ function AgentDiscoverGraph({ apiCollectionId }) {
                 defaultViewport={{ x: 0, y: 0, zoom: 1 }}
               >
                 <Background color="#e1e5e9" gap={16} />
-                
-                {/* Internal System Boundary */}
-                <div 
-                  style={{
-                    position: 'absolute',
-                    left: '300px',
-                    top: '130px',
-                    right: '500px',
-                    bottom: '150px',
-                    border: '2px dashed #7c3aed',
-                    borderRadius: '8px',
-                    pointerEvents: 'none',
-                    opacity: 0.8,
-                    zIndex: 1
-                  }}
-                />
+
+                {/* Internal System Boundary - wraps around the AI Agent */}
+                {nodes.some(n => n.data?.component?.category === 'agent') && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: '50px',
+                      top: '80px',
+                      width: '300px',
+                      height: '180px',
+                      border: '2px dashed #7c3aed',
+                      borderRadius: '8px',
+                      pointerEvents: 'none',
+                      opacity: 0.6,
+                      zIndex: 0
+                    }}
+                  />
+                )}
 
               </ReactFlow>
             </div>

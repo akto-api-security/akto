@@ -198,7 +198,7 @@ public class CyborgApiClient {
             logger.debug("Successfully updated job: jobId={}", id);
 
         } catch (Exception e) {
-            logger.error("Error updating job", e);
+            logger.error("Failed to update job: jobId={}", id, e);
         }
     }
 
@@ -215,6 +215,7 @@ public class CyborgApiClient {
 
             logger.debug("Fetching job by ID: jobId={}", id);
             String body = makePostRequest("/fetchAccountJob", requestBody);
+
             if (body == null || body.isEmpty() || body.equals("null") || body.equals("{}")) {
                 logger.debug("Job not found: jobId={}", id);
                 return null;
@@ -233,7 +234,7 @@ public class CyborgApiClient {
             return job;
 
         } catch (Exception e) {
-            logger.error("Error fetching job by ID", e);
+            logger.error("Error fetching job by ID: jobId={}", id, e);
             return null;
         }
     }
@@ -263,7 +264,6 @@ public class CyborgApiClient {
                 if (idMap.containsKey("$oid")) {
                     job.setId(new ObjectId((String) idMap.get("$oid")));
                 } else if (idMap.containsKey("timestamp")) {
-                    // Create ObjectId from timestamp
                     int timestamp = getIntValue(idMap, "timestamp");
                     job.setId(new ObjectId(timestamp, 0));
                 }

@@ -16,6 +16,7 @@ import GithubSource from "./components/GithubSource"
 import AktoJax from "./components/AktoJax"  
 import McpScan from "./components/McpScan" 
 import AiAgentScan from "./components/AiAgentScan"
+import AIAgentConnectorImport from "./components/AIAgentConnectorImport"
 import { isGenAISecurityCategory, isMCPSecurityCategory, isAgenticSecurityCategory, isDastCategory, isApiSecurityCategory, isEndpointSecurityCategory } from "../../../main/labelHelper"
 import McpRecon from "./components/McpRecon"
 import McpProxy from "./components/McpProxy"
@@ -24,7 +25,6 @@ import McpGateway from "./McpGateway"
 import AIAgentsGateway from "./AIAgentsGateway"
 import ImpervaImport from "./components/ImpervaImport"
 import BrowserExtension from "./components/BrowserExtension"
-import AIAgentConnectorImport from "./components/AIAgentConnectorImport"
 import CursorHook from "./components/CursorHook"
 import {
     CONNECTOR_TYPE_N8N,
@@ -44,7 +44,19 @@ import {
     DESCRIPTION_COPILOT_STUDIO,
     DOCS_URL_COPILOT_STUDIO,
     INTERVAL_COPILOT_STUDIO,
-    COPILOT_STUDIO_FIELDS
+    COPILOT_STUDIO_FIELDS,
+    CONNECTOR_TYPE_DATABRICKS,
+    CONNECTOR_NAME_DATABRICKS,
+    DESCRIPTION_DATABRICKS,
+    DOCS_URL_DATABRICKS,
+    INTERVAL_DATABRICKS,
+    DATABRICKS_FIELDS,
+    CONNECTOR_TYPE_SNOWFLAKE,
+    CONNECTOR_NAME_SNOWFLAKE,
+    DESCRIPTION_SNOWFLAKE,
+    DOCS_URL_SNOWFLAKE,
+    INTERVAL_SNOWFLAKE,
+    SNOWFLAKE_FIELDS
 } from "./constants/aiAgentConnectorConstants"
 import DataDogConnector from "./components/DataDogConnector"
 
@@ -382,6 +394,18 @@ const customAIObj = {
     />
 }
 
+const huggingFaceObj = {
+    icon: '/public/huggingFace.svg',
+    label: "Hugging Face",
+    text: "Import your Hugging Face models seamlessly into AKTO.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-with-huggingface',
+    key: "HUGGING_FACE",
+    component : <BannerComponent
+            content="Import your Hugging Face models, seamlessly in AKTO."
+            docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-with-huggingface'
+    />
+}
+
 // AI Agent Platform Objects
 const awsBedrockObj = {
     icon: '/public/aws_bedrock.svg',
@@ -425,22 +449,6 @@ const azureAIFoundryObj = {
             "messages": [{"role": "user", "content": "Why is the sky blue?"}],
             "max_tokens": 100,
             "temperature": 0.7
-        }}
-        docsLink='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security'
-    />
-}
-
-const databricksObj = {
-    icon: '/public/databricks.svg',
-    label: "Databricks",
-    text: "Import Databricks AI agents seamlessly into AKTO.",
-    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security',
-    key: "DATABRICKS",
-    component : <AiAgentScan
-        description="Import your Databricks AI agents, seamlessly in AKTO."
-        defaultRequestBody={{
-            "prompt": "Why is the sky blue?",
-            "max_tokens": 100
         }}
         docsLink='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security'
     />
@@ -553,6 +561,22 @@ const mcpGateway = {
     docsUrl: 'https://ai-security-docs.akto.io/agentic-guardrails/overview/akto-mcp-proxy',
     key: "MCP_GATEWAY",
     component : <McpGateway/>
+}
+
+const snowflakeObj = {
+    icon: '/public/snowflake.svg',
+    label: "Snowflake",
+    text: "Connect to your Snowflake account to discover agents using Cortex and automatically fetch data for all Snowflake agents.",
+    docsUrl: DOCS_URL_SNOWFLAKE,
+    key: "SNOWFLAKE_IMPORT",
+    component: <AIAgentConnectorImport
+        connectorType={CONNECTOR_TYPE_SNOWFLAKE}
+        connectorName={CONNECTOR_NAME_SNOWFLAKE}
+        description={DESCRIPTION_SNOWFLAKE}
+        fields={SNOWFLAKE_FIELDS}
+        docsUrl={DOCS_URL_SNOWFLAKE}
+        recurringIntervalSeconds={INTERVAL_SNOWFLAKE}
+    />
 }
 
 const dockerObj = {
@@ -984,6 +1008,46 @@ const copilotStudioImportObj = {
         fields={COPILOT_STUDIO_FIELDS}
         docsUrl={DOCS_URL_COPILOT_STUDIO}
         recurringIntervalSeconds={INTERVAL_COPILOT_STUDIO}
+    />
+}
+
+const databricksImportObj = {
+    icon: '/public/databricks.svg',
+    label: "Databricks",
+    text: "Import Databricks agents seamlessly into AKTO.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/databrics',
+    key: "DATABRICKS_IMPORT",
+    component: <AIAgentConnectorImport
+        connectorType={CONNECTOR_TYPE_DATABRICKS}
+        connectorName={CONNECTOR_NAME_DATABRICKS}
+        description={DESCRIPTION_DATABRICKS}
+        fields={DATABRICKS_FIELDS}
+        docsUrl={DOCS_URL_DATABRICKS}
+        recurringIntervalSeconds={INTERVAL_DATABRICKS}
+    />
+}
+
+const litellmImportObj = {
+    icon: '/public/litellm.svg',
+    label: "LiteLLM",
+    text: "Import your LiteLLM proxy traffic, seamlessly into AKTO.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/litellm',
+    key: "LITELLM",
+    component: <BannerComponent
+        content="Import your LiteLLM proxy traffic, seamlessly in AKTO."
+        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/litellm'
+    />
+}
+
+const claudeCodeCliImportObj = {
+    icon: '/public/claudeCodeCli.svg',
+    label: "Claude Code CLI",
+    text: "Import your Claude Code CLI proxy traffic, seamlessly into AKTO.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/claude-code-cli',
+    key: "CLAUDECODECLI",
+    component: <BannerComponent
+        content="Import your Claude Code CLI proxy traffic, seamlessly in AKTO."
+        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/claude-code-cli'
     />
 }
 
@@ -1639,7 +1703,7 @@ const quickStartFunc = {
         ];
 
         const aiScanConnectors = [
-            geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj
+            geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj, huggingFaceObj
         ]
 
         const agenticProxies = [
@@ -1648,8 +1712,8 @@ const quickStartFunc = {
         ]
 
         const aiAgentConnectors = [
-            awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
-            n8nImportObj, langchainImportObj, copilotStudioImportObj
+            awsBedrockObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
+            n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj, snowflakeObj
         ]
 
         // MCP Scan
@@ -1738,24 +1802,24 @@ const quickStartFunc = {
     getConnectorsList: function () {
 
         if(func.checkLocal() || func.isLimitedAccount()){
-            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj]
+            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj, databricksImportObj]
         }
 
         // Combine all categories into connectorsList
         let connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj,
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj, databricksImportObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,
-            cloudflareWarpObj, zscalerObj
+            cloudflareWarpObj, zscalerObj, snowflakeObj
         ]
 
         if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
             connectorsList = connectorsList.concat([
-                geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj,
-                awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
-                n8nImportObj, langchainImportObj, copilotStudioImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj,
+                geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj, huggingFaceObj,
+                awsBedrockObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
+                n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj,
                 apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj
             ])
         }

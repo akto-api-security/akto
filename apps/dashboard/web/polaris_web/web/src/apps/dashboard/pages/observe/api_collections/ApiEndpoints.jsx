@@ -15,9 +15,6 @@ import RunTest from "./RunTest"
 import ObserveStore from "../observeStore"
 import WorkflowTests from "./WorkflowTests"
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
-// import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout"
-import dashboardFunc from "../../transform"
-import settingsRequests from "../../settings/api"
 import PersistStore from "../../../../main/PersistStore"
 import transform from "../transform"
 import { CellType } from "../../../components/tables/rows/GithubRow"
@@ -34,10 +31,12 @@ import { SelectSource } from "./SelectSource"
 import InlineEditableText from "../../../components/shared/InlineEditableText"
 import IssuesApi from "../../issues/api"
 import SequencesFlow from "./SequencesFlow"
+import SwaggerDependenciesFlow from "./SwaggerDependenciesFlow"
 import { CATEGORY_API_SECURITY, getDashboardCategory, isCategory, mapLabel, isEndpointSecurityCategory } from "../../../../main/labelHelper"
-import AgentDiscoverGraph from "./AgentDiscoverGraph"
 import McpToolsGraph from "./McpToolsGraph"
 import { findTypeTag, TYPE_TAG_KEYS } from "../agentic/mcpClientHelper"
+import AgentDiscoverGraphWithDummyData from "./AgentDiscoveryGraphWithDummyData"
+import AgentDiscoverGraph from "./AgentDiscoverGraph"
 
 const headings = [
     {
@@ -244,6 +243,7 @@ function ApiEndpoints(props) {
     const [apiDetail, setApiDetail] = useState({})
     const [exportOpen, setExportOpen] = useState(false)
     const [showSequencesFlow, setShowSequencesFlow] = useState(false)
+    const [showSwaggerDependenciesFlow, setShowSwaggerDependenciesFlow] = useState(false)
 
     const filteredEndpoints = ObserveStore(state => state.filteredItems)
     const setFilteredEndpoints = ObserveStore(state => state.setFilteredItems)
@@ -1142,14 +1142,23 @@ function ApiEndpoints(props) {
                                     content: showSequencesFlow ? "Display table view" : "Display graph view",
                                     onAction: () => { 
                                         setShowSequencesFlow(!showSequencesFlow); 
+                                        setShowSwaggerDependenciesFlow(false);
                                         setExportOpen(false); 
                                     },
                                     prefix: <Box width="24px"> <Icon source={showSequencesFlow ? HideMinor: ViewMinor} /></Box>
                                 },
-                               
-                            ]
+                                !isApiGroup && (!isHostnameCollection && hasAccessToDiscoveryAgent) && {
+                                    content: showSwaggerDependenciesFlow ? "Display table view" : "Display dependencies graph",
+                                    onAction: () => { 
+                                        setShowSwaggerDependenciesFlow(!showSwaggerDependenciesFlow); 
+                                        setShowSequencesFlow(false);
+                                        setExportOpen(false); 
+                                    },
+                                    prefix: <Box width="24px"> <Icon source={showSwaggerDependenciesFlow ? HideMinor: ViewMinor} /></Box>
+                                }
+                            ].filter(Boolean)
                         },
-                        ...(showSequencesFlow ? [] : [
+                        ...(showSequencesFlow || showSwaggerDependenciesFlow ? [] : [
                             {
                                 title:'Re-Compute',
                                 items: [
@@ -1533,7 +1542,7 @@ function ApiEndpoints(props) {
                     apiCollectionId={apiCollectionId}
                     endpointsList={loading ? [] : endpointData["all"]}
                 />
-            ] : showEmptyScreen ? [
+            ] : showEmptyScreen && !(showSequencesFlow || showSwaggerDependenciesFlow) ? [
                 <EmptyScreensLayout key={"emptyScreen"}
                     iconSrc={"/public/file_plus.svg"}
                     headingText={getEmptyScreenText(collectionsObj).headingText}
@@ -1544,8 +1553,10 @@ function ApiEndpoints(props) {
                     docsUrl={ENDPOINTS_PAGE_DOCS_URL}
                 />] : showSequencesFlow ? [
                 <SequencesFlow key="sequences-flow" apiCollectionId={apiCollectionId}  />
+            ] : showSwaggerDependenciesFlow ? [
+                <SwaggerDependenciesFlow key="swagger-dependencies-flow" apiCollectionId={apiCollectionId}  />
             ] : [
-                func.isDemoAccount() ? <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : null,
+                func.isDemoAccount() ? <AgentDiscoverGraphWithDummyData key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} />,
                 (!isCategory(CATEGORY_API_SECURITY)) ? <McpToolsGraph key="mcp-tools-graph" apiCollectionId={apiCollectionId} /> : null,
                 // Hide "Test your Endpoints" banner for Endpoint Security
                 (!isEndpointSecurityCategory() && (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)))) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null,

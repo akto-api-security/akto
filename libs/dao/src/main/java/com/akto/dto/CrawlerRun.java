@@ -61,7 +61,7 @@ public class CrawlerRun {
     private String errorMessage;
 
     public static final String COOKIES = "cookies";
-    private Object cookies;
+    private String cookies;
 
     public static final String CRAWLING_TIME = "crawlingTime";
     private Integer crawlingTime;
@@ -74,6 +74,9 @@ public class CrawlerRun {
 
     public static final String SELECTED_MINI_TESTING_SERVICE = "selectedMiniTestingService";
     private String selectedMiniTestingService;
+
+    public static final String TEST_ROLE_HEX_ID = "testRoleHexId";
+    private String testRoleHexId;
 
     public CrawlerRun() {
     }
@@ -89,7 +92,7 @@ public class CrawlerRun {
     }
 
     public enum CrawlerRunStatus {
-        PENDING, RUNNING, COMPLETED, FAILED
+        PENDING, RUNNING, COMPLETED, FAILED, STOP_REQUESTED, STOPPED
     }
 
     @Override

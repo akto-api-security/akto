@@ -409,7 +409,8 @@ function TestRunResultFlyout(props) {
         window.open(navUrl, "_blank")
     }
 
-    const owaspData = func.categoryMapping[selectedTestRunResult?.testCategory] || {};
+    const categoryKey = selectedTestRunResult?.testCategory?.match(/\(([^)]+)\)/)?.[1] || selectedTestRunResult?.testCategory;
+    const owaspData = func.categoryMapping[categoryKey] || {};
     const owaspMapping = owaspData.label || "";
     const owaspUrl = owaspData.url || "";
 

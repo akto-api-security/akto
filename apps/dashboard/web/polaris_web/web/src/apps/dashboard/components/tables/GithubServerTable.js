@@ -592,6 +592,7 @@ function GithubServerTable(props) {
             popoverActive={popoverActive}
             setPopoverActive={setPopoverActive}
             treeView={props?.treeView}
+            preventRowClickOnActions={props?.preventRowClickOnActions || false}
           />
         );
       },

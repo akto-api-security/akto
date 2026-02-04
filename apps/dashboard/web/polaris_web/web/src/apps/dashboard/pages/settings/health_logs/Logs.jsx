@@ -129,11 +129,13 @@ const Logs = () => {
         });
     }
 
+    const CONFIGURABLE_MODULE_TYPES = ['TRAFFIC_COLLECTOR', 'THREAT_DETECTION'];
+
     const canRebootModule = (module) => {
         const twoMinutesAgo = Math.floor(Date.now() / 1000) - 120;
         return module.lastHeartbeatReceived >= twoMinutesAgo &&
                module.name &&
-               (module.name.startsWith('Default_') || module.moduleType === 'TRAFFIC_COLLECTOR');
+               (module.name.startsWith('Default_') || module.name.startsWith('akto-mr')|| CONFIGURABLE_MODULE_TYPES.includes(module.moduleType));
     }
 
     const handleModuleTypeClick = (module) => {
@@ -163,10 +165,10 @@ const Logs = () => {
     const moduleInfoRows = sortedModuleInfos.map(module => {
         const isEligible = canRebootModule(module);
         const isSelected = selectedModules.includes(module.id);
-        const isTrafficCollector = module.moduleType === 'TRAFFIC_COLLECTOR';
+        const isConfigurable = CONFIGURABLE_MODULE_TYPES.includes(module.moduleType);
 
         return [
-            isTrafficCollector ? (
+            isConfigurable ? (
                 <Link onClick={() => handleModuleTypeClick(module)} removeUnderline>{module.moduleType || '-'}</Link>
             ) : (
                 module.moduleType || '-'

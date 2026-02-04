@@ -14,11 +14,15 @@ public final class AIAgentConnectorConstants {
     public static final String CONNECTOR_TYPE_N8N = "N8N";
     public static final String CONNECTOR_TYPE_LANGCHAIN = "LANGCHAIN";
     public static final String CONNECTOR_TYPE_COPILOT_STUDIO = "COPILOT_STUDIO";
+    public static final String CONNECTOR_TYPE_DATABRICKS = "DATABRICKS";
+    public static final String CONNECTOR_TYPE_SNOWFLAKE = "SNOWFLAKE";
 
     // Binary Names
     public static final String BINARY_NAME_N8N = "n8n-shield";
     public static final String BINARY_NAME_LANGCHAIN = "langchain-shield";
     public static final String BINARY_NAME_COPILOT_STUDIO = "copilot-shield";
+    public static final String BINARY_NAME_DATABRICKS = "databricks-shield";
+    public static final String BINARY_NAME_SNOWFLAKE = "snowflake-shield";
 
     // Configuration Keys - N8N
     public static final String CONFIG_N8N_BASE_URL = "N8N_BASE_URL";
@@ -33,6 +37,31 @@ public final class AIAgentConnectorConstants {
     public static final String CONFIG_DATAVERSE_TENANT_ID = "DATAVERSE_TENANT_ID";
     public static final String CONFIG_DATAVERSE_CLIENT_ID = "DATAVERSE_CLIENT_ID";
     public static final String CONFIG_DATAVERSE_CLIENT_SECRET = "DATAVERSE_CLIENT_SECRET";
+
+    // Configuration Keys - Snowflake
+    public static final String CONFIG_SNOWFLAKE_ACCOUNT_URL = "SNOWFLAKE_ACCOUNT_URL";
+    public static final String CONFIG_SNOWFLAKE_AUTH_TYPE = "SNOWFLAKE_AUTH_TYPE"; // "PASSWORD", "TOKEN", or "KEY_PAIR"
+    public static final String CONFIG_SNOWFLAKE_USERNAME = "SNOWFLAKE_USERNAME";
+    public static final String CONFIG_SNOWFLAKE_PASSWORD = "SNOWFLAKE_PASSWORD";
+    public static final String CONFIG_SNOWFLAKE_TOKEN = "SNOWFLAKE_TOKEN"; // OAuth token
+    public static final String CONFIG_SNOWFLAKE_PRIVATE_KEY = "SNOWFLAKE_PRIVATE_KEY"; // RSA private key for key pair auth
+    public static final String CONFIG_SNOWFLAKE_PRIVATE_KEY_PASSPHRASE = "SNOWFLAKE_PRIVATE_KEY_PASSPHRASE"; // Optional passphrase for encrypted private key
+    public static final String CONFIG_SNOWFLAKE_WAREHOUSE = "SNOWFLAKE_WAREHOUSE";
+    public static final String CONFIG_SNOWFLAKE_DATABASE = "SNOWFLAKE_DATABASE";
+    public static final String CONFIG_SNOWFLAKE_SCHEMA = "SNOWFLAKE_SCHEMA";
+    
+    // Snowflake Auth Types
+    public static final String SNOWFLAKE_AUTH_TYPE_PASSWORD = "PASSWORD";
+    public static final String SNOWFLAKE_AUTH_TYPE_TOKEN = "TOKEN";
+    public static final String SNOWFLAKE_AUTH_TYPE_KEY_PAIR = "KEY_PAIR";
+
+    // Configuration Keys - Databricks
+    public static final String CONFIG_DATABRICKS_HOST = "DATABRICKS_HOST";
+    public static final String CONFIG_DATABRICKS_CLIENT_ID = "DATABRICKS_CLIENT_ID";
+    public static final String CONFIG_DATABRICKS_CLIENT_SECRET = "DATABRICKS_CLIENT_SECRET";
+    public static final String CONFIG_DATABRICKS_CATALOG = "DATABRICKS_CATALOG";
+    public static final String CONFIG_DATABRICKS_SCHEMA = "DATABRICKS_SCHEMA";
+    public static final String CONFIG_DATABRICKS_PREFIX = "DATABRICKS_PREFIX";
 
     // Common Configuration Keys
     public static final String CONFIG_DATA_INGESTION_SERVICE_URL = "DATA_INGESTION_SERVICE_URL";

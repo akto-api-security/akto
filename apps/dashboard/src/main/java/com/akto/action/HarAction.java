@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import com.akto.audit_logs_util.Audit;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.BurpPluginInfoDao;
 import com.akto.dao.context.Context;
@@ -7,6 +8,8 @@ import com.akto.dao.file.FilesDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
 import com.akto.har.HAR;
 import com.akto.listener.KafkaListener;
 import com.akto.log.LoggerMaker;
@@ -50,6 +53,7 @@ public class HarAction extends UserAction {
     }
 
     @Override
+    @Audit(description = "User uploaded a HAR file", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"getApiCollectionId"})
     public String execute() throws IOException {
         if (DashboardMode.isKubernetes()) {
             skipKafka = true;
@@ -159,6 +163,10 @@ public class HarAction extends UserAction {
             return SUCCESS.toUpperCase();
         }
         return SUCCESS.toUpperCase();
+    }
+
+    public int getApiCollectionId() {
+        return this.apiCollectionId;
     }
 
     public void setContent(BasicDBObject content) {
