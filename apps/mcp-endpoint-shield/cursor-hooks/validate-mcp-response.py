@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
+"""
+Cursor MCP After Hook - Response Ingestion via Akto HTTP Proxy API
+Logs MCP tool responses for monitoring and analysis.
+NOTE: Cursor afterMCPExecution hooks cannot block responses, only log/ingest.
+"""
 import json
 import logging
 import os
 import sys
 import urllib.request
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, Union
 
 from machine_id import get_machine_id
 
@@ -15,7 +20,7 @@ MODE = os.getenv("MODE", "argus").lower()
 AKTO_DATA_INGESTION_URL = os.getenv("AKTO_DATA_INGESTION_URL")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
-AKTO_CONNECTOR = "claude_code_cli"
+AKTO_CONNECTOR = "cursor_mcp"
 
 # Configure CLAUDE_API_URL based on mode
 if MODE == "atlas":
@@ -52,7 +57,26 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
             return raw
 
 
-def build_ingestion_payload(user_prompt: str, response_text: str) -> Dict[str, Any]:
+def extract_mcp_server_name(input_data: Dict[str, Any]) -> str:
+    """Extract MCP server identifier from Cursor hook input."""
+    # Priority: server > url (extract domain) > command > tool_name prefix > default
+    if server := input_data.get("server"):
+        return server
+    if url := input_data.get("url"):
+        # Extract domain from URL
+        return url.replace("https://", "").replace("http://", "").split("/")[0]
+    if command := input_data.get("command"):
+        return command
+    if tool_name := input_data.get("tool_name", ""):
+        if tool_name.startswith("mcp__"):
+            parts = tool_name.split("__")
+            if len(parts) > 1:
+                return parts[1]
+    return "cursor-unknown"
+
+
+def build_ingestion_payload(tool_input: str, result_json: str, mcp_server_name: str) -> Dict[str, Any]:
+    """Build the request body for data ingestion."""
     # Build tags based on mode
     tags = {"gen-ai": "Gen AI"}
     if MODE == "atlas":
@@ -68,17 +92,16 @@ def build_ingestion_payload(user_prompt: str, response_text: str) -> Dict[str, A
                 "content-type": "application/json"
             },
             "body": {
-                "messages": [{"role": "user", "content": user_prompt}]
+                "tool_input": tool_input
             },
             "queryParams": {},
             "metadata": {
-                "tag": tags
+                "tag": tags,
+                "mcp_server_name": mcp_server_name
             }
         },
         "response": {
-            "body": {
-                "choices": [{"message": {"content": response_text}}]
-            },
+            "body": json.loads(result_json) if result_json else {},
             "headers": {
                 "content-type": "application/json"
             },
@@ -88,46 +111,12 @@ def build_ingestion_payload(user_prompt: str, response_text: str) -> Dict[str, A
     }
 
 
-def get_last_interaction(transcript_path: str) -> tuple[str, str]:
-    if not os.path.exists(transcript_path):
-        return "", ""
-
-    user_prompt, assistant_response = "", ""
-    
-    try:
-        with open(transcript_path, 'r') as f:
-            for line in f:
-                try:
-                    entry = json.loads(line)
-                    entry_type = entry.get('type')
-                    if entry_type not in ('user', 'assistant'):
-                        continue
-                    
-                    content = entry.get('message', {}).get('content', '')
-                    text = content if isinstance(content, str) else "".join(
-                        block.get('text', '') for block in content if block.get('type') == 'text'
-                    )
-                    
-                    if entry_type == 'user':
-                        user_prompt = text
-                    else:
-                        assistant_response = text
-                        
-                except json.JSONDecodeError:
-                    continue
-                    
-        return user_prompt, assistant_response
-    except Exception as e:
-        logger.error(f"Error reading transcript: {e}")
-        return "", ""
-
-
-def send_ingestion_data(user_prompt: str, response_text: str):
-    if not user_prompt.strip() or not response_text.strip():
+def send_ingestion_data(tool_input: str, result_json: str, mcp_server_name: str):
+    if not tool_input.strip() or not result_json.strip():
         return
 
     try:
-        request_body = build_ingestion_payload(user_prompt, response_text)
+        request_body = build_ingestion_payload(tool_input, result_json, mcp_server_name)
         post_payload_json(
             build_http_proxy_url(
                 guardrails=not AKTO_SYNC_MODE,
@@ -144,24 +133,26 @@ def send_ingestion_data(user_prompt: str, response_text: str):
 def main():
     try:
         input_data = json.load(sys.stdin)
-        transcript_path = input_data.get("transcript_path")
-        
-        if not transcript_path:
-            sys.exit(0)
-
-        transcript_path = os.path.expanduser(transcript_path)
-        
-        user_prompt, response_text = get_last_interaction(transcript_path)
-        
-        if not user_prompt or not response_text:
-            sys.exit(0)
-
-        send_ingestion_data(user_prompt, response_text)
-
-    except Exception as e:
-        logger.error(f"Main error: {e}")
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON input: {e}")
+        # After hooks must return empty JSON
+        print(json.dumps({}))
         sys.exit(0)
 
+    # Extract tool_input and result_json
+    tool_input = json.dumps(input_data.get("tool_input", {}))
+    result_json = input_data.get("result_json", "{}")
+    mcp_server_name = extract_mcp_server_name(input_data)
+
+    if not tool_input or tool_input == "{}" or not result_json or result_json == "{}":
+        print(json.dumps({}))
+        sys.exit(0)
+
+    # Send data for ingestion
+    send_ingestion_data(tool_input, result_json, mcp_server_name)
+
+    # After hooks must return empty JSON (cannot modify/block responses)
+    print(json.dumps({}))
     sys.exit(0)
 
 

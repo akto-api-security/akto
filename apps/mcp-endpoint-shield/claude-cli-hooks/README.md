@@ -19,7 +19,21 @@ Add the following environment variables to your shell configuration file (e.g. `
 # Add these to ~/.zshrc
 export AKTO_DATA_INGESTION_URL="ingestion-service-url"
 export AKTO_SYNC_MODE="true" # Set to false if you want to allow prompts if guardrails blocks them but still send them to Claude
+export MODE="argus" # Options: "argus" (default) or "atlas"
+export DEVICE_ID="" # Optional: Custom device ID for atlas mode (auto-generated if not provided)
 ```
+
+#### Mode Configuration
+
+- **argus** (default): Standard mode using configured `CLAUDE_API_URL` or defaults to `https://api.anthropic.com`
+- **atlas**: Uses device-specific routing with format `https://{deviceId}.claudecli.ai-agent` and includes additional metadata tags:
+  - `ai-agent=cursor`
+  - `source=ENDPOINT`
+
+**Device ID for Atlas Mode:**
+- If `DEVICE_ID` environment variable is set, it will be used directly
+- If `DEVICE_ID` is not set, the device ID is automatically generated from your machine's MAC address and cached
+- The auto-generated device ID is lowercase with no dashes or colons
 
 Then reload your shell configuration (or open a new terminal) before running Claude Code:
 

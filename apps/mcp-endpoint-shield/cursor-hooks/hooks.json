@@ -3,12 +3,12 @@
   "hooks": {
     "beforeMCPExecution": [
       {
-        "command": "/path/to/userhome/.cursor/hooks/akto/akto-mcp-guard-before.sh"
+        "command": "python3 ~/.cursor/hooks/akto/validate-mcp-request.py"
       }
     ],
     "afterMCPExecution": [
       {
-        "command": "/path/to/userhome/.cursor/hooks/akto/akto-mcp-guard-after.sh"
+        "command": "python3 ~/.cursor/hooks/akto/validate-mcp-response.py"
       }
     ]
   }

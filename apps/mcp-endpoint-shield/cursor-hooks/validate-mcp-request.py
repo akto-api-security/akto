@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+"""
+Cursor MCP Before Hook - Request Validation via Akto HTTP Proxy API
+Validates MCP tool requests before execution using Akto guardrails.
+"""
 import json
 import logging
 import os
@@ -15,7 +19,7 @@ MODE = os.getenv("MODE", "argus").lower()
 AKTO_DATA_INGESTION_URL = os.getenv("AKTO_DATA_INGESTION_URL")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
-AKTO_CONNECTOR = "claude_code_cli"
+AKTO_CONNECTOR = "cursor_mcp"
 
 # Configure CLAUDE_API_URL based on mode
 if MODE == "atlas":
@@ -52,7 +56,25 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
             return raw
 
 
-def build_validation_request(query: str) -> dict:
+def extract_mcp_server_name(input_data: Dict[str, Any]) -> str:
+    """Extract MCP server identifier from Cursor hook input."""
+    # Priority: server > url (extract domain) > command > tool_name prefix > default
+    if server := input_data.get("server"):
+        return server
+    if url := input_data.get("url"):
+        # Extract domain from URL
+        return url.replace("https://", "").replace("http://", "").split("/")[0]
+    if command := input_data.get("command"):
+        return command
+    if tool_name := input_data.get("tool_name", ""):
+        if tool_name.startswith("mcp__"):
+            parts = tool_name.split("__")
+            if len(parts) > 1:
+                return parts[1]
+    return "cursor-unknown"
+
+
+def build_validation_request(tool_input: str, mcp_server_name: str) -> dict:
     """Build the request body for guardrails validation."""
     # Build tags based on mode
     tags = {"gen-ai": "Gen AI"}
@@ -69,23 +91,24 @@ def build_validation_request(query: str) -> dict:
                 "content-type": "application/json"
             },
             "body": {
-                "query": query.strip(),
+                "tool_input": tool_input,
             },
             "queryParams": {},
             "metadata": {
-                "tag": tags
+                "tag": tags,
+                "mcp_server_name": mcp_server_name
             }
         },
         "response": None
     }
 
 
-def call_guardrails(query: str) -> Tuple[bool, str]:
-    if not query.strip():
+def call_guardrails(tool_input: str, mcp_server_name: str) -> Tuple[bool, str]:
+    if not tool_input.strip():
         return True, ""
 
     try:
-        request_body = build_validation_request(query)
+        request_body = build_validation_request(tool_input, mcp_server_name)
         result = post_payload_json(
             build_http_proxy_url(guardrails=True, ingest_data=False),
             request_body,
@@ -103,7 +126,7 @@ def call_guardrails(query: str) -> Tuple[bool, str]:
         return True, ""
 
 
-def ingest_blocked_request(user_prompt: str):
+def ingest_blocked_request(tool_input: str, mcp_server_name: str):
     if not AKTO_DATA_INGESTION_URL or not AKTO_SYNC_MODE:
         return
 
@@ -115,7 +138,7 @@ def ingest_blocked_request(user_prompt: str):
             "status": "forbidden"
         }
 
-        request_body = build_validation_request(user_prompt)
+        request_body = build_validation_request(tool_input, mcp_server_name)
         request_body["response"] = blocked_response_payload
         post_payload_json(
             build_http_proxy_url(guardrails=False, ingest_data=True),
@@ -131,24 +154,32 @@ def main():
         input_data = json.load(sys.stdin)
     except json.JSONDecodeError as e:
         logger.error(f"Invalid JSON input: {e}")
-        sys.exit(1)
+        # Allow by default on parse errors
+        print(json.dumps({"permission": "allow"}))
+        sys.exit(0)
 
-    prompt = input_data.get("prompt", "")
+    # Extract tool_input (the actual MCP tool parameters)
+    tool_input = json.dumps(input_data.get("tool_input", {}))
+    mcp_server_name = extract_mcp_server_name(input_data)
 
-    if not prompt.strip():
+    if not tool_input.strip() or tool_input == "{}":
+        print(json.dumps({"permission": "allow"}))
         sys.exit(0)
 
     if AKTO_SYNC_MODE:
-        allowed, reason = call_guardrails(prompt)
+        allowed, reason = call_guardrails(tool_input, mcp_server_name)
         if not allowed:
             output = {
-                "decision": "block",
-                "reason": f"Blocked by Akto Guardrails"
+                "permission": "deny",
+                "user_message": "Request blocked by Akto security policy",
+                "agent_message": f"Blocked by Akto Guardrails: {reason}"
             }
             print(json.dumps(output))
-            ingest_blocked_request(prompt)
-            sys.exit(1)
+            ingest_blocked_request(tool_input, mcp_server_name)
+            sys.exit(0)
 
+    # Allow the request
+    print(json.dumps({"permission": "allow"}))
     sys.exit(0)
 
 
