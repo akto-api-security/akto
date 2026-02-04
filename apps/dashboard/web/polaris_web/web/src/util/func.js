@@ -2352,7 +2352,8 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   },
 
    isWhiteListedOrganization(){
-      return window.USER_NAME.indexOf("@akto.io") || window.USER_NAME.indexOf("@lab.morganstanley.com") || window.USER_NAME.indexOf("@blinkrx.com") > 0;
+      return window.USER_NAME.indexOf("@akto.io") || window.USER_NAME.indexOf("@lab.morganstanley.com") || window.USER_NAME.indexOf("@blinkrx.com")
+      || window.USER_NAME.indexOf("@testmuai.com") > 0;
     },
 
     isTempAccount(){
