@@ -3422,7 +3422,6 @@ public class DbAction extends ActionSupport {
                 return Action.ERROR.toUpperCase();
             }
 
-            loggerMaker.infoAndAddToDb("Updated service graph for collection " + apiCollectionId + " with " + serviceGraphEdges.size() + " edges");
             return Action.SUCCESS.toUpperCase();
 
         } catch (Exception e) {
