@@ -1635,6 +1635,26 @@
             </result>
         </action>
 
+        <action name="api/updateServiceGraphEdges" class="com.akto.action.ApiCollectionsAction" method="updateServiceGraphEdges">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/redactCollection" class="com.akto.action.ApiCollectionsAction" method="redactCollection">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
