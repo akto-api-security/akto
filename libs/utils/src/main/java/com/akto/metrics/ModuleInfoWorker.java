@@ -94,8 +94,7 @@ public class ModuleInfoWorker {
         moduleInfo.setName(this.moduleName);
 
         scheduler.scheduleWithFixedDelay(() -> {
-            // Collect environment variables FRESH on each heartbeat to pick up ThreatClientTelemetry changes
-            Map<String, Object> envVariables = _this.collectEnvironmentVariables(_this.moduleType);
+            Map<String, Object> envVariables = collectEnvironmentVariables(_this.moduleType);
             Map<String, Object> additionalData = new HashMap<>();
             if (!envVariables.isEmpty()) {
                 additionalData.put("env", envVariables);
