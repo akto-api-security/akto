@@ -543,7 +543,7 @@ public class HttpCallParser {
             int apiCollectionId = ServiceGraphBuilder.getInstance().getApiCollectionIdFromWorkflowId(workflowId, hostname);
 
 
-            if (apiCollectionId > 0) {
+            if (apiCollectionId != -1) {
                 java.util.Map<String, ServiceGraphEdgeInfo> edges = N8nTraceParser.getInstance().extractServiceGraph(n8nTraceJson);
                 if (edges != null && !edges.isEmpty()) {
                     ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
