@@ -1,15 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Modal, TextField, VerticalStack, Text, Checkbox, BlockStack } from "@shopify/polaris";
+import { Modal, TextField, VerticalStack, Text, Checkbox } from "@shopify/polaris";
 import CustomHeadersInput from "../../quick_start/components/CustomHeadersInput";
-
-const CONTEXT_SOURCE_OPTIONS = [
-    { value: "API", label: "API" },
-    { value: "DAST", label: "DAST" },
-    { value: "MCP", label: "MCP" },
-    { value: "GEN_AI", label: "Gen AI" },
-    { value: "AGENTIC", label: "Agentic" },
-    { value: "ENDPOINT", label: "Endpoint" }
-];
 
 const formatLastSync = (lastSyncTime) => {
     if (!lastSyncTime || lastSyncTime <= 0) return "Never";
@@ -21,10 +12,10 @@ const formatLastSync = (lastSyncTime) => {
     }
 };
 
-const WebhookIntegrationModal = ({ open, onClose, onSave, initialEndpoint = "", initialHeaders = [{ key: "", value: "" }], initialContextSources = ["API"], lastSyncTime = 0 }) => {
+const WebhookIntegrationModal = ({ open, onClose, onSave, initialEndpoint = "", initialHeaders = [{ key: "", value: "" }], initialUseGzip = false, lastSyncTime = 0 }) => {
     const [webhookEndpoint, setWebhookEndpoint] = useState(initialEndpoint);
     const [customHeaders, setCustomHeaders] = useState(initialHeaders);
-    const [selectedContextSources, setSelectedContextSources] = useState(initialContextSources);
+    const [useGzip, setUseGzip] = useState(initialUseGzip);
 
     useEffect(() => {
         if (open) {
@@ -34,24 +25,13 @@ const WebhookIntegrationModal = ({ open, onClose, onSave, initialEndpoint = "", 
                     ? initialHeaders
                     : [{ key: "", value: "" }]
             );
-            setSelectedContextSources(
-                Array.isArray(initialContextSources) && initialContextSources.length > 0
-                    ? initialContextSources
-                    : ["API"]
-            );
+            setUseGzip(initialUseGzip);
         }
-    }, [open, initialEndpoint, initialHeaders, initialContextSources]);
-
-    const toggleContextSource = (value) => {
-        setSelectedContextSources((prev) =>
-            prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
-        );
-    };
+    }, [open, initialEndpoint, initialHeaders, initialUseGzip]);
 
     const handleSave = () => {
         const headersToSave = customHeaders.filter((h) => h.key?.trim());
-        const contextSourcesToSave = selectedContextSources.length > 0 ? selectedContextSources : ["API"];
-        onSave?.({ webhookEndpoint: webhookEndpoint?.trim() || "", customHeaders: headersToSave, contextSources: contextSourcesToSave });
+        onSave?.({ webhookEndpoint: webhookEndpoint?.trim() || "", customHeaders: headersToSave, useGzip });
         onClose();
     };
 
@@ -81,21 +61,15 @@ const WebhookIntegrationModal = ({ open, onClose, onSave, initialEndpoint = "", 
                         value={webhookEndpoint}
                         onChange={setWebhookEndpoint}
                         placeholder="https://your-webhook-endpoint.com/events"
-                        helpText="URL to which guardrail activity data will be sent in batches (gzip, every 15 minutes)"
+                        helpText="URL to which threat activity data will be sent in batches (every 15 minutes)"
                         autoComplete="url"
                     />
-                    <BlockStack gap="200">
-                        <Text variant="bodyMd" fontWeight="semibold">Context sources to sync</Text>
-                        <Text variant="bodySm" color="subdued">Threat data for these context sources will be sent to the webhook.</Text>
-                        {CONTEXT_SOURCE_OPTIONS.map((opt) => (
-                            <Checkbox
-                                key={opt.value}
-                                label={opt.label}
-                                checked={selectedContextSources.includes(opt.value)}
-                                onChange={() => toggleContextSource(opt.value)}
-                            />
-                        ))}
-                    </BlockStack>
+                    <Checkbox
+                        label="Use gzip encoding"
+                        helpText="Send request body compressed with gzip (Content-Encoding: gzip). If unchecked, payload is sent as plain JSON."
+                        checked={useGzip}
+                        onChange={setUseGzip}
+                    />
                     <CustomHeadersInput
                         customHeaders={customHeaders}
                         setCustomHeaders={setCustomHeaders}

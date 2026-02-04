@@ -717,7 +717,7 @@ function ThreatDetectionPage() {
                                                         setWebhookIntegrationData({
                                                             url: integ.url || '',
                                                             customHeaders: headers.length > 0 ? headers : [{ key: '', value: '' }],
-                                                            contextSources: Array.isArray(integ.contextSources) ? integ.contextSources : ['API'],
+                                                            useGzip: Boolean(integ.useGzip),
                                                             lastSyncTime: integ.lastSyncTime || 0
                                                         });
                                                     } else {
@@ -756,11 +756,11 @@ function ThreatDetectionPage() {
                 onClose={() => setWebhookIntegrationModalOpen(false)}
                 initialEndpoint={webhookIntegrationData?.url ?? ''}
                 initialHeaders={webhookIntegrationData?.customHeaders ?? [{ key: '', value: '' }]}
-                initialContextSources={webhookIntegrationData?.contextSources ?? ['API']}
+                initialUseGzip={webhookIntegrationData?.useGzip ?? false}
                 lastSyncTime={webhookIntegrationData?.lastSyncTime ?? 0}
                 onSave={async (config) => {
                     try {
-                        await api.addThreatActivityWebhookIntegration(config.webhookEndpoint, config.customHeaders, config.contextSources);
+                        await api.addThreatActivityWebhookIntegration(config.webhookEndpoint, config.customHeaders, config.useGzip);
                         func.setToast(true, false, 'Webhook integration saved');
                         setWebhookIntegrationModalOpen(false);
                     } catch (e) {
