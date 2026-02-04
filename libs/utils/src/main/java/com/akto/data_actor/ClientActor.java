@@ -4562,4 +4562,24 @@ public class ClientActor extends DataActor {
             return;
         }
     }
+
+    public boolean updateServiceGraphEdges(int apiCollectionId, Map<String, ApiCollection.ServiceGraphEdgeInfo> serviceGraphEdges) {
+        Map<String, List<String>> headers = buildHeaders();
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("apiCollectionId", apiCollectionId);
+        payload.put("serviceGraphEdges", serviceGraphEdges);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateServiceGraphEdges", "", "POST", gson.toJson(payload), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateServiceGraphEdges: " + response.getStatusCode(), LoggerMaker.LogDb.RUNTIME);
+                return false;
+            }
+            loggerMaker.infoAndAddToDb("Successfully updated service graph edges for collection: " + apiCollectionId, LoggerMaker.LogDb.RUNTIME);
+            return true;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in updateServiceGraphEdges: " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+            return false;
+        }
+    }
 }

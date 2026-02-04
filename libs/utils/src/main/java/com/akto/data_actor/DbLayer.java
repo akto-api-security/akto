@@ -1386,4 +1386,16 @@ public class DbLayer {
     public static void storeSpans(List<Span> spans) {
         SpanDao.instance.insertMany(spans);
     }
+
+    public static boolean updateServiceGraphEdges(int apiCollectionId, Map<String, ApiCollection.ServiceGraphEdgeInfo> serviceGraphEdges) {
+        try {
+            org.bson.conversions.Bson filter = com.mongodb.client.model.Filters.eq(ApiCollection.ID, apiCollectionId);
+            org.bson.conversions.Bson update = com.mongodb.client.model.Updates.set(ApiCollection.SERVICE_GRAPH_EDGES, serviceGraphEdges);
+            com.mongodb.client.result.UpdateResult result = ApiCollectionsDao.instance.getMCollection().updateOne(filter, update);
+            return result.getMatchedCount() > 0;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Failed to update service graph edges: " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+            return false;
+        }
+    }
 }

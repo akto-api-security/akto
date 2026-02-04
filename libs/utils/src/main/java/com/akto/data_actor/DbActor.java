@@ -738,4 +738,8 @@ public class DbActor extends DataActor {
     public void storeSpans(List<Span> spans) {
         DbLayer.storeSpans(spans);
     }
+
+    public boolean updateServiceGraphEdges(int apiCollectionId, Map<String, ApiCollection.ServiceGraphEdgeInfo> serviceGraphEdges) {
+        return DbLayer.updateServiceGraphEdges(apiCollectionId, serviceGraphEdges);
+    }
 }
