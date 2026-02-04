@@ -3,8 +3,8 @@
 Machine ID generation utility for device identification.
 Mimics the Go implementation for generating unique device identifiers.
 """
+import subprocess
 import uuid
-import socket
 
 
 _machine_id = None
@@ -15,34 +15,39 @@ def _generate_machine_id() -> str:
     Generate a unique machine ID using multiple fallback methods.
 
     Priority:
-    1. UUID-based node ID (MAC address)
-    2. First non-empty network interface MAC address
+    1. macOS: IOPlatformUUID from ioreg (matches Go implementation)
+    2. Fallback: UUID-based node ID (MAC address)
 
     Returns:
         Machine ID as a lowercase string without dashes
     """
-    # Try uuid.getnode() - returns MAC address as integer
+    # Try macOS ioreg first (matches Go denisbrodbeck/machineid implementation)
+    try:
+        result = subprocess.run(
+            ["ioreg", "-rd1", "-c", "IOPlatformExpertDevice"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0:
+            for line in result.stdout.split('\n'):
+                if 'IOPlatformUUID' in line:
+                    # Extract UUID from line: "IOPlatformUUID" = "UUID-VALUE"
+                    parts = line.split('"')
+                    if len(parts) >= 4:
+                        uuid_val = parts[3].replace('-', '').lower()
+                        return uuid_val
+    except (FileNotFoundError, subprocess.TimeoutExpired, Exception):
+        pass
+
+    # Fallback: Try uuid.getnode() - returns MAC address as integer
     try:
         node_id = uuid.getnode()
         if node_id != 0:
             # Convert to MAC address format
             mac = ':'.join(['{:02x}'.format((node_id >> i) & 0xff)
                            for i in range(0, 48, 8)][::-1])
-            return mac.replace('-', '').replace(':', '')
-    except Exception:
-        pass
-
-    # Fallback: Try to get MAC from network interfaces
-    try:
-        # Get hostname and associated network info
-        hostname = socket.gethostname()
-        # This is a best-effort fallback
-        # In practice, uuid.getnode() should work on most systems
-        node_id = uuid.getnode()
-        if node_id != 0:
-            mac = ':'.join(['{:02x}'.format((node_id >> i) & 0xff)
-                           for i in range(0, 48, 8)][::-1])
-            return mac.replace('-', '').replace(':', '')
+            return mac.replace('-', '').replace(':', '').lower()
     except Exception:
         pass
 
