@@ -66,3 +66,8 @@ def get_machine_id() -> str:
     if _machine_id is None:
         _machine_id = _generate_machine_id().lower()
     return _machine_id
+
+
+if __name__ == "__main__":
+    # Print machine ID when script is executed directly
+    print(get_machine_id())
