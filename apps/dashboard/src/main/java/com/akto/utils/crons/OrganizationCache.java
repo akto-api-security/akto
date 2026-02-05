@@ -123,10 +123,44 @@ public class OrganizationCache {
         // First, try direct lookup
         OrganizationInfo orgInfo = domainToOrgInfoCache.get(emailDomain);
         if (orgInfo != null) {
+            // Check if the found orgInfo has no valid planType
+            String planType = orgInfo.getPlanType();
+            if (planType == null || planType.isEmpty() || "planType".equals(planType)) {
+                logger.debug("Direct lookup found org with invalid planType: " + planType + " for domain: " + emailDomain);
+                
+                // Check canonical mapping for planType. If canonical domain has planType then that planType to be used
+                //Eg - If blinkrx is present in cache with no planType, then chcek it's canonical domain - blinkhealth's planType
+                String canonicalDomain = InviteUserAction.commonOrganisationsMap.get(emailDomain);
+                if (canonicalDomain != null) {
+                    canonicalDomain = canonicalDomain.trim().toLowerCase();
+                    OrganizationInfo canonicalOrgInfo = domainToOrgInfoCache.get(canonicalDomain);
+                    
+                    if (canonicalOrgInfo != null) {
+                        String canonicalPlanType = canonicalOrgInfo.getPlanType();
+                        if (canonicalPlanType != null && !canonicalPlanType.isEmpty() && !"planType".equals(canonicalPlanType)) {
+                            // Create updated orgInfo with canonical domain's planType
+                            OrganizationInfo updatedOrgInfo = new OrganizationInfo(
+                                orgInfo.getOrganizationId(), 
+                                orgInfo.getAdminEmail(), 
+                                canonicalPlanType
+                            );
+                            
+                            // Update cache with the enhanced planType
+                            domainToOrgInfoCache.put(emailDomain, updatedOrgInfo);
+                            
+                            logger.debug("Updated cache for domain: " + emailDomain + 
+                                " with planType: " + canonicalPlanType + " from canonical domain: " + canonicalDomain);
+                            
+                            return updatedOrgInfo;
+                        }
+                    }
+                }
+            }
+            
             return orgInfo;
         }
         
-        // If not found, check bidirectional mapping
+        // If domain not found in cache , check bidirectional mapping
         // Check if this domain has a canonical mapping (input domain -> canonical domain)
         String canonicalDomain = InviteUserAction.commonOrganisationsMap.get(emailDomain);
         if (canonicalDomain != null) {
