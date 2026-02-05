@@ -59,7 +59,7 @@ public class Utils {
         String uuid = workflowNodeDetails.getOtpRefUuid();
 
         if (otpTestData == null) {
-            loggerMaker.warnAndAddToDb("no otp data received for uuid=" + uuid);
+            loggerMaker.warnAndAddToDb("no otp data received for uuid" + uuid);
             message = "otp data not received for uuid " + uuid;
             data.put("error", message);
             body.put("body", data);
@@ -95,7 +95,7 @@ public class Utils {
         OtpTestData otpTestData = null;
         WorkflowNodeDetails workflowNodeDetails = node.getWorkflowNodeDetails();
         for (int i=0; i<retries; i++) {
-            loggerMaker.warnAndAddToDb("FETCH_OTP_REQUEST: attempt=" + (i + 1) + ", otpRefUuid=" + workflowNodeDetails.getOtpRefUuid());
+            loggerMaker.warnAndAddToDb("FETCH_OTP_REQUEST: attempt=" + (i + 1) );
             try {
                 int waitInSeconds = Math.min(workflowNodeDetails.getWaitInSeconds(), 60);
                 if (waitInSeconds > 0) {
@@ -110,7 +110,7 @@ public class Utils {
             int curTime = Context.now() - 5 * 60;
             otpTestData = dataActor.fetchOtpTestData(uuid, curTime); //cyborg call
 
-            loggerMaker.warnAndAddToDb("FETCH_OTP_RESPONSE: attempt=" + (i + 1) + ", otpRefUuid=" + workflowNodeDetails.getOtpRefUuid() + ", hasData=" + (otpTestData != null));
+            loggerMaker.warnAndAddToDb("FETCH_OTP_RESPONSE: attempt=" + (i + 1)  + ", hasData=" + (otpTestData != null));
             if (otpTestData != null) {
                 break;
             }
