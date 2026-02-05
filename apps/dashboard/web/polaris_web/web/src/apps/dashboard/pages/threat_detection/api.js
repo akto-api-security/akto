@@ -287,6 +287,13 @@ const threatDetectionRequests = {
             method: 'post',
             data: { ipAddress }
         })
+    },
+    fetchThreatsForActor(actor, limit = 20) {
+        return request({
+            url: '/api/fetchThreatsForActor',
+            method: 'post',
+            data: { actor, limit }
+        })
     }
 }
 export default threatDetectionRequests
