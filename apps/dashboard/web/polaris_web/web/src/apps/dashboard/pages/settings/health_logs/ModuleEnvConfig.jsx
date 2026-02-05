@@ -77,7 +77,10 @@ const ModuleEnvConfigComponent = ({ title, description, module, allowedEnvFields
                         return (
                             <HorizontalGrid key={field.key} columns={2} gap="4">
                                 <Box>
-                                    <Text variant="bodyMd" as="p" fontWeight="medium">
+                                    <Text variant="bodyMd" as="p" fontWeight="semibold">
+                                        {field.key}
+                                    </Text>
+                                    <Text variant="bodySm" tone="subdued">
                                         {field.label}
                                     </Text>
                                     {field.helpText && (
