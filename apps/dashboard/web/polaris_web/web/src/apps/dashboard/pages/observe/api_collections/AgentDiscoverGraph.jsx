@@ -60,18 +60,18 @@ const AgentNode = memo(function AgentNode({ data }) {
 
 // Custom Edge Component following ApiDependencyEdge pattern - memoized to prevent re-renders
 const AgentEdge = memo(function AgentEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, data }) {
-  const [show, setShow] = useState(false);
-  const { connectionType } = data || {};
+  const { edgeParam } = data || {};
 
   // Use getBezierPath for proper edge rendering
   const edgePath = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
 
+  // Calculate midpoint for label
+  const midX = (sourceX + targetX) / 2;
+  const midY = (sourceY + targetY) / 2;
+
   return (
     <>
-      <g
-        onMouseEnter={() => setShow(true)}
-        onMouseLeave={() => setShow(false)}
-      >
+      <g>
         <defs>
           <marker
             id={`arrow-${id}`}
@@ -97,34 +97,21 @@ const AgentEdge = memo(function AgentEdge({ id, sourceX, sourceY, targetX, targe
           d={edgePath}
           markerEnd={`url(#arrow-${id})`}
         />
-        {show && (
+        {edgeParam && (
           <foreignObject
-            x={sourceX - 75}
-            y={sourceY - 30}
-            width={150}
-            height={60}
+            x={midX - 60}
+            y={midY - 15}
+            width={120}
+            height={30}
           >
-            <div xmlns="http://www.w3.org/1999/xhtml" style={{
+            <div style={{
               display: 'flex',
               justifyContent: 'center',
               alignItems: 'center',
-              height: '100%',
-              width: '100%'
             }}>
-              <Card padding={3}>
-                <VerticalStack gap={1}>
-                  <Box width='150px'>
-                    <Text color='subdued' variant='bodySm'>
-                      Connection
-                    </Text>
-                  </Box>
-                  <Box width='150px'>
-                    <Text variant='bodySm'>
-                      {connectionType || 'Data Flow'}
-                    </Text>
-                  </Box>
-                </VerticalStack>
-              </Card>
+              <Badge size='small' status="new">
+                <TooltipText tooltip={edgeParam} text={edgeParam} />
+              </Badge>
             </div>
           </foreignObject>
         )}
@@ -364,7 +351,7 @@ function AgentDiscoverGraph({ apiCollectionId }) {
       };
 
       // Calculate starting Y positions to center each column
-      const containerHeight = 500;
+      const containerHeight = 400;
       const leftHeight = leftNodes.length * (NODE_HEIGHT + VERTICAL_SPACING) - VERTICAL_SPACING;
       const centerHeight = NODE_HEIGHT;
       const rightHeight = rightNodes.length * (NODE_HEIGHT + VERTICAL_SPACING) - VERTICAL_SPACING;
@@ -395,6 +382,7 @@ function AgentDiscoverGraph({ apiCollectionId }) {
             type: 'agentEdge',
             data: {
               connectionType: edgeInfo?.metadata?.type || 'default',
+              edgeParam: edgeInfo?.metadata?.edgeParam,
               requestCount: edgeInfo.requestCount
             }
           });
