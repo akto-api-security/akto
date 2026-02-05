@@ -57,19 +57,9 @@ import { extractRuleViolated } from '../utils/formatUtils';
       id: `${item}-${index}`,
     }));
 
-    if (loading) {
-      return (
-        <Box padding="4">
-          <VerticalStack align="center" gap="4">
-            <Spinner size="large" />
-            <Text variant="bodyMd" color="subdued">Loading activity data...</Text>
-          </VerticalStack>
-        </Box>
-      );
-    }
-
     const {mode, setMode} = useSetIndexFiltersMode();
-  
+    const breakpoints = useBreakpoints();
+
     const resourceName = {
       singular: 'activitysdc',
       plural: 'activities',
@@ -146,8 +136,19 @@ import { extractRuleViolated } from '../utils/formatUtils';
       },
     );
   
+    if (loading) {
+      return (
+        <Box padding="4">
+          <VerticalStack align="center" gap="4">
+            <Spinner size="large" />
+            <Text variant="bodyMd" color="subdued">Loading activity data...</Text>
+          </VerticalStack>
+        </Box>
+      );
+    }
+
     return (
-      <> 
+      <>
       <style>
         {`
           #activity-log-card .Polaris-IndexTable__TableHeading--first,
@@ -172,7 +173,7 @@ import { extractRuleViolated } from '../utils/formatUtils';
             canCreateNewView={false}
           />
           <IndexTable
-              condensed={useBreakpoints().smDown}
+              condensed={breakpoints.smDown}
               resourceName={resourceName}
               itemCount={data.length}
               headings={[
