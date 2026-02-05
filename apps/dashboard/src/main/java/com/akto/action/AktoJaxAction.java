@@ -87,6 +87,7 @@ public class AktoJaxAction extends UserAction {
 
     private boolean runTestAfterCrawling;
     private String selectedMiniTestingService;
+    private String collectionName;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AktoJaxAction.class, LogDb.DASHBOARD);
 
@@ -102,8 +103,13 @@ public class AktoJaxAction extends UserAction {
             URL parsedUrl = new URL(hostname);
             String host = parsedUrl.getHost();
 
+            // Use custom collection name if provided, otherwise use hostname
+            String finalCollectionName = (collectionName != null && !collectionName.trim().isEmpty())
+                ? collectionName.trim()
+                : host;
+
             ApiCollectionsAction collectionsAction = new ApiCollectionsAction();
-            collectionsAction.setCollectionName(host);
+            collectionsAction.setCollectionName(finalCollectionName);
             String collectionStatus = collectionsAction.createCollection();
             int collectionId = 0;
             ApiCollection apiCollection = null;
@@ -113,13 +119,13 @@ public class AktoJaxAction extends UserAction {
                     apiCollection = apiCollections.get(0);
                     collectionId = apiCollection.getId();
                 } else {
-                    apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.NAME, host));
+                    apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.NAME, finalCollectionName));
                     if (apiCollection != null) {
                         collectionId = apiCollection.getId();
                     }
                 }
             } else {
-                apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.NAME, host));
+                apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.NAME, finalCollectionName));
                 if (apiCollection != null) {
                     collectionId = apiCollection.getId();
                 }
@@ -841,5 +847,13 @@ public class AktoJaxAction extends UserAction {
 
     public void setSelectedMiniTestingService(String selectedMiniTestingService) {
         this.selectedMiniTestingService = selectedMiniTestingService;
+    }
+
+    public String getCollectionName() {
+        return collectionName;
+    }
+
+    public void setCollectionName(String collectionName) {
+        this.collectionName = collectionName;
     }
 }
