@@ -31,4 +31,5 @@ public class Trace {
     private Map<String, Object> rootOutput;
     private Map<String, Object> metadata;
     private List<String> spanIds;
+    private int apiCollectionId;
 }
