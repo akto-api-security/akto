@@ -137,7 +137,8 @@ function getActions(item, fetchAllDastScans, navigate, setDuplicateScanData) {
                             selectedMiniTestingService: run.selectedMiniTestingService ?? '',
                             urlTemplatePatterns: run.urlTemplatePatterns ?? '',
                             applicationPages: run.applicationPages ?? '',
-                            apiKey: run.apiKey ?? ''
+                            apiKey: run.apiKey ?? '',
+                            collectionName: run.collectionName ?? ''
                         })
 
                         // Navigate to QuickStart with DAST connector
