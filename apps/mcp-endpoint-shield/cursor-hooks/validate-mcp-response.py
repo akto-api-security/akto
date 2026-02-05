@@ -47,8 +47,10 @@ AKTO_CONNECTOR = "cursor_mcp"
 if MODE == "atlas":
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
     API_URL = f"https://{device_id}.cursor.ai-agent" if device_id else "https://api.anthropic.com"
+    logger.info(f"MODE: {MODE}, Device ID: {device_id}, API_URL: {API_URL}")
 else:
     API_URL = os.getenv("API_URL", "https://api.anthropic.com")
+    logger.info(f"MODE: {MODE}, API_URL: {API_URL}")
 
 
 def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:

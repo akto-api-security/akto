@@ -42,8 +42,10 @@ AKTO_CONNECTOR = "claude_code_cli"
 if MODE == "atlas":
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
     CLAUDE_API_URL = f"https://{device_id}.claudecli.ai-agent" if device_id else "https://api.anthropic.com"
+    logger.info(f"MODE: {MODE}, Device ID: {device_id}, CLAUDE_API_URL: {CLAUDE_API_URL}")
 else:
     CLAUDE_API_URL = os.getenv("CLAUDE_API_URL", "https://api.anthropic.com")
+    logger.info(f"MODE: {MODE}, CLAUDE_API_URL: {CLAUDE_API_URL}")
 
 
 def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
