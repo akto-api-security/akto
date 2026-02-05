@@ -45,7 +45,7 @@ public class Utils {
 
     public static WorkflowTestResult.NodeResult processOtpNode(Node node, Map<String, Object> valuesMap) {
 
-        loggerMaker.infoAndAddToDb("processOtpNode started", LogDb.TESTING);
+        loggerMaker.warn("processOtpNode started");
 
         List<String> testErrors = new ArrayList<>();
         BasicDBObject resp = new BasicDBObject();
@@ -55,11 +55,11 @@ public class Utils {
 
         OtpTestData otpTestData = fetchOtpTestData(node, 4);
         WorkflowNodeDetails workflowNodeDetails = node.getWorkflowNodeDetails();
-        loggerMaker.infoAndAddToDb("workflowNodeDetails: " + workflowNodeDetails.toString(), LogDb.TESTING);
+        loggerMaker.warnAndAddToDb("workflowNodeDetails: " + workflowNodeDetails.toString());
         String uuid = workflowNodeDetails.getOtpRefUuid();
 
         if (otpTestData == null) {
-            loggerMaker.infoAndAddToDb("no otp data received for uuid=" + uuid, LogDb.TESTING);
+            loggerMaker.warnAndAddToDb("no otp data received for uuid=" + uuid);
             message = "otp data not received for uuid " + uuid;
             data.put("error", message);
             body.put("body", data);
@@ -95,13 +95,13 @@ public class Utils {
         OtpTestData otpTestData = null;
         WorkflowNodeDetails workflowNodeDetails = node.getWorkflowNodeDetails();
         for (int i=0; i<retries; i++) {
-            loggerMaker.infoAndAddToDb("FETCH_OTP_REQUEST: attempt=" + (i + 1) + ", otpRefUuid=" + workflowNodeDetails.getOtpRefUuid(), LogDb.TESTING);
+            loggerMaker.warnAndAddToDb("FETCH_OTP_REQUEST: attempt=" + (i + 1) + ", otpRefUuid=" + workflowNodeDetails.getOtpRefUuid());
             try {
                 int waitInSeconds = Math.min(workflowNodeDetails.getWaitInSeconds(), 60);
                 if (waitInSeconds > 0) {
-                    loggerMaker.infoAndAddToDb("WAITING: " + waitInSeconds + " seconds", LogDb.TESTING);
+                    loggerMaker.warnAndAddToDb("WAITING: " + waitInSeconds + " seconds");
                     Thread.sleep(waitInSeconds*1000);
-                    loggerMaker.infoAndAddToDb("DONE WAITING!!!!", LogDb.TESTING);
+                    loggerMaker.warnAndAddToDb("DONE WAITING!!!!");
                 }
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
@@ -110,7 +110,7 @@ public class Utils {
             int curTime = Context.now() - 5 * 60;
             otpTestData = dataActor.fetchOtpTestData(uuid, curTime); //cyborg call
 
-            loggerMaker.infoAndAddToDb("FETCH_OTP_RESPONSE: attempt=" + (i + 1) + ", otpRefUuid=" + workflowNodeDetails.getOtpRefUuid() + ", hasData=" + (otpTestData != null), LogDb.TESTING);
+            loggerMaker.warnAndAddToDb("FETCH_OTP_RESPONSE: attempt=" + (i + 1) + ", otpRefUuid=" + workflowNodeDetails.getOtpRefUuid() + ", hasData=" + (otpTestData != null));
             if (otpTestData != null) {
                 break;
             }
@@ -119,7 +119,7 @@ public class Utils {
     }
 
     private static String extractOtpCode(String text, String regex) {
-        loggerMaker.infoAndAddToDb("OTP_EXTRACT_REQUEST: regex=" + regex + ", textPreview=" + (text == null ? "null" : text.substring(0, Math.min(text.length(), 200))), LogDb.TESTING);
+        loggerMaker.warnAndAddToDb("OTP_EXTRACT_REQUEST: regex=" + regex + ", textPreview=" + (text == null ? "null" : text.substring(0, Math.min(text.length(), 200))));
 
         Pattern pattern = Pattern.compile(regex);
         Matcher matcher = pattern.matcher(text);
@@ -128,7 +128,7 @@ public class Utils {
             verificationCode = matcher.group(1);
         }
 
-        loggerMaker.infoAndAddToDb("OTP_EXTRACT_RESPONSE: verificationCode=" + verificationCode, LogDb.TESTING);
+        loggerMaker.warnAndAddToDb("OTP_EXTRACT_RESPONSE: verificationCode=" + verificationCode);
 
         return verificationCode;
     }
