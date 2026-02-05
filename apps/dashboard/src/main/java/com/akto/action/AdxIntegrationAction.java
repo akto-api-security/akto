@@ -796,7 +796,8 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
                         smr.getLabel(),
                         smr.getHost(),
                         smr.getJiraTicketUrl(),
-                        smr.getSeverity()
+                        smr.getSeverity(),
+                        smr.getSessionContext() != null && !smr.getSessionContext().isEmpty() ? smr.getSessionContext() : ""
                     ))
                     .collect(Collectors.toList())
                 );

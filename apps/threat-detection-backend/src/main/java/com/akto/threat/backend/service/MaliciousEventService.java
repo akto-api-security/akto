@@ -406,6 +406,7 @@ public class MaliciousEventService {
                 .setHost(evt.getHost() != null ? evt.getHost() : "")
                 .setJiraTicketUrl(evt.getJiraTicketUrl() != null ? evt.getJiraTicketUrl() : "")
                 .setSeverity(evt.getSeverity() != null ? evt.getSeverity() : "HIGH")
+                .setSessionContext(evt.getSessionContext() != null && !evt.getSessionContext().isEmpty() ? evt.getSessionContext() : "")
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()

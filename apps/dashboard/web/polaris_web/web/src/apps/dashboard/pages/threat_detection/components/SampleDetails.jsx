@@ -227,6 +227,189 @@ function SampleDetails(props) {
         component: (<MarkdownViewer markdown={remediationText}></MarkdownViewer>)
     })
 
+    // Session Context Tab - shows prompts involved in session-based detection
+    const SessionContextComponent = () => {
+        // Extract session data from moreInfoData.sessionContext
+        let sessionPrompts = [];
+        let sessionId = null;
+        let detectionType = 'SINGLE_PROMPT';
+        let sessionSummary = null;
+
+        const sessionContext = moreInfoData?.sessionContext;
+
+        if (sessionContext) {
+            try {
+                const sessionData = typeof sessionContext === 'string'
+                    ? JSON.parse(sessionContext)
+                    : sessionContext;
+                sessionPrompts = sessionData?.sessionPrompts || [];
+                sessionId = sessionData?.sessionId || null;
+                detectionType = sessionData?.detectionType || 'SINGLE_PROMPT';
+                sessionSummary = sessionData?.sessionSummary || null;
+            } catch (e) {
+                console.error('[SampleDetails] Error parsing sessionContext:', e);
+            }
+        }
+
+        // Format timestamp to show full date and time (not just date)
+        const formatTimestamp = (timestamp) => {
+            if (!timestamp) return '';
+            const date = new Date(timestamp * 1000);
+            return date.toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+            });
+        };
+
+        return (
+            <Box padding={"4"}>
+                <VerticalStack gap={"5"}>
+                    <VerticalStack gap={"2"}>
+                        <Text variant="headingMd">Detection Type</Text>
+                        <HorizontalStack gap={"2"}>
+                            <Badge status={detectionType === 'SESSION_CONTEXT' ? 'info' : 'default'}>
+                                {detectionType === 'SESSION_CONTEXT' ? 'Session-based' : 'Single Prompt'}
+                            </Badge>
+                            {sessionId && (
+                                <Text variant="bodySm" color="subdued">Session ID: {sessionId}</Text>
+                            )}
+                        </HorizontalStack>
+                    </VerticalStack>
+
+                    {detectionType === 'SESSION_CONTEXT' && (
+                        <>
+                            {sessionSummary && (
+                                <>
+                                    <Divider />
+                                    <VerticalStack gap={"2"}>
+                                        <Text variant="headingMd">Session Summary</Text>
+                                        <Box padding={"4"} background="bg-surface-caution" borderRadius="200">
+                                            <Text variant="bodyMd">
+                                                {sessionSummary}
+                                            </Text>
+                                        </Box>
+                                    </VerticalStack>
+                                </>
+                            )}
+
+                            {sessionPrompts.length > 0 && (
+                                <>
+                                    <Divider />
+                                    <VerticalStack gap={"4"}>
+                                        <Text variant="headingMd">Conversation Timeline ({sessionPrompts.length} exchanges)</Text>
+
+                                        <VerticalStack gap={"4"}>
+                                            {sessionPrompts.map((prompt, idx) => (
+                                                <Box key={idx} padding={"4"} background="bg-surface-secondary" borderRadius="200">
+                                                    <VerticalStack gap={"4"}>
+                                                        {/* Prompt section */}
+                                                        <VerticalStack gap={"2"}>
+                                                            <HorizontalStack align="space-between" blockAlign="center">
+                                                                <Badge size="small" tone="info">
+                                                                    Prompt {idx + 1}
+                                                                </Badge>
+                                                                {prompt.timestamp && (
+                                                                    <Text variant="bodySm" color="subdued">
+                                                                        {formatTimestamp(prompt.timestamp)}
+                                                                    </Text>
+                                                                )}
+                                                            </HorizontalStack>
+                                                            <Box
+                                                                padding={"3"}
+                                                                background="bg-surface"
+                                                                borderRadius="200"
+                                                                style={{
+                                                                    maxHeight: '200px',
+                                                                    overflowY: 'auto',
+                                                                    fontSize: '14px',
+                                                                    lineHeight: '1.6',
+                                                                    wordBreak: 'break-word',
+                                                                    whiteSpace: 'pre-wrap'
+                                                                }}
+                                                            >
+                                                                <Text variant="bodyMd">
+                                                                    {prompt.content || prompt.snippet || prompt}
+                                                                </Text>
+                                                            </Box>
+                                                        </VerticalStack>
+
+                                                        {/* Agent Response section */}
+                                                        {prompt.response && (
+                                                            <VerticalStack gap={"2"}>
+                                                                <HorizontalStack gap={"2"}>
+                                                                    <Text variant="headingSm" fontWeight="medium">
+                                                                        Agent Response
+                                                                    </Text>
+                                                                    {prompt.flagged && (
+                                                                        <Badge tone="critical" size="small">🚫 Blocked</Badge>
+                                                                    )}
+                                                                </HorizontalStack>
+                                                                <Box
+                                                                    padding={"3"}
+                                                                    background="bg-surface"
+                                                                    borderRadius="200"
+                                                                    style={{
+                                                                        maxHeight: '200px',
+                                                                        overflowY: 'auto',
+                                                                        fontSize: '14px',
+                                                                        lineHeight: '1.6',
+                                                                        wordBreak: 'break-word',
+                                                                        whiteSpace: 'pre-wrap'
+                                                                    }}
+                                                                >
+                                                                    <Text variant="bodyMd">
+                                                                        {prompt.response}
+                                                                    </Text>
+                                                                </Box>
+                                                                {prompt.detectionReason && (
+                                                                    <Box padding={"2"} background="bg-surface-critical" borderRadius="100">
+                                                                        <HorizontalStack gap={"1"}>
+                                                                            <Text variant="bodySm" fontWeight="semibold" color="critical">
+                                                                                Reason:
+                                                                            </Text>
+                                                                            <Text variant="bodySm" color="critical">
+                                                                                {prompt.detectionReason}
+                                                                            </Text>
+                                                                        </HorizontalStack>
+                                                                    </Box>
+                                                                )}
+                                                            </VerticalStack>
+                                                        )}
+                                                    </VerticalStack>
+                                                </Box>
+                                            ))}
+                                        </VerticalStack>
+                                    </VerticalStack>
+                                </>
+                            )}
+                        </>
+                    )}
+
+                    {detectionType === 'SINGLE_PROMPT' && (
+                        <>
+                            <Divider />
+                            <Box padding={"3"} background="bg-surface-secondary" borderRadius="200">
+                                <Text variant="bodyMd" color="subdued">
+                                    This threat was detected based on a single prompt analysis without session context.
+                                </Text>
+                            </Box>
+                        </>
+                    )}
+                </VerticalStack>
+            </Box>
+        );
+    };
+
+    const sessionContextTab = data.length > 0 && {
+        id: "session-context",
+        content: "Session Context",
+        component: <SessionContextComponent />
+    }
+
     useEffect(() => {
         fetchRemediationInfo()
         aggregateActivity()
@@ -658,7 +841,9 @@ Reference URL: ${window.location.href}`.trim();
     const tabsComponent = (
         <LayoutWithTabs
             key={`tabs-comp-${eventId || 'default'}`}
-            tabs={ window.location.href.indexOf("guardrails") > -1 ? [overviewTab, ValuesTab] : [overviewTab, timelineTab, ValuesTab, remediationTab]}
+            tabs={ window.location.href.indexOf("guardrails") > -1
+                ? [overviewTab, ValuesTab, sessionContextTab]
+                : [overviewTab, timelineTab, ValuesTab, sessionContextTab, remediationTab]}
             currTab = {() => {}}
         />
     )
