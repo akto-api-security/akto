@@ -751,6 +751,26 @@ export default {
         })
     },
 
+    fetchLatestTraces(apiCollectionId) {
+        return request({
+            url: '/api/fetchLatestTraces',
+            method: 'post',
+            data: {
+                apiCollectionId
+            }
+        })
+    },
+
+    fetchSpansForTrace(traceId) {
+        return request({
+            url: '/api/fetchSpansForTrace',
+            method: 'post',
+            data: {
+                traceId
+            }
+        })
+    },
+
     async getCoverageInfoForCollections(){
         return await request({
             url: '/api/getCoverageInfoForCollections',
