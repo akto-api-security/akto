@@ -296,6 +296,31 @@ function SampleDetails(props) {
                                 </>
                             )}
 
+                            {/* Detection Reason - show all reasons from blocked prompts */}
+                            {sessionPrompts.some(p => p.detectionReason) && (
+                                <>
+                                    <Divider />
+                                    <VerticalStack gap={"2"}>
+                                        <Box padding={"3"} background="bg-surface-critical" borderRadius="200">
+                                            <VerticalStack gap={"2"}>
+                                                {sessionPrompts
+                                                    .filter(p => p.detectionReason)
+                                                    .map((prompt, idx) => (
+                                                        <HorizontalStack key={idx} gap={"1"}>
+                                                            <Text variant="bodyMd" fontWeight="semibold" color="critical">
+                                                                Reason:
+                                                            </Text>
+                                                            <Text variant="bodyMd" color="critical">
+                                                                {prompt.detectionReason}
+                                                            </Text>
+                                                        </HorizontalStack>
+                                                    ))}
+                                            </VerticalStack>
+                                        </Box>
+                                    </VerticalStack>
+                                </>
+                            )}
+
                             {sessionPrompts.length > 0 && (
                                 <>
                                     <Divider />
@@ -365,18 +390,6 @@ function SampleDetails(props) {
                                                                         {prompt.response}
                                                                     </Text>
                                                                 </Box>
-                                                                {prompt.detectionReason && (
-                                                                    <Box padding={"2"} background="bg-surface-critical" borderRadius="100">
-                                                                        <HorizontalStack gap={"1"}>
-                                                                            <Text variant="bodySm" fontWeight="semibold" color="critical">
-                                                                                Reason:
-                                                                            </Text>
-                                                                            <Text variant="bodySm" color="critical">
-                                                                                {prompt.detectionReason}
-                                                                            </Text>
-                                                                        </HorizontalStack>
-                                                                    </Box>
-                                                                )}
                                                             </VerticalStack>
                                                         )}
                                                     </VerticalStack>
