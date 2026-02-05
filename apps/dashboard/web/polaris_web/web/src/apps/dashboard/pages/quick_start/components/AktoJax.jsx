@@ -9,8 +9,12 @@ import CustomHeadersInput from './CustomHeadersInput';
 import Dropdown from '../../../components/layouts/Dropdown';
 import testingApi from '../../testing/api'
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
+import QuickStartStore from '../quickStartStore';
 
 const AktoJax = () => {
+    const duplicateScanData = QuickStartStore(state => state.duplicateScanData)
+    const setDuplicateScanData = QuickStartStore(state => state.setDuplicateScanData)
+
     const [loading, setLoading] = useState(false)
 
     const [hostname, setHostname] = useState('')
@@ -114,6 +118,37 @@ const AktoJax = () => {
         fetchTestRoles()
         fetchAvailableModules()
     }, [])
+
+    // Pre-fill form with duplicate scan data
+    useEffect(() => {
+        if (duplicateScanData) {
+            setHostname(duplicateScanData.hostname || '')
+            setAuthType(duplicateScanData.authType || 'none')
+            setEmail(duplicateScanData.email || '')
+            setPassword(duplicateScanData.password || '')
+            setTestRole(duplicateScanData.testRoleHexId || '')
+            setOutscopeUrls(duplicateScanData.outscopeUrls || '')
+            setCrawlingTime(duplicateScanData.crawlingTime || 600)
+            setSelectedModule(duplicateScanData.selectedModule || '')
+            setUrlTemplatePatterns(duplicateScanData.urlTemplatePatterns || '')
+            setApplicationPages(duplicateScanData.applicationPages || '')
+            setRunTestAfterCrawling(duplicateScanData.runTestAfterCrawling || false)
+            setSelectedMiniTestingService(duplicateScanData.selectedMiniTestingService || '')
+            setApiKey(duplicateScanData.apiKey || '')
+
+            // Convert custom headers: object → array
+            if (duplicateScanData.customHeaders && Object.keys(duplicateScanData.customHeaders).length > 0) {
+                const headersArray = Object.entries(duplicateScanData.customHeaders).map(([key, value]) => ({
+                    key,
+                    value
+                }))
+                setCustomHeaders(headersArray)
+            }
+
+            // Clear after use
+            setDuplicateScanData(null)
+        }
+    }, [duplicateScanData, setDuplicateScanData])
 
     return (
         <div className='card-items'>
