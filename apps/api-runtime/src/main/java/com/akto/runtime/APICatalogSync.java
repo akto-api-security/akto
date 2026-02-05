@@ -292,7 +292,7 @@ public class APICatalogSync {
 
     }
 
-    public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic, BloomFilter<CharSequence> existingAPIsInDb, boolean ignoreCaseInsensitiveApis, boolean mergeUrlsOnVersions) {
+    public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic, BloomFilter<CharSequence> existingAPIsInDb, boolean ignoreCaseInsensitiveApis, boolean mergeUrlsOnVersions, boolean skipMergingOnKnownStaticURLsForVersionedApis) {
         ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
 
         if (apiCollection != null && apiCollection.isMcpCollection()) {
@@ -393,7 +393,7 @@ public class APICatalogSync {
 
 
             for(int size: sizeToUrlToSti.keySet()) {
-                ApiMergerResult result = tryMergingWithKnownStrictURLs(sizeToUrlToSti.get(size), urlRegexMatchingEnabled, !mergeUrlsBasic, mergeUrlsOnVersions);
+                ApiMergerResult result = tryMergingWithKnownStrictURLs(sizeToUrlToSti.get(size), urlRegexMatchingEnabled, !mergeUrlsBasic, mergeUrlsOnVersions, skipMergingOnKnownStaticURLsForVersionedApis);
                 finalResult.templateToStaticURLs.putAll(result.templateToStaticURLs);
             }
 
@@ -446,7 +446,7 @@ public class APICatalogSync {
     }
 
     private static ApiMergerResult tryMergingWithKnownStrictURLs(
-        Map<String, Set<String>> pendingRequests, Boolean urlRegexMatchingEnabled, boolean doBodyMatch, boolean mergeUrlsOnVersions
+        Map<String, Set<String>> pendingRequests, Boolean urlRegexMatchingEnabled, boolean doBodyMatch, boolean mergeUrlsOnVersions, boolean skipMergingOnKnownStaticURLsForVersionedApis
     ) {
         Map<URLTemplate, Set<String>> templateToStaticURLs = new HashMap<>();
 
@@ -459,7 +459,6 @@ public class APICatalogSync {
             Set<String> newTemplate = entry.getValue();
             Method newMethod = Method.fromString(newUrl.split(" ")[0]);
             String newEndpoint = newUrl.split(" ")[1];
-
             boolean matchedInDeltaTemplate = false;
             for(URLTemplate urlTemplate: templateToStaticURLs.keySet()){
                 if (urlTemplate.match(newEndpoint, newMethod)) {
@@ -514,6 +513,10 @@ public class APICatalogSync {
             }
 
             if (countSimilarURLs >= APICatalogSync.STRING_MERGING_THRESHOLD) {
+                if(skipMergingOnKnownStaticURLsForVersionedApis){
+                    continue;
+                }
+
                 URLTemplate mergedTemplate = potentialMerges.keySet().iterator().next();
                 Set<String> matchedStaticURLs = templateToStaticURLs.get(mergedTemplate);
 
@@ -903,10 +906,10 @@ public class APICatalogSync {
         return urlTemplate;
     }
 
-    public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic, BloomFilter<CharSequence> existingAPIsInDb,boolean ignoreCaseInsensitiveApis, boolean mergeUrlsOnVersions) {
+    public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic, BloomFilter<CharSequence> existingAPIsInDb,boolean ignoreCaseInsensitiveApis, boolean mergeUrlsOnVersions, boolean skipMergingOnKnownStaticURLsForVersionedApis) {
         if (apiCollectionId == LLM_API_COLLECTION_ID || apiCollectionId == VULNERABLE_API_COLLECTION_ID) return;
 
-        ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, urlRegexMatchingEnabled, mergeUrlsBasic, existingAPIsInDb, ignoreCaseInsensitiveApis, mergeUrlsOnVersions);
+        ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, urlRegexMatchingEnabled, mergeUrlsBasic, existingAPIsInDb, ignoreCaseInsensitiveApis, mergeUrlsOnVersions, skipMergingOnKnownStaticURLsForVersionedApis);
 
         String deletedStaticUrlsString = "";
         int counter = 0;
@@ -1162,7 +1165,7 @@ public class APICatalogSync {
                 Set<HttpResponseParams> responseParamsList = entry.getValue();
 
                 String endpoint = url.getUrl();
-                if(this.skipMergingOnKnownStaticURLsForVersionedApis && VERSION_PATTERN.matcher(endpoint).find()){
+                if(this.skipMergingOnKnownStaticURLsForVersionedApis){
                     continue;
                 }
 
@@ -1599,14 +1602,14 @@ public class APICatalogSync {
                             int start = Context.now();
                             loggerMaker.infoAndAddToDb("Started merging API collection " + apiCollection.getId(), LogDb.RUNTIME);
                             try {
-                                mergeUrlsAndSave(apiCollection.getId(), true, true, existingAPIsInDb, makeApisCaseInsensitive, mergeUrlsOnVersions);
+                                mergeUrlsAndSave(apiCollection.getId(), true, true, existingAPIsInDb, makeApisCaseInsensitive, mergeUrlsOnVersions, this.skipMergingOnKnownStaticURLsForVersionedApis);
                                 loggerMaker.infoAndAddToDb("Finished merging API collection basic " + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
                             } catch (Exception e) {
                                 loggerMaker.errorAndAddToDb(e.getMessage(),LogDb.RUNTIME);
                             }
 
                             try {
-                                mergeUrlsAndSave(apiCollection.getId(), true, false, existingAPIsInDb, makeApisCaseInsensitive, mergeUrlsOnVersions);
+                                mergeUrlsAndSave(apiCollection.getId(), true, false, existingAPIsInDb, makeApisCaseInsensitive, mergeUrlsOnVersions, this.skipMergingOnKnownStaticURLsForVersionedApis);
                                 loggerMaker.infoAndAddToDb("Finished merging API collection all" + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
                             } catch (Exception e) {
                                 loggerMaker.errorAndAddToDb(e.getMessage(),LogDb.RUNTIME);
