@@ -25,7 +25,7 @@ import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 
 public class ApiNodeExecutor extends NodeExecutor {
     
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiNodeExecutor.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiNodeExecutor.class, LogDb.TESTING);
 
     public NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
         loggerMaker.infoAndAddToDb("\n", LogDb.TESTING);
@@ -74,7 +74,17 @@ public class ApiNodeExecutor extends NodeExecutor {
                     Thread.sleep(sleep);
                 }
 
+                loggerMaker.warnAndAddToDb("API_NODE_REQUEST [Node " + nodeId + "]: method=" + request.getMethod() +
+                    ", url=" + request.getUrl() +
+                    ", queryParams=" + request.getQueryParams() +
+                    ", headers=" + request.getHeaders() +
+                    ", body=" + request.getBody());
+
                 response = ApiExecutor.sendRequest(request, followRedirects, null, debug, testLogs, Main.SKIP_SSRF_CHECK);
+
+                loggerMaker.warnAndAddToDb("API_NODE_RESPONSE [Node " + nodeId + "]: statusCode=" + response.getStatusCode() +
+                    ", headers=" + response.getHeaders() +
+                    ", body=" + response.getBody());
 
                 int statusCode = response.getStatusCode();
 
