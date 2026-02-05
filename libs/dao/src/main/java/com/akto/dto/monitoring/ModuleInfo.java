@@ -101,6 +101,7 @@ public class ModuleInfo {
         MCP_ENDPOINT_SHIELD,
         DATA_INGESTION,
         TRAFFIC_COLLECTOR,
+        AKTO_AGENT_GATEWAY,
         DAST
     }
 
