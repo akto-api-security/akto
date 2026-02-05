@@ -174,7 +174,8 @@ const api = {
         return request({
             url: '/api/initiateCrawler',
             method: 'post',
-            data: {hostname, username, password, apiKey, dashboardUrl, testRoleHexId, outscopeUrls, crawlingTime, selectedModuleName, customHeaders, runTestAfterCrawling, selectedMiniTestingService, urlTemplatePatterns, applicationPages}
+            data: {hostname, username, password, apiKey, dashboardUrl, testRoleHexId, outscopeUrls, crawlingTime, selectedModuleName, customHeaders, runTestAfterCrawling, selectedMiniTestingService, urlTemplatePatterns, applicationPages},
+            timeout: 360000
         })
     },
 
