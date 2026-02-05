@@ -58,7 +58,7 @@ public class BigQueryConfig {
         validateDatasetOrTable("dataset", config.dataset);
         validateDatasetOrTable("table", config.table);
 
-        config.fromDate = parseDate(jobConfig.get("fromDate"), Instant.now().minus(48, ChronoUnit.HOURS));
+        config.fromDate = parseDate(jobConfig.get("fromDate"), Instant.now().minus(24, ChronoUnit.HOURS));
         config.toDate = parseDate(jobConfig.get("toDate"), Instant.now());
 
         if (config.fromDate.isAfter(config.toDate)) {
