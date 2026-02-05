@@ -59,6 +59,11 @@ const getHeaders = () => {
       text: "Filter",
       value: "filterId",
       title: labelMap[PersistStore.getState().dashboardCategory]["Attack type"],
+    },
+    {
+      text: "Detection Type",
+      value: "detectionType",
+      title: "Detection Type",
     });
 
   if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
@@ -532,6 +537,20 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       const complianceMap = filterTemplate?.compliance?.mapComplianceToListClauses || {};
       const complianceList = Object.keys(complianceMap);
 
+      // Extract detection type from sessionContext field (new field for session data)
+      let detectionType = 'SINGLE_PROMPT';
+      try {
+        if (x?.sessionContext) {
+          const sessionData = typeof x.sessionContext === 'string'
+            ? JSON.parse(x.sessionContext)
+            : x.sessionContext;
+          detectionType = sessionData?.detectionType || 'SINGLE_PROMPT';
+        }
+      } catch (e) {
+        console.error('[SusDataTable] Error parsing sessionContext:', e);
+      }
+      const isSessionBased = detectionType === 'SESSION_CONTEXT';
+
       let nextUrl = null;
       if (x.refId && x.eventType && x.actor && x.filterId) {
         const params = new URLSearchParams();
@@ -568,6 +587,11 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         severityComp: (<div className={`badge-wrapper-${severity}`}>
                           <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                       </div>
+        ),
+        detectionType: (
+          <Badge status={isSessionBased ? 'info' : 'default'}>
+            {isSessionBased ? 'Session' : 'Single Prompt'}
+          </Badge>
         ),
         ...((isAgenticSecurityCategory() || isEndpointSecurityCategory()) && {
           ruleViolated: extractRuleViolated(x?.metadata)
