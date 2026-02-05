@@ -30,6 +30,7 @@ import com.akto.jsonrpc.JsonRpcUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mcp.McpRequestResponseUtils;
+import com.akto.rag.RagDetector;
 import com.akto.rest.RestMethodUtils;
 import com.akto.runtime.RuntimeUtil;
 import com.akto.runtime.parser.SampleParser;
@@ -845,6 +846,15 @@ public class HttpCallParser {
                     }
                     tagList.add(mcpServerTagOpt.get());
                     ismcpServer = true;
+                } else {
+                    // Check for RAG if not MCP
+                    Optional<CollectionTags> ragTagOpt = getRagTag(httpResponseParam);
+                    if (ragTagOpt.isPresent()) {
+                        if (tagList == null) {
+                            tagList = new ArrayList<>();
+                        }
+                        tagList.add(ragTagOpt.get());
+                    }
                 }
                 try {
 
@@ -1260,6 +1270,13 @@ public class HttpCallParser {
     private Optional<CollectionTags> getMcpServerTag(HttpResponseParams responseParams) {
         if (McpRequestResponseUtils.isMcpRequest(responseParams).getFirst()) {
             return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_MCP_SERVER_TAG, "MCP Server", TagSource.KUBERNETES));
+        }
+        return Optional.empty();
+    }
+
+    private Optional<CollectionTags> getRagTag(HttpResponseParams responseParams) {
+        if (RagDetector.isRagRequest(responseParams)) {
+            return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_RAG_DATABASE_TAG, "RAG Database", TagSource.KUBERNETES));
         }
         return Optional.empty();
     }

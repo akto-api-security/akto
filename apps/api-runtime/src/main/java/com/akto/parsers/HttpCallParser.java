@@ -22,6 +22,7 @@ import com.akto.jsonrpc.JsonRpcUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mcp.McpRequestResponseUtils;
+import com.akto.rag.RagDetector;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.Main;
 import com.akto.runtime.RuntimeUtil;
@@ -117,7 +118,7 @@ public class HttpCallParser {
         return null;
     }
 
-    public int createCollectionSimple(int vxlanId, boolean isMcpRequest) {
+    public int createCollectionSimple(int vxlanId, boolean isMcpRequest, boolean isRagRequest) {
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
 
@@ -129,6 +130,8 @@ public class HttpCallParser {
 
         if (isMcpRequest) {
             updates = Updates.combine(updates, Updates.setOnInsert("userSetEnvType", MCP_SERVER_TAG));
+        } else if (isRagRequest) {
+            updates = Updates.combine(updates, Updates.setOnInsert("userSetEnvType", Constants.AKTO_RAG_DATABASE_TAG));
         }
 
 
@@ -141,7 +144,7 @@ public class HttpCallParser {
     }
 
 
-    public int createCollectionBasedOnHostName(int id, String host, boolean isMcpRequest)  throws Exception {
+    public int createCollectionBasedOnHostName(int id, String host, boolean isMcpRequest, boolean isRagRequest)  throws Exception {
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
         // 3 cases
@@ -161,6 +164,8 @@ public class HttpCallParser {
                 if (isMcpRequest) {
                     String tag = "MCP Server";
                     updates = Updates.combine(updates, Updates.setOnInsert("userSetEnvType", tag));
+                } else if (isRagRequest) {
+                    updates = Updates.combine(updates, Updates.setOnInsert("userSetEnvType", Constants.AKTO_RAG_DATABASE_TAG));
                 }
 
                 ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
@@ -431,6 +436,13 @@ public class HttpCallParser {
         int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
 
         boolean isMcpRequest = McpRequestResponseUtils.isMcpRequest(httpResponseParam).getFirst();
+
+        // Check for RAG if not MCP
+        boolean isRagRequest = false;
+        if (!isMcpRequest) {
+            isRagRequest = RagDetector.isRagRequest(httpResponseParam);
+        }
+
         if (useHostCondition(hostName, httpResponseParam.getSource())) {
             hostName = hostName.toLowerCase();
             hostName = hostName.trim();
@@ -444,12 +456,12 @@ public class HttpCallParser {
                 int id = hostName.hashCode();
                 try {
 
-                    apiCollectionId = createCollectionBasedOnHostName(id, hostName, isMcpRequest);
+                    apiCollectionId = createCollectionBasedOnHostName(id, hostName, isMcpRequest, isRagRequest);
 
                     hostNameToIdMap.put(key, apiCollectionId);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb("Failed to create collection for host : " + hostName, LogDb.RUNTIME);
-                    createCollectionSimple(vxlanId, isMcpRequest);
+                    createCollectionSimple(vxlanId, isMcpRequest, isRagRequest);
                     hostNameToIdMap.put("null " + vxlanId, vxlanId);
                     apiCollectionId = httpResponseParam.requestParams.getApiCollectionId();
                 }
@@ -458,7 +470,7 @@ public class HttpCallParser {
         } else {
             String key = "null" + " " + vxlanId;
             if (!hostNameToIdMap.containsKey(key)) {
-                createCollectionSimple(vxlanId, isMcpRequest);
+                createCollectionSimple(vxlanId, isMcpRequest, isRagRequest);
                 hostNameToIdMap.put(key, vxlanId);
             }
 

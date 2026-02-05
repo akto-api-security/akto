@@ -51,6 +51,13 @@ public class Constants {
     public static final String AKTO_MCP_RESOURCES_TAG = "mcp-resource";
     public static final String AKTO_MCP_PROMPTS_TAG = "mcp-prompt";
 
+    // RAG and Vector Database Tags
+    public static final String AKTO_RAG_DATABASE_TAG = "rag-database";
+    public static final String AKTO_VECTOR_SEARCH_TAG = "vector-search";
+    public static final String AKTO_EMBEDDING_TAG = "embedding";
+    public static final String AKTO_SIMILARITY_SEARCH_TAG = "similarity-search";
+    public static final String AKTO_RAG_COLLECTION_TAG = "rag-collection";
+
     // AI Agent source type constants
     public static final String AI_AGENT_SOURCE_N8N = "N8N";
     public static final String AI_AGENT_SOURCE_LANGCHAIN = "LANGCHAIN";
