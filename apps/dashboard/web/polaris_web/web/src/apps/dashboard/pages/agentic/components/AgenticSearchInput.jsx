@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
-import { Box, Icon, TextField } from '@shopify/polaris';
+import { Box, Icon, Link, Text, TextField } from '@shopify/polaris';
 import { ArrowUpMinor } from '@shopify/polaris-icons';
 import '../AgenticConversationPage.css';
 
@@ -158,6 +158,11 @@ const AgenticSearchInput = forwardRef(({
                             </Box>
                         )}
                     </Box>
+                </Box>
+                <Box style={{ textAlign: 'center', marginTop: '8px' }}>
+                    <Text variant="bodySm" color="subdued">
+                        Ask Akto can make mistakes. For help <Link url="mailto:support@akto.io">contact support</Link>.
+                    </Text>
                 </Box>
             </Box>
         </Box>
