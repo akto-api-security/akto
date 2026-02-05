@@ -22,6 +22,17 @@ public class ModuleInfoConstants {
             put("AKTO_IGNORE_IP_TRAFFIC", "Ignore IP Traffic");
         }});
 
+        put(ModuleInfo.ModuleType.AKTO_AGENT_GATEWAY, new HashMap<String, String>() {{
+            put("AKTO_API_BASE_URL", "URL for Akto data ingestion service");
+            put("APP_SERVER_NAME", "Name to identify this agent server for policy filtering, If not set, will be automatically extracted from APP_URL hostname");
+            put("SKIP_THREAT", "Set to true to skip sending threat reports to Akto");
+            put("REQUEST_TIMEOUT", "Timeout for forwarding requests to AI agent");
+            put("ALLOWED_HTTP_METHODS", "Comma-separated list of allowed HTTP methods");
+            put("APPLY_GUARDRAILS_TO_SSE", "Apply guardrails to SSE (Server-Sent Events / text/event-stream) requests");
+            put("GUARDRAIL_ENDPOINTS", "Specific endpoints to apply guardrails");
+            put("GUARDRAIL_FIELD_MAPPING", "Per-endpoint JSON path for user prompt field, Format: METHOD:PATH:fieldPath");
+        }});
+
         put(ModuleInfo.ModuleType.THREAT_DETECTION, new HashMap<String, String>() {{
             put("AKTO_TRAFFIC_KAFKA_BOOTSTRAP_SERVER", "Traffic Kafka Bootstrap Server");
             put("AKTO_INTERNAL_KAFKA_BOOTSTRAP_SERVER", "Internal Kafka Bootstrap Server");
