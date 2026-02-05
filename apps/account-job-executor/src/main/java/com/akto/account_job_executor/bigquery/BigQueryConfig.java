@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 public class BigQueryConfig {
 
@@ -16,6 +17,26 @@ public class BigQueryConfig {
 
     private String ingestionServiceUrl;
     private String authToken;
+    private String credentialsPath;
+    private String credentialsJson;
+    private String credentialsJsonBase64;
+
+    private int ingestionBatchSize;
+    private int queryPageSize;
+    private int queryTimeoutSeconds;
+    private Integer maxRows;
+    private Long maximumBytesBilled;
+    private int connectTimeoutMs;
+    private int socketTimeoutMs;
+
+    private static final int DEFAULT_INGESTION_BATCH_SIZE = 100;
+    private static final int DEFAULT_QUERY_PAGE_SIZE = 1000;
+    private static final int DEFAULT_QUERY_TIMEOUT_SECONDS = 600;
+    private static final int DEFAULT_CONNECT_TIMEOUT_MS = 10_000;
+    private static final int DEFAULT_SOCKET_TIMEOUT_MS = 30_000;
+
+    private static final Pattern BQ_PROJECT_PATTERN = Pattern.compile("^[A-Za-z0-9_\\-]+$");
+    private static final Pattern BQ_DATASET_TABLE_PATTERN = Pattern.compile("^[A-Za-z0-9_]+$");
 
     private static final String DEFAULT_QUERY_TEMPLATE = "SELECT endpoint, deployed_model_id, logging_time, request_id, request_payload, response_payload "
             +
@@ -33,19 +54,60 @@ public class BigQueryConfig {
         config.dataset = getRequiredString(jobConfig, "dataset");
         config.table = getRequiredString(jobConfig, "table");
 
-        config.fromDate = parseDate(jobConfig.get("fromDate"), Instant.now().minus(24, ChronoUnit.HOURS));
+        validateProjectId("projectId", config.projectId);
+        validateDatasetOrTable("dataset", config.dataset);
+        validateDatasetOrTable("table", config.table);
+
+        config.fromDate = parseDate(jobConfig.get("fromDate"), Instant.now().minus(48, ChronoUnit.HOURS));
         config.toDate = parseDate(jobConfig.get("toDate"), Instant.now());
+
+        if (config.fromDate.isAfter(config.toDate)) {
+            throw new IllegalArgumentException("Invalid time range: fromDate is after toDate");
+        }
 
         config.ingestionServiceUrl = getString(jobConfig, "ingestionServiceUrl",
                 System.getenv("DATA_INGESTION_SERVICE_URL"));
 
-        config.authToken = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+        config.authToken = getString(jobConfig, "authToken",
+                System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN"));
+
+        config.credentialsPath = getString(jobConfig, "credentialsPath",
+                System.getenv("GOOGLE_APPLICATION_CREDENTIALS"));
+
+        config.credentialsJson = getString(jobConfig, "credentialsJson",
+                System.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON"));
+
+        config.credentialsJsonBase64 = getString(jobConfig, "credentialsJsonBase64",
+                System.getenv("GOOGLE_APPLICATION_CREDENTIALS_BASE64"));
+
+        config.ingestionBatchSize = getInt(jobConfig, "ingestionBatchSize", DEFAULT_INGESTION_BATCH_SIZE);
+        config.queryPageSize = getInt(jobConfig, "queryPageSize", DEFAULT_QUERY_PAGE_SIZE);
+        config.queryTimeoutSeconds = getInt(jobConfig, "queryTimeoutSeconds", DEFAULT_QUERY_TIMEOUT_SECONDS);
+        config.maxRows = getOptionalInt(jobConfig, "maxRows");
+        config.maximumBytesBilled = getOptionalLong(jobConfig, "maximumBytesBilled");
+        config.connectTimeoutMs = getInt(jobConfig, "connectTimeoutMs", DEFAULT_CONNECT_TIMEOUT_MS);
+        config.socketTimeoutMs = getInt(jobConfig, "socketTimeoutMs", DEFAULT_SOCKET_TIMEOUT_MS);
+
+        // Validate ingestion service URL early to fail fast
+        if (config.ingestionServiceUrl == null || config.ingestionServiceUrl.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "ingestionServiceUrl not set. Provide in job config or set DATA_INGESTION_SERVICE_URL env var");
+        }
+
+        if (config.authToken == null || config.authToken.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "authToken not set. Provide in job config or set DATABASE_ABSTRACTOR_SERVICE_TOKEN env var");
+        }
 
         return config;
     }
 
     public String getQuery() {
-        return String.format(DEFAULT_QUERY_TEMPLATE, projectId, dataset, table);
+        String baseQuery = String.format(DEFAULT_QUERY_TEMPLATE, projectId, dataset, table);
+        if (maxRows != null && maxRows > 0) {
+            return baseQuery + " LIMIT " + maxRows;
+        }
+        return baseQuery;
     }
 
     private static String getRequiredString(Map<String, Object> config, String key) {
@@ -69,10 +131,63 @@ public class BigQueryConfig {
         } catch (Exception e) {
             try {
                 long epoch = Long.parseLong(value.toString());
-                return Instant.ofEpochSecond(epoch);
+                // Support both epoch seconds and epoch millis
+                // epoch millis is typically >= 10^12 (2001-09-09 and later)
+                if (epoch >= 1_000_000_000_000L) {
+                    return Instant.ofEpochMilli(epoch);
+                } else {
+                    return Instant.ofEpochSecond(epoch);
+                }
             } catch (NumberFormatException nfe) {
                 return defaultValue;
             }
+        }
+    }
+
+    private static void validateProjectId(String key, String value) {
+        if (value == null || value.isEmpty() || !BQ_PROJECT_PATTERN.matcher(value).matches()) {
+            throw new IllegalArgumentException("Invalid BigQuery project identifier for " + key
+                    + ": only alphanumeric, underscores, and hyphens allowed");
+        }
+    }
+
+    private static void validateDatasetOrTable(String key, String value) {
+        if (value == null || value.isEmpty() || !BQ_DATASET_TABLE_PATTERN.matcher(value).matches()) {
+            throw new IllegalArgumentException("Invalid BigQuery identifier for " + key
+                    + ": only alphanumeric and underscores allowed (no hyphens)");
+        }
+    }
+
+    private static int getInt(Map<String, Object> config, String key, int defaultValue) {
+        Object value = config.get(key);
+        if (value == null)
+            return defaultValue;
+        try {
+            return Integer.parseInt(value.toString());
+        } catch (Exception e) {
+            return defaultValue;
+        }
+    }
+
+    private static Integer getOptionalInt(Map<String, Object> config, String key) {
+        Object value = config.get(key);
+        if (value == null)
+            return null;
+        try {
+            return Integer.parseInt(value.toString());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static Long getOptionalLong(Map<String, Object> config, String key) {
+        Object value = config.get(key);
+        if (value == null)
+            return null;
+        try {
+            return Long.parseLong(value.toString());
+        } catch (Exception e) {
+            return null;
         }
     }
 
@@ -105,6 +220,46 @@ public class BigQueryConfig {
         return authToken;
     }
 
+    public String getCredentialsPath() {
+        return credentialsPath;
+    }
+
+    public String getCredentialsJson() {
+        return credentialsJson;
+    }
+
+    public String getCredentialsJsonBase64() {
+        return credentialsJsonBase64;
+    }
+
+    public int getIngestionBatchSize() {
+        return ingestionBatchSize;
+    }
+
+    public int getQueryPageSize() {
+        return queryPageSize;
+    }
+
+    public int getQueryTimeoutSeconds() {
+        return queryTimeoutSeconds;
+    }
+
+    public Integer getMaxRows() {
+        return maxRows;
+    }
+
+    public Long getMaximumBytesBilled() {
+        return maximumBytesBilled;
+    }
+
+    public int getConnectTimeoutMs() {
+        return connectTimeoutMs;
+    }
+
+    public int getSocketTimeoutMs() {
+        return socketTimeoutMs;
+    }
+
     public String getFromDateFormatted() {
         return DateTimeFormatter.ISO_INSTANT.format(fromDate);
     }
@@ -121,6 +276,13 @@ public class BigQueryConfig {
                 ", table='" + table + '\'' +
                 ", fromDate=" + fromDate +
                 ", toDate=" + toDate +
+                ", ingestionBatchSize=" + ingestionBatchSize +
+                ", queryPageSize=" + queryPageSize +
+                ", queryTimeoutSeconds=" + queryTimeoutSeconds +
+                ", maxRows=" + maxRows +
+                ", maximumBytesBilled=" + maximumBytesBilled +
+                ", connectTimeoutMs=" + connectTimeoutMs +
+                ", socketTimeoutMs=" + socketTimeoutMs +
                 '}';
     }
 }
