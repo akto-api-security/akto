@@ -351,11 +351,13 @@ public class Utils {
     public static Map<String, Object> constructValueMap(LoginFlowParams loginFlowParams) {
         Map<String, Object> valuesMap = new HashMap<>();
         if (loginFlowParams == null || !loginFlowParams.getFetchValueMap()) {
+            loggerMaker.warnAndAddToDb("NO LOGIN FLOW PARAMS OR NO FETCH VALUE MAP");
             return valuesMap;
         }
         LoginFlowStepsData loginFlowStepData = dataActor.fetchLoginFlowStepsData(loginFlowParams.getUserId());
 
         if (loginFlowStepData == null || loginFlowStepData.getValuesMap() == null) {
+            loggerMaker.warnAndAddToDb("NO LOGIN FLOW STEPS DATA OR NO VALUES MAP");
             return valuesMap;
         }
 
