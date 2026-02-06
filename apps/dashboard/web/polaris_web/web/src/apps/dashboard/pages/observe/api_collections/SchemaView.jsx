@@ -50,6 +50,24 @@ function SchemaView({ apiCollectionId }) {
         if (!loading && schemaData && editorRef.current && !editorInstance) {
             const content = JSON.stringify(schemaData, null, 2);
 
+            // Define custom theme matching the codebase style
+            editor.defineTheme('schemaTheme', {
+                base: 'vs',
+                inherit: true,
+                rules: [
+                    { token: 'string.key.json', foreground: 'A31515' },
+                    { token: 'string.value.json', foreground: '0451A5' },
+                    { token: 'number', foreground: '098658' },
+                    { token: 'keyword.json', foreground: '0000FF' },
+                ],
+                colors: {
+                    'editor.background': '#FAFBFB',
+                    'editorLineNumber.foreground': '#999999',
+                    'editorLineNumber.activeForeground': '#000000',
+                    'editorIndentGuide.background': '#D3D3D3',
+                }
+            });
+
             const editorOptions = {
                 value: content,
                 language: 'json',
@@ -61,7 +79,7 @@ function SchemaView({ apiCollectionId }) {
                 folding: true,
                 foldingStrategy: 'indentation',
                 showFoldingControls: 'always',
-                theme: 'vs-dark',
+                theme: 'schemaTheme',
                 fontSize: 13,
                 lineNumbers: 'on',
                 renderLineHighlight: 'line',
@@ -150,14 +168,19 @@ function SchemaView({ apiCollectionId }) {
                     <Box width="50%">
                         <Card padding="0">
                             <VerticalStack>
-                                <Box padding="2" background="bg-inverse">
+                                <Box padding="2" background="bg-surface-secondary">
                                     <HorizontalStack gap="2">
-                                        <Button size="slim" onClick={handleCollapseAll}>Collapse All</Button>
-                                        <Button size="slim" onClick={handleExpandAll}>Expand All</Button>
+                                        <Text variant="headingSm" fontWeight="semibold">Raw Schema</Text>
+                                        <Box paddingInlineStart="4">
+                                            <HorizontalStack gap="2">
+                                                <Button size="slim" onClick={handleCollapseAll}>Collapse All</Button>
+                                                <Button size="slim" onClick={handleExpandAll}>Expand All</Button>
+                                            </HorizontalStack>
+                                        </Box>
                                     </HorizontalStack>
                                 </Box>
                                 <Divider />
-                                                <div ref={editorRef} style={{ height: 'calc(100vh - 350px)', minHeight: '400px' }} />
+                                <div ref={editorRef} style={{ height: 'calc(100vh - 280px)', minHeight: '500px' }} />
                             </VerticalStack>
                         </Card>
                     </Box>
@@ -165,18 +188,34 @@ function SchemaView({ apiCollectionId }) {
                     {/* Right Panel - Swagger UI */}
                     <Box width="50%">
                         <Card padding="0">
-                            <div style={{ height: 'calc(100vh - 350px)', minHeight: '400px', overflow: 'auto' }}>
-                                <SwaggerUI
-                                    spec={schemaData}
-                                    docExpansion="list"
-                                    defaultModelsExpandDepth={-1}
-                                    displayRequestDuration={true}
-                                    filter={true}
-                                    showExtensions={true}
-                                    showCommonExtensions={true}
-                                    tryItOutEnabled={false}
-                                />
-                            </div>
+                            <VerticalStack>
+                                <Box padding="2" background="bg-surface-secondary">
+                                    <HorizontalStack align="start">
+                                        <Text variant="headingSm" fontWeight="semibold">Visual Documentation</Text>
+                                    </HorizontalStack>
+                                </Box>
+                                <Divider />
+                                <div style={{ height: 'calc(100vh - 280px)', minHeight: '500px', overflow: 'auto' }} className="swagger-ui-container">
+                                    <SwaggerUI
+                                        spec={schemaData}
+                                        docExpansion="list"
+                                        defaultModelsExpandDepth={-1}
+                                        displayRequestDuration={true}
+                                        filter={true}
+                                        showExtensions={true}
+                                        showCommonExtensions={true}
+                                        tryItOutEnabled={false}
+                                    />
+                                    <style>{`
+                                        .swagger-ui .info {
+                                            display: none;
+                                        }
+                                        .swagger-ui .filter-container {
+                                            display: none;
+                                        }
+                                    `}</style>
+                                </div>
+                            </VerticalStack>
                         </Card>
                     </Box>
                 </HorizontalStack>
