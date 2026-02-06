@@ -49,6 +49,7 @@
     "react-scripts": "5.0.1",
     "react-syntax-highlighter": "^15.6.1",
     "stream": "^0.0.2",
+    "swagger-ui-react": "^5.31.0",
     "timers": "^0.1.1",
     "vaul": "^1.1.2",
     "web-vitals": "^2.1.4",
