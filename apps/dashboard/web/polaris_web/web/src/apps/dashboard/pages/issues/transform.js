@@ -120,7 +120,7 @@ const transform = {
                 let badge = totalCompliance > maxShowCompliance ? <Badge size="extraSmall">+{totalCompliance - maxShowCompliance}</Badge> : null
                 return {
                     key: key,
-                    id: issue.urls.map((x) => x.id),
+                    id: issue.id,
                     severity: <div className={`badge-wrapper-${issue.severityType}`}>
                                 <Badge size="small" key={idx}>{issue.severity}</Badge>
                             </div>,
