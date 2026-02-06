@@ -125,8 +125,9 @@ public class HttpProxyAction extends ActionSupport {
     }
 
     /**
-     * TrueFoundry-specific endpoint that converts TrueFoundry format to Akto format
-     * and processes through guardrails/data ingestion
+     * TrueFoundry-specific endpoint wrapper
+     * Converts TrueFoundry format to standard http-proxy format,
+     * calls httpProxy(), and transforms response for TrueFoundry
      */
     public String truefoundryProxy() {
         try {
@@ -134,7 +135,6 @@ public class HttpProxyAction extends ActionSupport {
 
             // Build TrueFoundry input from individual fields
             Map<String, Object> tfInput = new HashMap<>();
-            
             if (requestBody != null) {
                 tfInput.put("requestBody", requestBody);
             }
@@ -148,11 +148,6 @@ public class HttpProxyAction extends ActionSupport {
                 tfInput.put("context", context);
             }
 
-            loggerMaker.info("TrueFoundry input fields - requestBody: " + (requestBody != null) + 
-                ", responseBody: " + (responseBody != null) + 
-                ", config: " + (config != null) + 
-                ", context: " + (context != null));
-
             // Validate that at least requestBody is present
             if (requestBody == null || requestBody.isEmpty()) {
                 loggerMaker.warn("TrueFoundry: Missing requestBody");
@@ -163,38 +158,50 @@ public class HttpProxyAction extends ActionSupport {
                 return Action.ERROR.toUpperCase();
             }
 
-            // Convert TrueFoundry format to Akto format
+            // Convert TrueFoundry format to standard http-proxy format
             Map<String, Object> aktoFormat = convertTrueFoundryToAktoFormat(tfInput);
 
-            // Build URL query parameters for gateway
-            Map<String, Object> urlQueryParams = new HashMap<>();
-            if (guardrails != null && !guardrails.isEmpty()) {
-                urlQueryParams.put("guardrails", guardrails);
+            // Set class properties from converted format
+            this.url = (String) aktoFormat.get("url");
+            this.path = (String) aktoFormat.get("path");
+            this.request = (Map<String, Object>) aktoFormat.get("request");
+            this.response = (Map<String, Object>) aktoFormat.get("response");
+
+            // Default connector name for TrueFoundry if not provided
+            if (this.akto_connector == null || this.akto_connector.isEmpty()) {
+                this.akto_connector = "truefoundry";
             }
-            // Default connector name for TrueFoundry
-            String connector = akto_connector != null && !akto_connector.isEmpty() ? akto_connector : "truefoundry";
-            urlQueryParams.put("akto_connector", connector);
-            if (ingest_data != null && !ingest_data.isEmpty()) {
-                urlQueryParams.put("ingest_data", ingest_data);
-            }
 
-            loggerMaker.info("TrueFoundry URL Query Params - guardrails: " + guardrails +
-                ", akto_connector: " + connector + ", ingest_data: " + ingest_data);
+            loggerMaker.info("Calling httpProxy() with converted TrueFoundry data");
 
-            // Build proxy data for gateway processing
-            Map<String, Object> proxyData = new HashMap<>();
-            proxyData.put("url", aktoFormat.get("url"));
-            proxyData.put("path", aktoFormat.get("path"));
-            proxyData.put("request", aktoFormat.get("request"));
-            if (aktoFormat.containsKey("response") && aktoFormat.get("response") != null) {
-                proxyData.put("response", aktoFormat.get("response"));
-            }
-            proxyData.put("urlQueryParams", urlQueryParams);
+            // Call the existing httpProxy method
+            String result = httpProxy();
 
-            // Process through gateway (guardrails validation and data ingestion)
-            data = gateway.processHttpProxy(proxyData);
+            // Transform response for TrueFoundry format
+            return transformResponseForTrueFoundry(result);
 
-            // Check guardrails result for TrueFoundry
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error in TrueFoundry Proxy action: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
+
+            success = false;
+            message = "Unexpected error: " + e.getMessage();
+            data = new HashMap<>();
+            data.put("error", e.getMessage());
+
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Transform http-proxy response to TrueFoundry format
+     * - SUCCESS → SUCCESS (empty response)
+     * - ERROR with guardrails blocked → BLOCKED (HTTP 400)
+     * - ERROR → ERROR (HTTP 422)
+     */
+    @SuppressWarnings("unchecked")
+    private String transformResponseForTrueFoundry(String httpProxyResult) {
+        if (Action.SUCCESS.toUpperCase().equals(httpProxyResult)) {
+            // Check if request was blocked by guardrails
             if (data != null && guardrails != null && !guardrails.isEmpty()) {
                 Map<String, Object> guardrailsResult = (Map<String, Object>) data.get("guardrailsResult");
                 if (guardrailsResult != null) {
@@ -215,25 +222,13 @@ public class HttpProxyAction extends ActionSupport {
                 }
             }
 
-            // Request allowed - return null/empty success
-            // success = true;
-            // message = "TrueFoundry request processed successfully";
-            // data = null; // Return null for allowed requests
-
-            loggerMaker.info("TrueFoundry Proxy processed through gateway - success: " + success);
-
+            // Request allowed - clear data for empty response
+            data = null;
             return Action.SUCCESS.toUpperCase();
-
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error in TrueFoundry Proxy action: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
-
-            success = false;
-            message = "Unexpected error: " + e.getMessage();
-            data = new HashMap<>();
-            data.put("error", e.getMessage());
-
-            return Action.ERROR.toUpperCase();
         }
+
+        // Pass through ERROR result as-is
+        return httpProxyResult;
     }
 
     /**
