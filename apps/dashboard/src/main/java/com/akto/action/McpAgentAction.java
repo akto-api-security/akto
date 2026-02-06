@@ -92,8 +92,7 @@ public class McpAgentAction extends UserAction {
                 }
             }
 
-           //String userEmail = getSUser() != null ? getSUser().getLogin() : null;
-            String userEmail = "fenil@akto.io";
+            String userEmail = getSUser() != null ? getSUser().getLogin() : null;
             GenericAgentConversation responseFromMcpServer = agentClient.getResponseFromMcpServer(message, conversationId, 20000, storedTitle, conversationTypeEnum, accessTokenForRequest, contextString, userEmail);
             if(responseFromMcpServer != null) {
                 responseFromMcpServer.setCreatedAt(timeNow);
