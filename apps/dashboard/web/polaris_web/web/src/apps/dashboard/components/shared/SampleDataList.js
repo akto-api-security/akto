@@ -5,18 +5,13 @@ import {
   Text,
   VerticalStack,
   HorizontalStack, Box, LegacyCard, HorizontalGrid,
-  Pagination, Key, Badge, Button, Collapsible} from '@shopify/polaris';
+  Pagination, Key, Badge} from '@shopify/polaris';
 import SampleDataComponent from './SampleDataComponent';
 import SampleData from './SampleData';
 import func from '../../../../util/func';
 import { getDashboardCategory, mapLabel } from '../../../main/labelHelper';
-import api from '../../pages/observe/api';
 
-function SchemaValidationError({ sampleData, apiCollectionId}) {
-    const [schemaOpen, setSchemaOpen] = useState(false);
-    const [schemaContent, setSchemaContent] = useState(null);
-    const [loadingSchema, setLoadingSchema] = useState(false);
-    
+function SchemaValidationError({ sampleData}) {
     if (!sampleData || !sampleData?.metadata) {
         return null;
     }
@@ -29,35 +24,11 @@ function SchemaValidationError({ sampleData, apiCollectionId}) {
         return null;
     }
 
-    const handleViewSchema = async () => {
-        if (!schemaOpen && !schemaContent && apiCollectionId) {
-            setLoadingSchema(true);
-            try {
-                const response = await api.fetchOpenApiSchema(apiCollectionId);
-                setSchemaContent(response?.openApiSchema || "No schema available");
-            } catch (error) {
-                setSchemaContent("Error loading schema: " + error.message);
-            }
-            setLoadingSchema(false);
-        }
-        setSchemaOpen(!schemaOpen);
-    };
-
-    const bannerTitle = (
-        <HorizontalStack align="space-between" blockAlign="center">
-            <Text variant="headingMd" as="h2">Schema Validation Errors</Text>
-            {apiCollectionId && (
-                <Button onClick={handleViewSchema} loading={loadingSchema} size="slim">
-                    {schemaOpen ? "Hide Schema" : "View Schema"}
-                </Button>
-            )}
-        </HorizontalStack>
-    );
 
     return (
         <VerticalStack gap={"4"}>
             <Banner
-                title={bannerTitle}
+                title="Schema Validation Errors"
                 status="critical"
             >
                 <List type="bullet">
@@ -66,27 +37,14 @@ function SchemaValidationError({ sampleData, apiCollectionId}) {
                     })}
                 </List>
             </Banner>
-            {apiCollectionId && (
-                <Collapsible open={schemaOpen} id="schema-collapsible">
-                    <LegacyCard>
-                        <LegacyCard.Section>
-                            <SampleData 
-                                data={{ original: schemaContent }} 
-                                language="json" 
-                                minHeight="30vh" 
-                                wordWrap={true} 
-                            />
-                        </LegacyCard.Section>
-                    </LegacyCard>
-                </Collapsible>
-            )}
+
         </VerticalStack>
     )
 }
 
 function SampleDataList(props) {
 
-    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, apiCollectionId} = props;
+    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata} = props;
 
     const [page, setPage] = useState(0);
 
@@ -96,7 +54,7 @@ function SampleDataList(props) {
   
     return (
       <VerticalStack gap="3">
-         <SchemaValidationError sampleData={sampleData[Math.min(page, sampleData.length - 1)]} apiCollectionId={apiCollectionId} />
+         <SchemaValidationError sampleData={sampleData[Math.min(page, sampleData.length - 1)]} />
         <HorizontalStack align='space-between'>
           <HorizontalStack gap="2">
             <Text variant='headingMd'>
