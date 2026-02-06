@@ -3,8 +3,8 @@ package com.akto.rag;
 import com.akto.dto.HttpResponseParams;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
@@ -16,13 +16,13 @@ import static com.akto.util.Constants.AKTO_RAG_DATABASE_TAG;
 
 /**
  * RAG (Retrieval-Augmented Generation) detection system.
- * Simple detector that identifies vector database and RAG-related traffic.
+ * Optimized detector that identifies vector database and RAG-related traffic.
+ * Parses JSON and checks if RAG keywords exist as keys.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class RagDetector {
 
     private static final LoggerMaker logger = new LoggerMaker(RagDetector.class, LogDb.RUNTIME);
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     // ==================== URL PATTERNS ====================
     private static final List<Pattern> RAG_URL_PATTERNS = Arrays.asList(
@@ -43,7 +43,9 @@ public final class RagDetector {
         "embedding", "embeddings", "vector", "vectors", "query_embedding",
         "query_vector", "similarity", "distance", "cosine", "euclidean",
         "nearest", "neighbors", "knn", "ann", "top_k", "n_results",
-        "collection", "collections", "index", "indices"
+        "collection", "collections", "collection_name", "index", "indices",
+        "anns_field", "search_params", "metric_type", "limit",
+        "namespace", "output_fields", "with_payload", "include_metadata"
     ));
 
     /**
@@ -58,7 +60,6 @@ public final class RagDetector {
         try {
             String url = responseParams.getRequestParams().getURL();
             String requestBody = responseParams.getRequestParams().getPayload();
-            String responseBody = responseParams.getPayload();
 
             if (url == null) {
                 return false;
@@ -71,7 +72,7 @@ public final class RagDetector {
             }
 
             // Check body patterns
-            if (checkBodyPatterns(requestBody, responseBody)) {
+            if (checkBodyPatterns(requestBody)) {
                 logger.info("Detected RAG operation from body content");
                 return true;
             }
@@ -99,25 +100,13 @@ public final class RagDetector {
     /**
      * Check request/response body for RAG keywords
      */
-    private static boolean checkBodyPatterns(String requestBody, String responseBody) {
+    private static boolean checkBodyPatterns(String requestBody) {
         try {
             // Check request body
             if (StringUtils.isNotBlank(requestBody)) {
-                if (containsRagKeywords(requestBody)) {
-                    JsonNode requestJson = OBJECT_MAPPER.readTree(requestBody);
-                    if (hasVectorData(requestJson)) {
-                        return true;
-                    }
-                }
-            }
-
-            // Check response body
-            if (StringUtils.isNotBlank(responseBody)) {
-                if (containsRagKeywords(responseBody)) {
-                    JsonNode responseJson = OBJECT_MAPPER.readTree(responseBody);
-                    if (hasVectorData(responseJson)) {
-                        return true;
-                    }
+                if (containsRagKeys(requestBody)) {
+                    logger.info("Detected RAG operation from request body");
+                    return true;
                 }
             }
 
@@ -129,47 +118,28 @@ public final class RagDetector {
     }
 
     /**
-     * Check if text contains RAG keywords
+     * Parse JSON and check if any RAG keyword exists as a key.
+     * Iterates through RAG_KEYWORDS and checks if they exist in parsed JSON.
      */
-    private static boolean containsRagKeywords(String text) {
-        String lowerText = text.toLowerCase();
-        for (String keyword : RAG_KEYWORDS) {
-            if (lowerText.contains(keyword)) {
-                return true;
-            }
+    private static boolean containsRagKeys(String jsonString) {
+        if (jsonString == null || jsonString.isEmpty()) {
+            return false;
         }
-        return false;
-    }
 
-    /**
-     * Check if JSON contains vector/embedding data
-     */
-    private static boolean hasVectorData(JsonNode json) {
-        if (json == null) return false;
+        try {
+            // Parse JSON with fastjson2
+            JSONObject json = JSON.parseObject(jsonString);
 
-        Iterator<String> fieldNames = json.fieldNames();
-        while (fieldNames.hasNext()) {
-            String fieldName = fieldNames.next().toLowerCase();
-            if (RAG_KEYWORDS.contains(fieldName)) {
-                JsonNode value = json.get(fieldName);
-                // Check if it's an array of numbers (typical for embeddings/vectors)
-                if (value.isArray() && value.size() > 0) {
-                    JsonNode first = value.get(0);
-                    if (first.isNumber() || (first.isArray() && first.size() > 0)) {
-                        return true;
-                    }
+            // Check each keyword from RAG_KEYWORDS
+            for (String keyword : RAG_KEYWORDS) {
+                if (json.containsKey(keyword)) {
+                    return true;  // Found RAG keyword as key
                 }
-                return true;
             }
-        }
 
-        // Recursively check nested objects
-        Iterator<JsonNode> elements = json.elements();
-        while (elements.hasNext()) {
-            JsonNode element = elements.next();
-            if (element.isObject() && hasVectorData(element)) {
-                return true;
-            }
+        } catch (Exception e) {
+            // Not valid JSON or parsing error
+            return false;
         }
 
         return false;
