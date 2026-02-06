@@ -55,7 +55,7 @@ public class Utils {
 
         OtpTestData otpTestData = fetchOtpTestData(node, 4);
         WorkflowNodeDetails workflowNodeDetails = node.getWorkflowNodeDetails();
-        loggerMaker.warnAndAddToDb("workflowNodeDetails: " + workflowNodeDetails.toString());
+        loggerMaker.warnAndAddToDb("OTP REQUEST [Node " + node.getId() + "]: " + workflowNodeDetails.toString());
         String uuid = workflowNodeDetails.getOtpRefUuid();
 
         if (otpTestData == null) {
@@ -76,7 +76,7 @@ public class Utils {
                 data.put("otp", otp);
                 data.put("otpText", otpTestData.getOtpText());
             }
-            body.put("body", data);
+            body.put("body", data); 
             resp.put("response", body);
             valuesMap.put(node.getId() + ".response.body.otp", otp);
             loggerMaker.warnAndAddToDb("OTP_NODE_RESPONSE [Node " + node.getId() + "]: " + resp.toString());
@@ -250,6 +250,7 @@ public class Utils {
     }
 
     public static LoginFlowResponse runLoginFlow(WorkflowTest workflowTest, AuthMechanism authMechanism, LoginFlowParams loginFlowParams) throws Exception {
+        loggerMaker.warnAndAddToDb("RUN_LOGIN_FLOW_STARTED");
         Graph graph = new Graph();
         graph.buildGraph(workflowTest);
 
@@ -262,9 +263,11 @@ public class Utils {
         }
         
         Map<String, Object> valuesMap = constructValueMap(loginFlowParams);
+        loggerMaker.warnAndAddToDb("VALUES_MAP_CONSTRUCTED: " + valuesMap.toString());
 
         int index = 0;
         for (Node node: nodes) {
+            loggerMaker.warnAndAddToDb("PROCESSING_NODE: " + node.getId());
             boolean allowAllStatusCodes = false;
             WorkflowTestResult.NodeResult nodeResult;
             try {
@@ -273,7 +276,7 @@ public class Utils {
                 }
                 nodeResult = processNode(node, valuesMap, allowAllStatusCodes, false, new ArrayList<>(), null, authMechanism);
             } catch (Exception e) {
-                ;
+                loggerMaker.warnAndAddToDb("ERROR_PROCESSING_NODE: " + node.getId() + " " + e.getMessage());
                 List<String> testErrors = new ArrayList<>();
                 testErrors.add("Error Processing Node In Login Flow " + e.getMessage());
                 nodeResult = new WorkflowTestResult.NodeResult("{}", false, testErrors);
@@ -287,6 +290,7 @@ public class Utils {
             responses.add(respString.toString());
             
             if (nodeResult.getErrors().size() > 0) {
+                loggerMaker.warnAndAddToDb("FAILED_TO_PROCESS_NODE: " + node.getId());
                 return new LoginFlowResponse(responses, "Failed to process node " + node.getId(), false);
             } else {
                 if (loginFlowParams != null && loginFlowParams.getFetchValueMap()) {
