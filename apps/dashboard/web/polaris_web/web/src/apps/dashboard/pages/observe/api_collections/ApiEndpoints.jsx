@@ -33,9 +33,10 @@ import IssuesApi from "../../issues/api"
 import SequencesFlow from "./SequencesFlow"
 import SwaggerDependenciesFlow from "./SwaggerDependenciesFlow"
 import { CATEGORY_API_SECURITY, getDashboardCategory, isCategory, mapLabel, isEndpointSecurityCategory } from "../../../../main/labelHelper"
-import AgentDiscoverGraph from "./AgentDiscoverGraph"
 import McpToolsGraph from "./McpToolsGraph"
 import { findTypeTag, TYPE_TAG_KEYS } from "../agentic/mcpClientHelper"
+import AgentDiscoverGraphWithDummyData from "./AgentDiscoveryGraphWithDummyData"
+import AgentDiscoverGraph from "./AgentDiscoverGraph"
 
 const headings = [
     {
@@ -1555,7 +1556,7 @@ function ApiEndpoints(props) {
             ] : showSwaggerDependenciesFlow ? [
                 <SwaggerDependenciesFlow key="swagger-dependencies-flow" apiCollectionId={apiCollectionId}  />
             ] : [
-                func.isDemoAccount() ? <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : null,
+                func.isDemoAccount() ? <AgentDiscoverGraphWithDummyData key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} />,
                 (!isCategory(CATEGORY_API_SECURITY)) ? <McpToolsGraph key="mcp-tools-graph" apiCollectionId={apiCollectionId} /> : null,
                 // Hide "Test your Endpoints" banner for Endpoint Security
                 (!isEndpointSecurityCategory() && (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)))) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null,

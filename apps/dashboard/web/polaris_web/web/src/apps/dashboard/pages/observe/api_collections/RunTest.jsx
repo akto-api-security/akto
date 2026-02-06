@@ -162,10 +162,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         } else {
             metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
         }
-        if (func.isDemoAccount()) {
-            let categoriesName = getCategoriesBasedOnDashboardCategory(dashboardCategory, localCategoryMap);
-            metaDataObj.subCategories = filterSubCategoriesBasedOnCategories(metaDataObj.subCategories, categoriesName);
-        }
+        let categoriesName = getCategoriesBasedOnDashboardCategory(dashboardCategory, localCategoryMap);
+        metaDataObj.subCategories = filterSubCategoriesBasedOnCategories(metaDataObj.subCategories, categoriesName);
         let categories = metaDataObj.categories
         categories = func.sortByCategoryPriority(categories, 'name')
         const categoriesNames = categories.map(category => category.name)

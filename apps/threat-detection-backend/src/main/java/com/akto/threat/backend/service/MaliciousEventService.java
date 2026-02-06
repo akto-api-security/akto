@@ -164,6 +164,7 @@ public class MaliciousEventService {
         .setEventType(maliciousEventType)
         .setLatestApiIp(evt.getLatestApiIp())
         .setCountry(evt.getMetadata().getCountryCode())
+        .setDestCountry(evt.getMetadata() != null && evt.getMetadata().getDestCountryCode() != null ? evt.getMetadata().getDestCountryCode() : "")
         .setCategory(evt.getCategory())
         .setSubCategory(evt.getSubCategory())
         .setRefId(refId)
@@ -387,6 +388,7 @@ public class MaliciousEventService {
                 .setId(evt.getId())
                 .setIp(evt.getLatestApiIp())
                 .setCountry(evt.getCountry())
+                .setDestCountry(evt.getDestCountry() != null ? evt.getDestCountry() : "")
                 .setPayload(evt.getLatestApiOrig())
                 .setEndpoint(evt.getLatestApiEndpoint())
                 .setMethod(evt.getLatestApiMethod().name())
@@ -404,6 +406,7 @@ public class MaliciousEventService {
                 .setHost(evt.getHost() != null ? evt.getHost() : "")
                 .setJiraTicketUrl(evt.getJiraTicketUrl() != null ? evt.getJiraTicketUrl() : "")
                 .setSeverity(evt.getSeverity() != null ? evt.getSeverity() : "HIGH")
+                .setSessionContext(evt.getSessionContext() != null && !evt.getSessionContext().isEmpty() ? evt.getSessionContext() : "")
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()

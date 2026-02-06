@@ -33,6 +33,8 @@ message ListMaliciousRequestsResponse {
       string host = 21;   // Host header from the request
       string jira_ticket_url = 22;  // URL of associated Jira ticket
       string severity = 23;  // Severity level: "CRITICAL", "HIGH", "MEDIUM", "LOW"
+      string dest_country = 24;  // Destination country code (where the request is going to)
+      string session_context = 25;  // JSON string containing session-based detection data
     }
     repeated MaliciousEvent malicious_events = 1;
     uint64 total = 2;
@@ -424,4 +426,22 @@ message FetchTopNDataResponse {
 
   repeated TopApiData top_apis = 1;
   repeated TopHostData top_hosts = 2;
+}
+
+message FetchThreatsForActorRequest {
+  string actor = 1;
+  uint32 limit = 2;
+}
+
+message FetchThreatsForActorResponse {
+  message ActivityData {
+    string url = 1;
+    string sub_category = 2;
+    uint64 detected_at = 3;
+    string severity = 4;
+    string method = 5;
+    string host = 6;
+    string metadata = 7;
+  }
+  repeated ActivityData activities = 1;
 }

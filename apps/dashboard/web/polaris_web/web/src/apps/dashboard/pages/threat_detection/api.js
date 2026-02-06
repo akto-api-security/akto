@@ -230,14 +230,14 @@ const threatDetectionRequests = {
             data: {}
         })
     },
-    addThreatActivityWebhookIntegration(webhookUrl, customHeaders, contextSources) {
+    addThreatActivityWebhookIntegration(webhookUrl, customHeaders, useGzip) {
         return request({
             url: '/api/addThreatActivityWebhookIntegration',
             method: 'post',
             data: {
                 webhookUrl: webhookUrl,
                 customHeaders: customHeaders || [],
-                ...(contextSources && contextSources.length > 0 ? { contextSources } : {})
+                useGzip: Boolean(useGzip)
             }
         })
     },
@@ -286,6 +286,13 @@ const threatDetectionRequests = {
             url: '/api/getIpReputationScore',
             method: 'post',
             data: { ipAddress }
+        })
+    },
+    fetchThreatsForActor(actor, limit = 20) {
+        return request({
+            url: '/api/fetchThreatsForActor',
+            method: 'post',
+            data: { actor, limit }
         })
     }
 }

@@ -378,7 +378,8 @@ function ThreatDetectionPage() {
             status: data.status || '',
             eventId: data.id || '',
             jiraTicketUrl: data.jiraTicketUrl || '',
-            severity: data.severity || ''
+            severity: data.severity || '',
+            sessionContext: data.sessionContext || ''
         });
 
         setShowDetails(true);
@@ -393,6 +394,7 @@ function ThreatDetectionPage() {
                 apiCollectionId: data.apiCollectionId,
                 templateId: data.filterId,
                 severity: data.severity || '',
+                sessionContext: data.sessionContext || ''
             },
             currentEventId: data.id || '',
             currentEventStatus: data.status || '',
@@ -491,6 +493,7 @@ function ThreatDetectionPage() {
               apiCollectionId: rowContext?.apiCollectionId,
               templateId: queryParams.filterId,
               severity: rowContext?.severity || '',
+              sessionContext: rowContext?.sessionContext || ''
             },
             currentEventId: rowContext?.eventId || '',
             currentEventStatus: queryParams.status || rowContext?.status || '',
@@ -717,7 +720,7 @@ function ThreatDetectionPage() {
                                                         setWebhookIntegrationData({
                                                             url: integ.url || '',
                                                             customHeaders: headers.length > 0 ? headers : [{ key: '', value: '' }],
-                                                            contextSources: Array.isArray(integ.contextSources) ? integ.contextSources : ['API'],
+                                                            useGzip: Boolean(integ.useGzip),
                                                             lastSyncTime: integ.lastSyncTime || 0
                                                         });
                                                     } else {
@@ -756,11 +759,11 @@ function ThreatDetectionPage() {
                 onClose={() => setWebhookIntegrationModalOpen(false)}
                 initialEndpoint={webhookIntegrationData?.url ?? ''}
                 initialHeaders={webhookIntegrationData?.customHeaders ?? [{ key: '', value: '' }]}
-                initialContextSources={webhookIntegrationData?.contextSources ?? ['API']}
+                initialUseGzip={webhookIntegrationData?.useGzip ?? false}
                 lastSyncTime={webhookIntegrationData?.lastSyncTime ?? 0}
                 onSave={async (config) => {
                     try {
-                        await api.addThreatActivityWebhookIntegration(config.webhookEndpoint, config.customHeaders, config.contextSources);
+                        await api.addThreatActivityWebhookIntegration(config.webhookEndpoint, config.customHeaders, config.useGzip);
                         func.setToast(true, false, 'Webhook integration saved');
                         setWebhookIntegrationModalOpen(false);
                     } catch (e) {
