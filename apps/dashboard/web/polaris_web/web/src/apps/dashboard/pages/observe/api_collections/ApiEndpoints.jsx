@@ -1141,7 +1141,7 @@ function ApiEndpoints(props) {
             label: 'View Schema',
             state: showSchemaView,
             setState: setShowSchemaView,
-            condition: window.USER_NAME?.indexOf("@akto.io") !== -1
+            condition: true 
         }
     ];
 
