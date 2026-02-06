@@ -45,7 +45,7 @@ public class Utils {
 
     public static WorkflowTestResult.NodeResult processOtpNode(Node node, Map<String, Object> valuesMap) {
 
-        loggerMaker.warn("processOtpNode started");
+        loggerMaker.warnAndAddToDb("PROCESS_OTP_NODE_STARTED");
 
         List<String> testErrors = new ArrayList<>();
         BasicDBObject resp = new BasicDBObject();
@@ -59,7 +59,7 @@ public class Utils {
         String uuid = workflowNodeDetails.getOtpRefUuid();
 
         if (otpTestData == null) {
-            loggerMaker.warnAndAddToDb("no otp data received for uuid" + uuid);
+            loggerMaker.warnAndAddToDb("NO OTP DATA RECEIVED FOR UUID: " + uuid);
             message = "otp data not received for uuid " + uuid;
             data.put("error", message);
             body.put("body", data);
