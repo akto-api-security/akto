@@ -1,20 +1,15 @@
 #!/usr/bin/env python3
-"""
-Cursor MCP After Hook - Response Ingestion via Akto HTTP Proxy API
-Logs MCP tool responses for monitoring and analysis.
-NOTE: Cursor afterMCPExecution hooks cannot block responses, only log/ingest.
-"""
 import json
 import logging
 import os
 import sys
 import urllib.request
-from typing import Any, Dict, Union
+from typing import Any, Dict, Tuple, Union
 
-from machine_id import get_machine_id
+from akto_machine_id import get_machine_id
 
 # Configure logging
-LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.cursor/mcp-logs"))
+LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.claude/akto/logs"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 LOG_PAYLOADS = os.getenv("LOG_PAYLOADS", "false").lower() == "true"
 
@@ -41,16 +36,16 @@ MODE = os.getenv("MODE", "argus").lower()
 AKTO_DATA_INGESTION_URL = os.getenv("AKTO_DATA_INGESTION_URL")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
-AKTO_CONNECTOR = "claude_code_cli" # todo: update connector name to cursor
+AKTO_CONNECTOR = "claude_code_cli"
 
-# Configure API_URL based on mode
+# Configure CLAUDE_API_URL based on mode
 if MODE == "atlas":
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
-    API_URL = f"https://{device_id}.cursor.ai-agent" if device_id else "https://api.anthropic.com"
-    logger.info(f"MODE: {MODE}, Device ID: {device_id}, API_URL: {API_URL}")
+    CLAUDE_API_URL = f"https://{device_id}.ai-agent.claudecli" if device_id else "https://api.anthropic.com"
+    logger.info(f"MODE: {MODE}, Device ID: {device_id}, CLAUDE_API_URL: {CLAUDE_API_URL}")
 else:
-    API_URL = os.getenv("API_URL", "https://api.anthropic.com")
-    logger.info(f"MODE: {MODE}, API_URL: {API_URL}")
+    CLAUDE_API_URL = os.getenv("CLAUDE_API_URL", "https://api.anthropic.com")
+    logger.info(f"MODE: {MODE}, CLAUDE_API_URL: {CLAUDE_API_URL}")
 
 
 def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
@@ -100,34 +95,15 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         raise
 
 
-def extract_mcp_server_name(input_data: Dict[str, Any]) -> str:
-    """Extract MCP server identifier from Cursor hook input."""
-    # Priority: server > url (extract domain) > command > tool_name prefix > default
-    if server := input_data.get("server"):
-        return server
-    if url := input_data.get("url"):
-        # Extract domain from URL
-        return url.replace("https://", "").replace("http://", "").split("/")[0]
-    if command := input_data.get("command"):
-        return command
-    if tool_name := input_data.get("tool_name", ""):
-        if tool_name.startswith("mcp__"):
-            parts = tool_name.split("__")
-            if len(parts) > 1:
-                return parts[1]
-    return "cursor-unknown"
-
-
-def build_ingestion_payload(tool_input: str, result_json: str, mcp_server_name: str) -> Dict[str, Any]:
-    """Build the request body for data ingestion."""
+def build_ingestion_payload(user_prompt: str, response_text: str) -> Dict[str, Any]:
     # Build tags based on mode
     tags = {"gen-ai": "Gen AI"}
     if MODE == "atlas":
-        tags["ai-agent"] = "cursor"
+        tags["ai-agent"] = "claudecli"
         tags["source"] = "ENDPOINT"
 
     return {
-        "url": API_URL,
+        "url": CLAUDE_API_URL,
         "path": "/v1/messages",
         "request": {
             "method": "POST",
@@ -135,16 +111,17 @@ def build_ingestion_payload(tool_input: str, result_json: str, mcp_server_name: 
                 "content-type": "application/json"
             },
             "body": {
-                "tool_input": tool_input
+                "messages": [{"role": "user", "content": user_prompt}]
             },
             "queryParams": {},
             "metadata": {
-                "tag": tags,
-                "mcp_server_name": mcp_server_name
+                "tag": tags
             }
         },
         "response": {
-            "body": json.loads(result_json) if result_json else {},
+            "body": {
+                "choices": [{"message": {"content": response_text}}]
+            },
             "headers": {
                 "content-type": "application/json"
             },
@@ -154,17 +131,54 @@ def build_ingestion_payload(tool_input: str, result_json: str, mcp_server_name: 
     }
 
 
-def send_ingestion_data(tool_input: str, result_json: str, mcp_server_name: str):
-    if not tool_input.strip() or not result_json.strip():
+def get_last_interaction(transcript_path: str) -> tuple[str, str]:
+    if not os.path.exists(transcript_path):
+        return "", ""
+
+    user_prompt, assistant_response = "", ""
+    
+    try:
+        with open(transcript_path, 'r') as f:
+            for line in f:
+                try:
+                    entry = json.loads(line)
+                    entry_type = entry.get('type')
+                    if entry_type not in ('user', 'assistant'):
+                        continue
+                    
+                    content = entry.get('message', {}).get('content', '')
+                    text = content if isinstance(content, str) else "".join(
+                        block.get('text', '') for block in content if block.get('type') == 'text'
+                    )
+                    
+                    if entry_type == 'user':
+                        user_prompt = text
+                    else:
+                        assistant_response = text
+                        
+                except json.JSONDecodeError:
+                    continue
+                    
+        return user_prompt, assistant_response
+    except Exception as e:
+        logger.error(f"Error reading transcript: {e}")
+        return "", ""
+
+
+def send_ingestion_data(user_prompt: str, response_text: str):
+    if not user_prompt.strip() or not response_text.strip():
         return
 
-    logger.info(f"Ingesting response data for MCP server: {mcp_server_name}")
+    logger.info("Ingesting conversation data")
     if LOG_PAYLOADS:
-        logger.debug(f"Tool input: {tool_input[:500]}...")
-        logger.debug(f"Result: {result_json[:500]}...")
+        logger.debug(f"Prompt: {user_prompt[:200]}...")
+        logger.debug(f"Response: {response_text[:200]}...")
+    else:
+        logger.info(f"Prompt preview: {user_prompt[:100]}...")
+        logger.info(f"Response preview: {response_text[:100]}...")
 
     try:
-        request_body = build_ingestion_payload(tool_input, result_json, mcp_server_name)
+        request_body = build_ingestion_payload(user_prompt, response_text)
         post_payload_json(
             build_http_proxy_url(
                 guardrails=not AKTO_SYNC_MODE,
@@ -172,10 +186,10 @@ def send_ingestion_data(tool_input: str, result_json: str, mcp_server_name: str)
             ),
             request_body,
         )
-        logger.info(f"Data ingestion successful for {mcp_server_name}")
+        logger.info("Conversation ingestion successful")
 
     except Exception as e:
-        logger.error(f"Ingestion error for {mcp_server_name}: {e}")
+        logger.error(f"Ingestion error: {e}")
 
 
 def main():
@@ -183,30 +197,29 @@ def main():
 
     try:
         input_data = json.load(sys.stdin)
-    except json.JSONDecodeError as e:
-        logger.error(f"Invalid JSON input: {e}")
-        # After hooks must return empty JSON
-        print(json.dumps({}))
+        transcript_path = input_data.get("transcript_path")
+
+        if not transcript_path:
+            logger.info("No transcript path provided")
+            sys.exit(0)
+
+        transcript_path = os.path.expanduser(transcript_path)
+        logger.info(f"Reading transcript from: {transcript_path}")
+
+        user_prompt, response_text = get_last_interaction(transcript_path)
+
+        if not user_prompt or not response_text:
+            logger.info("No complete interaction found in transcript")
+            sys.exit(0)
+
+        logger.info(f"Extracted interaction - Prompt: {len(user_prompt)} chars, Response: {len(response_text)} chars")
+        send_ingestion_data(user_prompt, response_text)
+
+    except Exception as e:
+        logger.error(f"Main error: {e}")
         sys.exit(0)
 
-    # Extract tool_input and result_json
-    tool_input = json.dumps(input_data.get("tool_input", {}))
-    result_json = input_data.get("result_json", "{}")
-    mcp_server_name = extract_mcp_server_name(input_data)
-
-    logger.info(f"Processing response from MCP server: {mcp_server_name}")
-
-    if not tool_input or tool_input == "{}" or not result_json or result_json == "{}":
-        logger.info("Empty input or result, skipping ingestion")
-        print(json.dumps({}))
-        sys.exit(0)
-
-    # Send data for ingestion
-    send_ingestion_data(tool_input, result_json, mcp_server_name)
-
-    # After hooks must return empty JSON (cannot modify/block responses)
-    logger.info("Response ingestion completed")
-    print(json.dumps({}))
+    logger.info("Hook execution completed")
     sys.exit(0)
 
 

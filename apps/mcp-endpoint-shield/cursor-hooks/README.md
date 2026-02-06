@@ -1,6 +1,6 @@
-# Akto Guardrails for Cursor MCP
+# Akto Guardrails for Cursor Agent
 
-Validate MCP tool execution requests against Akto AI Guardrails before they're executed in Cursor.
+Comprehensive validation and monitoring for Cursor agent interactions, including both chat conversations and MCP tool executions.
 
 ## Setup
 
@@ -12,9 +12,17 @@ cd ~/.cursor/hooks/akto
 ```
 
 Copy the following files to this directory:
-- `validate-mcp-request.py`
-- `validate-mcp-response.py`
-- `machine_id.py`
+
+**For Chat Monitoring:**
+- `akto-validate-chat-prompt.py` - Validates user prompts before submission
+- `akto-validate-chat-response.py` - Ingests agent responses for analysis
+
+**For MCP Tool Monitoring:**
+- `akto-validate-mcp-request.py` - Validates MCP tool requests before execution
+- `akto-validate-mcp-response.py` - Ingests MCP tool responses for analysis
+
+**Shared:**
+- `akto-machine-id.py` - Device ID generation utility
 
 ### 2. Configure environment
 
@@ -28,7 +36,7 @@ export MODE="argus" # Options: "argus" (default) or "atlas"
 export DEVICE_ID="" # Optional: Custom device ID for atlas mode (auto-generated if not provided)
 
 # Optional logging configuration
-export LOG_DIR="~/.cursor/mcp-logs" # Default: ~/.cursor/mcp-logs
+export LOG_DIR="~/.cursor/akto/mcp-logs" # Default: ~/.cursor/akto/mcp-logs (MCP tools), ~/.cursor/akto/chat-logs (chat)
 export LOG_LEVEL="INFO" # Options: DEBUG, INFO, WARNING, ERROR (default: INFO)
 export LOG_PAYLOADS="false" # Set to "true" to log request/response payloads (default: false)
 ```
@@ -36,7 +44,7 @@ export LOG_PAYLOADS="false" # Set to "true" to log request/response payloads (de
 #### Mode Configuration
 
 - **argus** (default): Standard mode using configured `API_URL` or defaults to `https://api.anthropic.com`
-- **atlas**: Uses device-specific routing with format `https://{deviceId}.cursor.ai-agent` and includes additional metadata tags:
+- **atlas**: Uses device-specific routing with format `https://{deviceId}.ai-agent.cursor` and includes additional metadata tags:
   - `ai-agent=cursor`
   - `source=ENDPOINT`
 
@@ -59,19 +67,43 @@ Edit or create `~/.cursor/hooks.json`:
 {
   "version": 1,
   "hooks": {
+    "beforeSubmitPrompt": [
+      {
+        "command": "python3 ~/.cursor/hooks/akto/akto-validate-chat-prompt.py",
+        "type": "command",
+        "timeout": 10
+      }
+    ],
+    "afterAgentResponse": [
+      {
+        "command": "python3 ~/.cursor/hooks/akto/akto-validate-chat-response.py",
+        "type": "command",
+        "timeout": 10
+      }
+    ],
     "beforeMCPExecution": [
       {
-        "command": "python3 ~/.cursor/hooks/akto/validate-mcp-request.py"
+        "command": "python3 ~/.cursor/hooks/akto/akto-validate-mcp-request.py",
+        "type": "command",
+        "timeout": 10
       }
     ],
     "afterMCPExecution": [
       {
-        "command": "python3 ~/.cursor/hooks/akto/validate-mcp-response.py"
+        "command": "python3 ~/.cursor/hooks/akto/akto-validate-mcp-response.py",
+        "type": "command",
+        "timeout": 10
       }
     ]
   }
 }
 ```
+
+**Hook Types:**
+- `beforeSubmitPrompt` - Intercepts ALL user chat prompts before submission
+- `afterAgentResponse` - Observes ALL agent chat responses after generation
+- `beforeMCPExecution` - Intercepts MCP tool calls only
+- `afterMCPExecution` - Observes MCP tool results only
 
 ### 4. Restart Cursor
 
@@ -79,14 +111,38 @@ Close and reopen Cursor for the hooks to take effect.
 
 ## How It Works
 
-### Before Execution (validate-mcp-request.py)
+### Chat Hooks
 
-- Intercepts MCP tool execution requests
-- Validates tool inputs against Akto guardrails
-- Blocks requests that violate security policies
-- Logs blocked requests for monitoring
+#### Before Submit (akto-validate-chat-prompt.py)
+- **Trigger:** `beforeSubmitPrompt` - Before user prompt is sent
+- **Input:** `{"prompt": "text", "attachments": [...]}`
+- **Actions:**
+  - Validates user prompt against Akto guardrails
+  - Blocks prompts that violate security policies
+  - Logs validation decisions
+- **Output:** `{"continue": true/false, "user_message": "reason"}`
+- **Can Block:** ✅ Yes
 
-**Response Format:**
+#### After Response (akto-validate-chat-response.py)
+- **Trigger:** `afterAgentResponse` - After agent generates response
+- **Input:** `{"text": "agent response"}`
+- **Actions:**
+  - Captures agent responses for monitoring
+  - Sends to Akto for ingestion and analysis
+  - Logs response metrics
+- **Output:** `{}` (observational only)
+- **Can Block:** ❌ No (observational only)
+
+### MCP Tool Hooks
+
+#### Before Execution (akto-validate-mcp-request.py)
+- **Trigger:** `beforeMCPExecution` - Before MCP tool execution
+- **Input:** `{"server": "...", "tool_name": "...", "arguments": {...}}`
+- **Actions:**
+  - Validates tool inputs against Akto guardrails
+  - Blocks requests that violate security policies
+  - Logs blocked requests for monitoring
+- **Output:**
 ```json
 {
   "permission": "allow|deny|ask",
@@ -94,15 +150,30 @@ Close and reopen Cursor for the hooks to take effect.
   "agent_message": "Message shown to agent (if denied)"
 }
 ```
+- **Can Block:** ✅ Yes
 
-### After Execution (validate-mcp-response.py)
+#### After Execution (akto-validate-mcp-response.py)
+- **Trigger:** `afterMCPExecution` - After MCP tool execution
+- **Input:** `{"server": "...", "tool_name": "...", "result": {...}}`
+- **Actions:**
+  - Captures MCP tool execution responses
+  - Sends request-response pairs to Akto for ingestion
+  - Logs alerts for policy violations
+- **Output:** `{}` (observational only)
+- **Can Block:** ❌ No (Cursor limitation)
 
-- Captures MCP tool execution responses
-- Sends request-response pairs to Akto for ingestion and analysis
-- Cannot block responses (Cursor limitation)
-- Logs alerts for policy violations
+### Coverage Comparison
 
-**Note:** The after-execution hook only logs and ingests data. It cannot prevent the response from being delivered to the agent.
+| Hook Type | Scope | Can Block | Use Case |
+|-----------|-------|-----------|----------|
+| Chat Hooks | All user prompts & responses | Prompts only | Monitor all conversations |
+| MCP Hooks | Tool executions only | Requests only | Monitor external API calls |
+
+**With both hook types enabled, you get:**
+- ✅ Complete conversation history
+- ✅ All tool execution tracking
+- ✅ Comprehensive security validation
+- ✅ Full audit trail
 
 ## Configuration Options
 
@@ -114,7 +185,7 @@ Close and reopen Cursor for the hooks to take effect.
 | `MODE` | `argus` | Operation mode: `argus` or `atlas` |
 | `DEVICE_ID` | (auto-generated) | Custom device ID for atlas mode |
 | `API_URL` | `https://api.anthropic.com` | API endpoint URL (argus mode only) |
-| `LOG_DIR` | `~/.cursor/mcp-logs` | Directory for log files |
+| `LOG_DIR` | `~/.cursor/akto/mcp-logs` or `~/.cursor/akto/chat-logs` | Directory for log files (auto-set per hook type) |
 | `LOG_LEVEL` | `INFO` | Logging verbosity: DEBUG, INFO, WARNING, ERROR |
 | `LOG_PAYLOADS` | `false` | Log request/response payloads (privacy-sensitive) |
 
@@ -137,20 +208,28 @@ If the Akto service is unavailable:
 
 Hook execution logs are written to persistent files:
 
-**Log File Locations** (default: `~/.cursor/mcp-logs/`):
-- `validate-request.log` - Before hook (request validation) logs
-- `validate-response.log` - After hook (response ingestion) logs
+**Log File Locations:**
+
+*Chat Hooks* (default: `~/.cursor/akto/chat-logs/`):
+- `akto-validate-chat-prompt.log` - Chat prompt validation logs
+- `akto-validate-chat-response.log` - Chat response ingestion logs
+
+*MCP Tool Hooks* (default: `~/.cursor/akto/mcp-logs/`):
+- `akto-validate-request.log` - MCP request validation logs
+- `akto-validate-response.log` - MCP response ingestion logs
 
 **View logs in real-time:**
 ```bash
-# Watch request validation logs
-tail -f ~/.cursor/mcp-logs/validate-request.log
+# Watch chat hooks
+tail -f ~/.cursor/akto/chat-logs/akto-validate-chat-prompt.log
+tail -f ~/.cursor/akto/chat-logs/akto-validate-chat-response.log
 
-# Watch response ingestion logs
-tail -f ~/.cursor/mcp-logs/validate-response.log
+# Watch MCP hooks
+tail -f ~/.cursor/akto/mcp-logs/akto-validate-request.log
+tail -f ~/.cursor/akto/mcp-logs/akto-validate-response.log
 
-# View both logs together
-tail -f ~/.cursor/mcp-logs/*.log
+# View all logs together
+tail -f ~/.cursor/akto/chat-logs/*.log ~/.cursor/akto/mcp-logs/*.log
 ```
 
 **Log Format:**
@@ -178,11 +257,11 @@ tail -f ~/.cursor/mcp-logs/*.log
    - Response status codes
    - Response sizes
 
-3. **Guardrails Decisions** (validate-mcp-request.py)
+3. **Guardrails Decisions** (akto-validate-mcp-request.py)
    - ALLOWED/DENIED with reasons
    - MCP tool input previews
 
-4. **Data Ingestion** (validate-mcp-response.py)
+4. **Data Ingestion** (akto-validate-mcp-response.py)
    - Ingestion attempts and results
    - Tool input/result previews
 

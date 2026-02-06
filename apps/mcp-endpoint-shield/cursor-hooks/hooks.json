@@ -1,14 +1,32 @@
 {
   "version": 1,
   "hooks": {
+    "beforeSubmitPrompt": [
+      {
+        "command": "python3 ~/.cursor/hooks/akto/akto-validate-chat-prompt.py",
+        "type": "command",
+        "timeout": 10
+      }
+    ],
+    "afterAgentResponse": [
+      {
+        "command": "python3 ~/.cursor/hooks/akto/akto-validate-chat-response.py",
+        "type": "command",
+        "timeout": 10
+      }
+    ],
     "beforeMCPExecution": [
       {
-        "command": "python3 ~/.cursor/hooks/akto/validate-mcp-request.py"
+        "command": "python3 ~/.cursor/hooks/akto/akto-validate-mcp-request.py",
+        "type": "command",
+        "timeout": 10
       }
     ],
     "afterMCPExecution": [
       {
-        "command": "python3 ~/.cursor/hooks/akto/validate-mcp-response.py"
+        "command": "python3 ~/.cursor/hooks/akto/akto-validate-mcp-response.py",
+        "type": "command",
+        "timeout": 10
       }
     ]
   }

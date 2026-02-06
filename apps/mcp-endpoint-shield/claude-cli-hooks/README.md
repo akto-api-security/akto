@@ -12,9 +12,9 @@ cd ~/.claude/hooks
 ```
 
 Copy the following files to this directory:
-- `validate-prompt.py`
-- `validate-response.py`
-- `machine_id.py`
+- `akto-validate-prompt.py`
+- `akto-validate-response.py`
+- `akto-machine-id.py`
 
 ### 2. Configure environment
 
@@ -28,7 +28,7 @@ export MODE="argus" # Options: "argus" (default) or "atlas"
 export DEVICE_ID="" # Optional: Custom device ID for atlas mode (auto-generated if not provided)
 
 # Optional logging configuration
-export LOG_DIR="~/.claude/logs" # Default: ~/.claude/logs
+export LOG_DIR="~/.claude/akto/logs" # Default: ~/.claude/akto/logs
 export LOG_LEVEL="INFO" # Options: DEBUG, INFO, WARNING, ERROR (default: INFO)
 export LOG_PAYLOADS="false" # Set to "true" to log request/response payloads (default: false)
 ```
@@ -36,8 +36,8 @@ export LOG_PAYLOADS="false" # Set to "true" to log request/response payloads (de
 #### Mode Configuration
 
 - **argus** (default): Standard mode using configured `CLAUDE_API_URL` or defaults to `https://api.anthropic.com`
-- **atlas**: Uses device-specific routing with format `https://{deviceId}.claudecli.ai-agent` and includes additional metadata tags:
-  - `ai-agent=cursor`
+- **atlas**: Uses device-specific routing with format `https://{deviceId}.ai-agent.claudecli` and includes additional metadata tags:
+  - `ai-agent=claudecli`
   - `source=ENDPOINT`
 
 **Device ID for Atlas Mode:**
@@ -63,7 +63,7 @@ Edit `~/.claude/settings.json`:
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "python3 ~/.claude/hooks/validate-prompt.py",
+                        "command": "python3 ~/.claude/hooks/akto-validate-prompt.py",
                         "timeout": 10
                     }
                 ]
@@ -74,7 +74,7 @@ Edit `~/.claude/settings.json`:
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "python3 ~/.claude/hooks/validate-response.py",
+                        "command": "python3 ~/.claude/hooks/akto-validate-response.py",
                         "timeout": 10
                     }
                 ]
@@ -92,7 +92,7 @@ claude
 
 ## How It Works
 
-### Before Prompt Submit (validate-prompt.py)
+### Before Prompt Submit (akto-validate-prompt.py)
 
 - Intercepts prompts before they're sent to Claude
 - Validates prompts against Akto guardrails
@@ -107,7 +107,7 @@ claude
 }
 ```
 
-### After Response (validate-response.py)
+### After Response (akto-validate-response.py)
 
 - Captures completed prompt-response pairs
 - Sends conversation data to Akto for ingestion and analysis
@@ -125,7 +125,7 @@ claude
 | `MODE` | `argus` | Operation mode: `argus` or `atlas` |
 | `DEVICE_ID` | (auto-generated) | Custom device ID for atlas mode |
 | `CLAUDE_API_URL` | `https://api.anthropic.com` | Claude API URL (argus mode only) |
-| `LOG_DIR` | `~/.claude/logs` | Directory for log files |
+| `LOG_DIR` | `~/.claude/akto/logs` | Directory for log files |
 | `LOG_LEVEL` | `INFO` | Logging verbosity: DEBUG, INFO, WARNING, ERROR |
 | `LOG_PAYLOADS` | `false` | Log request/response payloads (privacy-sensitive) |
 
@@ -133,20 +133,20 @@ claude
 
 Hook execution logs are written to persistent files:
 
-**Log File Locations** (default: `~/.claude/logs/`):
-- `validate-prompt.log` - Before hook (prompt validation) logs
-- `validate-response.log` - After hook (response ingestion) logs
+**Log File Locations** (default: `~/.claude/akto/logs/`):
+- `akto-validate-prompt.log` - Before hook (prompt validation) logs
+- `akto-validate-response.log` - After hook (response ingestion) logs
 
 **View logs in real-time:**
 ```bash
 # Watch prompt validation logs
-tail -f ~/.claude/logs/validate-prompt.log
+tail -f ~/.claude/akto/logs/akto-validate-prompt.log
 
 # Watch response ingestion logs
-tail -f ~/.claude/logs/validate-response.log
+tail -f ~/.claude/akto/logs/akto-validate-response.log
 
 # View both logs together
-tail -f ~/.claude/logs/*.log
+tail -f ~/.claude/akto/logs/*.log
 ```
 
 **Log Format:**
@@ -196,7 +196,7 @@ tail -f ~/.claude/logs/*.log
 2. Check that Python 3 is available: `python3 --version`
 3. Ensure environment variables are set: `echo $AKTO_DATA_INGESTION_URL`
 4. Check file permissions: `chmod +x ~/.claude/hooks/*.py`
-5. Check logs for errors: `tail -f ~/.claude/logs/*.log`
+5. Check logs for errors: `tail -f ~/.claude/akto/logs/*.log`
 
 ### Service unavailable errors
 
@@ -206,7 +206,7 @@ If the Akto service is unavailable:
 
 Check logs to see API call failures:
 ```bash
-grep "API CALL FAILED" ~/.claude/logs/*.log
+grep "API CALL FAILED" ~/.claude/akto/logs/*.log
 ```
 
 ### Debug logging
