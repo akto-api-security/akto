@@ -2,6 +2,7 @@ package com.akto.threat.detection.tasks;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -542,19 +543,18 @@ public class MaliciousTrafficDetectorTask implements Task {
 
       // Evaluate filter first (ignore and filter are independent conditions)
       // SchemaConform check is disabled
-      if(Context.accountId.get() == 1758179941 && apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
+      List<Integer> accountIds = Arrays.asList(1758179941, 1763355072);
+      if(accountIds.contains(Context.accountId.get()) && apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
         logger.debug("SchemaConform filter found for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
-        vulnerable = handleSchemaConformFilter(responseParam, apiInfoKey, vulnerable); 
+        // vulnerable = handleSchemaConformFilter(responseParam, apiInfoKey, vulnerable); 
         
-        // String apiSchema = getApiSchema(apiCollectionId);
+        String apiSchema = getApiSchema(apiCollectionId);
 
-        // if (apiSchema == null || apiSchema.isEmpty()) {
+        if (apiSchema == null || apiSchema.isEmpty()) {
+          continue;
+        }
 
-        //   continue;
-
-        // }
-
-        // vulnerable = RequestValidator.validate(responseParam, apiSchema, apiInfoKey.toString());
+        vulnerable = RequestValidator.validate(responseParam, apiSchema, apiInfoKey.toString());
         hasPassedFilter = vulnerable != null && !vulnerable.isEmpty();
 
       }else {
