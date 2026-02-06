@@ -48,9 +48,9 @@ public class ApiNodeExecutor extends NodeExecutor {
 
         String url = request.getUrl();
         valuesMap.put(nodeId + ".request.url", url);
-
         Utils.populateValuesMap(valuesMap, request.getBody(), nodeId, request.getHeaders(),
                 true, request.getQueryParams());
+        loggerMaker.warnAndAddToDb("VALUES_MAP_AFTER_POPULATE: " + valuesMap.toString());
 
         OriginalHttpResponse response = null;
         int maxRetries = type.equals(WorkflowNodeDetails.Type.POLL) ? workflowNodeDetails.getMaxPollRetries() : 1;
@@ -90,8 +90,8 @@ public class ApiNodeExecutor extends NodeExecutor {
 
                 String statusKey =   nodeId + "." + "response" + "." + "status_code";
                 valuesMap.put(statusKey, statusCode);
-
                 Utils.populateValuesMap(valuesMap, response.getBody(), nodeId, response.getHeaders(), false, null);
+                loggerMaker.warnAndAddToDb("VALUES_MAP_AFTER_POPULATE: " + valuesMap.toString());
                 if (!allowAllStatusCodes && (statusCode >= 400)) {
                     testErrors.add("process node failed with status code " + statusCode);
                 }
