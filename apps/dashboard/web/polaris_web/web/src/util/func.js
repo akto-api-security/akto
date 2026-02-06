@@ -2351,7 +2351,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
 
    isWhiteListedOrganization(){
       return window.USER_NAME.indexOf("@akto.io")>0 || window.USER_NAME.indexOf("@lab.morganstanley.com")>0
-       || window.USER_NAME.indexOf("@blinkrx.com")>0 || window.USER_NAME.indexOf("@testmuai.com")> 0;
+       || window.USER_NAME.indexOf("@blinkrx.com")>0 || window.USER_NAME.indexOf("@testmuai.com")> 0 || window.USER_NAME.indexOf("@aktosecurity.com")>0 ;
     },
 
     isTempAccount(){
