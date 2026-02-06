@@ -426,3 +426,13 @@ message FetchTopNDataResponse {
   repeated TopApiData top_apis = 1;
   repeated TopHostData top_hosts = 2;
 }
+
+message GetThreatActorsRequest {
+  uint32 start_ts = 1;
+  uint32 end_ts = 2;
+}
+
+message GetThreatActorsResponse {
+  uint32 total_actors = 1;
+  uint32 critical_actors = 2;
+}

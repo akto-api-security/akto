@@ -108,6 +108,8 @@ public class ThreatUtils {
         requiredIndexes.put("contextSource_1_detectedAt_-1", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.descending("detectedAt")));
         requiredIndexes.put("idx_host", Indexes.ascending("host"));
         requiredIndexes.put("idx_detected_context_actor_country", Indexes.compoundIndex(Indexes.descending("detectedAt"), Indexes.ascending("contextSource"), Indexes.ascending("filterId"), Indexes.ascending("actor"), Indexes.ascending("country")));
+        requiredIndexes.put("idx_detectedAt_actor_severity", Indexes.compoundIndex(Indexes.ascending("detectedAt"), Indexes.ascending("actor"), Indexes.ascending("severity")));
+        requiredIndexes.put("successfulExploit_1", Indexes.ascending("successfulExploit"));
 
         for (Map.Entry<String, Bson> entry : requiredIndexes.entrySet()) {
             if (!existingIndexes.contains(entry.getKey())) {

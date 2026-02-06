@@ -15,6 +15,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountResponse.ActorsCount;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.GetThreatActorsResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
 import java.util.List;
@@ -54,6 +55,9 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
 
   @Getter List<TopApiData> topApis;
   @Getter List<TopHostData> topHosts;
+
+  @Getter int totalThreatActors;
+  @Getter int criticalThreatActors;
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -367,6 +371,40 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
                         smr.getHost(),
                         smr.getAttacks()
                     )).collect(Collectors.toList());
+              });
+    } catch (Exception e) {
+      e.printStackTrace();
+      return ERROR.toUpperCase();
+    }
+
+    return SUCCESS.toUpperCase();
+  }
+
+  public String getThreatActors() {
+    HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_threat_actors", this.getBackendUrl()));
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
+
+    Map<String, Object> body = new HashMap<String, Object>() {
+      {
+        put("start_ts", startTs);
+        put("end_ts", endTs);
+      }
+    };
+    String msg = objectMapper.valueToTree(body).toString();
+
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      String responseBody = EntityUtils.toString(resp.getEntity());
+
+      ProtoMessageUtils.<GetThreatActorsResponse>toProtoMessage(
+        GetThreatActorsResponse.class, responseBody)
+          .ifPresent(
+              m -> {
+                this.totalThreatActors = m.getTotalActors();
+                this.criticalThreatActors = m.getCriticalActors();
               });
     } catch (Exception e) {
       e.printStackTrace();

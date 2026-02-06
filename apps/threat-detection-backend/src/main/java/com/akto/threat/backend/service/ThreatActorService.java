@@ -23,6 +23,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorResponse.ActivityData;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.GetThreatActorsResponse;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.utils.ThreatUtils;
@@ -836,6 +837,37 @@ public class ThreatActorService {
     return FetchTopNDataResponse.newBuilder()
         .addAllTopApis(topApis)
         .addAllTopHosts(topHosts)
+        .build();
+  }
+
+  public GetThreatActorsResponse getThreatActors(String accountId, long startTs, long endTs) {
+    List<Document> pipeline = new ArrayList<>();
+
+    Document match = new Document("detectedAt", new Document("$gte", startTs).append("$lte", endTs));
+    pipeline.add(new Document("$match", match));
+
+    pipeline.add(new Document("$group",new Document("_id", "$actor").append("severities", new Document("$addToSet", "$severity"))));
+
+    pipeline.add(new Document("$project",new Document("hasCritical", new Document("$in", Arrays.asList("CRITICAL", "$severities")))));
+
+    pipeline.add(new Document("$group",new Document("_id", null).append("totalActors", new Document("$sum", 1)).append("criticalActors", new Document("$sum", new Document("$cond", Arrays.asList("$hasCritical", 1, 0))))));
+
+    pipeline.add(new Document("$project",new Document("_id", 0).append("totalActors", 1).append("criticalActors", 1)));
+
+    int totalActors = 0;
+    int criticalActors = 0;
+
+    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {
+      if (cursor.hasNext()) {
+        Document doc = cursor.next();
+        totalActors = doc.getInteger("totalActors", 0);
+        criticalActors = doc.getInteger("criticalActors", 0);
+      }
+    }
+
+    return GetThreatActorsResponse.newBuilder()
+        .setTotalActors(totalActors)
+        .setCriticalActors(criticalActors)
         .build();
   }
 }
