@@ -65,6 +65,7 @@ public class Utils {
             body.put("body", data);
             resp.put("response", body);
             testErrors.add(message);
+            loggerMaker.warnAndAddToDb("VALUES_MAP_AFTER_OTP_NODE_ERROR: " + valuesMap.toString());
             return new WorkflowTestResult.NodeResult(resp.toString(), false, testErrors);
         }
         try {
@@ -79,6 +80,7 @@ public class Utils {
             body.put("body", data); 
             resp.put("response", body);
             valuesMap.put(node.getId() + ".response.body.otp", otp);
+            loggerMaker.warnAndAddToDb("VALUES_MAP_AFTER_OTP_EXTRACTION: " + valuesMap.toString());
             loggerMaker.warnAndAddToDb("OTP_NODE_RESPONSE [Node " + node.getId() + "]: " + resp.toString());
         } catch(Exception e) {
             message ="Error extracting otp data for uuid " + uuid + " error " + e.getMessage();
@@ -87,10 +89,12 @@ public class Utils {
             body.put("body", data);
             resp.put("response", body);
             testErrors.add(message);
+            loggerMaker.warnAndAddToDb("VALUES_MAP_AFTER_OTP_NODE_EXCEPTION: " + valuesMap.toString());
             loggerMaker.warnAndAddToDb("OTP_NODE_RESPONSE [Node " + node.getId() + "]: " + resp.toString());
             return new WorkflowTestResult.NodeResult(resp.toString(), false, testErrors);
         }
         loggerMaker.warnAndAddToDb("OTP_NODE_RESPONSE [Node " + node.getId() + "]: " + resp.toString());
+        loggerMaker.warnAndAddToDb("VALUES_MAP_AFTER_OTP_NODE: " + valuesMap.toString());
         return new WorkflowTestResult.NodeResult(resp.toString(), false, testErrors);
     }
 
