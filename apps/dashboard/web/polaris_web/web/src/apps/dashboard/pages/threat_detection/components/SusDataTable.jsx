@@ -54,14 +54,19 @@ const getHeaders = () => {
     });
   }
 
-  baseHeaders.push(
-    {
-      text: "Filter",
-      value: "filterId",
-      title: labelMap[PersistStore.getState().dashboardCategory]["Attack type"],
-    });
+  baseHeaders.push({
+    text: "Filter",
+    value: "filterId",
+    title: labelMap[PersistStore.getState().dashboardCategory]["Attack type"],
+  });
 
+  // Only show detection type for Agentic Security (Argus) and Endpoint Security (Atlas), not for API Security
   if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
+    baseHeaders.push({
+      text: "Detection Type",
+      value: "detectionType",
+      title: "Detection Type",
+    });
     baseHeaders.push({
       text: "Rule Violated",
       value: "ruleViolated",
@@ -570,6 +575,11 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
                       </div>
         ),
         ...((isAgenticSecurityCategory() || isEndpointSecurityCategory()) && {
+          detectionType: (
+            <Badge status={isSessionBased ? 'info' : 'default'}>
+              {isSessionBased ? 'Session' : 'Single Prompt'}
+            </Badge>
+          ),
           ruleViolated: extractRuleViolated(x?.metadata)
         }),
         compliance: complianceList.length > 0 ? (

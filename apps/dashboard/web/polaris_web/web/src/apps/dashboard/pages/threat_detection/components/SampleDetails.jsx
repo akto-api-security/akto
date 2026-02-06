@@ -655,10 +655,15 @@ Reference URL: ${window.location.href}`.trim();
         )
     }
 
+    // Only show session context tab for Agentic Security (Argus) and Endpoint Security (Atlas), not for API Security
+    const showSessionContext = isAgenticSecurityCategory() || isEndpointSecurityCategory();
+
     const tabsComponent = (
         <LayoutWithTabs
             key={`tabs-comp-${eventId || 'default'}`}
-            tabs={ window.location.href.indexOf("guardrails") > -1 ? [overviewTab, ValuesTab] : [overviewTab, timelineTab, ValuesTab, remediationTab]}
+            tabs={ window.location.href.indexOf("guardrails") > -1
+                ? (showSessionContext ? [overviewTab, ValuesTab, sessionContextTab] : [overviewTab, ValuesTab])
+                : (showSessionContext ? [overviewTab, timelineTab, ValuesTab, sessionContextTab, remediationTab] : [overviewTab, timelineTab, ValuesTab, remediationTab])}
             currTab = {() => {}}
         />
     )
