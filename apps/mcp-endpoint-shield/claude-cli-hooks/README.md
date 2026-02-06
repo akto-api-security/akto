@@ -14,7 +14,7 @@ cd ~/.claude/hooks
 Copy the following files to this directory:
 - `akto-validate-prompt.py`
 - `akto-validate-response.py`
-- `akto-machine-id.py`
+- `akto_machine_id.py`
 
 ### 2. Configure environment
 

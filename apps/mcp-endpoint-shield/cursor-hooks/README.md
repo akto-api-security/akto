@@ -22,7 +22,7 @@ Copy the following files to this directory:
 - `akto-validate-mcp-response.py` - Ingests MCP tool responses for analysis
 
 **Shared:**
-- `akto-machine-id.py` - Device ID generation utility
+- `akto_machine_id.py` - Device ID generation utility
 
 ### 2. Configure environment
 
