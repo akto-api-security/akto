@@ -195,7 +195,7 @@ public class BigQueryIngestionClient implements AutoCloseable {
                 || statusCode == 504;
     }
 
-    private void sleepBackoff(int attempt, Integer statusCode) {
+    private void sleepBackoff(int attempt, Integer statusCode) throws IOException {
         long delay = baseBackoffMs * (1L << Math.min(6, attempt - 1));
         long jitter = (long) (Math.random() * 200);
         long sleepMs = Math.min(10_000, delay + jitter);
@@ -206,6 +206,7 @@ public class BigQueryIngestionClient implements AutoCloseable {
             Thread.sleep(sleepMs);
         } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
+            throw new IOException("Ingestion interrupted", ie);
         }
     }
 

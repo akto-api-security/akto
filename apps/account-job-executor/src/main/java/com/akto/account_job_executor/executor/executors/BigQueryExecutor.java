@@ -8,7 +8,9 @@ import com.akto.dto.jobs.AccountJob;
 import com.akto.jobs.exception.RetryableJobException;
 import com.akto.log.LoggerMaker;
 
+import java.io.IOException;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class BigQueryExecutor extends AccountJobExecutor {
 
@@ -38,6 +40,8 @@ public class BigQueryExecutor extends AccountJobExecutor {
 
         BigQueryConnector connector = null;
         BigQueryIngestionClient ingestionClient = null;
+        AtomicInteger batchNumber = new AtomicInteger(0);
+        AtomicInteger ingested = new AtomicInteger(0);
 
         try {
             logger.info("Connecting to BigQuery project: {}", bqConfig.getProjectId());
@@ -57,28 +61,24 @@ public class BigQueryExecutor extends AccountJobExecutor {
             final BigQueryIngestionClient finalIngestionClient = ingestionClient;
             final int finalAccountId = accountId;
 
-            final int[] batchNumber = new int[] { 0 };
-            final int[] ingested = new int[] { 0 };
-
             connector.streamQueryResults(
                     bqConfig.getIngestionBatchSize(),
                     () -> updateJobHeartbeat(job),
                     batch -> {
-                        batchNumber[0]++;
+                        int batchNum = batchNumber.incrementAndGet();
                         int sent = finalIngestionClient.sendBatchToIngestionService(
                                 batch,
                                 SOURCE_TAG,
                                 finalAccountId,
-                                batchNumber[0],
+                                batchNum,
                                 () -> updateJobHeartbeat(job));
-                        ingested[0] += sent;
+                        ingested.addAndGet(sent);
                     });
 
-            logger.info("Successfully ingested {} records in {} batches", ingested[0], batchNumber[0]);
-
+            logger.info("Successfully ingested {} records in {} batches", ingested.get(), batchNumber.get());
         } catch (Exception e) {
-            if (isRetryable(e)) {
-                throw new RetryableJobException("Transient failure in BigQueryExecutor", e);
+            if (isTransientFailure(e)) {
+                throw new RetryableJobException(e.getMessage() != null ? e.getMessage() : "Transient failure", e);
             }
             throw e;
         } finally {
@@ -93,37 +93,27 @@ public class BigQueryExecutor extends AccountJobExecutor {
         logger.info("BigQuery job completed successfully: jobId={}", job.getId());
     }
 
-    private boolean isRetryable(Throwable t) {
-        if (t == null)
+    private static boolean isTransientFailure(Throwable e) {
+        if (e == null) {
             return false;
-        if (t instanceof java.net.SocketTimeoutException)
-            return true;
-        if (t instanceof java.net.ConnectException)
-            return true;
-        if (t instanceof java.net.UnknownHostException)
-            return true;
-
-        if (t instanceof com.google.cloud.bigquery.BigQueryException) {
-            int code = ((com.google.cloud.bigquery.BigQueryException) t).getCode();
-            return code == 408 || code == 429 || code == 500 || code == 502 || code == 503 || code == 504;
         }
-
-        String msg = t.getMessage();
-        if (msg != null) {
-            String m = msg.toLowerCase();
-            if (m.contains("timed out") || m.contains("timeout"))
-                return true;
-            if (m.contains("connection reset") || m.contains("refused"))
-                return true;
-            if (m.contains("ingestion service returned 429")
-                    || m.contains("ingestion service returned 502")
-                    || m.contains("ingestion service returned 503")
-                    || m.contains("ingestion service returned 504")) {
-                return true;
+        if (e instanceof BigQueryIngestionClient.IngestionHttpException) {
+            int status = ((BigQueryIngestionClient.IngestionHttpException) e).getStatusCode();
+            return status == 408 || status == 429 || status == 500 || status == 502 || status == 503 || status == 504;
+        }
+        if (e instanceof IOException) {
+            String msg = e.getMessage();
+            if (msg != null) {
+                String lower = msg.toLowerCase();
+                if (lower.contains("interrupted")) {
+                    return false;
+                }
+                if (lower.contains("timed out") || lower.contains("timeout") || lower.contains("connection reset")) {
+                    return true;
+                }
             }
         }
-
-        return isRetryable(t.getCause());
+        return false;
     }
 
 }

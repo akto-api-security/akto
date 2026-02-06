@@ -88,6 +88,8 @@ public class BigQueryConfig {
         config.connectTimeoutMs = getInt(jobConfig, "connectTimeoutMs", DEFAULT_CONNECT_TIMEOUT_MS);
         config.socketTimeoutMs = getInt(jobConfig, "socketTimeoutMs", DEFAULT_SOCKET_TIMEOUT_MS);
 
+        validateNumericConfig(config);
+
         // Validate ingestion service URL early to fail fast
         if (config.ingestionServiceUrl == null || config.ingestionServiceUrl.isEmpty()) {
             throw new IllegalArgumentException(
@@ -155,6 +157,41 @@ public class BigQueryConfig {
         if (value == null || value.isEmpty() || !BQ_DATASET_TABLE_PATTERN.matcher(value).matches()) {
             throw new IllegalArgumentException("Invalid BigQuery identifier for " + key
                     + ": only alphanumeric and underscores allowed (no hyphens)");
+        }
+    }
+
+    private static final int MAX_INGESTION_BATCH_SIZE = 10_000;
+    private static final int MAX_QUERY_PAGE_SIZE = 10_000;
+    private static final int MAX_QUERY_TIMEOUT_SECONDS = 3600;
+    private static final int MAX_TIMEOUT_MS = 300_000;
+
+    private static void validateNumericConfig(BigQueryConfig config) {
+        if (config.ingestionBatchSize < 1 || config.ingestionBatchSize > MAX_INGESTION_BATCH_SIZE) {
+            throw new IllegalArgumentException("ingestionBatchSize must be between 1 and " + MAX_INGESTION_BATCH_SIZE
+                    + ", got: " + config.ingestionBatchSize);
+        }
+        if (config.queryPageSize < 1 || config.queryPageSize > MAX_QUERY_PAGE_SIZE) {
+            throw new IllegalArgumentException("queryPageSize must be between 1 and " + MAX_QUERY_PAGE_SIZE
+                    + ", got: " + config.queryPageSize);
+        }
+        if (config.queryTimeoutSeconds < 1 || config.queryTimeoutSeconds > MAX_QUERY_TIMEOUT_SECONDS) {
+            throw new IllegalArgumentException("queryTimeoutSeconds must be between 1 and " + MAX_QUERY_TIMEOUT_SECONDS
+                    + ", got: " + config.queryTimeoutSeconds);
+        }
+        if (config.connectTimeoutMs < 1 || config.connectTimeoutMs > MAX_TIMEOUT_MS) {
+            throw new IllegalArgumentException("connectTimeoutMs must be between 1 and " + MAX_TIMEOUT_MS
+                    + ", got: " + config.connectTimeoutMs);
+        }
+        if (config.socketTimeoutMs < 1 || config.socketTimeoutMs > MAX_TIMEOUT_MS) {
+            throw new IllegalArgumentException("socketTimeoutMs must be between 1 and " + MAX_TIMEOUT_MS
+                    + ", got: " + config.socketTimeoutMs);
+        }
+        if (config.maxRows != null && config.maxRows < 1) {
+            throw new IllegalArgumentException("maxRows must be positive when set, got: " + config.maxRows);
+        }
+        if (config.maximumBytesBilled != null && config.maximumBytesBilled < 1) {
+            throw new IllegalArgumentException("maximumBytesBilled must be positive when set, got: "
+                    + config.maximumBytesBilled);
         }
     }
 
