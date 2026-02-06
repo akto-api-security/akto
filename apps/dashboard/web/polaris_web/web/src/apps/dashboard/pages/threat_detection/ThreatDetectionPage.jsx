@@ -472,6 +472,42 @@ function ThreatDetectionPage() {
         const rowContext = pendingRowContext && pendingRowContext.refId === queryParams.refId ? pendingRowContext : null;
         
         try {
+          // If we don't have rowContext (e.g., on page refresh), fetch the event metadata first
+          let eventMetadata = rowContext;
+          if (!rowContext) {
+            // Fetch event list with actor filter to get the full event object including apiCollectionId
+            const eventListResponse = await api.fetchSuspectSampleData(
+              0, // skip
+              [queryParams.actor], // ips filter
+              [], // apiCollectionIds
+              [], // urls
+              [], // types
+              {}, // sort
+              0, // startTimestamp (use 0 to get all)
+              Math.floor(Date.now() / 1000), // endTimestamp (current time)
+              [queryParams.filterId], // latestAttack filter
+              10, // limit
+              queryParams.status || 'ACTIVE', // statusFilter
+              undefined, // successfulExploit
+              LABELS.THREAT, // label
+              [], // hosts
+              undefined // latestApiOrigRegex
+            );
+            
+            // Find the event matching the refId
+            const matchingEvent = eventListResponse?.maliciousEvents?.find(e => e.refId === queryParams.refId);
+            if (matchingEvent) {
+              eventMetadata = {
+                url: matchingEvent.url,
+                method: matchingEvent.method,
+                apiCollectionId: matchingEvent.apiCollectionId,
+                eventId: matchingEvent.id,
+                status: matchingEvent.status,
+                jiraTicketUrl: matchingEvent.jiraTicketUrl
+              };
+            }
+          }
+          
           const payloadResponse = await threatDetectionRequests.fetchMaliciousRequest(
             queryParams.refId,
             queryParams.eventType,
@@ -488,16 +524,16 @@ function ThreatDetectionPage() {
             currentRefId: queryParams.refId,
             rowDataList: maliciousPayloads,
             moreInfoData: {
-              url: rowContext?.url || '',
-              method: rowContext?.method || '',
-              apiCollectionId: rowContext?.apiCollectionId,
+              url: eventMetadata?.url || '',
+              method: eventMetadata?.method || '',
+              apiCollectionId: eventMetadata?.apiCollectionId,
               templateId: queryParams.filterId,
               severity: rowContext?.severity || '',
               sessionContext: rowContext?.sessionContext || ''
             },
-            currentEventId: rowContext?.eventId || '',
-            currentEventStatus: queryParams.status || rowContext?.status || '',
-            currentJiraTicketUrl: rowContext?.jiraTicketUrl || ''
+            currentEventId: eventMetadata?.eventId || '',
+            currentEventStatus: queryParams.status || eventMetadata?.status || '',
+            currentJiraTicketUrl: eventMetadata?.jiraTicketUrl || ''
           });
         } catch (error) {
           console.error('Error fetching event:', error);
