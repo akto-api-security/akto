@@ -2,6 +2,7 @@ package com.akto.threat.detection.tasks;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -32,6 +33,7 @@ import com.akto.RawApiMetadataFactory;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.data_actor.DataActor;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.api_protection_parse_layer.AggregationRules;
 import com.akto.dto.api_protection_parse_layer.Rule;
@@ -198,8 +200,10 @@ public class MaliciousTrafficDetectorTask implements Task {
               AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
               if (config == null) {
                 Context.isRedactPayload.set(false);
+                Context.accountId.set(1000000);
               } else {
                 Context.isRedactPayload.set(config.isRedacted());
+                Context.accountId.set(config.getAccountId());
               }
 
               for (ConsumerRecord<String, byte[]> record : records) {
@@ -435,7 +439,6 @@ public class MaliciousTrafficDetectorTask implements Task {
 
   private void processRecord(HttpResponseParam record) throws Exception {
     HttpResponseParams responseParam = buildHttpResponseParam(record);
-    Context.accountId.set(Integer.parseInt(responseParam.getAccountId()));
     String actor = this.threatConfigEvaluator.getActorId(responseParam);
     if (actor == null || actor.isEmpty()) {
       logger.warnAndAddToDb("Dropping processing of record with no actor IP, account: " + responseParam.getAccountId());
@@ -541,19 +544,18 @@ public class MaliciousTrafficDetectorTask implements Task {
 
       // Evaluate filter first (ignore and filter are independent conditions)
       // SchemaConform check is disabled
-      if(Context.accountId.get() == 1758179941 && apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
+      List<Integer> accountIds = Arrays.asList(1758179941, 1763355072);
+      if(accountIds.contains(Context.accountId.get()) && apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
         logger.debug("SchemaConform filter found for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
-        vulnerable = handleSchemaConformFilter(responseParam, apiInfoKey, vulnerable); 
+        // vulnerable = handleSchemaConformFilter(responseParam, apiInfoKey, vulnerable); 
         
-        // String apiSchema = getApiSchema(apiCollectionId);
+        String apiSchema = getApiSchema(apiCollectionId);
 
-        // if (apiSchema == null || apiSchema.isEmpty()) {
+        if (apiSchema == null || apiSchema.isEmpty()) {
+          continue;
+        }
 
-        //   continue;
-
-        // }
-
-        // vulnerable = RequestValidator.validate(responseParam, apiSchema, apiInfoKey.toString());
+        vulnerable = RequestValidator.validate(responseParam, apiSchema, apiInfoKey.toString());
         hasPassedFilter = vulnerable != null && !vulnerable.isEmpty();
 
       }else {
@@ -679,6 +681,8 @@ public class MaliciousTrafficDetectorTask implements Task {
       host = requestHeaders.get("host").get(0);
     }
     
+    String contextSourceValue = CONTEXT_SOURCE.API.name();
+    
     MaliciousEventMessage maliciousEvent =
         MaliciousEventMessage.newBuilder()
             .setFilterId(apiFilter.getId())
@@ -699,6 +703,7 @@ public class MaliciousTrafficDetectorTask implements Task {
             .setSuccessfulExploit(maliciousReq.getSuccessfulExploit())
             .setStatus(maliciousReq.getStatus())
             .setHost(host != null ? host : "")
+            .setContextSource(contextSourceValue)
             .build();
     MaliciousEventKafkaEnvelope envelope =
         MaliciousEventKafkaEnvelope.newBuilder()

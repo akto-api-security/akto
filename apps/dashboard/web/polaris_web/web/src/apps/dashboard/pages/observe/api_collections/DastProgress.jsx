@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { Box, IndexFiltersMode, Text } from "@shopify/polaris"
 import { CircleCancelMajor, ReplayMinor } from "@shopify/polaris-icons"
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable"
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow"
 import api from "./api"
-import quickStartApi from "../../quick_start/api"
 import func from "@/util/func"
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered"
 import TooltipText from "@/apps/dashboard/components/shared/TooltipText"
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
+import QuickStartStore from "../../quick_start/quickStartStore"
 
 const headers = [
     {
@@ -98,7 +99,7 @@ const resourceName = {
     plural: 'DAST scans',
 }
 
-function getActions(item, fetchAllDastScans) {
+function getActions(item, fetchAllDastScans, navigate, setDuplicateScanData) {
     const isStopDisabled = item.status === "STOPPED" || item.status === "STOP_REQUESTED"
     const run = item.runData
     const canDuplicate = run && !(run.cookies && !run.testRoleHexId)
@@ -110,30 +111,38 @@ function getActions(item, fetchAllDastScans) {
                     content: "Duplicate scan",
                     icon: ReplayMinor,
                     disabled: !canDuplicate,
-                    onAction: async () => {
+                    onAction: () => {
                         if (!run) return
-                        try {
-                            await quickStartApi.initiateCrawler(
-                                run.hostname,
-                                run.username ?? '',
-                                run.password ?? '',
-                                run.apiKey ?? '',
-                                run.dashboardUrl ?? window.location.origin,
-                                run.testRoleHexId ?? '',
-                                run.outScopeUrls ?? '',
-                                run.crawlingTime ?? 600,
-                                (run.moduleName && run.moduleName !== "Internal DAST (Akto)") ? run.moduleName : '',
-                                run.customHeaders ?? {},
-                                run.runTestAfterCrawling ?? false,
-                                run.selectedMiniTestingService ?? '',
-                                run.urlTemplatePatterns ?? '',
-                                run.applicationPages ?? ''
-                            )
-                            func.setToast(true, false, "Duplicate scan started")
-                            fetchAllDastScans()
-                        } catch {
-                            func.setToast(true, true, "Failed to duplicate scan")
+
+                        // Determine auth type
+                        let authType = "none"
+                        if (run.username && run.password) {
+                            authType = "emailpass"
+                        } else if (run.testRoleHexId) {
+                            authType = "test-role"
                         }
+
+                        // Store all scan data
+                        setDuplicateScanData({
+                            hostname: run.hostname,
+                            authType: authType,
+                            email: run.username ?? '',
+                            password: run.password ?? '',
+                            testRoleHexId: run.testRoleHexId ?? '',
+                            outscopeUrls: run.outScopeUrls ?? '',
+                            crawlingTime: run.crawlingTime ?? 600,
+                            selectedModule: (run.moduleName && run.moduleName !== "Internal DAST (Akto)") ? run.moduleName : '',
+                            customHeaders: run.customHeaders ?? {},
+                            runTestAfterCrawling: run.runTestAfterCrawling ?? false,
+                            selectedMiniTestingService: run.selectedMiniTestingService ?? '',
+                            urlTemplatePatterns: run.urlTemplatePatterns ?? '',
+                            applicationPages: run.applicationPages ?? '',
+                            apiKey: run.apiKey ?? '',
+                            collectionName: run.collectionName ?? ''
+                        })
+
+                        // Navigate to QuickStart with DAST connector
+                        navigate('/dashboard/quick-start?connector=aktodast')
                     }
                 },
                 {
@@ -157,6 +166,8 @@ function getActions(item, fetchAllDastScans) {
 }
 
 function DastProgress() {
+    const navigate = useNavigate()
+    const setDuplicateScanData = QuickStartStore(state => state.setDuplicateScanData)
     const [loading, setLoading] = useState(false)
     const [data, setData] = useState([])
 
@@ -266,7 +277,7 @@ function DastProgress() {
                     useNewRow={true}
                     condensedHeight={true}
                     disambiguateLabel={(_, value) => func.convertToDisambiguateLabelObj(value, null, 2)}
-                    getActions={(item) => getActions(item, fetchAllDastScans)}
+                    getActions={(item) => getActions(item, fetchAllDastScans, navigate, setDuplicateScanData)}
                     hasRowActions={true}
                     lastColumnSticky={true}
                     preventRowClickOnActions={true}

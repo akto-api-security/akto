@@ -163,6 +163,7 @@ public class N8nTraceParser implements TraceParser {
                 .rootOutput(rootOutput)
                 .spanIds(spanIds)
                 .metadata(buildTraceMetadata(root))
+                .apiCollectionId(ServiceGraphBuilder.getInstance().getApiCollectionIdFromWorkflowId(workflowId))
                 .build();
 
             return TraceParseResult.builder()

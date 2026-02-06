@@ -277,6 +277,15 @@ export default {
             }
         })
     },
+    fetchOpenApiSchema(apiCollectionId) {
+        return request({
+            url: '/api/fetchOpenApiSchema',
+            method: 'post',
+            data: {
+                apiCollectionId
+            }
+        })
+    },
     exportToPostman(apiCollectionId) {
         return request({
             url: '/api/createPostmanApi',
@@ -747,6 +756,26 @@ export default {
             method: 'post',
             data: {
                 apiCollectionId, url, method
+            }
+        })
+    },
+
+    fetchLatestTraces(apiCollectionId) {
+        return request({
+            url: '/api/fetchLatestTraces',
+            method: 'post',
+            data: {
+                apiCollectionId
+            }
+        })
+    },
+
+    fetchSpansForTrace(traceId) {
+        return request({
+            url: '/api/fetchSpansForTrace',
+            method: 'post',
+            data: {
+                traceId
             }
         })
     },

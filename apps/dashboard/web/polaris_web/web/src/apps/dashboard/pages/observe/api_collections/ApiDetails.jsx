@@ -1,5 +1,5 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Box, Button, Popover, Modal, Tooltip, ActionList, VerticalStack, HorizontalStack, Tag, Text } from "@shopify/polaris"
+import { Box, Button, Popover, Tooltip, ActionList, VerticalStack, HorizontalStack, Tag, Text } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import ApiGroups from "../../../components/shared/ApiGroups";
@@ -8,14 +8,12 @@ import SampleData from "../../../components/shared/SampleData";
 import { useEffect, useState, useRef } from "react";
 import api from "../api";
 import ApiSchema from "./ApiSchema";
-import dashboardFunc from "../../transform";
-// import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout";
 import func from "@/util/func" 
 import transform from "../transform";
 import ApiDependency from "./ApiDependency";
+import ApiTraces from "./ApiTraces";
 import RunTest from "./RunTest";
 import PersistStore from "../../../../main/PersistStore";
-// import gptApi from "../../../components/aktoGpt/api";
 import GraphMetric from '../../../components/GraphMetric'
 import { HorizontalDotsMinor, FileMinor } from "@shopify/polaris-icons"
 import LocalStore from "../../../../main/LocalStorageStore";
@@ -402,16 +400,6 @@ function ApiDetails(props) {
             });
     };
 
-    const runTests = async (testsList) => {
-        setIsGptScreenActive(false)
-        const apiKeyInfo = {
-            apiCollectionId: apiDetail.apiCollectionId,
-            url: selectedUrl.url,
-            method: selectedUrl.method
-        }
-        await api.scheduleTestForCustomEndpoints(apiKeyInfo, func.timNow(), false, testsList, "akto_gpt_test", -1, -1)
-        func.setToast(true, false, "Triggered tests successfully!")
-    }
 
     useEffect(() => {
         if (
@@ -631,6 +619,16 @@ function ApiDetails(props) {
         </Box>,
     }
 
+    const TracesTab = {
+        id: 'traces',
+        content: "Traces",
+        component: <Box paddingBlockStart={"2"}>
+            <ApiTraces
+                apiCollectionId={apiDetail['apiCollectionId']}
+            />
+        </Box>,
+    }
+
     const hasIssues = apiDetail?.severityObj && Object.values(apiDetail.severityObj).some(count => count > 0);
 
     const IssuesTab = {
@@ -843,7 +841,8 @@ function ApiDetails(props) {
                     ...(hasIssues ? [IssuesTab] : []),
                     ...(apiDetail?.isThreatEnabled ? [ThreatIssuesTab] : []),
                     ApiCallStatsTab,
-                    DependencyTab
+                    DependencyTab,
+                    TracesTab
                 ]}
                 currTab={(tab) => setSelectedTabId(tab.id)}
                 disabledTabs={disabledTabs}
