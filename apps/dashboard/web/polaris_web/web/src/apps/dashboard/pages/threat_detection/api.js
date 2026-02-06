@@ -145,6 +145,13 @@ const threatDetectionRequests = {
             data: {startTs, endTs, latestAttack: latestAttack || []}
         })
     },
+    getThreatActors(startTs, endTs) {
+        return request({
+            url: '/api/getThreatActors',
+            method: 'post',
+            data: {startTs, endTs}
+        })
+    },
     fetchSensitiveParamsForEndpoints (urls) {
         return request({
             url: '/api/fetchSensitiveParamsForEndpoints',
