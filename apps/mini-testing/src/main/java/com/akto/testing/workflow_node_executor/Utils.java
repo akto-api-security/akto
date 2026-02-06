@@ -45,7 +45,7 @@ public class Utils {
 
     public static WorkflowTestResult.NodeResult processOtpNode(Node node, Map<String, Object> valuesMap) {
 
-        loggerMaker.warn("processOtpNode started");
+        loggerMaker.warnAndAddToDb("PROCESS_OTP_NODE_STARTED");
 
         List<String> testErrors = new ArrayList<>();
         BasicDBObject resp = new BasicDBObject();
@@ -55,16 +55,17 @@ public class Utils {
 
         OtpTestData otpTestData = fetchOtpTestData(node, 4);
         WorkflowNodeDetails workflowNodeDetails = node.getWorkflowNodeDetails();
-        loggerMaker.warnAndAddToDb("workflowNodeDetails: " + workflowNodeDetails.toString());
+        loggerMaker.warnAndAddToDb("OTP REQUEST [Node " + node.getId() + "]: " + workflowNodeDetails.toString());
         String uuid = workflowNodeDetails.getOtpRefUuid();
 
         if (otpTestData == null) {
-            loggerMaker.warnAndAddToDb("no otp data received for uuid" + uuid);
+            loggerMaker.warnAndAddToDb("NO OTP DATA RECEIVED FOR UUID: " + uuid);
             message = "otp data not received for uuid " + uuid;
             data.put("error", message);
             body.put("body", data);
             resp.put("response", body);
             testErrors.add(message);
+            loggerMaker.warnAndAddToDb("VALUES_MAP_AFTER_OTP_NODE_ERROR: " + valuesMap.toString());
             return new WorkflowTestResult.NodeResult(resp.toString(), false, testErrors);
         }
         try {
@@ -76,9 +77,10 @@ public class Utils {
                 data.put("otp", otp);
                 data.put("otpText", otpTestData.getOtpText());
             }
-            body.put("body", data);
+            body.put("body", data); 
             resp.put("response", body);
             valuesMap.put(node.getId() + ".response.body.otp", otp);
+            loggerMaker.warnAndAddToDb("VALUES_MAP_AFTER_OTP_EXTRACTION: " + valuesMap.toString());
             loggerMaker.warnAndAddToDb("OTP_NODE_RESPONSE [Node " + node.getId() + "]: " + resp.toString());
         } catch(Exception e) {
             message ="Error extracting otp data for uuid " + uuid + " error " + e.getMessage();
@@ -87,10 +89,12 @@ public class Utils {
             body.put("body", data);
             resp.put("response", body);
             testErrors.add(message);
+            loggerMaker.warnAndAddToDb("VALUES_MAP_AFTER_OTP_NODE_EXCEPTION: " + valuesMap.toString());
             loggerMaker.warnAndAddToDb("OTP_NODE_RESPONSE [Node " + node.getId() + "]: " + resp.toString());
             return new WorkflowTestResult.NodeResult(resp.toString(), false, testErrors);
         }
         loggerMaker.warnAndAddToDb("OTP_NODE_RESPONSE [Node " + node.getId() + "]: " + resp.toString());
+        loggerMaker.warnAndAddToDb("VALUES_MAP_AFTER_OTP_NODE: " + valuesMap.toString());
         return new WorkflowTestResult.NodeResult(resp.toString(), false, testErrors);
     }
 
@@ -250,6 +254,7 @@ public class Utils {
     }
 
     public static LoginFlowResponse runLoginFlow(WorkflowTest workflowTest, AuthMechanism authMechanism, LoginFlowParams loginFlowParams) throws Exception {
+        loggerMaker.warnAndAddToDb("RUN_LOGIN_FLOW_STARTED");
         Graph graph = new Graph();
         graph.buildGraph(workflowTest);
 
@@ -262,9 +267,11 @@ public class Utils {
         }
         
         Map<String, Object> valuesMap = constructValueMap(loginFlowParams);
+        loggerMaker.warnAndAddToDb("VALUES_MAP_CONSTRUCTED: " + valuesMap.toString());
 
         int index = 0;
         for (Node node: nodes) {
+            loggerMaker.warnAndAddToDb("PROCESSING_NODE: " + node.getId());
             boolean allowAllStatusCodes = false;
             WorkflowTestResult.NodeResult nodeResult;
             try {
@@ -273,7 +280,7 @@ public class Utils {
                 }
                 nodeResult = processNode(node, valuesMap, allowAllStatusCodes, false, new ArrayList<>(), null, authMechanism);
             } catch (Exception e) {
-                ;
+                loggerMaker.warnAndAddToDb("ERROR_PROCESSING_NODE: " + node.getId() + " " + e.getMessage());
                 List<String> testErrors = new ArrayList<>();
                 testErrors.add("Error Processing Node In Login Flow " + e.getMessage());
                 nodeResult = new WorkflowTestResult.NodeResult("{}", false, testErrors);
@@ -287,6 +294,7 @@ public class Utils {
             responses.add(respString.toString());
             
             if (nodeResult.getErrors().size() > 0) {
+                loggerMaker.warnAndAddToDb("FAILED_TO_PROCESS_NODE: " + node.getId());
                 return new LoginFlowResponse(responses, "Failed to process node " + node.getId(), false);
             } else {
                 if (loginFlowParams != null && loginFlowParams.getFetchValueMap()) {
@@ -347,11 +355,13 @@ public class Utils {
     public static Map<String, Object> constructValueMap(LoginFlowParams loginFlowParams) {
         Map<String, Object> valuesMap = new HashMap<>();
         if (loginFlowParams == null || !loginFlowParams.getFetchValueMap()) {
+            loggerMaker.warnAndAddToDb("NO LOGIN FLOW PARAMS OR NO FETCH VALUE MAP");
             return valuesMap;
         }
         LoginFlowStepsData loginFlowStepData = dataActor.fetchLoginFlowStepsData(loginFlowParams.getUserId());
 
         if (loginFlowStepData == null || loginFlowStepData.getValuesMap() == null) {
+            loggerMaker.warnAndAddToDb("NO LOGIN FLOW STEPS DATA OR NO VALUES MAP");
             return valuesMap;
         }
 
