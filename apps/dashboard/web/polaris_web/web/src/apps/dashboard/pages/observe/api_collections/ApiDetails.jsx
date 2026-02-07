@@ -25,7 +25,7 @@ import ForbiddenRole from "../../../components/shared/ForbiddenRole";
 
 import Highcharts from 'highcharts';
 import HighchartsMore from 'highcharts/highcharts-more';
-import { getDashboardCategory, mapLabel, isEndpointSecurityCategory } from "../../../../main/labelHelper";
+import { getDashboardCategory, mapLabel, isEndpointSecurityCategory, isAgenticSecurityCategory } from "../../../../main/labelHelper";
 
 HighchartsMore(Highcharts);
 
@@ -619,6 +619,9 @@ function ApiDetails(props) {
         </Box>,
     }
 
+    // Only show traces for Agentic Security (Argus) and Endpoint Security (Atlas), not for API Security
+    const showTraces = isAgenticSecurityCategory() || isEndpointSecurityCategory();
+
     const TracesTab = {
         id: 'traces',
         content: "Traces",
@@ -842,7 +845,7 @@ function ApiDetails(props) {
                     ...(apiDetail?.isThreatEnabled ? [ThreatIssuesTab] : []),
                     ApiCallStatsTab,
                     DependencyTab,
-                    TracesTab
+                    ...(showTraces ? [TracesTab] : [])
                 ]}
                 currTab={(tab) => setSelectedTabId(tab.id)}
                 disabledTabs={disabledTabs}
