@@ -512,11 +512,7 @@ public class APICatalogSync {
                 }
             }
 
-            if (countSimilarURLs >= APICatalogSync.STRING_MERGING_THRESHOLD) {
-                if(skipMergingOnKnownStaticURLsForVersionedApis){
-                    continue;
-                }
-
+            if (countSimilarURLs >= APICatalogSync.STRING_MERGING_THRESHOLD && !skipMergingOnKnownStaticURLsForVersionedApis) {
                 URLTemplate mergedTemplate = potentialMerges.keySet().iterator().next();
                 Set<String> matchedStaticURLs = templateToStaticURLs.get(mergedTemplate);
 
@@ -1152,6 +1148,9 @@ public class APICatalogSync {
     }
 
     private void processKnownStaticURLs(URLAggregator aggregator, APICatalog deltaCatalog, APICatalog dbCatalog, boolean makeApisCaseInsensitive) {
+        if(this.skipMergingOnKnownStaticURLsForVersionedApis){
+            return;
+        }
         Iterator<Map.Entry<URLStatic, Set<HttpResponseParams>>> iterator = aggregator.urls.entrySet().iterator();
         List<SingleTypeInfo> deletedInfo = deltaCatalog.getDeletedInfo();
 
@@ -1165,9 +1164,6 @@ public class APICatalogSync {
                 Set<HttpResponseParams> responseParamsList = entry.getValue();
 
                 String endpoint = url.getUrl();
-                if(this.skipMergingOnKnownStaticURLsForVersionedApis){
-                    continue;
-                }
 
                 if(makeApisCaseInsensitive){
                     if(lowerCaseApisSet.contains(endpoint.toLowerCase())){
